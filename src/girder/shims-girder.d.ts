@@ -2,6 +2,8 @@ declare module "@girder/components/src/components" {
   import Vue from "vue";
 
   export class Authentication extends Vue {}
+
+  export class Upload extends Vue {}
 }
 
 declare module "@girder/components/src/utils" {
@@ -10,6 +12,7 @@ declare module "@girder/components/src/utils" {
 
 declare module "@girder/components/src" {
   import { PluginObject } from "vue";
+  import { AxiosInstance } from "axios";
 
   const Girder: PluginObject<any>;
 
@@ -19,10 +22,34 @@ declare module "@girder/components/src" {
     login: string;
   }
 
-  export class RestClient {
-    constructor(options: { apiRoot: string });
-
-    user: IGirderUser | null;
+  interface IRestClientOptions {
+    apiRoot: string;
     token: string;
+    useGirderAuthorizationHeader: boolean;
+    setLocalCookie: true;
   }
+  export interface RestClient
+    extends AxiosInstance,
+      Readonly<IRestClientOptions> {
+    readonly user: Readonly<IGirderUser> | null;
+
+    login(username: string, password: string, otp: string): Promise<any>;
+    logout(): void | Promise<void>;
+    register(
+      login: string,
+      email: string,
+      firstName: string,
+      lastName: string,
+      password: string,
+      admin?: boolean
+    ): Promise<any>;
+
+    fetchUser(): Promise<Readonly<IGirderUser>>;
+  }
+
+  export interface RestClientConstructor {
+    new (options: Partial<IRestClientOptions>): RestClient;
+  }
+
+  export const RestClient: RestClientConstructor;
 }

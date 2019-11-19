@@ -1,11 +1,13 @@
 <template>
-  <authentication
-    :force-otp="false"
-    :register="true"
-    :oauth="true"
-    :key="girderRest.token"
-    :forgot-password-url="forgotPasswordUrl"
-  />
+  <v-dialog :value="true" max-width="20vw">
+    <authentication
+      :force-otp="false"
+      :register="true"
+      :oauth="true"
+      :key="girderRest.token"
+      :forgot-password-url="forgotPasswordUrl"
+    />
+  </v-dialog>
 </template>
 
 <script lang="ts">

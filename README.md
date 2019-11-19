@@ -8,11 +8,21 @@
 npm install
 ```
 
-### Compiles and hot-reloads for development
+## Development environment
 
-```
+```sh
+git clone https://github.com/Kitware/UPennContrast.git
+cd UPennContrast
+npm install
+docker-compose up -d
 npm run serve
 ```
+
+### Setup Girder
+
+1.  go to http://localhost:8080
+1.  create a new account
+1.  go to the Admin console and create a File System Asset Store at `/store`
 
 ### Compiles and minifies for production
 
