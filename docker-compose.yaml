@@ -11,3 +11,8 @@ services:
       - "8080:8080"
     links:
       - mongodb
+    volumes:
+      - "store:/store"
+
+volumes:
+  store: null
