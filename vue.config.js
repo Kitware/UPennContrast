@@ -1,4 +1,3 @@
 module.exports = {
-  /* ... other settings */
-  transpileDependencies: ["vuex-module-decorators"]
+  transpileDependencies: ["vuex-module-decorators", "vuetify"]
 };
