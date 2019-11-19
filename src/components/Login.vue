@@ -10,8 +10,7 @@
 
 <script lang="ts">
 import { Vue, Component, Inject } from "vue-property-decorator";
-import { Authentication } from "@girder/components/src/components";
-import { IGirderRestClient } from "../girder";
+import { Authentication, RestClient } from "@/girder";
 
 @Component({
   components: {
@@ -20,7 +19,7 @@ import { IGirderRestClient } from "../girder";
 })
 export default class Login extends Vue {
   @Inject("girderRest")
-  private girderRest!: IGirderRestClient;
+  private girderRest!: RestClient;
 
   readonly forgotPasswordUrl = "/#?dialog=resetpassword";
 

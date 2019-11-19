@@ -1,8 +1,3 @@
-export interface IGirderUser {
-  login: string;
-}
-
-export interface IGirderRestClient {
-  user: IGirderUser | null;
-  token: string;
-}
+export { Authentication } from "@girder/components/src/components";
+export { vuetifyConfig } from "@girder/components/src/utils";
+export { default, RestClient } from "@girder/components/src";
