@@ -20,9 +20,10 @@ npm run serve
 
 ### Setup Girder
 
-1.  go to http://localhost:8080
-1.  create a new account
-1.  go to the Admin console and create a File System Asset Store at `/store`
+1. go to http://localhost:8080
+1. create a new account
+1. go to the Admin console and create a File System Asset Store at `/store`
+1. go to the Admin console -> settings -> advanced -> `CORS Allowed Origins` -> `*`
 
 ### Compiles and minifies for production
 

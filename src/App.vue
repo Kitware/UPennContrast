@@ -4,11 +4,11 @@
       <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
       <v-toolbar-title>UPenn Contrast</v-toolbar-title>
       <v-spacer />
+      <UserMenu />
     </v-app-bar>
 
     <v-navigation-drawer v-model="drawer" app>
       <Menu />
-      <Login />
     </v-navigation-drawer>
 
     <v-content>
@@ -26,14 +26,14 @@
 <script lang="ts">
 import Vue from "vue";
 import Menu from "./components/Menu.vue";
-import Login from "./components/Login.vue";
+import UserMenu from "./components/UserMenu.vue";
 
 export default Vue.extend({
   name: "App",
 
   components: {
     Menu,
-    Login
+    UserMenu
   },
 
   data: () => ({
