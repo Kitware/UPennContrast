@@ -8,6 +8,7 @@
 
     <v-navigation-drawer v-model="drawer" app>
       <Menu />
+      <Login />
     </v-navigation-drawer>
 
     <v-content>
@@ -25,12 +26,14 @@
 <script lang="ts">
 import Vue from "vue";
 import Menu from "./components/Menu.vue";
+import Login from "./components/Login.vue";
 
 export default Vue.extend({
   name: "App",
 
   components: {
-    Menu
+    Menu,
+    Login
   },
 
   data: () => ({

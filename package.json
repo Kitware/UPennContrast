@@ -10,6 +10,7 @@
     "test": "npm run lint && npm run build"
   },
   "dependencies": {
+    "@girder/components": "^2.0.2",
     "@mdi/font": "^3.6.95",
     "@mdi/js": "^4.5.95",
     "reflect-metadata": "^0.1.13",
@@ -38,6 +39,8 @@
     "eslint-plugin-vue": "^5.0.0",
     "node-sass": "^4.12.0",
     "prettier": "^1.18.2",
+    "pug": "^2.0.4",
+    "pug-plain-loader": "^1.0.0",
     "sass": "^1.19.0",
     "sass-loader": "^8.0.0",
     "typescript": "~3.5.3",

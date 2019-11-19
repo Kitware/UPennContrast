@@ -7,10 +7,14 @@ import { store } from "./store";
 import vuetify from "./plugins/vuetify";
 import "roboto-fontface/css/roboto/roboto-fontface.css";
 import "@mdi/font/css/materialdesignicons.css";
+import { girderRest } from "./plugins/girder";
 
 Vue.config.productionTip = false;
 
 new Vue({
+  provide: {
+    girderRest
+  },
   router,
   store,
   vuetify,
