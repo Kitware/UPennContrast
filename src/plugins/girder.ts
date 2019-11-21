@@ -4,12 +4,3 @@ import Girder, { RestClient } from "@/girder";
 
 // Install the Vue plugin that lets us use the components
 Vue.use(Girder);
-
-// This connects to another server if the VUE_APP_API_ROOT
-// environment variable is set at build-time
-const apiRoot = process.env.VUE_APP_API_ROOT || "http://localhost:8080/api/v1";
-
-// Create the axios-based client to be used for all API requests
-export const girderRest = new RestClient({
-  apiRoot
-});

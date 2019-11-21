@@ -33,7 +33,7 @@ declare module "@girder/components/src" {
       Readonly<IRestClientOptions> {
     readonly user: Readonly<IGirderUser> | null;
 
-    login(username: string, password: string, otp: string): Promise<any>;
+    login(username: string, password: string, otp?: string): Promise<any>;
     logout(): void | Promise<void>;
     register(
       login: string,

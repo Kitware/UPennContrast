@@ -3,18 +3,17 @@ import "reflect-metadata";
 import App from "./App.vue";
 import "./registerServiceWorker";
 import router from "./router";
-import { store } from "./store";
+import main, { store } from "./store";
 import vuetify from "./plugins/vuetify";
 import "roboto-fontface/css/roboto/roboto-fontface.css";
 import "@mdi/font/css/materialdesignicons.css";
-import { girderRest } from "./plugins/girder";
 
 Vue.config.productionTip = false;
 
 new Vue({
-  provide: {
-    girderRest
-  },
+  provide: () => ({
+    girderRest: main.girderRest
+  }),
   router,
   store,
   vuetify,

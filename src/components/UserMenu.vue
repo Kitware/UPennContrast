@@ -1,18 +1,42 @@
 <template>
   <v-menu v-model="userMenu" close-on-click>
     <template #activator="{ on }">
-      <v-btn icon v-on="on">
-        <v-icon>mdi-account-circle</v-icon>
+      <v-btn v-on="on">
+        {{ store.userName }}
       </v-btn>
     </template>
-    <v-dialog :value="true" max-width="20vw" v-if="!isLoggedIn">
-      <authentication
-        :force-otp="false"
-        :register="true"
-        :oauth="true"
-        :key="girderRest.token"
-        :forgot-password-url="forgotPasswordUrl"
-      />
+    <v-dialog :value="true" max-width="20vw" v-if="!store.isLoggedIn">
+      <v-alert :value="Boolean(error)" color="error">
+        {{ error }}
+      </v-alert>
+      <v-container class="loginDialog">
+        <v-form @submit.prevent="login">
+          <v-text-field
+            v-model="domain"
+            label="Girder Domain"
+            required
+            prepend-icon="$vuetify.icons.user"
+          />
+          <v-text-field
+            v-model="username"
+            label="Username or e-mail"
+            autofocus
+            required
+            prepend-icon="$vuetify.icons.user"
+          />
+          <v-text-field
+            v-model="password"
+            type="password"
+            label="Password"
+            prepend-icon="$vuetify.icons.lock"
+          />
+          <v-card-actions>
+            <v-btn type="submit" color="primary">
+              Login
+            </v-btn>
+          </v-card-actions>
+        </v-form>
+      </v-container>
     </v-dialog>
     <v-list v-else>
       <v-divider />
@@ -25,36 +49,47 @@
 
 <script lang="ts">
 import { Vue, Component, Inject } from "vue-property-decorator";
-import { Authentication, RestClient } from "@/girder";
+import store from "@/store";
 
-@Component({
-  components: {
-    Authentication
-  }
-})
+@Component
 export default class UserMenu extends Vue {
-  @Inject("girderRest")
-  private girderRest!: RestClient;
-
-  readonly forgotPasswordUrl = "/#?dialog=resetpassword";
-
   userMenu = false;
   loginDialog = false;
 
-  get loggedOut() {
-    return this.girderRest.user === null;
+  readonly store = store;
+
+  domain = store.girderUrl;
+  username = "";
+  password = "";
+
+  error = "";
+
+  async login() {
+    this.error = "";
+    const result = await store.login({
+      domain: this.domain,
+      username: this.username,
+      password: this.password
+    });
+    if (result) {
+      this.password = "";
+      this.error = result;
+    } else {
+      this.error = "";
+      this.loginDialog = false;
+      this.userMenu = false;
+    }
   }
 
-  get isLoggedIn() {
-    return this.girderRest.user != null;
-  }
-
-  get currentUserLogin() {
-    return this.girderRest.user ? this.girderRest.user.login : "anonymous";
-  }
-
-  logout() {
-    this.girderRest.logout();
+  async logout() {
+    await this.store.logout();
+    this.userMenu = false;
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.loginDialog {
+  background: white;
+}
+</style>

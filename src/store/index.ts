@@ -7,6 +7,8 @@ import {
   Action,
   getModule
 } from "vuex-module-decorators";
+import { RestClient } from "@/girder";
+import { IGirderUser } from "@girder/components/src";
 
 Vue.use(Vuex);
 
@@ -14,26 +16,79 @@ export const store = new Vuex.Store({});
 
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
-  count = 0;
+  girderUrl = "http://localhost:8080";
+  girderRest = new RestClient({
+    apiRoot: `${this.girderUrl}/api/v1`
+  });
+
+  girderUser: IGirderUser | null = null;
+
+  get userName() {
+    return this.girderUser ? this.girderUser.login : "anonymous";
+  }
+
+  get isLoggedIn() {
+    return this.girderUser != null;
+  }
 
   @Mutation
-  increment(delta: number) {
-    this.count += delta;
-  }
-  @Mutation
-  decrement(delta: number) {
-    this.count -= delta;
+  protected loggedIn({
+    girderUrl,
+    girderRest
+  }: {
+    girderUrl: string;
+    girderRest: RestClient;
+  }) {
+    this.girderUrl = girderUrl;
+    this.girderRest = girderRest;
+    this.girderUser = girderRest.user;
   }
 
-  // action 'incr' commits mutation 'increment' when done with return value as payload
-  @Action({ commit: "increment" })
-  incr() {
-    return 5;
+  @Mutation
+  protected loggedOut() {
+    this.girderUser = null;
   }
-  // action 'decr' commits mutation 'decrement' when done with return value as payload
-  @Action({ commit: "decrement" })
-  decr() {
-    return 5;
+
+  @Action({})
+  async logout() {
+    try {
+      await this.girderRest.logout();
+    } catch (err) {
+      console.log("error during logging out", err);
+    }
+    this.context.commit("loggedOut");
+  }
+
+  @Action({})
+  async login({
+    domain,
+    username,
+    password
+  }: {
+    domain: string;
+    username: string;
+    password: string;
+  }) {
+    const restClient = new RestClient({
+      apiRoot: `${domain}/api/v1`
+    });
+
+    try {
+      await restClient.login(username, password);
+    } catch (err) {
+      if (!err.response || err.response.status !== 401) {
+        return "Unknown error occurred";
+      } else {
+        const { message } = err.response.data;
+        return message || "Unauthorized.";
+      }
+    }
+
+    this.context.commit("loggedIn", {
+      girderUrl: domain,
+      girderRest: restClient
+    });
+    return null;
   }
 }
 
