@@ -2,13 +2,12 @@
   <v-container>
     <girder-file-manager
       v-if="store.isLoggedIn"
-      v-model="selected"
       drag-enabled
       new-folder-enabled
-      selectable
       :location.sync="location"
       upload-multiple
       upload-enabled
+      @rowclick="onRowClick"
     />
   </v-container>
 </template>
@@ -17,7 +16,7 @@
 import { Vue, Component, Inject } from "vue-property-decorator";
 import store from "@/store";
 import { FileManager as GirderFileManager } from "@/girder";
-import { IGirderLocation } from "@girder/components/src";
+import { IGirderLocation, IGirderSelectAble } from "@girder/components/src";
 
 @Component({
   components: {
@@ -27,18 +26,18 @@ import { IGirderLocation } from "@girder/components/src";
 export default class Upload extends Vue {
   readonly store = store;
 
-  selected: any[] = [];
-  internalLocation: IGirderLocation | null = null;
-
   get location() {
-    return (
-      this.internalLocation ||
-      (this.store.isLoggedIn ? this.store.girderUser : { type: "collections" })
-    );
+    return this.store.location;
   }
 
-  set location(value: any) {
-    this.internalLocation = value;
+  set location(value: IGirderLocation | null) {
+    this.store.changeLocation(value);
+  }
+
+  onRowClick(data: IGirderSelectAble) {
+    if (data._modelType === "item") {
+      this.$router.push({ name: "view", params: { id: data._id } });
+    }
   }
 }
 </script>

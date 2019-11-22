@@ -23,6 +23,9 @@ declare module "@girder/components/src" {
   export default Girder;
 
   export interface IGirderUser {
+    _modelType: "user";
+    _id: string;
+
     login: string;
     type: "user";
   }
@@ -30,6 +33,37 @@ declare module "@girder/components/src" {
   export interface IGirderLocation {
     type: "collection" | "user" | "folder";
   }
+
+  export interface IGirderItem {
+    _modelType: "item";
+    _id: string;
+
+    name: string;
+    description: string;
+    meta: any;
+  }
+
+  export interface IGirderFolder {
+    _modelType: "folder";
+    _id: string;
+
+    name: string;
+    description: string;
+    meta: any;
+  }
+
+  export interface IGirderFile {
+    _modelType: "file";
+    _id: string;
+
+    name: string;
+  }
+
+  export type IGirderSelectAble =
+    | IGirderItem
+    | IGirderUser
+    | IGirderFolder
+    | IGirderFile;
 
   interface IRestClientOptions {
     apiRoot: string;

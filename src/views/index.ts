@@ -1,7 +1,7 @@
 import Vue from "vue";
 import VueRouter from "vue-router";
 import Home from "./Home.vue";
-import Upload from "./Upload.vue";
+import Viewer from "./Viewer.vue";
 
 Vue.use(VueRouter);
 
@@ -12,9 +12,10 @@ const routes = [
     component: Home
   },
   {
-    path: "/upload",
-    name: "upload",
-    component: Upload
+    path: "/:id",
+    name: "view",
+    props: true,
+    component: Viewer
   }
 ];
 

@@ -8,7 +8,11 @@ import {
   getModule
 } from "vuex-module-decorators";
 import { RestClient } from "@/girder";
-import { IGirderUser, IGirderLocation } from "@girder/components/src";
+import {
+  IGirderUser,
+  IGirderLocation,
+  IGirderItem
+} from "@girder/components/src";
 
 Vue.use(Vuex);
 
@@ -45,7 +49,8 @@ export class Main extends VuexModule {
 
   girderUser: IGirderUser | null = this.girderRest.user;
 
-  internalLocation: IGirderLocation | null = null;
+  selectedItem: IGirderItem | null = null;
+  private internalLocation: IGirderLocation | null = null;
 
   get location(): IGirderLocation {
     if (this.internalLocation) {
@@ -86,6 +91,11 @@ export class Main extends VuexModule {
   @Mutation
   protected loggedOut() {
     this.girderUser = null;
+  }
+
+  @Mutation
+  setSelectedItem(selected: IGirderItem) {
+    this.selectedItem = selected;
   }
 
   @Action({})
