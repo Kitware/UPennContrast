@@ -53,8 +53,9 @@ export class Main extends VuexModule {
   async logout() {
     try {
       await this.girderRest.logout();
-    } catch (err) {
-      console.log("error during logging out", err);
+    } catch {
+      // ignore
+      // console.log("error during logging out", err);
     }
     this.context.commit("loggedOut");
   }
