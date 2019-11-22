@@ -99,7 +99,27 @@ export class Main extends VuexModule {
     this.context.commit("loggedOut");
   }
 
-  @Action({})
+  @Action
+  async initialize() {
+    if (!this.girderRest.token) {
+      return;
+    }
+    this.girderRest
+      .fetchUser()
+      .then(user => {
+        if (user) {
+          this.context.commit("loggedIn", {
+            girderUrl: this.girderUrl,
+            girderRest: this.girderRest
+          });
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
+  }
+
+  @Action
   async login({
     domain,
     username,
@@ -133,5 +153,7 @@ export class Main extends VuexModule {
 }
 
 const main = getModule(Main);
+
+main.initialize();
 
 export default main;
