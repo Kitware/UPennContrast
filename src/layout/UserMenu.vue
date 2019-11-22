@@ -54,14 +54,14 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Inject } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
 
 @Component
 export default class UserMenu extends Vue {
-  userMenu = false;
-
   readonly store = store;
+
+  userMenu = false;
 
   domain = store.girderUrl;
   username = "";

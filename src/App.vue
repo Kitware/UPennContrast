@@ -25,8 +25,8 @@
 
 <script lang="ts">
 import Vue from "vue";
-import Menu from "./components/layout/Menu.vue";
-import UserMenu from "./components/layout/UserMenu.vue";
+import Menu from "./layout/Menu.vue";
+import UserMenu from "./layout/UserMenu.vue";
 
 export default Vue.extend({
   name: "App",
