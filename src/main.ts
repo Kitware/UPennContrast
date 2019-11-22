@@ -3,15 +3,17 @@ import "reflect-metadata";
 import "./registerServiceWorker";
 import vuetify from "./plugins/vuetify";
 import "./plugins/router";
+import "./plugins/resize";
 import Girder, { RestClient } from "./girder";
 
 import main, { store, Main } from "./store";
 
-import router from "./views";
+import routes from "./views";
 import App from "./App.vue";
 
 import "roboto-fontface/css/roboto/roboto-fontface.css";
 import "@mdi/font/css/materialdesignicons.css";
+import VueRouter from "vue-router";
 
 Vue.config.productionTip = false;
 
@@ -26,7 +28,9 @@ new Vue({
       }
     })
   },
-  router,
+  router: new VueRouter({
+    routes
+  }),
   store,
   vuetify,
   render: (h: any) => h(App)

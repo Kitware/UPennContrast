@@ -1,9 +1,8 @@
-import VueRouter from "vue-router";
 import Home from "./Home.vue";
-import Info from "./viewer/Info.vue";
+import viewerRoutes from "./viewer";
 import Viewer from "./viewer/Viewer.vue";
 
-const routes = [
+export default [
   {
     path: "/",
     name: "home",
@@ -13,18 +12,6 @@ const routes = [
     path: "/:id",
     props: true,
     component: Viewer,
-    children: [
-      {
-        path: "",
-        name: "view",
-        component: Info
-      }
-    ]
+    children: viewerRoutes
   }
 ];
-
-const router = new VueRouter({
-  routes
-});
-
-export default router;

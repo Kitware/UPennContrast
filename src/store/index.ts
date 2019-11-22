@@ -7,7 +7,7 @@ import {
   Action,
   getModule
 } from "vuex-module-decorators";
-import { RestClient } from "@/girder";
+import { RestClient, RestClientHelper } from "@/girder";
 import {
   IGirderUser,
   IGirderLocation,
@@ -52,6 +52,10 @@ export class Main extends VuexModule {
   selectedItemId: string | null = null;
   selectedItem: IGirderItem | null = null;
   private internalLocation: IGirderLocation | null = null;
+
+  get api() {
+    return new RestClientHelper(this.girderRest);
+  }
 
   get location(): IGirderLocation {
     if (this.internalLocation) {
@@ -177,9 +181,8 @@ export class Main extends VuexModule {
       return;
     }
     try {
-      const r = await this.girderRest.get(`item/${itemId}`);
-      console.log(r);
-      this.context.commit("setItem", { itemId, data: r.data });
+      const r = await this.api.getItem(itemId);
+      this.context.commit("setItem", { itemId, data: r });
     } catch (error) {
       // TODO
     }
