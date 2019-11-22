@@ -49,6 +49,7 @@ export class Main extends VuexModule {
 
   girderUser: IGirderUser | null = this.girderRest.user;
 
+  selectedItemId: string | null = null;
   selectedItem: IGirderItem | null = null;
   private internalLocation: IGirderLocation | null = null;
 
@@ -94,8 +95,9 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  setSelectedItem(selected: IGirderItem) {
-    this.selectedItem = selected;
+  protected setItem({ itemId, data }: { itemId: string; data: any }) {
+    this.selectedItemId = itemId;
+    this.selectedItem = data;
   }
 
   @Action({})
@@ -114,19 +116,21 @@ export class Main extends VuexModule {
     if (!this.girderRest.token) {
       return;
     }
-    this.girderRest
-      .fetchUser()
-      .then(user => {
-        if (user) {
-          this.context.commit("loggedIn", {
-            girderUrl: this.girderUrl,
-            girderRest: this.girderRest
-          });
-        }
-      })
-      .catch(() => {
-        // ignore
-      });
+    try {
+      const user = await this.girderRest.fetchUser();
+      if (user) {
+        this.context.commit("loggedIn", {
+          girderUrl: this.girderUrl,
+          girderRest: this.girderRest
+        });
+      }
+      if (user && this.selectedItemId) {
+        // load after logged in
+        await this.context.dispatch("setSelectedItem", this.selectedItemId);
+      }
+    } catch (error) {
+      // TODO
+    }
   }
 
   @Action
@@ -158,7 +162,27 @@ export class Main extends VuexModule {
       girderUrl: domain,
       girderRest: restClient
     });
+
+    if (this.selectedItemId) {
+      // load after logged in
+      await this.context.dispatch("setSelectedItem", this.selectedItemId);
+    }
     return null;
+  }
+
+  @Action
+  async setSelectedItem(itemId: string) {
+    if (!this.isLoggedIn) {
+      this.context.commit("setItem", { itemId });
+      return;
+    }
+    try {
+      const r = await this.girderRest.get(`item/${itemId}`);
+      console.log(r);
+      this.context.commit("setItem", { itemId, data: r.data });
+    } catch (error) {
+      // TODO
+    }
   }
 }
 

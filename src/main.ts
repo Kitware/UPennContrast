@@ -1,13 +1,17 @@
 import Vue from "vue";
 import "reflect-metadata";
-import App from "./App.vue";
 import "./registerServiceWorker";
-import router from "./views";
-import main, { store } from "./store";
 import vuetify from "./plugins/vuetify";
+import "./plugins/router";
+import Girder from "./girder";
+
+import main, { store } from "./store";
+
+import router from "./views";
+import App from "./App.vue";
+
 import "roboto-fontface/css/roboto/roboto-fontface.css";
 import "@mdi/font/css/materialdesignicons.css";
-import Girder from "./girder";
 
 Vue.config.productionTip = false;
 

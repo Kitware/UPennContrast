@@ -1,9 +1,7 @@
-import Vue from "vue";
 import VueRouter from "vue-router";
 import Home from "./Home.vue";
-import Viewer from "./Viewer.vue";
-
-Vue.use(VueRouter);
+import Info from "./viewer/Info.vue";
+import Viewer from "./viewer/Viewer.vue";
 
 const routes = [
   {
@@ -13,9 +11,15 @@ const routes = [
   },
   {
     path: "/:id",
-    name: "view",
     props: true,
-    component: Viewer
+    component: Viewer,
+    children: [
+      {
+        path: "",
+        name: "view",
+        component: Info
+      }
+    ]
   }
 ];
 
