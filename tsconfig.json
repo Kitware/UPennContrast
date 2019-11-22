@@ -18,7 +18,7 @@
     "jsxFactory": "h",
     "sourceMap": true,
     "baseUrl": ".",
-    "types": ["webpack-env", "vuetify"],
+    "types": ["webpack-env", "vuetify", "vue"],
     "paths": {
       "@/*": ["src/*"]
     },

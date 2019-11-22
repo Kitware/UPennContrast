@@ -1,7 +1,7 @@
-import Vue from "vue";
-import Vuetify from "vuetify/lib";
 import { vuetifyConfig } from "@/girder";
 import { merge } from "lodash-es";
+import Vue from "vue";
+import Vuetify from "vuetify/lib";
 import { VuetifyPreset } from "vuetify/types/presets";
 
 Vue.use(Vuetify);

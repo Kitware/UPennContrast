@@ -33,7 +33,9 @@
           prepend-icon="$vuetify.icons.lock"
         />
         <v-card-actions>
-          <v-btn type="submit" color="primary">Login</v-btn>
+          <v-btn type="submit" color="primary">
+            Login
+          </v-btn>
         </v-card-actions>
       </v-form>
       <v-alert :value="Boolean(error)" color="error">{{ error }}</v-alert>
