@@ -16,7 +16,8 @@ export const store = new Vuex.Store({});
 
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
-  girderUrl = "http://localhost:8080";
+  girderUrl =
+    window.localStorage.getItem("girderUrl") || "http://localhost:8080";
   girderRest = new RestClient({
     apiRoot: `${this.girderUrl}/api/v1`
   });
@@ -40,6 +41,8 @@ export class Main extends VuexModule {
     girderRest: RestClient;
   }) {
     this.girderUrl = girderUrl;
+    // store for next time
+    window.localStorage.setItem("girderUrl", girderUrl);
     this.girderRest = girderRest;
     this.girderUser = girderRest.user;
   }

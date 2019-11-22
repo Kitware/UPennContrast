@@ -1,6 +1,6 @@
 <template>
   <v-app id="inspire">
-    <v-app-bar app clipped-right dark>
+    <v-app-bar app clipped-right>
       <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
       <v-toolbar-title>UPenn Contrast</v-toolbar-title>
       <v-spacer />
@@ -15,18 +15,18 @@
       <router-view />
     </v-content>
 
-    <v-footer app>
+    <!-- <v-footer app>
       <span>Kitware</span>
       <v-spacer />
       <span>&copy; 2019</span>
-    </v-footer>
+    </v-footer>-->
   </v-app>
 </template>
 
 <script lang="ts">
 import Vue from "vue";
-import Menu from "./components/Menu.vue";
-import UserMenu from "./components/UserMenu.vue";
+import Menu from "./components/layout/Menu.vue";
+import UserMenu from "./components/layout/UserMenu.vue";
 
 export default Vue.extend({
   name: "App",
