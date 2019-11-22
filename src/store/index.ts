@@ -96,6 +96,9 @@ export class Main extends VuexModule {
   @Mutation
   protected loggedOut() {
     this.girderUser = null;
+    this.selectedItem = null;
+    this.selectedItemId = null;
+    this.internalLocation = null;
   }
 
   @Mutation
@@ -175,8 +178,8 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async setSelectedItem(itemId: string) {
-    if (!this.isLoggedIn) {
+  async setSelectedItem(itemId: string | null) {
+    if (!this.isLoggedIn || !itemId) {
       this.context.commit("setItem", { itemId });
       return;
     }

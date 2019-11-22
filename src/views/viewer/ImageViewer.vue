@@ -26,10 +26,11 @@ export default class ImageViewer extends Vue {
   mounted() {
     this.refsMounted = true;
     this.handleResize();
+    this.reloadImage(this.store.selectedItem);
   }
 
   @Watch("store.selectedItem")
-  protected async reloadImage(value: IGirderItem) {
+  protected async reloadImage(value: IGirderItem | null) {
     if (!value) {
       this.image = null;
       return;

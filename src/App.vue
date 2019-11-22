@@ -2,7 +2,10 @@
   <v-app id="inspire">
     <v-app-bar app clipped-right>
       <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
-      <v-toolbar-title>UPenn Contrast</v-toolbar-title>
+      <v-toolbar-title @click="goHome" class="logo"
+        >UPenn Contrast</v-toolbar-title
+      >
+      <BreadCrumbs />
       <v-spacer />
       <UserMenu />
     </v-app-bar>
@@ -24,20 +27,30 @@
 </template>
 
 <script lang="ts">
-import Vue from "vue";
 import Menu from "./layout/Menu.vue";
 import UserMenu from "./layout/UserMenu.vue";
+import BreadCrumbs from "./layout/BreadCrumbs.vue";
+import { Vue, Component, Prop } from "vue-property-decorator";
+import store from "@/store";
 
-export default Vue.extend({
-  name: "App",
-
+@Component({
   components: {
     Menu,
-    UserMenu
-  },
+    UserMenu,
+    BreadCrumbs
+  }
+})
+export default class App extends Vue {
+  drawer = false;
 
-  data: () => ({
-    drawer: false
-  })
-});
+  goHome() {
+    console.log("go home");
+    this.$router.push({ name: "home" });
+  }
+}
 </script>
+<style lang="scss" scoped>
+.logo {
+  cursor: pointer;
+}
+</style>
