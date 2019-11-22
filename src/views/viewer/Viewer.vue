@@ -35,5 +35,15 @@ export default class Viewer extends Vue {
       store.setSelectedItem(to.params.id).then(() => next());
     }
   }
+
+  beforeRouteLeave(
+    to: Route,
+    _from: Route,
+    next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any
+  ) {
+    if (!to.params.id) {
+      store.setSelectedItem(null).then(() => next());
+    }
+  }
 }
 </script>
