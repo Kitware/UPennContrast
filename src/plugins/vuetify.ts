@@ -9,11 +9,6 @@ Vue.use(Vuetify);
 const custom: Partial<VuetifyPreset> = {
   theme: {
     dark: false
-  },
-  icons: {
-    values: {
-      domain: "mdi-domain"
-    }
   }
 };
 const config: Partial<VuetifyPreset> = merge({}, vuetifyConfig, custom);

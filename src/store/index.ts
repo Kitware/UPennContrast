@@ -22,7 +22,7 @@ export class Main extends VuexModule {
     apiRoot: `${this.girderUrl}/api/v1`
   });
 
-  girderUser: IGirderUser | null = null;
+  girderUser: IGirderUser | null = this.girderRest.user;
 
   get userName() {
     return this.girderUser ? this.girderUser.login : "anonymous";

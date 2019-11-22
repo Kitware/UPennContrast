@@ -4,6 +4,7 @@
     close-on-click
     offset-y
     :close-on-content-click="store.isLoggedIn"
+    transition="slide-y"
   >
     <template #activator="{ on }">
       <v-btn v-on="on">{{ store.userName }}</v-btn>
@@ -15,7 +16,7 @@
           name="domain"
           label="Girder Domain"
           required
-          prepend-icon="$vuetify.icons.domain"
+          prepend-icon="mdi-domain"
         />
         <v-text-field
           v-model="username"
@@ -23,14 +24,14 @@
           label="Username or e-mail"
           autofocus
           required
-          prepend-icon="$vuetify.icons.user"
+          prepend-icon="mdi-account"
         />
         <v-text-field
           v-model="password"
           name="password"
           type="password"
           label="Password"
-          prepend-icon="$vuetify.icons.lock"
+          prepend-icon="mdi-lock"
         />
         <v-card-actions>
           <v-btn type="submit" color="primary">
@@ -40,9 +41,12 @@
       </v-form>
       <v-alert :value="Boolean(error)" color="error">{{ error }}</v-alert>
     </v-container>
-    <v-list v-else>
+    <v-list v-else dense>
       <v-divider />
       <v-list-item @click="logout">
+        <v-list-item-avatar>
+          <v-icon>mdi-logout</v-icon>
+        </v-list-item-avatar>
         <v-list-item-title>Logout</v-list-item-title>
       </v-list-item>
     </v-list>
