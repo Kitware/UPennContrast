@@ -3,9 +3,9 @@ import "reflect-metadata";
 import "./registerServiceWorker";
 import vuetify from "./plugins/vuetify";
 import "./plugins/router";
-import Girder from "./girder";
+import Girder, { RestClient } from "./girder";
 
-import main, { store } from "./store";
+import main, { store, Main } from "./store";
 
 import router from "./views";
 import App from "./App.vue";
@@ -18,9 +18,14 @@ Vue.config.productionTip = false;
 Vue.use(Girder);
 
 new Vue({
-  provide: () => ({
-    girderRest: main.girderRest
-  }),
+  provide: {
+    // use a proxy to dynamically resolve to the right girderRest client
+    girderRest: new Proxy(main, {
+      get(obj: Main, prop: keyof RestClient) {
+        return obj.girderRest[prop];
+      }
+    })
+  },
   router,
   store,
   vuetify,
