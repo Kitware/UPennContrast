@@ -20,7 +20,6 @@ export default class Viewer extends Vue {
     _from: Route,
     next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any
   ) {
-    console.log(to);
     if (to.params.id && store.selectedItemId !== to.params.id) {
       store.setSelectedItem(to.params.id).then(() => next());
     }
@@ -32,7 +31,6 @@ export default class Viewer extends Vue {
     _from: Route,
     next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any
   ) {
-    console.log(to);
     if (to.params.id && store.selectedItemId !== to.params.id) {
       store.setSelectedItem(to.params.id).then(() => next());
     }
