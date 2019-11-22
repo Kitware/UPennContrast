@@ -16,6 +16,7 @@
     "noImplicitThis": true,
     "noUnusedParameters": true,
     "jsxFactory": "h",
+    "noEmit": true,
     "sourceMap": true,
     "baseUrl": ".",
     "types": ["webpack-env", "vuetify", "vue"],

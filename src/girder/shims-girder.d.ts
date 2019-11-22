@@ -1,9 +1,13 @@
 declare module "@girder/components/src/components" {
-  import Vue from "vue";
+  import Vue, { VueConstructor, Component } from "vue";
 
-  export class Authentication extends Vue {}
+  export const Upload: Component;
+}
 
-  export class Upload extends Vue {}
+declare module "@girder/components/src/components/Snippet" {
+  import Vue, { VueConstructor, Component } from "vue";
+
+  export const FileManager: Component;
 }
 
 declare module "@girder/components/src/utils" {
@@ -20,6 +24,11 @@ declare module "@girder/components/src" {
 
   export interface IGirderUser {
     login: string;
+    type: "user";
+  }
+
+  export interface IGirderLocation {
+    type: "collection" | "user" | "folder";
   }
 
   interface IRestClientOptions {

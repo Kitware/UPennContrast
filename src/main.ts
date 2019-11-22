@@ -7,8 +7,11 @@ import main, { store } from "./store";
 import vuetify from "./plugins/vuetify";
 import "roboto-fontface/css/roboto/roboto-fontface.css";
 import "@mdi/font/css/materialdesignicons.css";
+import Girder from "./girder";
 
 Vue.config.productionTip = false;
+
+Vue.use(Girder);
 
 new Vue({
   provide: () => ({

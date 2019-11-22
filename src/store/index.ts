@@ -8,21 +8,54 @@ import {
   getModule
 } from "vuex-module-decorators";
 import { RestClient } from "@/girder";
-import { IGirderUser } from "@girder/components/src";
+import { IGirderUser, IGirderLocation } from "@girder/components/src";
 
 Vue.use(Vuex);
 
 export const store = new Vuex.Store({});
 
+class Persister {
+  private readonly store: Storage;
+  constructor(store = window.localStorage) {
+    this.store = store;
+  }
+  get<T>(key: string, defaultValue: T): T {
+    const r = this.store.getItem(key);
+    return r === null ? defaultValue : (JSON.parse(r) as T);
+  }
+  set<T>(key: string, value: T): T {
+    this.store.setItem(key, JSON.stringify(value));
+    return value;
+  }
+  delete(key: string) {
+    const r = this.store.getItem(key);
+    this.store.removeItem(key);
+    return r != null;
+  }
+}
+
+const persister = new Persister();
+
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
-  girderUrl =
-    window.localStorage.getItem("girderUrl") || "http://localhost:8080";
+  girderUrl = persister.get("girderUrl", "http://localhost:8080");
   girderRest = new RestClient({
     apiRoot: `${this.girderUrl}/api/v1`
   });
 
   girderUser: IGirderUser | null = this.girderRest.user;
+
+  internalLocation: IGirderLocation | null = null;
+
+  get location(): IGirderLocation {
+    if (this.internalLocation) {
+      return this.internalLocation;
+    }
+    if (this.isLoggedIn && this.girderUser) {
+      return this.girderUser;
+    }
+    return { type: "collection" };
+  }
 
   get userName() {
     return this.girderUser ? this.girderUser.login : "anonymous";
@@ -33,6 +66,11 @@ export class Main extends VuexModule {
   }
 
   @Mutation
+  changeLocation(location: IGirderLocation | null) {
+    this.internalLocation = location;
+  }
+
+  @Mutation
   protected loggedIn({
     girderUrl,
     girderRest
@@ -40,9 +78,7 @@ export class Main extends VuexModule {
     girderUrl: string;
     girderRest: RestClient;
   }) {
-    this.girderUrl = girderUrl;
-    // store for next time
-    window.localStorage.setItem("girderUrl", girderUrl);
+    this.girderUrl = persister.set("girderUrl", girderUrl);
     this.girderRest = girderRest;
     this.girderUser = girderRest.user;
   }
