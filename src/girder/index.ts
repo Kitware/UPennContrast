@@ -32,9 +32,9 @@ export class RestClientHelper {
     return this.client.get(`item/${toId(item)}/files`).then(r => r.data);
   }
   downloadUrl(item: string | IGirderItem) {
-    return `${this.client.apiRoot}/item/${toId(
-      item
-    )}/download?contentDisposition=inline`;
+    const url = new URL(`${this.client.apiRoot}/item/${toId(item)}/download`);
+    url.searchParams.set("contentDisposition", "inline");
+    return url.href;
   }
 
   getImage(item: string | IGirderItem) {
@@ -44,5 +44,88 @@ export class RestClientHelper {
       image.onerror = evt => reject(evt);
       image.src = this.downloadUrl(item);
     });
+  }
+
+  tileUrl(
+    item: string | IGirderItem,
+    { x, y, z, frame }: { x: number; y: number; z: number; frame: number },
+    style: ITileOptions
+  ) {
+    const url = new URL(
+      `${this.client.apiRoot}/item/${toId(
+        item
+      )}/tiles/fzyx/${frame}/${z}/${x}/${y}`
+    );
+    url.searchParams.set("encoding", "PNG");
+    url.searchParams.set("style", JSON.stringify(style));
+
+    return url.href;
+  }
+
+  getTiles(item: string | IGirderItem): Promise<ITileMeta> {
+    return this.client.get(`item/${toId(item)}/tiles`).then(r => r.data);
+  }
+
+  getHistogram(
+    item: string | IGirderItem,
+    options: Partial<IHistogramOptions> = {}
+  ): Promise<ITileHistogram> {
+    const o: Readonly<IHistogramOptions> = Object.assign(
+      {
+        frame: 0,
+        bins: 512,
+        width: 2048,
+        height: 2048,
+        resample: false
+      },
+      options
+    );
+
+    return this.client
+      .get(`item/${toId(item)}/tiles/histogram`, {
+        params: o
+      })
+      .then(r => r.data);
+  }
+}
+
+export interface IHistogramOptions {
+  frame: number;
+  bins: number;
+  width: number;
+  height: number;
+  resample: boolean;
+}
+
+export interface ITileHistogram {
+  test: number[];
+  min: number;
+  max: number;
+  // TODO
+}
+
+export interface ITileMeta {
+  sizeX: number;
+  sizeY: number;
+  tileWidth: number;
+  tileHeight: number;
+  frames?: number[];
+  // TODO
+}
+
+export interface ITileOptions {
+  min: number | "auto" | "min" | "max";
+  max: number | "auto" | "min" | "max";
+  palette: string[]; // palette of hex colors, e.g. #000000
+}
+
+function k(steps: number, gamma: number) {
+  const palette: string[] = [];
+  for (let i = 0; i < steps; i++) {
+    const s = i / (steps - 1);
+    const d = s ? Math.pow(s, 1.0 / gamma) : 0;
+    let hex = `0${Math.round(d * 255).toString(16)}`;
+    hex = hex.substring(hex.length - 2);
+    palette.push(`#${hex}${hex}${hex}`);
   }
 }
