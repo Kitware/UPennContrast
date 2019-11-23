@@ -21,3 +21,5 @@ yarn-error.log*
 *.sw?
 src/**/*.map
 src/**/*.js
+
+/logs

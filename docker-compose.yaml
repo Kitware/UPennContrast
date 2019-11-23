@@ -3,16 +3,33 @@ version: "3.2"
 services:
   mongodb:
     image: mongo
+  rabbitmq:
+    image: rabbitmq
+  redis:
+    image: redis
   girder:
     build:
-      context: ./devops
+      context: ./devops/girder
     command: "-d mongodb://mongodb:27017/girder --host 0.0.0.0"
     ports:
       - "8080:8080"
     links:
       - mongodb
+      - redis
+      - rabbitmq
     volumes:
       - "store:/store"
+      - "./logs/girder:/root/.girder/logs"
+  girder-worker:
+    build:
+      context: ./devops/girder-worker
+    command: "-d mongodb://mongodb:27017/girder --host 0.0.0.0"
+    links:
+      - mongodb
+      - redis
+      - rabbitmq
+    volumes:
+      - "./logs/girder-worker:/root/.girder/logs"
 
 volumes:
   store: null
