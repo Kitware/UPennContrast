@@ -1,5 +1,7 @@
 import DatasetInfo from "./DatasetInfo.vue";
 import Configuration, { routes as cRoutes } from "./configuration";
+import NewConfiguration from "./configuration/NewConfiguration.vue";
+import { Main } from "@/store";
 
 export const routes = [
   {
@@ -11,11 +13,21 @@ export const routes = [
     }
   },
   {
+    path: "new",
+    name: "newconfiguration",
+    component: NewConfiguration,
+    meta: {
+      text: "New Configuration"
+    }
+  },
+  {
     path: ":config",
     component: Configuration,
     props: true,
     meta: {
-      hidden: true
+      text(store: Main) {
+        return store.configuration?.name || store.selectedConfigurationId;
+      }
     },
     children: cRoutes
   }

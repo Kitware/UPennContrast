@@ -14,8 +14,14 @@ export default class BreadCrumbs extends Vue {
     return this.$route.matched
       .filter(m => !m.meta.hidden)
       .map(record => {
+        const customText = record.meta.text;
+        let text = customText
+          ? typeof customText === "function"
+            ? customText(this.store)
+            : customText
+          : record.name;
         return {
-          text: record.meta.name ? record.meta.name(this.store) : record.name,
+          text,
           to: { name: record.name, params: this.$route.params }
         };
       });
