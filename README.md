@@ -24,7 +24,8 @@ npm run serve
 1. create a new account
 1. go to the Admin console and create a File System Asset Store at `/store`
 1. go to the Admin console -> settings -> advanced -> `CORS Allowed Origins` -> `*`
-1. go to the Admin console -> plugins -> worker: enter the urls `amqp://guest:guest@rabbitmq/` for both broker and backend and `http://girder:8080/api/v1` for the api url
+
+1. optional: go to the Admin console -> plugins -> worker: enter the urls `amqp://guest:guest@rabbitmq/` for both broker and backend and `http://girder:8080/api/v1` for the api url
 
 ### Compiles and minifies for production
 
