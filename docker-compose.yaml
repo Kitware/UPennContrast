@@ -5,17 +5,17 @@ services:
     image: mongo
   rabbitmq:
     image: rabbitmq
-  redis:
-    image: redis
   girder:
     build:
       context: ./devops/girder
     command: "-d mongodb://mongodb:27017/girder --host 0.0.0.0"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - "GIRDER_WORKER_BROKER=amqp://guest:guest@rabbitmq/"
     ports:
       - "8080:8080"
     links:
       - mongodb
-      - redis
       - rabbitmq
     volumes:
       - "store:/store"
@@ -23,12 +23,14 @@ services:
   girder-worker:
     build:
       context: ./devops/girder-worker
-    command: "-d mongodb://mongodb:27017/girder --host 0.0.0.0"
+    environment:
+      - "GIRDER_WORKER_BROKER=amqp://guest:guest@rabbitmq/"
     links:
       - mongodb
-      - redis
       - rabbitmq
+      - girder
     volumes:
+      - "store:/store:ro"
       - "./logs/girder-worker:/root/.girder/logs"
 
 volumes:
