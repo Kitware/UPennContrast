@@ -35,8 +35,6 @@ export default class Upload extends Vue {
   }
 
   onRowClick(data: IGirderSelectAble) {
-    console.log(data);
-    debugger;
     if (
       data._modelType === "folder" &&
       data.meta.subtype === "contrastDataset"
