@@ -6,6 +6,6 @@ WORKDIR /src
 RUN apt-get update && apt-get install -y git
 RUN git clone https://github.com/girder/large_image.git -b style-option
 WORKDIR /src/large_image
-RUN pip install .[ometiff] --find-links https://girder.github.io/large_image_wheels
+RUN pip install -e .[ometiff,mapnik] --find-links https://girder.github.io/large_image_wheels
 RUN cd tasks && pip install -e .[worker] --find-links https://girder.github.io/large_image_wheels
 USER worker
