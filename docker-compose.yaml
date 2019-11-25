@@ -3,35 +3,32 @@ version: "3.2"
 services:
   mongodb:
     image: mongo
-  rabbitmq:
-    image: rabbitmq
+  # rabbitmq:
+  #   image: rabbitmq
   girder:
     build:
       context: ./devops/girder
     command: "-d mongodb://mongodb:27017/girder --host 0.0.0.0"
-    environment:
-      - RABBITMQ_HOST=rabbitmq
-      - "GIRDER_WORKER_BROKER=amqp://guest:guest@rabbitmq/"
     ports:
       - "8080:8080"
     links:
       - mongodb
-      - rabbitmq
+      # - rabbitmq
     volumes:
       - "store:/store"
       - "./logs/girder:/root/.girder/logs"
-  girder-worker:
-    build:
-      context: ./devops/girder-worker
-    environment:
-      - "GIRDER_WORKER_BROKER=amqp://guest:guest@rabbitmq/"
-    links:
-      - mongodb
-      - rabbitmq
-      - girder
-    volumes:
-      - "store:/store:ro"
-      - "./logs/girder-worker:/root/.girder/logs"
+  # girder-worker:
+  #   build:
+  #     context: ./devops/girder-worker
+  #   environment:
+  #     - "GIRDER_WORKER_BROKER=amqp://guest:guest@rabbitmq/"
+  #   links:
+  #     - mongodb
+  #     - rabbitmq
+  #     - girder
+  #   volumes:
+  #     - "store:/store:ro"
+  #     - "./logs/girder-worker:/root/.girder/logs"
 
 volumes:
   store: null
