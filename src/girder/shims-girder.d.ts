@@ -23,6 +23,7 @@ declare module "@girder/components/src" {
   export default Girder;
 
   export interface IGirderUser {
+    name: string; // TODO check
     _modelType: "user";
     _id: string;
 
