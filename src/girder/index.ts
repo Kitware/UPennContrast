@@ -10,6 +10,7 @@ import {
   IGirderFolder,
   IGirderFile
 } from "@girder/components/src";
+import { IDataset, IDatasetConfiguration } from "@/store/model";
 
 function toId(item: string | { _id: string }) {
   return typeof item === "string" ? item : item._id;
@@ -86,6 +87,30 @@ export class RestClientHelper {
         params: o
       })
       .then(r => r.data);
+  }
+
+  getDataset(id: string): Promise<IDataset> {
+    return this.getFolder(id).then(folder => {
+      // TODO derive from OME tiff data
+      return {
+        name: folder.name,
+        description: folder.description,
+        z: { min: 0, max: 1 },
+        time: { min: 0, max: 1 },
+        channels: [{ min: 0, max: 1 }]
+      };
+    });
+  }
+
+  getDatasetConfiguration(id: string): Promise<IDatasetConfiguration> {
+    return this.getItem(id).then(item => {
+      return {
+        name: item.name,
+        description: item.description,
+        layers: [], // TODO get from meta
+        layerMode: item.meta.layerMode === "single" ? "single" : "multiple"
+      };
+    });
   }
 }
 

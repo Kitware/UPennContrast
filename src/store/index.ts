@@ -13,6 +13,7 @@ import {
   IGirderLocation,
   IGirderItem
 } from "@girder/components/src";
+import { IDataset, IDatasetConfiguration } from "./model";
 
 Vue.use(Vuex);
 
@@ -49,8 +50,12 @@ export class Main extends VuexModule {
 
   girderUser: IGirderUser | null = this.girderRest.user;
 
-  selectedItemId: string | null = null;
-  selectedItem: IGirderItem | null = null;
+  selectedDatasetId: string | null = null;
+  dataset: IDataset | null = null;
+
+  selectedConfigurationId: string | null = null;
+  configuration: IDatasetConfiguration | null = null;
+
   private internalLocation: IGirderLocation | null = null;
 
   get api() {
@@ -96,15 +101,28 @@ export class Main extends VuexModule {
   @Mutation
   protected loggedOut() {
     this.girderUser = null;
-    this.selectedItem = null;
-    this.selectedItemId = null;
+    this.selectedDatasetId = null;
+    this.dataset = null;
+    this.selectedConfigurationId = null;
+    this.configuration = null;
     this.internalLocation = null;
   }
 
   @Mutation
-  protected setItem({ itemId, data }: { itemId: string; data: any }) {
-    this.selectedItemId = itemId;
-    this.selectedItem = data;
+  protected setDataset({ id, data }: { id: string; data: IDataset }) {
+    this.selectedDatasetId = id;
+    this.dataset = data;
+  }
+  @Mutation
+  protected setConfiguration({
+    id,
+    data
+  }: {
+    id: string;
+    data: IDatasetConfiguration;
+  }) {
+    this.selectedConfigurationId = id;
+    this.configuration = data;
   }
 
   @Action({})
@@ -131,12 +149,23 @@ export class Main extends VuexModule {
           girderRest: this.girderRest
         });
       }
-      if (user && this.selectedItemId) {
-        // load after logged in
-        await this.context.dispatch("setSelectedItem", this.selectedItemId);
-      }
+      await this.initFromUrl();
     } catch (error) {
       // TODO
+    }
+  }
+
+  private async initFromUrl() {
+    if (this.girderUser && this.selectedDatasetId) {
+      // load after logged in
+      await this.context.dispatch("setDataset", this.selectedDatasetId);
+    }
+    if (this.girderUser && this.selectedConfigurationId && this.dataset) {
+      // load after logged in
+      await this.context.dispatch(
+        "setConfiguration",
+        this.selectedConfigurationId
+      );
     }
   }
 
@@ -170,22 +199,33 @@ export class Main extends VuexModule {
       girderRest: restClient
     });
 
-    if (this.selectedItemId) {
-      // load after logged in
-      await this.context.dispatch("setSelectedItem", this.selectedItemId);
-    }
+    await this.initFromUrl();
     return null;
   }
 
   @Action
-  async setSelectedItem(itemId: string | null) {
-    if (!this.isLoggedIn || !itemId) {
-      this.context.commit("setItem", { itemId });
+  async setSelectedDataset(id: string | null) {
+    if (!this.isLoggedIn || !id) {
+      this.context.commit("setDataset", { id });
       return;
     }
     try {
-      const r = await this.api.getItem(itemId);
-      this.context.commit("setItem", { itemId, data: r });
+      const r = await this.api.getDataset(id);
+      this.context.commit("setDataset", { id, data: r });
+    } catch (error) {
+      // TODO
+    }
+  }
+
+  @Action
+  async setSelectedConfiguration(id: string | null) {
+    if (!this.isLoggedIn || !id) {
+      this.context.commit("setConfiguration", { id });
+      return;
+    }
+    try {
+      const r = await this.api.getDatasetConfiguration(id);
+      this.context.commit("setConfiguration", { id, data: r });
     } catch (error) {
       // TODO
     }

@@ -1,6 +1,5 @@
 import Home from "./Home.vue";
-import viewerRoutes from "./viewer";
-import Viewer from "./viewer/Viewer.vue";
+import Dataset, { routes as datasetRoutes } from "./dataset";
 
 export default [
   {
@@ -11,7 +10,7 @@ export default [
   {
     path: "/:id",
     props: true,
-    component: Viewer,
-    children: viewerRoutes
+    component: Dataset,
+    children: datasetRoutes
   }
 ];
