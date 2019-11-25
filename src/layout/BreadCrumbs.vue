@@ -11,15 +11,14 @@ export default class BreadCrumbs extends Vue {
   readonly store = store;
 
   get items() {
-    if (this.store.selectedItem) {
-      return [
-        {
-          text: this.store.selectedItem.name,
-          to: { name: "view", params: { id: this.store.selectedItem._id } }
-        }
-      ];
-    }
-    return [];
+    return this.$route.matched
+      .filter(m => !m.meta.hidden)
+      .map(record => {
+        return {
+          text: record.meta.name ? record.meta.name(this.store) : record.name,
+          to: { name: record.name, params: this.$route.params }
+        };
+      });
   }
 }
 </script>

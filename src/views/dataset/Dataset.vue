@@ -6,7 +6,7 @@ import store from "@/store";
 import routeMapper from "@/utils/routeMapper";
 
 export default routeMapper(
-  "config",
+  "id",
   () => store.selectedDatasetId,
   value => store.setSelectedDataset(value)
 );

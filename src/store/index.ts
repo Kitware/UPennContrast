@@ -155,15 +155,16 @@ export class Main extends VuexModule {
     }
   }
 
+  @Action
   private async initFromUrl() {
     if (this.girderUser && this.selectedDatasetId) {
       // load after logged in
-      await this.context.dispatch("setDataset", this.selectedDatasetId);
+      await this.context.dispatch("setSelectedDataset", this.selectedDatasetId);
     }
     if (this.girderUser && this.selectedConfigurationId && this.dataset) {
       // load after logged in
       await this.context.dispatch(
-        "setConfiguration",
+        "setSelectedConfiguration",
         this.selectedConfigurationId
       );
     }

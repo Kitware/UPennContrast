@@ -4,7 +4,7 @@ import Configuration, { routes as cRoutes } from "./configuration";
 export const routes = [
   {
     path: "",
-    name: "info",
+    name: "dataset",
     component: DatasetInfo,
     meta: {
       hidden: true

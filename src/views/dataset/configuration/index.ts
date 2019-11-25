@@ -3,7 +3,7 @@ import ConfigurationInfo from "./ConfigurationInfo.vue";
 export const routes = [
   {
     path: "",
-    name: "cinfo",
+    name: "configuration",
     component: ConfigurationInfo,
     meta: {
       hidden: true

@@ -35,8 +35,13 @@ export default class Upload extends Vue {
   }
 
   onRowClick(data: IGirderSelectAble) {
-    if (data._modelType === "item") {
-      this.$router.push({ name: "view", params: { id: data._id } });
+    console.log(data);
+    debugger;
+    if (
+      data._modelType === "folder" &&
+      data.meta.subtype === "contrastDataset"
+    ) {
+      this.$router.push({ name: "dataset", params: { id: data._id } });
     }
   }
 }

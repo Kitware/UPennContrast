@@ -8,7 +8,7 @@ Vue.use(Vuetify);
 
 const custom: Partial<VuetifyPreset> = {
   theme: {
-    dark: true
+    dark: false
   }
 };
 const config: Partial<VuetifyPreset> = merge({}, vuetifyConfig, custom);

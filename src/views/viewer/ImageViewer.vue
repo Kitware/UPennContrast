@@ -26,7 +26,7 @@ export default class ImageViewer extends Vue {
   mounted() {
     this.refsMounted = true;
     this.handleResize();
-    this.reloadImage(null); // TODO
+    this.reloadImage(null); // TODOselectedItem
   }
 
   @Watch("store.selectedItem")
