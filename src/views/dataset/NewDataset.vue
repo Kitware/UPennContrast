@@ -1,18 +1,8 @@
 <template>
   <v-container>
     <v-form v-model="valid">
-      <v-text-field
-        v-model="name"
-        label="Name"
-        required
-        :rules="rules"
-        :readonly="pageTwo"
-      />
-      <v-textarea
-        v-model="description"
-        label="Description"
-        :readonly="pageTwo"
-      />
+      <v-text-field v-model="name" label="Name" required :rules="rules" :readonly="pageTwo" />
+      <v-textarea v-model="description" label="Description" :readonly="pageTwo" />
       <v-text-field
         :value="pathName"
         label="Path"
@@ -28,7 +18,7 @@
 
       <template v-if="dataset != null">
         <v-subheader>Images</v-subheader>
-        <girder-upload accept=".ome.tif" :dest="dataset._girder" />
+        <girder-upload accept=".ome.tif" :dest="dataset._girder" @done="uploadDone = true" />
       </template>
 
       <v-btn
@@ -37,31 +27,29 @@
         class="mr-4"
         @click="submit"
         v-if="dataset == null"
-      >
-        Create
-      </v-btn>
+      >Create</v-btn>
       <v-btn
-        :disabled="!valid"
+        :disabled="!uploadDone"
         color="success"
         class="mr-4"
-        @click="done"
         v-else
-      >
-        Done
-      </v-btn>
+        :to="{name: 'dataset', params: {id: dataset.id}}"
+      >Done</v-btn>
     </v-form>
   </v-container>
 </template>
 <script lang="ts">
 import { Vue, Component, Inject, Prop } from "vue-property-decorator";
 import store from "@/store";
-import { IGirderSelectAble } from "../../girder";
+import { IGirderSelectAble, Upload as GirderUpload } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
+
 import { IDataset } from "../../store/model";
 
 @Component({
   components: {
-    GirderLocationChooser
+    GirderLocationChooser,
+    GirderUpload
   }
 })
 export default class NewDataset extends Vue {
@@ -74,6 +62,8 @@ export default class NewDataset extends Vue {
   path: IGirderSelectAble | null = null;
 
   dataset: IDataset | null = null;
+
+  uploadDone = false;
 
   get pageTwo() {
     return this.dataset != null;
@@ -101,10 +91,6 @@ export default class NewDataset extends Vue {
       .then(ds => {
         this.dataset = ds;
       });
-  }
-
-  done() {
-    //
   }
 }
 </script>

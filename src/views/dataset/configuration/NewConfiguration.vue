@@ -12,13 +12,8 @@
 import { Vue, Component, Inject, Prop } from "vue-property-decorator";
 import store from "@/store";
 import { IDataset } from "../../../store/model";
-import { Upload as GirderUpload } from "@/girder";
 
-@Component({
-  components: {
-    GirderUpload
-  }
-})
+@Component
 export default class NewConfiguration extends Vue {
   readonly store = store;
 

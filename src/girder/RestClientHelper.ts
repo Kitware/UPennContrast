@@ -156,6 +156,22 @@ export default class RestClientHelper {
       .post("item", data)
       .then(r => asConfigurationItem(r.data));
   }
+
+  updateConfiguration(
+    config: IDatasetConfiguration
+  ): Promise<IDatasetConfiguration> {
+    const data = new FormData();
+    data.set(
+      "metaData",
+      JSON.stringify({
+        layerMode: config.layerMode,
+        layers: config.layers
+      })
+    );
+    return this.client
+      .put(`/item/${config.id}/metadata`, data)
+      .then(() => config);
+  }
 }
 
 function asDataset(folder: IGirderFolder): IDataset {
@@ -178,7 +194,7 @@ function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
     _girder: item,
     name: item.name,
     description: item.description,
-    layers: [], // TODO get from meta
+    layers: item.meta.layers || [],
     layerMode: item.meta.layerMode === "single" ? "single" : "multiple"
   };
 }
