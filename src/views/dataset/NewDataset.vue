@@ -1,8 +1,18 @@
 <template>
   <v-container>
     <v-form v-model="valid">
-      <v-text-field v-model="name" label="Name" required :rules="rules" :readonly="pageTwo" />
-      <v-textarea v-model="description" label="Description" :readonly="pageTwo" />
+      <v-text-field
+        v-model="name"
+        label="Name"
+        required
+        :rules="rules"
+        :readonly="pageTwo"
+      />
+      <v-textarea
+        v-model="description"
+        label="Description"
+        :readonly="pageTwo"
+      />
       <v-text-field
         :value="pathName"
         label="Path"
@@ -18,7 +28,11 @@
 
       <template v-if="dataset != null">
         <v-subheader>Images</v-subheader>
-        <girder-upload accept=".ome.tif" :dest="dataset._girder" @done="uploadDone = true" />
+        <girder-upload
+          accept=".ome.tif"
+          :dest="dataset._girder"
+          @done="uploadDone = true"
+        />
       </template>
 
       <v-btn
@@ -27,14 +41,16 @@
         class="mr-4"
         @click="submit"
         v-if="dataset == null"
-      >Create</v-btn>
+        >Create</v-btn
+      >
       <v-btn
         :disabled="!uploadDone"
         color="success"
         class="mr-4"
         v-else
-        :to="{name: 'dataset', params: {id: dataset.id}}"
-      >Done</v-btn>
+        :to="{ name: 'dataset', params: { id: dataset.id } }"
+        >Done</v-btn
+      >
     </v-form>
   </v-container>
 </template>

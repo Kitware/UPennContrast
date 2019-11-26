@@ -7,7 +7,9 @@
     <v-text-field :value="channels" label="# Channels" readonly />
     <v-subheader>
       <span class="grow">Configurations</span>
-      <v-btn :to="{ name: 'newconfiguration', params: $route.params }">Add Configuration</v-btn>
+      <v-btn :to="{ name: 'newconfiguration', params: $route.params }"
+        >Add Configuration</v-btn
+      >
     </v-subheader>
     <v-list two-line>
       <v-list-item v-for="c in configurations" :key="c.name">

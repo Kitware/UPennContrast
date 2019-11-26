@@ -5,13 +5,17 @@
       <v-list-item
         v-for="d in configurations"
         :key="d.id"
-        @click="$router.push({
-              name: 'configuration',
-              params: {id: d.datasetId, config: d.id}
-            })"
+        @click="
+          $router.push({
+            name: 'configuration',
+            params: { id: d.datasetId, config: d.id }
+          })
+        "
       >
         <v-list-item-content>
-          <v-list-item-title>{{ d.datasetName }} / {{ d.name }}</v-list-item-title>
+          <v-list-item-title
+            >{{ d.datasetName }} / {{ d.name }}</v-list-item-title
+          >
           <v-list-item-subtitle>{{ d.description }}</v-list-item-subtitle>
         </v-list-item-content>
         <v-list-item-action>
@@ -19,7 +23,7 @@
             icon
             :to="{
               name: 'configuration',
-              params: {id: d.datasetId, config: d.id}
+              params: { id: d.datasetId, config: d.id }
             }"
           >
             <v-icon>mdi-eye</v-icon>
