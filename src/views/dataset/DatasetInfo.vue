@@ -2,6 +2,9 @@
   <v-container>
     <v-text-field :value="name" label="Name" readonly />
     <v-textarea :value="description" label="Description" readonly />
+    <v-text-field :value="time" label="# Timepoints" readonly />
+    <v-text-field :value="z" label="# Z-Slices" readonly />
+    <v-text-field :value="channels" label="# Channels" readonly />
     <v-subheader>
       <span class="grow">Configurations</span>
       <v-btn :to="{ name: 'newconfiguration', params: $route.params }">Add Configuration</v-btn>
@@ -41,6 +44,18 @@ export default class DatasetInfo extends Vue {
 
   get description() {
     return this.store.dataset ? this.store.dataset.description : "";
+  }
+
+  get z() {
+    return this.store.dataset ? this.store.dataset.z.length : "?";
+  }
+
+  get time() {
+    return this.store.dataset ? this.store.dataset.time.length : "?";
+  }
+
+  get channels() {
+    return this.store.dataset ? this.store.dataset.channels.length : "?";
   }
 
   get configurations() {

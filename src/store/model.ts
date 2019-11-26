@@ -17,6 +17,22 @@ export interface IDatasetConfigurationMeta {
   description: string;
 }
 
+export interface IFrameInfo {
+  DeltaT: number;
+  PositionX: number;
+  PositionY: number;
+  PositionZ: number;
+  TheC: number;
+  TheT: number;
+  TheZ: number;
+}
+
+export interface IImage {
+  item: IGirderItem;
+  frameIndex: number;
+  frame: IFrameInfo;
+}
+
 export interface IDataset {
   readonly id: string;
   readonly _girder: IGirderFolder;
@@ -24,9 +40,10 @@ export interface IDataset {
   name: string;
   description: string;
 
-  z: IDimension;
-  time: IDimension;
-  channels: IDimension[];
+  z: number[];
+  time: number[];
+  channels: number[]; // TODO histogram to calculate the boundaries
+  images(time: number, z: number, channel: number): IImage[];
 
   configurations: IDatasetConfiguration[];
 }
