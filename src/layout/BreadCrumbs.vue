@@ -21,8 +21,12 @@ export default class BreadCrumbs extends Vue {
             : customText
           : record.name;
         return {
+          exact: true,
           text,
-          to: { name: record.name, params: this.$route.params }
+          to: {
+            name: record.name || record.meta.name,
+            params: this.$route.params
+          }
         };
       });
   }

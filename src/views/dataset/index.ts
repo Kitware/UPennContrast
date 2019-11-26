@@ -25,6 +25,7 @@ export const routes = [
     component: Configuration,
     props: true,
     meta: {
+      name: "configuration",
       text(store: Main) {
         return store.configuration?.name || store.selectedConfigurationId;
       }

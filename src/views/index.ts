@@ -23,6 +23,7 @@ export default [
     component: Dataset,
     children: datasetRoutes,
     meta: {
+      name: "dataset",
       text(store: Main) {
         return store.dataset?.name || store.selectedDatasetId;
       }

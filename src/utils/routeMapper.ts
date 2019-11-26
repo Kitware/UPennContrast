@@ -14,6 +14,8 @@ export default function routeMapper(
     ) {
       if (to.params[paramKey] && get() !== to.params[paramKey]) {
         set(to.params.id).then(() => next());
+      } else {
+        next();
       }
     },
     // when route changes and this component is already rendered,
@@ -25,6 +27,8 @@ export default function routeMapper(
     ) {
       if (to.params[paramKey] && get() !== to.params[paramKey]) {
         set(to.params.id).then(() => next());
+      } else {
+        next();
       }
     },
 
@@ -35,6 +39,8 @@ export default function routeMapper(
     ) {
       if (!to.params[paramKey]) {
         set(null).then(() => next());
+      } else {
+        next();
       }
     }
   });
