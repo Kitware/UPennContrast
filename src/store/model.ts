@@ -4,15 +4,19 @@ export interface IDimension {
 }
 
 export interface IDataset {
+  id: string;
   name: string;
   description: string;
 
   z: IDimension;
   time: IDimension;
   channels: IDimension[];
+
+  configurations: IDatasetConfiguration[];
 }
 
 export interface IDatasetConfiguration {
+  id: string;
   name: string;
   description: string;
 

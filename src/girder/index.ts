@@ -93,11 +93,13 @@ export class RestClientHelper {
     return this.getFolder(id).then(folder => {
       // TODO derive from OME tiff data
       return {
+        id,
         name: folder.name,
         description: folder.description,
         z: { min: 0, max: 1 },
         time: { min: 0, max: 1 },
-        channels: [{ min: 0, max: 1 }]
+        channels: [{ min: 0, max: 1 }],
+        configurations: [] // TODO
       };
     });
   }
@@ -105,6 +107,7 @@ export class RestClientHelper {
   getDatasetConfiguration(id: string): Promise<IDatasetConfiguration> {
     return this.getItem(id).then(item => {
       return {
+        id,
         name: item.name,
         description: item.description,
         layers: [], // TODO get from meta
