@@ -1,19 +1,23 @@
+import { RestClient, RestClientHelper } from "@/girder";
+import {
+  IGirderLocation,
+  IGirderSelectAble,
+  IGirderUser
+} from "@girder/components/src";
 import Vue from "vue";
 import Vuex from "vuex";
 import {
-  Module,
-  VuexModule,
-  Mutation,
   Action,
-  getModule
+  getModule,
+  Module,
+  Mutation,
+  VuexModule
 } from "vuex-module-decorators";
-import { RestClient, RestClientHelper } from "@/girder";
 import {
-  IGirderUser,
-  IGirderLocation,
-  IGirderItem
-} from "@girder/components/src";
-import { IDataset, IDatasetConfiguration } from "./model";
+  IDataset,
+  IDatasetConfiguration,
+  IDatasetConfigurationMeta
+} from "./model";
 
 Vue.use(Vuex);
 
@@ -55,6 +59,10 @@ export class Main extends VuexModule {
 
   selectedConfigurationId: string | null = null;
   configuration: IDatasetConfiguration | null = null;
+  recentConfigurations: IDatasetConfigurationMeta[] = persister.get(
+    "recentConfigurations",
+    []
+  );
 
   private internalLocation: IGirderLocation | null = null;
 
@@ -69,7 +77,7 @@ export class Main extends VuexModule {
     if (this.isLoggedIn && this.girderUser) {
       return this.girderUser;
     }
-    return { type: "collection" };
+    return { type: "root" };
   }
 
   get userName() {
@@ -123,6 +131,21 @@ export class Main extends VuexModule {
   }) {
     this.selectedConfigurationId = id;
     this.configuration = data;
+    if (data) {
+      // remove old
+      const index = this.recentConfigurations.findIndex(d => d.id === data.id);
+      if (index >= 0) {
+        this.recentConfigurations.splice(index, 1);
+      }
+      this.recentConfigurations.unshift({
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        datasetId: this.selectedDatasetId!,
+        datasetName: this.dataset?.name || "Unknown"
+      });
+      persister.set("recentConfigurations", this.recentConfigurations);
+    }
   }
 
   @Action({})
@@ -230,6 +253,46 @@ export class Main extends VuexModule {
     } catch (error) {
       // TODO
     }
+  }
+
+  @Action
+  async createDataset({
+    name,
+    description,
+    path
+  }: {
+    name: string;
+    description: string;
+    path: IGirderSelectAble;
+  }) {
+    try {
+      const ds = await this.api.createDataset(name, description, path);
+      return ds;
+    } catch (error) {
+      // TODO
+    }
+    return null;
+  }
+
+  @Action
+  async createConfiguration({
+    name,
+    description
+  }: {
+    name: string;
+    description: string;
+  }) {
+    try {
+      const config = await this.api.createConfiguration(
+        name,
+        description,
+        this.dataset!
+      );
+      return config;
+    } catch (error) {
+      // TODO
+    }
+    return null;
   }
 }
 

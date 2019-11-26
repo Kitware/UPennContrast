@@ -53,9 +53,3 @@ export default class App extends Vue {
   cursor: pointer;
 }
 </style>
-
-<style lang="scss">
-.grow {
-  flex: 1 1 0;
-}
-</style>

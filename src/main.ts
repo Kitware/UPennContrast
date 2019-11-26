@@ -1,6 +1,7 @@
 import Vue from "vue";
 import "reflect-metadata";
 import "./registerServiceWorker";
+import "./style.scss";
 import vuetify from "./plugins/vuetify";
 import "./plugins/router";
 import "./plugins/resize";

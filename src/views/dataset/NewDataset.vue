@@ -1,8 +1,18 @@
 <template>
   <v-container>
     <v-form v-model="valid">
-      <v-text-field v-model="name" label="Name" required :rules="rules" />
-      <v-textarea v-model="description" label="Description" />
+      <v-text-field
+        v-model="name"
+        label="Name"
+        required
+        :rules="rules"
+        :readonly="pageTwo"
+      />
+      <v-textarea
+        v-model="description"
+        label="Description"
+        :readonly="pageTwo"
+      />
       <v-text-field
         :value="pathName"
         label="Path"
@@ -16,10 +26,28 @@
         </template>
       </v-text-field>
 
-      <!-- Upload Area -->
+      <template v-if="dataset != null">
+        <v-subheader>Images</v-subheader>
+        <girder-upload accept=".ome.tif" :dest="dataset._girder" />
+      </template>
 
-      <v-btn :disabled="!valid" color="success" class="mr-4" @click="submit">
+      <v-btn
+        :disabled="!valid"
+        color="success"
+        class="mr-4"
+        @click="submit"
+        v-if="dataset == null"
+      >
         Create
+      </v-btn>
+      <v-btn
+        :disabled="!valid"
+        color="success"
+        class="mr-4"
+        @click="done"
+        v-else
+      >
+        Done
       </v-btn>
     </v-form>
   </v-container>
@@ -29,6 +57,7 @@ import { Vue, Component, Inject, Prop } from "vue-property-decorator";
 import store from "@/store";
 import { IGirderSelectAble } from "../../girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
+import { IDataset } from "../../store/model";
 
 @Component({
   components: {
@@ -44,6 +73,12 @@ export default class NewDataset extends Vue {
 
   path: IGirderSelectAble | null = null;
 
+  dataset: IDataset | null = null;
+
+  get pageTwo() {
+    return this.dataset != null;
+  }
+
   get pathName() {
     return this.path ? this.path.name : "";
   }
@@ -57,7 +92,19 @@ export default class NewDataset extends Vue {
       return;
     }
 
-    // TODO create dataset for real
+    this.store
+      .createDataset({
+        name: this.name,
+        description: this.description,
+        path: this.path!
+      })
+      .then(ds => {
+        this.dataset = ds;
+      });
+  }
+
+  done() {
+    //
   }
 }
 </script>

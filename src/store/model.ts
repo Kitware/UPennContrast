@@ -1,10 +1,26 @@
+import {
+  IGirderItem,
+  IGirderFolder,
+  IGirderSelectAble
+} from "@girder/components/src";
+
 export interface IDimension {
   min: number;
   max: number;
 }
 
-export interface IDataset {
+export interface IDatasetConfigurationMeta {
   id: string;
+  datasetId: string;
+  datasetName: string;
+  name: string;
+  description: string;
+}
+
+export interface IDataset {
+  readonly id: string;
+  readonly _girder: IGirderFolder;
+
   name: string;
   description: string;
 
@@ -16,7 +32,9 @@ export interface IDataset {
 }
 
 export interface IDatasetConfiguration {
-  id: string;
+  readonly id: string;
+  readonly _girder: IGirderItem;
+
   name: string;
   description: string;
 
@@ -62,4 +80,12 @@ export interface IUISetting {
   z: number;
   time: number;
   activeLayer: IDisplayLayer;
+}
+
+export function isConfigurationItem(item: IGirderItem) {
+  return item.meta.subtype === "contrastConfiguration";
+}
+
+export function isDatasetFolder(folder: IGirderFolder) {
+  return folder.meta.subtype === "contrastDataset";
 }

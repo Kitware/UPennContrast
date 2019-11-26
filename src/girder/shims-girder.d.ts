@@ -28,12 +28,12 @@ declare module "@girder/components/src" {
     _id: string;
 
     login: string;
-    type: "user";
   }
 
-  export interface IGirderLocation {
-    type: "collection" | "user" | "folder";
-  }
+  export type IGirderLocation =
+    | IGirderUser
+    | IGirderFolder
+    | { type: "collections" | "root" | "users" };
 
   export interface IGirderItem {
     _modelType: "item";

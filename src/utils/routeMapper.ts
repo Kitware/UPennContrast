@@ -13,7 +13,7 @@ export default function routeMapper(
       next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any
     ) {
       if (to.params[paramKey] && get() !== to.params[paramKey]) {
-        set(to.params.id).then(() => next());
+        set(to.params[paramKey]).then(() => next());
       } else {
         next();
       }
@@ -26,7 +26,7 @@ export default function routeMapper(
       next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any
     ) {
       if (to.params[paramKey] && get() !== to.params[paramKey]) {
-        set(to.params.id).then(() => next());
+        set(to.params[paramKey]).then(() => next());
       } else {
         next();
       }
