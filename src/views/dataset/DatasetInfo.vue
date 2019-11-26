@@ -3,8 +3,8 @@
     <v-text-field :value="name" label="Name" readonly />
     <v-textarea :value="description" label="Description" readonly />
     <v-subheader>
-      <span> Configurations</span>
-      <v-btn :to="{ name: 'newconfiguration' }">
+      <span class="grow"> Configurations</span>
+      <v-btn :to="{ name: 'newconfiguration', params: $route.params }">
         Add Configuration
       </v-btn>
     </v-subheader>

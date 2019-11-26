@@ -60,9 +60,3 @@ export default class GirderLocationChooser extends Vue {
   }
 }
 </script>
-
-<style lang="scss" scoped>
-.grow {
-  flex: 1 1 0;
-}
-</style>
