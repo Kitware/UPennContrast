@@ -1,8 +1,8 @@
 <template>
-  <v-expansion-panels multiple>
+  <v-expansion-panels multiple accordion>
     <display-layer
       v-for="(l, index) in layers"
-      :key="index"
+      :key="l.id"
       :value="l"
       :index="index"
     />

@@ -75,6 +75,7 @@ export interface IDisplaySlice {
 // UI TODO: hotkey for enable/disable layer: 1 ... toggle layer 1
 
 export interface IDisplayLayer {
+  readonly id: string; // to have better keys for UI
   name: string;
   color: string;
 
@@ -122,6 +123,12 @@ const colors = [
   "#00FFFF"
 ];
 
+function randomId() {
+  return Math.random()
+    .toString(36)
+    .substr(2, 5);
+}
+
 export function newLayer(
   dataset: IDataset,
   configuration: IDatasetConfiguration
@@ -135,6 +142,7 @@ export function newLayer(
 
   // guess a good new layer
   return {
+    id: randomId(),
     name: `Layer ${configuration.layers.length + 1}`,
     visible: true,
     channel: nextChannel[0] || 0,

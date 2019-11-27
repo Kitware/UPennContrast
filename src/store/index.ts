@@ -382,6 +382,18 @@ export class Main extends VuexModule {
     }
     Object.assign(this.configuration.layers[index], delta);
   }
+
+  @Mutation
+  removeLayer(index: number) {
+    if (
+      !this.configuration ||
+      index < 0 ||
+      index >= this.configuration.layers.length
+    ) {
+      return;
+    }
+    this.configuration.layers.splice(index, 1);
+  }
 }
 
 const main = getModule(Main);

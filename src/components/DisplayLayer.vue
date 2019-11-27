@@ -71,6 +71,12 @@
         label="Time-Slice"
         :max-value="maxTime"
       />
+      <div>
+        TODO Histogram
+      </div>
+      <div class="buttons">
+        <v-btn color="warning" small @click="removeLayer">Remove</v-btn>
+      </div>
     </v-expansion-panel-content>
   </v-expansion-panel>
 </template>
@@ -139,6 +145,10 @@ export default class Contrast extends Vue {
       }
     });
   }
+
+  removeLayer() {
+    this.store.removeLayer(this.index);
+  }
 }
 </script>
 <style lang="scss" scoped>
@@ -154,5 +164,10 @@ export default class Contrast extends Vue {
 
 .toggleButton {
   margin: 0;
+}
+
+.buttons {
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

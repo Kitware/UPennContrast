@@ -54,7 +54,7 @@ export default class Viewer extends Vue {
 
 .layers {
   position: absolute;
-  top: 5em;
+  top: 6em;
   left: 0.5em;
   width: 20em;
 }
