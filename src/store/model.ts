@@ -61,8 +61,14 @@ export interface IDatasetConfiguration {
   layerMode: "multiple" | "single";
 }
 
+export declare type DisplaySliceType =
+  | "current"
+  | "max-merge"
+  | "constant"
+  | "offset";
+
 export interface IDisplaySlice {
-  type: "current" | "max-merge" | "constant" | "offset";
+  type: DisplaySliceType;
   value: number | null;
 }
 

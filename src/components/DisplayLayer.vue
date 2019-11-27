@@ -45,15 +45,40 @@
         width="300"
       />
     </v-menu>
+    <v-radio-group row :value="value.channel" label="Channel" dense>
+      <v-radio
+        v-for="(channel, index) in channels"
+        :key="index"
+        :value="index"
+        :label="channel.toString()"
+      />
+    </v-radio-group>
+    <display-slice
+      :value="value.z"
+      @change="changeProp('z', $event)"
+      label="Z-Slice"
+      :max-value="maxZ"
+    />
+    <display-slice
+      :value="value.time"
+      @change="changeProp('time', $event)"
+      label="Time-Slice"
+      :max-value="maxTime"
+    />
   </div>
 </template>
 
 <script lang="ts">
 import { Vue, Component, Prop, Emit } from "vue-property-decorator";
-import { IDimension, IDisplayLayer } from "../store/model";
+import { IDisplayLayer } from "../store/model";
+import DisplaySlice from "./DisplaySlice.vue";
 import store from "../store";
 
-@Component
+@Component({
+  components: {
+    DisplaySlice
+  }
+})
 export default class Contrast extends Vue {
   readonly store = store;
   @Prop()
@@ -63,6 +88,22 @@ export default class Contrast extends Vue {
   readonly index!: number;
 
   showColorPicker = false;
+
+  get channels() {
+    return this.store.dataset ? this.store.dataset.channels : [];
+  }
+
+  get maxZ() {
+    return this.store.dataset
+      ? this.store.dataset.z.length
+      : this.value.z.value || 0;
+  }
+
+  get maxTime() {
+    return this.store.dataset
+      ? this.store.dataset.time.length
+      : this.value.time.value || 0;
+  }
 
   changeProp(prop: keyof IDisplayLayer, value: any) {
     if (this.value[prop] === value) {
