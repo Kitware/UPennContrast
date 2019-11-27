@@ -1,19 +1,26 @@
 <template>
   <div class="viewer">
-    <viewer-toolbar class="toolbar" />
-    <display-layers class="layers" />
+    <aside class="toolbar">
+      <viewer-toolbar />
+      <div class="layers">
+        <display-layers />
+      </div>
+    </aside>
+    <image-viewer class="main" />
   </div>
 </template>
 <script lang="ts">
 import { Vue, Component, Inject, Prop } from "vue-property-decorator";
 import ViewerToolbar from "@/components/ViewerToolbar.vue";
 import DisplayLayers from "@/components/DisplayLayers.vue";
+import ImageViewer from "@/components/ImageViewer.vue";
 import store from "@/store";
 
 @Component({
   components: {
     ViewerToolbar,
-    DisplayLayers
+    DisplayLayers,
+    ImageViewer
   }
 })
 export default class Viewer extends Vue {
@@ -43,19 +50,21 @@ export default class Viewer extends Vue {
   top: 0;
   width: 100%;
   height: 100%;
+  display: flex;
 }
 
 .toolbar {
-  position: absolute;
-  top: 0.5em;
-  left: 0.5em;
+  display: flex;
+  flex-direction: column;
   width: 20em;
 }
 
 .layers {
-  position: absolute;
-  top: 6em;
-  left: 0.5em;
-  width: 20em;
+  flex: 1 1 0;
+  overflow: auto;
+}
+
+.main {
+  flex: 1 1 0;
 }
 </style>

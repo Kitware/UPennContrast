@@ -37,10 +37,6 @@ export default class DisplayLayers extends Vue {
 </script>
 
 <style lang="scss" scoped>
-.layers {
-  display: flex;
-  flex-direction: column;
-}
 .add-layer {
   display: flex;
   flex-direction: column;
