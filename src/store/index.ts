@@ -135,6 +135,7 @@ export class Main extends VuexModule {
   }) {
     this.selectedDatasetId = id;
     this.dataset = data;
+    this.api.flushImageCache();
   }
   @Mutation
   protected setConfiguration({

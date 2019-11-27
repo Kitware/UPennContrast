@@ -249,6 +249,10 @@ export default class RestClientHelper {
 
     return resolvedImages;
   }
+
+  flushImageCache() {
+    this.imageCache.clear();
+  }
 }
 
 function asDataset(folder: IGirderFolder): IDataset {

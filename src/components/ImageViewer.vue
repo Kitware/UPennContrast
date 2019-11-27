@@ -57,10 +57,14 @@ export default class ImageViewer extends Vue {
     const ready: string[] = [];
     value.forEach(layer => {
       layer.forEach(tile => {
-        if (tile.image.complete) {
+        if (tile.image.src && tile.image.complete) {
           ready.push(tile.url);
         } else {
-          tile.image.onload = () => this.ready.push(tile.url);
+          tile.image.onload = () => {
+            this.$nextTick(() => {
+              this.ready.push(tile.url);
+            });
+          };
         }
       });
     });
