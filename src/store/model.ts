@@ -106,3 +106,47 @@ export function isConfigurationItem(item: IGirderItem) {
 export function isDatasetFolder(folder: IGirderFolder) {
   return folder.meta.subtype === "contrastDataset";
 }
+
+const colors = [
+  "#FF0000",
+  "#00FF00",
+  "#0000FF",
+  "#FFFF00",
+  "#FF00FF",
+  "#00FFFF"
+];
+
+export function newLayer(
+  dataset: IDataset,
+  configuration: IDatasetConfiguration
+): IDisplayLayer {
+  const usedColors = new Set(configuration.layers.map(l => l.color));
+  const nextColor = colors.filter(c => !usedColors.has(c));
+  const usedChannels = new Set(configuration.layers.map(l => l.channel));
+  const nextChannel = dataset.channels
+    .map((_, i) => i)
+    .filter(c => !usedChannels.has(c));
+
+  // guess a good new layer
+  return {
+    name: `Layer ${configuration.layers.length + 1}`,
+    visible: true,
+    channel: nextChannel[0] || 0,
+    time: {
+      type: "current",
+      value: null
+    },
+    z: {
+      type: "current",
+      value: null
+    },
+    color: nextColor[0] || colors[0],
+    contrast: {
+      mode: "percentile",
+      blackPoint: 0,
+      savedBlackPoint: 0,
+      whitePoint: 100,
+      savedWhitePoint: 100
+    }
+  };
+}

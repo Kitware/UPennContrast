@@ -88,6 +88,7 @@ export default class UserMenu extends Vue {
   async logout() {
     await this.store.logout();
     this.userMenu = false;
+    this.$router.push({ name: "root" });
   }
 }
 </script>

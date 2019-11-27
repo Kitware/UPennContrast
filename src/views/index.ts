@@ -6,8 +6,11 @@ import { Main } from "@/store";
 export default [
   {
     path: "/",
-    name: "home",
-    component: Home
+    name: "root",
+    component: Home,
+    meta: {
+      hidden: true
+    }
   },
   {
     path: "/new",

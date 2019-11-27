@@ -8,7 +8,7 @@
         <v-list-item-title>Home</v-list-item-title>
       </v-list-item-content>
     </v-list-item>
-    <v-list-item :to="{ name: 'newdataset' }">
+    <v-list-item :to="{ name: 'newdataset' }" v-if="store.isLoggedIn">
       <v-list-item-action>
         <v-icon>mdi-plus-circle</v-icon>
       </v-list-item-action>

@@ -44,7 +44,7 @@ export default class App extends Vue {
   drawer = false;
 
   goHome() {
-    this.$router.push({ name: "home" });
+    this.$router.push({ name: "root" });
   }
 }
 </script>

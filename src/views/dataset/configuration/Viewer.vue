@@ -1,56 +1,37 @@
 <template>
   <div class="viewer">
-    <div class="toolbar">
-      <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
-      <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
-    </div>
+    <viewer-toolbar class="toolbar" />
+    <display-layers class="layers" />
   </div>
 </template>
 <script lang="ts">
 import { Vue, Component, Inject, Prop } from "vue-property-decorator";
-import ValueSlider from "@/components/ValueSlider.vue";
+import ViewerToolbar from "@/components/ViewerToolbar.vue";
+import DisplayLayers from "@/components/DisplayLayers.vue";
 import store from "@/store";
 
 @Component({
   components: {
-    ValueSlider
+    ViewerToolbar,
+    DisplayLayers
   }
 })
 export default class Viewer extends Vue {
   readonly store = store;
 
-  get z() {
-    return this.store.z;
+  created() {
+    document.addEventListener("keydown", this.onKeyDown);
   }
 
-  get time() {
-    return this.store.time;
+  beforeDestroy() {
+    document.removeEventListener("keydown", this.onKeyDown);
   }
 
-  set z(value: number) {
-    this.$router.replace({
-      query: {
-        ...this.$route.query,
-        z: value.toString()
-      }
-    });
-  }
-
-  set time(value: number) {
-    this.$router.replace({
-      query: {
-        ...this.$route.query,
-        time: value.toString()
-      }
-    });
-  }
-
-  get maxZ() {
-    return this.store.dataset ? this.store.dataset.z.length : this.z;
-  }
-
-  get maxTime() {
-    return this.store.dataset ? this.store.dataset.time.length : this.time;
+  private onKeyDown(evt: KeyboardEvent) {
+    // handle hot keys
+    if (/^\d$/g.test(evt.key)) {
+      this.store.handleHotkey(parseInt(evt.key, 10));
+    }
   }
 }
 </script>
@@ -67,6 +48,13 @@ export default class Viewer extends Vue {
 .toolbar {
   position: absolute;
   top: 0.5em;
+  left: 0.5em;
+  width: 20em;
+}
+
+.layers {
+  position: absolute;
+  top: 5em;
   left: 0.5em;
   width: 20em;
 }

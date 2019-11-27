@@ -15,8 +15,10 @@ import {
 } from "vuex-module-decorators";
 import {
   IDataset,
+  IDisplayLayer,
   IDatasetConfiguration,
-  IDatasetConfigurationMeta
+  IDatasetConfigurationMeta,
+  newLayer
 } from "./model";
 
 Vue.use(Vuex);
@@ -120,7 +122,13 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  protected setDataset({ id, data }: { id: string; data: IDataset }) {
+  protected setDataset({
+    id,
+    data
+  }: {
+    id: string | null;
+    data: IDataset | null;
+  }) {
     this.selectedDatasetId = id;
     this.dataset = data;
   }
@@ -129,8 +137,8 @@ export class Main extends VuexModule {
     id,
     data
   }: {
-    id: string;
-    data: IDatasetConfiguration;
+    id: string | null;
+    data: IDatasetConfiguration | null;
   }) {
     this.selectedConfigurationId = id;
     this.configuration = data;
@@ -169,7 +177,7 @@ export class Main extends VuexModule {
       // ignore
       // console.log("error during logging out", err);
     }
-    this.context.commit("loggedOut");
+    this.loggedOut();
   }
 
   @Action
@@ -180,7 +188,7 @@ export class Main extends VuexModule {
     try {
       const user = await this.girderRest.fetchUser();
       if (user) {
-        this.context.commit("loggedIn", {
+        this.loggedIn({
           girderUrl: this.girderUrl,
           girderRest: this.girderRest
         });
@@ -195,14 +203,11 @@ export class Main extends VuexModule {
   private async initFromUrl() {
     if (this.girderUser && this.selectedDatasetId) {
       // load after logged in
-      await this.context.dispatch("setSelectedDataset", this.selectedDatasetId);
+      await this.setSelectedDataset(this.selectedDatasetId);
     }
     if (this.girderUser && this.selectedConfigurationId && this.dataset) {
       // load after logged in
-      await this.context.dispatch(
-        "setSelectedConfiguration",
-        this.selectedConfigurationId
-      );
+      await this.setSelectedConfiguration(this.selectedConfigurationId);
     }
   }
 
@@ -231,7 +236,7 @@ export class Main extends VuexModule {
       }
     }
 
-    this.context.commit("loggedIn", {
+    this.loggedIn({
       girderUrl: domain,
       girderRest: restClient
     });
@@ -243,12 +248,12 @@ export class Main extends VuexModule {
   @Action
   async setSelectedDataset(id: string | null) {
     if (!this.isLoggedIn || !id) {
-      this.context.commit("setDataset", { id });
+      this.setDataset({ id, data: null });
       return;
     }
     try {
       const r = await this.api.getDataset(id);
-      this.context.commit("setDataset", { id, data: r });
+      this.setDataset({ id, data: r });
     } catch (error) {
       // TODO
     }
@@ -257,12 +262,12 @@ export class Main extends VuexModule {
   @Action
   async setSelectedConfiguration(id: string | null) {
     if (!this.isLoggedIn || !id) {
-      this.context.commit("setConfiguration", { id });
+      this.setConfiguration({ id, data: null });
       return;
     }
     try {
       const r = await this.api.getDatasetConfiguration(id);
-      this.context.commit("setConfiguration", { id, data: r });
+      this.setConfiguration({ id, data: r });
     } catch (error) {
       // TODO
     }
@@ -308,20 +313,74 @@ export class Main extends VuexModule {
     return null;
   }
 
-  @Action({
-    commit: "setZImpl"
-  })
+  @Action
   async setZ(value: number) {
-    console.log("set z", value);
-    return value;
+    this.setZImpl(value);
   }
 
-  @Action({
-    commit: "setTimeImpl"
-  })
+  @Action
   async setTime(value: number) {
-    console.log("set time", value);
-    return value;
+    this.setTimeImpl(value);
+  }
+
+  @Mutation
+  private pushLayer(layer: IDisplayLayer) {
+    this.configuration!.layers.push(layer);
+  }
+
+  @Mutation
+  private toggleLayer(index: number) {
+    if (!this.configuration) {
+      return;
+    }
+    const layers = this.configuration.layers;
+    switch (this.configuration.layerMode) {
+      case "single":
+        layers.forEach((l, i) => (l.visible = i === index));
+        break;
+      case "multiple":
+        layers[index].visible = !layers[index].visible;
+        break;
+    }
+  }
+
+  @Action
+  async addLayer() {
+    if (!this.configuration || !this.dataset) {
+      return;
+    }
+    this.pushLayer(newLayer(this.dataset, this.configuration));
+  }
+
+  @Action
+  handleHotkey(hotKey: number) {
+    if (
+      !this.dataset ||
+      !this.configuration ||
+      hotKey < 1 ||
+      hotKey > this.configuration.layers.length
+    ) {
+      return;
+    }
+    this.toggleLayer(hotKey - 1);
+  }
+
+  @Mutation
+  changeLayer({
+    index,
+    delta
+  }: {
+    index: number;
+    delta: Partial<IDisplayLayer>;
+  }) {
+    if (
+      !this.configuration ||
+      index < 0 ||
+      index >= this.configuration.layers.length
+    ) {
+      return;
+    }
+    Object.assign(this.configuration.layers[index], delta);
   }
 }
 

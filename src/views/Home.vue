@@ -1,13 +1,14 @@
 <template>
   <v-container>
+    <v-alert :value="!store.isLoggedIn" color="info">Login to start</v-alert>
     <v-subheader>Recent Dataset Configurations</v-subheader>
-    <v-list two-line>
+    <v-list two-line v-if="store.isLoggedIn">
       <v-list-item
         v-for="d in configurations"
         :key="d.id"
         @click="
           $router.push({
-            name: 'configuration',
+            name: 'view',
             params: { id: d.datasetId, config: d.id }
           })
         "
