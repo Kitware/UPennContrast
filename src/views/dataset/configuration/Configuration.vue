@@ -28,7 +28,8 @@ export default routeMapper(
     mode: {
       parse: v => v as CompositionMode,
       get: () => store.compositionMode,
-      set: (value: CompositionMode) => store.setCompositionMode(value)
+      set: (value: CompositionMode) =>
+        store.setCompositionMode(value || "multiply")
     }
   }
 );

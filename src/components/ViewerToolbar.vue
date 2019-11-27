@@ -72,11 +72,11 @@ export default class ViewerToolbar extends Vue {
   }
 
   get maxZ() {
-    return this.store.dataset ? this.store.dataset.z.length : this.z;
+    return this.store.dataset ? this.store.dataset.z.length - 1 : this.z;
   }
 
   get maxTime() {
-    return this.store.dataset ? this.store.dataset.time.length : this.time;
+    return this.store.dataset ? this.store.dataset.time.length - 1 : this.time;
   }
 }
 </script>

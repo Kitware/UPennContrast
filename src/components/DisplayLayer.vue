@@ -124,13 +124,13 @@ export default class Contrast extends Vue {
 
   get maxZ() {
     return this.store.dataset
-      ? this.store.dataset.z.length
+      ? this.store.dataset.z.length - 1
       : this.value.z.value || 0;
   }
 
   get maxTime() {
     return this.store.dataset
-      ? this.store.dataset.time.length
+      ? this.store.dataset.time.length - 1
       : this.value.time.value || 0;
   }
 
