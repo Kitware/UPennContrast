@@ -188,6 +188,8 @@ function asDataset(folder: IGirderFolder): IDataset {
     name: folder.name,
     description: folder.description,
     z: [],
+    width: 100,
+    height: 100,
     time: [],
     channels: [],
     images: () => [],
@@ -274,7 +276,11 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
       const info: IImage = {
         frame,
         frameIndex: j,
-        item
+        item,
+        sizeX: tile.sizeX,
+        sizeY: tile.sizeY,
+        tileWidth: tile.tileWidth,
+        tileHeight: tile.tileHeight
       };
       if (!lookup.has(key)) {
         lookup.set(key, [info]);
@@ -283,12 +289,33 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
       }
     });
   });
+
+  let width = 0;
+  let height = 0;
+
+  // TODO better stiching for now just horizontally
+  lookup.forEach(images => {
+    const cwidth = images.reduce((acc, image) => acc + image.sizeX, 0);
+    const cheight = images.reduce(
+      (acc, image) => Math.max(acc, image.sizeY),
+      0
+    );
+    if (cwidth > width) {
+      width = cwidth;
+    }
+    if (cheight > height) {
+      height = cheight;
+    }
+  });
+
   return {
     images: (time: number, z: number, channel: number) =>
       lookup.get(toKey(time, z, channel)) || [],
     z: Array.from(zs).sort((a, b) => a - b),
     channels: Array.from(cs).sort((a, b) => a - b),
-    time: Array.from(ts).sort((a, b) => a - b)
+    time: Array.from(ts).sort((a, b) => a - b),
+    width,
+    height
   };
 }
 

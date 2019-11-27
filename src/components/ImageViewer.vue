@@ -3,6 +3,8 @@
     <canvas
       class="canvas"
       ref="canvas"
+      :width="width"
+      :height="height"
       :data-update="reactiveDraw"
       :style="{ transform: cssTransform }"
     />
@@ -20,9 +22,9 @@ export default class ImageViewer extends Vue {
   readonly store = store;
 
   private refsMounted = false;
-  private width = 10;
-  private height = 10;
   private transform = Object.assign({}, zoomIdentity);
+
+  private containerDimensions = { width: 100, height: 100 };
 
   readonly zoom = d3Zoom<HTMLElement, any>().on("zoom", () => {
     this.zoomed(d3Event as D3ZoomEvent<HTMLElement, any>);
@@ -36,9 +38,17 @@ export default class ImageViewer extends Vue {
     return `translate(${this.transform.x}px, ${this.transform.y}px) scale(${this.transform.k})`;
   }
 
+  get width() {
+    return this.store.dataset?.width || 100;
+  }
+
+  get height() {
+    return this.store.dataset?.height || 100;
+  }
+
   mounted() {
     this.refsMounted = true;
-    this.handleResize();
+    this.updateContainerSize();
     this.initZoom();
   }
 
@@ -48,13 +58,11 @@ export default class ImageViewer extends Vue {
 
   private zoomed(evt: D3ZoomEvent<HTMLElement, any>) {
     this.transform = evt.transform;
-    console.log(evt.transform.toString());
   }
 
-  handleResize() {
+  updateContainerSize() {
     const { width, height } = this.$el.getBoundingClientRect();
-    this.width = width - 1;
-    this.height = height - 1;
+    this.containerDimensions = { width, height };
   }
 
   get reactiveDraw() {
@@ -67,10 +75,7 @@ export default class ImageViewer extends Vue {
   private draw(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillRect(10, 10, 10, 10);
-
-    // TODO
+    ctx.globalCompositeOperation = this.store.compositionMode;
   }
 }
 </script>
@@ -86,5 +91,6 @@ export default class ImageViewer extends Vue {
   left: 0;
   top: 0;
   transform-origin: 0 0;
+  border: 1px solid black;
 }
 </style>

@@ -18,7 +18,8 @@ import {
   IDisplayLayer,
   IDatasetConfiguration,
   IDatasetConfigurationMeta,
-  newLayer
+  newLayer,
+  CompositionMode
 } from "./model";
 
 Vue.use(Vuex);
@@ -68,6 +69,7 @@ export class Main extends VuexModule {
 
   z: number = 0;
   time: number = 0;
+  compositionMode: CompositionMode = "multiply";
 
   private internalLocation: IGirderLocation | null = null;
 
@@ -350,6 +352,16 @@ export class Main extends VuexModule {
       return;
     }
     this.pushLayer(newLayer(this.dataset, this.configuration));
+  }
+
+  @Mutation
+  private setCompositionModeImpl(mode: CompositionMode) {
+    this.compositionMode = mode;
+  }
+
+  @Action
+  async setCompositionMode(mode: CompositionMode) {
+    this.setCompositionModeImpl(mode);
   }
 
   @Action

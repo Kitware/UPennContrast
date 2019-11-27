@@ -4,6 +4,7 @@
 <script lang="ts">
 import store from "@/store";
 import routeMapper from "@/utils/routeMapper";
+import { CompositionMode } from "@/store/model";
 
 export default routeMapper(
   {
@@ -23,6 +24,11 @@ export default routeMapper(
       parse: v => parseInt(v, 10),
       get: () => store.time,
       set: (value: number) => store.setTime(value || 0)
+    },
+    mode: {
+      parse: v => v as CompositionMode,
+      get: () => store.compositionMode,
+      set: (value: CompositionMode) => store.setCompositionMode(value)
     }
   }
 );
