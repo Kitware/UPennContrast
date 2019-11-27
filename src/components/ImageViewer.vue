@@ -61,7 +61,8 @@ export default class ImageViewer extends Vue {
           ready.push(tile.url);
         } else {
           tile.image.onload = () => {
-            this.$nextTick(() => {
+            // not just loaded but also decoded
+            tile.image.decode().then(() => {
               this.ready.push(tile.url);
             });
           };
