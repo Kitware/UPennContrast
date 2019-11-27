@@ -312,6 +312,7 @@ export class Main extends VuexModule {
     commit: "setZImpl"
   })
   async setZ(value: number) {
+    console.log("set z", value);
     return value;
   }
 
@@ -319,6 +320,7 @@ export class Main extends VuexModule {
     commit: "setTimeImpl"
   })
   async setTime(value: number) {
+    console.log("set time", value);
     return value;
   }
 }

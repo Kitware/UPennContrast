@@ -14,7 +14,10 @@ export const routes = [
     path: "view",
     name: "view",
     props: true,
-    component: Viewer
+    component: Viewer,
+    meta: {
+      text: "Explore"
+    }
   }
 ];
 

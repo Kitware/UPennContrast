@@ -17,12 +17,12 @@ export default routeMapper(
     z: {
       parse: v => parseInt(v, 10),
       get: () => store.z,
-      set: (value: number) => store.setZ(value)
+      set: (value: number) => store.setZ(value || 0)
     },
     time: {
       parse: v => parseInt(v, 10),
       get: () => store.time,
-      set: (value: number) => store.setTime(value)
+      set: (value: number) => store.setTime(value || 0)
     }
   }
 );
