@@ -25,6 +25,7 @@ export interface IFrameInfo {
 
 export interface IImage {
   item: IGirderItem;
+  levels: number;
   frameIndex: number;
   frame: IFrameInfo;
   sizeX: number;
@@ -244,3 +245,12 @@ export const COMPOSITION_MODES = {
   luminosity:
     "Preserves the hue and chroma of the bottom layer, while adopting the luma of the top layer."
 };
+
+export interface IImageTile {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  url: string;
+  image: HTMLImageElement;
+}

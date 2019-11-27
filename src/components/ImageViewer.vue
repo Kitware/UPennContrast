@@ -12,10 +12,11 @@
   </div>
 </template>
 <script lang="ts">
-import { Vue, Component } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import { select, event as d3Event } from "d3-selection";
 import { zoom as d3Zoom, D3ZoomEvent, zoomIdentity } from "d3-zoom";
+import { IImageTile } from "../store/model";
 
 @Component
 export default class ImageViewer extends Vue {
@@ -30,6 +31,8 @@ export default class ImageViewer extends Vue {
     this.zoomed(d3Event as D3ZoomEvent<HTMLElement, any>);
   });
 
+  private ready: string[] = [];
+
   $refs!: {
     canvas: HTMLCanvasElement;
   };
@@ -39,17 +42,41 @@ export default class ImageViewer extends Vue {
   }
 
   get width() {
-    return this.store.dataset?.width || 100;
+    return this.store.dataset ? this.store.dataset.width : 100;
   }
 
   get height() {
-    return this.store.dataset?.height || 100;
+    return this.store.dataset ? this.store.dataset.height : 100;
+  }
+
+  get imageStack() {
+    return this.store.imageStack;
+  }
+
+  private trackImages(value: IImageTile[][]) {
+    const ready: string[] = [];
+    value.forEach(layer => {
+      layer.forEach(tile => {
+        if (tile.image.complete) {
+          ready.push(tile.url);
+        } else {
+          tile.image.onload = () => this.ready.push(tile.url);
+        }
+      });
+    });
+    this.ready = ready;
+  }
+
+  @Watch("imageStack")
+  watchImageStack(value: IImageTile[][]) {
+    this.trackImages(value);
   }
 
   mounted() {
     this.refsMounted = true;
     this.updateContainerSize();
     this.initZoom();
+    this.trackImages(this.imageStack);
   }
 
   private initZoom() {
@@ -72,10 +99,35 @@ export default class ImageViewer extends Vue {
     this.draw(this.$refs.canvas);
   }
 
+  private get layers() {
+    return this.store.configuration ? this.store.configuration.layers : [];
+  }
+
   private draw(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = this.store.compositionMode;
+
+    const isReady = new Set(this.ready);
+
+    this.imageStack.forEach(layer => {
+      layer.forEach(tile => {
+        if (!isReady.has(tile.url)) {
+          return;
+        }
+        ctx.drawImage(
+          tile.image,
+          0,
+          0,
+          tile.width,
+          tile.height,
+          tile.x,
+          tile.y,
+          tile.width,
+          tile.height
+        );
+      });
+    });
   }
 }
 </script>

@@ -10,8 +10,11 @@ import {
   IDatasetConfiguration,
   isConfigurationItem,
   IFrameInfo,
-  IImage
+  IImage,
+  IContrast,
+  IImageTile
 } from "@/store/model";
+import { hsl } from "d3-color";
 
 function toId(item: string | { _id: string }) {
   return typeof item === "string" ? item : item._id;
@@ -19,6 +22,8 @@ function toId(item: string | { _id: string }) {
 
 export default class RestClientHelper {
   private readonly client: RestClient;
+
+  private readonly imageCache = new Map<string, HTMLImageElement>();
 
   constructor(client: RestClient) {
     this.client = client;
@@ -39,26 +44,16 @@ export default class RestClientHelper {
     return url.href;
   }
 
-  getImage(item: string | IGirderItem) {
-    return new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = evt => reject(evt);
-      image.src = this.downloadUrl(item);
-    });
-  }
-
   tileUrl(
     item: string | IGirderItem,
     { x, y, z, frame }: { x: number; y: number; z: number; frame: number },
     style: ITileOptions
   ) {
     const url = new URL(
-      `${this.client.apiRoot}/item/${toId(
-        item
-      )}/tiles/fzyx/${frame}/${z}/${x}/${y}`
+      `${this.client.apiRoot}/item/${toId(item)}/tiles/zxy/${z}/${x}/${y}`
     );
     url.searchParams.set("encoding", "PNG");
+    url.searchParams.set("frame", frame.toString());
     url.searchParams.set("style", JSON.stringify(style));
 
     return url.href;
@@ -179,6 +174,81 @@ export default class RestClientHelper {
       .put(`/item/${config.id}/metadata`, data)
       .then(() => config);
   }
+
+  private loadImage(
+    url: string,
+    width: number,
+    height: number,
+    mimeType: string
+  ) {
+    if (this.imageCache.has(url)) {
+      return this.imageCache.get(url)!;
+    }
+    // need to go through axios to have the right header flags
+    const image = new Image(width, height);
+    this.imageCache.set(url, image);
+
+    // load and set the source when done
+    this.client
+      .get(url, {
+        responseType: "arraybuffer"
+      })
+      .then(r => {
+        const buffer = r.data as ArrayBuffer;
+        const blob = new Blob([buffer], {
+          type: mimeType
+        });
+        const blobUrl = URL.createObjectURL(blob);
+        image.src = blobUrl;
+      });
+
+    return image;
+  }
+
+  generateImages(images: IImage[], color: string, contrast: IContrast) {
+    const resolvedImages: IImageTile[] = [];
+    let offsetX = 0;
+    const offsetY = 0;
+
+    const style = toStyle(color, contrast);
+
+    images.forEach(image => {
+      for (let x = 0; x < image.sizeX; x += image.tileWidth) {
+        const w = Math.min(image.sizeX - x, image.tileWidth);
+        for (let y = 0; y < image.sizeY; y += image.tileHeight) {
+          const h = Math.min(image.sizeY - y, image.tileHeight);
+          const url = this.tileUrl(
+            image.item,
+            {
+              x: x / image.tileWidth,
+              y: y / image.tileHeight,
+              z: image.levels - 1, // highest level for max zoom
+              frame: image.frameIndex
+            },
+            style
+          );
+          resolvedImages.push({
+            x: offsetX + x,
+            y: offsetY + y,
+            width: w,
+            height: h,
+            url,
+            image: this.loadImage(
+              url,
+              image.tileWidth,
+              image.tileHeight,
+              "image/png"
+            )
+          });
+        }
+      }
+
+      // since horizontal tiling only
+      offsetX += image.sizeX;
+    });
+
+    return resolvedImages;
+  }
 }
 
 function asDataset(folder: IGirderFolder): IDataset {
@@ -275,6 +345,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
       const key = toKey(t, z, c);
       const info: IImage = {
         frame,
+        levels: tile.levels,
         frameIndex: j,
         item,
         sizeX: tile.sizeX,
@@ -319,324 +390,27 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   };
 }
 
-const example = {
-  frames: [
-    {
-      DeltaT: "1239759.375000",
-      ExposureTime: "3100.000000",
-      PositionX: "27808.039063",
-      PositionY: "38605.839844",
-      PositionZ: "1905.224976",
-      TheC: "0",
-      TheT: "0",
-      TheZ: "0"
-    },
-    {
-      DeltaT: "1239759.375000",
-      ExposureTime: "3100.000000",
-      PositionX: "27808.039063",
-      PositionY: "38605.839844",
-      PositionZ: "1905.224976",
-      TheC: "1",
-      TheT: "0",
-      TheZ: "0"
-    },
-    {
-      DeltaT: "1239759.375000",
-      ExposureTime: "3100.000000",
-      PositionX: "27808.039063",
-      PositionY: "38605.839844",
-      PositionZ: "1905.224976",
-      TheC: "2",
-      TheT: "0",
-      TheZ: "0"
-    },
-    {
-      DeltaT: "1239759.375000",
-      ExposureTime: "3100.000000",
-      PositionX: "27808.039063",
-      PositionY: "38605.839844",
-      PositionZ: "1905.224976",
-      TheC: "3",
-      TheT: "0",
-      TheZ: "0"
-    },
-    {
-      DeltaT: "1239759.375000",
-      ExposureTime: "3100.000000",
-      PositionX: "27808.039063",
-      PositionY: "38605.839844",
-      PositionZ: "1905.224976",
-      TheC: "4",
-      TheT: "0",
-      TheZ: "0"
-    }
-  ],
-  levels: 3,
-  magnification: 45.645426328281914,
-  mm_x: 0.00021907999999999997,
-  mm_y: 0.00021907999999999997,
-  omeinfo: {
-    Experimenter: { ID: "Experimenter:0", Institution: "", LastName: "" },
-    Image: [
-      {
-        AcquisitionDate: "2019-07-21T15:26:39",
-        Description:
-          "Metadata:\nDimensions: XY(10) x Z(29) x \u03bb(5)\nCamera Name: Flash4.0, SN:302486\nNumerical Aperture: 1.4\nRefractive Index: 1.515\nNumber of Picture Planes: 5\nPlane #1:\n Name: Brightfield\n Component Count: 1\n Modality: Brightfield\n Camera Settings:   Exposure: 50 ms\n  Binning: 2x2\n  Scan Mode: Slow\n  Temperature: -10.0\u00b0C\n Microscope Settings:   Microscope: Ti Microscope\n  Nikon Ti, FilterChanger(Turret1): 2 (GFPHQ)\n  Nikon Ti, Shutter(EPI): Closed\n  Nikon Ti, Shutter(DIA): Closed\n  Nikon Ti, Illuminator(Illuminator-DIA): Remote Switch On\n  Nikon Ti, Illuminator(Illuminator-DIA): On\n  Nikon Ti, Illuminator(Illuminator-DIA) Voltage: 5.0\n  LightPath: R100\n  PFS-S, state: Off\n  PFS-S, offset: 6311\n  PFS-S, mirror: Inserted\n  PFS-S, mirror: Inserted\n  \n  Zoom: 1.00x\n  Sola II, Shutter(Sola): Closed\n  Sola II, Illuminator(Sola) Iris intensity: 0.0\nPlane #2:\n Name: CY3\n Component Count: 1\n Modality: Widefield Fluorescence\n Camera Settings:   Exposure: 1 s\n  Binning: 2x2\n  Scan Mode: Slow\n  Temperature: -10.0\u00b0C\n Microscope Settings:   Microscope: Ti Microscope\n  Nikon Ti, FilterChanger(Turret1): 4 (Cy3)\n  Nikon Ti, Shutter(EPI): Opened\n  Nikon Ti, Shutter(DIA): Closed\n  Nikon Ti, Illuminator(Illuminator-DIA): Remote Switch On\n  Nikon Ti, Illuminator(Illuminator-DIA): On\n  Nikon Ti, Illuminator(Illuminator-DIA) Voltage: 3.0\n  LightPath: R100\n  PFS-S, state: Off\n  PFS-S, offset: 6311\n  PFS-S, mirror: Inserted\n  PFS-S, mirror: Inserted\n  \n  Zoom: 1.00x\n  Sola II, Shutter(Sola): Closed\n  Sola II, Illuminator(Sola) Iris intensity: 100.0\nPlane #3:\n Name: A594\n Component Count: 1\n Modality: Widefield Fluorescence\n Camera Settings:   Exposure: 1 s\n  Binning: 2x2\n  Scan Mode: Slow\n  Temperature: -10.0\u00b0C\n Microscope Settings:   Microscope: Ti Microscope\n  Nikon Ti, FilterChanger(Turret1): 3 (A594)\n  Nikon Ti, Shutter(EPI): Opened\n  Nikon Ti, Shutter(DIA): Closed\n  Nikon Ti, Illuminator(Illuminator-DIA): Remote Switch On\n  Nikon Ti, Illuminator(Illuminator-DIA): On\n  Nikon Ti, Illuminator(Illuminator-DIA) Voltage: 3.0\n  LightPath: R100\n  PFS-S, state: Off\n  PFS-S, offset: 6311\n  PFS-S, mirror: Inserted\n  PFS-S, mirror: Inserted\n  \n  Zoom: 1.00x\n  Sola II, Shutter(Sola): Closed\n  Sola II, Illuminator(Sola) Iris intensity: 100.0\nPlane #4:\n Name: CY5\n Component Count: 1\n Modality: Widefield Fluorescence\n Camera Settings:   Exposure: 1 s\n  Binning: 2x2\n  Scan Mode: Slow\n  Temperature: -10.0\u00b0C\n Microscope Settings:   Microscope: Ti Microscope\n  Nikon Ti, FilterChanger(Turret1): 5 (Cy5)\n  Nikon Ti, Shutter(EPI): Opened\n  Nikon Ti, Shutter(DIA): Closed\n  Nikon Ti, Illuminator(Illuminator-DIA): Remote Switch On\n  Nikon Ti, Illuminator(Illuminator-DIA): On\n  Nikon Ti, Illuminator(Illuminator-DIA) Voltage: 3.0\n  LightPath: R100\n  PFS-S, state: Off\n  PFS-S, offset: 6311\n  PFS-S, mirror: Inserted\n  PFS-S, mirror: Inserted\n  \n  Zoom: 1.00x\n  Sola II, Shutter(Sola): Closed\n  Sola II, Illuminator(Sola) Iris intensity: 100.0\nPlane #5:\n Name: DAPI\n Component Count: 1\n Modality: Widefield Fluorescence\n Camera Settings:   Exposure: 50 ms\n  Binning: 2x2\n  Scan Mode: Slow\n  Temperature: -10.0\u00b0C\n Microscope Settings:   Microscope: Ti Microscope\n  Nikon Ti, FilterChanger(Turret1): 1 (DAPI)\n  Nikon Ti, Shutter(EPI): Opened\n  Nikon Ti, Shutter(DIA): Closed\n  Nikon Ti, Illuminator(Illuminator-DIA): Remote Switch Off\n  Nikon Ti, Illuminator(Illuminator-DIA): On\n  Nikon Ti, Illuminator(Illuminator-DIA) Voltage: 1.5\n  LightPath: R100\n  PFS-S, state: Off\n  PFS-S, offset: 6311\n  PFS-S, mirror: Inserted\n  PFS-S, mirror: Inserted\n  \n  Zoom: 1.00x\n  Sola II, Shutter(Sola): Closed\n  Sola II, Illuminator(Sola) Iris intensity: 100.0\nZ Stack Loop: 29\n- Step: 0.3 \u00b5m\n- Device: Ti ZDrive",
-        ID: "Image:0",
-        ImagingEnvironment: { Temperature: "-1.000000" },
-        InstrumentRef: { ID: "Instrument:1" },
-        Name:
-          "C:\\Users\\arjunrajlab\\Documents\\Ben\\20190720_MemSeq_scan\\DDX58_AXL_EGFR_well2\\DDX58_AXL_EGFR_well2_XY08.ome.tif",
-        Pixels: {
-          Channel: [
-            {
-              ContrastMethod: "Brightfield",
-              DetectorSettings: { Binning: "2x2", ID: "Detector:0" },
-              EmissionWavelength: "540",
-              ID: "Channel:0",
-              Name: "Brightfield",
-              PinholeSize: "-1.000000"
-            },
-            {
-              AcquisitionMode: "WideField",
-              Color: "16711680",
-              DetectorSettings: { Binning: "2x2", ID: "Detector:0" },
-              EmissionWavelength: "590",
-              ID: "Channel:1",
-              Name: "CY3",
-              PinholeSize: "-1.000000"
-            },
-            {
-              AcquisitionMode: "WideField",
-              Color: "16711680",
-              DetectorSettings: { Binning: "2x2", ID: "Detector:0" },
-              ID: "Channel:2",
-              Name: "A594",
-              PinholeSize: "-1.000000"
-            },
-            {
-              AcquisitionMode: "WideField",
-              Color: "16711935",
-              DetectorSettings: { Binning: "2x2", ID: "Detector:0" },
-              EmissionWavelength: "670",
-              ID: "Channel:3",
-              Name: "CY5",
-              PinholeSize: "-1.000000"
-            },
-            {
-              AcquisitionMode: "WideField",
-              Color: "255",
-              DetectorSettings: { Binning: "2x2", ID: "Detector:0" },
-              EmissionWavelength: "460",
-              ID: "Channel:4",
-              Name: "DAPI",
-              PinholeSize: "-1.000000"
-            }
-          ],
-          DimensionOrder: "XYCZT",
-          ID: "Pixels:0",
-          PhysicalSizeX: "0.219080",
-          PhysicalSizeY: "0.219080",
-          Plane: [
-            {
-              DeltaT: "1239759.375000",
-              ExposureTime: "3100.000000",
-              PositionX: "27808.039063",
-              PositionY: "38605.839844",
-              PositionZ: "1905.224976",
-              TheC: "0",
-              TheT: "0",
-              TheZ: "0"
-            },
-            {
-              DeltaT: "1239759.375000",
-              ExposureTime: "3100.000000",
-              PositionX: "27808.039063",
-              PositionY: "38605.839844",
-              PositionZ: "1905.224976",
-              TheC: "1",
-              TheT: "0",
-              TheZ: "0"
-            },
-            {
-              DeltaT: "1239759.375000",
-              ExposureTime: "3100.000000",
-              PositionX: "27808.039063",
-              PositionY: "38605.839844",
-              PositionZ: "1905.224976",
-              TheC: "2",
-              TheT: "0",
-              TheZ: "0"
-            },
-            {
-              DeltaT: "1239759.375000",
-              ExposureTime: "3100.000000",
-              PositionX: "27808.039063",
-              PositionY: "38605.839844",
-              PositionZ: "1905.224976",
-              TheC: "3",
-              TheT: "0",
-              TheZ: "0"
-            },
-            {
-              DeltaT: "1239759.375000",
-              ExposureTime: "3100.000000",
-              PositionX: "27808.039063",
-              PositionY: "38605.839844",
-              PositionZ: "1905.224976",
-              TheC: "4",
-              TheT: "0",
-              TheZ: "0"
-            }
-          ],
-          SizeC: "5",
-          SizeT: "1",
-          SizeX: "1024",
-          SizeY: "1022",
-          SizeZ: "1",
-          TiffData: [
-            {
-              DeltaT: "1239759.375000",
-              ExposureTime: "3100.000000",
-              PositionX: "27808.039063",
-              PositionY: "38605.839844",
-              PositionZ: "1905.224976",
-              TheC: "0",
-              TheT: "0",
-              TheZ: "0"
-            },
-            {
-              DeltaT: "1239759.375000",
-              ExposureTime: "3100.000000",
-              PositionX: "27808.039063",
-              PositionY: "38605.839844",
-              PositionZ: "1905.224976",
-              TheC: "1",
-              TheT: "0",
-              TheZ: "0"
-            },
-            {
-              DeltaT: "1239759.375000",
-              ExposureTime: "3100.000000",
-              PositionX: "27808.039063",
-              PositionY: "38605.839844",
-              PositionZ: "1905.224976",
-              TheC: "2",
-              TheT: "0",
-              TheZ: "0"
-            },
-            {
-              DeltaT: "1239759.375000",
-              ExposureTime: "3100.000000",
-              PositionX: "27808.039063",
-              PositionY: "38605.839844",
-              PositionZ: "1905.224976",
-              TheC: "3",
-              TheT: "0",
-              TheZ: "0"
-            },
-            {
-              DeltaT: "1239759.375000",
-              ExposureTime: "3100.000000",
-              PositionX: "27808.039063",
-              PositionY: "38605.839844",
-              PositionZ: "1905.224976",
-              TheC: "4",
-              TheT: "0",
-              TheZ: "0"
-            }
-          ],
-          Type: "uint16"
-        }
-      }
-    ],
-    Instrument: [
-      {
-        ID: "Instrument:0",
-        LightSource: [
-          { ID: "LightSource:0", Laser: {} },
-          { ID: "LightSource:1", Laser: {} },
-          { ID: "LightSource:2", Laser: {} },
-          { ID: "LightSource:3", Laser: {} },
-          { ID: "LightSource:4", Laser: {} }
-        ],
-        Objective: {
-          CalibratedMagnification: "1.000000",
-          ID: "Objective:0",
-          LensNA: "1.400000",
-          NominalMagnification: "1"
-        }
-      },
-      {
-        Detector: { ID: "Detector:0" },
-        Filter: [
-          {
-            ID: "Filter:0",
-            Model: "Custom",
-            TransmittanceRange: { CutOut: "1" },
-            Type: "BandPass"
-          },
-          {
-            ID: "Filter:1",
-            Model: "Custom",
-            TransmittanceRange: { CutOut: "1" },
-            Type: "BandPass"
-          },
-          {
-            ID: "Filter:2",
-            Model: "Custom",
-            TransmittanceRange: { CutOut: "1" },
-            Type: "BandPass"
-          },
-          {
-            ID: "Filter:3",
-            Model: "Custom",
-            TransmittanceRange: { CutOut: "1" },
-            Type: "BandPass"
-          },
-          {
-            ID: "Filter:4",
-            Model: "Custom",
-            TransmittanceRange: { CutOut: "1" },
-            Type: "BandPass"
-          }
-        ],
-        ID: "Instrument:1",
-        Microscope: { Model: "Ti Microscope" },
-        Objective: {
-          Correction: "PlanApo",
-          ID: "Objective:1",
-          Immersion: "Oil",
-          LensNA: "1.400000",
-          Model: "Plan Apo \u03bb 60x Oil",
-          NominalMagnification: "60",
-          WorkingDistance: "130.000000"
-        }
-      }
-    ],
-    schemaLocation:
-      "http://www.openmicroscopy.org/Schemas/OME/2015-01 http://www.openmicroscopy.org/Schemas/OME/2015-01/ome.xsd"
-  },
-  sizeX: 1024,
-  sizeY: 1022,
-  tileHeight: 256,
-  tileWidth: 1024
-};
-
 export interface ITileOptions {
   min: number | "auto" | "min" | "max";
   max: number | "auto" | "min" | "max";
   palette: string[]; // palette of hex colors, e.g. #000000
 }
 
-function k(steps: number, gamma: number) {
+function palette(color: string, steps: number) {
+  const base = hsl(color);
   const palette: string[] = [];
   for (let i = 0; i < steps; i++) {
-    const s = i / (steps - 1);
-    const d = s ? Math.pow(s, 1.0 / gamma) : 0;
-    let hex = `0${Math.round(d * 255).toString(16)}`;
-    hex = hex.substring(hex.length - 2);
-    palette.push(`#${hex}${hex}${hex}`);
+    const color = hsl(base);
+    color.l = i / (steps - 1);
+    palette.push(color.hex());
   }
+  return palette;
+}
+
+function toStyle(color: string, _contrast: IContrast): ITileOptions {
+  return {
+    min: "min",
+    max: "max",
+    palette: palette(color, 17)
+  };
 }

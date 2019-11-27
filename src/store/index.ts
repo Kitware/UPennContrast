@@ -19,7 +19,9 @@ import {
   IDatasetConfiguration,
   IDatasetConfigurationMeta,
   newLayer,
-  CompositionMode
+  CompositionMode,
+  IDisplaySlice,
+  IImageTile
 } from "./model";
 
 Vue.use(Vuex);
@@ -405,6 +407,39 @@ export class Main extends VuexModule {
       return;
     }
     this.configuration.layers.splice(index, 1);
+  }
+
+  get imageStack(): IImageTile[][] {
+    if (!this.dataset || !this.configuration) {
+      return [];
+    }
+    const ds = this.dataset;
+    const layers = this.configuration.layers;
+
+    const resolveSlice = (slice: IDisplaySlice, value: number) => {
+      switch (slice.type) {
+        case "constant":
+          return slice.value!;
+        case "offset":
+          return value + slice.value!;
+        case "max-merge":
+          return value; // TODO
+        default:
+          return value;
+      }
+    };
+
+    return layers
+      .filter(d => d.visible)
+      .map(layer => {
+        const channel = ds.channels[layer.channel];
+        const z = ds.z[resolveSlice(layer.z, this.z)];
+        const time = ds.time[resolveSlice(layer.time, this.time)];
+
+        const images = ds.images(time, z, channel);
+
+        return this.api.generateImages(images, layer.color, layer.contrast);
+      });
   }
 }
 
