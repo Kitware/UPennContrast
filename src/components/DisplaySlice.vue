@@ -17,7 +17,7 @@
           type="number"
           dense
           hide-details
-          @change="changeSlice('constant', $event)"
+          @input="changeSlice('constant', $event)"
         />
       </template>
     </v-radio>
@@ -30,7 +30,7 @@
           type="number"
           dense
           hide-details
-          @change="changeSlice('offset', $event)"
+          @input="changeSlice('offset', $event)"
         />
       </template>
     </v-radio>
@@ -51,13 +51,14 @@ export default class DisplaySlice extends Vue {
   @Prop()
   readonly label!: string;
 
-  changeSlice(type: DisplaySliceType, value: number | null) {
-    if (this.value.type === type && this.value.value === value) {
+  changeSlice(type: DisplaySliceType, value: string | number | null) {
+    const v = typeof value === "string" ? parseInt(value, 10) : value;
+    if (this.value.type === type && this.value.value === v) {
       return;
     }
     this.$emit("change", {
       type,
-      value: type === "constant" || type === "offset" ? value : null
+      value: type === "constant" || type === "offset" ? v : null
     });
   }
 }

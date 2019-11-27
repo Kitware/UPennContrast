@@ -456,11 +456,21 @@ export class Main extends VuexModule {
     return layers
       .filter(d => d.visible)
       .map(layer => {
-        const channel = ds.channels[layer.channel];
-        const z = ds.z[resolveSlice(layer.z, this.z)];
-        const time = ds.time[resolveSlice(layer.time, this.time)];
+        const zIndex = resolveSlice(layer.z, this.z);
+        // invalid slices
+        if (zIndex < 0 || zIndex >= ds.z.length) {
+          return [];
+        }
+        const tIndex = resolveSlice(layer.time, this.time);
+        if (tIndex < 0 || tIndex >= ds.time.length) {
+          return [];
+        }
 
-        const images = ds.images(time, z, channel);
+        const images = ds.images(
+          ds.time[tIndex],
+          ds.z[zIndex],
+          ds.channels[layer.channel]
+        );
 
         return this.api.generateImages(images, layer.color, layer.contrast);
       });
