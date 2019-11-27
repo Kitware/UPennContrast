@@ -71,9 +71,7 @@
         label="Time-Slice"
         :max-value="maxTime"
       />
-      <div>
-        TODO Histogram
-      </div>
+      <contrast-histogram :value="value.contrast" :histogram="histogram" />
       <div class="buttons">
         <v-btn color="warning" small @click="removeLayer">Remove</v-btn>
       </div>
@@ -85,14 +83,16 @@
 import { Vue, Component, Prop, Emit } from "vue-property-decorator";
 import { IDisplayLayer } from "../store/model";
 import DisplaySlice from "./DisplaySlice.vue";
+import ContrastHistogram from "./ContrastHistogram.vue";
 import store from "../store";
 
 @Component({
   components: {
-    DisplaySlice
+    DisplaySlice,
+    ContrastHistogram
   }
 })
-export default class Contrast extends Vue {
+export default class DisplayLayer extends Vue {
   readonly store = store;
   @Prop()
   readonly value!: IDisplayLayer;
@@ -101,6 +101,10 @@ export default class Contrast extends Vue {
   readonly index!: number;
 
   showColorPicker = false;
+
+  get histogram() {
+    return this.store.getLayerHistogram(this.value);
+  }
 
   get channels() {
     return this.store.dataset ? this.store.dataset.channels : [];

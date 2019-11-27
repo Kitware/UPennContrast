@@ -20,9 +20,9 @@ import {
   IDatasetConfigurationMeta,
   newLayer,
   CompositionMode,
-  IDisplaySlice,
   IImageTile
 } from "./model";
+import { getLayerImages } from "./images";
 
 Vue.use(Vuex);
 
@@ -251,7 +251,7 @@ export class Main extends VuexModule {
 
   @Action
   async setSelectedDataset(id: string | null) {
-    this.api.flushImageCache();
+    this.api.flushCaches();
     if (!this.isLoggedIn || !id) {
       this.setDataset({ id, data: null });
       return;
@@ -440,40 +440,23 @@ export class Main extends VuexModule {
     const ds = this.dataset;
     const layers = this.configuration.layers;
 
-    const resolveSlice = (slice: IDisplaySlice, value: number) => {
-      switch (slice.type) {
-        case "constant":
-          return slice.value!;
-        case "offset":
-          return value + slice.value!;
-        case "max-merge":
-          return value; // TODO
-        default:
-          return value;
-      }
-    };
-
     return layers
       .filter(d => d.visible)
       .map(layer => {
-        const zIndex = resolveSlice(layer.z, this.z);
-        // invalid slices
-        if (zIndex < 0 || zIndex >= ds.z.length) {
-          return [];
-        }
-        const tIndex = resolveSlice(layer.time, this.time);
-        if (tIndex < 0 || tIndex >= ds.time.length) {
-          return [];
-        }
-
-        const images = ds.images(
-          ds.time[tIndex],
-          ds.z[zIndex],
-          ds.channels[layer.channel]
-        );
-
+        const images = getLayerImages(layer, ds, this.time, this.z);
         return this.api.generateImages(images, layer.color, layer.contrast);
       });
+  }
+
+  get getLayerHistogram() {
+    // need to be like that to be detected as a getter
+    return (layer: IDisplayLayer) => {
+      if (!this.dataset || !this.configuration) {
+        return Promise.resolve(null);
+      }
+      const images = getLayerImages(layer, this.dataset, this.time, this.z);
+      return this.api.getLayerHistogram(images);
+    };
   }
 }
 

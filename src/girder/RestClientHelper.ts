@@ -14,7 +14,12 @@ import {
   IContrast,
   IImageTile
 } from "@/store/model";
-import { hsl } from "d3-color";
+import {
+  toStyle,
+  ITileOptions,
+  mergeHistograms,
+  ITileHistogram
+} from "@/store/images";
 
 function toId(item: string | { _id: string }) {
   return typeof item === "string" ? item : item._id;
@@ -24,6 +29,7 @@ export default class RestClientHelper {
   private readonly client: RestClient;
 
   private readonly imageCache = new Map<string, HTMLImageElement>();
+  private readonly histogramCache = new Map<string, Promise<ITileHistogram>>();
 
   constructor(client: RestClient) {
     this.client = client;
@@ -63,14 +69,14 @@ export default class RestClientHelper {
     return this.client.get(`item/${toId(item)}/tiles`).then(r => r.data);
   }
 
-  getHistogram(
+  private getHistogram(
     item: string | IGirderItem,
     options: Partial<IHistogramOptions> = {}
   ): Promise<ITileHistogram> {
     const o: Readonly<IHistogramOptions> = Object.assign(
       {
         frame: 0,
-        bins: 512,
+        bins: 128,
         width: 2048,
         height: 2048,
         resample: false
@@ -82,7 +88,7 @@ export default class RestClientHelper {
       .get(`item/${toId(item)}/tiles/histogram`, {
         params: o
       })
-      .then(r => r.data);
+      .then(r => r.data[0]); // TODO why is this an array?
   }
 
   private getItems(folderId: string): Promise<IGirderItem[]> {
@@ -245,8 +251,28 @@ export default class RestClientHelper {
     return resolvedImages;
   }
 
-  flushImageCache() {
+  getLayerHistogram(images: IImage[]) {
+    const key = images.map(i => `${i.item._id}#${i.frameIndex}`).join(",");
+    if (this.histogramCache.has(key)) {
+      return this.histogramCache.get(key)!;
+    }
+
+    const promise = Promise.all(
+      images.map(image =>
+        this.getHistogram(image.item, {
+          frame: image.frameIndex,
+          width: image.sizeX,
+          height: image.sizeY
+        })
+      )
+    ).then(histograms => mergeHistograms(histograms));
+    this.histogramCache.set(key, promise);
+    return promise;
+  }
+
+  flushCaches() {
     this.imageCache.clear();
+    this.histogramCache.clear();
   }
 }
 
@@ -283,13 +309,6 @@ export interface IHistogramOptions {
   width: number;
   height: number;
   resample: boolean;
-}
-
-export interface ITileHistogram {
-  test: number[];
-  min: number;
-  max: number;
-  // TODO
 }
 
 export interface ITileMeta {
@@ -386,30 +405,5 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
     time: Array.from(ts).sort((a, b) => a - b),
     width,
     height
-  };
-}
-
-export interface ITileOptions {
-  min: number | "auto" | "min" | "max";
-  max: number | "auto" | "min" | "max";
-  palette: string[]; // palette of hex colors, e.g. #000000
-}
-
-function palette(color: string, steps: number) {
-  const base = hsl(color);
-  const palette: string[] = [];
-  for (let i = 0; i < steps; i++) {
-    const color = hsl(base);
-    color.l = i / (steps - 1);
-    palette.push(color.hex());
-  }
-  return palette;
-}
-
-function toStyle(color: string, _contrast: IContrast): ITileOptions {
-  return {
-    min: "min",
-    max: "max",
-    palette: palette(color, 17)
   };
 }
