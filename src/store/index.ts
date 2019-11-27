@@ -135,7 +135,6 @@ export class Main extends VuexModule {
   }) {
     this.selectedDatasetId = id;
     this.dataset = data;
-    this.api.flushImageCache();
   }
   @Mutation
   protected setConfiguration({
@@ -252,6 +251,7 @@ export class Main extends VuexModule {
 
   @Action
   async setSelectedDataset(id: string | null) {
+    this.api.flushImageCache();
     if (!this.isLoggedIn || !id) {
       this.setDataset({ id, data: null });
       return;
