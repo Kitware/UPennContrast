@@ -1,15 +1,17 @@
 <template>
-  <div class="layers">
+  <v-expansion-panels multiple>
     <display-layer
       v-for="(l, index) in layers"
       :key="index"
       :value="l"
       :index="index"
     />
-    <v-btn class="add-layer" @click="addLayer" icon>
-      <v-icon>mdi-plus-circle</v-icon>
-    </v-btn>
-  </div>
+    <v-expansion-panel readonly class="add-layer">
+      <v-btn @click="addLayer" icon>
+        <v-icon>mdi-plus-circle</v-icon>
+      </v-btn>
+    </v-expansion-panel>
+  </v-expansion-panels>
 </template>
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
@@ -40,6 +42,8 @@ export default class DisplayLayers extends Vue {
   flex-direction: column;
 }
 .add-layer {
-  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 </style>
