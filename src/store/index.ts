@@ -350,11 +350,20 @@ export class Main extends VuexModule {
   }
 
   @Action
+  async syncConfiguration() {
+    if (!this.configuration) {
+      return;
+    }
+    await this.api.updateConfiguration(this.configuration);
+  }
+
+  @Action
   async addLayer() {
     if (!this.configuration || !this.dataset) {
       return;
     }
     this.pushLayer(newLayer(this.dataset, this.configuration));
+    await this.syncConfiguration();
   }
 
   @Mutation
@@ -365,10 +374,11 @@ export class Main extends VuexModule {
   @Action
   async setCompositionMode(mode: CompositionMode) {
     this.setCompositionModeImpl(mode);
+    await this.syncConfiguration();
   }
 
   @Action
-  handleHotkey(hotKey: number) {
+  async handleHotkey(hotKey: number) {
     if (
       !this.dataset ||
       !this.configuration ||
@@ -378,10 +388,11 @@ export class Main extends VuexModule {
       return;
     }
     this.toggleLayer(hotKey - 1);
+    await this.syncConfiguration();
   }
 
   @Mutation
-  changeLayer({
+  private changeLayerImpl({
     index,
     delta
   }: {
@@ -398,8 +409,14 @@ export class Main extends VuexModule {
     Object.assign(this.configuration.layers[index], delta);
   }
 
+  @Action
+  async changeLayer(args: { index: number; delta: Partial<IDisplayLayer> }) {
+    this.changeLayerImpl(args);
+    await this.syncConfiguration();
+  }
+
   @Mutation
-  removeLayer(index: number) {
+  private removeLayerImpl(index: number) {
     if (
       !this.configuration ||
       index < 0 ||
@@ -408,6 +425,12 @@ export class Main extends VuexModule {
       return;
     }
     this.configuration.layers.splice(index, 1);
+  }
+
+  @Action
+  async removeLayer(index: number) {
+    this.removeLayerImpl(index);
+    await this.syncConfiguration();
   }
 
   get imageStack(): IImageTile[][] {

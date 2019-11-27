@@ -162,16 +162,11 @@ export default class RestClientHelper {
   updateConfiguration(
     config: IDatasetConfiguration
   ): Promise<IDatasetConfiguration> {
-    const data = new FormData();
-    data.set(
-      "metaData",
-      JSON.stringify({
+    return this.client
+      .put(`/item/${config.id}/metadata`, {
         layerMode: config.layerMode,
         layers: config.layers
       })
-    );
-    return this.client
-      .put(`/item/${config.id}/metadata`, data)
       .then(() => config);
   }
 
