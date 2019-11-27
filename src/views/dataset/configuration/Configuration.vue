@@ -6,8 +6,24 @@ import store from "@/store";
 import routeMapper from "@/utils/routeMapper";
 
 export default routeMapper(
-  "config",
-  () => store.selectedConfigurationId,
-  value => store.setSelectedConfiguration(value)
+  {
+    config: {
+      parse: String,
+      get: () => store.selectedConfigurationId,
+      set: (value: string) => store.setSelectedConfiguration(value)
+    }
+  },
+  {
+    z: {
+      parse: v => parseInt(v, 10),
+      get: () => store.z,
+      set: (value: number) => store.setZ(value)
+    },
+    time: {
+      parse: v => parseInt(v, 10),
+      get: () => store.time,
+      set: (value: number) => store.setTime(value)
+    }
+  }
 );
 </script>

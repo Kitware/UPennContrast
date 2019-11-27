@@ -64,6 +64,9 @@ export class Main extends VuexModule {
     []
   );
 
+  z: number = 0;
+  time: number = 0;
+
   private internalLocation: IGirderLocation | null = null;
 
   get api() {
@@ -146,6 +149,16 @@ export class Main extends VuexModule {
       });
       persister.set("recentConfigurations", this.recentConfigurations);
     }
+  }
+
+  @Mutation
+  private setZImpl(value: number) {
+    this.z = value;
+  }
+
+  @Mutation
+  private setTimeImpl(value: number) {
+    this.time = value;
   }
 
   @Action({})
@@ -293,6 +306,20 @@ export class Main extends VuexModule {
       // TODO
     }
     return null;
+  }
+
+  @Action({
+    commit: "setZImpl"
+  })
+  async setZ(value: number) {
+    return value;
+  }
+
+  @Action({
+    commit: "setTimeImpl"
+  })
+  async setTime(value: number) {
+    return value;
   }
 }
 

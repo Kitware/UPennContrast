@@ -5,9 +5,11 @@
 import store from "@/store";
 import routeMapper from "@/utils/routeMapper";
 
-export default routeMapper(
-  "id",
-  () => store.selectedDatasetId,
-  value => store.setSelectedDataset(value)
-);
+export default routeMapper({
+  id: {
+    parse: String,
+    get: () => store.selectedDatasetId,
+    set: (value: string) => store.setSelectedDataset(value)
+  }
+});
 </script>

@@ -1,8 +1,10 @@
 <template>
-  <div>{{ name }}</div>
+  <v-container>
+    <div>{{ name }}</div>
+  </v-container>
 </template>
 <script lang="ts">
-import { Vue, Component, Inject, Prop } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
 
 @Component

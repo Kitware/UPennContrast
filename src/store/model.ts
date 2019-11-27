@@ -73,7 +73,7 @@ export interface IDisplayLayer {
   color: string;
 
   // TODO: boolean or which channel to use? why multiple allowed and how to combine
-  fluorescenceChannel: boolean;
+  channel: number;
 
   z: IDisplaySlice;
   time: IDisplaySlice;

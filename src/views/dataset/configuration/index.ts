@@ -1,4 +1,5 @@
 import ConfigurationInfo from "./ConfigurationInfo.vue";
+import Viewer from "./Viewer.vue";
 
 export const routes = [
   {
@@ -8,6 +9,12 @@ export const routes = [
     meta: {
       hidden: true
     }
+  },
+  {
+    path: "view",
+    name: "view",
+    props: true,
+    component: Viewer
   }
 ];
 

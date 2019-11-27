@@ -12,19 +12,17 @@
       >
     </v-subheader>
     <v-list two-line>
-      <v-list-item v-for="c in configurations" :key="c.name">
+      <v-list-item
+        v-for="c in configurations"
+        :key="c.name"
+        @click="$router.push(toRoute(c))"
+      >
         <v-list-item-content>
           <v-list-item-title>{{ c.name }}</v-list-item-title>
           <v-list-item-subtitle>{{ c.description }}</v-list-item-subtitle>
         </v-list-item-content>
         <v-list-item-action>
-          <v-btn
-            icon
-            :to="{
-              name: 'configuration',
-              params: Object.assign({ config: c.id }, $route.params)
-            }"
-          >
+          <v-btn icon :to="toRoute(c)">
             <v-icon>mdi-eye</v-icon>
           </v-btn>
         </v-list-item-action>
@@ -35,6 +33,7 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
+import { IDatasetConfiguration } from "../../store/model";
 
 @Component
 export default class DatasetInfo extends Vue {
@@ -62,6 +61,13 @@ export default class DatasetInfo extends Vue {
 
   get configurations() {
     return this.store.dataset ? this.store.dataset.configurations : [];
+  }
+
+  toRoute(c: IDatasetConfiguration) {
+    return {
+      name: "view",
+      params: Object.assign({ config: c.id }, this.$route.params)
+    };
   }
 }
 </script>

@@ -22,7 +22,7 @@
           <v-btn
             icon
             :to="{
-              name: 'configuration',
+              name: 'view',
               params: { id: d.datasetId, config: d.id }
             }"
           >
