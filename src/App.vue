@@ -5,9 +5,10 @@
       <v-toolbar-title @click="goHome" class="logo"
         >UPenn Contrast</v-toolbar-title
       >
-      <BreadCrumbs />
+      <bread-crumbs />
       <v-spacer />
-      <UserMenu />
+      <user-menu />
+      <server-status />
     </v-app-bar>
 
     <v-navigation-drawer v-model="drawer" app>
@@ -29,6 +30,7 @@
 <script lang="ts">
 import Menu from "./layout/Menu.vue";
 import UserMenu from "./layout/UserMenu.vue";
+import ServerStatus from "./components/ServerStatus.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
@@ -37,7 +39,8 @@ import store from "@/store";
   components: {
     Menu,
     UserMenu,
-    BreadCrumbs
+    BreadCrumbs,
+    ServerStatus
   }
 })
 export default class App extends Vue {
