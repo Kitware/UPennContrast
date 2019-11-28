@@ -30,6 +30,12 @@ export default routeMapper(
       get: () => store.compositionMode,
       set: (value: CompositionMode) =>
         store.setCompositionMode(value || "multiply")
+    },
+    layer: {
+      parse: v => v,
+      get: () => store.layerMode,
+      set: (value: string) =>
+        store.setLayerMode(value === "single" ? "single" : "multiple")
     }
   }
 );

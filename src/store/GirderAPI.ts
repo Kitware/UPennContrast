@@ -170,7 +170,6 @@ export default class GirderAPI {
   ): Promise<IDatasetConfiguration> {
     return this.client
       .put(`/item/${config.id}/metadata`, {
-        layerMode: config.layerMode,
         layers: config.layers
       })
       .then(() => config);
@@ -304,8 +303,7 @@ function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
     _girder: item,
     name: item.name,
     description: item.description,
-    layers: item.meta.layers || [],
-    layerMode: item.meta.layerMode === "single" ? "single" : "multiple"
+    layers: item.meta.layers || []
   };
 }
 

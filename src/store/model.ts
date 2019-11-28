@@ -59,9 +59,6 @@ export interface IDatasetConfiguration {
   description: string;
 
   layers: IDisplayLayer[];
-  // whether to show multiple ... hotkey/toggle as checkbox
-  // single ... hotkey/toggle as radio
-  layerMode: "multiple" | "single";
 }
 
 export declare type DisplaySliceType =

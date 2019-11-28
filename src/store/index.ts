@@ -56,6 +56,7 @@ export class Main extends VuexModule {
   z: number = 0;
   time: number = 0;
   compositionMode: CompositionMode = "multiply";
+  layerMode: "single" | "multiple" = "multiple";
 
   private internalLocation: IGirderLocation | null = null;
 
@@ -353,7 +354,7 @@ export class Main extends VuexModule {
       return;
     }
     const layers = this.configuration.layers;
-    switch (this.configuration.layerMode) {
+    switch (this.layerMode) {
       case "single":
         layers.forEach((l, i) => (l.visible = i === index));
         break;
@@ -394,7 +395,41 @@ export class Main extends VuexModule {
   @Action
   async setCompositionMode(mode: CompositionMode) {
     this.setCompositionModeImpl(mode);
-    await this.syncConfiguration();
+  }
+
+  @Mutation
+  private setLayerModeImpl(mode: "multiple" | "single") {
+    this.layerMode = mode;
+  }
+
+  @Mutation
+  private verifySingleLayerMode() {
+    if (!this.configuration) {
+      return;
+    }
+    const visible = this.configuration.layers.reduce(
+      (acc, l) => acc + (l.visible ? 1 : 0),
+      0
+    );
+    if (visible > 1) {
+      let first = true;
+      this.configuration.layers.forEach(l => {
+        if (l.visible) {
+          l.visible = first;
+          first = false;
+        }
+      });
+    }
+  }
+
+  @Action
+  async setLayerMode(mode: "multiple" | "single") {
+    this.setLayerModeImpl(mode);
+
+    if (mode === "single") {
+      this.verifySingleLayerMode();
+      await this.syncConfiguration();
+    }
   }
 
   @Action

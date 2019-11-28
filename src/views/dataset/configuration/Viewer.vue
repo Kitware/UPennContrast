@@ -1,7 +1,7 @@
 <template>
   <div class="viewer">
-    <aside class="toolbar">
-      <viewer-toolbar />
+    <aside class="side">
+      <viewer-toolbar class="toolbar" />
       <div class="layers">
         <display-layers />
       </div>
@@ -53,10 +53,14 @@ export default class Viewer extends Vue {
   display: flex;
 }
 
-.toolbar {
+.side {
   display: flex;
   flex-direction: column;
   width: 20em;
+}
+
+.toolbar {
+  padding: 0.5em 1em;
 }
 
 .layers {

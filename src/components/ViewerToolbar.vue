@@ -2,7 +2,12 @@
   <div>
     <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
     <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
-    <v-select v-model="mode" label="Composition Mode" :items="modes">
+    <v-select
+      v-model="mode"
+      label="Composition Mode"
+      :items="modes"
+      hide-details
+    >
       <template #append>
         <v-btn
           href="https://mdn.mozillademos.org/en-US/docs/Web/API/Canvas_API/Tutorial/Compositing/Example$samples/Compositing_example"
@@ -14,6 +19,15 @@
         </v-btn>
       </template>
     </v-select>
+    <v-switch v-model="layerMode" label="Multiple" hide-details id="layerMode">
+      <template #prepend>
+        <!--styling helper -->
+        <div class="v-input--selection-controls__input" style="width: 0"></div>
+        <label class="v-label theme--dark" for="layerMode"
+          >Layers: Single</label
+        >
+      </template>
+    </v-switch>
   </div>
 </template>
 <script lang="ts">
@@ -75,6 +89,14 @@ export default class ViewerToolbar extends Vue {
 
   get maxTime() {
     return this.store.dataset ? this.store.dataset.time.length - 1 : this.time;
+  }
+
+  set layerMode(value: boolean) {
+    this.changeQuery("layer", value ? "multiple" : "single");
+  }
+
+  get layerMode() {
+    return this.store.layerMode === "multiple";
   }
 }
 </script>
