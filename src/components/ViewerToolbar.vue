@@ -36,13 +36,21 @@ export default class ViewerToolbar extends Vue {
     return this.store.compositionMode;
   }
 
-  set mode(value: string) {
+  private changeQuery(param: string, value: string) {
+    const old = this.$route.query[param];
+    if (old === value) {
+      return;
+    }
     this.$router.replace({
       query: {
         ...this.$route.query,
-        mode: value
+        [param]: value
       }
     });
+  }
+
+  set mode(value: string) {
+    this.changeQuery("mode", value);
   }
 
   get z() {
@@ -54,21 +62,11 @@ export default class ViewerToolbar extends Vue {
   }
 
   set z(value: number) {
-    this.$router.replace({
-      query: {
-        ...this.$route.query,
-        z: value.toString()
-      }
-    });
+    this.changeQuery("z", value.toString());
   }
 
   set time(value: number) {
-    this.$router.replace({
-      query: {
-        ...this.$route.query,
-        time: value.toString()
-      }
-    });
+    this.changeQuery("time", value.toString());
   }
 
   get maxZ() {
