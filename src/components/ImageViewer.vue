@@ -30,9 +30,21 @@ export default class ImageViewer extends Vue {
 
   private containerDimensions = { width: 100, height: 100 };
 
-  readonly zoom = d3Zoom<HTMLElement, any>().on("zoom", () => {
-    this.zoomed(d3Event as D3ZoomEvent<HTMLElement, any>);
-  });
+  readonly zoom = d3Zoom<HTMLElement, any>()
+    .on("zoom", () => {
+      this.zoomed(d3Event as D3ZoomEvent<HTMLElement, any>);
+    })
+    .on("start", function(this: HTMLElement) {
+      const event = (d3Event as D3ZoomEvent<HTMLElement, any>).sourceEvent;
+      if (event && event.type === "wheel") {
+        this.classList.add(event.wheelDelta > 0 ? "zoomIn" : "zoomOut");
+      } else {
+        this.classList.add("grabbing");
+      }
+    })
+    .on("end", function(this: HTMLElement) {
+      this.classList.remove("grabbing", "zoomIn", "zoomOut");
+    });
 
   private ready: string[] = [];
 
@@ -63,11 +75,11 @@ export default class ImageViewer extends Vue {
   }
 
   private trackImages(value: IImageTile[][]) {
-    const ready: string[] = [];
+    this.ready = [];
     value.forEach(layer => {
       layer.forEach(tile => {
         if (tile.image.src && tile.image.complete) {
-          ready.push(tile.url);
+          this.ready.push(tile.url);
         } else {
           tile.image.onload = () => {
             // not just loaded but also decoded
@@ -78,7 +90,6 @@ export default class ImageViewer extends Vue {
         }
       });
     });
-    this.ready = ready;
   }
 
   @Watch("imageStack")
@@ -150,6 +161,23 @@ export default class ImageViewer extends Vue {
 .image {
   position: relative;
   overflow: hidden;
+  cursor: grab;
+}
+
+.grabbing {
+  cursor: grabbing;
+}
+
+.zoomIn {
+  cursor: nwse-resize;
+  cursor: -moz-zoom-in;
+  cursor: -webkit-zoom-in;
+}
+
+.zoomOut {
+  cursor: nwse-resize;
+  cursor: -moz-zoom-out;
+  cursor: -webkit-zoom-out;
 }
 
 .loading {
