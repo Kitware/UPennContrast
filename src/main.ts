@@ -1,7 +1,9 @@
 import Vue from "vue";
+import "roboto-fontface/css/roboto/roboto-fontface.css";
+import "@mdi/font/css/materialdesignicons.css";
+
 import "reflect-metadata";
 import "./registerServiceWorker";
-import "./style.scss";
 import vuetify from "./plugins/vuetify";
 import "./plugins/router";
 import "./plugins/resize";
@@ -12,8 +14,7 @@ import main, { store, Main } from "./store";
 import routes from "./views";
 import App from "./App.vue";
 
-import "roboto-fontface/css/roboto/roboto-fontface.css";
-import "@mdi/font/css/materialdesignicons.css";
+import "./style.scss";
 import VueRouter from "vue-router";
 
 Vue.config.productionTip = false;
