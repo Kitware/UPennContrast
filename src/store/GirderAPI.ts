@@ -25,7 +25,7 @@ function toId(item: string | { _id: string }) {
   return typeof item === "string" ? item : item._id;
 }
 
-export default class RestClientHelper {
+export default class GirderAPI {
   private readonly client: RestClient;
 
   private readonly imageCache = new Map<string, HTMLImageElement>();

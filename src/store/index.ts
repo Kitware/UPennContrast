@@ -1,4 +1,4 @@
-import { RestClient, RestClientHelper } from "@/girder";
+import { RestClient } from "@/girder";
 import {
   IGirderLocation,
   IGirderSelectAble,
@@ -23,6 +23,7 @@ import {
   IImageTile
 } from "./model";
 import { getLayerImages } from "./images";
+import GirderAPI from "./GirderAPI";
 
 Vue.use(Vuex);
 
@@ -56,6 +57,7 @@ export class Main extends VuexModule {
   girderRest = new RestClient({
     apiRoot: `${this.girderUrl}/api/v1`
   });
+  api = new GirderAPI(this.girderRest);
 
   girderUser: IGirderUser | null = this.girderRest.user;
 
@@ -74,10 +76,6 @@ export class Main extends VuexModule {
   compositionMode: CompositionMode = "multiply";
 
   private internalLocation: IGirderLocation | null = null;
-
-  get api() {
-    return new RestClientHelper(this.girderRest);
-  }
 
   get location(): IGirderLocation {
     if (this.internalLocation) {
@@ -113,6 +111,7 @@ export class Main extends VuexModule {
     this.girderUrl = persister.set("girderUrl", girderUrl);
     this.girderRest = girderRest;
     this.girderUser = girderRest.user;
+    this.api = new GirderAPI(this.girderRest);
   }
 
   @Mutation
