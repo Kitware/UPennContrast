@@ -1,7 +1,8 @@
 <template>
   <v-expansion-panel>
     <v-expansion-panel-header class="displayLayerHeader">
-      <span>{{ value.name }}</span>
+      <v-icon :color="value.color">mdi-square</v-icon>
+      <span class="header">{{ value.name }}</span>
       <v-switch
         @click.native.stop
         @mousedown.native.stop
@@ -164,7 +165,10 @@ export default class DisplayLayer extends Vue {
 }
 
 .displayLayerHeader {
-  > span {
+  > i {
+    flex: 0 0 auto;
+  }
+  > .header {
     flex: 1 1 0;
   }
 }
