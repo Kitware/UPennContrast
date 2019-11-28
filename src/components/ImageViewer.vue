@@ -9,6 +9,9 @@
       :style="{ transform: cssTransform }"
     />
     <!-- <resize-observer @notify="handleResize" /> -->
+    <div class="loading" v-if="readyPercentage < 100">
+      <v-progress-circular :value="readyPercentage" />
+    </div>
   </div>
 </template>
 <script lang="ts">
@@ -39,6 +42,12 @@ export default class ImageViewer extends Vue {
 
   get cssTransform() {
     return `translate(${this.transform.x}px, ${this.transform.y}px) scale(${this.transform.k})`;
+  }
+
+  get readyPercentage() {
+    const total = this.imageStack.reduce((acc, d) => acc + d.length, 0);
+    const loaded = this.ready.length;
+    return Math.round((100 * loaded) / total);
   }
 
   get width() {
@@ -141,6 +150,12 @@ export default class ImageViewer extends Vue {
 .image {
   position: relative;
   overflow: hidden;
+}
+
+.loading {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .canvas {
