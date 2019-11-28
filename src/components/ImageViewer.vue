@@ -47,7 +47,7 @@ export default class ImageViewer extends Vue {
   get readyPercentage() {
     const total = this.imageStack.reduce((acc, d) => acc + d.length, 0);
     const loaded = this.ready.length;
-    return Math.round((100 * loaded) / total);
+    return Math.round((100.0 * loaded) / total);
   }
 
   get width() {

@@ -271,6 +271,12 @@ export default class GirderAPI {
   }
 
   flushCaches() {
+    this.imageCache.forEach(value => {
+      if (value.src) {
+        // clean up blobs
+        URL.revokeObjectURL(value.src);
+      }
+    });
     this.imageCache.clear();
     this.histogramCache.clear();
   }
