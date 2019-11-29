@@ -11,7 +11,7 @@
         color="primary"
         :to="{
           name: 'newconfiguration',
-          params: Object.assign({}, $route.params)
+          params: Object.assign({ id: '' }, $route.params)
         }"
         >Add Configuration</v-btn
       >
@@ -51,7 +51,7 @@
       </v-dialog>
       <v-btn
         color="primary"
-        :to="toRoute(configurations[0])"
+        :to="configurations.length > 0 ? toRoute(configurations[0]) : undefined"
         :disabled="configurations.length === 0"
       >
         <v-icon left>mdi-eye</v-icon>

@@ -1,56 +1,69 @@
 <template>
-  <v-menu
-    v-model="userMenu"
-    close-on-click
-    offset-y
-    :close-on-content-click="store.isLoggedIn"
-    transition="slide-y"
-  >
-    <template #activator="{ on }">
-      <v-btn v-on="on">{{ store.userName }}</v-btn>
-    </template>
-    <v-container v-if="!store.isLoggedIn" class="loginDialog">
-      <v-form @submit.prevent="login">
-        <v-text-field
-          v-model="domain"
-          name="domain"
-          label="Girder Domain"
-          required
-          prepend-icon="mdi-domain"
-        />
-        <v-text-field
-          v-model="username"
-          name="username"
-          label="Username or e-mail"
-          autofocus
-          required
-          prepend-icon="mdi-account"
-        />
-        <v-text-field
-          v-model="password"
-          name="password"
-          type="password"
-          label="Password"
-          prepend-icon="mdi-lock"
-        />
-        <v-card-actions>
-          <v-btn type="submit" color="primary">
-            Login
-          </v-btn>
-        </v-card-actions>
-      </v-form>
-      <v-alert :value="Boolean(error)" color="error">{{ error }}</v-alert>
-    </v-container>
-    <v-list v-else dense>
-      <v-divider />
-      <v-list-item @click="logout">
-        <v-list-item-avatar>
-          <v-icon>mdi-logout</v-icon>
-        </v-list-item-avatar>
-        <v-list-item-title>Logout</v-list-item-title>
-      </v-list-item>
-    </v-list>
-  </v-menu>
+  <div>
+    <v-dialog
+      v-model="userMenu"
+      v-if="!store.isLoggedIn"
+      class="loginDialog"
+      max-width="300px"
+    >
+      <template #activator="{ on }">
+        <v-btn v-on="on">{{ store.userName }}</v-btn>
+      </template>
+      <v-container>
+        <v-form @submit.prevent="login">
+          <v-text-field
+            v-model="domain"
+            name="domain"
+            label="Girder Domain"
+            required
+            prepend-icon="mdi-domain"
+          />
+          <v-text-field
+            v-model="username"
+            name="username"
+            label="Username or e-mail"
+            autofocus
+            required
+            prepend-icon="mdi-account"
+          />
+          <v-text-field
+            v-model="password"
+            name="password"
+            type="password"
+            label="Password"
+            prepend-icon="mdi-lock"
+          />
+          <v-card-actions class="button-bar">
+            <v-btn type="submit" color="primary">
+              Login
+            </v-btn>
+          </v-card-actions>
+        </v-form>
+        <v-alert :value="Boolean(error)" color="error">{{ error }}</v-alert>
+      </v-container>
+    </v-dialog>
+    <v-menu
+      v-else
+      v-model="userMenu"
+      close-on-click
+      offset-y
+      :close-on-content-click="store.isLoggedIn"
+      transition="slide-y"
+    >
+      <template #activator="{ on }">
+        <v-btn v-on="on">{{ store.userName }}</v-btn>
+      </template>
+      <v-list dense>
+        <v-divider />
+        <v-list-item @click="logout">
+          <v-list-item-avatar>
+            <v-icon>mdi-logout</v-icon>
+          </v-list-item-avatar>
+          <v-list-item-title>Logout</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-menu>
+  </div>
 </template>
 
 <script lang="ts">
@@ -61,7 +74,7 @@ import store from "@/store";
 export default class UserMenu extends Vue {
   readonly store = store;
 
-  userMenu = false;
+  userMenu = !store.isLoggedIn;
 
   domain = store.girderUrl;
   username = "";
