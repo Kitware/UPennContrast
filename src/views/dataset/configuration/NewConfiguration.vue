@@ -4,9 +4,11 @@
       <v-text-field v-model="name" label="Name" :rules="rules" />
       <v-textarea v-model="description" label="Description" />
 
-      <v-btn :disabled="!valid" color="success" class="mr-4" @click="submit"
-        >Create</v-btn
-      >
+      <div class="button-bar">
+        <v-btn :disabled="!valid" color="success" class="mr-4" @click="submit"
+          >Create
+        </v-btn>
+      </div>
     </v-form>
   </v-container>
 </template>

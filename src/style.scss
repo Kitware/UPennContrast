@@ -8,3 +8,13 @@ body {
 .grow {
   flex: 1 1 0;
 }
+
+.button-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1em;
+
+  > * {
+    margin-left: 1em;
+  }
+}

@@ -22,7 +22,7 @@
         </v-list-item-content>
       </v-list-item>
     </v-list>
-    <div class="toolbar">
+    <div class="button-bar">
       <v-dialog v-model="removeConfirm" max-width="33vw">
         <template #activator="{ on }">
           <v-btn color="warning" v-on="on" :disabled="!store.configuration">
@@ -32,7 +32,7 @@
         </template>
         <v-card>
           <v-card-title>Are you sure to remove "{{ name }}"?</v-card-title>
-          <v-card-actions class="toolbar">
+          <v-card-actions class="button-bar">
             <v-btn @click="removeConfirm = false">Cancel</v-btn>
             <v-btn @click="remove" color="warning">Remove</v-btn>
           </v-card-actions>
@@ -108,15 +108,6 @@ export default class ConfigurationInfo extends Vue {
 }
 </script>
 <style lang="scss" scoped>
-.toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 1em;
-
-  > * {
-    margin-left: 1em;
-  }
-}
 
 .code {
   margin: 0 1em 0 0.5em;

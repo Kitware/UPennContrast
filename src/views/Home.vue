@@ -43,6 +43,13 @@
       upload-enabled
       @rowclick="onRowClick"
     />
+
+    <v-subheader>Actions</v-subheader>
+    <div class="button-bar">
+      <v-btn color="primary" :to="{ name: 'newdataset' }">
+        Create Dataset
+      </v-btn>
+    </div>
   </v-container>
 </template>
 

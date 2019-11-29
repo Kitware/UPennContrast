@@ -35,22 +35,24 @@
         />
       </template>
 
-      <v-btn
-        :disabled="!valid"
-        color="success"
-        class="mr-4"
-        @click="submit"
-        v-if="dataset == null"
-        >Create</v-btn
-      >
-      <v-btn
-        :disabled="!uploadDone"
-        color="success"
-        class="mr-4"
-        v-else
-        :to="{ name: 'dataset', params: { id: dataset.id } }"
-        >Done</v-btn
-      >
+      <div class="button-bar">
+        <v-btn
+          :disabled="!valid"
+          color="success"
+          class="mr-4"
+          @click="submit"
+          v-if="dataset == null"
+          >Create</v-btn
+        >
+        <v-btn
+          :disabled="!uploadDone"
+          color="success"
+          class="mr-4"
+          v-else
+          :to="{ name: 'dataset', params: { id: dataset.id } }"
+          >Done</v-btn
+        >
+      </div>
     </v-form>
   </v-container>
 </template>
