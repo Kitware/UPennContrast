@@ -18,7 +18,12 @@
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import { select, event as d3Event } from "d3-selection";
-import { zoom as d3Zoom, D3ZoomEvent, zoomIdentity } from "d3-zoom";
+import {
+  zoom as d3Zoom,
+  D3ZoomEvent,
+  zoomIdentity,
+  zoomTransform
+} from "d3-zoom";
 import { IImageTile } from "../store/model";
 
 @Component
@@ -92,6 +97,16 @@ export default class ImageViewer extends Vue {
     });
   }
 
+  @Watch("width")
+  watchWidth() {
+    this.$nextTick(() => this.centerZoom());
+  }
+
+  @Watch("height")
+  watchHeight() {
+    this.$nextTick(() => this.centerZoom());
+  }
+
   @Watch("imageStack")
   watchImageStack(value: IImageTile[][]) {
     this.trackImages(value);
@@ -102,10 +117,28 @@ export default class ImageViewer extends Vue {
     this.updateContainerSize();
     this.initZoom();
     this.trackImages(this.imageStack);
+    this.centerZoom();
+  }
+
+  private d3Element() {
+    return select(this.$el as HTMLElement);
   }
 
   private initZoom() {
-    select(this.$el as HTMLElement).call(this.zoom);
+    this.d3Element().call(this.zoom);
+  }
+
+  private centerZoom() {
+    const cw = this.containerDimensions.width;
+    const ch = this.containerDimensions.height;
+
+    // transform image such that it is in the center maybe even scaled
+    const k = Math.min(cw / this.width, ch / this.height, 1);
+    const x = (cw - this.width * k) / 2;
+    const y = (ch - this.height * k) / 2;
+
+    this.transform = zoomIdentity.translate(x, y).scale(k);
+    this.zoom.transform(this.d3Element(), this.transform);
   }
 
   private zoomed(evt: D3ZoomEvent<HTMLElement, any>) {
