@@ -10,7 +10,7 @@
     />
     <!-- <resize-observer @notify="handleResize" /> -->
     <div class="loading" v-if="readyPercentage < 100">
-      <v-progress-circular :value="readyPercentage" />
+      <v-progress-circular indeterminate />
     </div>
   </div>
 </template>
