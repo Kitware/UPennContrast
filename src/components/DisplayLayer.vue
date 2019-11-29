@@ -21,6 +21,7 @@
         label="Name"
         dense
       />
+      <contrast-histogram :value="value.contrast" :histogram="histogram" />
       <v-menu
         ref="colorMenu"
         v-model="showColorPicker"
@@ -72,7 +73,6 @@
         label="Time-Slice"
         :max-value="maxTime"
       />
-      <contrast-histogram :value="value.contrast" :histogram="histogram" />
       <div class="buttons">
         <v-btn color="warning" small @click="removeLayer">Remove</v-btn>
       </div>
