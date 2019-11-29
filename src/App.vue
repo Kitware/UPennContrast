@@ -11,7 +11,7 @@
       <server-status />
     </v-app-bar>
 
-    <v-navigation-drawer v-model="drawer" app>
+    <v-navigation-drawer v-model="drawer" app disable-resize-watcher>
       <Menu />
     </v-navigation-drawer>
 
