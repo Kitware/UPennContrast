@@ -67,7 +67,7 @@ export function toStyle(
   if (hist) {
     const scale = scaleLinear()
       .domain([0, 100])
-      .range([hist.min, hist.max]);
+      .rangeRound([hist.min, hist.max]);
     return {
       min: scale(contrast.blackPoint),
       max: scale(contrast.whitePoint),
