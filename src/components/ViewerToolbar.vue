@@ -44,7 +44,11 @@ import { COMPOSITION_MODES } from "@/store/model";
 export default class ViewerToolbar extends Vue {
   readonly store = store;
 
-  readonly modes = Object.keys(COMPOSITION_MODES);
+  readonly modes = COMPOSITION_MODES.map(v => ({
+    text: v[0],
+    help: v[1],
+    value: v[0]
+  }));
 
   get mode() {
     return this.store.compositionMode;
