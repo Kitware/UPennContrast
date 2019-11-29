@@ -11,8 +11,14 @@
           <v-icon :color="l.color">mdi-square</v-icon>
         </v-list-item-avatar>
         <v-list-item-content>
-          <v-list-item-title>{{ l.name }}</v-list-item-title>
-          <v-list-item-subtitle>TODO</v-list-item-subtitle>
+          <v-list-item-title>
+            {{ l.name }}{{ !l.visible ? "(hidden)" : "" }}
+          </v-list-item-title>
+          <v-list-item-subtitle>
+            Channel: <code class="code">{{ l.channel }}</code> Z-Slice:
+            <code class="code">{{ toSlice(l.z) }}</code> Time-Slice:
+            <code class="code">{{ toSlice(l.time) }}</code>
+          </v-list-item-subtitle>
         </v-list-item-content>
       </v-list-item>
     </v-list>
@@ -42,6 +48,7 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
+import { IDisplayLayer, IDisplaySlice } from "@/store/model";
 
 @Component
 export default class ConfigurationInfo extends Vue {
@@ -74,6 +81,19 @@ export default class ConfigurationInfo extends Vue {
     };
   }
 
+  toSlice(slice: IDisplaySlice) {
+    switch (slice.type) {
+      case "constant":
+        return String(slice.value);
+      case "max-merge":
+        return "Max Merge";
+      case "offset":
+        return `Offset by ${slice.value}`;
+      default:
+        return "Current";
+    }
+  }
+
   remove() {
     this.store.deleteConfiguration(this.store.configuration!).then(() => {
       this.removeConfirm = false;
@@ -96,5 +116,9 @@ export default class ConfigurationInfo extends Vue {
   > * {
     margin-left: 1em;
   }
+}
+
+.code {
+  margin: 0 1em 0 0.5em;
 }
 </style>
