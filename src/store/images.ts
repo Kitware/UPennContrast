@@ -1,5 +1,6 @@
 import { IDisplayLayer, IDataset, IDisplaySlice, IContrast } from "./model";
 import { hsl } from "d3-color";
+import { scaleLinear } from "d3-scale";
 
 export function getLayerImages(
   layer: IDisplayLayer,
@@ -50,11 +51,34 @@ function palette(color: string, steps: number) {
   return palette;
 }
 
-export function toStyle(color: string, _contrast: IContrast): ITileOptions {
+export function toStyle(
+  color: string,
+  contrast: IContrast,
+  hist: ITileHistogram | null
+): ITileOptions {
+  const p = palette(color, 17);
+  if (contrast.mode === "absolute") {
+    return {
+      min: contrast.blackPoint,
+      max: contrast.whitePoint,
+      palette: p
+    };
+  }
+  if (hist) {
+    const scale = scaleLinear()
+      .domain([0, 100])
+      .range([hist.min, hist.max]);
+    return {
+      min: scale(contrast.blackPoint),
+      max: scale(contrast.whitePoint),
+      palette: p
+    };
+  }
+  // cannot compute absolute values yet
   return {
     min: "min",
     max: "max",
-    palette: palette(color, 17)
+    palette: p
   };
 }
 

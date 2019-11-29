@@ -30,6 +30,7 @@ export default class GirderAPI {
 
   private readonly imageCache = new Map<string, HTMLImageElement>();
   private readonly histogramCache = new Map<string, Promise<ITileHistogram>>();
+  private readonly resolvedHistogramCache = new Map<string, ITileHistogram>();
 
   constructor(client: RestClient) {
     this.client = client;
@@ -210,7 +211,8 @@ export default class GirderAPI {
     let offsetX = 0;
     const offsetY = 0;
 
-    const style = toStyle(color, contrast);
+    const hist = this.getResolvedLayerHistogram(images);
+    const style = toStyle(color, contrast, hist);
 
     images.forEach(image => {
       for (let x = 0; x < image.sizeX; x += image.tileWidth) {
@@ -266,7 +268,16 @@ export default class GirderAPI {
       )
     ).then(histograms => mergeHistograms(histograms));
     this.histogramCache.set(key, promise);
+    promise.then(hist => this.resolvedHistogramCache.set(key, hist));
     return promise;
+  }
+
+  getResolvedLayerHistogram(images: IImage[]) {
+    const key = images.map(i => `${i.item._id}#${i.frameIndex}`).join(",");
+    if (this.resolvedHistogramCache.has(key)) {
+      return this.resolvedHistogramCache.get(key)!;
+    }
+    return null;
   }
 
   flushCaches() {
@@ -278,6 +289,7 @@ export default class GirderAPI {
     });
     this.imageCache.clear();
     this.histogramCache.clear();
+    this.resolvedHistogramCache.clear();
   }
 }
 

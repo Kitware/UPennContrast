@@ -13,28 +13,31 @@
       <svg :width="width" :height="height">
         <path class="path" :d="areaPath" />
       </svg>
-      <div class="min-hint" :style="{ width: blackPoint }" />
-      <div class="max-hint" :style="{ width: whitePoint }" />
+      <div class="min-hint" :style="{ width: toValue(currentBlackPoint) }" />
+      <div
+        class="max-hint"
+        :style="{ width: toValue(currentWhitePoint, true) }"
+      />
       <div
         ref="min"
         class="min"
+        :style="{ left: toValue(currentBlackPoint) }"
         :title="toLabel(value.blackPoint)"
-        :style="{ left: blackPoint }"
       />
       <div
         class="saved-min"
-        :style="{ left: savedBlackPoint }"
+        :style="{ left: toValue(value.savedBlackPoint) }"
         :title="`Saved: ${toLabel(value.savedBlackPoint)}`"
       />
       <div
         ref="max"
         class="max"
+        :style="{ right: toValue(currentWhitePoint, true) }"
         :title="toLabel(value.whitePoint)"
-        :style="{ right: whitePoint }"
       />
       <div
         class="saved-max"
-        :style="{ right: savedWhitePoint }"
+        :style="{ right: toValue(value.savedWhitePoint, true) }"
         :title="`Saved: ${toLabel(value.savedWhitePoint)}`"
       />
       <resize-observer @notify="handleResize" />
@@ -76,6 +79,17 @@ import { scaleLinear, scalePoint } from "d3-scale";
 import { area, curveStep } from "d3-shape";
 import { selectAll, event as d3Event } from "d3-selection";
 import { drag, D3DragEvent } from "d3-drag";
+import { throttle } from "lodash-es";
+
+function roundPer(v: number) {
+  return Math.round(v * 100) / 100;
+}
+
+function roundAbs(v: number) {
+  return Math.round(v);
+}
+
+const THROTTLE = 250; // ms
 
 @Component({
   components: {
@@ -100,6 +114,19 @@ export default class ContrastHistogram extends Vue {
 
   _uid!: string; // Vue has that appearantly
 
+  currentBlackPoint = this.value.blackPoint;
+  currentWhitePoint = this.value.whitePoint;
+
+  @Watch("value.blackPoint")
+  onBlackPointChange(value: number) {
+    this.currentBlackPoint = value;
+  }
+
+  @Watch("value.whitePoint")
+  onWhitePointChange(value: number) {
+    this.currentWhitePoint = value;
+  }
+
   get mode() {
     return this.value.mode;
   }
@@ -120,10 +147,7 @@ export default class ContrastHistogram extends Vue {
       .range([0, this.width]);
   }
 
-  private computeValue(value: number, isWhite = false) {
-    if (!this.histData) {
-      return 0;
-    }
+  toValue(value: number, isWhite = false) {
     const base =
       this.value.mode === "percentile"
         ? this.percentageToPixel(value)
@@ -132,22 +156,6 @@ export default class ContrastHistogram extends Vue {
       return `${this.width - base}px`;
     }
     return `${base}px`;
-  }
-
-  get blackPoint() {
-    return this.computeValue(this.value.blackPoint);
-  }
-
-  get savedBlackPoint() {
-    return this.computeValue(this.value.savedBlackPoint);
-  }
-
-  get whitePoint() {
-    return this.computeValue(this.value.whitePoint, true);
-  }
-
-  get savedWhitePoint() {
-    return this.computeValue(this.value.savedWhitePoint, true);
   }
 
   toLabel(value: number) {
@@ -178,7 +186,7 @@ export default class ContrastHistogram extends Vue {
         drag<HTMLElement, any>()
           .on("drag", (which: "blackPoint" | "whitePoint") => {
             const evt = d3Event as D3DragEvent<HTMLElement, any, any>;
-            this.updatePoint(which, evt.x);
+            this.updatePoint(which, Math.max(0, Math.min(evt.x, this.width)));
           })
           .on("end", () => this.commitChanges())
       );
@@ -189,14 +197,27 @@ export default class ContrastHistogram extends Vue {
 
     switch (this.value.mode) {
       case "percentile":
-        copy[which] = this.percentageToPixel.invert(pixel);
+        copy[which] = roundPer(this.percentageToPixel.invert(pixel));
         break;
       default:
-        copy[which] = this.histToPixel.invert(pixel);
+        copy[which] = roundAbs(this.histToPixel.invert(pixel));
         break;
     }
-    this.$emit("change", copy);
+    if (which === "blackPoint") {
+      this.currentBlackPoint = copy.blackPoint;
+    } else {
+      this.currentWhitePoint = copy.whitePoint;
+    }
+    this.emitChange.call(this, copy);
   }
+
+  private readonly emitChange = throttle(function(
+    this: ContrastHistogram,
+    value: IContrast
+  ) {
+    this.$emit("change", value);
+  },
+  THROTTLE);
 
   private commitChanges() {
     this.$emit("commit", Object.assign({}, this.value));
@@ -206,10 +227,10 @@ export default class ContrastHistogram extends Vue {
     const copy = Object.assign({}, this.value);
     copy.mode = value;
 
-    const perToAbs = (v: number) =>
-      this.percentageToPixel.invert(this.histToPixel(v));
     const absToPer = (v: number) =>
-      this.histToPixel.invert(this.percentageToPixel(v));
+      roundPer(this.percentageToPixel.invert(this.histToPixel(v)));
+    const perToAbs = (v: number) =>
+      roundAbs(this.histToPixel.invert(this.percentageToPixel(v)));
     const converter = value === "percentile" ? absToPer : perToAbs;
 
     copy.blackPoint = converter(copy.blackPoint);
