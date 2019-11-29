@@ -65,6 +65,17 @@ export default class GirderAPI {
 
     return url.href;
   }
+  private cleanOldImages(url: string) {
+    // delete images that match except for the style
+    const styleStart = url.indexOf("style=");
+    const search = url.slice(0, styleStart);
+
+    Array.from(this.imageCache.keys()).forEach(key => {
+      if (key !== url && key.startsWith(search)) {
+        this.imageCache.delete(key);
+      }
+    });
+  }
 
   getTiles(item: string | IGirderItem): Promise<ITileMeta> {
     return this.client.get(`item/${toId(item)}/tiles`).then(r => r.data);
@@ -219,16 +230,15 @@ export default class GirderAPI {
         const w = Math.min(image.sizeX - x, image.tileWidth);
         for (let y = 0; y < image.sizeY; y += image.tileHeight) {
           const h = Math.min(image.sizeY - y, image.tileHeight);
-          const url = this.tileUrl(
-            image.item,
-            {
-              x: x / image.tileWidth,
-              y: y / image.tileHeight,
-              z: image.levels - 1, // highest level for max zoom
-              frame: image.frameIndex
-            },
-            style
-          );
+          const loc = {
+            x: x / image.tileWidth,
+            y: y / image.tileHeight,
+            z: image.levels - 1, // highest level for max zoom
+            frame: image.frameIndex
+          };
+          const url = this.tileUrl(image.item, loc, style);
+          this.cleanOldImages(url);
+
           resolvedImages.push({
             x: offsetX + x,
             y: offsetY + y,
