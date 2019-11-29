@@ -1,8 +1,8 @@
 <template>
   <div class="histogram">
-    <div class="bin" v-for="(bin, index) in bins" :key="index">
-      <div :style="{ height: `${bin.percentage}%` }" :title="bin.value" />
-    </div>
+    <svg :width="width" :height="height">
+      <path class="hist" :d="areaPath" />
+    </svg>
     <resize-observer @notify="handleResize" />
   </div>
 </template>
@@ -11,7 +11,8 @@
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import { IContrast } from "../store/model";
 import { ITileHistogram } from "../store/images";
-import { scaleLinear } from "d3-scale";
+import { scaleLinear, scalePoint } from "d3-scale";
+import { area, curveStep } from "d3-shape";
 
 @Component
 export default class ContrastHistogram extends Vue {
@@ -45,15 +46,24 @@ export default class ContrastHistogram extends Vue {
     this.height = height;
   }
 
-  get bins() {
+  get areaPath() {
     if (!this.histData) {
-      return [];
+      return "";
     }
     const bins = this.histData.hist;
-    const scale = scaleLinear()
+    const scaleY = scaleLinear()
       .domain([0, bins.reduce((acc, v) => Math.max(acc, v), 0)])
-      .range([0, 100]);
-    return bins.map(v => ({ value: v, percentage: scale(v) }));
+      .range([this.height, 0]);
+    const scaleX = scalePoint<number>()
+      .domain(bins.map((_, i) => i))
+      .range([0, this.width]);
+
+    const gen = area<number>()
+      .curve(curveStep)
+      .x((_, i) => scaleX(i)!)
+      .y0(d => scaleY(d)!)
+      .y1(scaleY(0));
+    return gen(bins);
   }
 }
 </script>
@@ -67,16 +77,7 @@ export default class ContrastHistogram extends Vue {
   justify-content: space-around;
 }
 
-.bin {
-  flex: 1 1 0;
-  position: relative;
-
-  > * {
-    position: absolute;
-    left: 0;
-    width: 100%;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.7);
-  }
+.hist {
+  fill: rgba(255, 255, 255, 0.7);
 }
 </style>
