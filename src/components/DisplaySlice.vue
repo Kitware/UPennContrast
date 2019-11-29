@@ -34,7 +34,7 @@
         />
       </template>
     </v-radio>
-    <v-radio value="max-merge" label="Max Merge" />
+    <!-- <v-radio value="max-merge" label="Max Merge" /> -->
   </v-radio-group>
 </template>
 

@@ -41,7 +41,7 @@
           <v-text-field
             :value="value.color"
             @change="changeProp('color', $event)"
-            label="Picker in menu"
+            label="Color"
             readonly
             hide-details
             v-on="on"
@@ -54,6 +54,7 @@
         <v-color-picker
           v-if="showColorPicker"
           :value="value.color"
+          hide-canvas
           @input="changeProp('color', $event)"
           width="300"
         />
@@ -190,6 +191,7 @@ export default class DisplayLayer extends Vue {
 
 .toggleButton {
   margin: 0;
+  flex: 0 0 auto;
 }
 
 .buttons {
