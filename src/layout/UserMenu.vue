@@ -92,9 +92,3 @@ export default class UserMenu extends Vue {
   }
 }
 </script>
-
-<style lang="scss" scoped>
-.loginDialog {
-  background: white;
-}
-</style>
