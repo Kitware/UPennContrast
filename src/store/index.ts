@@ -30,6 +30,31 @@ Vue.use(Vuex);
 
 export const store = new Vuex.Store({});
 
+@Module({ dynamic: true, store, name: "sync" })
+export class ServerSync extends VuexModule {
+  loading = false;
+  saving = false;
+  lastError: Error | null = null;
+
+  @Mutation
+  setSaving(status: boolean | Error) {
+    this.saving = status === true;
+    if (typeof status !== "boolean") {
+      this.lastError = status;
+    }
+  }
+
+  @Mutation
+  setLoading(status: boolean | Error) {
+    this.loading = status === true;
+    if (typeof status !== "boolean") {
+      this.lastError = status;
+    }
+  }
+}
+
+export const sync = getModule(ServerSync);
+
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
   girderUrl = persister.get("girderUrl", "http://localhost:8080");
@@ -38,10 +63,6 @@ export class Main extends VuexModule {
   });
   api = new GirderAPI(this.girderRest);
   girderUser: IGirderUser | null = this.girderRest.user;
-
-  loading = false;
-  saving = false;
-  lastError: Error | null = null;
 
   selectedDatasetId: string | null = null;
   dataset: IDataset | null = null;
@@ -58,45 +79,12 @@ export class Main extends VuexModule {
   compositionMode: CompositionMode = "multiply";
   layerMode: "single" | "multiple" = "multiple";
 
-  private internalLocation: IGirderLocation | null = null;
-
-  get location(): IGirderLocation {
-    if (this.internalLocation) {
-      return this.internalLocation;
-    }
-    if (this.isLoggedIn && this.girderUser) {
-      return this.girderUser;
-    }
-    return { type: "root" };
-  }
-
   get userName() {
     return this.girderUser ? this.girderUser.login : "anonymous";
   }
 
   get isLoggedIn() {
     return this.girderUser != null;
-  }
-
-  @Mutation
-  private setSaving(status: boolean | Error) {
-    this.saving = status === true;
-    if (typeof status !== "boolean") {
-      this.lastError = status;
-    }
-  }
-
-  @Mutation
-  private setLoading(status: boolean | Error) {
-    this.loading = status === true;
-    if (typeof status !== "boolean") {
-      this.lastError = status;
-    }
-  }
-
-  @Mutation
-  changeLocation(location: IGirderLocation | null) {
-    this.internalLocation = location;
   }
 
   @Mutation
@@ -120,7 +108,6 @@ export class Main extends VuexModule {
     this.dataset = null;
     this.selectedConfigurationId = null;
     this.configuration = null;
-    this.internalLocation = null;
   }
 
   @Mutation
@@ -183,12 +170,12 @@ export class Main extends VuexModule {
 
   @Action({})
   async logout() {
-    this.setSaving(true);
+    sync.setSaving(true);
     try {
       await this.girderRest.logout();
-      this.setSaving(false);
+      sync.setSaving(false);
     } catch (error) {
-      this.setSaving(error);
+      sync.setSaving(error);
     }
     this.loggedOut();
   }
@@ -199,7 +186,7 @@ export class Main extends VuexModule {
       return;
     }
     try {
-      this.setLoading(true);
+      sync.setLoading(true);
       const user = await this.girderRest.fetchUser();
       if (user) {
         this.loggedIn({
@@ -208,9 +195,9 @@ export class Main extends VuexModule {
         });
       }
       await this.initFromUrl();
-      this.setLoading(false);
+      sync.setLoading(false);
     } catch (error) {
-      this.setLoading(error);
+      sync.setLoading(error);
     }
   }
 
@@ -241,11 +228,11 @@ export class Main extends VuexModule {
     });
 
     try {
-      this.setLoading(true);
+      sync.setLoading(true);
       await restClient.login(username, password);
-      this.setLoading(false);
+      sync.setLoading(false);
     } catch (err) {
-      this.setLoading(err);
+      sync.setLoading(err);
       if (!err.response || err.response.status !== 401) {
         return "Unknown error occurred";
       } else {
@@ -271,12 +258,12 @@ export class Main extends VuexModule {
       return;
     }
     try {
-      this.setLoading(true);
+      sync.setLoading(true);
       const r = await this.api.getDataset(id);
       this.setDataset({ id, data: r });
-      this.setLoading(false);
+      sync.setLoading(false);
     } catch (error) {
-      this.setLoading(error);
+      sync.setLoading(error);
     }
   }
 
@@ -287,12 +274,12 @@ export class Main extends VuexModule {
       return;
     }
     try {
-      this.setLoading(true);
+      sync.setLoading(true);
       const r = await this.api.getDatasetConfiguration(id);
       this.setConfiguration({ id, data: r });
-      this.setLoading(false);
+      sync.setLoading(false);
     } catch (error) {
-      this.setLoading(error);
+      sync.setLoading(error);
     }
   }
 
@@ -307,12 +294,12 @@ export class Main extends VuexModule {
     path: IGirderSelectAble;
   }) {
     try {
-      this.setSaving(true);
+      sync.setSaving(true);
       const ds = await this.api.createDataset(name, description, path);
-      this.setSaving(false);
+      sync.setSaving(false);
       return ds;
     } catch (error) {
-      this.setSaving(error);
+      sync.setSaving(error);
     }
     return null;
   }
@@ -326,16 +313,16 @@ export class Main extends VuexModule {
     description: string;
   }) {
     try {
-      this.setSaving(true);
+      sync.setSaving(true);
       const config = await this.api.createConfiguration(
         name,
         description,
         this.dataset!
       );
-      this.setSaving(false);
+      sync.setSaving(false);
       return config;
     } catch (error) {
-      this.setSaving(error);
+      sync.setSaving(error);
     }
     return null;
   }
@@ -369,13 +356,13 @@ export class Main extends VuexModule {
   @Action
   async deleteConfiguration(configuration: IDatasetConfiguration) {
     try {
-      this.setSaving(true);
+      sync.setSaving(true);
       const config = await this.api.deleteConfiguration(configuration);
       this.deleteConfigurationImpl(configuration);
-      this.setSaving(false);
+      sync.setSaving(false);
       return config;
     } catch (error) {
-      this.setSaving(error);
+      sync.setSaving(error);
     }
     return null;
   }
@@ -408,13 +395,13 @@ export class Main extends VuexModule {
   @Action
   async deleteDataset(dataset: IDataset) {
     try {
-      this.setSaving(true);
+      sync.setSaving(true);
       const config = await this.api.deleteDataset(dataset);
       this.deleteDatasetImpl(dataset);
-      this.setSaving(false);
+      sync.setSaving(false);
       return config;
     } catch (error) {
-      this.setSaving(error);
+      sync.setSaving(error);
     }
     return null;
   }
@@ -455,12 +442,12 @@ export class Main extends VuexModule {
     if (!this.configuration) {
       return;
     }
-    this.setSaving(true);
+    sync.setSaving(true);
     try {
       await this.api.updateConfiguration(this.configuration);
-      this.setSaving(false);
+      sync.setSaving(false);
     } catch (error) {
-      this.setSaving(error);
+      sync.setSaving(error);
     }
   }
 

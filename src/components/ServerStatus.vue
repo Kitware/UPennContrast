@@ -21,26 +21,26 @@
 
 <script lang="ts">
 import { Vue, Component, Prop } from "vue-property-decorator";
-import store from "../store";
+import { sync } from "../store";
 
 @Component
 export default class ServerStatus extends Vue {
-  readonly store = store;
+  readonly store = sync;
 
   get lastError() {
-    if (!store.lastError) {
+    if (!this.store.lastError) {
       return "";
     }
 
-    return store.lastError.message;
+    return this.store.lastError.message;
   }
 
   get loading() {
-    return store.loading;
+    return this.store.loading;
   }
 
   get saving() {
-    return store.saving;
+    return this.store.saving;
   }
 }
 </script>
