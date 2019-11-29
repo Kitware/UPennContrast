@@ -108,7 +108,6 @@ export default class ConfigurationInfo extends Vue {
 }
 </script>
 <style lang="scss" scoped>
-
 .code {
   margin: 0 1em 0 0.5em;
 }

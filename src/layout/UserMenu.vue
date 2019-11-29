@@ -74,13 +74,22 @@ import store from "@/store";
 export default class UserMenu extends Vue {
   readonly store = store;
 
-  userMenu = !store.isLoggedIn;
+  userMenu = false;
 
   domain = store.girderUrl;
   username = "";
   password = "";
 
   error = "";
+
+  mounted() {
+    // delay auto open for auto relogin to finish
+    setTimeout(() => {
+      if (!this.userMenu) {
+        this.userMenu = !store.isLoggedIn;
+      }
+    }, 500);
+  }
 
   async login() {
     this.error = "";
