@@ -19,26 +19,28 @@
         </v-btn>
       </template>
     </v-select>
-    <v-switch v-model="layerMode" label="Multiple" hide-details id="layerMode">
-      <template #prepend>
-        <!--styling helper -->
-        <div class="v-input--selection-controls__input" style="width: 0"></div>
-        <label class="v-label theme--dark" for="layerMode"
-          >Layers: Single</label
-        >
-      </template>
-    </v-switch>
+    <switch-toggle
+      v-model="layerMode"
+      label="Layers: "
+      true-label="Multiple"
+      true-value="multiple"
+      false-label="Single"
+      false-value="single"
+      id="layerMode"
+    />
   </div>
 </template>
 <script lang="ts">
 import { Vue, Component, Inject, Prop } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
+import SwitchToggle from "./SwitchToggle.vue";
 import store from "@/store";
 import { COMPOSITION_MODES } from "@/store/model";
 
 @Component({
   components: {
-    ValueSlider
+    ValueSlider,
+    SwitchToggle
   }
 })
 export default class ViewerToolbar extends Vue {
@@ -95,12 +97,12 @@ export default class ViewerToolbar extends Vue {
     return this.store.dataset ? this.store.dataset.time.length - 1 : this.time;
   }
 
-  set layerMode(value: boolean) {
-    this.changeQuery("layer", value ? "multiple" : "single");
+  set layerMode(value: "multiple" | "single") {
+    this.changeQuery("layer", value);
   }
 
   get layerMode() {
-    return this.store.layerMode === "multiple";
+    return this.store.layerMode;
   }
 }
 </script>

@@ -465,9 +465,15 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async changeLayer(args: { index: number; delta: Partial<IDisplayLayer> }) {
+  async changeLayer(args: {
+    index: number;
+    delta: Partial<IDisplayLayer>;
+    sync?: boolean;
+  }) {
     this.changeLayerImpl(args);
-    await this.syncConfiguration();
+    if (args.sync !== false) {
+      await this.syncConfiguration();
+    }
   }
 
   @Mutation

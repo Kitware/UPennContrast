@@ -21,7 +21,12 @@
         label="Name"
         dense
       />
-      <contrast-histogram :value="value.contrast" :histogram="histogram" />
+      <contrast-histogram
+        :value="value.contrast"
+        @change="changeContrast($event, false)"
+        @commit="changeContrast($event, true)"
+        :histogram="histogram"
+      />
       <v-menu
         ref="colorMenu"
         v-model="showColorPicker"
@@ -38,7 +43,7 @@
             @change="changeProp('color', $event)"
             label="Picker in menu"
             readonly
-            dense
+            hide-details
             v-on="on"
           >
             <template #append>
@@ -82,7 +87,7 @@
 
 <script lang="ts">
 import { Vue, Component, Prop, Emit } from "vue-property-decorator";
-import { IDisplayLayer } from "../store/model";
+import { IDisplayLayer, IContrast } from "../store/model";
 import DisplaySlice from "./DisplaySlice.vue";
 import ContrastHistogram from "./ContrastHistogram.vue";
 import store from "../store";
@@ -150,6 +155,16 @@ export default class DisplayLayer extends Vue {
       index: this.index,
       delta: {
         [prop]: value
+      }
+    });
+  }
+
+  changeContrast(contrast: IContrast, sync = true) {
+    this.store.changeLayer({
+      index: this.index,
+      sync,
+      delta: {
+        contrast
       }
     });
   }
