@@ -12,7 +12,8 @@ import {
   IFrameInfo,
   IImage,
   IContrast,
-  IImageTile
+  IImageTile,
+  newLayer
 } from "@/store/model";
 import {
   toStyle,
@@ -156,6 +157,10 @@ export default class GirderAPI {
     return this.client.post("folder", data).then(r => asDataset(r.data));
   }
 
+  deleteDataset(dataset: IDataset): Promise<IDataset> {
+    return this.client.delete(`/folder/${dataset.id}`).then(() => dataset);
+  }
+
   createConfiguration(
     name: string,
     description: string,
@@ -169,7 +174,8 @@ export default class GirderAPI {
     data.set(
       "metadata",
       JSON.stringify({
-        subtype: "contrastConfiguration"
+        subtype: "contrastConfiguration",
+        layers: [newLayer(dataset, [])]
       })
     );
     return this.client
@@ -185,6 +191,12 @@ export default class GirderAPI {
         layers: config.layers
       })
       .then(() => config);
+  }
+
+  deleteConfiguration(
+    config: IDatasetConfiguration
+  ): Promise<IDatasetConfiguration> {
+    return this.client.delete(`/item/${config.id}`).then(() => config);
   }
 
   private loadImage(

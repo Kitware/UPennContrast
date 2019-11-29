@@ -48,7 +48,7 @@ export class Main extends VuexModule {
 
   selectedConfigurationId: string | null = null;
   configuration: IDatasetConfiguration | null = null;
-  recentConfigurations: IDatasetConfigurationMeta[] = persister.get(
+  readonly recentConfigurations: IDatasetConfigurationMeta[] = persister.get(
     "recentConfigurations",
     []
   );
@@ -147,6 +147,13 @@ export class Main extends VuexModule {
     if (!data) {
       return;
     }
+
+    if (this.dataset) {
+      if (!this.dataset.configurations.find(d => d.id === data.id)) {
+        this.dataset.configurations.push(data);
+      }
+    }
+
     // persist list
 
     // remove old
@@ -333,6 +340,85 @@ export class Main extends VuexModule {
     return null;
   }
 
+  @Mutation
+  private deleteConfigurationImpl(configuration: IDatasetConfiguration) {
+    if (this.configuration === configuration) {
+      this.configuration = null;
+    }
+    if (this.selectedConfigurationId === configuration.id) {
+      this.selectedConfigurationId = null;
+    }
+    if (this.dataset) {
+      const index = this.dataset.configurations.findIndex(
+        d => d.id === configuration.id
+      );
+      if (index >= 0) {
+        this.dataset.configurations.splice(index, 1);
+      }
+    }
+    // remove old
+    const index = this.recentConfigurations.findIndex(
+      d => d.id === configuration.id
+    );
+    if (index >= 0) {
+      this.recentConfigurations.splice(index, 1);
+      persister.set("recentConfigurations", this.recentConfigurations);
+    }
+  }
+
+  @Action
+  async deleteConfiguration(configuration: IDatasetConfiguration) {
+    try {
+      this.setSaving(true);
+      const config = await this.api.deleteConfiguration(configuration);
+      this.deleteConfigurationImpl(configuration);
+      this.setSaving(false);
+      return config;
+    } catch (error) {
+      this.setSaving(error);
+    }
+    return null;
+  }
+
+  @Mutation
+  private deleteDatasetImpl(dataset: IDataset) {
+    if (this.dataset === dataset) {
+      this.dataset = null;
+      this.configuration = null;
+      this.selectedConfigurationId = null;
+    }
+    if (this.selectedDatasetId === dataset.id) {
+      this.selectedDatasetId = null;
+    }
+
+    // remove all configurations
+    const toDelete: number[] = [];
+    this.recentConfigurations.forEach((d, i) => {
+      if (d.datasetId === dataset.id) {
+        toDelete.push(i);
+      }
+    });
+    if (toDelete.length > 0) {
+      // splice in reverse order
+      toDelete.reverse().forEach(i => this.recentConfigurations.splice(i, 1));
+      persister.set("recentConfigurations", this.recentConfigurations);
+    }
+  }
+
+  @Action
+  async deleteDataset(dataset: IDataset) {
+    try {
+      this.setSaving(true);
+      const config = await this.api.deleteDataset(dataset);
+      this.deleteDatasetImpl(dataset);
+      this.setSaving(false);
+      return config;
+    } catch (error) {
+      this.setSaving(error);
+    }
+    return null;
+  }
+
   @Action
   async setZ(value: number) {
     this.setZImpl(value);
@@ -383,7 +469,7 @@ export class Main extends VuexModule {
     if (!this.configuration || !this.dataset) {
       return;
     }
-    this.pushLayer(newLayer(this.dataset, this.configuration));
+    this.pushLayer(newLayer(this.dataset, this.configuration.layers));
     await this.syncConfiguration();
   }
 

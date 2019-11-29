@@ -7,7 +7,12 @@
     <v-text-field :value="channels" label="# Channels" readonly />
     <v-subheader>
       <span class="grow">Configurations</span>
-      <v-btn :to="{ name: 'newconfiguration', params: $route.params }"
+      <v-btn
+        color="primary"
+        :to="{
+          name: 'newconfiguration',
+          params: Object.assign({}, $route.params)
+        }"
         >Add Configuration</v-btn
       >
     </v-subheader>
@@ -28,6 +33,31 @@
         </v-list-item-action>
       </v-list-item>
     </v-list>
+    <div class="toolbar">
+      <v-dialog v-model="removeConfirm" max-width="33vw">
+        <template #activator="{ on }">
+          <v-btn color="warning" v-on="on" :disabled="!store.dataset">
+            <v-icon left>mdi-close</v-icon>
+            Remove
+          </v-btn>
+        </template>
+        <v-card>
+          <v-card-title>Are you sure to remove "{{ name }}"?</v-card-title>
+          <v-card-actions class="toolbar">
+            <v-btn @click="removeConfirm = false">Cancel</v-btn>
+            <v-btn @click="remove" color="warning">Remove</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+      <v-btn
+        color="primary"
+        :to="toRoute(configurations[0])"
+        :disabled="configurations.length === 0"
+      >
+        <v-icon left>mdi-eye</v-icon>
+        View
+      </v-btn>
+    </div>
   </v-container>
 </template>
 <script lang="ts">
@@ -38,6 +68,8 @@ import { IDatasetConfiguration } from "../../store/model";
 @Component
 export default class DatasetInfo extends Vue {
   readonly store = store;
+
+  removeConfirm = false;
 
   get name() {
     return this.store.dataset ? this.store.dataset.name : "";
@@ -69,5 +101,26 @@ export default class DatasetInfo extends Vue {
       params: Object.assign({ config: c.id }, this.$route.params)
     };
   }
+
+  remove() {
+    this.store.deleteDataset(this.store.dataset!).then(() => {
+      this.removeConfirm = false;
+      this.$router.push({
+        name: "root"
+      });
+    });
+  }
 }
 </script>
+
+<style lang="scss" scoped>
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1em;
+
+  > * {
+    margin-left: 1em;
+  }
+}
+</style>

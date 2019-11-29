@@ -131,11 +131,11 @@ function randomId() {
 
 export function newLayer(
   dataset: IDataset,
-  configuration: IDatasetConfiguration
+  layers: IDisplayLayer[]
 ): IDisplayLayer {
-  const usedColors = new Set(configuration.layers.map(l => l.color));
+  const usedColors = new Set(layers.map(l => l.color));
   const nextColor = colors.filter(c => !usedColors.has(c));
-  const usedChannels = new Set(configuration.layers.map(l => l.channel));
+  const usedChannels = new Set(layers.map(l => l.channel));
   const nextChannel = dataset.channels
     .map((_, i) => i)
     .filter(c => !usedChannels.has(c));
@@ -143,7 +143,7 @@ export function newLayer(
   // guess a good new layer
   return {
     id: randomId(),
-    name: `Layer ${configuration.layers.length + 1}`,
+    name: `Layer ${layers.length + 1}`,
     visible: true,
     channel: nextChannel[0] || 0,
     time: {
