@@ -46,7 +46,11 @@
 
     <v-subheader>Actions</v-subheader>
     <div class="button-bar">
-      <v-btn color="primary" :to="{ name: 'newdataset' }">
+      <v-btn
+        color="primary"
+        :to="{ name: 'newdataset' }"
+        :disabled="!store.isLoggedIn"
+      >
         Create Dataset
       </v-btn>
     </div>
