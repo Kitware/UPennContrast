@@ -31,7 +31,7 @@
   </div>
 </template>
 <script lang="ts">
-import { Vue, Component, Inject, Prop } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
 import store from "@/store";

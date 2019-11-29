@@ -1,10 +1,5 @@
 import { IGirderItem, IGirderFolder } from "@girder/components/src";
 
-export interface IDimension {
-  min: number;
-  max: number;
-}
-
 export interface IDatasetConfigurationMeta {
   id: string;
   datasetId: string;
@@ -34,6 +29,15 @@ export interface IImage {
   tileHeight: number;
 }
 
+export interface IImageTile {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  url: string;
+  image: HTMLImageElement;
+}
+
 export interface IDataset {
   readonly id: string;
   readonly _girder: IGirderFolder;
@@ -43,7 +47,7 @@ export interface IDataset {
 
   z: number[];
   time: number[];
-  channels: number[]; // TODO histogram to calculate the boundaries
+  channels: number[];
   width: number;
   height: number;
   images(time: number, z: number, channel: number): IImage[];
@@ -71,8 +75,6 @@ export interface IDisplaySlice {
   type: DisplaySliceType;
   value: number | null;
 }
-
-// UI TODO: hotkey for enable/disable layer: 1 ... toggle layer 1
 
 export interface IDisplayLayer {
   readonly id: string; // to have better keys for UI
@@ -217,12 +219,3 @@ class CompositionModes {
 
 export declare type CompositionMode = keyof CompositionModes;
 export const COMPOSITION_MODES = Object.entries(new CompositionModes());
-
-export interface IImageTile {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  url: string;
-  image: HTMLImageElement;
-}

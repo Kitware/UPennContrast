@@ -58,7 +58,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Inject } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
 import { FileManager as GirderFileManager } from "@/girder";
 import { IGirderLocation, IGirderSelectAble } from "@girder/components/src";

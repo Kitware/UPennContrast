@@ -14,13 +14,13 @@ import {
   IContrast,
   IImageTile,
   newLayer
-} from "@/store/model";
+} from "./model";
 import {
   toStyle,
   ITileOptions,
   mergeHistograms,
   ITileHistogram
-} from "@/store/images";
+} from "./images";
 
 function toId(item: string | { _id: string }) {
   return typeof item === "string" ? item : item._id;
@@ -120,11 +120,12 @@ export default class GirderAPI {
         const images = items.filter(d => (d as any).largeImage);
         return Promise.all(images.map(item => this.getTiles(item))).then(
           tiles => {
+            const configurations = items
+              .filter(isConfigurationItem)
+              .map(asConfigurationItem);
             return {
               ...asDataset(folder),
-              configurations: items
-                .filter(isConfigurationItem)
-                .map(asConfigurationItem),
+              configurations,
               ...parseTiles(images, tiles)
             };
           }

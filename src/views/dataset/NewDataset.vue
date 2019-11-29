@@ -57,12 +57,11 @@
   </v-container>
 </template>
 <script lang="ts">
-import { Vue, Component, Inject, Prop } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
 import { IGirderSelectAble, Upload as GirderUpload } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
-
-import { IDataset } from "../../store/model";
+import { IDataset } from "@/store/model";
 
 @Component({
   components: {

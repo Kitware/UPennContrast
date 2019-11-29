@@ -7,6 +7,11 @@ export interface IMapper<T> {
   set(value: T | null): Promise<any>;
 }
 
+/**
+ * component generator that will handle route params query params by syncing them with the given mapper information
+ * @param params
+ * @param query
+ */
 export default function routeMapper(
   params: { [key: string]: IMapper<any> },
   query: { [key: string]: IMapper<any> } = {}

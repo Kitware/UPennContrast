@@ -20,8 +20,8 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop } from "vue-property-decorator";
-import { sync } from "../store";
+import { Vue, Component } from "vue-property-decorator";
+import sync from "../store/sync";
 
 @Component
 export default class ServerStatus extends Vue {

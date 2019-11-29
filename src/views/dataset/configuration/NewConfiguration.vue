@@ -15,7 +15,7 @@
 <script lang="ts">
 import { Vue, Component, Inject, Prop } from "vue-property-decorator";
 import store from "@/store";
-import { IDataset } from "../../../store/model";
+import { IDataset } from "@/store/model";
 
 @Component
 export default class NewConfiguration extends Vue {

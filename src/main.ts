@@ -21,6 +21,8 @@ Vue.config.productionTip = false;
 
 Vue.use(Girder);
 
+main.initialize();
+
 new Vue({
   provide: {
     // use a proxy to dynamically resolve to the right girderRest client

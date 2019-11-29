@@ -1,11 +1,5 @@
 import { RestClient } from "@/girder";
-import {
-  IGirderLocation,
-  IGirderSelectAble,
-  IGirderUser
-} from "@girder/components/src";
-import Vue from "vue";
-import Vuex from "vuex";
+import { IGirderSelectAble, IGirderUser } from "@girder/components/src";
 import {
   Action,
   getModule,
@@ -13,47 +7,22 @@ import {
   Mutation,
   VuexModule
 } from "vuex-module-decorators";
+import GirderAPI from "./GirderAPI";
+import { getLayerImages } from "./images";
 import {
+  CompositionMode,
   IDataset,
-  IDisplayLayer,
   IDatasetConfiguration,
   IDatasetConfigurationMeta,
-  newLayer,
-  CompositionMode,
-  IImageTile
+  IDisplayLayer,
+  IImageTile,
+  newLayer
 } from "./model";
-import { getLayerImages } from "./images";
-import GirderAPI from "./GirderAPI";
 import persister from "./Persister";
+import store from "./root";
+import sync from "./sync";
 
-Vue.use(Vuex);
-
-export const store = new Vuex.Store({});
-
-@Module({ dynamic: true, store, name: "sync" })
-export class ServerSync extends VuexModule {
-  loading = false;
-  saving = false;
-  lastError: Error | null = null;
-
-  @Mutation
-  setSaving(status: boolean | Error) {
-    this.saving = status === true;
-    if (typeof status !== "boolean") {
-      this.lastError = status;
-    }
-  }
-
-  @Mutation
-  setLoading(status: boolean | Error) {
-    this.loading = status === true;
-    if (typeof status !== "boolean") {
-      this.lastError = status;
-    }
-  }
-}
-
-export const sync = getModule(ServerSync);
+export { default as store } from "./root";
 
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
@@ -168,7 +137,7 @@ export class Main extends VuexModule {
     this.time = value;
   }
 
-  @Action({})
+  @Action
   async logout() {
     sync.setSaving(true);
     try {
@@ -595,7 +564,5 @@ export class Main extends VuexModule {
 }
 
 const main = getModule(Main);
-
-main.initialize();
 
 export default main;
