@@ -1,5 +1,12 @@
 <template>
-  <v-slider v-model="slider" :max="max" :min="min" hide-details :label="label">
+  <v-slider
+    v-model="slider"
+    :max="max"
+    :min="min"
+    hide-details
+    :label="label"
+    :disabled="min === max"
+  >
     <template #append>
       <v-text-field
         v-model="slider"

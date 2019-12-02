@@ -42,6 +42,26 @@
       />
       <resize-observer @notify="handleResize" />
     </div>
+    <div class="sub">
+      <v-text-field
+        type="number"
+        :min="editMin"
+        :max="editMax"
+        v-model="editBlackPoint"
+        :append-icon="editIcon"
+        hide-details
+        dense
+      />
+      <v-text-field
+        type="number"
+        :min="editMin"
+        :max="editMax"
+        v-model="editWhitePoint"
+        :append-icon="editIcon"
+        hide-details
+        dense
+      />
+    </div>
     <div class="toolbar">
       <v-btn
         x-small
@@ -131,6 +151,21 @@ export default class ContrastHistogram extends Vue {
     return this.value.mode;
   }
 
+  get editMin() {
+    return this.value.mode === "percentile" || !this.histData
+      ? 0
+      : this.histData.min;
+  }
+  get editMax() {
+    return this.value.mode === "percentile" || !this.histData
+      ? 100
+      : this.histData.max;
+  }
+
+  get editIcon() {
+    return this.value.mode === "percentile" ? "mdi-percent" : undefined;
+  }
+
   get histToPixel() {
     const scale = scaleLinear()
       .domain([0, 100])
@@ -204,8 +239,12 @@ export default class ContrastHistogram extends Vue {
         break;
     }
     if (which === "blackPoint") {
+      // ensure not overlapping
+      copy.blackPoint = Math.min(copy.blackPoint, copy.whitePoint);
       this.currentBlackPoint = copy.blackPoint;
     } else {
+      // ensure not overlapping
+      copy.whitePoint = Math.max(copy.whitePoint, copy.blackPoint);
       this.currentWhitePoint = copy.whitePoint;
     }
     this.emitChange.call(this, copy);
@@ -239,6 +278,30 @@ export default class ContrastHistogram extends Vue {
     copy.savedWhitePoint = converter(copy.savedWhitePoint);
 
     this.$emit("commit", copy);
+  }
+
+  get editBlackPoint() {
+    return this.currentBlackPoint;
+  }
+
+  set editBlackPoint(value: string | number) {
+    const v = typeof value === "string" ? parseInt(value, 10) : value;
+    const copy = Object.assign({}, this.value);
+    copy.blackPoint = Math.min(v, copy.whitePoint);
+    this.currentBlackPoint = copy.blackPoint;
+    this.emitChange.call(this, copy);
+  }
+
+  get editWhitePoint() {
+    return this.currentWhitePoint;
+  }
+
+  set editWhitePoint(value: string | number) {
+    const v = typeof value === "string" ? parseInt(value, 10) : value;
+    const copy = Object.assign({}, this.value);
+    copy.whitePoint = Math.min(v, copy.blackPoint);
+    this.currentWhitePoint = copy.whitePoint;
+    this.emitChange.call(this, copy);
   }
 
   reset() {
@@ -385,5 +448,15 @@ $savedHint: 7px;
 
 .max-hint {
   right: 0;
+}
+
+.sub {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+
+  > div:first-of-type {
+    margin-right: 1em;
+  }
 }
 </style>
