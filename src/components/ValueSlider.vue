@@ -16,6 +16,7 @@
         type="number"
         :min="min"
         :max="max"
+        :disabled="min === max"
         style="width: 60px"
       ></v-text-field>
     </template>

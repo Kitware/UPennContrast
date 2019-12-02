@@ -358,7 +358,7 @@ export default class ContrastHistogram extends Vue {
 
 <style lang="scss" scoped>
 .histogram {
-  margin: 0.5em 0;
+  margin: 0.5em 0 1em 0;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -419,10 +419,21 @@ $savedHint: 7px;
   transform: translateX(#{-$savedHint});
 
   border-top: $savedHint solid lightgray;
+  transition: all 250ms ease;
+
+  &:hover {
+    border-left: $savedHint * 1.25 solid transparent;
+    border-right: $savedHint * 1.25 solid transparent;
+    transform: translateX(#{-$savedHint * 1.25});
+  }
 }
 
 .saved-max {
   transform: translateX(#{$savedHint});
+
+  &:hover {
+    transform: translateX(#{$savedHint * 1.25});
+  }
 }
 
 .min-hint,

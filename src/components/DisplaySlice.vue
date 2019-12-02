@@ -2,39 +2,49 @@
   <v-radio-group
     :value="value.type"
     @change="changeSlice($event, value.value)"
-    :label="label"
+    :label="labelHint"
     hide-details
     dense
   >
-    <v-radio value="current" label="Current" />
+    <template v-if="maxValue > 0">
+      <v-radio value="current" label="Current" class="smaller" />
 
-    <v-radio value="constant" class="inline-text">
-      <template #label>
-        <span>Constant</span>
-        <v-text-field
-          :disabled="value.type !== 'constant'"
-          :value="value.value || 0"
-          type="number"
-          dense
-          hide-details
-          @input="changeSlice('constant', $event)"
-        />
-      </template>
-    </v-radio>
-    <v-radio value="offset" class="inline-text">
-      <template #label>
-        <span>Offset</span>
-        <v-text-field
-          :disabled="value.type !== 'offset'"
-          :value="value.value || 0"
-          type="number"
-          dense
-          hide-details
-          @input="changeSlice('offset', $event)"
-        />
-      </template>
-    </v-radio>
-    <!-- <v-radio value="max-merge" label="Max Merge" /> -->
+      <v-radio value="constant" class="inline-text smaller">
+        <template #label>
+          <span>Constant</span>
+          <v-text-field
+            :disabled="value.type !== 'constant'"
+            :value="value.value || 0"
+            min="0"
+            :max="maxValue"
+            type="number"
+            dense
+            hide-details
+            @input="changeSlice('constant', $event)"
+          />
+        </template>
+      </v-radio>
+      <v-radio
+        value="offset"
+        class="inline-text smaller"
+        :disabled="maxValue === 0"
+      >
+        <template #label>
+          <span>Offset</span>
+          <v-text-field
+            :disabled="value.type !== 'offset'"
+            :value="value.value || 0"
+            type="number"
+            dense
+            :min="-maxValue + 1"
+            :max="maxValue - 1"
+            hide-details
+            @input="changeSlice('offset', $event)"
+          />
+        </template>
+      </v-radio>
+      <!-- <v-radio value="max-merge" label="Max Merge" class="smaller" /> -->
+    </template>
   </v-radio-group>
 </template>
 
@@ -51,6 +61,13 @@ export default class DisplaySlice extends Vue {
   @Prop()
   readonly label!: string;
 
+  get labelHint() {
+    if (this.maxValue === 0) {
+      return `${this.label} (no slices available)`;
+    }
+    return this.label;
+  }
+
   changeSlice(type: DisplaySliceType, value: string | number | null) {
     const v = typeof value === "string" ? parseInt(value, 10) : value;
     if (this.value.type === type && this.value.value === v) {
@@ -65,6 +82,15 @@ export default class DisplaySlice extends Vue {
 </script>
 
 <style lang="scss" scoped>
+.smaller {
+  margin-bottom: 0 !important;
+
+  ::v-deep .v-label {
+    font-size: 14px;
+    height: auto;
+  }
+}
+
 .inline-text {
   span {
     width: 6em;

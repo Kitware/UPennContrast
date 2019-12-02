@@ -8,7 +8,7 @@
     <v-list two-line>
       <v-list-item v-for="l in layers" :key="l.name">
         <v-list-item-avatar>
-          <v-icon :color="l.color">mdi-square</v-icon>
+          <v-icon :color="l.color">mdi-circle</v-icon>
         </v-list-item-avatar>
         <v-list-item-content>
           <v-list-item-title>

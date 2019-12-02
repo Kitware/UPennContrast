@@ -1,7 +1,7 @@
 <template>
   <v-expansion-panel>
     <v-expansion-panel-header class="displayLayerHeader">
-      <v-icon :color="value.color">mdi-square</v-icon>
+      <v-icon :color="value.color" left>mdi-circle</v-icon>
       <span class="header">{{ value.name }}</span>
       <v-switch
         @click.native.stop
@@ -20,6 +20,7 @@
         @change="changeProp('name', $event)"
         label="Name"
         dense
+        hide-details
       />
       <contrast-histogram
         :value="value.contrast"
@@ -43,6 +44,7 @@
             @change="changeProp('color', $event)"
             label="Color"
             readonly
+            dense
             hide-details
             v-on="on"
           >
@@ -59,7 +61,14 @@
           width="300"
         />
       </v-menu>
-      <v-radio-group row v-model="channel" label="Channel" dense>
+      <v-radio-group
+        row
+        v-model="channel"
+        label="Channel"
+        dense
+        hide-details
+        class="channel"
+      >
         <v-radio
           v-for="(channel, index) in channels"
           :key="index"
@@ -197,5 +206,19 @@ export default class DisplayLayer extends Vue {
 .buttons {
   display: flex;
   justify-content: flex-end;
+}
+
+.channel {
+  ::v-deep .v-label {
+    width: 100%;
+  }
+
+  ::v-deep .v-radio {
+    margin-right: 10px;
+
+    > .v-label {
+      font-size: 14px;
+    }
+  }
 }
 </style>
