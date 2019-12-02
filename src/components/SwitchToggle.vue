@@ -10,7 +10,14 @@
     <template #prepend>
       <!--styling helper -->
       <div class="v-input--selection-controls__input" style="width: 0"></div>
-      <label class="v-label theme--dark" :for="id">
+      <label
+        :class="{
+          'v-label': true,
+          'theme--light': !$vuetify.theme.dark,
+          'theme--dark': $vuetify.theme.dark
+        }"
+        :for="id"
+      >
         {{ label }} {{ falseLabel }}
       </label>
     </template>

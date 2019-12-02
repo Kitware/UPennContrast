@@ -16,12 +16,25 @@
         <v-list-item-title>New Dataset</v-list-item-title>
       </v-list-item-content>
     </v-list-item>
-    <v-list-item :to="{ name: 'newconfiguration' }" v-if="store.dataset">
+    <v-list-item
+      :to="{
+        name: 'newconfiguration',
+        params: { id: store.selectedDatasetId }
+      }"
+      v-if="store.dataset"
+    >
       <v-list-item-action>
         <v-icon>mdi-plus-circle</v-icon>
       </v-list-item-action>
       <v-list-item-content>
         <v-list-item-title>New Configuration</v-list-item-title>
+      </v-list-item-content>
+    </v-list-item>
+
+    <v-divider />
+    <v-list-item>
+      <v-list-item-content>
+        <v-switch v-model="$vuetify.theme.dark" label="Dark Theme" />
       </v-list-item-content>
     </v-list-item>
   </v-list>

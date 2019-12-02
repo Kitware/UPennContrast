@@ -1,5 +1,11 @@
 <template>
-  <div class="histogram">
+  <div
+    :class="{
+      histogram: true,
+      'theme--light': !$vuetify.theme.dark,
+      'theme--dark': $vuetify.theme.dark
+    }"
+  >
     <switch-toggle
       v-model="mode"
       label="Mode: "
@@ -380,10 +386,6 @@ export default class ContrastHistogram extends Vue {
   }
 }
 
-.path {
-  fill: rgba(255, 255, 255, 0.7);
-}
-
 .toolbar {
   display: flex;
   justify-content: space-evenly;
@@ -394,7 +396,6 @@ export default class ContrastHistogram extends Vue {
   position: absolute;
   top: 0;
   height: 100%;
-  border-right: 1px solid lightgray;
   transition: border-width 0.2s ease;
   width: 1px;
   cursor: ew-resize;
@@ -403,7 +404,6 @@ export default class ContrastHistogram extends Vue {
 .max {
   right: 0;
   border-right: none;
-  border-left: 1px solid lightgray;
 }
 
 $savedHint: 7px;
@@ -418,7 +418,6 @@ $savedHint: 7px;
   border-right: $savedHint solid transparent;
   transform: translateX(#{-$savedHint});
 
-  border-top: $savedHint solid lightgray;
   transition: all 250ms ease;
 
   &:hover {
@@ -443,14 +442,6 @@ $savedHint: 7px;
   height: 100%;
   user-select: none;
   pointer-events: none;
-
-  background: repeating-linear-gradient(
-    -45deg,
-    rgba(255, 255, 255, 0.5),
-    rgba(255, 255, 255, 0.5) 5px,
-    #696969 5px,
-    #696969 10px
-  );
 }
 
 .min-hint {
@@ -468,6 +459,66 @@ $savedHint: 7px;
 
   > div:first-of-type {
     margin-right: 1em;
+  }
+}
+
+.theme--dark {
+  .path {
+    fill: #c2c2c2;
+  }
+
+  .min {
+    border-right: 1px solid lightgray;
+  }
+
+  .max {
+    border-left: 1px solid lightgray;
+  }
+
+  .saved-min,
+  .saved-max {
+    border-top: $savedHint solid lightgray;
+  }
+
+  .min-hint,
+  .max-hint {
+    background: repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.5),
+      rgba(255, 255, 255, 0.5) 5px,
+      #696969 5px,
+      #696969 10px
+    );
+  }
+}
+
+.theme--light {
+  .path {
+    fill: #c2c2c2;
+  }
+
+  .min {
+    border-right: 1px solid darkgray;
+  }
+
+  .max {
+    border-left: 1px solid darkgray;
+  }
+
+  .saved-min,
+  .saved-max {
+    border-top: $savedHint solid darkgray;
+  }
+
+  .min-hint,
+  .max-hint {
+    background: repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.5),
+      rgba(255, 255, 255, 0.5) 5px,
+      #bdbdbd 5px,
+      #bdbdbd 10px
+    );
   }
 }
 </style>
