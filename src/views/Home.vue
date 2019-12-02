@@ -70,24 +70,10 @@ import { IGirderLocation, IGirderSelectAble } from "@girder/components/src";
 })
 export default class Upload extends Vue {
   readonly store = store;
-  private internalLocation: IGirderLocation | null = null;
+  location: IGirderLocation = { type: "root" };
 
   get configurations() {
     return this.store.recentConfigurations;
-  }
-
-  get location(): IGirderLocation {
-    if (this.internalLocation) {
-      return this.internalLocation;
-    }
-    if (this.store.isLoggedIn && this.store.girderUser) {
-      return this.store.girderUser;
-    }
-    return { type: "root" };
-  }
-
-  set location(value: IGirderLocation) {
-    this.internalLocation = value;
   }
 
   onRowClick(data: IGirderSelectAble) {

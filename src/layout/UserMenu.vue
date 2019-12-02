@@ -1,15 +1,16 @@
 <template>
   <div>
-    <v-dialog
-      v-model="userMenu"
-      v-if="!store.isLoggedIn"
-      class="loginDialog"
-      max-width="300px"
-    >
+    <v-dialog v-model="userMenu" v-if="!store.isLoggedIn" max-width="300px">
       <template #activator="{ on }">
         <v-btn v-on="on">{{ store.userName }}</v-btn>
       </template>
-      <v-container>
+      <v-container
+        :class="{
+          loginDialog: true,
+          'theme--light': !$vuetify.theme.dark,
+          'theme--dark': $vuetify.theme.dark
+        }"
+      >
         <v-form @submit.prevent="login">
           <v-text-field
             v-model="domain"
@@ -56,10 +57,12 @@
       <v-list dense>
         <v-divider />
         <v-list-item @click="logout">
-          <v-list-item-avatar>
-            <v-icon>mdi-logout</v-icon>
-          </v-list-item-avatar>
-          <v-list-item-title>Logout</v-list-item-title>
+          <v-list-item-content>
+            <v-list-item-title>
+              <v-icon left>mdi-logout</v-icon>
+              Logout
+            </v-list-item-title>
+          </v-list-item-content>
         </v-list-item>
       </v-list>
     </v-menu>
@@ -114,3 +117,8 @@ export default class UserMenu extends Vue {
   }
 }
 </script>
+<style lang="scss" scoped>
+.loginDialog.theme--light {
+  background: white;
+}
+</style>

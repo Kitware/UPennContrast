@@ -201,11 +201,12 @@ export class Main extends VuexModule {
       await restClient.login(username, password);
       sync.setLoading(false);
     } catch (err) {
-      sync.setLoading(err);
       if (!err.response || err.response.status !== 401) {
+        sync.setLoading(err);
         return "Unknown error occurred";
       } else {
         const { message } = err.response.data;
+        sync.setLoading(false);
         return message || "Unauthorized.";
       }
     }
