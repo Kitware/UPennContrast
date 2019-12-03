@@ -1,6 +1,6 @@
 import { IDisplayLayer, IDataset, IDisplaySlice, IContrast } from "./model";
-import { hsl } from "d3-color";
 import { scaleLinear } from "d3-scale";
+import { color as asColor } from "d3-color";
 
 export function getLayerImages(
   layer: IDisplayLayer,
@@ -41,12 +41,12 @@ export interface ITileOptions {
 }
 
 function palette(color: string, steps: number) {
-  const base = hsl(color);
+  const scale = scaleLinear<string>()
+    .domain([0, steps - 1])
+    .range(["#000000", color]);
   const palette: string[] = [];
   for (let i = 0; i < steps; i++) {
-    const color = hsl(base);
-    color.l = i / (steps - 1);
-    palette.push(color.hex());
+    palette.push(asColor(scale(i))!.hex());
   }
   return palette;
 }
