@@ -21,6 +21,7 @@ import {
 import persister from "./Persister";
 import store from "./root";
 import sync from "./sync";
+import { DEFAULT_COMPOSITION_MODE } from "./constants";
 
 export { default as store } from "./root";
 
@@ -45,7 +46,7 @@ export class Main extends VuexModule {
 
   z: number = 0;
   time: number = 0;
-  compositionMode: CompositionMode = "multiply";
+  compositionMode: CompositionMode = DEFAULT_COMPOSITION_MODE;
   layerMode: "single" | "multiple" = "multiple";
 
   get userName() {

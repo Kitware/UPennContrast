@@ -5,6 +5,7 @@
 import store from "@/store";
 import routeMapper from "@/utils/routeMapper";
 import { CompositionMode } from "@/store/model";
+import { DEFAULT_COMPOSITION_MODE } from "@/store/constants";
 
 export default routeMapper(
   {
@@ -29,7 +30,7 @@ export default routeMapper(
       parse: v => v as CompositionMode,
       get: () => store.compositionMode,
       set: (value: CompositionMode) =>
-        store.setCompositionMode(value || "multiply")
+        store.setCompositionMode(value || DEFAULT_COMPOSITION_MODE)
     },
     layer: {
       parse: v => v,
