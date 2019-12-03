@@ -3,12 +3,13 @@ import { merge } from "lodash-es";
 import Vue from "vue";
 import Vuetify from "vuetify/lib";
 import { VuetifyPreset } from "vuetify/types/presets";
+import Persister from "@/store/Persister";
 
 Vue.use(Vuetify);
 
 const custom: Partial<VuetifyPreset> = {
   theme: {
-    dark: true
+    dark: Persister.get("theme", "dark") === "dark"
   }
 };
 const config: Partial<VuetifyPreset> = merge({}, vuetifyConfig, custom);
