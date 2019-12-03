@@ -379,14 +379,15 @@ interface IOMEInfo {
 // in the end need a function that maps: t,z,c -> to an image (or tiled image) to be loaded which end up to be the frame
 // number of time points
 
-function toKey(t: number | string, z: number | string, c: number | string) {
-  return `t${t}:z${z}:c${c}`;
+function toKey(z: number | string, zTime: number | string, c: number | string) {
+  return `z${z}:t${zTime}:c${c}`;
 }
 
 function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   // t x z x c -> IImage[]
-  const ts = new Set<number>();
-  const zs = new Set<number>();
+
+  // z -> times
+  const zs = new Map<number, Set<number>>();
   const cs = new Set<number>();
 
   const lookup = new Map<string, IImage[]>();
@@ -396,10 +397,13 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
       const t = +frame.DeltaT;
       const z = +frame.PositionZ;
       const c = +frame.TheC;
-      ts.add(t);
-      zs.add(z);
+      if (zs.has(z)) {
+        zs.get(z)!.add(t);
+      } else {
+        zs.set(z, new Set([t]));
+      }
       cs.add(c);
-      const key = toKey(t, z, c);
+      const key = toKey(z, t, c);
       const info: IImage = {
         frame,
         levels: tile.levels,
@@ -436,12 +440,33 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
     }
   });
 
+  const entries = Array.from(zs.entries()).sort((a, b) => a[0] - b[0]);
+  const zValues: number[] = entries.map(() => NaN);
+  const numberOfTimeSlots = entries.reduce(
+    (acc, v) => Math.max(acc, v[1].size),
+    0
+  );
+  const zTime: number[][] = Array.from({ length: numberOfTimeSlots }).map(() =>
+    zValues.slice()
+  );
+
+  entries.forEach(([k, v], i) => {
+    zValues[i] = k;
+    const tValues = Array.from(v).sort((a, b) => a - b);
+    tValues.forEach((t, j) => {
+      zTime[j][i] = t;
+    });
+  });
+
+  const channels = Array.from(cs).sort((a, b) => a - b);
+  // console.log(zValues, zTime, channels);
+
   return {
-    images: (time: number, z: number, channel: number) =>
-      lookup.get(toKey(time, z, channel)) || [],
-    z: Array.from(zs).sort((a, b) => a - b),
-    channels: Array.from(cs).sort((a, b) => a - b),
-    time: Array.from(ts).sort((a, b) => a - b),
+    images: (z: number, zTime: number, channel: number) =>
+      lookup.get(toKey(z, zTime, channel)) || [],
+    z: zValues,
+    time: zTime,
+    channels,
     width,
     height
   };

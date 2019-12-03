@@ -31,7 +31,11 @@ export function getLayerImages(
     return [];
   }
 
-  return ds.images(ds.time[tIndex], ds.z[zIndex], ds.channels[layer.channel]);
+  return ds.images(
+    ds.z[zIndex],
+    ds.time[tIndex][zIndex],
+    ds.channels[layer.channel]
+  );
 }
 
 export interface ITileOptions {

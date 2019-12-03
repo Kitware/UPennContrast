@@ -46,11 +46,12 @@ export interface IDataset {
   description: string;
 
   z: number[];
-  time: number[];
+  time: number[][]; // number of time points, within a set of the time points that reflect valid z-time points
+  // time for t,z -> time[t][z]
   channels: number[];
   width: number;
   height: number;
-  images(time: number, z: number, channel: number): IImage[];
+  images(z: number, zTime: number, channel: number): IImage[];
 
   configurations: IDatasetConfiguration[];
 }
