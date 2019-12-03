@@ -1,37 +1,50 @@
+import Dataset from "./Dataset.vue";
+import NewDataset from "./NewDataset.vue";
+import ImportDataset from "./ImportDataset.vue";
 import DatasetInfo from "./DatasetInfo.vue";
-import Configuration, { routes as cRoutes } from "./configuration";
-import NewConfiguration from "./configuration/NewConfiguration.vue";
+import configurationRoutes from "./configuration";
 import { Main } from "@/store";
+import { RouteConfig } from "vue-router";
 
-export const routes = [
+const routes: RouteConfig[] = [
   {
-    path: "",
-    name: "dataset",
-    component: DatasetInfo,
+    path: "/new",
+    name: "newdataset",
+    component: NewDataset,
     meta: {
-      hidden: true
+      text: "New Dataset"
     }
   },
   {
-    path: "new",
-    name: "newconfiguration",
-    component: NewConfiguration,
+    path: "/import",
+    name: "importdataset",
+    component: ImportDataset,
     meta: {
-      text: "New Configuration"
+      text: "Import Dataset"
     }
   },
   {
-    path: ":config",
-    component: Configuration,
+    path: "/:id",
     props: true,
+    component: Dataset,
+    children: [
+      {
+        path: "",
+        name: "dataset",
+        component: DatasetInfo,
+        meta: {
+          hidden: true
+        }
+      },
+      ...configurationRoutes
+    ],
     meta: {
-      name: "configuration",
+      name: "dataset",
       text(store: Main) {
-        return store.configuration?.name || store.selectedConfigurationId;
+        return store.dataset?.name || store.selectedDatasetId;
       }
-    },
-    children: cRoutes
+    }
   }
 ];
 
-export { default } from "./Dataset.vue";
+export default routes;

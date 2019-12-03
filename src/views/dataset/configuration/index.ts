@@ -1,24 +1,49 @@
+import Configuration from "./Configuration.vue";
 import ConfigurationInfo from "./ConfigurationInfo.vue";
+import NewConfiguration from "./NewConfiguration.vue";
 import Viewer from "./Viewer.vue";
+import { Main } from "@/store";
+import { RouteConfig } from "vue-router";
 
-export const routes = [
+const routes: RouteConfig[] = [
   {
-    path: "",
-    name: "configuration",
-    component: ConfigurationInfo,
+    path: "new",
+    name: "newconfiguration",
+    component: NewConfiguration,
     meta: {
-      hidden: true
+      text: "New Configuration"
     }
   },
   {
-    path: "view",
-    name: "view",
+    path: ":config",
+    component: Configuration,
     props: true,
-    component: Viewer,
     meta: {
-      text: "Explore"
-    }
+      name: "configuration",
+      text(store: Main) {
+        return store.configuration?.name || store.selectedConfigurationId;
+      }
+    },
+    children: [
+      {
+        path: "",
+        name: "configuration",
+        component: ConfigurationInfo,
+        meta: {
+          hidden: true
+        }
+      },
+      {
+        path: "view",
+        name: "view",
+        props: true,
+        component: Viewer,
+        meta: {
+          text: "Explore"
+        }
+      }
+    ]
   }
 ];
 
-export { default } from "./Configuration.vue";
+export default routes;
