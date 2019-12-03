@@ -21,7 +21,10 @@ import {
 import persister from "./Persister";
 import store from "./root";
 import sync from "./sync";
-import { DEFAULT_COMPOSITION_MODE } from "./constants";
+import {
+  DEFAULT_COMPOSITION_MODE,
+  MAX_NUMBER_OF_RECENT_CONFIGURATIONS
+} from "./constants";
 
 export { default as store } from "./root";
 
@@ -125,6 +128,14 @@ export class Main extends VuexModule {
       datasetId: this.selectedDatasetId!,
       datasetName: this.dataset?.name || "Unknown"
     });
+    if (
+      this.recentConfigurations.length > MAX_NUMBER_OF_RECENT_CONFIGURATIONS
+    ) {
+      this.recentConfigurations.splice(
+        MAX_NUMBER_OF_RECENT_CONFIGURATIONS,
+        this.recentConfigurations.length - MAX_NUMBER_OF_RECENT_CONFIGURATIONS
+      );
+    }
     persister.set("recentConfigurations", this.recentConfigurations);
   }
 
