@@ -114,6 +114,12 @@ export default class GirderAPI {
       .then(r => r.data);
   }
 
+  getImages(folderId: string): Promise<IGirderItem[]> {
+    return this.getItems(folderId).then(items =>
+      items.filter(d => (d as any).largeImage)
+    );
+  }
+
   getDataset(id: string): Promise<IDataset> {
     return Promise.all([this.getFolder(id), this.getItems(id)]).then(
       ([folder, items]) => {
@@ -156,6 +162,14 @@ export default class GirderAPI {
       })
     );
     return this.client.post("folder", data).then(r => asDataset(r.data));
+  }
+
+  importDataset(path: IGirderSelectAble): Promise<IDataset> {
+    return this.client
+      .put(`/folder/${path._id}/metadata`, {
+        subtype: "contrastDataset"
+      })
+      .then(r => asDataset(r.data));
   }
 
   deleteDataset(dataset: IDataset): Promise<IDataset> {

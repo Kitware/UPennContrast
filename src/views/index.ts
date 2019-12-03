@@ -1,6 +1,7 @@
 import Home from "./Home.vue";
 import Dataset, { routes as datasetRoutes } from "./dataset";
 import NewDataset from "./dataset/NewDataset.vue";
+import ImportDataset from "./dataset/ImportDataset.vue";
 import { Main } from "@/store";
 
 export default [
@@ -18,6 +19,14 @@ export default [
     component: NewDataset,
     meta: {
       text: "New Dataset"
+    }
+  },
+  {
+    path: "/import",
+    name: "importdataset",
+    component: ImportDataset,
+    meta: {
+      text: "Import Dataset"
     }
   },
   {

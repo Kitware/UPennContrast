@@ -56,6 +56,13 @@
       >
         Create Dataset
       </v-btn>
+      <v-btn
+        color="primary"
+        :to="{ name: 'importdataset' }"
+        :disabled="!store.isLoggedIn"
+      >
+        Import Dataset
+      </v-btn>
     </div>
   </v-container>
 </template>

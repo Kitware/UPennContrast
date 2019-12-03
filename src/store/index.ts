@@ -276,6 +276,19 @@ export class Main extends VuexModule {
   }
 
   @Action
+  async importDataset(path: IGirderSelectAble) {
+    try {
+      sync.setSaving(true);
+      const ds = await this.api.importDataset(path);
+      sync.setSaving(false);
+      return ds;
+    } catch (error) {
+      sync.setSaving(error);
+    }
+    return null;
+  }
+
+  @Action
   async createConfiguration({
     name,
     description
