@@ -1,5 +1,5 @@
-import { RestClient } from "@/girder";
-import { IGirderSelectAble, IGirderUser } from "@girder/components/src";
+import { RestClient, RestClientInstance } from "@/girder";
+import { IGirderSelectAble, IGirderUser } from "@/girder";
 import {
   Action,
   getModule,
@@ -62,7 +62,7 @@ export class Main extends VuexModule {
     girderRest
   }: {
     girderUrl: string;
-    girderRest: RestClient;
+    girderRest: RestClientInstance;
   }) {
     this.girderUrl = persister.set("girderUrl", girderUrl);
     this.girderRest = girderRest;

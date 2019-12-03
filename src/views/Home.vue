@@ -1,48 +1,51 @@
 <template>
   <v-container>
     <v-alert :value="!store.isLoggedIn" color="info">Login to start</v-alert>
-    <v-subheader>Recent Dataset Configurations</v-subheader>
-    <v-list two-line v-if="store.isLoggedIn">
-      <v-list-item
-        v-for="d in configurations"
-        :key="d.id"
-        @click="
-          $router.push({
-            name: 'view',
-            params: { id: d.datasetId, config: d.id }
-          })
-        "
-      >
-        <v-list-item-content>
-          <v-list-item-title
-            >{{ d.datasetName }} / {{ d.name }}</v-list-item-title
-          >
-          <v-list-item-subtitle>{{ d.description }}</v-list-item-subtitle>
-        </v-list-item-content>
-        <v-list-item-action>
-          <v-btn
-            icon
-            :to="{
+    <section v-if="store.isLoggedIn">
+      <v-subheader>Recent Dataset Configurations</v-subheader>
+      <v-list two-line>
+        <v-list-item
+          v-for="d in configurations"
+          :key="d.id"
+          @click="
+            $router.push({
               name: 'view',
               params: { id: d.datasetId, config: d.id }
-            }"
-          >
-            <v-icon>mdi-eye</v-icon>
-          </v-btn>
-        </v-list-item-action>
-      </v-list-item>
-    </v-list>
+            })
+          "
+        >
+          <v-list-item-content>
+            <v-list-item-title
+              >{{ d.datasetName }} / {{ d.name }}</v-list-item-title
+            >
+            <v-list-item-subtitle>{{ d.description }}</v-list-item-subtitle>
+          </v-list-item-content>
+          <v-list-item-action>
+            <v-btn
+              icon
+              :to="{
+                name: 'view',
+                params: { id: d.datasetId, config: d.id }
+              }"
+            >
+              <v-icon>mdi-eye</v-icon>
+            </v-btn>
+          </v-list-item-action>
+        </v-list-item>
+      </v-list>
+    </section>
 
-    <v-subheader>Browse</v-subheader>
-    <girder-file-manager
-      v-if="store.isLoggedIn"
-      drag-enabled
-      new-folder-enabled
-      :location.sync="location"
-      upload-multiple
-      upload-enabled
-      @rowclick="onRowClick"
-    />
+    <section v-if="store.isLoggedIn">
+      <v-subheader>Browse</v-subheader>
+      <girder-file-manager
+        drag-enabled
+        new-folder-enabled
+        :location.sync="location"
+        upload-multiple
+        upload-enabled
+        @rowclick="onRowClick"
+      />
+    </section>
 
     <v-subheader>Actions</v-subheader>
     <div class="button-bar">
@@ -60,12 +63,12 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
-import { FileManager as GirderFileManager } from "@/girder";
-import { IGirderLocation, IGirderSelectAble } from "@girder/components/src";
+import { IGirderLocation, IGirderSelectAble } from "@/girder";
 
 @Component({
   components: {
-    GirderFileManager
+    GirderFileManager: () =>
+      import("@/girder/components").then(mod => mod.FileManager)
   }
 })
 export default class Upload extends Vue {

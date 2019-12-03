@@ -1,4 +1,4 @@
-import { IGirderItem, IGirderFolder } from "@girder/components/src";
+import { IGirderItem, IGirderFolder } from "@/girder";
 
 export interface IDatasetConfigurationMeta {
   id: string;

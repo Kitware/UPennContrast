@@ -4,3 +4,4 @@ declare module "*.vue" {
 }
 
 declare module "vue-resize";
+declare module "vue-async-computed";

@@ -59,14 +59,14 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
-import { IGirderSelectAble, Upload as GirderUpload } from "@/girder";
+import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 import { IDataset } from "@/store/model";
 
 @Component({
   components: {
     GirderLocationChooser,
-    GirderUpload
+    GirderUpload: () => import("@/girder/components").then(mod => mod.Upload)
   }
 })
 export default class NewDataset extends Vue {

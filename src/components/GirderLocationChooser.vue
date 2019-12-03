@@ -21,12 +21,12 @@
 <script lang="ts">
 import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
-import { FileManager as GirderFileManager } from "@/girder";
-import { IGirderLocation, IGirderSelectAble } from "@girder/components/src";
+import { IGirderLocation, IGirderSelectAble } from "@/girder";
 
 @Component({
   components: {
-    GirderFileManager
+    GirderFileManager: () =>
+      import("@/girder/components").then(mod => mod.FileManager)
   }
 })
 export default class GirderLocationChooser extends Vue {

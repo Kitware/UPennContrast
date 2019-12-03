@@ -1,10 +1,10 @@
 import {
-  RestClient,
+  RestClientInstance,
   IGirderItem,
   IGirderFolder,
   IGirderFile,
   IGirderSelectAble
-} from "@girder/components/src";
+} from "@/girder";
 import {
   IDataset,
   IDatasetConfiguration,
@@ -27,13 +27,13 @@ function toId(item: string | { _id: string }) {
 }
 
 export default class GirderAPI {
-  private readonly client: RestClient;
+  private readonly client: RestClientInstance;
 
   private readonly imageCache = new Map<string, HTMLImageElement>();
   private readonly histogramCache = new Map<string, Promise<ITileHistogram>>();
   private readonly resolvedHistogramCache = new Map<string, ITileHistogram>();
 
-  constructor(client: RestClient) {
+  constructor(client: RestClientInstance) {
     this.client = client;
   }
 

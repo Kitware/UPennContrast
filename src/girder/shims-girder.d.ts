@@ -13,14 +13,15 @@ declare module "@girder/components/src/components/Snippet" {
 declare module "@girder/components/src/utils" {
   export const vuetifyConfig: any;
 }
-
-declare module "@girder/components/src" {
-  import { PluginObject } from "vue";
+declare module "@girder/components/src/rest" {
   import { AxiosInstance } from "axios";
 
-  const Girder: PluginObject<any>;
-
-  export default Girder;
+  interface IRestClientOptions {
+    apiRoot: string;
+    token: string;
+    useGirderAuthorizationHeader: boolean;
+    setLocalCookie: true;
+  }
 
   export interface IGirderUser {
     name: string; // TODO check
@@ -30,49 +31,7 @@ declare module "@girder/components/src" {
     login: string;
   }
 
-  export type IGirderLocation =
-    | IGirderUser
-    | IGirderFolder
-    | { type: "collections" | "root" | "users" };
-
-  export interface IGirderItem {
-    _modelType: "item";
-    _id: string;
-
-    name: string;
-    description: string;
-    meta: any;
-  }
-
-  export interface IGirderFolder {
-    _modelType: "folder";
-    _id: string;
-
-    name: string;
-    description: string;
-    meta: any;
-  }
-
-  export interface IGirderFile {
-    _modelType: "file";
-    _id: string;
-
-    name: string;
-  }
-
-  export type IGirderSelectAble =
-    | IGirderItem
-    | IGirderUser
-    | IGirderFolder
-    | IGirderFile;
-
-  interface IRestClientOptions {
-    apiRoot: string;
-    token: string;
-    useGirderAuthorizationHeader: boolean;
-    setLocalCookie: true;
-  }
-  export interface RestClient
+  export interface RestClientInstance
     extends AxiosInstance,
       Readonly<IRestClientOptions> {
     readonly user: Readonly<IGirderUser> | null;
@@ -91,9 +50,11 @@ declare module "@girder/components/src" {
     fetchUser(): Promise<Readonly<IGirderUser>>;
   }
 
-  export interface RestClientConstructor {
-    new (options: Partial<IRestClientOptions>): RestClient;
+  export interface RestClientStatic extends RestClientInstance {
+    new (options: Partial<IRestClientOptions>): RestClientInstance;
   }
 
-  export const RestClient: RestClientConstructor;
+  const RestClient: RestClientStatic;
+
+  export default RestClient;
 }
