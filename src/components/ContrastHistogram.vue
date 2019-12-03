@@ -211,11 +211,40 @@ export default class ContrastHistogram extends Vue {
   @Watch("histogram")
   onValueChange(hist: Promise<ITileHistogram>) {
     this.histData = null;
-    hist.then(data => (this.histData = data));
+    hist.then(data => this.setAndVerify(data));
   }
 
   created() {
-    this.histogram.then(data => (this.histData = data));
+    this.histogram.then(data => this.setAndVerify(data));
+  }
+
+  private setAndVerify(data: ITileHistogram): void {
+    this.histData = data;
+
+    if (this.value.mode === "percentile") {
+      return;
+    }
+
+    // ensure the values are within the bounds
+    const copy = Object.assign({}, this.value);
+    const clamp = (value: number) =>
+      Math.min(Math.max(value, data.min), data.max);
+    const keys: (
+      | "blackPoint"
+      | "whitePoint"
+      | "savedBlackPoint"
+      | "savedWhitePoint"
+    )[] = ["blackPoint", "whitePoint", "savedBlackPoint", "savedWhitePoint"];
+    let changed = false;
+    keys.forEach(key => {
+      const v = clamp(copy[key]);
+      changed = changed || v !== copy[key];
+      copy[key] = v;
+    });
+
+    if (changed) {
+      this.$emit("commit", copy);
+    }
   }
 
   mounted() {
