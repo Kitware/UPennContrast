@@ -11,9 +11,9 @@ export function getLayerImages(
   const resolveSlice = (slice: IDisplaySlice, value: number) => {
     switch (slice.type) {
       case "constant":
-        return slice.value!;
+        return slice.value == null ? 0 : slice.value;
       case "offset":
-        return value + slice.value!;
+        return value + (slice.value == null ? 0 : slice.value);
       case "max-merge":
         return value; // TODO
       default:

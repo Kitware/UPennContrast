@@ -13,7 +13,7 @@
         <template #label>
           <span>Constant</span>
           <v-text-field
-            :disabled="value.type !== 'constant'"
+            v-show="value.type === 'constant'"
             :value="value.value || 0"
             min="0"
             :max="maxValue"
@@ -32,12 +32,12 @@
         <template #label>
           <span>Offset</span>
           <v-text-field
-            :disabled="value.type !== 'offset'"
+            v-show="value.type === 'offset'"
             :value="value.value || 0"
             type="number"
             dense
-            :min="-maxValue + 1"
-            :max="maxValue - 1"
+            :min="-maxValue"
+            :max="maxValue"
             hide-details
             @input="changeSlice('offset', $event)"
           />
@@ -73,9 +73,22 @@ export default class DisplaySlice extends Vue {
     if (this.value.type === type && this.value.value === v) {
       return;
     }
+    let validated = v;
+    switch (type) {
+      case "constant":
+        validated = v == null ? 0 : Math.max(Math.min(v, this.maxValue), 0);
+        break;
+      case "offset":
+        validated =
+          v == null ? 0 : Math.max(Math.min(v, this.maxValue), -this.maxValue);
+        break;
+      default:
+        validated = null;
+        break;
+    }
     this.$emit("change", {
       type,
-      value: type === "constant" || type === "offset" ? v : null
+      value: validated
     });
   }
 }
