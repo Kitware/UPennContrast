@@ -66,6 +66,20 @@ export default class GirderAPI {
 
     return url.href;
   }
+  wholeRegionUrl(
+    item: string | IGirderItem, 
+    { frame }: { frame: number },
+    style: ITileOptions
+  ) {
+    const url = new URL(
+      `${this.client.apiRoot}/item/${toId(item)}/tiles/region`
+    );
+    url.searchParams.set("encoding", "PNG");
+    url.searchParams.set("frame", frame.toString());
+    url.searchParams.set("style", JSON.stringify(style));
+
+    return url.href;
+  }
   private cleanOldImages(url: string) {
     // delete images that match except for the style
     const styleStart = url.indexOf("style=");
@@ -253,6 +267,10 @@ export default class GirderAPI {
     const style = toStyle(color, contrast, hist);
 
     images.forEach(image => {
+      /* This gets each tile separately, but since we get all of them this is 
+       * less efficient than just getting the entire image at once.  There is
+       * some potential parallelization speed up, but its benefit is lost in
+       * other inefficiencies.
       for (let x = 0; x < image.sizeX; x += image.tileWidth) {
         const w = Math.min(image.sizeX - x, image.tileWidth);
         for (let y = 0; y < image.sizeY; y += image.tileHeight) {
@@ -281,6 +299,23 @@ export default class GirderAPI {
           });
         }
       }
+      */
+      const url = this.wholeRegionUrl(image.item, {frame: image.frameIndex}, style);
+      this.cleanOldImages(url);
+
+      resolvedImages.push({
+        x: offsetX,
+        y: offsetY,
+        width: image.sizeX,
+        height: image.sizeY,
+        url,
+        image: this.loadImage(
+          url,
+          image.sizeX,
+          image.sizeY,
+          "image/png"
+        )
+      });
 
       // since horizontal tiling only
       offsetX += image.sizeX;
