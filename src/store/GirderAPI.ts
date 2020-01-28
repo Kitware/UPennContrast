@@ -336,6 +336,7 @@ function asDataset(folder: IGirderFolder): IDataset {
     _girder: folder,
     name: folder.name,
     description: folder.description,
+    xy: [],
     z: [],
     width: 100,
     height: 100,
@@ -393,14 +394,15 @@ interface IOMEInfo {
 // in the end need a function that maps: t,z,c -> to an image (or tiled image) to be loaded which end up to be the frame
 // number of time points
 
-function toKey(z: number | string, zTime: number | string, c: number | string) {
-  return `z${z}:t${zTime}:c${c}`;
+function toKey(z: number | string, zTime: number | string, xy: number | string, c: number | string) {
+  return `z${z}:t${zTime}:xy${xy}:c${c}`;
 }
 
 function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   // t x z x c -> IImage[]
 
   // z -> times
+  const xys = new Set<number>();
   const zs = new Map<number, Set<number>>();
   const cs = new Set<number>();
 
@@ -408,16 +410,18 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   tiles.forEach((tile, i) => {
     const item = items[i]!;
     tile.frames.forEach((frame, j) => {
-      const t = +frame.DeltaT;
-      const z = +frame.PositionZ;
+      const t = 0; // disable T for now.  +frame.DeltaT;
+      const xy = +(frame.IndexXY || 0);
+      const z = +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
       const c = +frame.TheC;
       if (zs.has(z)) {
         zs.get(z)!.add(t);
       } else {
         zs.set(z, new Set([t]));
       }
+      xys.add(xy);
       cs.add(c);
-      const key = toKey(z, t, c);
+      const key = toKey(z, t, xy, c);
       const info: IImage = {
         frame,
         levels: tile.levels,
@@ -476,8 +480,9 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   // console.log(zValues, zTime, channels);
 
   return {
-    images: (z: number, zTime: number, channel: number) =>
-      lookup.get(toKey(z, zTime, channel)) || [],
+    images: (z: number, zTime: number, xy: number, channel: number) =>
+      lookup.get(toKey(z, zTime, xy, channel)) || [],
+    xy: Array.from(xys).sort((a, b) => a - b),
     z: zValues,
     time: zTime,
     channels,

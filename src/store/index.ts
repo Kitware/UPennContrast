@@ -47,6 +47,7 @@ export class Main extends VuexModule {
     []
   );
 
+  xy: number = 0;
   z: number = 0;
   time: number = 0;
   compositionMode: CompositionMode = DEFAULT_COMPOSITION_MODE;
@@ -137,6 +138,11 @@ export class Main extends VuexModule {
       );
     }
     persister.set("recentConfigurations", this.recentConfigurations);
+  }
+
+  @Mutation
+  private setXYImpl(value: number) {
+    this.xy = value;
   }
 
   @Mutation
@@ -402,6 +408,11 @@ export class Main extends VuexModule {
   }
 
   @Action
+  async setXY(value: number) {
+    this.setXYImpl(value);
+  }
+
+  @Action
   async setZ(value: number) {
     this.setZImpl(value);
   }
@@ -575,7 +586,7 @@ export class Main extends VuexModule {
     return layers
       .filter(d => d.visible)
       .map(layer => {
-        const images = getLayerImages(layer, ds, this.time, this.z);
+        const images = getLayerImages(layer, ds, this.time, this.xy, this.z);
         return this.api.generateImages(images, layer.color, layer.contrast);
       });
   }
@@ -586,7 +597,7 @@ export class Main extends VuexModule {
       if (!this.dataset || !this.configuration) {
         return Promise.resolve(null);
       }
-      const images = getLayerImages(layer, this.dataset, this.time, this.z);
+      const images = getLayerImages(layer, this.dataset, this.time, this.xy, this.z);
       return this.api.getLayerHistogram(images);
     };
   }

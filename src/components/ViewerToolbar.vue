@@ -1,5 +1,6 @@
 <template>
   <div>
+    <value-slider v-model="xy" label="XY Value" :min="0" :max="maxXY" />
     <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
     <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
     <v-select
@@ -73,6 +74,10 @@ export default class ViewerToolbar extends Vue {
     this.changeQuery("mode", value);
   }
 
+  get xy() {
+    return this.store.xy;
+  }
+
   get z() {
     return this.store.z;
   }
@@ -81,12 +86,20 @@ export default class ViewerToolbar extends Vue {
     return this.store.time;
   }
 
+  set xy(value: number) {
+    this.changeQuery("xy", value.toString());
+  }
+
   set z(value: number) {
     this.changeQuery("z", value.toString());
   }
 
   set time(value: number) {
     this.changeQuery("time", value.toString());
+  }
+
+  get maxXY() {
+    return this.store.dataset ? this.store.dataset.xy.length - 1 : this.xy;
   }
 
   get maxZ() {

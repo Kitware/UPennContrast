@@ -77,6 +77,12 @@
         />
       </v-radio-group>
       <display-slice
+        :value="value.xy"
+        @change="changeProp('xy', $event)"
+        label="XY-Slice"
+        :max-value="maxXY"
+      />
+      <display-slice
         :value="value.z"
         @change="changeProp('z', $event)"
         label="Z-Slice"
@@ -143,6 +149,12 @@ export default class DisplayLayer extends Vue {
 
   set channel(value: number) {
     this.changeProp("channel", value);
+  }
+
+  get maxXY() {
+    return this.store.dataset
+      ? this.store.dataset.xy.length - 1
+      : this.value.xy.value || 0;
   }
 
   get maxZ() {

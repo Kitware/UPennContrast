@@ -16,6 +16,11 @@ export default routeMapper(
     }
   },
   {
+    xy: {
+      parse: v => parseInt(v, 10),
+      get: () => store.xy,
+      set: (value: number) => store.setXY(value || 0)
+    },
     z: {
       parse: v => parseInt(v, 10),
       get: () => store.z,

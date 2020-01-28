@@ -6,6 +6,7 @@ export function getLayerImages(
   layer: IDisplayLayer,
   ds: IDataset,
   time: number,
+  xy: number,
   z: number
 ) {
   const resolveSlice = (slice: IDisplaySlice, value: number) => {
@@ -21,6 +22,11 @@ export function getLayerImages(
     }
   };
 
+  const xyIndex = resolveSlice(layer.xy, xy);
+  // invalid slices
+  if (xyIndex < 0 || xyIndex >= ds.xy.length) {
+    return [];
+  }
   const zIndex = resolveSlice(layer.z, z);
   // invalid slices
   if (zIndex < 0 || zIndex >= ds.z.length) {
@@ -34,6 +40,7 @@ export function getLayerImages(
   return ds.images(
     ds.z[zIndex],
     ds.time[tIndex][zIndex],
+    ds.xy[xyIndex],
     ds.channels[layer.channel]
   );
 }

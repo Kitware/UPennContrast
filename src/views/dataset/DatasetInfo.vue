@@ -3,6 +3,7 @@
     <v-text-field :value="name" label="Name" readonly />
     <v-textarea :value="description" label="Description" readonly />
     <v-text-field :value="time" label="# Timepoints" readonly />
+    <v-text-field :value="xy" label="# XY-Slices" readonly />
     <v-text-field :value="z" label="# Z-Slices" readonly />
     <v-text-field :value="channels" label="# Channels" readonly />
     <v-subheader>
@@ -77,6 +78,10 @@ export default class DatasetInfo extends Vue {
 
   get description() {
     return this.store.dataset ? this.store.dataset.description : "";
+  }
+
+  get xy() {
+    return this.store.dataset ? this.store.dataset.xy.length : "?";
   }
 
   get z() {
