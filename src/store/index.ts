@@ -510,6 +510,9 @@ export class Main extends VuexModule {
     ) {
       return;
     }
+    if (/^(input|textarea|select)$/.test((document!.activeElement!.tagName || '').toLowerCase())) {
+      return;
+    }
     this.toggleLayer(hotKey - 1);
     await this.syncConfiguration();
   }
