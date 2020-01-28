@@ -231,29 +231,14 @@ export default class GirderAPI {
   private loadImage(
     url: string,
     width: number,
-    height: number,
-    mimeType: string
+    height: number
   ) {
     if (this.imageCache.has(url)) {
       return this.imageCache.get(url)!;
     }
-    // need to go through axios to have the right header flags
     const image = new Image(width, height);
+    image.src = url;
     this.imageCache.set(url, image);
-
-    // load and set the source when done
-    this.client
-      .get(url, {
-        responseType: "arraybuffer"
-      })
-      .then(r => {
-        const buffer = r.data as ArrayBuffer;
-        const blob = new Blob([buffer], {
-          type: mimeType
-        });
-        const blobUrl = URL.createObjectURL(blob);
-        image.src = blobUrl;
-      });
 
     return image;
   }
@@ -293,8 +278,7 @@ export default class GirderAPI {
             image: this.loadImage(
               url,
               image.tileWidth,
-              image.tileHeight,
-              "image/png"
+              image.tileHeight
             )
           });
         }
@@ -312,8 +296,7 @@ export default class GirderAPI {
         image: this.loadImage(
           url,
           image.sizeX,
-          image.sizeY,
-          "image/png"
+          image.sizeY
         )
       });
 
