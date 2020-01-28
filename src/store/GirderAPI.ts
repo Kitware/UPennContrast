@@ -80,16 +80,19 @@ export default class GirderAPI {
 
     return url.href;
   }
-  private cleanOldImages(url: string) {
+  private cleanOldImages(url: string): HTMLImageElement | undefined {
     // delete images that match except for the style
     const styleStart = url.indexOf("style=");
     const search = url.slice(0, styleStart);
 
+    let removed: HTMLImageElement | undefined;
     Array.from(this.imageCache.keys()).forEach(key => {
       if (key !== url && key.startsWith(search)) {
+        removed = this.imageCache.get(key);
         this.imageCache.delete(key);
       }
     });
+    return removed;
   }
 
   getTiles(item: string | IGirderItem): Promise<ITileMeta> {
@@ -231,14 +234,45 @@ export default class GirderAPI {
   private loadImage(
     url: string,
     width: number,
-    height: number
+    height: number,
+    oldImage: HTMLImageElement | undefined
   ) {
     if (this.imageCache.has(url)) {
       return this.imageCache.get(url)!;
     }
     const image = new Image(width, height);
-    image.src = url;
     this.imageCache.set(url, image);
+    if (oldImage !== undefined && !(oldImage.complete && oldImage.src)) {
+      // if we emptied a value from the tracker, then attach an onload/onerror
+      // event to that image that sets the source IFF this url is still in the
+      // cache.  If it has fallen out of cache, call the onerror function.
+      const previousOnload = oldImage.onload;
+      const previousOnerror = oldImage.onerror;
+      const localSetSource = (event: any) => {
+        if (this.imageCache.get(url)) {
+          image.src = url;
+        } else {
+          if (image.onerror) {
+            image.onerror(event);
+          }
+        }
+      };
+      oldImage.onload = (event) => {
+        if (previousOnload) {
+          previousOnload.call(oldImage, event);
+        }
+        localSetSource(event);
+      };
+      oldImage.onerror = (event) => {
+        if (previousOnerror) {
+          previousOnerror.call(oldImage, event);
+        }
+        localSetSource(event);
+      };
+    } else {
+      // if the old image is resolved or not present, just set the src
+      image.src = url;
+    }
 
     return image;
   }
@@ -285,7 +319,7 @@ export default class GirderAPI {
       }
       */
       const url = this.wholeRegionUrl(image.item, {frame: image.frameIndex}, style);
-      this.cleanOldImages(url);
+      const oldImage = this.cleanOldImages(url);
 
       resolvedImages.push({
         x: offsetX,
@@ -296,7 +330,8 @@ export default class GirderAPI {
         image: this.loadImage(
           url,
           image.sizeX,
-          image.sizeY
+          image.sizeY,
+          oldImage
         )
       });
 
