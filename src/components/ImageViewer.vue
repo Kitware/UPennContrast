@@ -63,7 +63,8 @@ export default class ImageViewer extends Vue {
 
   get readyPercentage() {
     const total = this.imageStack.reduce((acc, d) => acc + d.length, 0);
-    const loaded = this.ready.length;
+    const urls = this.imageStack.reduce<string[]>((acc, d) => acc.concat(d.map(i => i.url)), []);
+    const loaded = this.ready.filter(u => urls.indexOf(u) >= 0).length;
     return Math.round((100.0 * loaded) / total);
   }
 
