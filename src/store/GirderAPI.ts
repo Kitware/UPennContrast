@@ -67,7 +67,7 @@ export default class GirderAPI {
     return url.href;
   }
   wholeRegionUrl(
-    item: string | IGirderItem, 
+    item: string | IGirderItem,
     { frame }: { frame: number },
     style: ITileOptions
   ) {
@@ -257,13 +257,13 @@ export default class GirderAPI {
           }
         }
       };
-      oldImage.onload = (event) => {
+      oldImage.onload = event => {
         if (previousOnload) {
           previousOnload.call(oldImage, event);
         }
         localSetSource(event);
       };
-      oldImage.onerror = (event) => {
+      oldImage.onerror = event => {
         if (previousOnerror) {
           previousOnerror.call(oldImage, event);
         }
@@ -286,7 +286,7 @@ export default class GirderAPI {
     const style = toStyle(color, contrast, hist);
 
     images.forEach(image => {
-      /* This gets each tile separately, but since we get all of them this is 
+      /* This gets each tile separately, but since we get all of them this is
        * less efficient than just getting the entire image at once.  There is
        * some potential parallelization speed up, but its benefit is lost in
        * other inefficiencies.
@@ -318,7 +318,11 @@ export default class GirderAPI {
         }
       }
       */
-      const url = this.wholeRegionUrl(image.item, {frame: image.frameIndex}, style);
+      const url = this.wholeRegionUrl(
+        image.item,
+        { frame: image.frameIndex },
+        style
+      );
       const oldImage = this.cleanOldImages(url);
 
       resolvedImages.push({
@@ -327,12 +331,7 @@ export default class GirderAPI {
         width: image.sizeX,
         height: image.sizeY,
         url,
-        image: this.loadImage(
-          url,
-          image.sizeX,
-          image.sizeY,
-          oldImage
-        )
+        image: this.loadImage(url, image.sizeX, image.sizeY, oldImage)
       });
 
       // since horizontal tiling only
@@ -447,7 +446,12 @@ interface IOMEInfo {
 // in the end need a function that maps: t,z,c -> to an image (or tiled image) to be loaded which end up to be the frame
 // number of time points
 
-function toKey(z: number | string, zTime: number | string, xy: number | string, c: number | string) {
+function toKey(
+  z: number | string,
+  zTime: number | string,
+  xy: number | string,
+  c: number | string
+) {
   return `z${z}:t${zTime}:xy${xy}:c${c}`;
 }
 

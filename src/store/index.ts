@@ -521,7 +521,11 @@ export class Main extends VuexModule {
     ) {
       return;
     }
-    if (/^(input|textarea|select)$/.test((document!.activeElement!.tagName || '').toLowerCase())) {
+    if (
+      /^(input|textarea|select)$/.test(
+        (document!.activeElement!.tagName || "").toLowerCase()
+      )
+    ) {
       return;
     }
     this.toggleLayer(hotKey - 1);
@@ -597,7 +601,13 @@ export class Main extends VuexModule {
       if (!this.dataset || !this.configuration) {
         return Promise.resolve(null);
       }
-      const images = getLayerImages(layer, this.dataset, this.time, this.xy, this.z);
+      const images = getLayerImages(
+        layer,
+        this.dataset,
+        this.time,
+        this.xy,
+        this.z
+      );
       return this.api.getLayerHistogram(images);
     };
   }
