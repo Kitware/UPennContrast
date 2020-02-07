@@ -608,7 +608,38 @@ export class Main extends VuexModule {
         this.xy,
         this.z
       );
-      return this.api.getLayerHistogram(images);
+      if (!layer._histogram) {
+        layer._histogram = {
+          promise: Promise.resolve(),
+          last: true,
+          next: null,
+          images: null
+        };
+      }
+
+      // debounce histogram calls
+      let nextHistogram = () => {
+        if (layer._histogram.next) {
+          const images = layer._histogram.next;
+          layer._histogram.last = null;
+          layer._histogram.promise = this.api.getLayerHistogram(images);
+          layer._histogram.next = null;
+          layer._histogram.images = images;
+          layer._histogram.promise.then((value: any) => {
+            layer._histogram.last = value;
+            return null;
+          });
+          layer._histogram.promise.finally(nextHistogram);
+        }
+        return null;
+      };
+      if (images !== layer._histogram.images) {
+        layer._histogram.next = images;
+        if (layer._histogram.last) {
+          nextHistogram();
+        }
+      }
+      return layer._histogram.promise;
     };
   }
 }

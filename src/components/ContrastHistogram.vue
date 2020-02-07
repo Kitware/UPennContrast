@@ -115,7 +115,8 @@ function roundAbs(v: number) {
   return Math.round(v);
 }
 
-const THROTTLE = 250; // ms
+// This is debounced elsewhere
+const THROTTLE = 1; // ms
 
 @Component({
   components: {

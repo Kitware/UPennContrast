@@ -106,7 +106,7 @@ export default class GirderAPI {
     const o: Readonly<IHistogramOptions> = Object.assign(
       {
         frame: 0,
-        bins: 128,
+        bins: 512,
         width: 2048,
         height: 2048,
         resample: false
@@ -118,7 +118,7 @@ export default class GirderAPI {
       .get(`item/${toId(item)}/tiles/histogram`, {
         params: o
       })
-      .then(r => r.data[0]); // TODO why is this an array?
+      .then(r => r.data[0]); // TODO deal with multiple channel data
   }
 
   private getItems(folderId: string): Promise<IGirderItem[]> {
