@@ -22,6 +22,10 @@ import {
   ITileHistogram
 } from "./images";
 
+interface HTMLImageElementLocal extends HTMLImageElement {
+  _waitForHistogram?: boolean;
+}
+
 function toId(item: string | { _id: string }) {
   return typeof item === "string" ? item : item._id;
 }
@@ -235,44 +239,71 @@ export default class GirderAPI {
     url: string,
     width: number,
     height: number,
-    oldImage: HTMLImageElement | undefined
+    oldImage: HTMLImageElementLocal | undefined,
+    hist: any,
+    images: any,
+    item: any,
+    frame: any,
+    color: string,
+    contrast: IContrast
   ) {
     if (this.imageCache.has(url)) {
       return this.imageCache.get(url)!;
     }
-    const image = new Image(width, height);
+    const image = new Image(width, height) as HTMLImageElementLocal;
     this.imageCache.set(url, image);
-    if (oldImage !== undefined && !(oldImage.complete && oldImage.src)) {
-      // if we emptied a value from the tracker, then attach an onload/onerror
-      // event to that image that sets the source IFF this url is still in the
-      // cache.  If it has fallen out of cache, call the onerror function.
-      const previousOnload = oldImage.onload;
-      const previousOnerror = oldImage.onerror;
-      const localSetSource = (event: any) => {
-        if (this.imageCache.get(url)) {
-          image.src = url;
-        } else {
-          if (image.onerror) {
-            image.onerror(event);
-          }
-        }
-      };
-      oldImage.onload = event => {
-        if (previousOnload) {
-          previousOnload.call(oldImage, event);
-        }
-        localSetSource(event);
-      };
-      oldImage.onerror = event => {
-        if (previousOnerror) {
-          previousOnerror.call(oldImage, event);
-        }
-        localSetSource(event);
-      };
+    let promise;
+    if (!hist) {
+      promise = this.getLayerHistogram(images).then(hist => {
+        const style = toStyle(color, contrast, hist);
+        url = this.wholeRegionUrl(item, { frame: frame }, style);
+        return url;
+      });
     } else {
-      // if the old image is resolved or not present, just set the src
-      image.src = url;
+      promise = Promise.resolve(url);
     }
+    image._waitForHistogram = true;
+    if (oldImage !== undefined && oldImage._waitForHistogram) {
+      oldImage._waitForHistogram = false;
+    }
+    promise.then(url => {
+      if (!image._waitForHistogram) {
+        return;
+      }
+      image._waitForHistogram = false;
+
+      if (oldImage !== undefined && !(oldImage.complete && oldImage.src)) {
+        // if we emptied a value from the tracker, then attach an onload/onerror
+        // event to that image that sets the source IFF this url is still in the
+        // cache.  If it has fallen out of cache, call the onerror function.
+        const previousOnload = oldImage.onload;
+        const previousOnerror = oldImage.onerror;
+        const localSetSource = (event: any) => {
+          if (this.imageCache.get(url)) {
+            image.src = url;
+          } else {
+            if (image.onerror) {
+              image.onerror(event);
+            }
+          }
+        };
+        oldImage.onload = event => {
+          if (previousOnload) {
+            previousOnload.call(oldImage, event);
+          }
+          localSetSource(event);
+        };
+        oldImage.onerror = event => {
+          if (previousOnerror) {
+            previousOnerror.call(oldImage, event);
+          }
+          localSetSource(event);
+        };
+      } else {
+        // if the old image is resolved or not present, just set the src
+        image.src = url;
+      }
+    });
 
     return image;
   }
@@ -331,7 +362,18 @@ export default class GirderAPI {
         width: image.sizeX,
         height: image.sizeY,
         url,
-        image: this.loadImage(url, image.sizeX, image.sizeY, oldImage)
+        image: this.loadImage(
+          url,
+          image.sizeX,
+          image.sizeY,
+          oldImage,
+          hist,
+          images,
+          image.item,
+          image.frameIndex,
+          color,
+          contrast
+        )
       });
 
       // since horizontal tiling only
