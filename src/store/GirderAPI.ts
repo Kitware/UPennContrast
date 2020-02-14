@@ -509,7 +509,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   tiles.forEach((tile, i) => {
     const item = items[i]!;
     tile.frames.forEach((frame, j) => {
-      const t = 0; // disable T for now.  +frame.DeltaT;
+      const t = +frame.TheT;
       const xy = +(frame.IndexXY || 0);
       const z = +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
       const c = +frame.TheC;
