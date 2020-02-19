@@ -44,6 +44,9 @@ export default class ValueSlider extends Vue {
   }
 
   set slider(value: number) {
+    if (value == this.internalValue) {
+      return;
+    }
     this.internalValue = value;
     this.$emit("input", value);
   }

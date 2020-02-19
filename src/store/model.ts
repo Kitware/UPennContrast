@@ -95,6 +95,8 @@ export interface IDisplayLayer {
   visible: boolean;
 
   contrast: IContrast;
+
+  _histogram?: any | undefined;
 }
 
 export interface IContrast {

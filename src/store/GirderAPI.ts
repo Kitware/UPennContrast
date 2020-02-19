@@ -22,6 +22,10 @@ import {
   ITileHistogram
 } from "./images";
 
+interface HTMLImageElementLocal extends HTMLImageElement {
+  _waitForHistogram?: boolean;
+}
+
 function toId(item: string | { _id: string }) {
   return typeof item === "string" ? item : item._id;
 }
@@ -66,16 +70,33 @@ export default class GirderAPI {
 
     return url.href;
   }
-  private cleanOldImages(url: string) {
+  wholeRegionUrl(
+    item: string | IGirderItem,
+    { frame }: { frame: number },
+    style: ITileOptions
+  ) {
+    const url = new URL(
+      `${this.client.apiRoot}/item/${toId(item)}/tiles/region`
+    );
+    url.searchParams.set("encoding", "PNG");
+    url.searchParams.set("frame", frame.toString());
+    url.searchParams.set("style", JSON.stringify(style));
+
+    return url.href;
+  }
+  private cleanOldImages(url: string): HTMLImageElement | undefined {
     // delete images that match except for the style
     const styleStart = url.indexOf("style=");
     const search = url.slice(0, styleStart);
 
+    let removed: HTMLImageElement | undefined;
     Array.from(this.imageCache.keys()).forEach(key => {
       if (key !== url && key.startsWith(search)) {
+        removed = this.imageCache.get(key);
         this.imageCache.delete(key);
       }
     });
+    return removed;
   }
 
   getTiles(item: string | IGirderItem): Promise<ITileMeta> {
@@ -89,7 +110,7 @@ export default class GirderAPI {
     const o: Readonly<IHistogramOptions> = Object.assign(
       {
         frame: 0,
-        bins: 128,
+        bins: 512,
         width: 2048,
         height: 2048,
         resample: false
@@ -101,7 +122,7 @@ export default class GirderAPI {
       .get(`item/${toId(item)}/tiles/histogram`, {
         params: o
       })
-      .then(r => r.data[0]); // TODO why is this an array?
+      .then(r => r.data[0]); // TODO deal with multiple channel data
   }
 
   private getItems(folderId: string): Promise<IGirderItem[]> {
@@ -218,28 +239,71 @@ export default class GirderAPI {
     url: string,
     width: number,
     height: number,
-    mimeType: string
+    oldImage: HTMLImageElementLocal | undefined,
+    hist: any,
+    images: any,
+    item: any,
+    frame: any,
+    color: string,
+    contrast: IContrast
   ) {
     if (this.imageCache.has(url)) {
       return this.imageCache.get(url)!;
     }
-    // need to go through axios to have the right header flags
-    const image = new Image(width, height);
+    const image = new Image(width, height) as HTMLImageElementLocal;
     this.imageCache.set(url, image);
-
-    // load and set the source when done
-    this.client
-      .get(url, {
-        responseType: "arraybuffer"
-      })
-      .then(r => {
-        const buffer = r.data as ArrayBuffer;
-        const blob = new Blob([buffer], {
-          type: mimeType
-        });
-        const blobUrl = URL.createObjectURL(blob);
-        image.src = blobUrl;
+    let promise;
+    if (!hist) {
+      promise = this.getLayerHistogram(images).then(hist => {
+        const style = toStyle(color, contrast, hist);
+        url = this.wholeRegionUrl(item, { frame: frame }, style);
+        return url;
       });
+    } else {
+      promise = Promise.resolve(url);
+    }
+    image._waitForHistogram = true;
+    if (oldImage !== undefined && oldImage._waitForHistogram) {
+      oldImage._waitForHistogram = false;
+    }
+    promise.then(url => {
+      if (!image._waitForHistogram) {
+        return;
+      }
+      image._waitForHistogram = false;
+
+      if (oldImage !== undefined && !(oldImage.complete && oldImage.src)) {
+        // if we emptied a value from the tracker, then attach an onload/onerror
+        // event to that image that sets the source IFF this url is still in the
+        // cache.  If it has fallen out of cache, call the onerror function.
+        const previousOnload = oldImage.onload;
+        const previousOnerror = oldImage.onerror;
+        const localSetSource = (event: any) => {
+          if (this.imageCache.get(url)) {
+            image.src = url;
+          } else {
+            if (image.onerror) {
+              image.onerror(event);
+            }
+          }
+        };
+        oldImage.onload = event => {
+          if (previousOnload) {
+            previousOnload.call(oldImage, event);
+          }
+          localSetSource(event);
+        };
+        oldImage.onerror = event => {
+          if (previousOnerror) {
+            previousOnerror.call(oldImage, event);
+          }
+          localSetSource(event);
+        };
+      } else {
+        // if the old image is resolved or not present, just set the src
+        image.src = url;
+      }
+    });
 
     return image;
   }
@@ -253,6 +317,10 @@ export default class GirderAPI {
     const style = toStyle(color, contrast, hist);
 
     images.forEach(image => {
+      /* This gets each tile separately, but since we get all of them this is
+       * less efficient than just getting the entire image at once.  There is
+       * some potential parallelization speed up, but its benefit is lost in
+       * other inefficiencies.
       for (let x = 0; x < image.sizeX; x += image.tileWidth) {
         const w = Math.min(image.sizeX - x, image.tileWidth);
         for (let y = 0; y < image.sizeY; y += image.tileHeight) {
@@ -275,12 +343,38 @@ export default class GirderAPI {
             image: this.loadImage(
               url,
               image.tileWidth,
-              image.tileHeight,
-              "image/png"
+              image.tileHeight
             )
           });
         }
       }
+      */
+      const url = this.wholeRegionUrl(
+        image.item,
+        { frame: image.frameIndex },
+        style
+      );
+      const oldImage = this.cleanOldImages(url);
+
+      resolvedImages.push({
+        x: offsetX,
+        y: offsetY,
+        width: image.sizeX,
+        height: image.sizeY,
+        url,
+        image: this.loadImage(
+          url,
+          image.sizeX,
+          image.sizeY,
+          oldImage,
+          hist,
+          images,
+          image.item,
+          image.frameIndex,
+          color,
+          contrast
+        )
+      });
 
       // since horizontal tiling only
       offsetX += image.sizeX;
@@ -394,7 +488,12 @@ interface IOMEInfo {
 // in the end need a function that maps: t,z,c -> to an image (or tiled image) to be loaded which end up to be the frame
 // number of time points
 
-function toKey(z: number | string, zTime: number | string, xy: number | string, c: number | string) {
+function toKey(
+  z: number | string,
+  zTime: number | string,
+  xy: number | string,
+  c: number | string
+) {
   return `z${z}:t${zTime}:xy${xy}:c${c}`;
 }
 
@@ -410,7 +509,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   tiles.forEach((tile, i) => {
     const item = items[i]!;
     tile.frames.forEach((frame, j) => {
-      const t = 0; // disable T for now.  +frame.DeltaT;
+      const t = +frame.TheT;
       const xy = +(frame.IndexXY || 0);
       const z = +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
       const c = +frame.TheC;
