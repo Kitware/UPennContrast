@@ -13,6 +13,8 @@ export interface IFrameInfo {
   PositionX: number;
   PositionY: number;
   PositionZ: number;
+  IndexXY: number;
+  IndexZ: number;
   TheC: number;
   TheT: number;
   TheZ: number;
@@ -45,13 +47,14 @@ export interface IDataset {
   name: string;
   description: string;
 
+  xy: number[];
   z: number[];
   time: number[][]; // number of time points, within a set of the time points that reflect valid z-time points
   // time for t,z -> time[t][z]
   channels: number[];
   width: number;
   height: number;
-  images(z: number, zTime: number, channel: number): IImage[];
+  images(z: number, zTime: number, xy: number, channel: number): IImage[];
 
   configurations: IDatasetConfiguration[];
 }
@@ -85,12 +88,15 @@ export interface IDisplayLayer {
   // TODO: boolean or which channel to use? why multiple allowed and how to combine
   channel: number;
 
+  xy: IDisplaySlice;
   z: IDisplaySlice;
   time: IDisplaySlice;
 
   visible: boolean;
 
   contrast: IContrast;
+
+  _histogram?: any | undefined;
 }
 
 export interface IContrast {
@@ -150,6 +156,10 @@ export function newLayer(
     visible: true,
     channel: nextChannel[0] || 0,
     time: {
+      type: "current",
+      value: null
+    },
+    xy: {
       type: "current",
       value: null
     },

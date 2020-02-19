@@ -63,7 +63,8 @@ export default class ImageViewer extends Vue {
 
   get readyPercentage() {
     const total = this.imageStack.reduce((acc, d) => acc + d.length, 0);
-    const loaded = this.ready.length;
+    const urls = this.imageStack.reduce<string[]>((acc, d) => acc.concat(d.map(i => i.url)), []);
+    const loaded = this.ready.filter(u => urls.indexOf(u) >= 0).length;
     return Math.round((100.0 * loaded) / total);
   }
 
@@ -86,11 +87,16 @@ export default class ImageViewer extends Vue {
         if (tile.image.src && tile.image.complete) {
           this.ready.push(tile.url);
         } else {
-          tile.image.onload = () => {
+          const tileImage = tile.image;
+          const previousOnload = tileImage.onload;
+          tile.image.onload = (event) => {
             // not just loaded but also decoded
             tile.image.decode().then(() => {
               this.ready.push(tile.url);
             });
+            if (previousOnload) {
+              previousOnload.call(tileImage, event);
+            }
           };
         }
       });

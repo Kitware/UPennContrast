@@ -47,6 +47,7 @@ export class Main extends VuexModule {
     []
   );
 
+  xy: number = 0;
   z: number = 0;
   time: number = 0;
   compositionMode: CompositionMode = DEFAULT_COMPOSITION_MODE;
@@ -137,6 +138,11 @@ export class Main extends VuexModule {
       );
     }
     persister.set("recentConfigurations", this.recentConfigurations);
+  }
+
+  @Mutation
+  private setXYImpl(value: number) {
+    this.xy = value;
   }
 
   @Mutation
@@ -402,6 +408,11 @@ export class Main extends VuexModule {
   }
 
   @Action
+  async setXY(value: number) {
+    this.setXYImpl(value);
+  }
+
+  @Action
   async setZ(value: number) {
     this.setZImpl(value);
   }
@@ -510,7 +521,11 @@ export class Main extends VuexModule {
     ) {
       return;
     }
-    if (/^(input|textarea|select)$/.test((document!.activeElement!.tagName || '').toLowerCase())) {
+    if (
+      /^(input|textarea|select)$/.test(
+        (document!.activeElement!.tagName || "").toLowerCase()
+      )
+    ) {
       return;
     }
     this.toggleLayer(hotKey - 1);
@@ -575,7 +590,7 @@ export class Main extends VuexModule {
     return layers
       .filter(d => d.visible)
       .map(layer => {
-        const images = getLayerImages(layer, ds, this.time, this.z);
+        const images = getLayerImages(layer, ds, this.time, this.xy, this.z);
         return this.api.generateImages(images, layer.color, layer.contrast);
       });
   }
@@ -586,8 +601,45 @@ export class Main extends VuexModule {
       if (!this.dataset || !this.configuration) {
         return Promise.resolve(null);
       }
-      const images = getLayerImages(layer, this.dataset, this.time, this.z);
-      return this.api.getLayerHistogram(images);
+      const images = getLayerImages(
+        layer,
+        this.dataset,
+        this.time,
+        this.xy,
+        this.z
+      );
+      if (!layer._histogram) {
+        layer._histogram = {
+          promise: Promise.resolve(),
+          last: true,
+          next: null,
+          images: null
+        };
+      }
+
+      // debounce histogram calls
+      let nextHistogram = () => {
+        if (layer._histogram.next) {
+          const images = layer._histogram.next;
+          layer._histogram.last = null;
+          layer._histogram.promise = this.api.getLayerHistogram(images);
+          layer._histogram.next = null;
+          layer._histogram.images = images;
+          layer._histogram.promise.then((value: any) => {
+            layer._histogram.last = value;
+            return null;
+          });
+          layer._histogram.promise.finally(nextHistogram);
+        }
+        return null;
+      };
+      if (images !== layer._histogram.images) {
+        layer._histogram.next = images;
+        if (layer._histogram.last) {
+          nextHistogram();
+        }
+      }
+      return layer._histogram.promise;
     };
   }
 }
