@@ -8,11 +8,14 @@
         required
         :error-messages="errorMessages"
         :success-messages="successMessages"
-        placeholder="Choose Folder..."
+        placeholder="Choose folder with images..."
         :rules="rules"
       >
         <template #append>
-          <girder-location-chooser v-model="path" />
+          <girder-location-chooser
+            v-model="path"
+            title="Select a Folder with Images"
+          />
         </template>
       </v-text-field>
 
@@ -62,7 +65,11 @@ export default class NewDataset extends Vue {
         .getImages(value._id)
         .then(images => {
           if (images.length > 0) {
-            this.successMessages.push(`Detected ${images.length} images`);
+            this.successMessages.push(
+              `Detected ${images.length} ${
+                images.length > 1 ? "images" : "image"
+              }`
+            );
           } else {
             this.errorMessages.push(`No contained images detected`);
           }

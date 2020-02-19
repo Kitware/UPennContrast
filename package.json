@@ -10,7 +10,7 @@
     "test": "npm run lint && npm run build"
   },
   "dependencies": {
-    "@girder/components": "^2.0.2",
+    "@girder/components": "^2.0.7",
     "@types/d3-color": "^1.2.2",
     "@types/d3-drag": "^1.2.3",
     "@types/d3-scale": "^2.1.1",

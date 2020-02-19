@@ -12,7 +12,7 @@ const routes: RouteConfig[] = [
     name: "newdataset",
     component: NewDataset,
     meta: {
-      text: "New Dataset"
+      text: "Upload New Data"
     }
   },
   {
@@ -20,7 +20,7 @@ const routes: RouteConfig[] = [
     name: "importdataset",
     component: ImportDataset,
     meta: {
-      text: "Import Dataset"
+      text: "Use Existing Data"
     }
   },
   {

@@ -13,7 +13,7 @@
         <v-icon>mdi-plus-circle</v-icon>
       </v-list-item-action>
       <v-list-item-content>
-        <v-list-item-title>New Dataset</v-list-item-title>
+        <v-list-item-title>Upload New Data</v-list-item-title>
       </v-list-item-content>
     </v-list-item>
     <v-list-item :to="{ name: 'importdataset' }" v-if="store.isLoggedIn">
@@ -21,7 +21,7 @@
         <v-icon>mdi-plus-circle</v-icon>
       </v-list-item-action>
       <v-list-item-content>
-        <v-list-item-title>Import Dataset</v-list-item-title>
+        <v-list-item-title>Use Existing Data</v-list-item-title>
       </v-list-item-content>
     </v-list-item>
     <v-list-item

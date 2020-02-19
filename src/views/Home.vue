@@ -43,6 +43,8 @@
         :location.sync="location"
         upload-multiple
         upload-enabled
+        :initial-items-per-page="itemsPerPage"
+        :items-per-page-options="itemsPerPageOptions"
         @rowclick="onRowClick"
       />
     </section>
@@ -54,14 +56,14 @@
         :to="{ name: 'newdataset' }"
         :disabled="!store.isLoggedIn"
       >
-        Create Dataset
+        Upload New Data
       </v-btn>
       <v-btn
         color="primary"
         :to="{ name: 'importdataset' }"
         :disabled="!store.isLoggedIn"
       >
-        Import Dataset
+        Use Existing Data
       </v-btn>
     </div>
   </v-container>
@@ -93,6 +95,13 @@ export default class Upload extends Vue {
     ) {
       this.$router.push({ name: "dataset", params: { id: data._id } });
     }
+  }
+
+  data() {
+    return {
+      itemsPerPage: 100,
+      itemsPerPageOptions: [10, 20, 50, 100, -1]
+    };
   }
 }
 </script>
