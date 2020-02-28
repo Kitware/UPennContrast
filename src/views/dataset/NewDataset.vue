@@ -13,22 +13,6 @@
         label="Description"
         :readonly="pageTwo"
       />
-      <v-text-field
-        :value="pathName"
-        label="Path"
-        readonly
-        required
-        placeholder="Choose destination folder..."
-        :rules="rules"
-      >
-        <template #append>
-          <girder-location-chooser
-            v-model="path"
-            title="Select a Destination Folder"
-            :allowNewFolder="true"
-          />
-        </template>
-      </v-text-field>
 
       <template v-if="dataset != null">
         <v-subheader>Images</v-subheader>
@@ -96,6 +80,10 @@ export default class NewDataset extends Vue {
 
   get rules() {
     return [(v: string) => v.trim().length > 0 || `value is required`];
+  }
+
+  async mounted() {
+    this.path = await this.store.api.getUserPublicFolder();
   }
 
   submit() {

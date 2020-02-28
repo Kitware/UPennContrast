@@ -47,6 +47,12 @@ export default class GirderAPI {
   getFolder(folderId: string): Promise<IGirderFolder> {
     return this.client.get(`folder/${folderId}`).then(r => r.data);
   }
+
+  async getUserPublicFolder(): Promise<IGirderFolder> {
+    const me = await this.client.get("user/me");
+    return this.client.get(`folder?parentType=user&parentId=${me.data._id}&name=Public`);
+  }
+
   getFiles(item: string | IGirderItem): Promise<IGirderFile[]> {
     return this.client.get(`item/${toId(item)}/files`).then(r => r.data);
   }
