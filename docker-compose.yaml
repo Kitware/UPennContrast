@@ -10,7 +10,7 @@ services:
       context: ./devops/girder
     command: "-d mongodb://mongodb:27017/girder --host 0.0.0.0"
     ports:
-      - "8080:8080"
+      - "${GIRDER_PORT-8080}:8080"
     links:
       - mongodb
       # - rabbitmq
