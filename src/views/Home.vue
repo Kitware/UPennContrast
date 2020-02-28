@@ -56,14 +56,7 @@
         :to="{ name: 'newdataset' }"
         :disabled="!store.isLoggedIn"
       >
-        Upload New Data
-      </v-btn>
-      <v-btn
-        color="primary"
-        :to="{ name: 'importdataset' }"
-        :disabled="!store.isLoggedIn"
-      >
-        Use Existing Data
+        Upload Data
       </v-btn>
     </div>
   </v-container>
