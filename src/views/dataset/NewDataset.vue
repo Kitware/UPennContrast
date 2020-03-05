@@ -14,11 +14,11 @@
         :readonly="pageTwo"
       />
 
-      <template v-if="dataset != null">
+      <template>
         <v-subheader>Images</v-subheader>
         <girder-upload
           accept=".ome.tif"
-          :dest="dataset._girder"
+          :dest="path"
           @done="uploadDone = true"
         />
       </template>
