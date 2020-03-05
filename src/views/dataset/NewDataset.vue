@@ -17,6 +17,7 @@
       <template>
         <v-subheader>Images</v-subheader>
         <girder-upload
+          ref="uploader"
           :dest="path"
           startButtonText=""
           @done="uploadDone = true"
@@ -25,7 +26,7 @@
 
       <div class="button-bar">
         <v-btn
-          :disabled="!valid"
+          :disabled="!valid || files.length === 0"
           color="success"
           class="mr-4"
           @click="submit"
@@ -80,6 +81,10 @@ export default class NewDataset extends Vue {
 
   get rules() {
     return [(v: string) => v.trim().length > 0 || `value is required`];
+  }
+
+  get files() {
+    return this.$refs.uploader.files;
   }
 
   async mounted() {
