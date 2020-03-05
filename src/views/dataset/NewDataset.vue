@@ -30,7 +30,7 @@
           class="mr-4"
           @click="submit"
           v-if="dataset == null"
-          >Create</v-btn
+          >Upload</v-btn
         >
         <v-btn
           :disabled="!uploadDone"
