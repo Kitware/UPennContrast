@@ -17,7 +17,6 @@
       <template>
         <v-subheader>Images</v-subheader>
         <girder-upload
-          accept=".ome.tif"
           :dest="path"
           @done="uploadDone = true"
         />
