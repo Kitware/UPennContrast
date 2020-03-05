@@ -18,6 +18,7 @@
         <v-subheader>Images</v-subheader>
         <girder-upload
           :dest="path"
+          startButtonText=""
           @done="uploadDone = true"
         />
       </template>
