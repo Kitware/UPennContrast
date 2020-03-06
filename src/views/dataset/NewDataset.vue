@@ -23,6 +23,7 @@
         v-model="description"
         label="Description"
         :readonly="pageTwo"
+        rows="2"
       />
 
       <div class="button-bar">
