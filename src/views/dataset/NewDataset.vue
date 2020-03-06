@@ -1,6 +1,16 @@
 <template>
   <v-container>
     <v-form v-model="valid">
+      <girder-upload
+        v-if="path"
+        ref="uploader"
+        :dest="path"
+        hideStartButton
+        hideHeadline
+        @filesChanged="filesChanged"
+        @done="uploadDone = true"
+      />
+
       <v-text-field
         v-model="name"
         label="Name"
@@ -8,23 +18,12 @@
         :rules="rules"
         :readonly="pageTwo"
       />
+
       <v-textarea
         v-model="description"
         label="Description"
         :readonly="pageTwo"
       />
-
-      <template v-if="path">
-        <v-subheader>File(s)</v-subheader>
-        <girder-upload
-          ref="uploader"
-          :dest="path"
-          hideStartButton
-          hideHeadline
-          @filesChanged="filesChanged"
-          @done="uploadDone = true"
-        />
-      </template>
 
       <div class="button-bar">
         <v-btn
