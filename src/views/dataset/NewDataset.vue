@@ -15,7 +15,7 @@
       />
 
       <template>
-        <v-subheader>Images</v-subheader>
+        <v-subheader>File(s)</v-subheader>
         <girder-upload
           ref="uploader"
           :dest="path"
