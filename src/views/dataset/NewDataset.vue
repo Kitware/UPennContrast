@@ -21,26 +21,26 @@
           :dest="path"
           hideStartButton
           hideHeadline
+          @filesChanged="filesChanged"
           @done="uploadDone = true"
         />
       </template>
 
       <div class="button-bar">
         <v-btn
-          :disabled="!valid || files.length === 0"
+          v-if="dataset == null"
+          :disabled="!valid || !filesSelected"
           color="success"
           class="mr-4"
           @click="submit"
-          v-if="dataset == null"
           >Upload</v-btn
         >
         <v-btn
-          :disabled="!uploadDone"
+          v-else
           color="success"
           class="mr-4"
-          v-else
           :to="{ name: 'dataset', params: { id: dataset.id } }"
-          >Done</v-btn
+          >View Dataset</v-btn
         >
       </div>
     </v-form>
@@ -63,6 +63,7 @@ export default class NewDataset extends Vue {
   readonly store = store;
 
   valid = false;
+  filesSelected = false;
   name = "";
   description = "";
 
@@ -84,32 +85,30 @@ export default class NewDataset extends Vue {
     return [(v: string) => v.trim().length > 0 || `value is required`];
   }
 
-  get files() {
-    let files = [];
-    if (this.$refs.uploader) {
-      files = this.$refs.uploader.files;
-    }
-    return files;
-  }
-
   async mounted() {
     this.path = await this.store.api.getUserPublicFolder();
   }
 
-  submit() {
+  async submit() {
     if (!this.valid) {
       return;
     }
 
-    this.store
-      .createDataset({
-        name: this.name,
-        description: this.description,
-        path: this.path!
-      })
-      .then(ds => {
-        this.dataset = ds;
-      });
+    this.dataset = await this.store.createDataset({
+      name: this.name,
+      description: this.description,
+      path: this.path!
+    });
+
+    this.path = this.dataset._girder;
+
+    await Vue.nextTick();
+
+    this.$refs.uploader.startUpload();
+  }
+
+  filesChanged(files) {
+    this.filesSelected = files.length > 0;
   }
 }
 </script>
