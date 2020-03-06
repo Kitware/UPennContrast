@@ -14,7 +14,7 @@
         :readonly="pageTwo"
       />
 
-      <template>
+      <template v-if="path">
         <v-subheader>File(s)</v-subheader>
         <girder-upload
           ref="uploader"
@@ -85,7 +85,11 @@ export default class NewDataset extends Vue {
   }
 
   get files() {
-    return this.$refs.uploader.files;
+    let files = [];
+    if (this.$refs.uploader) {
+      files = this.$refs.uploader.files;
+    }
+    return files;
   }
 
   async mounted() {
