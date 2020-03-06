@@ -19,7 +19,8 @@
         <girder-upload
           ref="uploader"
           :dest="path"
-          startButtonText=""
+          hideStartButton
+          hideHeadline
           @done="uploadDone = true"
         />
       </template>
