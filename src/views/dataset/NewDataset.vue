@@ -63,7 +63,7 @@ export default class NewDataset extends Vue {
   readonly store = store;
 
   valid = false;
-  filesSelected = false;
+  files = [];
   name = "";
   description = "";
 
@@ -83,6 +83,10 @@ export default class NewDataset extends Vue {
 
   get rules() {
     return [(v: string) => v.trim().length > 0 || `value is required`];
+  }
+
+  get filesSelected() {
+    return this.files.length > 0;
   }
 
   async mounted() {
@@ -108,7 +112,7 @@ export default class NewDataset extends Vue {
   }
 
   filesChanged(files) {
-    this.filesSelected = files.length > 0;
+    this.files = files;
   }
 }
 </script>
