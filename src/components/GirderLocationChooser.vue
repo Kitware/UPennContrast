@@ -1,14 +1,20 @@
 <template>
-  <v-dialog v-model="open" max-width="33vw">
+  <v-dialog v-model="open" max-width="50vw">
     <template #activator="{ on }">
       <v-btn v-on="on">
         Choose...
       </v-btn>
     </template>
     <v-card>
-      <v-card-title>Item Chooser</v-card-title>
+      <v-card-title>{{ title }}</v-card-title>
       <v-card-text>
-        <girder-file-manager @rowclick="onRowClick" :location="value" />
+        <girder-file-manager
+          @rowclick="onRowClick"
+          :location="value"
+          :new-folder-enabled="allowNewFolder"
+          :initial-items-per-page="itemsPerPage"
+          :items-per-page-options="itemsPerPageOptions"
+        />
       </v-card-text>
       <v-card-actions>
         <div class="grow">{{ selectedName }}</div>
@@ -36,16 +42,26 @@ export default class GirderLocationChooser extends Vue {
   value!: IGirderSelectAble | null;
 
   @Prop({
+    default: "Select a Folder"
+  })
+  title!: string;
+
+  @Prop({
     default: false
   })
   chooseItem!: boolean;
+
+  @Prop({
+    default: false
+  })
+  allowNewFolder!: boolean;
 
   open = false;
 
   selected: IGirderSelectAble | null = this.value;
 
   get selectedName() {
-    return this.selected ? this.selected.name : "Select...";
+    return this.selected ? this.selected.name : "Select a folder...";
   }
 
   select() {
@@ -57,6 +73,13 @@ export default class GirderLocationChooser extends Vue {
     if ((data._modelType === "item") === this.chooseItem) {
       this.selected = data;
     }
+  }
+
+  data() {
+    return {
+      itemsPerPage: 100,
+      itemsPerPageOptions: [10, 20, 50, 100, -1]
+    };
   }
 }
 </script>

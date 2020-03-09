@@ -18,11 +18,15 @@
         label="Path"
         readonly
         required
-        placeholder="Choose Folder..."
+        placeholder="Choose destination folder..."
         :rules="rules"
       >
         <template #append>
-          <girder-location-chooser v-model="path" />
+          <girder-location-chooser
+            v-model="path"
+            title="Select a Destination Folder"
+            :allowNewFolder="true"
+          />
         </template>
       </v-text-field>
 

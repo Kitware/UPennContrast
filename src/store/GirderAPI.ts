@@ -224,7 +224,11 @@ export default class GirderAPI {
   ): Promise<IDatasetConfiguration> {
     return this.client
       .put(`/item/${config.id}/metadata`, {
-        layers: config.layers
+        layers: config.layers.map(l =>
+          Object.fromEntries(
+            Object.entries(l).filter(([k]) => !k.startsWith("_"))
+          )
+        )
       })
       .then(() => config);
   }
