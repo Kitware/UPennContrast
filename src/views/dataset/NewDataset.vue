@@ -2,13 +2,14 @@
   <v-container>
     <v-form v-model="valid">
       <girder-upload
-        v-if="path"
+        v-if="path && !hideUploader"
         ref="uploader"
         :dest="path"
         hideStartButton
         hideHeadline
         @filesChanged="filesChanged"
-        @done="uploadDone = true"
+        @done="nextStep"
+        @error="interruptedUpload"
       />
 
       <v-text-field
@@ -28,20 +29,13 @@
 
       <div class="button-bar">
         <v-btn
-          v-if="dataset == null"
-          :disabled="!valid || !filesSelected"
+          :disabled="!valid || !filesSelected || uploading"
           color="success"
           class="mr-4"
           @click="submit"
-          >Upload</v-btn
-        >
-        <v-btn
-          v-else
-          color="success"
-          class="mr-4"
-          :to="{ name: 'dataset', params: { id: dataset.id } }"
-          >View Dataset</v-btn
-        >
+          >Upload
+        </v-btn>
+
       </div>
     </v-form>
 
@@ -121,6 +115,8 @@ export default class NewDataset extends Vue {
 
   valid = false;
   failedDataset = "";
+  uploading = false;
+  hideUploader = false;
   files = [] as FileUpload[];
   name = "";
   description = "";
@@ -128,8 +124,6 @@ export default class NewDataset extends Vue {
   path: IGirderSelectAble | null = null;
 
   dataset: IDataset | null = null;
-
-  uploadDone = false;
 
   get pageTwo() {
     return this.dataset != null;
@@ -197,6 +191,7 @@ export default class NewDataset extends Vue {
 
     await Vue.nextTick();
 
+    this.uploading = true;
     (this.$refs.uploader as GWCUpload).startUpload();
   }
 
@@ -206,6 +201,22 @@ export default class NewDataset extends Vue {
     if (this.name === "" && files.length > 0) {
       this.name = this.recommendedName;
     }
+  }
+
+  interruptedUpload() {
+    this.uploading = false;
+    this.hideUploader = false;
+  }
+
+  nextStep() {
+    this.hideUploader = true;
+
+    this.$router.push({
+      name: 'dataset',
+      params: {
+        id: this.dataset!.id
+      }
+    });
   }
 }
 </script>
