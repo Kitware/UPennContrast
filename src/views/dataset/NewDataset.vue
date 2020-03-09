@@ -174,7 +174,7 @@ export default class NewDataset extends Vue {
       path: this.path!
     });
 
-    this.path = this.dataset._girder;
+    this.path = this.dataset!._girder;
 
     await Vue.nextTick();
 
