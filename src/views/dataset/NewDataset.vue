@@ -44,6 +44,17 @@
         >
       </div>
     </v-form>
+
+    <v-alert
+      v-if="failedDataset"
+      text
+      type="error"
+    >
+      Could not create dataset <strong>{{ failedDataset }}</strong>. This might
+      happen, for instance, if a dataset by that name already exists. Please
+      update the dataset name field and try again.
+    </v-alert>
+
   </v-container>
 </template>
 <script lang="ts">
@@ -109,6 +120,7 @@ export default class NewDataset extends Vue {
   readonly store = store;
 
   valid = false;
+  failedDataset = "";
   files = [] as FileUpload[];
   name = "";
   description = "";
@@ -173,6 +185,13 @@ export default class NewDataset extends Vue {
       description: this.description,
       path: this.path!
     });
+
+    if (this.dataset === null) {
+      this.failedDataset = this.name;
+      return;
+    }
+
+    this.failedDataset = "";
 
     this.path = this.dataset!._girder;
 
