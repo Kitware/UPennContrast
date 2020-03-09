@@ -35,20 +35,14 @@
           @click="submit"
           >Upload
         </v-btn>
-
       </div>
     </v-form>
 
-    <v-alert
-      v-if="failedDataset"
-      text
-      type="error"
-    >
-      Could not create dataset <strong>{{ failedDataset }}</strong>. This might
-      happen, for instance, if a dataset by that name already exists. Please
-      update the dataset name field and try again.
+    <v-alert v-if="failedDataset" text type="error">
+      Could not create dataset <strong>{{ failedDataset }}</strong
+      >. This might happen, for instance, if a dataset by that name already
+      exists. Please update the dataset name field and try again.
     </v-alert>
-
   </v-container>
 </template>
 <script lang="ts">
@@ -212,7 +206,7 @@ export default class NewDataset extends Vue {
     this.hideUploader = true;
 
     this.$router.push({
-      name: 'dataset',
+      name: "dataset",
       params: {
         id: this.dataset!.id
       }
