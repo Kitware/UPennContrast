@@ -53,6 +53,14 @@ import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 import { IDataset } from "@/store/model";
 
+interface FileUpload {
+  file: File;
+}
+
+type GWCUpload = Vue & {
+  startUpload(): any;
+};
+
 function basename(filename: string): string {
   const components = filename.split(".");
   return components.length > 1
@@ -101,7 +109,7 @@ export default class NewDataset extends Vue {
   readonly store = store;
 
   valid = false;
-  files = [];
+  files = [] as FileUpload[];
   name = "";
   description = "";
 
@@ -170,10 +178,10 @@ export default class NewDataset extends Vue {
 
     await Vue.nextTick();
 
-    this.$refs.uploader.startUpload();
+    (this.$refs.uploader as GWCUpload).startUpload();
   }
 
-  filesChanged(files) {
+  filesChanged(files: FileUpload[]) {
     this.files = files;
 
     if (this.name === "" && files.length > 0) {
