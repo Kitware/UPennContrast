@@ -53,6 +53,39 @@ import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 import { IDataset } from "@/store/model";
 
+function basename(filename: string): string {
+  const components = filename.split(".");
+  return components.length > 1 ? components.slice(0, -1).join(".") : components[0];
+}
+
+function findCommonPrefix(strings: string[]): string {
+  // Handle special cases
+  if (strings.length === 0) {
+    return "";
+  } else if (strings.length === 1) {
+    return strings[0];
+  }
+
+  // Get the minimum length of all the strings; the common prefix cannot be
+  // longer than this.
+  const minLength = strings.reduce((acc, cur) => Math.min(acc, cur.length), Infinity);
+
+  // Sweep through the first string, and compare the letter found in each
+  // position with the letter at that position for all the strings. Stop when an
+  // inequality occurs.
+  let result = [];
+  for (let i = 0; i < minLength; i++) {
+    const ch = strings[0].charAt(i);
+
+    if (!strings.map(s => s.charAt(i)).every(c => c === ch)) {
+      break;
+    }
+    result.push(ch);
+  }
+
+  return result.join("");
+}
+
 @Component({
   components: {
     GirderLocationChooser,
@@ -89,6 +122,32 @@ export default class NewDataset extends Vue {
     return this.files.length > 0;
   }
 
+  get recommendedName() {
+    const {
+      files,
+    } = this;
+
+    // If there aren't any files selected yet, return a blank string.
+    if (files.length === 0) {
+      return "";
+    }
+
+    // If there is only one file, return its name with the extension struck off.
+    if (files.length === 1) {
+      return basename(files[0].file.name);
+    }
+
+    // For more than one file, search for the longest prefix common to all, and
+    // use that as the name if it's nonblank; otherwise use the name of the
+    // first file.
+    const prefix = findCommonPrefix(files.map(d => d.file.name));
+    if (prefix.length > 0) {
+      return prefix;
+    } else {
+      return basename(files[0].file.name)
+    }
+  }
+
   async mounted() {
     this.path = await this.store.api.getUserPublicFolder();
   }
@@ -113,6 +172,10 @@ export default class NewDataset extends Vue {
 
   filesChanged(files) {
     this.files = files;
+
+    if (this.name === "" && files.length > 0) {
+      this.name = this.recommendedName;
+    }
   }
 }
 </script>
