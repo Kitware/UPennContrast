@@ -55,7 +55,9 @@ import { IDataset } from "@/store/model";
 
 function basename(filename: string): string {
   const components = filename.split(".");
-  return components.length > 1 ? components.slice(0, -1).join(".") : components[0];
+  return components.length > 1
+    ? components.slice(0, -1).join(".")
+    : components[0];
 }
 
 function findCommonPrefix(strings: string[]): string {
@@ -68,7 +70,10 @@ function findCommonPrefix(strings: string[]): string {
 
   // Get the minimum length of all the strings; the common prefix cannot be
   // longer than this.
-  const minLength = strings.reduce((acc, cur) => Math.min(acc, cur.length), Infinity);
+  const minLength = strings.reduce(
+    (acc, cur) => Math.min(acc, cur.length),
+    Infinity
+  );
 
   // Sweep through the first string, and compare the letter found in each
   // position with the letter at that position for all the strings. Stop when an
@@ -123,9 +128,7 @@ export default class NewDataset extends Vue {
   }
 
   get recommendedName() {
-    const {
-      files,
-    } = this;
+    const { files } = this;
 
     // If there aren't any files selected yet, return a blank string.
     if (files.length === 0) {
@@ -144,7 +147,7 @@ export default class NewDataset extends Vue {
     if (prefix.length > 0) {
       return prefix;
     } else {
-      return basename(files[0].file.name)
+      return basename(files[0].file.name);
     }
   }
 

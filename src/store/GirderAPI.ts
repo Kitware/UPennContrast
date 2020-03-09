@@ -50,7 +50,9 @@ export default class GirderAPI {
 
   async getUserPublicFolder(): Promise<IGirderFolder> {
     const me = await this.client.get("user/me");
-    const result = await this.client.get(`folder?parentType=user&parentId=${me.data._id}&name=Public`);
+    const result = await this.client.get(
+      `folder?parentType=user&parentId=${me.data._id}&name=Public`
+    );
     return result.data.length > 0 ? result.data[0] : null;
   }
 
