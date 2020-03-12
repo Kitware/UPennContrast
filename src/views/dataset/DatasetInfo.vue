@@ -182,7 +182,7 @@ export default class DatasetInfo extends Vue {
       description: "default configuration"
     });
 
-    this.$router.go();
+    this.$router.go(0);
   }
 }
 </script>
