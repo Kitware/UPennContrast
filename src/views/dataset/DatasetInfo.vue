@@ -170,19 +170,16 @@ export default class DatasetInfo extends Vue {
   }
 
   async ensureDefaultConfiguration() {
-    const {
-      dataset,
-      configurations,
-      store,
-    } = this;
+    const { configurations, store } = this;
 
+    const dataset = this.store.dataset;
     if (dataset === null || configurations.length > 0) {
       return;
     }
 
     const config = await store.createConfiguration({
       name: "default",
-      description: "default configuration",
+      description: "default configuration"
     });
 
     this.$router.go();
