@@ -149,6 +149,10 @@ export default class DatasetInfo extends Vue {
     return this.store.dataset ? this.store.dataset.configurations : [];
   }
 
+  updated() {
+    this.ensureDefaultConfiguration();
+  }
+
   toRoute(c: IDatasetConfiguration) {
     return {
       name: "view",
@@ -163,6 +167,25 @@ export default class DatasetInfo extends Vue {
         name: "root"
       });
     });
+  }
+
+  async ensureDefaultConfiguration() {
+    const {
+      dataset,
+      configurations,
+      store,
+    } = this;
+
+    if (dataset === null || configurations.length > 0) {
+      return;
+    }
+
+    const config = await store.createConfiguration({
+      name: "default",
+      description: "default configuration",
+    });
+
+    this.$router.go();
   }
 }
 </script>
