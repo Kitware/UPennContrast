@@ -1,11 +1,15 @@
 <template>
   <v-container>
-    <v-text-field :value="name" label="Name" readonly />
-    <v-textarea :value="description" label="Description" readonly />
-    <v-text-field :value="time" label="# Timepoints" readonly />
-    <v-text-field :value="xy" label="# XY-Slices" readonly />
-    <v-text-field :value="z" label="# Z-Slices" readonly />
-    <v-text-field :value="channels" label="# Channels" readonly />
+    <v-row>
+      <v-data-table
+        :headers="headers"
+        :items="report"
+        class="elevation-3"
+        hide-default-header
+        hide-default-footer
+      />
+    </v-row>
+
     <v-subheader>
       <span class="grow">Configurations</span>
       <v-btn
@@ -72,6 +76,20 @@ export default class DatasetInfo extends Vue {
 
   removeConfirm = false;
 
+  readonly headers = [
+    {
+      text: "Field",
+      sortable: false,
+      value: "name",
+      align: "right"
+    },
+    {
+      text: "Value",
+      sortable: false,
+      value: "value"
+    }
+  ];
+
   get name() {
     return this.store.dataset ? this.store.dataset.name : "";
   }
@@ -94,6 +112,37 @@ export default class DatasetInfo extends Vue {
 
   get channels() {
     return this.store.dataset ? this.store.dataset.channels.length : "?";
+  }
+
+  get report() {
+    const { name, description, time, xy, z, channels } = this;
+
+    return [
+      {
+        name: "Dataset Name",
+        value: name
+      },
+      {
+        name: "Dataset Description",
+        value: description
+      },
+      {
+        name: "Timepoints",
+        value: time
+      },
+      {
+        name: "XY Slices",
+        value: xy
+      },
+      {
+        name: "Z Slices",
+        value: z
+      },
+      {
+        name: "Channels",
+        value: channels
+      }
+    ];
   }
 
   get configurations() {
