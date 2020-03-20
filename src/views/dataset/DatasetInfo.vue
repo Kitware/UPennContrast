@@ -157,7 +157,9 @@ export default class DatasetInfo extends Vue {
   }
 
   get configurations() {
-    const existing = this.store.dataset ? this.store.dataset.configurations : [];
+    const existing = this.store.dataset
+      ? this.store.dataset.configurations
+      : [];
     const my = this.configuration;
 
     return existing.length === 0 ? existing.concat(my) : existing;
