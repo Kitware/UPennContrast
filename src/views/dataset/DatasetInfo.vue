@@ -70,7 +70,7 @@ import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
 import { IDatasetConfiguration } from "../../store/model";
 
-function formatDate(d) {
+function formatDate(d: Date): string {
   const year = d.getFullYear();
   const month = ("0" + (d.getMonth() + 1)).slice(-2);
   const day = ("0" + d.getDate()).slice(-2);
@@ -85,7 +85,7 @@ export default class DatasetInfo extends Vue {
   readonly store = store;
 
   removeConfirm = false;
-  configuration = [];
+  configuration: IDatasetConfiguration[] = [];
 
   readonly headers = [
     {
@@ -198,11 +198,15 @@ export default class DatasetInfo extends Vue {
     }
 
     const date = new Date();
-    const config = await store.createConfiguration({
-      name: `default ${formatDate(date)}`,
-      description: "default configuration"
-    });
-    this.configuration = config;
+    try {
+      const config = await store.createConfiguration({
+        name: `default ${formatDate(date)}`,
+        description: "default configuration"
+      });
+      this.configuration = [config!];
+    } catch (err) {
+      throw err;
+    }
   }
 }
 </script>
