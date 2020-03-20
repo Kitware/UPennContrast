@@ -70,6 +70,16 @@ import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
 import { IDatasetConfiguration } from "../../store/model";
 
+function formatDate(d) {
+  const year = d.getFullYear();
+  const month = ("0" + (d.getMonth() + 1)).slice(-2);
+  const day = ("0" + d.getDate()).slice(-2);
+  const hour = ("0" + d.getHours()).slice(-2);
+  const minute = ("0" + d.getMinutes()).slice(-2);
+
+  return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
 @Component
 export default class DatasetInfo extends Vue {
   readonly store = store;
@@ -185,8 +195,9 @@ export default class DatasetInfo extends Vue {
       return;
     }
 
+    const date = new Date();
     const config = await store.createConfiguration({
-      name: "default",
+      name: `default ${formatDate(date)}`,
       description: "default configuration"
     });
     this.configuration = config;
