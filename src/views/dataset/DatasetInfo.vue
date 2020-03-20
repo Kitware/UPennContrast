@@ -75,6 +75,7 @@ export default class DatasetInfo extends Vue {
   readonly store = store;
 
   removeConfirm = false;
+  configuration = [];
 
   readonly headers = [
     {
@@ -146,7 +147,10 @@ export default class DatasetInfo extends Vue {
   }
 
   get configurations() {
-    return this.store.dataset ? this.store.dataset.configurations : [];
+    const existing = this.store.dataset ? this.store.dataset.configurations : [];
+    const my = this.configuration;
+
+    return existing.length === 0 ? existing.concat(my) : existing;
   }
 
   updated() {
@@ -169,6 +173,10 @@ export default class DatasetInfo extends Vue {
     });
   }
 
+  mounted() {
+    this.ensureDefaultConfiguration();
+  }
+
   async ensureDefaultConfiguration() {
     const { configurations, store } = this;
 
@@ -181,8 +189,7 @@ export default class DatasetInfo extends Vue {
       name: "default",
       description: "default configuration"
     });
-
-    this.$router.go(0);
+    this.configuration = config;
   }
 }
 </script>
