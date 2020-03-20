@@ -1,11 +1,15 @@
 <template>
   <v-container>
-    <v-text-field :value="name" label="Name" readonly />
-    <v-textarea :value="description" label="Description" readonly />
-    <v-text-field :value="time" label="# Timepoints" readonly />
-    <v-text-field :value="xy" label="# XY-Slices" readonly />
-    <v-text-field :value="z" label="# Z-Slices" readonly />
-    <v-text-field :value="channels" label="# Channels" readonly />
+    <v-row>
+      <v-data-table
+        :headers="headers"
+        :items="report"
+        class="elevation-3"
+        hide-default-header
+        hide-default-footer
+      />
+    </v-row>
+
     <v-subheader>
       <span class="grow">Configurations</span>
       <v-btn
@@ -66,11 +70,36 @@ import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
 import { IDatasetConfiguration } from "../../store/model";
 
+function formatDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = ("0" + (d.getMonth() + 1)).slice(-2);
+  const day = ("0" + d.getDate()).slice(-2);
+  const hour = ("0" + d.getHours()).slice(-2);
+  const minute = ("0" + d.getMinutes()).slice(-2);
+
+  return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
 @Component
 export default class DatasetInfo extends Vue {
   readonly store = store;
 
   removeConfirm = false;
+  configuration: IDatasetConfiguration[] = [];
+
+  readonly headers = [
+    {
+      text: "Field",
+      sortable: false,
+      value: "name",
+      align: "right"
+    },
+    {
+      text: "Value",
+      sortable: false,
+      value: "value"
+    }
+  ];
 
   get name() {
     return this.store.dataset ? this.store.dataset.name : "";
@@ -96,8 +125,48 @@ export default class DatasetInfo extends Vue {
     return this.store.dataset ? this.store.dataset.channels.length : "?";
   }
 
+  get report() {
+    const { name, description, time, xy, z, channels } = this;
+
+    return [
+      {
+        name: "Dataset Name",
+        value: name
+      },
+      {
+        name: "Dataset Description",
+        value: description
+      },
+      {
+        name: "Timepoints",
+        value: time
+      },
+      {
+        name: "XY Slices",
+        value: xy
+      },
+      {
+        name: "Z Slices",
+        value: z
+      },
+      {
+        name: "Channels",
+        value: channels
+      }
+    ];
+  }
+
   get configurations() {
-    return this.store.dataset ? this.store.dataset.configurations : [];
+    const existing = this.store.dataset
+      ? this.store.dataset.configurations
+      : [];
+    const my = this.configuration;
+
+    return existing.length === 0 ? existing.concat(my) : existing;
+  }
+
+  updated() {
+    this.ensureDefaultConfiguration();
   }
 
   toRoute(c: IDatasetConfiguration) {
@@ -114,6 +183,30 @@ export default class DatasetInfo extends Vue {
         name: "root"
       });
     });
+  }
+
+  mounted() {
+    this.ensureDefaultConfiguration();
+  }
+
+  async ensureDefaultConfiguration() {
+    const { configurations, store } = this;
+
+    const dataset = this.store.dataset;
+    if (dataset === null || configurations.length > 0) {
+      return;
+    }
+
+    const date = new Date();
+    try {
+      const config = await store.createConfiguration({
+        name: `default ${formatDate(date)}`,
+        description: "default configuration"
+      });
+      this.configuration = [config!];
+    } catch (err) {
+      throw err;
+    }
   }
 }
 </script>
