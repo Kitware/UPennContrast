@@ -265,6 +265,14 @@ export default class GirderAPI {
       return this.imageCache.get(url)!;
     }
     const image = new Image(width, height) as HTMLImageElementLocal;
+
+    // Keep the size of the cache under control.
+    if (this.imageCache.size === 10) {
+      const oldest = this.imageCache.entries().next().value[0];
+      console.log(oldest);
+      this.imageCache.delete(oldest);
+    }
+
     this.imageCache.set(url, image);
     let promise;
     if (!hist) {
