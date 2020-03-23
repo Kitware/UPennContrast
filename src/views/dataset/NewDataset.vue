@@ -76,9 +76,13 @@ function findCommonPrefix(strings: string[]): string {
     return strings[0];
   }
 
+  // Extract the non-metadata prefix of each filename.
+  const re = /(.*?)(_channel|_XY|_Z|_time|$)/;
+  const matches = strings.map(s => s.match(re)[1]);
+
   // Get the minimum length of all the strings; the common prefix cannot be
   // longer than this.
-  const minLength = strings.reduce(
+  const minLength = matches.reduce(
     (acc, cur) => Math.min(acc, cur.length),
     Infinity
   );
@@ -88,9 +92,9 @@ function findCommonPrefix(strings: string[]): string {
   // inequality occurs.
   let result = [];
   for (let i = 0; i < minLength; i++) {
-    const ch = strings[0].charAt(i);
+    const ch = matches[0].charAt(i);
 
-    if (!strings.map(s => s.charAt(i)).every(c => c === ch)) {
+    if (!matches.map(s => s.charAt(i)).every(c => c === ch)) {
       break;
     }
     result.push(ch);
