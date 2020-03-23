@@ -12,10 +12,26 @@ export function parseXY(s: string): string | null {
   return match ? match[1] : null;
 }
 
-export function getFilenameMetadata(filename: string): { xy: string | null, t: string | null } {
+export function getFilenameMetadata(
+  filename: string
+): { xy: string | null; t: string | null } {
   return {
     t: parseTime(filename),
     xy: parseXY(filename)
+  };
+}
+
+function stringToNumber(val: string | null): number | null {
+  return val === null ? null : +val;
+}
+
+export function getNumericMetadata(
+  filename: string
+): { xy: number | null; t: number | null } {
+  const metadata = getFilenameMetadata(filename);
+  return {
+    t: stringToNumber(metadata.t),
+    xy: stringToNumber(metadata.xy)
   };
 }
 

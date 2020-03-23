@@ -21,7 +21,7 @@ import {
   mergeHistograms,
   ITileHistogram
 } from "./images";
-import { getFilenameMetadata } from "@/utils/parsing";
+import { getNumericMetadata } from "@/utils/parsing";
 
 interface HTMLImageElementLocal extends HTMLImageElement {
   _waitForHistogram?: boolean;
@@ -522,14 +522,11 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   const lookup = new Map<string, IImage[]>();
   tiles.forEach((tile, i) => {
     const item = items[i]!;
-    const metadata = getFilenameMetadata(item.name);
-
-    const itemT = metadata.t === null ? null : +metadata.t;
-    const itemXY = metadata.xy === null ? null : +metadata.xy;
+    const metadata = getNumericMetadata(item.name);
 
     tile.frames.forEach((frame, j) => {
-      const t = itemT || +frame.TheT;
-      const xy = itemXY || +(frame.IndexXY || 0);
+      const t = metadata.t || +frame.TheT;
+      const xy = metadata.xy || +(frame.IndexXY || 0);
       const z = +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
       const c = +frame.TheC;
       if (zs.has(z)) {
