@@ -1,18 +1,25 @@
-function parseTime(s: string): string | null {
+export function parseTime(s: string): string | null {
   const re = /time(\d+)/;
   const match = s.match(re);
 
   return match ? match[1] : null;
 }
 
-function parseXY(s: string): string | null {
+export function parseXY(s: string): string | null {
   const re = /XY(\d+)/;
   const match = s.match(re);
 
   return match ? match[1] : null;
 }
 
-function collectFilenameMetadata(
+export function getFilenameMetadata(filename: string): { xy: string | null, t: string | null } {
+  return {
+    t: parseTime(filename),
+    xy: parseXY(filename)
+  };
+}
+
+export function collectFilenameMetadata(
   filenames: string[]
 ): { xy: string[]; t: string[] } {
   const times = filenames.map(parseTime);
