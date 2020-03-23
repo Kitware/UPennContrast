@@ -66,9 +66,9 @@ export function collectFilenameMetadata(
   const channels = filenames.map(parseChannel);
 
   return {
-    t: times.filter(d => d !== null).sort(),
-    xy: xys.filter(d => d !== null).sort(),
-    z: zs.filter(d => d !== null).sort(),
-    chan: channels.filter(d => d !== null).sort()
+    t: times.filter(d => d !== null).sort() as string[],
+    xy: xys.filter(d => d !== null).sort() as string[],
+    z: zs.filter(d => d !== null).sort() as string[],
+    chan: channels.filter(d => d !== null).sort() as string[]
   };
 }

@@ -76,9 +76,10 @@ function findCommonPrefix(strings: string[]): string {
     return strings[0];
   }
 
-  // Extract the non-metadata prefix of each filename.
+  // Extract the non-metadata prefix of each filename. Note that because of the
+  // way the regex is constructed, the first match group will never be `null`.
   const re = /(.*?)(_channel|_XY|_Z|_time|$)/;
-  const matches = strings.map(s => s.match(re)[1]);
+  const matches = strings.map(s => s.match(re)![1]);
 
   // Get the minimum length of all the strings; the common prefix cannot be
   // longer than this.
