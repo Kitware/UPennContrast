@@ -1,16 +1,11 @@
-export function parseTime(s: string): string | null {
-  const re = /time(\d+)/;
-  const match = s.match(re);
-
+function applyRegex(regex: RegExp, s: string): string | null {
+  const match = s.match(regex);
   return match ? match[1] : null;
 }
 
-export function parseXY(s: string): string | null {
-  const re = /XY(\d+)/;
-  const match = s.match(re);
-
-  return match ? match[1] : null;
-}
+export const parseZ: (s: string) => string | null = applyRegex.bind(null, /Z(\d+)/);
+export const parseTime: (s: string) => string | null = applyRegex.bind(null, /time(\d+)/);
+export const parseXY: (s: string) => string | null = applyRegex.bind(null, /XY(\d+)/);
 
 export function getFilenameMetadata(
   filename: string
