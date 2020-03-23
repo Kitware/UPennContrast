@@ -15,24 +15,31 @@ export const parseXY: (s: string) => string | null = applyRegex.bind(
   null,
   /XY(\d+)/
 );
+export const parseChannel: (s: string) => string | null = applyRegex.bind(
+  null,
+  /channel(.*?)[_\.]/
+);
 
 interface FilenameMetadata {
   t: string | null;
   xy: string | null;
   z: string | null;
+  chan: string | null;
 }
 
 interface NumericMetadata {
   t: number | null;
   xy: number | null;
   z: number | null;
+  chan: string | null;
 }
 
 export function getFilenameMetadata(filename: string): FilenameMetadata {
   return {
     t: parseTime(filename),
     xy: parseXY(filename),
-    z: parseZ(filename)
+    z: parseZ(filename),
+    chan: parseChannel(filename)
   };
 }
 
@@ -45,20 +52,23 @@ export function getNumericMetadata(filename: string): NumericMetadata {
   return {
     t: stringToNumber(metadata.t),
     xy: stringToNumber(metadata.xy),
-    z: stringToNumber(metadata.z)
+    z: stringToNumber(metadata.z),
+    chan: metadata.chan
   };
 }
 
 export function collectFilenameMetadata(
   filenames: string[]
-): { xy: string[]; t: string[]; z: string[] } {
+): { xy: string[]; t: string[]; z: string[]; chan: string[] } {
   const times = filenames.map(parseTime);
   const xys = filenames.map(parseXY);
   const zs = filenames.map(parseZ);
+  const channels = filenames.map(parseChannel);
 
   return {
     t: times.filter(d => d !== null).sort(),
     xy: xys.filter(d => d !== null).sort(),
-    z: zs.filter(d => d !== null).sort()
+    z: zs.filter(d => d !== null).sort(),
+    chan: channels.filter(d => d !== null).sort()
   };
 }
