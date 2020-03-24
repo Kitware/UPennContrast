@@ -527,10 +527,14 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   const zs = new Map<number, Set<number>>();
   const cs = new Set<number>();
 
+  const channelInt = new Map<string | null, number>();
   const lookup = new Map<string, IImage[]>();
   tiles.forEach((tile, i) => {
     const item = items[i]!;
     const metadata = getNumericMetadata(item.name);
+    if (metadata.chan !== null && !channelInt.has(metadata.chan)) {
+      channelInt.set(metadata.chan, channelInt.size);
+    }
 
     tile.frames.forEach((frame, j) => {
       const t = metadata.t || +frame.TheT;
@@ -538,7 +542,8 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
       const z =
         metadata.z ||
         +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
-      const c = metadata.chan || +frame.TheC;
+      const metadataChannel = channelInt.get(metadata.chan);
+      const c = metadataChannel !== undefined ? metadataChannel : +frame.TheC;
       if (zs.has(z)) {
         zs.get(z)!.add(t);
       } else {
