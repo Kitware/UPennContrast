@@ -269,7 +269,6 @@ export default class GirderAPI {
     // Keep the size of the cache under control.
     if (this.imageCache.size === 100) {
       const oldest = this.imageCache.entries().next().value[0];
-      console.log(oldest);
       this.imageCache.delete(oldest);
     }
 
