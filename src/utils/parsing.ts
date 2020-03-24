@@ -3,22 +3,43 @@ function applyRegex(regex: RegExp, s: string): string | null {
   return match ? match[1] : null;
 }
 
+export function makeAlternation(strings: string[]): string {
+  return strings.join("|");
+}
+
+const triggerZ = ["z", "slice"];
 export const parseZ: (s: string) => string | null = applyRegex.bind(
   null,
-  /Z(\d+)/
+  new RegExp(`(?:^|[_\\-])(?:${makeAlternation(triggerZ)})(\\d+)`, "i")
 );
+
+const triggerTime = ["time", "t", "date", "hour", "min", "wk", "d", "h"];
 export const parseTime: (s: string) => string | null = applyRegex.bind(
   null,
-  /time(\d+)/
+  new RegExp(`(?:^|[_\\-])(?:${makeAlternation(triggerTime)})(\\d+)`, "i")
 );
+
+const triggerXY = ["xy", "x", "y", "stage", "pos"];
 export const parseXY: (s: string) => string | null = applyRegex.bind(
   null,
-  /XY(\d+)/
+  new RegExp(`(?:^|[_\\-])(?:${makeAlternation(triggerXY)})(\\d+)`, "i")
 );
+
+const triggerChannel = ["channel", "ch", "c", "wave"];
 export const parseChannel: (s: string) => string | null = applyRegex.bind(
   null,
-  /channel(.*?)[_\.]/
+  new RegExp(
+    `(?:^|[_\\-])(?:${makeAlternation(triggerChannel)})(.+?)[_\\.\\-]`,
+    "i"
+  )
 );
+
+export const triggers = [
+  ...triggerZ,
+  ...triggerTime,
+  ...triggerXY,
+  ...triggerChannel
+];
 
 interface FilenameMetadata {
   t: string | null;

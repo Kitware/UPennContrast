@@ -536,10 +536,12 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
     }
 
     tile.frames.forEach((frame, j) => {
-      const t = metadata.t !== undefined ? metadata.t : +frame.TheT;
-      const xy = metadata.xy !== undefined ? metadata.xy : +(frame.IndexXY || 0);
-      const z = metadata.z !== undefined ? metadata.z :
-        +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
+      const t = metadata.t !== null ? metadata.t : +frame.TheT;
+      const xy = metadata.xy !== null ? metadata.xy : +(frame.IndexXY || 0);
+      const z =
+        metadata.z !== null
+          ? metadata.z
+          : +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
       const metadataChannel = channelInt.get(metadata.chan);
       const c = metadataChannel !== undefined ? metadataChannel : +frame.TheC;
       if (zs.has(z)) {
