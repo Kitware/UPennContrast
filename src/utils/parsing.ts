@@ -25,7 +25,7 @@ export const parseXY: (s: string) => string | null = applyRegex.bind(
   new RegExp(`(?:^|[_\\-])(?:${makeAlternation(triggerXY)})(\\d+)`, "i")
 );
 
-const triggerChannel = ["channel", "ch", "c", "wave"];
+const triggerChannel = ["channel", "wave"];
 export const parseChannel: (s: string) => string | null = applyRegex.bind(
   null,
   new RegExp(
