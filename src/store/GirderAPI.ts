@@ -21,6 +21,7 @@ import {
   mergeHistograms,
   ITileHistogram
 } from "./images";
+import { getNumericMetadata } from "@/utils/parsing";
 
 interface HTMLImageElementLocal extends HTMLImageElement {
   _waitForHistogram?: boolean;
@@ -264,6 +265,13 @@ export default class GirderAPI {
       return this.imageCache.get(url)!;
     }
     const image = new Image(width, height) as HTMLImageElementLocal;
+
+    // Keep the size of the cache under control.
+    if (this.imageCache.size === 100) {
+      const oldest = this.imageCache.entries().next().value[0];
+      this.imageCache.delete(oldest);
+    }
+
     this.imageCache.set(url, image);
     let promise;
     if (!hist) {
@@ -518,14 +526,24 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   const zs = new Map<number, Set<number>>();
   const cs = new Set<number>();
 
+  const channelInt = new Map<string | null, number>();
   const lookup = new Map<string, IImage[]>();
   tiles.forEach((tile, i) => {
     const item = items[i]!;
+    const metadata = getNumericMetadata(item.name);
+    if (metadata.chan !== null && !channelInt.has(metadata.chan)) {
+      channelInt.set(metadata.chan, channelInt.size);
+    }
+
     tile.frames.forEach((frame, j) => {
-      const t = +frame.TheT;
-      const xy = +(frame.IndexXY || 0);
-      const z = +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
-      const c = +frame.TheC;
+      const t = metadata.t !== null ? metadata.t : +frame.TheT;
+      const xy = metadata.xy !== null ? metadata.xy : +(frame.IndexXY || 0);
+      const z =
+        metadata.z !== null
+          ? metadata.z
+          : +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
+      const metadataChannel = channelInt.get(metadata.chan);
+      const c = metadataChannel !== undefined ? metadataChannel : +frame.TheC;
       if (zs.has(z)) {
         zs.get(z)!.add(t);
       } else {
