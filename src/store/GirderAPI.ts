@@ -543,7 +543,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
           ? metadata.z
           : +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
       const metadataChannel = channelInt.get(metadata.chan);
-      const c = metadataChannel !== undefined ? metadataChannel : +frame.TheC;
+      const c = metadataChannel !== undefined ? metadataChannel : (isNaN(+frame.TheC) ? j : +frame.TheC);
       if (zs.has(z)) {
         zs.get(z)!.add(t);
       } else {
