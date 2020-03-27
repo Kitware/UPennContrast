@@ -457,6 +457,7 @@ function asDataset(folder: IGirderFolder): IDataset {
     height: 100,
     time: [],
     channels: [],
+    channelNames: new Map<number, string>(),
     images: () => [],
     configurations: []
   };
@@ -609,6 +610,12 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   const channels = Array.from(cs).sort((a, b) => a - b);
   // console.log(zValues, zTime, channels);
 
+  // Create a map of channel names for use in display.
+  const channelNames = new Map<number, string>();
+  for (const entry of channelInt) {
+    channelNames.set(entry[1], entry[0]!);
+  }
+
   return {
     images: (z: number, zTime: number, xy: number, channel: number) =>
       lookup.get(toKey(z, zTime, xy, channel)) || [],
@@ -616,6 +623,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
     z: zValues,
     time: zTime,
     channels,
+    channelNames,
     width,
     height
   };
