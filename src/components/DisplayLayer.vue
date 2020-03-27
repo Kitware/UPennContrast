@@ -73,7 +73,7 @@
           v-for="(channel, index) in channels"
           :key="index"
           :value="index"
-          :label="channel.toString()"
+          :label="channelName(channel)"
         />
       </v-radio-group>
       <display-slice
@@ -130,6 +130,14 @@ export default class DisplayLayer extends Vue {
 
   get channels() {
     return this.store.dataset ? this.store.dataset.channels : [];
+  }
+
+  channelName(channel: number): string {
+    let result = channel.toString();
+    if (this.store.dataset) {
+      result = this.store.dataset.channelNames.get(channel) || result;
+    }
+    return result;
   }
 
   get visible() {
