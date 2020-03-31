@@ -529,6 +529,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
 
   const channelInt = new Map<string | null, number>();
   const lookup = new Map<string, IImage[]>();
+  let frameChannel = {};
   tiles.forEach((tile, i) => {
     const item = items[i]!;
     const metadata = getNumericMetadata(item.name);
@@ -536,21 +537,24 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
       channelInt.set(metadata.chan, channelInt.size);
     }
 
+    frameChannel.channelmap = tile.channelmap;
+    frameChannel.channels = tile.channels;
+
     tile.frames.forEach((frame, j) => {
-      const t = metadata.t !== null ? metadata.t : +frame.TheT;
-      const xy = metadata.xy !== null ? metadata.xy : +(frame.IndexXY || 0);
+      const t = metadata.t !== null ? metadata.t : frame.IndexT;
+      const xy = metadata.xy !== null ? metadata.xy : (frame.IndexXY || 0);
       const z =
         metadata.z !== null
           ? metadata.z
-          : +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
+          : (frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
       const metadataChannel =
         channelInt.size > 1 ? channelInt.get(metadata.chan) : undefined;
       const c =
         metadataChannel !== undefined
           ? metadataChannel
-          : isNaN(+frame.TheC)
+          : frame.IndexC === undefined
           ? j
-          : +frame.TheC;
+          : frame.IndexC;
       if (zs.has(z)) {
         zs.get(z)!.add(t);
       } else {
@@ -617,9 +621,15 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   // console.log(zValues, zTime, channels);
 
   // Create a map of channel names for use in display.
-  const channelNames = new Map<number, string>();
-  for (const entry of channelInt) {
-    channelNames.set(entry[1], entry[0]!);
+  const channelNames = new Map<number, string>();;
+  if (frameChannel.channels === undefined) {
+    for (const entry of channelInt) {
+      channelNames.set(entry[1], entry[0]!);
+    }
+  } else {
+    frameChannel.channels.forEach((channel, index) => {
+      channelNames.set(index, channel);
+    });
   }
 
   return {

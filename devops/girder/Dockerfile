@@ -1,7 +1,7 @@
 FROM girder/girder:latest-py3
 
 WORKDIR /src
-RUN git clone https://github.com/girder/large_image.git
+RUN git clone https://github.com/girder/large_image.git -b standardize-frame-metadata
 WORKDIR /src/large_image
 RUN pip install -e . -rrequirements-dev.txt --find-links https://girder.github.io/large_image_wheels
 
