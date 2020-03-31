@@ -542,11 +542,13 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
 
     tile.frames.forEach((frame, j) => {
       const t = metadata.t !== null ? metadata.t : frame.IndexT;
-      const xy = metadata.xy !== null ? metadata.xy : (frame.IndexXY || 0);
+      const xy = metadata.xy !== null ? metadata.xy : frame.IndexXY || 0;
       const z =
         metadata.z !== null
           ? metadata.z
-          : (frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
+          : frame.IndexZ !== undefined
+          ? frame.IndexZ
+          : frame.PositionZ;
       const metadataChannel =
         channelInt.size > 1 ? channelInt.get(metadata.chan) : undefined;
       const c =
@@ -621,7 +623,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   // console.log(zValues, zTime, channels);
 
   // Create a map of channel names for use in display.
-  const channelNames = new Map<number, string>();;
+  const channelNames = new Map<number, string>();
   if (frameChannel.channels === undefined) {
     for (const entry of channelInt) {
       channelNames.set(entry[1], entry[0]!);
