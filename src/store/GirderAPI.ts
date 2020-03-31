@@ -492,6 +492,7 @@ export interface ITileMeta {
   tileHeight: number;
   frames: IFrameInfo[];
   omeinfo: IOMEInfo;
+  channels: string[];
 }
 
 interface IOMEInfo {
@@ -529,7 +530,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
 
   const channelInt = new Map<string | null, number>();
   const lookup = new Map<string, IImage[]>();
-  let frameChannel = {};
+  let frameChannels: string[] | undefined;
   tiles.forEach((tile, i) => {
     const item = items[i]!;
     const metadata = getNumericMetadata(item.name);
@@ -537,8 +538,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
       channelInt.set(metadata.chan, channelInt.size);
     }
 
-    frameChannel.channelmap = tile.channelmap;
-    frameChannel.channels = tile.channels;
+    frameChannels = tile.channels;
 
     tile.frames.forEach((frame, j) => {
       const t = metadata.t !== null ? metadata.t : frame.IndexT;
@@ -624,12 +624,12 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
 
   // Create a map of channel names for use in display.
   const channelNames = new Map<number, string>();
-  if (frameChannel.channels === undefined) {
+  if (frameChannels === undefined) {
     for (const entry of channelInt) {
       channelNames.set(entry[1], entry[0]!);
     }
   } else {
-    frameChannel.channels.forEach((channel, index) => {
+    frameChannels.forEach((channel: string, index: number) => {
       channelNames.set(index, channel);
     });
   }

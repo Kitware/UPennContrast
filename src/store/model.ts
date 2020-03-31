@@ -15,9 +15,8 @@ export interface IFrameInfo {
   PositionZ: number;
   IndexXY: number;
   IndexZ: number;
-  TheC: number;
-  TheT: number;
-  TheZ: number;
+  IndexC: number;
+  IndexT: number;
 }
 
 export interface IImage {
