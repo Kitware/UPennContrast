@@ -218,7 +218,7 @@ export default class DatasetInfo extends Vue {
       channels.forEach((c, i) => {
         const layer = layers[i];
         layer.channel = c;
-        layer.color = colors[i];
+        layer.color = channels.length === 1 ? "#FFFFFF" : colors[i];
         layer.name = dataset.channelNames.get(c) || `Channel ${c}`;
       });
 
