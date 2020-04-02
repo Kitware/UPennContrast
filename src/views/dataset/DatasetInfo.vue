@@ -68,7 +68,7 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
-import { IDatasetConfiguration } from "../../store/model";
+import { IDatasetConfiguration, newLayer } from "../../store/model";
 
 function formatDate(d: Date): string {
   const year = d.getFullYear();
@@ -203,6 +203,28 @@ export default class DatasetInfo extends Vue {
         name: `default ${formatDate(date)}`,
         description: "default configuration"
       });
+
+      const dataset = this.store.dataset;
+      const channels = dataset.channels.slice(0, 6);
+      const layers = channels.map(() => newLayer(dataset, []));
+      const colors = [
+        "#FF0000",
+        "#00FF00",
+        "#0000FF",
+        "#00FFFF",
+        "#FF00FF",
+        "#FFFF00",
+      ];
+      channels.forEach((c, i) => {
+        const layer = layers[i];
+        layer.channel = c;
+        layer.color = colors[i];
+        layer.name = dataset.channelNames.get(c) || `Channel ${c}`;
+      });
+
+      config.layers = layers;
+      await store.api.updateConfiguration(config);
+
       this.configuration = [config!];
     } catch (err) {
       throw err;
