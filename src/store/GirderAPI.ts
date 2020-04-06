@@ -555,7 +555,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
         metadataChannel !== undefined
           ? metadataChannel
           : frame.IndexC === undefined
-          ? j
+          ? 0
           : frame.IndexC;
       if (zs.has(z)) {
         zs.get(z)!.add(t);
