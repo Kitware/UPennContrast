@@ -16,6 +16,7 @@
     "noUnusedParameters": true,
     "jsxFactory": "h",
     "noEmit": true,
+    "downlevelIteration": true,
     "sourceMap": true,
     "baseUrl": ".",
     "types": ["webpack-env", "vuetify", "vue"],

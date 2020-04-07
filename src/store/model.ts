@@ -15,9 +15,8 @@ export interface IFrameInfo {
   PositionZ: number;
   IndexXY: number;
   IndexZ: number;
-  TheC: number;
-  TheT: number;
-  TheZ: number;
+  IndexC: number;
+  IndexT: number;
 }
 
 export interface IImage {
@@ -52,6 +51,7 @@ export interface IDataset {
   time: number[][]; // number of time points, within a set of the time points that reflect valid z-time points
   // time for t,z -> time[t][z]
   channels: number[];
+  channelNames: Map<number, string>;
   width: number;
   height: number;
   images(z: number, zTime: number, xy: number, channel: number): IImage[];

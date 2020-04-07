@@ -457,6 +457,7 @@ function asDataset(folder: IGirderFolder): IDataset {
     height: 100,
     time: [],
     channels: [],
+    channelNames: new Map<number, string>(),
     images: () => [],
     configurations: []
   };
@@ -491,6 +492,7 @@ export interface ITileMeta {
   tileHeight: number;
   frames: IFrameInfo[];
   omeinfo: IOMEInfo;
+  channels: string[];
 }
 
 interface IOMEInfo {
@@ -528,6 +530,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
 
   const channelInt = new Map<string | null, number>();
   const lookup = new Map<string, IImage[]>();
+  let frameChannels: string[] | undefined;
   tiles.forEach((tile, i) => {
     const item = items[i]!;
     const metadata = getNumericMetadata(item.name);
@@ -535,15 +538,25 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
       channelInt.set(metadata.chan, channelInt.size);
     }
 
+    frameChannels = tile.channels;
+
     tile.frames.forEach((frame, j) => {
-      const t = metadata.t !== null ? metadata.t : +frame.TheT;
-      const xy = metadata.xy !== null ? metadata.xy : +(frame.IndexXY || 0);
+      const t = metadata.t !== null ? metadata.t : frame.IndexT;
+      const xy = metadata.xy !== null ? metadata.xy : frame.IndexXY || 0;
       const z =
         metadata.z !== null
           ? metadata.z
-          : +(frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ);
-      const metadataChannel = channelInt.get(metadata.chan);
-      const c = metadataChannel !== undefined ? metadataChannel : +frame.TheC;
+          : frame.IndexZ !== undefined
+          ? frame.IndexZ
+          : frame.PositionZ;
+      const metadataChannel =
+        channelInt.size > 1 ? channelInt.get(metadata.chan) : undefined;
+      const c =
+        metadataChannel !== undefined
+          ? metadataChannel
+          : frame.IndexC === undefined
+          ? 0
+          : frame.IndexC;
       if (zs.has(z)) {
         zs.get(z)!.add(t);
       } else {
@@ -609,6 +622,18 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   const channels = Array.from(cs).sort((a, b) => a - b);
   // console.log(zValues, zTime, channels);
 
+  // Create a map of channel names for use in display.
+  const channelNames = new Map<number, string>();
+  if (frameChannels === undefined) {
+    for (const entry of channelInt) {
+      channelNames.set(entry[1], entry[0]!);
+    }
+  } else {
+    frameChannels.forEach((channel: string, index: number) => {
+      channelNames.set(index, channel);
+    });
+  }
+
   return {
     images: (z: number, zTime: number, xy: number, channel: number) =>
       lookup.get(toKey(z, zTime, xy, channel)) || [],
@@ -616,6 +641,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
     z: zValues,
     time: zTime,
     channels,
+    channelNames,
     width,
     height
   };
