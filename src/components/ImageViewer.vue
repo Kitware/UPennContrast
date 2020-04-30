@@ -230,11 +230,10 @@ export default class ImageViewer extends Vue {
 
   private draw(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = this.store.compositionMode;
 
     const isReady = new Set(this.ready);
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     let stack = this.imageDataStack;
     const layers = this.layerStack;
@@ -288,38 +287,6 @@ export default class ImageViewer extends Vue {
         );
       });
     });
-  }
-
-  private drawShadow(canvas: HTMLCanvasElement) {
-    const ctx = canvas.getContext("2d")!;
-
-    const image2 = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-    const image = new ImageData(
-      Uint8ClampedArray.from(image2.data),
-      canvas.width,
-      canvas.height
-    );
-
-    let d = image.data;
-    for (let i = 0; i < canvas.height; i++) {
-      for (let j = 0; j < canvas.width; j++) {
-        const idx = 4 * (i * canvas.width + j);
-        for (let k = 0; k < 1; k++) {
-          d[idx + k] = 255 - d[idx + k];
-          // d[idx + k] = Math.random() * 255;
-        }
-        // d[idx + 3] = 255;
-      }
-    }
-
-    // ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.putImageData(image, 0, 0);
-
-    // ctx.beginPath();
-    // ctx.rect(20, 20, canvas.width / 2, canvas.height / 3);
-    // ctx.fillStyle = "red";
-    // ctx.fill();
   }
 }
 </script>

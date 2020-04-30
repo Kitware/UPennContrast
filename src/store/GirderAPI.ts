@@ -265,7 +265,6 @@ export default class GirderAPI {
       return this.imageCache.get(url)!;
     }
     const image = new Image(width, height) as HTMLImageElementLocal;
-    image.crossOrigin = "Anonymous";
 
     // Keep the size of the cache under control.
     if (this.imageCache.size === 100) {
