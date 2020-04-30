@@ -37,7 +37,7 @@ import {
 } from "d3-zoom";
 import { IImageTile } from "../store/model";
 
-function generateFilterURL(contrast: { whitePoint: number; blackPoint: number }, color: string): string {
+function generateFilterURL(contrast: { whitePoint: number; blackPoint: number }, color: string, hist): string {
   // Tease out the RGB color levels.
   const toVal = (s: str) => parseInt(`0x${s}`);
   const red = toVal(color.slice(1, 3));
@@ -54,8 +54,8 @@ function generateFilterURL(contrast: { whitePoint: number; blackPoint: number },
     const el = document.getElementById(id);
 
     const levelP = level / 255;
-    const wpP = wp / 100;
-    const bpP = bp / 100;
+    const wpP = wp;
+    const bpP = bp;
 
     el.setAttribute("slope", `${levelP / (wpP - bpP)}`);
     el.setAttribute("intercept", `${-(levelP * bpP) / (wpP - bpP)}`);
@@ -63,9 +63,16 @@ function generateFilterURL(contrast: { whitePoint: number; blackPoint: number },
 
   const slope = (wp: number, bp: number, level: number) => ((wp - bp) / 100) * level / 255;
 
-  setSlopeIntercept2("func-r", contrast.whitePoint, contrast.blackPoint, red);
-  setSlopeIntercept2("func-g", contrast.whitePoint, contrast.blackPoint, green);
-  setSlopeIntercept2("func-b", contrast.whitePoint, contrast.blackPoint, blue);
+  const scalePoint = (val: number, mode: string) => mode === "absolute" ?
+    (val - hist.min) / (hist.max - hist.min) :
+    val / 100;
+
+  const whitePoint = scalePoint(contrast.whitePoint, contrast.mode);
+  const blackPoint = scalePoint(contrast.blackPoint, contrast.mode);
+
+  setSlopeIntercept2("func-r", whitePoint, blackPoint, red);
+  setSlopeIntercept2("func-g", whitePoint, blackPoint, green);
+  setSlopeIntercept2("func-b", whitePoint, blackPoint, blue);
 
   return "#recolor";
 }
@@ -236,7 +243,8 @@ export default class ImageViewer extends Vue {
           if (stack.length > layerIndex && stack[layerIndex][tileIndex] !== undefined) {
             const oldTile = stack[layerIndex][tileIndex];
             const layerConfig = layers[layerIndex];
-            const filterURL = generateFilterURL(layerConfig.contrast, layerConfig.color);
+            console.log(layerConfig);
+            const filterURL = generateFilterURL(layerConfig.contrast, layerConfig.color, layerConfig._histogram.last);
             ctx.filter = `url(${filterURL})`;
             ctx.drawImage(
               oldTile.image,
