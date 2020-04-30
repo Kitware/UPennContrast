@@ -43,7 +43,7 @@ function generateFilterURL(
   hist: { min: number; max: number }
 ): string {
   // Tease out the RGB color levels.
-  const toVal = (s: string) => parseInt(`0x${s}`);
+  const toVal = (s: string) => parseInt(`0x${s}`) / 255;
 
   const red = toVal(color.slice(1, 3));
   const green = toVal(color.slice(3, 5));
@@ -57,7 +57,7 @@ function generateFilterURL(
   ) => {
     const el = document.getElementById(id)!;
 
-    const levelP = level / 255;
+    const levelP = level;
     const wpP = wp;
     const bpP = bp;
 
