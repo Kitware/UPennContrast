@@ -48,13 +48,7 @@ function generateFilterURL(
   const green = toVal(color.slice(3, 5));
   const blue = toVal(color.slice(5, 7));
 
-  const setSlopeIntercept = (id: string, slope: number, intercept: number) => {
-    const el = document.getElementById(id)!;
-    el.setAttribute("slope", `${slope}`);
-    el.setAttribute("intercept", `${intercept}`);
-  };
-
-  const setSlopeIntercept2 = (
+  const setSlopeIntercept = (
     id: string,
     wp: number,
     bp: number,
@@ -70,18 +64,15 @@ function generateFilterURL(
     el.setAttribute("intercept", `${-(levelP * bpP) / (wpP - bpP)}`);
   };
 
-  const slope = (wp: number, bp: number, level: number) =>
-    (((wp - bp) / 100) * level) / 255;
-
   const scalePoint = (val: number, mode: string) =>
     mode === "absolute" ? (val - hist.min) / (hist.max - hist.min) : val / 100;
 
   const whitePoint = scalePoint(contrast.whitePoint, contrast.mode);
   const blackPoint = scalePoint(contrast.blackPoint, contrast.mode);
 
-  setSlopeIntercept2("func-r", whitePoint, blackPoint, red);
-  setSlopeIntercept2("func-g", whitePoint, blackPoint, green);
-  setSlopeIntercept2("func-b", whitePoint, blackPoint, blue);
+  setSlopeIntercept("func-r", whitePoint, blackPoint, red);
+  setSlopeIntercept("func-g", whitePoint, blackPoint, green);
+  setSlopeIntercept("func-b", whitePoint, blackPoint, blue);
 
   return "#recolor";
 }
