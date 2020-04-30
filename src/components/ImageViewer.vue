@@ -37,7 +37,11 @@ import {
 } from "d3-zoom";
 import { IImageTile } from "../store/model";
 
-function generateFilterURL(contrast: { whitePoint: number; blackPoint: number; mode: string }, color: string, hist: { min: number, max: number }): string {
+function generateFilterURL(
+  contrast: { whitePoint: number; blackPoint: number; mode: string },
+  color: string,
+  hist: { min: number; max: number }
+): string {
   // Tease out the RGB color levels.
   const toVal = (s: string) => parseInt(`0x${s}`);
   const red = toVal(color.slice(1, 3));
@@ -50,7 +54,12 @@ function generateFilterURL(contrast: { whitePoint: number; blackPoint: number; m
     el.setAttribute("intercept", `${intercept}`);
   };
 
-  const setSlopeIntercept2 = (id: string, wp: number, bp: number, level: number) => {
+  const setSlopeIntercept2 = (
+    id: string,
+    wp: number,
+    bp: number,
+    level: number
+  ) => {
     const el = document.getElementById(id)!;
 
     const levelP = level / 255;
@@ -61,11 +70,11 @@ function generateFilterURL(contrast: { whitePoint: number; blackPoint: number; m
     el.setAttribute("intercept", `${-(levelP * bpP) / (wpP - bpP)}`);
   };
 
-  const slope = (wp: number, bp: number, level: number) => ((wp - bp) / 100) * level / 255;
+  const slope = (wp: number, bp: number, level: number) =>
+    (((wp - bp) / 100) * level) / 255;
 
-  const scalePoint = (val: number, mode: string) => mode === "absolute" ?
-    (val - hist.min) / (hist.max - hist.min) :
-    val / 100;
+  const scalePoint = (val: number, mode: string) =>
+    mode === "absolute" ? (val - hist.min) / (hist.max - hist.min) : val / 100;
 
   const whitePoint = scalePoint(contrast.whitePoint, contrast.mode);
   const blackPoint = scalePoint(contrast.blackPoint, contrast.mode);
@@ -240,11 +249,18 @@ export default class ImageViewer extends Vue {
     this.imageStack.forEach((layer, layerIndex) => {
       layer.forEach((tile, tileIndex) => {
         if (!isReady.has(tile.url)) {
-          if (stack.length > layerIndex && stack[layerIndex][tileIndex] !== undefined) {
+          if (
+            stack.length > layerIndex &&
+            stack[layerIndex][tileIndex] !== undefined
+          ) {
             const oldTile = stack[layerIndex][tileIndex];
             const layerConfig = layers[layerIndex];
             console.log(layerConfig);
-            const filterURL = generateFilterURL(layerConfig.contrast, layerConfig.color, layerConfig._histogram.last);
+            const filterURL = generateFilterURL(
+              layerConfig.contrast,
+              layerConfig.color,
+              layerConfig._histogram.last
+            );
             ctx.filter = `url(${filterURL})`;
             ctx.drawImage(
               oldTile.image,
@@ -255,9 +271,9 @@ export default class ImageViewer extends Vue {
               oldTile.x,
               oldTile.y,
               oldTile.width,
-              oldTile.height,
+              oldTile.height
             );
-            ctx.filter = 'none';
+            ctx.filter = "none";
           }
           return;
         }
@@ -288,7 +304,11 @@ export default class ImageViewer extends Vue {
 
     const image2 = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-    const image = new ImageData(Uint8ClampedArray.from(image2.data), canvas.width, canvas.height);
+    const image = new ImageData(
+      Uint8ClampedArray.from(image2.data),
+      canvas.width,
+      canvas.height
+    );
 
     let d = image.data;
     for (let i = 0; i < canvas.height; i++) {

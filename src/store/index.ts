@@ -602,8 +602,7 @@ export class Main extends VuexModule {
     const ds = this.dataset;
     const layers = this.configuration.layers;
 
-    return layers
-      .filter(d => d.visible);
+    return layers.filter(d => d.visible);
   }
 
   get getLayerHistogram() {
