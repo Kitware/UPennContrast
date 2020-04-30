@@ -14,7 +14,7 @@
     </div>
     <svg xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <filter id="recolor">
+        <filter id="recolor" color-interpolation-filters="sRGB">
           <feComponentTransfer>
             <feFuncR id="func-r" type="linear" slope="0" intercept="0" />
             <feFuncG id="func-g" type="linear" slope="0" intercept="0" />
