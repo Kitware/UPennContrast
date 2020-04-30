@@ -44,6 +44,7 @@ function generateFilterURL(
 ): string {
   // Tease out the RGB color levels.
   const toVal = (s: string) => parseInt(`0x${s}`);
+
   const red = toVal(color.slice(1, 3));
   const green = toVal(color.slice(3, 5));
   const blue = toVal(color.slice(5, 7));
@@ -246,7 +247,6 @@ export default class ImageViewer extends Vue {
           ) {
             const oldTile = stack[layerIndex][tileIndex];
             const layerConfig = layers[layerIndex];
-            console.log(layerConfig);
             const filterURL = generateFilterURL(
               layerConfig.contrast,
               layerConfig.color,
