@@ -12,6 +12,17 @@
     <div class="loading" v-if="readyPercentage < 100">
       <v-progress-circular indeterminate />
     </div>
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="recolor">
+          <feComponentTransfer>
+            <feFuncR id="func-r" type="linear" slope="0" intercept="0" />
+            <feFuncG id="func-g" type="linear" slope="0" intercept="0" />
+            <feFuncB id="func-b" type="linear" slope="0" intercept="0" />
+          </feComponentTransfer>
+        </filter>
+      </defs>
+    </svg>
   </div>
 </template>
 <script lang="ts">
@@ -26,6 +37,39 @@ import {
 } from "d3-zoom";
 import { IImageTile } from "../store/model";
 
+function generateFilterURL(contrast: { whitePoint: number; blackPoint: number }, color: string): string {
+  // Tease out the RGB color levels.
+  const toVal = (s: str) => parseInt(`0x${s}`);
+  const red = toVal(color.slice(1, 3));
+  const green = toVal(color.slice(3, 5));
+  const blue = toVal(color.slice(5, 7));
+
+  const setSlopeIntercept = (id: str, slope: number, intercept: number) => {
+    const el = document.getElementById(id);
+    el.setAttribute("slope", `${slope}`);
+    el.setAttribute("intercept", `${intercept}`);
+  };
+
+  const setSlopeIntercept2 = (id: str, wp: number, bp: number, level: number) => {
+    const el = document.getElementById(id);
+
+    const levelP = level / 255;
+    const wpP = wp / 100;
+    const bpP = bp / 100;
+
+    el.setAttribute("slope", `${levelP / (wpP - bpP)}`);
+    el.setAttribute("intercept", `${-(levelP * bpP) / (wpP - bpP)}`);
+  };
+
+  const slope = (wp: number, bp: number, level: number) => ((wp - bp) / 100) * level / 255;
+
+  setSlopeIntercept2("func-r", contrast.whitePoint, contrast.blackPoint, red);
+  setSlopeIntercept2("func-g", contrast.whitePoint, contrast.blackPoint, green);
+  setSlopeIntercept2("func-b", contrast.whitePoint, contrast.blackPoint, blue);
+
+  return "#recolor";
+}
+
 @Component
 export default class ImageViewer extends Vue {
   readonly store = store;
@@ -34,6 +78,8 @@ export default class ImageViewer extends Vue {
   private transform = Object.assign({}, zoomIdentity);
 
   private containerDimensions = { width: 100, height: 100 };
+
+  private imageDataStack: ImageData[][] = [];
 
   readonly zoom = d3Zoom<HTMLElement, any>()
     .on("zoom", () => {
@@ -81,6 +127,10 @@ export default class ImageViewer extends Vue {
 
   get imageStack() {
     return this.store.imageStack;
+  }
+
+  get layerStack() {
+    return this.store.layerStack;
   }
 
   private trackImages(value: IImageTile[][]) {
@@ -174,19 +224,42 @@ export default class ImageViewer extends Vue {
     const ctx = canvas.getContext("2d")!;
     ctx.globalCompositeOperation = this.store.compositionMode;
 
-    if (this.ready.length === 0) {
-      this.drawShadow(canvas);
-      return;
-    }
-
     const isReady = new Set(this.ready);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    this.imageStack.forEach(layer => {
-      layer.forEach(tile => {
+
+    let stack = this.imageDataStack;
+    const layers = this.layerStack;
+    this.imageStack.forEach((layer, layerIndex) => {
+      layer.forEach((tile, tileIndex) => {
         if (!isReady.has(tile.url)) {
+          if (stack.length > layerIndex && stack[layerIndex][tileIndex] !== undefined) {
+            const oldTile = stack[layerIndex][tileIndex];
+            const layerConfig = layers[layerIndex];
+            const filterURL = generateFilterURL(layerConfig.contrast, layerConfig.color);
+            ctx.filter = `url(${filterURL})`;
+            ctx.drawImage(
+              oldTile.image,
+              0,
+              0,
+              oldTile.width,
+              oldTile.height,
+              oldTile.x,
+              oldTile.y,
+              oldTile.width,
+              oldTile.height,
+            );
+            ctx.filter = 'none';
+          }
           return;
         }
+
+        if (stack.length <= layerIndex) {
+          stack[layerIndex] = [];
+        }
+
+        stack[layerIndex][tileIndex] = tile;
+
         ctx.drawImage(
           tile.image,
           0,
