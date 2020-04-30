@@ -595,7 +595,7 @@ export class Main extends VuexModule {
       });
   }
 
-  get layerStack(): IImageTile[][] {
+  get layerStack(): IDisplayLayer[] {
     if (!this.dataset || !this.configuration) {
       return [];
     }

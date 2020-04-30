@@ -37,21 +37,21 @@ import {
 } from "d3-zoom";
 import { IImageTile } from "../store/model";
 
-function generateFilterURL(contrast: { whitePoint: number; blackPoint: number }, color: string, hist): string {
+function generateFilterURL(contrast: { whitePoint: number; blackPoint: number; mode: string }, color: string, hist: { min: number, max: number }): string {
   // Tease out the RGB color levels.
-  const toVal = (s: str) => parseInt(`0x${s}`);
+  const toVal = (s: string) => parseInt(`0x${s}`);
   const red = toVal(color.slice(1, 3));
   const green = toVal(color.slice(3, 5));
   const blue = toVal(color.slice(5, 7));
 
-  const setSlopeIntercept = (id: str, slope: number, intercept: number) => {
-    const el = document.getElementById(id);
+  const setSlopeIntercept = (id: string, slope: number, intercept: number) => {
+    const el = document.getElementById(id)!;
     el.setAttribute("slope", `${slope}`);
     el.setAttribute("intercept", `${intercept}`);
   };
 
-  const setSlopeIntercept2 = (id: str, wp: number, bp: number, level: number) => {
-    const el = document.getElementById(id);
+  const setSlopeIntercept2 = (id: string, wp: number, bp: number, level: number) => {
+    const el = document.getElementById(id)!;
 
     const levelP = level / 255;
     const wpP = wp;
@@ -86,7 +86,7 @@ export default class ImageViewer extends Vue {
 
   private containerDimensions = { width: 100, height: 100 };
 
-  private imageDataStack: ImageData[][] = [];
+  private imageDataStack: IImageTile[][] = [];
 
   readonly zoom = d3Zoom<HTMLElement, any>()
     .on("zoom", () => {
