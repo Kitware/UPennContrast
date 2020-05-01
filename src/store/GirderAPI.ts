@@ -35,6 +35,7 @@ export default class GirderAPI {
   private readonly client: RestClientInstance;
 
   private readonly imageCache = new Map<string, HTMLImageElement>();
+  private readonly fullImageCache = new Map<string, HTMLImageElement>();
   private readonly histogramCache = new Map<string, Promise<ITileHistogram>>();
   private readonly resolvedHistogramCache = new Map<string, ITileHistogram>();
 
@@ -249,6 +250,36 @@ export default class GirderAPI {
     return this.client.delete(`/item/${config.id}`).then(() => config);
   }
 
+  private getFullImage(
+    item: any,
+    frame: any,
+    width: number,
+    height: number,
+    hist: any
+  ): HTMLImageElement {
+    let url = this.wholeRegionUrl(
+      item,
+      { frame: frame },
+      toStyle(
+        "#ffffff",
+        {
+          mode: "percentile",
+          blackPoint: 0,
+          whitePoint: 100,
+          savedBlackPoint: 0,
+          savedWhitePoint: 100
+        },
+        hist
+      )
+    );
+    if (!this.fullImageCache.has(url)) {
+      const image = new Image(width, height) as HTMLImageElementLocal;
+      image.src = url;
+      this.fullImageCache.set(url, image);
+    }
+    return this.fullImageCache.get(url)!;
+  }
+
   private loadImage(
     url: string,
     width: number,
@@ -394,6 +425,13 @@ export default class GirderAPI {
           image.frameIndex,
           color,
           contrast
+        ),
+        fullImage: this.getFullImage(
+          image.item,
+          image.frameIndex,
+          image.sizeX,
+          image.sizeY,
+          hist
         )
       });
 

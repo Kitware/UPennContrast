@@ -253,7 +253,7 @@ export default class ImageViewer extends Vue {
             );
             ctx.filter = `url(${filterURL})`;
             ctx.drawImage(
-              oldTile.image,
+              oldTile.fullImage,
               0,
               0,
               oldTile.width,
