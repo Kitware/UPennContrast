@@ -256,7 +256,7 @@ export default class GirderAPI {
     width: number,
     height: number,
     hist: any
-  ) {
+  ): HTMLImageElement {
     let url = this.wholeRegionUrl(
       item,
       { frame: frame },
@@ -277,7 +277,7 @@ export default class GirderAPI {
       image.src = url;
       this.fullImageCache.set(url, image);
     }
-    return this.fullImageCache.get(url);
+    return this.fullImageCache.get(url)!;
   }
 
   private loadImage(
