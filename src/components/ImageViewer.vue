@@ -87,8 +87,6 @@ export default class ImageViewer extends Vue {
 
   private containerDimensions = { width: 100, height: 100 };
 
-  private imageDataStack: IImageTile[][] = [];
-
   readonly zoom = d3Zoom<HTMLElement, any>()
     .on("zoom", () => {
       this.zoomed(d3Event as D3ZoomEvent<HTMLElement, any>);
@@ -235,45 +233,31 @@ export default class ImageViewer extends Vue {
 
     const isReady = new Set(this.ready);
 
-    let stack = this.imageDataStack;
     const layers = this.layerStack;
     this.imageStack.forEach((layer, layerIndex) => {
       layer.forEach((tile, tileIndex) => {
         if (!isReady.has(tile.url)) {
-          if (
-            stack.length > layerIndex &&
-            stack[layerIndex][tileIndex] !== undefined
-          ) {
-            const oldTile = stack[layerIndex][tileIndex];
-            const layerConfig = layers[layerIndex];
-            const filterURL = generateFilterURL(
-              layerConfig.contrast,
-              layerConfig.color,
-              layerConfig._histogram.last
-            );
-            ctx.filter = `url(${filterURL})`;
-            ctx.drawImage(
-              oldTile.fullImage,
-              0,
-              0,
-              oldTile.width,
-              oldTile.height,
-              oldTile.x,
-              oldTile.y,
-              oldTile.width,
-              oldTile.height
-            );
-            ctx.filter = "none";
-          }
+          const layerConfig = layers[layerIndex];
+          const filterURL = generateFilterURL(
+            layerConfig.contrast,
+            layerConfig.color,
+            layerConfig._histogram.last
+          );
+          ctx.filter = `url(${filterURL})`;
+          ctx.drawImage(
+            tile.fullImage,
+            0,
+            0,
+            tile.width,
+            tile.height,
+            tile.x,
+            tile.y,
+            tile.width,
+            tile.height
+          );
+          ctx.filter = "none";
           return;
         }
-
-        if (stack.length <= layerIndex) {
-          stack[layerIndex] = [];
-        }
-
-        stack[layerIndex][tileIndex] = tile;
-
         ctx.drawImage(
           tile.image,
           0,
