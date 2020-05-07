@@ -235,7 +235,7 @@ export default class ImageViewer extends Vue {
 
     const layers = this.layerStack;
     this.imageStack.forEach((layer, layerIndex) => {
-      layer.forEach((tile, tileIndex) => {
+      layer.forEach(tile => {
         if (!isReady.has(tile.url)) {
           const layerConfig = layers[layerIndex];
           const filterURL = generateFilterURL(

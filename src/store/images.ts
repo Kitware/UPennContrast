@@ -67,7 +67,8 @@ export function toStyle(
   contrast: IContrast,
   hist: ITileHistogram | null
 ): ITileOptions {
-  const p = palette(color, 17);
+  // unless we add a gamma function, 2 steps are all that are necessary.
+  const p = palette(color, 2);
   if (contrast.mode === "absolute") {
     return {
       min: contrast.blackPoint,
@@ -75,7 +76,7 @@ export function toStyle(
       palette: p
     };
   }
-  if (hist) {
+  if (hist && (contrast.blackPoint !== 0 || contrast.whitePoint !== 100)) {
     const scale = scaleLinear()
       .domain([0, 100])
       .rangeRound([hist.min, hist.max]);
@@ -85,7 +86,7 @@ export function toStyle(
       palette: p
     };
   }
-  // cannot compute absolute values yet
+  // cannot compute absolute values or they are the min/max
   return {
     min: "min",
     max: "max",
