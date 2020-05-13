@@ -144,14 +144,18 @@ export default class ImageViewer extends Vue {
     value.forEach(layer => {
       layer.forEach(tile => {
         if (tile.image.src && tile.image.complete) {
-          this.ready.push(tile.url);
+          if (!this.ready.includes(tile.url)) {
+            this.ready.push(tile.url);
+          }
         } else {
           const tileImage = tile.image;
           const previousOnload = tileImage.onload;
           tile.image.onload = event => {
             // not just loaded but also decoded
             tile.image.decode().then(() => {
-              this.ready.push(tile.url);
+              if (!this.ready.includes(tile.url)) {
+                this.ready.push(tile.url);
+              }
             });
             if (previousOnload) {
               previousOnload.call(tileImage, event);

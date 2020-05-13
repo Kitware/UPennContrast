@@ -23,7 +23,6 @@
             v-model="username"
             name="username"
             label="Username or e-mail"
-            autofocus
             required
             prepend-icon="mdi-account"
           />
