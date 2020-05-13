@@ -37,6 +37,7 @@ export interface IImageTile {
   height: number;
   url: string;
   image: HTMLImageElement;
+  fullImage: HTMLImageElement;
 }
 
 export interface IDataset {

@@ -595,6 +595,16 @@ export class Main extends VuexModule {
       });
   }
 
+  get layerStack(): IDisplayLayer[] {
+    if (!this.dataset || !this.configuration) {
+      return [];
+    }
+    const ds = this.dataset;
+    const layers = this.configuration.layers;
+
+    return layers.filter(d => d.visible);
+  }
+
   get getLayerHistogram() {
     // need to be like that to be detected as a getter
     return (layer: IDisplayLayer) => {

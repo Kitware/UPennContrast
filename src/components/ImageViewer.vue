@@ -12,6 +12,17 @@
     <div class="loading" v-if="readyPercentage < 100">
       <v-progress-circular indeterminate />
     </div>
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="recolor" color-interpolation-filters="sRGB">
+          <feComponentTransfer>
+            <feFuncR id="func-r" type="linear" slope="0" intercept="0" />
+            <feFuncG id="func-g" type="linear" slope="0" intercept="0" />
+            <feFuncB id="func-b" type="linear" slope="0" intercept="0" />
+          </feComponentTransfer>
+        </filter>
+      </defs>
+    </svg>
   </div>
 </template>
 <script lang="ts">
@@ -25,6 +36,47 @@ import {
   zoomTransform
 } from "d3-zoom";
 import { IImageTile } from "../store/model";
+
+function generateFilterURL(
+  contrast: { whitePoint: number; blackPoint: number; mode: string },
+  color: string,
+  hist: { min: number; max: number }
+): string {
+  // Tease out the RGB color levels.
+  const toVal = (s: string) => parseInt(`0x${s}`) / 255;
+
+  const red = toVal(color.slice(1, 3));
+  const green = toVal(color.slice(3, 5));
+  const blue = toVal(color.slice(5, 7));
+
+  const setSlopeIntercept = (
+    id: string,
+    wp: number,
+    bp: number,
+    level: number
+  ) => {
+    const el = document.getElementById(id)!;
+
+    const levelP = level;
+    const wpP = wp;
+    const bpP = bp;
+
+    el.setAttribute("slope", `${levelP / (wpP - bpP)}`);
+    el.setAttribute("intercept", `${-(levelP * bpP) / (wpP - bpP)}`);
+  };
+
+  const scalePoint = (val: number, mode: string) =>
+    mode === "absolute" ? (val - hist.min) / (hist.max - hist.min) : val / 100;
+
+  const whitePoint = scalePoint(contrast.whitePoint, contrast.mode);
+  const blackPoint = scalePoint(contrast.blackPoint, contrast.mode);
+
+  setSlopeIntercept("func-r", whitePoint, blackPoint, red);
+  setSlopeIntercept("func-g", whitePoint, blackPoint, green);
+  setSlopeIntercept("func-b", whitePoint, blackPoint, blue);
+
+  return "#recolor";
+}
 
 @Component
 export default class ImageViewer extends Vue {
@@ -83,19 +135,27 @@ export default class ImageViewer extends Vue {
     return this.store.imageStack;
   }
 
+  get layerStack() {
+    return this.store.layerStack;
+  }
+
   private trackImages(value: IImageTile[][]) {
     this.ready = [];
     value.forEach(layer => {
       layer.forEach(tile => {
         if (tile.image.src && tile.image.complete) {
-          this.ready.push(tile.url);
+          if (!this.ready.includes(tile.url)) {
+            this.ready.push(tile.url);
+          }
         } else {
           const tileImage = tile.image;
           const previousOnload = tileImage.onload;
           tile.image.onload = event => {
             // not just loaded but also decoded
             tile.image.decode().then(() => {
-              this.ready.push(tile.url);
+              if (!this.ready.includes(tile.url)) {
+                this.ready.push(tile.url);
+              }
             });
             if (previousOnload) {
               previousOnload.call(tileImage, event);
@@ -177,9 +237,29 @@ export default class ImageViewer extends Vue {
 
     const isReady = new Set(this.ready);
 
-    this.imageStack.forEach(layer => {
+    const layers = this.layerStack;
+    this.imageStack.forEach((layer, layerIndex) => {
       layer.forEach(tile => {
         if (!isReady.has(tile.url)) {
+          const layerConfig = layers[layerIndex];
+          const filterURL = generateFilterURL(
+            layerConfig.contrast,
+            layerConfig.color,
+            layerConfig._histogram.last
+          );
+          ctx.filter = `url(${filterURL})`;
+          ctx.drawImage(
+            tile.fullImage,
+            0,
+            0,
+            tile.width,
+            tile.height,
+            tile.x,
+            tile.y,
+            tile.width,
+            tile.height
+          );
+          ctx.filter = "none";
           return;
         }
         ctx.drawImage(
