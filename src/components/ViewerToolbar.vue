@@ -3,6 +3,16 @@
     <value-slider v-model="xy" label="XY Value" :min="0" :max="maxXY" />
     <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
     <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
+    <switch-toggle
+      v-model="layerMode"
+      label="Layers: "
+      true-label="Multiple"
+      true-value="multiple"
+      false-label="Single"
+      false-value="single"
+      id="layerMode"
+    />
+    <slot></slot>
     <v-select
       v-model="mode"
       label="Composition Mode"
@@ -20,17 +30,13 @@
         </v-btn>
       </template>
     </v-select>
-    <switch-toggle
-      v-model="layerMode"
-      label="Layers: "
-      true-label="Multiple"
-      true-value="multiple"
-      false-label="Single"
-      false-value="single"
-      id="layerMode"
-    />
   </div>
 </template>
+<style scoped>
+.v-input--selection-controls {
+  margin-top: 0;
+}
+</style>
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
