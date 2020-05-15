@@ -1,10 +1,11 @@
 <template>
   <div class="viewer">
     <aside class="side">
-      <viewer-toolbar class="toolbar" />
-      <div class="layers">
-        <display-layers />
-      </div>
+      <viewer-toolbar class="toolbar">
+        <div class="layers">
+          <display-layers />
+        </div>
+      </viewer-toolbar>
     </aside>
     <image-viewer class="main" />
   </div>
@@ -60,7 +61,7 @@ export default class Viewer extends Vue {
 }
 
 .toolbar {
-  padding: 0.5em 1em;
+  padding: 0.5em;
 }
 
 .layers {
