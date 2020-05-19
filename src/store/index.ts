@@ -54,6 +54,8 @@ export class Main extends VuexModule {
   layerMode: "single" | "multiple" = "multiple";
 
   splayXY: boolean = false;
+  splayZ: boolean = false;
+  splayT: boolean = false;
 
   get userName() {
     return this.girderUser ? this.girderUser.login : "anonymous";
@@ -162,6 +164,16 @@ export class Main extends VuexModule {
     this.splayXY = value;
   }
 
+  @Mutation
+  public setSplayZ(value: boolean) {
+    this.splayZ = value;
+  }
+
+  @Mutation
+  public setSplayT(value: boolean) {
+    this.splayT = value;
+  }
+
   @Action
   async logout() {
     sync.setSaving(true);
@@ -259,7 +271,7 @@ export class Main extends VuexModule {
     }
     try {
       sync.setLoading(true);
-      const r = await this.api.getDataset(id, this.splayXY);
+      const r = await this.api.getDataset(id, this.splayXY, this.splayZ, this.splayT);
       this.setDataset({ id, data: r });
       sync.setLoading(false);
     } catch (error) {

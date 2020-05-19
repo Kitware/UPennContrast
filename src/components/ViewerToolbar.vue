@@ -6,7 +6,15 @@
       label="Splay by XY"
     />
     <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
+    <v-checkbox
+      v-model="splayZ"
+      label="Splay by Z"
+    />
     <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
+    <v-checkbox
+      v-model="splayT"
+      label="Splay by T"
+    />
     <switch-toggle
       v-model="layerMode"
       label="Layers: "
@@ -118,6 +126,32 @@ export default class ViewerToolbar extends Vue {
 
   @Watch("splayXY")
   watchSplayXY(value: boolean) {
+    this.store.refreshDataset();
+  }
+
+  get splayZ() {
+    return this.store.splayZ;
+  }
+
+  set splayZ(value: boolean) {
+    this.store.setSplayZ(value);
+  }
+
+  @Watch("splayZ")
+  watchSplayZ(value: boolean) {
+    this.store.refreshDataset();
+  }
+
+  get splayT() {
+    return this.store.splayT;
+  }
+
+  set splayT(value: boolean) {
+    this.store.setSplayT(value);
+  }
+
+  @Watch("splayT")
+  watchSplayT(value: boolean) {
     this.store.refreshDataset();
   }
 
