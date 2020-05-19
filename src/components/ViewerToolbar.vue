@@ -1,6 +1,10 @@
 <template>
   <div>
     <value-slider v-model="xy" label="XY Value" :min="0" :max="maxXY" />
+    <v-checkbox
+      v-model="splayXY"
+      label="Splay by XY"
+    />
     <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
     <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
     <switch-toggle
@@ -38,7 +42,7 @@
 }
 </style>
 <script lang="ts">
-import { Vue, Component } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
 import store from "@/store";
@@ -102,6 +106,19 @@ export default class ViewerToolbar extends Vue {
 
   set time(value: number) {
     this.changeQuery("time", value.toString());
+  }
+
+  get splayXY() {
+    return this.store.splayXY;
+  }
+
+  set splayXY(value: boolean) {
+    this.store.setSplayXY(value);
+  }
+
+  @Watch("splayXY")
+  watchSplayXY(value: boolean) {
+    this.store.refreshDataset();
   }
 
   get maxXY() {

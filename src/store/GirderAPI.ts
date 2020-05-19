@@ -152,7 +152,7 @@ export default class GirderAPI {
     );
   }
 
-  getDataset(id: string): Promise<IDataset> {
+  getDataset(id: string, splayXY: boolean): Promise<IDataset> {
     return Promise.all([this.getFolder(id), this.getItems(id)]).then(
       ([folder, items]) => {
         const images = items.filter(d => (d as any).largeImage);
@@ -164,7 +164,7 @@ export default class GirderAPI {
             return {
               ...asDataset(folder),
               configurations,
-              ...parseTiles(images, tiles)
+              ...parseTiles(images, tiles, splayXY)
             };
           }
         );
@@ -564,7 +564,7 @@ function toKey(
   return `z${z}:t${zTime}:xy${xy}:c${c}`;
 }
 
-function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
+function parseTiles(items: IGirderItem[], tiles: ITileMeta[], splayXY: boolean) {
   // t x z x c -> IImage[]
 
   // z -> times
@@ -586,7 +586,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
 
     tile.frames.forEach((frame, j) => {
       const t = metadata.t !== null ? metadata.t : frame.IndexT;
-      const xy = metadata.xy !== null ? metadata.xy : frame.IndexXY || 0;
+      const xy = splayXY ? "X" : (metadata.xy !== null ? metadata.xy : frame.IndexXY || 0);
       const z =
         metadata.z !== null
           ? metadata.z

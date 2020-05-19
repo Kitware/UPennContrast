@@ -53,6 +53,8 @@ export class Main extends VuexModule {
   compositionMode: CompositionMode = DEFAULT_COMPOSITION_MODE;
   layerMode: "single" | "multiple" = "multiple";
 
+  splayXY: boolean = false;
+
   get userName() {
     return this.girderUser ? this.girderUser.login : "anonymous";
   }
@@ -155,6 +157,11 @@ export class Main extends VuexModule {
     this.time = value;
   }
 
+  @Mutation
+  public setSplayXY(value: boolean) {
+    this.splayXY = value;
+  }
+
   @Action
   async logout() {
     sync.setSaving(true);
@@ -198,6 +205,11 @@ export class Main extends VuexModule {
       // load after logged in
       await this.setSelectedConfiguration(this.selectedConfigurationId);
     }
+  }
+
+  @Action
+  public async refreshDataset() {
+    await this.setSelectedDataset(this.selectedDatasetId);
   }
 
   @Action
@@ -247,7 +259,7 @@ export class Main extends VuexModule {
     }
     try {
       sync.setLoading(true);
-      const r = await this.api.getDataset(id);
+      const r = await this.api.getDataset(id, this.splayXY);
       this.setDataset({ id, data: r });
       sync.setLoading(false);
     } catch (error) {
