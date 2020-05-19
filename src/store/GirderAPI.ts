@@ -368,7 +368,7 @@ export default class GirderAPI {
     const hist = this.getResolvedLayerHistogram(images);
     const style = toStyle(color, contrast, hist);
 
-    const rowLength = Math.floor(Math.sqrt(images.length));
+    const rowLength = Math.ceil(Math.sqrt(images.length));
 
     images.forEach((image, idx) => {
       /* This gets each tile separately, but since we get all of them this is
@@ -634,7 +634,7 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   //
   // TODO: this approach assumes all images have the same size.
   lookup.forEach(images => {
-    const rowLength = Math.floor(Math.sqrt(images.length));
+    const rowLength = Math.ceil(Math.sqrt(images.length));
     const colLength = Math.ceil(images.length / rowLength);
 
     const cwidth = rowLength * images[0].sizeX;
