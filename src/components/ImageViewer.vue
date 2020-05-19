@@ -42,6 +42,9 @@ function generateFilterURL(
   color: string,
   hist: { min: number; max: number }
 ): string {
+  if (hist === null) {
+    return '';
+  }
   // Tease out the RGB color levels.
   const toVal = (s: string) => parseInt(`0x${s}`) / 255;
 
@@ -247,6 +250,9 @@ export default class ImageViewer extends Vue {
             layerConfig.color,
             layerConfig._histogram.last
           );
+          if (filterURL === '') {
+            return;
+          }
           ctx.filter = `url(${filterURL})`;
           ctx.drawImage(
             tile.fullImage,
