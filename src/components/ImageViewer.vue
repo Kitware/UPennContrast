@@ -43,7 +43,7 @@ function generateFilterURL(
   hist: { min: number; max: number }
 ): string {
   if (hist === null) {
-    return '';
+    return "";
   }
   // Tease out the RGB color levels.
   const toVal = (s: string) => parseInt(`0x${s}`) / 255;
