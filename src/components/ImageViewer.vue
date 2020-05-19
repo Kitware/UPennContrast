@@ -250,7 +250,7 @@ export default class ImageViewer extends Vue {
             layerConfig.color,
             layerConfig._histogram.last
           );
-          if (filterURL === '') {
+          if (filterURL === "") {
             return;
           }
           ctx.filter = `url(${filterURL})`;
