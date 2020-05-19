@@ -152,7 +152,12 @@ export default class GirderAPI {
     );
   }
 
-  getDataset(id: string, splayXY: boolean, splayZ: boolean, splayT: boolean): Promise<IDataset> {
+  getDataset(
+    id: string,
+    splayXY: boolean,
+    splayZ: boolean,
+    splayT: boolean
+  ): Promise<IDataset> {
     return Promise.all([this.getFolder(id), this.getItems(id)]).then(
       ([folder, items]) => {
         const images = items.filter(d => (d as any).largeImage);
@@ -564,7 +569,13 @@ function toKey(
   return `z${z}:t${zTime}:xy${xy}:c${c}`;
 }
 
-function parseTiles(items: IGirderItem[], tiles: ITileMeta[], splayXY: boolean, splayZ: boolean, splayT: boolean) {
+function parseTiles(
+  items: IGirderItem[],
+  tiles: ITileMeta[],
+  splayXY: boolean,
+  splayZ: boolean,
+  splayT: boolean
+) {
   // t x z x c -> IImage[]
 
   // z -> times
@@ -585,14 +596,19 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[], splayXY: boolean, 
     frameChannels = tile.channels;
 
     tile.frames.forEach((frame, j) => {
-      const t = splayT ? "X" : (metadata.t !== null ? metadata.t : frame.IndexT);
-      const xy = splayXY ? "X" : (metadata.xy !== null ? metadata.xy : frame.IndexXY || 0);
-      const z = splayZ ? "X" :
-        (metadata.z !== null
-          ? metadata.z
-          : frame.IndexZ !== undefined
-          ? frame.IndexZ
-          : frame.PositionZ);
+      const t = splayT ? "X" : metadata.t !== null ? metadata.t : frame.IndexT;
+      const xy = splayXY
+        ? "X"
+        : metadata.xy !== null
+        ? metadata.xy
+        : frame.IndexXY || 0;
+      const z = splayZ
+        ? "X"
+        : metadata.z !== null
+        ? metadata.z
+        : frame.IndexZ !== undefined
+        ? frame.IndexZ
+        : frame.PositionZ;
       const metadataChannel =
         channelInt.size > 1 ? channelInt.get(metadata.chan) : undefined;
       const c =

@@ -271,7 +271,12 @@ export class Main extends VuexModule {
     }
     try {
       sync.setLoading(true);
-      const r = await this.api.getDataset(id, this.splayXY, this.splayZ, this.splayT);
+      const r = await this.api.getDataset(
+        id,
+        this.splayXY,
+        this.splayZ,
+        this.splayT
+      );
       this.setDataset({ id, data: r });
       sync.setLoading(false);
     } catch (error) {

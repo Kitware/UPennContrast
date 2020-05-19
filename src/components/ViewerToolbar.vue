@@ -1,20 +1,11 @@
 <template>
   <div>
     <value-slider v-model="xy" label="XY Value" :min="0" :max="maxXY" />
-    <v-checkbox
-      v-model="splayXY"
-      label="Splay by XY"
-    />
+    <v-checkbox v-model="splayXY" label="Splay by XY" />
     <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
-    <v-checkbox
-      v-model="splayZ"
-      label="Splay by Z"
-    />
+    <v-checkbox v-model="splayZ" label="Splay by Z" />
     <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
-    <v-checkbox
-      v-model="splayT"
-      label="Splay by T"
-    />
+    <v-checkbox v-model="splayT" label="Splay by T" />
     <switch-toggle
       v-model="layerMode"
       label="Layers: "
