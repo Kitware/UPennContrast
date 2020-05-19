@@ -47,6 +47,11 @@
     </template>
   </v-radio-group>
 </template>
+<style>
+.v-input--radio-group--column .v-input--radio-group__input > .v-label {
+  padding-bottom: 2px;
+}
+</style>
 
 <script lang="ts">
 import { Vue, Component, Prop } from "vue-property-decorator";

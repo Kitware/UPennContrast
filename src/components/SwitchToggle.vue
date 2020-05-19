@@ -23,6 +23,15 @@
     </template>
   </v-switch>
 </template>
+<style>
+.v-input--selection-controls > .v-input__prepend-outer {
+  white-space: nowrap;
+  margin-top: 2px;
+}
+.v-input--selection-controls {
+  margin-top: 8px;
+}
+</style>
 <script lang="ts">
 import { Vue, Component, Prop } from "vue-property-decorator";
 
