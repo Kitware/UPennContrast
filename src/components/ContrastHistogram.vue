@@ -226,6 +226,10 @@ export default class ContrastHistogram extends Vue {
       return;
     }
 
+    if (data.max - data.min <= 1) {
+      return;
+    }
+
     // ensure the values are within the bounds
     const copy = Object.assign({}, this.value);
     const clamp = (value: number) =>
