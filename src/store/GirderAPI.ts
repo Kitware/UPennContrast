@@ -363,12 +363,14 @@ export default class GirderAPI {
   generateImages(images: IImage[], color: string, contrast: IContrast) {
     const resolvedImages: IImageTile[] = [];
     let offsetX = 0;
-    const offsetY = 0;
+    let offsetY = 0;
 
     const hist = this.getResolvedLayerHistogram(images);
     const style = toStyle(color, contrast, hist);
 
-    images.forEach(image => {
+    const rowLength = Math.ceil(Math.sqrt(images.length));
+
+    images.forEach((image, idx) => {
       /* This gets each tile separately, but since we get all of them this is
        * less efficient than just getting the entire image at once.  There is
        * some potential parallelization speed up, but its benefit is lost in
@@ -435,8 +437,12 @@ export default class GirderAPI {
         )
       });
 
-      // since horizontal tiling only
-      offsetX += image.sizeX;
+      if ((idx + 1) % rowLength === 0) {
+        offsetX = 0;
+        offsetY += image.sizeY;
+      } else {
+        offsetX += image.sizeX;
+      }
     });
 
     return resolvedImages;
@@ -624,13 +630,15 @@ function parseTiles(items: IGirderItem[], tiles: ITileMeta[]) {
   let width = 0;
   let height = 0;
 
-  // TODO better stiching for now just horizontally
+  // Lay out images in a grid that is as roughly square as possible.
+  //
+  // TODO: this approach assumes all images have the same size.
   lookup.forEach(images => {
-    const cwidth = images.reduce((acc, image) => acc + image.sizeX, 0);
-    const cheight = images.reduce(
-      (acc, image) => Math.max(acc, image.sizeY),
-      0
-    );
+    const rowLength = Math.ceil(Math.sqrt(images.length));
+    const colLength = Math.ceil(images.length / rowLength);
+
+    const cwidth = rowLength * images[0].sizeX;
+    const cheight = colLength * images[0].sizeY;
     if (cwidth > width) {
       width = cwidth;
     }
