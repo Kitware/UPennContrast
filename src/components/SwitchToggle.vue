@@ -8,8 +8,6 @@
     :false-value="falseValue"
   >
     <template #prepend>
-      <!--styling helper -->
-      <div class="v-input--selection-controls__input" style="width: 0"></div>
       <label
         :class="{
           'v-label': true,
