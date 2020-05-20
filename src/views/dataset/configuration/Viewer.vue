@@ -55,13 +55,15 @@ export default class Viewer extends Vue {
 }
 
 .side {
-  display: flex;
-  flex-direction: column;
   width: 20em;
 }
 
 .toolbar {
   padding: 0.5em;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-bottom: 0;
 }
 
 .layers {
@@ -71,5 +73,11 @@ export default class Viewer extends Vue {
 
 .main {
   flex: 1 1 0;
+}
+</style>
+<style>
+.toolbar .v-expansion-panel-content__wrap, .toolbar .v-expansion-panel-header {
+  padding-left: 0;
+  padding-right: 5px;
 }
 </style>

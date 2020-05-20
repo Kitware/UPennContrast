@@ -1,40 +1,49 @@
 <template>
   <div>
-    <value-slider v-model="xy" label="XY Value" :min="0" :max="maxXY" />
-    <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
-    <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
-    <switch-toggle
-      v-model="layerMode"
-      label="Layers: "
-      true-label="Multiple"
-      true-value="multiple"
-      false-label="Single"
-      false-value="single"
-      id="layerMode"
-    />
-    <slot></slot>
-    <v-select
-      v-model="mode"
-      label="Composition Mode"
-      :items="modes"
-      hide-details
-    >
-      <template #append>
-        <v-btn
-          href="https://mdn.mozillademos.org/en-US/docs/Web/API/Canvas_API/Tutorial/Compositing/Example$samples/Compositing_example"
-          rel="noopener noreferrer"
-          target="_blank"
-          icon
-        >
-          <v-icon>mdi-open-in-new</v-icon>
-        </v-btn>
-      </template>
-    </v-select>
+    <div>
+      <value-slider v-model="xy" label="XY Value" :min="0" :max="maxXY" />
+      <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
+      <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
+      <switch-toggle
+        v-model="layerMode"
+        label="Layers: "
+        true-label="Multiple"
+        true-value="multiple"
+        false-label="Single"
+        false-value="single"
+        id="layerMode"
+      />
+    </div>
+    <div class="lowertools">
+      <slot></slot>
+      <v-select
+        v-model="mode"
+        label="Composition Mode"
+        :items="modes"
+        hide-details
+      >
+        <template #append>
+          <v-btn
+            href="https://mdn.mozillademos.org/en-US/docs/Web/API/Canvas_API/Tutorial/Compositing/Example$samples/Compositing_example"
+            rel="noopener noreferrer"
+            target="_blank"
+            icon
+          >
+            <v-icon>mdi-open-in-new</v-icon>
+          </v-btn>
+        </template>
+      </v-select>
+    </div>
   </div>
 </template>
 <style scoped>
 .v-input--selection-controls {
   margin-top: 0;
+}
+.lowertools {
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 </style>
 <script lang="ts">
