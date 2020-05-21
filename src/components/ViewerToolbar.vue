@@ -1,24 +1,48 @@
 <template>
   <div>
     <div>
-      <value-slider v-model="xy" label="XY Value" :min="0" :max="maxXY" />
-      <v-checkbox
-        v-model="splayXY"
-        label="Unroll by XY"
-        :disabled="!(maxXY > 0 || splayXY)"
-      />
-      <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
-      <v-checkbox
-        v-model="splayZ"
-        label="Unroll by Z"
-        :disabled="!(maxZ > 0 || splayZ)"
-      />
-      <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
-      <v-checkbox
-        v-model="splayT"
-        label="Unroll by T"
-        :disabled="!(maxTime > 0 || splayT)"
-      />
+      <v-layout>
+        <value-slider
+          v-model="xy"
+          label="XY"
+          :min="0"
+          :max="maxXY"
+          :title="maxXY > 0 ? maxXY + 1 + ' XY Values' : ''"
+        />
+        <v-checkbox
+          v-model="splayXY"
+          label="Unroll"
+          :disabled="!(maxXY > 0 || splayXY)"
+        />
+      </v-layout>
+      <v-layout>
+        <value-slider
+          v-model="z"
+          label="Z"
+          :min="0"
+          :max="maxZ"
+          :title="maxZ > 0 ? maxZ + 1 + ' Z Values' : ''"
+        />
+        <v-checkbox
+          v-model="splayZ"
+          label="Unroll"
+          :disabled="!(maxZ > 0 || splayZ)"
+        />
+      </v-layout>
+      <v-layout>
+        <value-slider
+          v-model="time"
+          label="Time"
+          :min="0"
+          :max="maxTime"
+          :title="maxTime > 0 ? maxTime + 1 + ' Time Values' : ''"
+        />
+        <v-checkbox
+          v-model="splayT"
+          label="Unroll"
+          :disabled="!(maxTime > 0 || splayT)"
+        />
+      </v-layout>
       <switch-toggle
         v-model="layerMode"
         label="Layers: "
