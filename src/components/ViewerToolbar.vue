@@ -133,7 +133,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   set splayXY(value: boolean) {
-    this.store.setSplayXY(value);
+    this.changeQuery("unrollXY", value.toString());
   }
 
   @Watch("splayXY")
@@ -147,6 +147,7 @@ export default class ViewerToolbar extends Vue {
 
   set splayZ(value: boolean) {
     this.store.setSplayZ(value);
+    this.changeQuery("unrollZ", value.toString());
   }
 
   @Watch("splayZ")
@@ -159,7 +160,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   set splayT(value: boolean) {
-    this.store.setSplayT(value);
+    this.changeQuery("unrollT", value.toString());
   }
 
   @Watch("splayT")
