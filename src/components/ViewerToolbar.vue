@@ -5,19 +5,19 @@
       <v-checkbox
         v-model="splayXY"
         label="Unroll by XY"
-        v-if="maxXY > 0 || splayXY"
+        :disabled="!(maxXY > 0 || splayXY)"
       />
       <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
       <v-checkbox
         v-model="splayZ"
         label="Unroll by Z"
-        v-if="maxZ > 0 || splayZ"
+        :disabled="!(maxZ > 0 || splayZ)"
       />
       <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
       <v-checkbox
         v-model="splayT"
         label="Unroll by T"
-        v-if="maxTime > 0 || splayT"
+        :disabled="!(maxTime > 0 || splayT)"
       />
       <switch-toggle
         v-model="layerMode"
