@@ -22,7 +22,7 @@ export default routeMapper(
       set: (value: number) => store.setXY(value || 0)
     },
     unrollXY: {
-      parse: v => v === 'true',
+      parse: v => v === "true",
       get: () => store.splayXY,
       set: (value: boolean) => store.setSplayXY(value)
     },
@@ -32,7 +32,7 @@ export default routeMapper(
       set: (value: number) => store.setZ(value || 0)
     },
     unrollZ: {
-      parse: v => v === 'true',
+      parse: v => v === "true",
       get: () => store.splayZ,
       set: (value: boolean) => store.setSplayZ(value)
     },
@@ -42,7 +42,7 @@ export default routeMapper(
       set: (value: number) => store.setTime(value || 0)
     },
     unrollT: {
-      parse: v => v === 'true',
+      parse: v => v === "true",
       get: () => store.splayT,
       set: (value: boolean) => store.setSplayT(value)
     },
