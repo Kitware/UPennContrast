@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@girder/components": "^2.1.0",
+    "@types/bluebird": "^3.5.32",
     "@types/d3-color": "^1.2.2",
     "@types/d3-drag": "^1.2.3",
     "@types/d3-scale": "^2.1.1",

@@ -22,9 +22,20 @@ import {
   ITileHistogram
 } from "./images";
 import { getNumericMetadata } from "@/utils/parsing";
+import { Promise } from "bluebird";
+
+// Modern browsers limit concurrency to a single domain at 6 requests (though
+// using HTML 2 might improve that slightly).  For a single layer, if we set
+// this to exactly 6, processing in javascript can leave some of the request
+// capacity slack.  If it is too great (thousands, for instance), browsers can
+// fail.  9 is a balance that is somewhat low but was measured as fast as
+// higher values in a limited set of tests.
+const ImageConcurrency: number = 9;
+const HistogramConcurrency: number = 9;
 
 interface HTMLImageElementLocal extends HTMLImageElement {
   _waitForHistogram?: boolean;
+  _promise: () => Promise<void | null> | null;
 }
 
 function toId(item: string | { _id: string }) {
@@ -279,8 +290,14 @@ export default class GirderAPI {
     );
     if (!this.fullImageCache.has(url)) {
       const image = new Image(width, height) as HTMLImageElementLocal;
-      image.src = url;
-      this.fullImageCache.set(url, image);
+      image._promise = () => {
+        if (image.src && image.complete) {
+          return null;
+        }
+        image.src = url;
+        return image.decode();
+      };
+      this.fullImageCache.set(url, image as HTMLImageElement);
     }
     return this.fullImageCache.get(url)!;
   }
@@ -309,7 +326,7 @@ export default class GirderAPI {
     }
 
     this.imageCache.set(url, image);
-    let promise;
+    let promise: Promise<string>;
     if (!hist) {
       promise = this.getLayerHistogram(images).then(hist => {
         const style = toStyle(color, contrast, hist);
@@ -323,44 +340,49 @@ export default class GirderAPI {
     if (oldImage !== undefined && oldImage._waitForHistogram) {
       oldImage._waitForHistogram = false;
     }
-    promise.then(url => {
-      if (!image._waitForHistogram) {
-        return;
-      }
-      image._waitForHistogram = false;
+    image._promise = () =>
+      promise.then((url: string) => {
+        if (!image._waitForHistogram) {
+          return null;
+        }
+        let retVal: Promise<void> | null = null;
+        image._waitForHistogram = false;
 
-      if (oldImage !== undefined && !(oldImage.complete && oldImage.src)) {
-        // if we emptied a value from the tracker, then attach an onload/onerror
-        // event to that image that sets the source IFF this url is still in the
-        // cache.  If it has fallen out of cache, call the onerror function.
-        const previousOnload = oldImage.onload;
-        const previousOnerror = oldImage.onerror;
-        const localSetSource = (event: any) => {
-          if (this.imageCache.get(url)) {
-            image.src = url;
-          } else {
-            if (image.onerror) {
-              image.onerror(event);
+        if (oldImage !== undefined && !(oldImage.complete && oldImage.src)) {
+          // if we emptied a value from the tracker, then attach an onload/onerror
+          // event to that image that sets the source IFF this url is still in the
+          // cache.  If it has fallen out of cache, call the onerror function.
+          const previousOnload = oldImage.onload;
+          const previousOnerror = oldImage.onerror;
+          const localSetSource = (event: any) => {
+            if (this.imageCache.get(url)) {
+              image.src = url;
+              retVal = image.decode();
+            } else {
+              if (image.onerror) {
+                image.onerror(event);
+              }
             }
-          }
-        };
-        oldImage.onload = event => {
-          if (previousOnload) {
-            previousOnload.call(oldImage, event);
-          }
-          localSetSource(event);
-        };
-        oldImage.onerror = event => {
-          if (previousOnerror) {
-            previousOnerror.call(oldImage, event);
-          }
-          localSetSource(event);
-        };
-      } else {
-        // if the old image is resolved or not present, just set the src
-        image.src = url;
-      }
-    });
+          };
+          oldImage.onload = event => {
+            if (previousOnload) {
+              previousOnload.call(oldImage, event);
+            }
+            localSetSource(event);
+          };
+          oldImage.onerror = event => {
+            if (previousOnerror) {
+              previousOnerror.call(oldImage, event);
+            }
+            localSetSource(event);
+          };
+        } else {
+          // if the old image is resolved or not present, just set the src
+          image.src = url;
+          retVal = image.decode();
+        }
+        return retVal;
+      });
 
     return image;
   }
@@ -420,12 +442,13 @@ export default class GirderAPI {
         y: offsetY,
         width: image.sizeX,
         height: image.sizeY,
+        frame: image.frameIndex,
         url,
         image: this.loadImage(
           url,
           image.sizeX,
           image.sizeY,
-          oldImage,
+          oldImage as HTMLImageElementLocal,
           hist,
           images,
           image.item,
@@ -450,6 +473,28 @@ export default class GirderAPI {
       }
     });
 
+    // TODO: since we merge histograms for multi-image layers, full-range
+    // images can't use min/max as their defaults -- they need to be informed
+    // by the histogram, too.
+    Promise.map(
+      resolvedImages,
+      imgEntry => {
+        const img = imgEntry.fullImage as HTMLImageElementLocal;
+        return img._promise();
+      },
+      { concurrency: ImageConcurrency }
+    );
+    // we may want to chain these together to ensure that the full-range images
+    // have all started before the styled images.  However, currently we only
+    // redraw when a styled image arrives, so that would need to change.
+    Promise.map(
+      resolvedImages,
+      imgEntry => {
+        const img = imgEntry.image as HTMLImageElementLocal;
+        return img._promise();
+      },
+      { concurrency: ImageConcurrency }
+    );
     return resolvedImages;
   }
 
@@ -459,17 +504,20 @@ export default class GirderAPI {
       return this.histogramCache.get(key)!;
     }
 
-    const promise = Promise.all(
-      images.map(image =>
+    const promise = Promise.map(
+      images,
+      (image: IImage) =>
         this.getHistogram(image.item, {
           frame: image.frameIndex,
           width: image.sizeX,
           height: image.sizeY
-        })
-      )
-    ).then(histograms => mergeHistograms(histograms));
+        }),
+      { concurrency: HistogramConcurrency }
+    ).then((histograms: ITileHistogram[]) => mergeHistograms(histograms));
     this.histogramCache.set(key, promise);
-    promise.then(hist => this.resolvedHistogramCache.set(key, hist));
+    promise.then((hist: ITileHistogram) =>
+      this.resolvedHistogramCache.set(key, hist)
+    );
     return promise;
   }
 
@@ -596,14 +644,14 @@ function parseTiles(
     frameChannels = tile.channels;
 
     tile.frames.forEach((frame, j) => {
-      const t = splayT ? "X" : metadata.t !== null ? metadata.t : frame.IndexT;
+      const t = splayT ? -1 : metadata.t !== null ? metadata.t : frame.IndexT;
       const xy = splayXY
-        ? "X"
+        ? -1
         : metadata.xy !== null
         ? metadata.xy
         : frame.IndexXY || 0;
       const z = splayZ
-        ? "X"
+        ? -1
         : metadata.z !== null
         ? metadata.z
         : frame.IndexZ !== undefined
@@ -682,7 +730,6 @@ function parseTiles(
   });
 
   const channels = Array.from(cs).sort((a, b) => a - b);
-  // console.log(zValues, zTime, channels);
 
   // Create a map of channel names for use in display.
   const channelNames = new Map<number, string>();

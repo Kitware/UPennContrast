@@ -2,11 +2,23 @@
   <div>
     <div>
       <value-slider v-model="xy" label="XY Value" :min="0" :max="maxXY" />
-      <v-checkbox v-model="splayXY" label="Splay by XY" />
+      <v-checkbox
+        v-model="splayXY"
+        label="Splay by XY"
+        v-if="maxXY > 0 || splayXY"
+      />
       <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
-      <v-checkbox v-model="splayZ" label="Splay by Z" />
+      <v-checkbox
+        v-model="splayZ"
+        label="Splay by Z"
+        v-if="maxZ > 0 || splayZ"
+      />
       <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
-      <v-checkbox v-model="splayT" label="Splay by T" />
+      <v-checkbox
+        v-model="splayT"
+        label="Splay by T"
+        v-if="maxTime > 0 || splayT"
+      />
       <switch-toggle
         v-model="layerMode"
         label="Layers: "
@@ -125,7 +137,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   @Watch("splayXY")
-  watchSplayXY(value: boolean) {
+  watchSplayXY(_value: boolean) {
     this.store.refreshDataset();
   }
 
@@ -138,7 +150,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   @Watch("splayZ")
-  watchSplayZ(value: boolean) {
+  watchSplayZ(_value: boolean) {
     this.store.refreshDataset();
   }
 
@@ -151,7 +163,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   @Watch("splayT")
-  watchSplayT(value: boolean) {
+  watchSplayT(_value: boolean) {
     this.store.refreshDataset();
   }
 

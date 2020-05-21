@@ -35,6 +35,7 @@ export interface IImageTile {
   y: number;
   width: number;
   height: number;
+  frame: number;
   url: string;
   image: HTMLImageElement;
   fullImage: HTMLImageElement;
