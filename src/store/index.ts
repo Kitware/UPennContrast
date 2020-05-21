@@ -160,17 +160,17 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  public setSplayXY(value: boolean) {
+  public setSplayXYImpl(value: boolean) {
     this.splayXY = value;
   }
 
   @Mutation
-  public setSplayZ(value: boolean) {
+  public setSplayZImpl(value: boolean) {
     this.splayZ = value;
   }
 
   @Mutation
-  public setSplayT(value: boolean) {
+  public setSplayTImpl(value: boolean) {
     this.splayT = value;
   }
 
@@ -442,13 +442,28 @@ export class Main extends VuexModule {
   }
 
   @Action
+  async setSplayXY(value: boolean) {
+    this.setSplayXYImpl(value);
+  }
+
+  @Action
   async setZ(value: number) {
     this.setZImpl(value);
   }
 
   @Action
+  async setSplayZ(value: boolean) {
+    this.setSplayZImpl(value);
+  }
+
+  @Action
   async setTime(value: number) {
     this.setTimeImpl(value);
+  }
+
+  @Action
+  async setSplayT(value: boolean) {
+    this.setSplayTImpl(value);
   }
 
   @Mutation
