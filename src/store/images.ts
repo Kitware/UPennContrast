@@ -86,7 +86,12 @@ export function toStyle(
       palette: p
     };
   }
-  console.warn('Getting style without histogram information', color, contrast, hist);
+  console.warn(
+    "Getting style without histogram information",
+    color,
+    contrast,
+    hist
+  );
   // cannot compute absolute values
   return {
     min: "min",

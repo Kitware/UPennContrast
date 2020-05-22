@@ -403,7 +403,7 @@ export default class GirderAPI {
     let offsetY = 0;
 
     const hist = this.getResolvedLayerHistogram(images);
-    const style = hist ? toStyle(color, contrast, hist) : '';
+    const style = hist ? toStyle(color, contrast, hist) : "";
 
     const rowLength = Math.ceil(Math.sqrt(images.length));
 
