@@ -76,7 +76,7 @@ export function toStyle(
       palette: p
     };
   }
-  if (hist && (contrast.blackPoint !== 0 || contrast.whitePoint !== 100)) {
+  if (hist) {
     const scale = scaleLinear()
       .domain([0, 100])
       .rangeRound([hist.min, hist.max]);
@@ -86,7 +86,8 @@ export function toStyle(
       palette: p
     };
   }
-  // cannot compute absolute values or they are the min/max
+  console.warn('Getting style without histogram information', color, contrast, hist);
+  // cannot compute absolute values
   return {
     min: "min",
     max: "max",

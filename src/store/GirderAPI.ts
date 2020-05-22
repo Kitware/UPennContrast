@@ -271,35 +271,45 @@ export default class GirderAPI {
     frame: any,
     width: number,
     height: number,
-    hist: any
+    hist: any,
+    images: any
   ): HTMLImageElement {
-    let url = this.wholeRegionUrl(
-      item,
-      { frame: frame },
-      toStyle(
-        "#ffffff",
-        {
-          mode: "percentile",
-          blackPoint: 0,
-          whitePoint: 100,
-          savedBlackPoint: 0,
-          savedWhitePoint: 100
-        },
-        hist
-      )
-    );
-    if (!this.fullImageCache.has(url)) {
+    const key = `${item}|${frame}`;
+    if (!this.fullImageCache.has(key)) {
       const image = new Image(width, height) as HTMLImageElementLocal;
       image._promise = () => {
         if (image.src && image.complete) {
           return null;
         }
-        image.src = url;
-        return image.decode();
+        let promise;
+        if (!hist) {
+          promise = this.getLayerHistogram(images);
+        } else {
+          promise = Promise.resolve(hist);
+        }
+        return promise.then(hist => {
+          let url = this.wholeRegionUrl(
+            item,
+            { frame: frame },
+            toStyle(
+              "#ffffff",
+              {
+                mode: "percentile",
+                blackPoint: 0,
+                whitePoint: 100,
+                savedBlackPoint: 0,
+                savedWhitePoint: 100
+              },
+              hist
+            )
+          );
+          image.src = url;
+          return image.decode();
+        });
       };
-      this.fullImageCache.set(url, image as HTMLImageElement);
+      this.fullImageCache.set(key, image as HTMLImageElement);
     }
-    return this.fullImageCache.get(url)!;
+    return this.fullImageCache.get(key)!;
   }
 
   private loadImage(
@@ -393,7 +403,7 @@ export default class GirderAPI {
     let offsetY = 0;
 
     const hist = this.getResolvedLayerHistogram(images);
-    const style = toStyle(color, contrast, hist);
+    const style = hist ? toStyle(color, contrast, hist) : '';
 
     const rowLength = Math.ceil(Math.sqrt(images.length));
 
@@ -461,7 +471,8 @@ export default class GirderAPI {
           image.frameIndex,
           image.sizeX,
           image.sizeY,
-          hist
+          hist,
+          images
         )
       });
 
