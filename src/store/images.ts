@@ -22,17 +22,17 @@ export function getLayerImages(
     }
   };
 
-  const xyIndex = resolveSlice(layer.xy, xy);
+  const xyIndex = ds.xy.length > 1 ? resolveSlice(layer.xy, xy) : 0;
   // invalid slices
   if (xyIndex < 0 || xyIndex >= ds.xy.length) {
     return [];
   }
-  const zIndex = resolveSlice(layer.z, z);
+  const zIndex = ds.z.length > 1 ? resolveSlice(layer.z, z) : 0;
   // invalid slices
   if (zIndex < 0 || zIndex >= ds.z.length) {
     return [];
   }
-  const tIndex = resolveSlice(layer.time, time);
+  const tIndex = ds.time.length > 1 ? resolveSlice(layer.time, time) : 0;
   if (tIndex < 0 || tIndex >= ds.time.length) {
     return [];
   }
