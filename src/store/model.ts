@@ -125,6 +125,8 @@ export function isDatasetFolder(folder: IGirderFolder) {
   return folder.meta.subtype === "contrastDataset";
 }
 
+// Fallback colors for channels with unknown names or with duplicate colors.
+// Keep the same uppercase/lowercase as the `channelColors` color values.
 const colors = [
   "#FF0000",
   "#00FF00",
@@ -133,6 +135,18 @@ const colors = [
   "#FF00FF",
   "#00FFFF"
 ];
+
+// keys should be all uppercase.  Values should have the same case as the
+// `colors` list.
+const channelColors: { [key: string]: string } = {
+  BRIGHTFIELD: "#FFFFFF",
+  DAPI: "#0000FF",
+  A594: "#FF0000",
+  CY3: "#FF8000", // orange
+  CY5: "#FF00FF",
+  YFP: "#00FF00",
+  GFP: "#00FF00"
+};
 
 function randomId() {
   return Math.random()
@@ -150,6 +164,12 @@ export function newLayer(
   const nextChannel = dataset.channels
     .map((_, i) => i)
     .filter(c => !usedChannels.has(c));
+
+  const channelName = dataset.channelNames.get(nextChannel[0] || 0) || "";
+  let channelColor = channelColors[channelName.toUpperCase()];
+  if (!channelColor || usedColors.has(channelColor)) {
+    channelColor = nextColor[0] || colors[0];
+  }
 
   // guess a good new layer
   return {
@@ -169,7 +189,7 @@ export function newLayer(
       type: "current",
       value: null
     },
-    color: nextColor[0] || colors[0],
+    color: channelColor,
     contrast: {
       mode: "percentile",
       blackPoint: 0,
