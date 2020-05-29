@@ -635,7 +635,12 @@ export class Main extends VuexModule {
       .filter(d => d.visible)
       .map(layer => {
         const images = getLayerImages(layer, ds, this.time, this.xy, this.z);
-        return this.api.generateImages(images, layer.color, layer.contrast);
+        return this.api.generateImages(
+          images,
+          layer.color,
+          layer.contrast,
+          ds.width
+        );
       });
   }
 
