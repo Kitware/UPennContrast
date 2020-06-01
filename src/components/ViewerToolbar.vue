@@ -1,9 +1,48 @@
 <template>
   <div>
     <div>
-      <value-slider v-model="xy" label="XY Value" :min="0" :max="maxXY" />
-      <value-slider v-model="z" label="Z Value" :min="0" :max="maxZ" />
-      <value-slider v-model="time" label="Time Value" :min="0" :max="maxTime" />
+      <v-layout>
+        <value-slider
+          v-model="xy"
+          label="XY"
+          :min="0"
+          :max="maxXY"
+          :title="maxXY > 0 ? maxXY + 1 + ' XY Values' : ''"
+        />
+        <v-checkbox
+          v-model="splayXY"
+          label="Unroll"
+          :disabled="!(maxXY > 0 || splayXY)"
+        />
+      </v-layout>
+      <v-layout>
+        <value-slider
+          v-model="z"
+          label="Z"
+          :min="0"
+          :max="maxZ"
+          :title="maxZ > 0 ? maxZ + 1 + ' Z Values' : ''"
+        />
+        <v-checkbox
+          v-model="splayZ"
+          label="Unroll"
+          :disabled="!(maxZ > 0 || splayZ)"
+        />
+      </v-layout>
+      <v-layout>
+        <value-slider
+          v-model="time"
+          label="Time"
+          :min="0"
+          :max="maxTime"
+          :title="maxTime > 0 ? maxTime + 1 + ' Time Values' : ''"
+        />
+        <v-checkbox
+          v-model="splayT"
+          label="Unroll"
+          :disabled="!(maxTime > 0 || splayT)"
+        />
+      </v-layout>
       <switch-toggle
         v-model="layerMode"
         label="Layers: "
@@ -47,7 +86,7 @@
 }
 </style>
 <script lang="ts">
-import { Vue, Component } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
 import store from "@/store";
@@ -111,6 +150,46 @@ export default class ViewerToolbar extends Vue {
 
   set time(value: number) {
     this.changeQuery("time", value.toString());
+  }
+
+  get splayXY() {
+    return this.store.splayXY;
+  }
+
+  set splayXY(value: boolean) {
+    this.changeQuery("unrollXY", value.toString());
+  }
+
+  @Watch("splayXY")
+  watchSplayXY(_value: boolean) {
+    this.store.refreshDataset();
+  }
+
+  get splayZ() {
+    return this.store.splayZ;
+  }
+
+  set splayZ(value: boolean) {
+    this.store.setSplayZ(value);
+    this.changeQuery("unrollZ", value.toString());
+  }
+
+  @Watch("splayZ")
+  watchSplayZ(_value: boolean) {
+    this.store.refreshDataset();
+  }
+
+  get splayT() {
+    return this.store.splayT;
+  }
+
+  set splayT(value: boolean) {
+    this.changeQuery("unrollT", value.toString());
+  }
+
+  @Watch("splayT")
+  watchSplayT(_value: boolean) {
+    this.store.refreshDataset();
   }
 
   get maxXY() {

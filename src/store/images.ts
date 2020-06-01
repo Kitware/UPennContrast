@@ -22,17 +22,17 @@ export function getLayerImages(
     }
   };
 
-  const xyIndex = resolveSlice(layer.xy, xy);
+  const xyIndex = ds.xy.length > 1 ? resolveSlice(layer.xy, xy) : 0;
   // invalid slices
   if (xyIndex < 0 || xyIndex >= ds.xy.length) {
     return [];
   }
-  const zIndex = resolveSlice(layer.z, z);
+  const zIndex = ds.z.length > 1 ? resolveSlice(layer.z, z) : 0;
   // invalid slices
   if (zIndex < 0 || zIndex >= ds.z.length) {
     return [];
   }
-  const tIndex = resolveSlice(layer.time, time);
+  const tIndex = ds.time.length > 1 ? resolveSlice(layer.time, time) : 0;
   if (tIndex < 0 || tIndex >= ds.time.length) {
     return [];
   }
@@ -76,7 +76,7 @@ export function toStyle(
       palette: p
     };
   }
-  if (hist && (contrast.blackPoint !== 0 || contrast.whitePoint !== 100)) {
+  if (hist) {
     const scale = scaleLinear()
       .domain([0, 100])
       .rangeRound([hist.min, hist.max]);
@@ -86,7 +86,7 @@ export function toStyle(
       palette: p
     };
   }
-  // cannot compute absolute values or they are the min/max
+  // cannot compute absolute values
   return {
     min: "min",
     max: "max",

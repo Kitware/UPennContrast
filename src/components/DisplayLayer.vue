@@ -81,18 +81,21 @@
         @change="changeProp('xy', $event)"
         label="XY-Slice"
         :max-value="maxXY"
+        v-if="maxXY > 0"
       />
       <display-slice
         :value="value.z"
         @change="changeProp('z', $event)"
         label="Z-Slice"
         :max-value="maxZ"
+        v-if="maxZ > 0"
       />
       <display-slice
         :value="value.time"
         @change="changeProp('time', $event)"
         label="Time-Slice"
         :max-value="maxTime"
+        v-if="maxTime > 0"
       />
       <div class="buttons">
         <v-btn color="warning" small @click="removeLayer">Remove</v-btn>

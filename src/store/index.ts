@@ -53,6 +53,10 @@ export class Main extends VuexModule {
   compositionMode: CompositionMode = DEFAULT_COMPOSITION_MODE;
   layerMode: "single" | "multiple" = "multiple";
 
+  splayXY: boolean = false;
+  splayZ: boolean = false;
+  splayT: boolean = false;
+
   get userName() {
     return this.girderUser ? this.girderUser.login : "anonymous";
   }
@@ -155,6 +159,21 @@ export class Main extends VuexModule {
     this.time = value;
   }
 
+  @Mutation
+  public setSplayXYImpl(value: boolean) {
+    this.splayXY = value;
+  }
+
+  @Mutation
+  public setSplayZImpl(value: boolean) {
+    this.splayZ = value;
+  }
+
+  @Mutation
+  public setSplayTImpl(value: boolean) {
+    this.splayT = value;
+  }
+
   @Action
   async logout() {
     sync.setSaving(true);
@@ -198,6 +217,11 @@ export class Main extends VuexModule {
       // load after logged in
       await this.setSelectedConfiguration(this.selectedConfigurationId);
     }
+  }
+
+  @Action
+  public async refreshDataset() {
+    await this.setSelectedDataset(this.selectedDatasetId);
   }
 
   @Action
@@ -247,7 +271,12 @@ export class Main extends VuexModule {
     }
     try {
       sync.setLoading(true);
-      const r = await this.api.getDataset(id);
+      const r = await this.api.getDataset(
+        id,
+        this.splayXY,
+        this.splayZ,
+        this.splayT
+      );
       this.setDataset({ id, data: r });
       sync.setLoading(false);
     } catch (error) {
@@ -413,13 +442,28 @@ export class Main extends VuexModule {
   }
 
   @Action
+  async setSplayXY(value: boolean) {
+    this.setSplayXYImpl(value);
+  }
+
+  @Action
   async setZ(value: number) {
     this.setZImpl(value);
   }
 
   @Action
+  async setSplayZ(value: boolean) {
+    this.setSplayZImpl(value);
+  }
+
+  @Action
   async setTime(value: number) {
     this.setTimeImpl(value);
+  }
+
+  @Action
+  async setSplayT(value: boolean) {
+    this.setSplayTImpl(value);
   }
 
   @Mutation

@@ -76,7 +76,8 @@ export default class Viewer extends Vue {
 }
 </style>
 <style>
-.toolbar .v-expansion-panel-content__wrap, .toolbar .v-expansion-panel-header {
+.toolbar .v-expansion-panel-content__wrap,
+.toolbar .v-expansion-panel-header {
   padding-left: 0;
   padding-right: 5px;
 }
