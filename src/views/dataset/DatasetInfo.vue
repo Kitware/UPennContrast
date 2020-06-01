@@ -68,7 +68,11 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
-import { IDatasetConfiguration, newLayer } from "../../store/model";
+import {
+  IDatasetConfiguration,
+  IDisplayLayer,
+  newLayer
+} from "../../store/model";
 
 function formatDate(d: Date): string {
   const year = d.getFullYear();
@@ -213,21 +217,8 @@ export default class DatasetInfo extends Vue {
         throw new Error("dataset was null when it shouldn't be");
       }
       const channels = dataset.channels.slice(0, 6);
-      const layers = channels.map(() => newLayer(dataset, []));
-      const colors = [
-        "#FF0000",
-        "#00FF00",
-        "#0000FF",
-        "#00FFFF",
-        "#FF00FF",
-        "#FFFF00"
-      ];
-      channels.forEach((c, i) => {
-        const layer = layers[i];
-        layer.channel = c;
-        layer.color = channels.length === 1 ? "#FFFFFF" : colors[i];
-        layer.name = dataset.channelNames.get(c) || `Channel ${c}`;
-      });
+      const layers: IDisplayLayer[] = [];
+      channels.forEach(() => layers.push(newLayer(dataset, layers)));
 
       config.layers = layers;
       await store.api.updateConfiguration(config);

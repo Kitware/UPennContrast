@@ -8,6 +8,7 @@ import {
 import {
   IDataset,
   IDatasetConfiguration,
+  IDisplayLayer,
   isConfigurationItem,
   IFrameInfo,
   IImage,
@@ -234,11 +235,14 @@ export default class GirderAPI {
     data.set("name", name);
     data.set("description", description);
     data.set("reuseExisting", "false");
+    const channels = dataset.channels.slice(0, 6);
+    const layers: IDisplayLayer[] = [];
+    channels.forEach(() => layers.push(newLayer(dataset, layers)));
     data.set(
       "metadata",
       JSON.stringify({
         subtype: "contrastConfiguration",
-        layers: [newLayer(dataset, [])]
+        layers: layers
       })
     );
     return this.client

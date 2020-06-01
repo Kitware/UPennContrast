@@ -165,16 +165,22 @@ export function newLayer(
     .map((_, i) => i)
     .filter(c => !usedChannels.has(c));
 
-  const channelName = dataset.channelNames.get(nextChannel[0] || 0) || "";
+  const channelName =
+    dataset.channelNames.get(nextChannel[0] || 0) ||
+    `Channel ${nextChannel[0] || 0}`;
   let channelColor = channelColors[channelName.toUpperCase()];
   if (!channelColor || usedColors.has(channelColor)) {
     channelColor = nextColor[0] || colors[0];
+  }
+  let layerName = channelName;
+  if (layerName === "" || layers.some(l => l.name === layerName)) {
+    layerName = `Layer ${layers.length + 1}`;
   }
 
   // guess a good new layer
   return {
     id: randomId(),
-    name: `Layer ${layers.length + 1}`,
+    name: layerName,
     visible: true,
     channel: nextChannel[0] || 0,
     time: {
