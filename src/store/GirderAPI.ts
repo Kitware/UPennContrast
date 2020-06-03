@@ -278,7 +278,7 @@ export default class GirderAPI {
     hist: any,
     images: any
   ): HTMLImageElement {
-    const key = `${item}|${frame}`;
+    const key = `${item._id}|${frame}`;
     if (!this.fullImageCache.has(key)) {
       const image = new Image(width, height) as HTMLImageElementLocal;
       image._promise = () => {
