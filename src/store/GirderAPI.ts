@@ -667,6 +667,10 @@ function parseTiles(
 
     frameChannels = tile.channels;
 
+    if (!tile.frames) {
+      tile.frames = [{Index:0, Frame: 0} as unknown as IFrameInfo];
+    }
+
     tile.frames.forEach((frame, j) => {
       let t = metadata.t !== null ? metadata.t : frame.IndexT;
       let xy = metadata.xy !== null ? metadata.xy : frame.IndexXY || 0;
