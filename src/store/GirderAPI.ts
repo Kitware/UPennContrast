@@ -401,7 +401,12 @@ export default class GirderAPI {
     return image;
   }
 
-  generateImages(images: IImage[], color: string, contrast: IContrast) {
+  generateImages(
+    images: IImage[],
+    color: string,
+    contrast: IContrast,
+    canvasWidth: number
+  ) {
     const resolvedImages: IImageTile[] = [];
     let offsetX = 0;
     let offsetY = 0;
@@ -409,7 +414,9 @@ export default class GirderAPI {
     const hist = this.getResolvedLayerHistogram(images);
     const style = toStyle(color, contrast, hist);
 
-    const rowLength = Math.ceil(Math.sqrt(images.length));
+    const rowLength = canvasWidth
+      ? Math.round(canvasWidth / images[0].sizeX)
+      : Math.ceil(Math.sqrt(images.length));
 
     images.forEach((image, idx) => {
       /* This gets each tile separately, but since we get all of them this is
@@ -649,6 +656,8 @@ function parseTiles(
   const channelInt = new Map<string | null, number>();
   const lookup = new Map<string, IImage[]>();
   let frameChannels: string[] | undefined;
+  let splayCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
+  let splayOrder: string[] = [];
   tiles.forEach((tile, i) => {
     const item = items[i]!;
     const metadata = getNumericMetadata(item.name);
@@ -659,19 +668,35 @@ function parseTiles(
     frameChannels = tile.channels;
 
     tile.frames.forEach((frame, j) => {
-      const t = splayT ? -1 : metadata.t !== null ? metadata.t : frame.IndexT;
-      const xy = splayXY
-        ? -1
-        : metadata.xy !== null
-        ? metadata.xy
-        : frame.IndexXY || 0;
-      const z = splayZ
-        ? -1
-        : metadata.z !== null
-        ? metadata.z
-        : frame.IndexZ !== undefined
-        ? frame.IndexZ
-        : frame.PositionZ;
+      let t = metadata.t !== null ? metadata.t : frame.IndexT;
+      let xy = metadata.xy !== null ? metadata.xy : frame.IndexXY || 0;
+      let z =
+        metadata.z !== null
+          ? metadata.z
+          : frame.IndexZ !== undefined
+          ? frame.IndexZ
+          : frame.PositionZ;
+      if (splayT) {
+        splayCount.t = Math.max(splayCount.t, t + 1);
+        t = -1;
+        if (!splayOrder.includes("t")) {
+          splayOrder.push("t");
+        }
+      }
+      if (splayXY) {
+        splayCount.xy = Math.max(splayCount.xy, xy + 1);
+        xy = -1;
+        if (!splayOrder.includes("xy")) {
+          splayOrder.push("xy");
+        }
+      }
+      if (splayZ) {
+        splayCount.z = Math.max(splayCount.z, z + 1);
+        z = -1;
+        if (!splayOrder.includes("z")) {
+          splayOrder.push("z");
+        }
+      }
       const metadataChannel =
         channelInt.size > 1 ? channelInt.get(metadata.chan) : undefined;
       const c =
@@ -713,7 +738,10 @@ function parseTiles(
   //
   // TODO: this approach assumes all images have the same size.
   lookup.forEach(images => {
-    const rowLength = Math.ceil(Math.sqrt(images.length));
+    let rowLength = Math.ceil(Math.sqrt(images.length));
+    if (splayOrder.length > 1) {
+      rowLength = splayCount[splayOrder[0]];
+    }
     const colLength = Math.ceil(images.length / rowLength);
 
     const cwidth = rowLength * images[0].sizeX;
