@@ -668,7 +668,7 @@ function parseTiles(
     frameChannels = tile.channels;
 
     if (!tile.frames) {
-      tile.frames = [{Index:0, Frame: 0} as unknown as IFrameInfo];
+      tile.frames = [({ Index: 0, Frame: 0 } as unknown) as IFrameInfo];
     }
 
     tile.frames.forEach((frame, j) => {

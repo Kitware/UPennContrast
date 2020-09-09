@@ -57,7 +57,7 @@
     "pug-plain-loader": "^1.0.0",
     "sass": "^1.23.7",
     "sass-loader": "^8.0.0",
-    "typescript": "~3.7.2",
+    "typescript": "~3.8.0",
     "vue-cli-plugin-vuetify": "^2.0.2",
     "vue-template-compiler": "^2.6.10",
     "vuetify-loader": "^1.4.2",
