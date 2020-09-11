@@ -624,34 +624,40 @@ export class Main extends VuexModule {
     await this.syncConfiguration();
   }
 
-  get imageStack(): IImageTile[][] {
+  get layerStackImages(): any {
     if (!this.dataset || !this.configuration) {
       return [];
     }
-    const ds = this.dataset;
     const layers = this.configuration.layers;
 
-    return layers
-      .filter(d => d.visible)
-      .map(layer => {
-        const images = getLayerImages(layer, ds, this.time, this.xy, this.z);
-        return this.api.generateImages(
-          images,
+    return layers.map(layer => {
+      const images = getLayerImages(layer, this.dataset, this.time, this.xy, this.z);
+      const hist = this.api.getResolvedLayerHistogram(images);
+      return {
+        layer: layer,
+        images: images,
+        urls: images.map(image => this.api.tileTemplateUrl(
+          image.item,
+          image.frameIndex,
           layer.color,
           layer.contrast,
-          ds.width
-        );
-      });
-  }
-
-  get layerStack(): IDisplayLayer[] {
-    if (!this.dataset || !this.configuration) {
-      return [];
-    }
-    const ds = this.dataset;
-    const layers = this.configuration.layers;
-
-    return layers.filter(d => d.visible);
+          hist
+        )),
+        fullUrls: images.map(image => this.api.tileTemplateUrl(
+          image.item,
+          image.frameIndex,
+          "#ffffff",
+          {
+            mode: "percentile",
+            blackPoint: 0,
+            whitePoint: 100,
+            savedBlackPoint: 0,
+            savedWhitePoint: 100
+          },
+          hist
+        ))
+      };
+    });
   }
 
   get getLayerHistogram() {

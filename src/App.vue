@@ -15,9 +15,9 @@
       <Menu />
     </v-navigation-drawer>
 
-    <v-content>
+    <v-main>
       <router-view />
-    </v-content>
+    </v-main>
 
     <!-- <v-footer app>
       <span>Kitware</span>

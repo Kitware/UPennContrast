@@ -1,15 +1,11 @@
 <template>
   <div class="image">
-    <canvas
-      class="canvas"
-      ref="canvas"
-      :width="width"
-      :height="height"
+    <div
+      id="map"
+      ref="geojsmap"
       :data-update="reactiveDraw"
-      :style="{ transform: cssTransform }"
     />
-    <!-- <resize-observer @notify="handleResize" /> -->
-    <div class="loading" v-if="readyPercentage < 100">
+    <div class="loading" v-if="fullyReady">
       <v-progress-circular indeterminate />
     </div>
     <svg xmlns="http://www.w3.org/2000/svg">
@@ -29,6 +25,7 @@
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import { select, event as d3Event } from "d3-selection";
+import geojs from "geojs";
 import {
   zoom as d3Zoom,
   D3ZoomEvent,
@@ -86,201 +83,89 @@ export default class ImageViewer extends Vue {
   readonly store = store;
 
   private refsMounted = false;
-  private transform = Object.assign({}, zoomIdentity);
-
-  private containerDimensions = { width: 100, height: 100 };
-
-  readonly zoom = d3Zoom<HTMLElement, any>()
-    .on("zoom", () => {
-      this.zoomed(d3Event as D3ZoomEvent<HTMLElement, any>);
-    })
-    .on("start", function(this: HTMLElement) {
-      const event = (d3Event as D3ZoomEvent<HTMLElement, any>).sourceEvent;
-      if (event && event.type === "wheel") {
-        this.classList.add(event.wheelDelta > 0 ? "zoomIn" : "zoomOut");
-      } else {
-        this.classList.add("grabbing");
-      }
-    })
-    .on("end", function(this: HTMLElement) {
-      this.classList.remove("grabbing", "zoomIn", "zoomOut");
-    });
 
   private ready: string[] = [];
 
   $refs!: {
-    canvas: HTMLCanvasElement;
+    geojsmap: HTMLElement;
   };
 
-  get cssTransform() {
-    return `translate(${this.transform.x}px, ${this.transform.y}px) scale(${this.transform.k})`;
+  get fullyReady() {
+    return !this.map || this.map.idle();
   }
 
-  get readyPercentage() {
-    const total = this.imageStack.reduce((acc, d) => acc + d.length, 0);
-    const urls = this.imageStack.reduce<string[]>(
-      (acc, d) => acc.concat(d.map(i => i.url)),
-      []
-    );
-    const loaded = this.ready.filter(u => urls.indexOf(u) >= 0).length;
-    return Math.round((100.0 * loaded) / total);
+  get dataset() {
+    return this.store.dataset;
   }
 
   get width() {
-    return this.store.dataset ? this.store.dataset.width : 100;
+    return this.store.dataset ? this.store.dataset.width : 1;
   }
 
   get height() {
-    return this.store.dataset ? this.store.dataset.height : 100;
-  }
-
-  get imageStack() {
-    return this.store.imageStack;
-  }
-
-  get layerStack() {
-    return this.store.layerStack;
-  }
-
-  private trackImages(value: IImageTile[][]) {
-    this.ready = [];
-    value.forEach(layer => {
-      layer.forEach(tile => {
-        if (tile.image.src && tile.image.complete) {
-          if (!this.ready.includes(tile.url)) {
-            this.ready.push(tile.url);
-          }
-        } else {
-          const tileImage = tile.image;
-          const previousOnload = tileImage.onload;
-          tile.image.onload = event => {
-            // not just loaded but also decoded
-            tile.image.decode().then(() => {
-              if (!this.ready.includes(tile.url)) {
-                this.ready.push(tile.url);
-              }
-            });
-            if (previousOnload) {
-              previousOnload.call(tileImage, event);
-            }
-          };
-        }
-      });
-    });
-  }
-
-  @Watch("width")
-  watchWidth() {
-    this.$nextTick(() => this.centerZoom());
-  }
-
-  @Watch("height")
-  watchHeight() {
-    this.$nextTick(() => this.centerZoom());
-  }
-
-  @Watch("imageStack")
-  watchImageStack(value: IImageTile[][]) {
-    this.trackImages(value);
+    return this.store.dataset ? this.store.dataset.height : 1;
   }
 
   mounted() {
     this.refsMounted = true;
-    this.updateContainerSize();
-    this.initZoom();
-    this.trackImages(this.imageStack);
-    this.centerZoom();
-  }
-
-  private d3Element() {
-    return select(this.$el as HTMLElement);
-  }
-
-  private initZoom() {
-    this.d3Element().call(this.zoom);
-  }
-
-  private centerZoom() {
-    const cw = this.containerDimensions.width;
-    const ch = this.containerDimensions.height;
-
-    // transform image such that it is in the center maybe even scaled
-    const k = Math.min(cw / this.width, ch / this.height, 1);
-    const x = (cw - this.width * k) / 2;
-    const y = (ch - this.height * k) / 2;
-
-    this.transform = zoomIdentity.translate(x, y).scale(k);
-    this.zoom.transform(this.d3Element(), this.transform);
-  }
-
-  private zoomed(evt: D3ZoomEvent<HTMLElement, any>) {
-    this.transform = evt.transform;
-  }
-
-  updateContainerSize() {
-    const { width, height } = this.$el.getBoundingClientRect();
-    this.containerDimensions = { width, height };
   }
 
   get reactiveDraw() {
-    if (!this.refsMounted || !this.$refs.canvas) {
+    if (!this.refsMounted || !this.$refs.geojsmap) {
       return;
     }
-    this.draw(this.$refs.canvas);
+    this.draw(this.$refs.geojsmap);
   }
 
-  private get layers() {
-    return this.store.configuration ? this.store.configuration.layers : [];
+  private get layerStackImages() {
+    return this.store.configuration ? this.store.layerStackImages : [];
   }
 
-  private draw(canvas: HTMLCanvasElement) {
-    const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.globalCompositeOperation = this.store.compositionMode;
-
-    const isReady = new Set(this.ready);
-
-    const layers = this.layerStack;
-    this.imageStack.forEach((layer, layerIndex) => {
-      layer.forEach(tile => {
-        if (!isReady.has(tile.url)) {
-          const layerConfig = layers[layerIndex];
-          const filterURL = generateFilterURL(
-            layerConfig.contrast,
-            layerConfig.color,
-            layerConfig._histogram.last
-          );
-          if (filterURL === "") {
-            return;
-          }
-          ctx.filter = `url(${filterURL})`;
-          ctx.drawImage(
-            tile.fullImage,
-            0,
-            0,
-            tile.width,
-            tile.height,
-            tile.x,
-            tile.y,
-            tile.width,
-            tile.height
-          );
-          ctx.filter = "none";
-          return;
+  private draw(mapElement: HTMLElement) {
+    if ((this.width == this.height && this.width == 1) || !this.dataset) {
+      return;
+    }
+    if (!this.map) {
+      let tileWidth = this.dataset.images(0, 0, 0, 0)[0].tileWidth;
+      let tileHeight = this.dataset.images(0, 0, 0, 0)[0].tileHeight;
+      let params = geojs.util.pixelCoordinateParams(
+        mapElement,
+        this.width,
+        this.height,
+        tileWidth,
+        tileHeight
+      );
+      params.layer.useCredentials = true;
+      params.layer.autoshareRenderer = false;
+      params.map.max += 1;
+      this.map = geojs.map(params.map);
+      this.layerParams = params.layer;
+      this.imageLayers = [];
+      // TODO: add annotation layer
+    }
+    const mapnode = this.map.node();
+    if (mapnode.width() != this.map.size().width || mapnode.height() != this.map.size.height) {
+      this.map.size({ width: mapnode.width(), height: mapnode.height() });
+    }
+    this.layerStackImages.forEach(({layer, images, urls, fullUrls}, layerIndex) => {
+      while (this.imageLayers.length < (layerIndex + 1) * 2) {
+        if (this.imageLayers.length >= 12) {
+          this.layerParams.renderer = 'canvas';
+        } else {
+          delete this.layerParams.renderer;
         }
-        ctx.drawImage(
-          tile.image,
-          0,
-          0,
-          tile.width,
-          tile.height,
-          tile.x,
-          tile.y,
-          tile.width,
-          tile.height
-        );
-      });
+        this.imageLayers.push(this.map.createLayer('osm', this.layerParams));
+      }
+      // TODO: add multiple tile sources when compositing multiple images
+      let fullLayer = this.imageLayers[layerIndex * 2];
+      let adjLayer = this.imageLayers[layerIndex * 2 + 1];
+      fullLayer.url(fullUrls[0]).visible(false);
+      adjLayer.url(urls[0]).visible(layer.visible);
     });
+    while (this.imageLayers.length > this.layerStackImages.length * 2) {
+      this.map.deleteLayer(this.imageLayers.pop());
+    }
+    this.map.draw();
   }
 }
 </script>
@@ -289,36 +174,18 @@ export default class ImageViewer extends Vue {
 .image {
   position: relative;
   overflow: hidden;
-  cursor: grab;
 }
-
-.grabbing {
-  cursor: grabbing;
-}
-
-.zoomIn {
-  cursor: nwse-resize;
-  cursor: -moz-zoom-in;
-  cursor: -webkit-zoom-in;
-}
-
-.zoomOut {
-  cursor: nwse-resize;
-  cursor: -moz-zoom-out;
-  cursor: -webkit-zoom-out;
-}
-
-.loading {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
-.canvas {
+.geojs-map {
   position: absolute;
   left: 0;
   top: 0;
-  transform-origin: 0 0;
-  border: 1px solid black;
+  width: 100%;
+  height: 100%;
+  background: black;
+}
+</style>
+<style lang="scss">
+.geojs-map .geojs-layer {
+  mix-blend-mode: lighten;
 }
 </style>

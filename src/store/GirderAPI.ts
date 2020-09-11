@@ -79,20 +79,23 @@ export default class GirderAPI {
     return url.href;
   }
 
-  tileUrl(
+  tileTemplateUrl(
     item: string | IGirderItem,
-    { x, y, z, frame }: { x: number; y: number; z: number; frame: number },
-    style: ITileOptions
+    frame: number,
+    color: string,
+    contrast: IContrast
+    hist: any,
   ) {
     const url = new URL(
-      `${this.client.apiRoot}/item/${toId(item)}/tiles/zxy/${z}/${x}/${y}`
+      `${this.client.apiRoot}/item/${toId(item)}/tiles/zxy`
     );
     url.searchParams.set("encoding", "PNG");
     url.searchParams.set("frame", frame.toString());
+    const style = toStyle(color, contrast, hist);
     url.searchParams.set("style", JSON.stringify(style));
-
-    return url.href;
+    return url.href.replace("tiles/zxy", "tiles/zxy/{z}/{x}/{y}");
   }
+
   wholeRegionUrl(
     item: string | IGirderItem,
     { frame }: { frame: number },
@@ -307,7 +310,7 @@ export default class GirderAPI {
               hist
             )
           );
-          image.src = url;
+          // image.src = url;
           return image.decode();
         });
       };
@@ -370,7 +373,7 @@ export default class GirderAPI {
           const previousOnerror = oldImage.onerror;
           const localSetSource = (event: any) => {
             if (this.imageCache.get(url)) {
-              image.src = url;
+              // image.src = url;
               retVal = image.decode();
             } else {
               if (image.onerror) {
@@ -392,7 +395,7 @@ export default class GirderAPI {
           };
         } else {
           // if the old image is resolved or not present, just set the src
-          image.src = url;
+          // image.src = url;
           retVal = image.decode();
         }
         return retVal;
@@ -572,8 +575,8 @@ function asDataset(folder: IGirderFolder): IDataset {
     description: folder.description,
     xy: [],
     z: [],
-    width: 100,
-    height: 100,
+    width: 1,
+    height: 1,
     time: [],
     channels: [],
     channelNames: new Map<number, string>(),
