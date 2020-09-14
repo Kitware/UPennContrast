@@ -625,7 +625,7 @@ export class Main extends VuexModule {
   }
 
   get layerStackImages(): any {
-    if (!this.dataset || !this.configuration) {
+    if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
       return [];
     }
     const layers = this.configuration.layers;

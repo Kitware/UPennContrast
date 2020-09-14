@@ -159,6 +159,11 @@ export default class ImageViewer extends Vue {
       // TODO: add multiple tile sources when compositing multiple images
       let fullLayer = this.imageLayers[layerIndex * 2];
       let adjLayer = this.imageLayers[layerIndex * 2 + 1];
+      if (!fullUrls[0] || !urls[0]) {
+        fullLayer.visible(false);
+        adjLayer.visible(false);
+        return;
+      }
       fullLayer.url(fullUrls[0]).visible(false);
       adjLayer.url(urls[0]).visible(layer.visible);
     });
