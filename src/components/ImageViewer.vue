@@ -1,7 +1,7 @@
 <template>
   <div class="image">
     <div id="map" ref="geojsmap" :data-update="reactiveDraw" />
-    <div class="loading" v-if="fullyReady">
+    <div class="loading" v-if="!fullyReady">
       <v-progress-circular indeterminate />
     </div>
     <svg xmlns="http://www.w3.org/2000/svg">
@@ -90,7 +90,7 @@ export default class ImageViewer extends Vue {
 
   private refsMounted = false;
 
-  private ready: string[] = [];
+  private ready = { layers: [] };
 
   private imageLayers = [];
 
@@ -99,7 +99,7 @@ export default class ImageViewer extends Vue {
   };
 
   get fullyReady() {
-    return !this.map || this.map.idle();
+    return this.ready.layers.every(d => d);
   }
 
   get dataset() {
@@ -177,6 +177,7 @@ export default class ImageViewer extends Vue {
           .css("filter", `url(#recolor-${index})`);
       }
     }
+    this.ready.layers.splice(this.layerStackImages.length);
     // set tile urls
     this.layerStackImages.forEach(
       ({ layer, images, urls, fullUrls, hist }, layerIndex) => {
@@ -188,6 +189,7 @@ export default class ImageViewer extends Vue {
         if (!fullUrls[0] || !urls[0]) {
           fullLayer.visible(false);
           adjLayer.visible(false);
+          Vue.set(this.ready.layers, layerIndex, true);
           return;
         }
         fullLayer.visible(true);
@@ -203,12 +205,14 @@ export default class ImageViewer extends Vue {
             .url(urls[0])
             .node()
             .css("visibility", "hidden");
+          Vue.set(this.ready.layers, layerIndex, false);
           adjLayer.onIdle(() => {
             if (fullLayer.url() == fullUrls[0] && adjLayer.url() == urls[0]) {
               fullLayer.node().css("visibility", "hidden");
               adjLayer
                 .node()
                 .css("visibility", layer.visible ? "visible" : "hidden");
+              Vue.set(this.ready.layers, layerIndex, true);
             }
           });
         } else {
@@ -219,6 +223,7 @@ export default class ImageViewer extends Vue {
           adjLayer
             .node()
             .css("visibility", idle && layer.visible ? "visible" : "hidden");
+          Vue.set(this.ready.layers, layerIndex, idle);
         }
       }
     );
@@ -231,6 +236,9 @@ export default class ImageViewer extends Vue {
 .image {
   position: relative;
   overflow: hidden;
+}
+.loading {
+  color: white;
 }
 .geojs-map {
   position: absolute;
