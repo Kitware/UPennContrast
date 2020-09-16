@@ -1,20 +1,21 @@
 <template>
   <div class="image">
-    <div
-      id="map"
-      ref="geojsmap"
-      :data-update="reactiveDraw"
-    />
+    <div id="map" ref="geojsmap" :data-update="reactiveDraw" />
     <div class="loading" v-if="fullyReady">
       <v-progress-circular indeterminate />
     </div>
     <svg xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <filter id="recolor" color-interpolation-filters="sRGB">
+        <filter
+          :id="'recolor-' + index"
+          color-interpolation-filters="sRGB"
+          v-for="(item, index) in imageLayers"
+          :key="'recolor-' + index"
+        >
           <feComponentTransfer>
-            <feFuncR id="func-r" type="linear" slope="0" intercept="0" />
-            <feFuncG id="func-g" type="linear" slope="0" intercept="0" />
-            <feFuncB id="func-b" type="linear" slope="0" intercept="0" />
+            <feFuncR class="func-r" type="linear" slope="0" intercept="0" />
+            <feFuncG class="func-g" type="linear" slope="0" intercept="0" />
+            <feFuncB class="func-b" type="linear" slope="0" intercept="0" />
           </feComponentTransfer>
         </filter>
       </defs>
@@ -22,6 +23,8 @@
   </div>
 </template>
 <script lang="ts">
+// in cosole debugging, you can access the map via
+//  $('.geojs-map').data('data-geojs-map')
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import { select, event as d3Event } from "d3-selection";
@@ -35,6 +38,7 @@ import {
 import { IImageTile } from "../store/model";
 
 function generateFilterURL(
+  index: number,
   contrast: { whitePoint: number; blackPoint: number; mode: string },
   color: string,
   hist: { min: number; max: number }
@@ -50,12 +54,16 @@ function generateFilterURL(
   const blue = toVal(color.slice(5, 7));
 
   const setSlopeIntercept = (
+    index: number,
     id: string,
     wp: number,
     bp: number,
     level: number
   ) => {
-    const el = document.getElementById(id)!;
+    const el = document.querySelector(`#recolor-${index} .${id}`);
+    if (!el) {
+      return;
+    }
 
     const levelP = level;
     const wpP = wp;
@@ -71,11 +79,9 @@ function generateFilterURL(
   const whitePoint = scalePoint(contrast.whitePoint, contrast.mode);
   const blackPoint = scalePoint(contrast.blackPoint, contrast.mode);
 
-  setSlopeIntercept("func-r", whitePoint, blackPoint, red);
-  setSlopeIntercept("func-g", whitePoint, blackPoint, green);
-  setSlopeIntercept("func-b", whitePoint, blackPoint, blue);
-
-  return "#recolor";
+  setSlopeIntercept(index, "func-r", whitePoint, blackPoint, red);
+  setSlopeIntercept(index, "func-g", whitePoint, blackPoint, green);
+  setSlopeIntercept(index, "func-b", whitePoint, blackPoint, blue);
 }
 
 @Component
@@ -85,6 +91,8 @@ export default class ImageViewer extends Vue {
   private refsMounted = false;
 
   private ready: string[] = [];
+
+  private imageLayers = [];
 
   $refs!: {
     geojsmap: HTMLElement;
@@ -137,39 +145,83 @@ export default class ImageViewer extends Vue {
       );
       params.layer.useCredentials = true;
       params.layer.autoshareRenderer = false;
+      params.layer.url =
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFhAJ/wlseKgAAAABJRU5ErkJggg==";
       params.map.max += 1;
       this.map = geojs.map(params.map);
       this.layerParams = params.layer;
-      this.imageLayers = [];
       // TODO: add annotation layer
     }
     const mapnode = this.map.node();
-    if (mapnode.width() != this.map.size().width || mapnode.height() != this.map.size.height) {
+    if (
+      mapnode.width() != this.map.size().width ||
+      mapnode.height() != this.map.size.height
+    ) {
       this.map.size({ width: mapnode.width(), height: mapnode.height() });
     }
-    this.layerStackImages.forEach(({layer, images, urls, fullUrls}, layerIndex) => {
-      while (this.imageLayers.length < (layerIndex + 1) * 2) {
-        if (this.imageLayers.length >= 12) {
-          this.layerParams.renderer = 'canvas';
-        } else {
-          delete this.layerParams.renderer;
-        }
-        this.imageLayers.push(this.map.createLayer('osm', this.layerParams));
-      }
-      // TODO: add multiple tile sources when compositing multiple images
-      let fullLayer = this.imageLayers[layerIndex * 2];
-      let adjLayer = this.imageLayers[layerIndex * 2 + 1];
-      if (!fullUrls[0] || !urls[0]) {
-        fullLayer.visible(false);
-        adjLayer.visible(false);
-        return;
-      }
-      fullLayer.url(fullUrls[0]).visible(false);
-      adjLayer.url(urls[0]).visible(layer.visible);
-    });
+    // adjust number of tile layers
     while (this.imageLayers.length > this.layerStackImages.length * 2) {
       this.map.deleteLayer(this.imageLayers.pop());
     }
+    while (this.imageLayers.length < this.layerStackImages.length * 2) {
+      if (this.imageLayers.length >= 12) {
+        this.layerParams.renderer = "canvas";
+      } else {
+        delete this.layerParams.renderer;
+      }
+      this.imageLayers.push(this.map.createLayer("osm", this.layerParams));
+      if (this.imageLayers.length & 1) {
+        const index = (this.imageLayers.length - 1) / 2;
+        this.imageLayers[this.imageLayers.length - 1]
+          .node()
+          .css("filter", `url(#recolor-${index})`);
+      }
+    }
+    // set tile urls
+    this.layerStackImages.forEach(
+      ({ layer, images, urls, fullUrls, hist }, layerIndex) => {
+        let fullLayer = this.imageLayers[layerIndex * 2];
+        let adjLayer = this.imageLayers[layerIndex * 2 + 1];
+        // set fullLayer's transform
+        generateFilterURL(layerIndex, layer.contrast, layer.color, hist);
+        // TODO: add multiple tile sources when compositing multiple images
+        if (!fullUrls[0] || !urls[0]) {
+          fullLayer.visible(false);
+          adjLayer.visible(false);
+          return;
+        }
+        fullLayer.visible(true);
+        adjLayer.visible(true);
+        // use css visibility so that geojs will still load tiles when not
+        // viisble.
+        if (fullUrls[0] !== fullLayer.url() || urls[0] != adjLayer.url()) {
+          fullLayer
+            .url(fullUrls[0])
+            .node()
+            .css("visibility", layer.visible ? "visible" : "hidden");
+          adjLayer
+            .url(urls[0])
+            .node()
+            .css("visibility", "hidden");
+          adjLayer.onIdle(() => {
+            if (fullLayer.url() == fullUrls[0] && adjLayer.url() == urls[0]) {
+              fullLayer.node().css("visibility", "hidden");
+              adjLayer
+                .node()
+                .css("visibility", layer.visible ? "visible" : "hidden");
+            }
+          });
+        } else {
+          const idle = fullLayer.idle && adjLayer.idle;
+          fullLayer
+            .node()
+            .css("visibility", !idle && layer.visible ? "visible" : "hidden");
+          adjLayer
+            .node()
+            .css("visibility", idle && layer.visible ? "visible" : "hidden");
+        }
+      }
+    );
     this.map.draw();
   }
 }

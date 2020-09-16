@@ -91,9 +91,7 @@ export default class GirderAPI {
     if (hist === null) {
       return;
     }
-    const url = new URL(
-      `${this.client.apiRoot}/item/${toId(item)}/tiles/zxy`
-    );
+    const url = new URL(`${this.client.apiRoot}/item/${toId(item)}/tiles/zxy`);
     url.searchParams.set("encoding", "PNG");
     url.searchParams.set("frame", frame.toString());
     const style = toStyle(color, contrast, hist);
