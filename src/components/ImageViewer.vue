@@ -134,8 +134,9 @@ export default class ImageViewer extends Vue {
       return;
     }
     if (!this.map) {
-      let tileWidth = this.dataset.images(0, 0, 0, 0)[0].tileWidth;
-      let tileHeight = this.dataset.images(0, 0, 0, 0)[0].tileHeight;
+      const someImage = this.dataset.anyImage();
+      let tileWidth = someImage.tileWidth;
+      let tileHeight = someImage.tileHeight;
       let params = geojs.util.pixelCoordinateParams(
         mapElement,
         this.width,

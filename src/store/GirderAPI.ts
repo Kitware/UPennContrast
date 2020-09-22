@@ -307,6 +307,7 @@ function asDataset(folder: IGirderFolder): IDataset {
     channels: [],
     channelNames: new Map<number, string>(),
     images: () => [],
+    anyImage: () => null,
     configurations: []
   };
 }
@@ -522,6 +523,19 @@ function parseTiles(
   return {
     images: (z: number, zTime: number, xy: number, channel: number) =>
       lookup.get(toKey(z, zTime, xy, channel)) || [],
+    anyImage: () => {
+      const values = lookup.values();
+      let it = values.next();
+      while (!it.done) {
+        if (it.value.length > 0) {
+          return it.value[0];
+        }
+
+        it = values.next()
+      }
+
+      return null;
+    },
     xy: Array.from(xys).sort((a, b) => a - b),
     z: zValues,
     time: zTime,
