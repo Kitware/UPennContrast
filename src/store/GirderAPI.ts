@@ -143,9 +143,9 @@ export default class GirderAPI {
 
   getDataset(
     id: string,
-    splayXY: boolean,
-    splayZ: boolean,
-    splayT: boolean
+    unrollXY: boolean,
+    unrollZ: boolean,
+    unrollT: boolean
   ): Promise<IDataset> {
     return Promise.all([this.getFolder(id), this.getItems(id)]).then(
       ([folder, items]) => {
@@ -158,7 +158,7 @@ export default class GirderAPI {
             return {
               ...asDataset(folder),
               configurations,
-              ...parseTiles(images, tiles, splayXY, splayZ, splayT)
+              ...parseTiles(images, tiles, unrollXY, unrollZ, unrollT)
             };
           }
         );
@@ -372,9 +372,9 @@ function toKey(
 function parseTiles(
   items: IGirderItem[],
   tiles: ITileMeta[],
-  splayXY: boolean,
-  splayZ: boolean,
-  splayT: boolean
+  unrollXY: boolean,
+  unrollZ: boolean,
+  unrollT: boolean
 ) {
   // t x z x c -> IImage[]
 
@@ -386,8 +386,8 @@ function parseTiles(
   const channelInt = new Map<string | null, number>();
   const lookup = new Map<string, IImage[]>();
   let frameChannels: string[] | undefined;
-  let splayCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
-  let splayOrder: string[] = [];
+  let unrollCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
+  let unrollOrder: string[] = [];
   tiles.forEach((tile, i) => {
     const item = items[i]!;
     const metadata = getNumericMetadata(item.name);
@@ -410,25 +410,25 @@ function parseTiles(
           : frame.IndexZ !== undefined
           ? frame.IndexZ
           : frame.PositionZ;
-      if (splayT) {
-        splayCount.t = Math.max(splayCount.t, t + 1);
+      if (unrollT) {
+        unrollCount.t = Math.max(unrollCount.t, t + 1);
         t = -1;
-        if (!splayOrder.includes("t")) {
-          splayOrder.push("t");
+        if (!unrollOrder.includes("t")) {
+          unrollOrder.push("t");
         }
       }
-      if (splayXY) {
-        splayCount.xy = Math.max(splayCount.xy, xy + 1);
+      if (unrollXY) {
+        unrollCount.xy = Math.max(unrollCount.xy, xy + 1);
         xy = -1;
-        if (!splayOrder.includes("xy")) {
-          splayOrder.push("xy");
+        if (!unrollOrder.includes("xy")) {
+          unrollOrder.push("xy");
         }
       }
-      if (splayZ) {
-        splayCount.z = Math.max(splayCount.z, z + 1);
+      if (unrollZ) {
+        unrollCount.z = Math.max(unrollCount.z, z + 1);
         z = -1;
-        if (!splayOrder.includes("z")) {
-          splayOrder.push("z");
+        if (!unrollOrder.includes("z")) {
+          unrollOrder.push("z");
         }
       }
       const metadataChannel =
@@ -473,8 +473,8 @@ function parseTiles(
   // TODO: this approach assumes all images have the same size.
   lookup.forEach(images => {
     let rowLength = Math.ceil(Math.sqrt(images.length));
-    if (splayOrder.length > 1) {
-      rowLength = splayCount[splayOrder[0]];
+    if (unrollOrder.length > 1) {
+      rowLength = unrollCount[unrollOrder[0]];
     }
     const colLength = Math.ceil(images.length / rowLength);
 

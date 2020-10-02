@@ -53,9 +53,9 @@ export class Main extends VuexModule {
   compositionMode: CompositionMode = DEFAULT_COMPOSITION_MODE;
   layerMode: "single" | "multiple" = "multiple";
 
-  splayXY: boolean = false;
-  splayZ: boolean = false;
-  splayT: boolean = false;
+  unrollXY: boolean = false;
+  unrollZ: boolean = false;
+  unrollT: boolean = false;
 
   get userName() {
     return this.girderUser ? this.girderUser.login : "anonymous";
@@ -160,18 +160,18 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  public setSplayXYImpl(value: boolean) {
-    this.splayXY = value;
+  public setUnrollXYImpl(value: boolean) {
+    this.unrollXY = value;
   }
 
   @Mutation
-  public setSplayZImpl(value: boolean) {
-    this.splayZ = value;
+  public setUnrollZImpl(value: boolean) {
+    this.unrollZ = value;
   }
 
   @Mutation
-  public setSplayTImpl(value: boolean) {
-    this.splayT = value;
+  public setUnrollTImpl(value: boolean) {
+    this.unrollT = value;
   }
 
   @Action
@@ -273,9 +273,9 @@ export class Main extends VuexModule {
       sync.setLoading(true);
       const r = await this.api.getDataset(
         id,
-        this.splayXY,
-        this.splayZ,
-        this.splayT
+        this.unrollXY,
+        this.unrollZ,
+        this.unrollT
       );
       this.setDataset({ id, data: r });
       sync.setLoading(false);
@@ -442,8 +442,8 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async setSplayXY(value: boolean) {
-    this.setSplayXYImpl(value);
+  async setUnrollXY(value: boolean) {
+    this.setUnrollXYImpl(value);
   }
 
   @Action
@@ -452,8 +452,8 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async setSplayZ(value: boolean) {
-    this.setSplayZImpl(value);
+  async setUnrollZ(value: boolean) {
+    this.setUnrollZImpl(value);
   }
 
   @Action
@@ -462,8 +462,8 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async setSplayT(value: boolean) {
-    this.setSplayTImpl(value);
+  async setUnrollT(value: boolean) {
+    this.setUnrollTImpl(value);
   }
 
   @Mutation
