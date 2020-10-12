@@ -133,25 +133,61 @@ export default class ImageViewer extends Vue {
     if ((this.width == this.height && this.width == 1) || !this.dataset) {
       return;
     }
+    if (!this.layerStackImages.length) {
+      return;
+    }
+    let unrollCount = this.layerStackImages[0].images.length;
+    const someImage = this.layerStackImages[0].images[0];
+    let unrollW = Math.min(
+      unrollCount,
+      Math.ceil(
+        Math.sqrt(someImage.sizeX * someImage.sizeY * unrollCount) /
+          someImage.sizeX
+      )
+    );
+    let unrollH = Math.ceil(unrollCount / unrollW);
+    let mapWidth = unrollW * someImage.sizeX;
+    let mapHeight = unrollH * someImage.sizeY;
+    let adjustLayers = true;
+    let tileWidth = someImage.tileWidth;
+    let tileHeight = someImage.tileHeight;
+    let params = geojs.util.pixelCoordinateParams(
+      mapElement,
+      someImage.sizeX,
+      someImage.sizeY,
+      tileWidth,
+      tileHeight
+    );
+    params.map.maxBounds.right = mapWidth;
+    params.map.maxBounds.bottom = mapHeight;
+    params.map.min -= Math.ceil(
+      Math.log(Math.max(unrollW, unrollH)) / Math.log(2)
+    );
+    params.map.zoom = params.map.min;
+    params.map.center = { x: mapWidth / 2, y: map.Height / 2 };
+    params.layer.useCredentials = true;
+    params.layer.autoshareRenderer = false;
+    delete params.layer.tilesMaxBounds;
+    params.layer.url =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+    params.map.max += 1;
+    this.layerParams = params.layer;
     if (!this.map) {
-      const someImage = this.dataset.anyImage();
-      let tileWidth = someImage.tileWidth;
-      let tileHeight = someImage.tileHeight;
-      let params = geojs.util.pixelCoordinateParams(
-        mapElement,
-        this.width,
-        this.height,
-        tileWidth,
-        tileHeight
-      );
-      params.layer.useCredentials = true;
-      params.layer.autoshareRenderer = false;
-      params.layer.url =
-        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFhAJ/wlseKgAAAABJRU5ErkJggg==";
-      params.map.max += 1;
       this.map = geojs.map(params.map);
-      this.layerParams = params.layer;
       // TODO: add annotation layer
+    } else {
+      adjustLayers =
+        Math.abs(this.map.maxBounds(undefined, null).right - mapWidth) >= 0.5 ||
+        Math.abs(this.map.maxBounds(undefined, null).bottom - mapHeight) >= 0.5;
+      if (adjustLayers) {
+        this.map.maxBounds({
+          left: 0,
+          top: 0,
+          right: params.map.maxBounds.right,
+          bottom: params.map.maxBounds.bottom
+        });
+        this.map.zoomRange(params.map);
+      }
     }
     const mapnode = this.map.node();
     if (
@@ -164,19 +200,104 @@ export default class ImageViewer extends Vue {
     while (this.imageLayers.length > this.layerStackImages.length * 2) {
       this.map.deleteLayer(this.imageLayers.pop());
     }
+    this.unrollW = unrollW;
+    this.unrollH = unrollH;
     while (this.imageLayers.length < this.layerStackImages.length * 2) {
+      this.layerParams.tilesAtZoom = level => {
+        const s = Math.pow(2, someImage.levels - 1 - level);
+        const result = {
+          x:
+            Math.ceil(someImage.sizeX / s / someImage.tileWidth) * this.unrollW,
+          y:
+            Math.ceil(someImage.sizeY / s / someImage.tileHeight) * this.unrollH
+        };
+        return result;
+      };
       if (this.imageLayers.length >= 12) {
         this.layerParams.renderer = "canvas";
       } else {
         delete this.layerParams.renderer;
       }
       this.imageLayers.push(this.map.createLayer("osm", this.layerParams));
+      let layer = this.imageLayers[this.imageLayers.length - 1];
       if (this.imageLayers.length & 1) {
         const index = (this.imageLayers.length - 1) / 2;
-        this.imageLayers[this.imageLayers.length - 1]
-          .node()
-          .css("filter", `url(#recolor-${index})`);
+        layer.node().css("filter", `url(#recolor-${index})`);
       }
+      layer.url((x, y, level, subdomains) => {
+        const s = Math.pow(2, someImage.levels - 1 - level);
+        const txy = {
+          x: Math.ceil(someImage.sizeX / s / someImage.tileWidth),
+          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight)
+        };
+        const imageNum =
+          Math.floor(x / txy.x) + Math.floor(y / txy.y) * this.unrollW;
+        if (!layer._imageUrls || !layer._imageUrls[imageNum]) {
+          return params.layer.url;
+        }
+        const tx = x % txy.x;
+        const ty = y % txy.y;
+        const result = layer._imageUrls[imageNum]
+          .replace("{z}", level)
+          .replace("{x}", tx)
+          .replace("{y}", ty);
+        return result;
+      });
+      const o = layer._tileBounds;
+      layer._tileBounds = tile => {
+        const s = Math.pow(2, someImage.levels - 1 - tile.index.level);
+        const w = Math.ceil(someImage.sizeX / s),
+          h = Math.ceil(someImage.sizeY / s);
+        const txy = {
+          x: Math.ceil(someImage.sizeX / s / someImage.tileWidth),
+          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight)
+        };
+        const imagexy = {
+          x: Math.floor(tile.index.x / txy.x),
+          y: Math.floor(tile.index.y / txy.y)
+        };
+        const tilexy = {
+          x: tile.index.x % txy.x,
+          y: tile.index.y % txy.y
+        };
+        const result = {
+          left: tilexy.x * tile.size.x + w * imagexy.x,
+          top: tilexy.y * tile.size.y + h * imagexy.y,
+          right: Math.min((tilexy.x + 1) * tile.size.x, w) + w * imagexy.x,
+          bottom: Math.min((tilexy.y + 1) * tile.size.y, h) + h * imagexy.y
+        };
+        return result;
+      };
+      layer.tileAtPoint = (point, level) => {
+        point = layer.displayToLevel(
+          layer.map().gcsToDisplay(point, null),
+          someImage.levels - 1
+        );
+        const s = Math.pow(2, someImage.levels - 1 - level);
+        const x = point.x,
+          y = point.y;
+        const txy = {
+          x: Math.ceil(someImage.sizeX / s / someImage.tileWidth),
+          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight)
+        };
+        const result = {
+          x:
+            Math.floor(x / someImage.sizeX) * txy.x +
+            Math.floor(
+              (x - Math.floor(x / someImage.sizeX) * someImage.sizeX) /
+                someImage.tileWidth /
+                s
+            ),
+          y:
+            Math.floor(y / someImage.sizeY) * txy.y +
+            Math.floor(
+              (y - Math.floor(y / someImage.sizeY) * someImage.sizeY) /
+                someImage.tileHeight /
+                s
+            )
+        };
+        return result;
+      };
     }
     this.ready.layers.splice(this.layerStackImages.length);
     // set tile urls
@@ -186,7 +307,6 @@ export default class ImageViewer extends Vue {
         let adjLayer = this.imageLayers[layerIndex * 2 + 1];
         // set fullLayer's transform
         generateFilterURL(layerIndex, layer.contrast, layer.color, hist);
-        // TODO: add multiple tile sources when compositing multiple images
         if (!fullUrls[0] || !urls[0]) {
           fullLayer.visible(false);
           adjLayer.visible(false);
@@ -196,19 +316,28 @@ export default class ImageViewer extends Vue {
         fullLayer.visible(true);
         adjLayer.visible(true);
         // use css visibility so that geojs will still load tiles when not
-        // viisble.
-        if (fullUrls[0] !== fullLayer.url() || urls[0] != adjLayer.url()) {
-          fullLayer
-            .url(fullUrls[0])
-            .node()
-            .css("visibility", layer.visible ? "visible" : "hidden");
-          adjLayer
-            .url(urls[0])
-            .node()
-            .css("visibility", "hidden");
-          Vue.set(this.ready.layers, layerIndex, false);
+        // visible.
+        if (
+          !fullLayer._imageUrls ||
+          fullUrls.length !== fullLayer._imageUrls.length ||
+          fullUrls.some((url, idx) => url !== fullLayer._imageUrls[idx])
+        ) {
+          fullLayer._imageUrls = fullUrls;
+          fullLayer.reset();
+        }
+        if (
+          !adjLayer._imageUrls ||
+          urls.length !== adjLayer._imageUrls.length ||
+          urls.some((url, idx) => url !== adjLayer._imageUrls[idx])
+        ) {
+          adjLayer._imageUrls = urls;
+          adjLayer.reset();
+          adjLayer.map().draw();
           adjLayer.onIdle(() => {
-            if (fullLayer.url() == fullUrls[0] && adjLayer.url() == urls[0]) {
+            if (
+              fullUrls.every((url, idx) => url === fullLayer._imageUrls[idx]) &&
+              urls.every((url, idx) => url === adjLayer._imageUrls[idx])
+            ) {
               fullLayer.node().css("visibility", "hidden");
               adjLayer
                 .node()
@@ -216,16 +345,15 @@ export default class ImageViewer extends Vue {
               Vue.set(this.ready.layers, layerIndex, true);
             }
           });
-        } else {
-          const idle = fullLayer.idle && adjLayer.idle;
-          fullLayer
-            .node()
-            .css("visibility", !idle && layer.visible ? "visible" : "hidden");
-          adjLayer
-            .node()
-            .css("visibility", idle && layer.visible ? "visible" : "hidden");
-          Vue.set(this.ready.layers, layerIndex, idle);
         }
+        const idle = fullLayer.idle && adjLayer.idle;
+        fullLayer
+          .node()
+          .css("visibility", !idle && layer.visible ? "visible" : "hidden");
+        adjLayer
+          .node()
+          .css("visibility", idle && layer.visible ? "visible" : "hidden");
+        Vue.set(this.ready.layers, layerIndex, idle);
       }
     );
     this.map.draw();

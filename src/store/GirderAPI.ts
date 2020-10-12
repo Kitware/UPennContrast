@@ -96,6 +96,7 @@ export default class GirderAPI {
     url.searchParams.set("frame", frame.toString());
     const style = toStyle(color, contrast, hist);
     url.searchParams.set("style", JSON.stringify(style));
+    url.searchParams.set("edge", "crop");
     return url.href.replace("tiles/zxy", "tiles/zxy/{z}/{x}/{y}");
   }
 
@@ -531,7 +532,7 @@ function parseTiles(
           return it.value[0];
         }
 
-        it = values.next()
+        it = values.next();
       }
 
       return null;
