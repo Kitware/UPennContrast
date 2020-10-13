@@ -42,9 +42,9 @@ function generateFilterURL(
   contrast: { whitePoint: number; blackPoint: number; mode: string },
   color: string,
   hist: { min: number; max: number }
-): string {
+) {
   if (hist === null) {
-    return "";
+    return;
   }
   // Tease out the RGB color levels.
   const toVal = (s: string) => parseInt(`0x${s}`) / 255;
@@ -92,7 +92,12 @@ export default class ImageViewer extends Vue {
 
   private ready = { layers: [] };
 
-  private imageLayers = [];
+  private imageLayers: any[] = [];
+
+  private layerParams: any;
+  private map: any;
+  private unrollW: number = 1;
+  private unrollH: number = 1;
 
   $refs!: {
     geojsmap: HTMLElement;
@@ -164,7 +169,7 @@ export default class ImageViewer extends Vue {
       Math.log(Math.max(unrollW, unrollH)) / Math.log(2)
     );
     params.map.zoom = params.map.min;
-    params.map.center = { x: mapWidth / 2, y: map.Height / 2 };
+    params.map.center = { x: mapWidth / 2, y: mapHeight / 2 };
     params.layer.useCredentials = true;
     params.layer.autoshareRenderer = false;
     delete params.layer.tilesMaxBounds;
@@ -203,7 +208,7 @@ export default class ImageViewer extends Vue {
     this.unrollW = unrollW;
     this.unrollH = unrollH;
     while (this.imageLayers.length < this.layerStackImages.length * 2) {
-      this.layerParams.tilesAtZoom = level => {
+      this.layerParams.tilesAtZoom = (level: number) => {
         const s = Math.pow(2, someImage.levels - 1 - level);
         const result = {
           x:
@@ -224,7 +229,7 @@ export default class ImageViewer extends Vue {
         const index = (this.imageLayers.length - 1) / 2;
         layer.node().css("filter", `url(#recolor-${index})`);
       }
-      layer.url((x, y, level, subdomains) => {
+      layer.url((x: number, y: number, level: number) => {
         const s = Math.pow(2, someImage.levels - 1 - level);
         const txy = {
           x: Math.ceil(someImage.sizeX / s / someImage.tileWidth),
@@ -244,7 +249,7 @@ export default class ImageViewer extends Vue {
         return result;
       });
       const o = layer._tileBounds;
-      layer._tileBounds = tile => {
+      layer._tileBounds = (tile: any) => {
         const s = Math.pow(2, someImage.levels - 1 - tile.index.level);
         const w = Math.ceil(someImage.sizeX / s),
           h = Math.ceil(someImage.sizeY / s);
@@ -268,7 +273,7 @@ export default class ImageViewer extends Vue {
         };
         return result;
       };
-      layer.tileAtPoint = (point, level) => {
+      layer.tileAtPoint = (point: any, level: number) => {
         point = layer.displayToLevel(
           layer.map().gcsToDisplay(point, null),
           someImage.levels - 1
@@ -302,7 +307,15 @@ export default class ImageViewer extends Vue {
     this.ready.layers.splice(this.layerStackImages.length);
     // set tile urls
     this.layerStackImages.forEach(
-      ({ layer, images, urls, fullUrls, hist }, layerIndex) => {
+      (
+        {
+          layer,
+          urls,
+          fullUrls,
+          hist
+        }: { layer: any; urls: string[]; fullUrls: string[]; hist: any },
+        layerIndex: number
+      ) => {
         let fullLayer = this.imageLayers[layerIndex * 2];
         let adjLayer = this.imageLayers[layerIndex * 2 + 1];
         // set fullLayer's transform

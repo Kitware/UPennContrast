@@ -10,7 +10,6 @@ import {
 import GirderAPI from "./GirderAPI";
 import { getLayerImages } from "./images";
 import {
-  CompositionMode,
   IDataset,
   IDatasetConfiguration,
   IDatasetConfigurationMeta,
@@ -21,10 +20,7 @@ import {
 import persister from "./Persister";
 import store from "./root";
 import sync from "./sync";
-import {
-  DEFAULT_COMPOSITION_MODE,
-  MAX_NUMBER_OF_RECENT_CONFIGURATIONS
-} from "./constants";
+import { MAX_NUMBER_OF_RECENT_CONFIGURATIONS } from "./constants";
 
 export { default as store } from "./root";
 
@@ -50,7 +46,6 @@ export class Main extends VuexModule {
   xy: number = 0;
   z: number = 0;
   time: number = 0;
-  compositionMode: CompositionMode = DEFAULT_COMPOSITION_MODE;
   layerMode: "single" | "multiple" = "multiple";
 
   unrollXY: boolean = false;
@@ -511,16 +506,6 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  private setCompositionModeImpl(mode: CompositionMode) {
-    this.compositionMode = mode;
-  }
-
-  @Action
-  async setCompositionMode(mode: CompositionMode) {
-    this.setCompositionModeImpl(mode);
-  }
-
-  @Mutation
   private setLayerModeImpl(mode: "multiple" | "single") {
     this.layerMode = mode;
   }
@@ -633,7 +618,7 @@ export class Main extends VuexModule {
     return layers.map(layer => {
       const images = getLayerImages(
         layer,
-        this.dataset,
+        this.dataset!,
         this.time,
         this.xy,
         this.z
