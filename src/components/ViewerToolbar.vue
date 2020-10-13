@@ -96,10 +96,6 @@ export default class ViewerToolbar extends Vue {
     });
   }
 
-  set mode(value: string) {
-    this.changeQuery("mode", value);
-  }
-
   get xy() {
     return this.store.xy;
   }
