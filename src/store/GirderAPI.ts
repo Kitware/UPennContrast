@@ -55,6 +55,8 @@ export default class GirderAPI {
     this.client = client;
   }
 
+  histogramsLoaded = 0;
+
   getItem(itemId: string): Promise<IGirderItem> {
     return this.client.get(`item/${itemId}`).then(r => r.data);
   }
@@ -79,47 +81,23 @@ export default class GirderAPI {
     return url.href;
   }
 
-  tileUrl(
+  tileTemplateUrl(
     item: string | IGirderItem,
-    { x, y, z, frame }: { x: number; y: number; z: number; frame: number },
-    style: ITileOptions
+    frame: number,
+    color: string,
+    contrast: IContrast,
+    hist: any
   ) {
-    const url = new URL(
-      `${this.client.apiRoot}/item/${toId(item)}/tiles/zxy/${z}/${x}/${y}`
-    );
+    if (hist === null) {
+      return;
+    }
+    const url = new URL(`${this.client.apiRoot}/item/${toId(item)}/tiles/zxy`);
     url.searchParams.set("encoding", "PNG");
     url.searchParams.set("frame", frame.toString());
+    const style = toStyle(color, contrast, hist);
     url.searchParams.set("style", JSON.stringify(style));
-
-    return url.href;
-  }
-  wholeRegionUrl(
-    item: string | IGirderItem,
-    { frame }: { frame: number },
-    style: ITileOptions
-  ) {
-    const url = new URL(
-      `${this.client.apiRoot}/item/${toId(item)}/tiles/region`
-    );
-    url.searchParams.set("encoding", "PNG");
-    url.searchParams.set("frame", frame.toString());
-    url.searchParams.set("style", JSON.stringify(style));
-
-    return url.href;
-  }
-  private cleanOldImages(url: string): HTMLImageElement | undefined {
-    // delete images that match except for the style
-    const styleStart = url.indexOf("style=");
-    const search = url.slice(0, styleStart);
-
-    let removed: HTMLImageElement | undefined;
-    Array.from(this.imageCache.keys()).forEach(key => {
-      if (key !== url && key.startsWith(search)) {
-        removed = this.imageCache.get(key);
-        this.imageCache.delete(key);
-      }
-    });
-    return removed;
+    url.searchParams.set("edge", "crop");
+    return url.href.replace("tiles/zxy", "tiles/zxy/{z}/{x}/{y}");
   }
 
   getTiles(item: string | IGirderItem): Promise<ITileMeta> {
@@ -166,9 +144,9 @@ export default class GirderAPI {
 
   getDataset(
     id: string,
-    splayXY: boolean,
-    splayZ: boolean,
-    splayT: boolean
+    unrollXY: boolean,
+    unrollZ: boolean,
+    unrollT: boolean
   ): Promise<IDataset> {
     return Promise.all([this.getFolder(id), this.getItems(id)]).then(
       ([folder, items]) => {
@@ -181,7 +159,7 @@ export default class GirderAPI {
             return {
               ...asDataset(folder),
               configurations,
-              ...parseTiles(images, tiles, splayXY, splayZ, splayT)
+              ...parseTiles(images, tiles, unrollXY, unrollZ, unrollT)
             };
           }
         );
@@ -270,256 +248,6 @@ export default class GirderAPI {
     return this.client.delete(`/item/${config.id}`).then(() => config);
   }
 
-  private getFullImage(
-    item: any,
-    frame: any,
-    width: number,
-    height: number,
-    hist: any,
-    images: any
-  ): HTMLImageElement {
-    const key = `${item._id}|${frame}`;
-    if (!this.fullImageCache.has(key)) {
-      const image = new Image(width, height) as HTMLImageElementLocal;
-      image._promise = () => {
-        if (image.src && image.complete) {
-          return null;
-        }
-        let promise;
-        if (!hist) {
-          promise = this.getLayerHistogram(images);
-        } else {
-          promise = Promise.resolve(hist);
-        }
-        return promise.then(hist => {
-          let url = this.wholeRegionUrl(
-            item,
-            { frame: frame },
-            toStyle(
-              "#ffffff",
-              {
-                mode: "percentile",
-                blackPoint: 0,
-                whitePoint: 100,
-                savedBlackPoint: 0,
-                savedWhitePoint: 100
-              },
-              hist
-            )
-          );
-          image.src = url;
-          return image.decode();
-        });
-      };
-      this.fullImageCache.set(key, image as HTMLImageElement);
-    }
-    return this.fullImageCache.get(key)!;
-  }
-
-  private loadImage(
-    url: string,
-    width: number,
-    height: number,
-    oldImage: HTMLImageElementLocal | undefined,
-    hist: any,
-    images: any,
-    item: any,
-    frame: any,
-    color: string,
-    contrast: IContrast
-  ) {
-    if (this.imageCache.has(url)) {
-      return this.imageCache.get(url)!;
-    }
-    const image = new Image(width, height) as HTMLImageElementLocal;
-
-    // Keep the size of the cache under control.
-    if (this.imageCache.size === 100) {
-      const oldest = this.imageCache.entries().next().value[0];
-      this.imageCache.delete(oldest);
-    }
-
-    this.imageCache.set(url, image);
-    let promise: Promise<string>;
-    if (!hist) {
-      promise = this.getLayerHistogram(images).then(hist => {
-        const style = toStyle(color, contrast, hist);
-        url = this.wholeRegionUrl(item, { frame: frame }, style);
-        return url;
-      });
-    } else {
-      promise = Promise.resolve(url);
-    }
-    image._waitForHistogram = true;
-    if (oldImage !== undefined && oldImage._waitForHistogram) {
-      oldImage._waitForHistogram = false;
-    }
-    image._promise = () =>
-      promise.then((url: string) => {
-        if (!image._waitForHistogram) {
-          return null;
-        }
-        let retVal: Promise<void> | null = null;
-        image._waitForHistogram = false;
-
-        if (oldImage !== undefined && !(oldImage.complete && oldImage.src)) {
-          // if we emptied a value from the tracker, then attach an onload/onerror
-          // event to that image that sets the source IFF this url is still in the
-          // cache.  If it has fallen out of cache, call the onerror function.
-          const previousOnload = oldImage.onload;
-          const previousOnerror = oldImage.onerror;
-          const localSetSource = (event: any) => {
-            if (this.imageCache.get(url)) {
-              image.src = url;
-              retVal = image.decode();
-            } else {
-              if (image.onerror) {
-                image.onerror(event);
-              }
-            }
-          };
-          oldImage.onload = event => {
-            if (previousOnload) {
-              previousOnload.call(oldImage, event);
-            }
-            localSetSource(event);
-          };
-          oldImage.onerror = event => {
-            if (previousOnerror) {
-              previousOnerror.call(oldImage, event);
-            }
-            localSetSource(event);
-          };
-        } else {
-          // if the old image is resolved or not present, just set the src
-          image.src = url;
-          retVal = image.decode();
-        }
-        return retVal;
-      });
-
-    return image;
-  }
-
-  generateImages(
-    images: IImage[],
-    color: string,
-    contrast: IContrast,
-    canvasWidth: number
-  ) {
-    const resolvedImages: IImageTile[] = [];
-    let offsetX = 0;
-    let offsetY = 0;
-
-    const hist = this.getResolvedLayerHistogram(images);
-    const style = toStyle(color, contrast, hist);
-
-    const rowLength = canvasWidth
-      ? Math.round(canvasWidth / images[0].sizeX)
-      : Math.ceil(Math.sqrt(images.length));
-
-    images.forEach((image, idx) => {
-      /* This gets each tile separately, but since we get all of them this is
-       * less efficient than just getting the entire image at once.  There is
-       * some potential parallelization speed up, but its benefit is lost in
-       * other inefficiencies.
-      for (let x = 0; x < image.sizeX; x += image.tileWidth) {
-        const w = Math.min(image.sizeX - x, image.tileWidth);
-        for (let y = 0; y < image.sizeY; y += image.tileHeight) {
-          const h = Math.min(image.sizeY - y, image.tileHeight);
-          const loc = {
-            x: x / image.tileWidth,
-            y: y / image.tileHeight,
-            z: image.levels - 1, // highest level for max zoom
-            frame: image.frameIndex
-          };
-          const url = this.tileUrl(image.item, loc, style);
-          this.cleanOldImages(url);
-
-          resolvedImages.push({
-            x: offsetX + x,
-            y: offsetY + y,
-            width: w,
-            height: h,
-            url,
-            image: this.loadImage(
-              url,
-              image.tileWidth,
-              image.tileHeight
-            )
-          });
-        }
-      }
-      */
-      const url = this.wholeRegionUrl(
-        image.item,
-        { frame: image.frameIndex },
-        style
-      );
-      const oldImage = this.cleanOldImages(url);
-
-      resolvedImages.push({
-        x: offsetX,
-        y: offsetY,
-        width: image.sizeX,
-        height: image.sizeY,
-        frame: image.frameIndex,
-        url,
-        image: this.loadImage(
-          url,
-          image.sizeX,
-          image.sizeY,
-          oldImage as HTMLImageElementLocal,
-          hist,
-          images,
-          image.item,
-          image.frameIndex,
-          color,
-          contrast
-        ),
-        fullImage: this.getFullImage(
-          image.item,
-          image.frameIndex,
-          image.sizeX,
-          image.sizeY,
-          hist,
-          images
-        )
-      });
-
-      if ((idx + 1) % rowLength === 0) {
-        offsetX = 0;
-        offsetY += image.sizeY;
-      } else {
-        offsetX += image.sizeX;
-      }
-    });
-
-    // TODO: since we merge histograms for multi-image layers, full-range
-    // images can't use min/max as their defaults -- they need to be informed
-    // by the histogram, too.
-    Promise.map(
-      resolvedImages,
-      imgEntry => {
-        const img = imgEntry.fullImage as HTMLImageElementLocal;
-        return img._promise();
-      },
-      { concurrency: ImageConcurrency }
-    );
-    // we may want to chain these together to ensure that the full-range images
-    // have all started before the styled images.  However, currently we only
-    // redraw when a styled image arrives, so that would need to change.
-    Promise.map(
-      resolvedImages,
-      imgEntry => {
-        const img = imgEntry.image as HTMLImageElementLocal;
-        return img._promise();
-      },
-      { concurrency: ImageConcurrency }
-    );
-    return resolvedImages;
-  }
-
   getLayerHistogram(images: IImage[]) {
     const key = images.map(i => `${i.item._id}#${i.frameIndex}`).join(",");
     if (this.histogramCache.has(key)) {
@@ -537,9 +265,11 @@ export default class GirderAPI {
       { concurrency: HistogramConcurrency }
     ).then((histograms: ITileHistogram[]) => mergeHistograms(histograms));
     this.histogramCache.set(key, promise);
-    promise.then((hist: ITileHistogram) =>
-      this.resolvedHistogramCache.set(key, hist)
-    );
+    promise.then((hist: ITileHistogram) => {
+      this.resolvedHistogramCache.set(key, hist);
+      this.histogramsLoaded = this.histogramsLoaded + 1;
+      return hist;
+    });
     return promise;
   }
 
@@ -572,12 +302,13 @@ function asDataset(folder: IGirderFolder): IDataset {
     description: folder.description,
     xy: [],
     z: [],
-    width: 100,
-    height: 100,
+    width: 1,
+    height: 1,
     time: [],
     channels: [],
     channelNames: new Map<number, string>(),
     images: () => [],
+    anyImage: () => null,
     configurations: []
   };
 }
@@ -642,9 +373,9 @@ function toKey(
 function parseTiles(
   items: IGirderItem[],
   tiles: ITileMeta[],
-  splayXY: boolean,
-  splayZ: boolean,
-  splayT: boolean
+  unrollXY: boolean,
+  unrollZ: boolean,
+  unrollT: boolean
 ) {
   // t x z x c -> IImage[]
 
@@ -656,8 +387,8 @@ function parseTiles(
   const channelInt = new Map<string | null, number>();
   const lookup = new Map<string, IImage[]>();
   let frameChannels: string[] | undefined;
-  let splayCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
-  let splayOrder: string[] = [];
+  let unrollCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
+  let unrollOrder: string[] = [];
   tiles.forEach((tile, i) => {
     const item = items[i]!;
     const metadata = getNumericMetadata(item.name);
@@ -668,7 +399,7 @@ function parseTiles(
     frameChannels = tile.channels;
 
     if (!tile.frames) {
-      tile.frames = [{Index:0, Frame: 0} as unknown as IFrameInfo];
+      tile.frames = [({ Index: 0, Frame: 0 } as unknown) as IFrameInfo];
     }
 
     tile.frames.forEach((frame, j) => {
@@ -680,25 +411,25 @@ function parseTiles(
           : frame.IndexZ !== undefined
           ? frame.IndexZ
           : frame.PositionZ;
-      if (splayT) {
-        splayCount.t = Math.max(splayCount.t, t + 1);
+      if (unrollT) {
+        unrollCount.t = Math.max(unrollCount.t, t + 1);
         t = -1;
-        if (!splayOrder.includes("t")) {
-          splayOrder.push("t");
+        if (!unrollOrder.includes("t")) {
+          unrollOrder.push("t");
         }
       }
-      if (splayXY) {
-        splayCount.xy = Math.max(splayCount.xy, xy + 1);
+      if (unrollXY) {
+        unrollCount.xy = Math.max(unrollCount.xy, xy + 1);
         xy = -1;
-        if (!splayOrder.includes("xy")) {
-          splayOrder.push("xy");
+        if (!unrollOrder.includes("xy")) {
+          unrollOrder.push("xy");
         }
       }
-      if (splayZ) {
-        splayCount.z = Math.max(splayCount.z, z + 1);
+      if (unrollZ) {
+        unrollCount.z = Math.max(unrollCount.z, z + 1);
         z = -1;
-        if (!splayOrder.includes("z")) {
-          splayOrder.push("z");
+        if (!unrollOrder.includes("z")) {
+          unrollOrder.push("z");
         }
       }
       const metadataChannel =
@@ -743,8 +474,8 @@ function parseTiles(
   // TODO: this approach assumes all images have the same size.
   lookup.forEach(images => {
     let rowLength = Math.ceil(Math.sqrt(images.length));
-    if (splayOrder.length > 1) {
-      rowLength = splayCount[splayOrder[0]];
+    if (unrollOrder.length > 1) {
+      rowLength = unrollCount[unrollOrder[0]];
     }
     const colLength = Math.ceil(images.length / rowLength);
 
@@ -793,6 +524,19 @@ function parseTiles(
   return {
     images: (z: number, zTime: number, xy: number, channel: number) =>
       lookup.get(toKey(z, zTime, xy, channel)) || [],
+    anyImage: () => {
+      const values = lookup.values();
+      let it = values.next();
+      while (!it.done) {
+        if (it.value.length > 0) {
+          return it.value[0];
+        }
+
+        it = values.next();
+      }
+
+      return null;
+    },
     xy: Array.from(xys).sort((a, b) => a - b),
     z: zValues,
     time: zTime,

@@ -10,7 +10,6 @@ import {
 import GirderAPI from "./GirderAPI";
 import { getLayerImages } from "./images";
 import {
-  CompositionMode,
   IDataset,
   IDatasetConfiguration,
   IDatasetConfigurationMeta,
@@ -21,10 +20,7 @@ import {
 import persister from "./Persister";
 import store from "./root";
 import sync from "./sync";
-import {
-  DEFAULT_COMPOSITION_MODE,
-  MAX_NUMBER_OF_RECENT_CONFIGURATIONS
-} from "./constants";
+import { MAX_NUMBER_OF_RECENT_CONFIGURATIONS } from "./constants";
 
 export { default as store } from "./root";
 
@@ -50,12 +46,11 @@ export class Main extends VuexModule {
   xy: number = 0;
   z: number = 0;
   time: number = 0;
-  compositionMode: CompositionMode = DEFAULT_COMPOSITION_MODE;
   layerMode: "single" | "multiple" = "multiple";
 
-  splayXY: boolean = false;
-  splayZ: boolean = false;
-  splayT: boolean = false;
+  unrollXY: boolean = false;
+  unrollZ: boolean = false;
+  unrollT: boolean = false;
 
   get userName() {
     return this.girderUser ? this.girderUser.login : "anonymous";
@@ -160,18 +155,18 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  public setSplayXYImpl(value: boolean) {
-    this.splayXY = value;
+  public setUnrollXYImpl(value: boolean) {
+    this.unrollXY = value;
   }
 
   @Mutation
-  public setSplayZImpl(value: boolean) {
-    this.splayZ = value;
+  public setUnrollZImpl(value: boolean) {
+    this.unrollZ = value;
   }
 
   @Mutation
-  public setSplayTImpl(value: boolean) {
-    this.splayT = value;
+  public setUnrollTImpl(value: boolean) {
+    this.unrollT = value;
   }
 
   @Action
@@ -273,9 +268,9 @@ export class Main extends VuexModule {
       sync.setLoading(true);
       const r = await this.api.getDataset(
         id,
-        this.splayXY,
-        this.splayZ,
-        this.splayT
+        this.unrollXY,
+        this.unrollZ,
+        this.unrollT
       );
       this.setDataset({ id, data: r });
       sync.setLoading(false);
@@ -442,8 +437,8 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async setSplayXY(value: boolean) {
-    this.setSplayXYImpl(value);
+  async setUnrollXY(value: boolean) {
+    this.setUnrollXYImpl(value);
   }
 
   @Action
@@ -452,8 +447,8 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async setSplayZ(value: boolean) {
-    this.setSplayZImpl(value);
+  async setUnrollZ(value: boolean) {
+    this.setUnrollZImpl(value);
   }
 
   @Action
@@ -462,8 +457,8 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async setSplayT(value: boolean) {
-    this.setSplayTImpl(value);
+  async setUnrollT(value: boolean) {
+    this.setUnrollTImpl(value);
   }
 
   @Mutation
@@ -508,16 +503,6 @@ export class Main extends VuexModule {
     }
     this.pushLayer(newLayer(this.dataset, this.configuration.layers));
     await this.syncConfiguration();
-  }
-
-  @Mutation
-  private setCompositionModeImpl(mode: CompositionMode) {
-    this.compositionMode = mode;
-  }
-
-  @Action
-  async setCompositionMode(mode: CompositionMode) {
-    this.setCompositionModeImpl(mode);
   }
 
   @Mutation
@@ -624,34 +609,51 @@ export class Main extends VuexModule {
     await this.syncConfiguration();
   }
 
-  get imageStack(): IImageTile[][] {
-    if (!this.dataset || !this.configuration) {
+  get layerStackImages(): any {
+    if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
       return [];
     }
-    const ds = this.dataset;
     const layers = this.configuration.layers;
 
-    return layers
-      .filter(d => d.visible)
-      .map(layer => {
-        const images = getLayerImages(layer, ds, this.time, this.xy, this.z);
-        return this.api.generateImages(
-          images,
-          layer.color,
-          layer.contrast,
-          ds.width
-        );
-      });
-  }
-
-  get layerStack(): IDisplayLayer[] {
-    if (!this.dataset || !this.configuration) {
-      return [];
-    }
-    const ds = this.dataset;
-    const layers = this.configuration.layers;
-
-    return layers.filter(d => d.visible);
+    return layers.map(layer => {
+      const images = getLayerImages(
+        layer,
+        this.dataset!,
+        this.time,
+        this.xy,
+        this.z
+      );
+      const hist = this.api.getResolvedLayerHistogram(images);
+      return {
+        layer,
+        images,
+        urls: images.map(image =>
+          this.api.tileTemplateUrl(
+            image.item,
+            image.frameIndex,
+            layer.color,
+            layer.contrast,
+            hist
+          )
+        ),
+        fullUrls: images.map(image =>
+          this.api.tileTemplateUrl(
+            image.item,
+            image.frameIndex,
+            "#ffffff",
+            {
+              mode: "percentile",
+              blackPoint: 0,
+              whitePoint: 100,
+              savedBlackPoint: 0,
+              savedWhitePoint: 100
+            },
+            hist
+          )
+        ),
+        hist
+      };
+    });
   }
 
   get getLayerHistogram() {

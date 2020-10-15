@@ -4,8 +4,6 @@
 <script lang="ts">
 import store from "@/store";
 import routeMapper from "@/utils/routeMapper";
-import { CompositionMode } from "@/store/model";
-import { DEFAULT_COMPOSITION_MODE } from "@/store/constants";
 
 export default routeMapper(
   {
@@ -23,8 +21,8 @@ export default routeMapper(
     },
     unrollXY: {
       parse: v => v === "true",
-      get: () => store.splayXY,
-      set: (value: boolean) => store.setSplayXY(value)
+      get: () => store.unrollXY,
+      set: (value: boolean) => store.setUnrollXY(value)
     },
     z: {
       parse: v => parseInt(v, 10),
@@ -33,8 +31,8 @@ export default routeMapper(
     },
     unrollZ: {
       parse: v => v === "true",
-      get: () => store.splayZ,
-      set: (value: boolean) => store.setSplayZ(value)
+      get: () => store.unrollZ,
+      set: (value: boolean) => store.setUnrollZ(value)
     },
     time: {
       parse: v => parseInt(v, 10),
@@ -43,14 +41,8 @@ export default routeMapper(
     },
     unrollT: {
       parse: v => v === "true",
-      get: () => store.splayT,
-      set: (value: boolean) => store.setSplayT(value)
-    },
-    mode: {
-      parse: v => v as CompositionMode,
-      get: () => store.compositionMode,
-      set: (value: CompositionMode) =>
-        store.setCompositionMode(value || DEFAULT_COMPOSITION_MODE)
+      get: () => store.unrollT,
+      set: (value: boolean) => store.setUnrollT(value)
     },
     layer: {
       parse: v => v,

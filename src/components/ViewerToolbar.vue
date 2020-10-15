@@ -10,9 +10,9 @@
           :title="maxXY > 0 ? maxXY + 1 + ' XY Values' : ''"
         />
         <v-checkbox
-          v-model="splayXY"
+          v-model="unrollXY"
           label="Unroll"
-          :disabled="!(maxXY > 0 || splayXY)"
+          :disabled="!(maxXY > 0 || unrollXY)"
         />
       </v-layout>
       <v-layout>
@@ -24,9 +24,9 @@
           :title="maxZ > 0 ? maxZ + 1 + ' Z Values' : ''"
         />
         <v-checkbox
-          v-model="splayZ"
+          v-model="unrollZ"
           label="Unroll"
-          :disabled="!(maxZ > 0 || splayZ)"
+          :disabled="!(maxZ > 0 || unrollZ)"
         />
       </v-layout>
       <v-layout>
@@ -38,9 +38,9 @@
           :title="maxTime > 0 ? maxTime + 1 + ' Time Values' : ''"
         />
         <v-checkbox
-          v-model="splayT"
+          v-model="unrollT"
           label="Unroll"
-          :disabled="!(maxTime > 0 || splayT)"
+          :disabled="!(maxTime > 0 || unrollT)"
         />
       </v-layout>
       <switch-toggle
@@ -55,23 +55,6 @@
     </div>
     <div class="lowertools">
       <slot></slot>
-      <v-select
-        v-model="mode"
-        label="Composition Mode"
-        :items="modes"
-        hide-details
-      >
-        <template #append>
-          <v-btn
-            href="https://mdn.mozillademos.org/en-US/docs/Web/API/Canvas_API/Tutorial/Compositing/Example$samples/Compositing_example"
-            rel="noopener noreferrer"
-            target="_blank"
-            icon
-          >
-            <v-icon>mdi-open-in-new</v-icon>
-          </v-btn>
-        </template>
-      </v-select>
     </div>
   </div>
 </template>
@@ -90,7 +73,6 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
 import store from "@/store";
-import { COMPOSITION_MODES } from "@/store/model";
 
 @Component({
   components: {
@@ -100,16 +82,6 @@ import { COMPOSITION_MODES } from "@/store/model";
 })
 export default class ViewerToolbar extends Vue {
   readonly store = store;
-
-  readonly modes = COMPOSITION_MODES.map(v => ({
-    text: v[0],
-    help: v[1],
-    value: v[0]
-  }));
-
-  get mode() {
-    return this.store.compositionMode;
-  }
 
   private changeQuery(param: string, value: string) {
     const old = this.$route.query[param];
@@ -122,10 +94,6 @@ export default class ViewerToolbar extends Vue {
         [param]: value
       }
     });
-  }
-
-  set mode(value: string) {
-    this.changeQuery("mode", value);
   }
 
   get xy() {
@@ -152,43 +120,43 @@ export default class ViewerToolbar extends Vue {
     this.changeQuery("time", value.toString());
   }
 
-  get splayXY() {
-    return this.store.splayXY;
+  get unrollXY() {
+    return this.store.unrollXY;
   }
 
-  set splayXY(value: boolean) {
+  set unrollXY(value: boolean) {
     this.changeQuery("unrollXY", value.toString());
   }
 
-  @Watch("splayXY")
-  watchSplayXY(_value: boolean) {
+  @Watch("unrollXY")
+  watchUnrollXY(_value: boolean) {
     this.store.refreshDataset();
   }
 
-  get splayZ() {
-    return this.store.splayZ;
+  get unrollZ() {
+    return this.store.unrollZ;
   }
 
-  set splayZ(value: boolean) {
-    this.store.setSplayZ(value);
+  set unrollZ(value: boolean) {
+    this.store.setUnrollZ(value);
     this.changeQuery("unrollZ", value.toString());
   }
 
-  @Watch("splayZ")
-  watchSplayZ(_value: boolean) {
+  @Watch("unrollZ")
+  watchUnrollZ(_value: boolean) {
     this.store.refreshDataset();
   }
 
-  get splayT() {
-    return this.store.splayT;
+  get unrollT() {
+    return this.store.unrollT;
   }
 
-  set splayT(value: boolean) {
+  set unrollT(value: boolean) {
     this.changeQuery("unrollT", value.toString());
   }
 
-  @Watch("splayT")
-  watchSplayT(_value: boolean) {
+  @Watch("unrollT")
+  watchUnrollT(_value: boolean) {
     this.store.refreshDataset();
   }
 

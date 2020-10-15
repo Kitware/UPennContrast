@@ -1,24 +1,21 @@
 <template>
   <div class="image">
-    <canvas
-      class="canvas"
-      ref="canvas"
-      :width="width"
-      :height="height"
-      :data-update="reactiveDraw"
-      :style="{ transform: cssTransform }"
-    />
-    <!-- <resize-observer @notify="handleResize" /> -->
-    <div class="loading" v-if="readyPercentage < 100">
+    <div id="map" ref="geojsmap" :data-update="reactiveDraw" />
+    <div class="loading" v-if="!fullyReady">
       <v-progress-circular indeterminate />
     </div>
     <svg xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <filter id="recolor" color-interpolation-filters="sRGB">
+        <filter
+          :id="'recolor-' + index"
+          color-interpolation-filters="sRGB"
+          v-for="(item, index) in imageLayers"
+          :key="'recolor-' + index"
+        >
           <feComponentTransfer>
-            <feFuncR id="func-r" type="linear" slope="0" intercept="0" />
-            <feFuncG id="func-g" type="linear" slope="0" intercept="0" />
-            <feFuncB id="func-b" type="linear" slope="0" intercept="0" />
+            <feFuncR class="func-r" type="linear" slope="0" intercept="0" />
+            <feFuncG class="func-g" type="linear" slope="0" intercept="0" />
+            <feFuncB class="func-b" type="linear" slope="0" intercept="0" />
           </feComponentTransfer>
         </filter>
       </defs>
@@ -26,9 +23,12 @@
   </div>
 </template>
 <script lang="ts">
+// in cosole debugging, you can access the map via
+//  $('.geojs-map').data('data-geojs-map')
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import { select, event as d3Event } from "d3-selection";
+import geojs from "geojs";
 import {
   zoom as d3Zoom,
   D3ZoomEvent,
@@ -38,12 +38,13 @@ import {
 import { IImageTile } from "../store/model";
 
 function generateFilterURL(
+  index: number,
   contrast: { whitePoint: number; blackPoint: number; mode: string },
   color: string,
   hist: { min: number; max: number }
-): string {
+) {
   if (hist === null) {
-    return "";
+    return;
   }
   // Tease out the RGB color levels.
   const toVal = (s: string) => parseInt(`0x${s}`) / 255;
@@ -53,12 +54,16 @@ function generateFilterURL(
   const blue = toVal(color.slice(5, 7));
 
   const setSlopeIntercept = (
+    index: number,
     id: string,
     wp: number,
     bp: number,
     level: number
   ) => {
-    const el = document.getElementById(id)!;
+    const el = document.querySelector(`#recolor-${index} .${id}`);
+    if (!el) {
+      return;
+    }
 
     const levelP = level;
     const wpP = wp;
@@ -74,11 +79,9 @@ function generateFilterURL(
   const whitePoint = scalePoint(contrast.whitePoint, contrast.mode);
   const blackPoint = scalePoint(contrast.blackPoint, contrast.mode);
 
-  setSlopeIntercept("func-r", whitePoint, blackPoint, red);
-  setSlopeIntercept("func-g", whitePoint, blackPoint, green);
-  setSlopeIntercept("func-b", whitePoint, blackPoint, blue);
-
-  return "#recolor";
+  setSlopeIntercept(index, "func-r", whitePoint, blackPoint, red);
+  setSlopeIntercept(index, "func-g", whitePoint, blackPoint, green);
+  setSlopeIntercept(index, "func-b", whitePoint, blackPoint, blue);
 }
 
 @Component
@@ -86,201 +89,287 @@ export default class ImageViewer extends Vue {
   readonly store = store;
 
   private refsMounted = false;
-  private transform = Object.assign({}, zoomIdentity);
 
-  private containerDimensions = { width: 100, height: 100 };
+  private ready = { layers: [] };
 
-  readonly zoom = d3Zoom<HTMLElement, any>()
-    .on("zoom", () => {
-      this.zoomed(d3Event as D3ZoomEvent<HTMLElement, any>);
-    })
-    .on("start", function(this: HTMLElement) {
-      const event = (d3Event as D3ZoomEvent<HTMLElement, any>).sourceEvent;
-      if (event && event.type === "wheel") {
-        this.classList.add(event.wheelDelta > 0 ? "zoomIn" : "zoomOut");
-      } else {
-        this.classList.add("grabbing");
-      }
-    })
-    .on("end", function(this: HTMLElement) {
-      this.classList.remove("grabbing", "zoomIn", "zoomOut");
-    });
+  private imageLayers: any[] = [];
 
-  private ready: string[] = [];
+  private layerParams: any;
+  private map: any;
+  private unrollW: number = 1;
+  private unrollH: number = 1;
 
   $refs!: {
-    canvas: HTMLCanvasElement;
+    geojsmap: HTMLElement;
   };
 
-  get cssTransform() {
-    return `translate(${this.transform.x}px, ${this.transform.y}px) scale(${this.transform.k})`;
+  get fullyReady() {
+    return this.ready.layers.every(d => d);
   }
 
-  get readyPercentage() {
-    const total = this.imageStack.reduce((acc, d) => acc + d.length, 0);
-    const urls = this.imageStack.reduce<string[]>(
-      (acc, d) => acc.concat(d.map(i => i.url)),
-      []
-    );
-    const loaded = this.ready.filter(u => urls.indexOf(u) >= 0).length;
-    return Math.round((100.0 * loaded) / total);
+  get dataset() {
+    return this.store.dataset;
   }
 
   get width() {
-    return this.store.dataset ? this.store.dataset.width : 100;
+    return this.store.dataset ? this.store.dataset.width : 1;
   }
 
   get height() {
-    return this.store.dataset ? this.store.dataset.height : 100;
-  }
-
-  get imageStack() {
-    return this.store.imageStack;
-  }
-
-  get layerStack() {
-    return this.store.layerStack;
-  }
-
-  private trackImages(value: IImageTile[][]) {
-    this.ready = [];
-    value.forEach(layer => {
-      layer.forEach(tile => {
-        if (tile.image.src && tile.image.complete) {
-          if (!this.ready.includes(tile.url)) {
-            this.ready.push(tile.url);
-          }
-        } else {
-          const tileImage = tile.image;
-          const previousOnload = tileImage.onload;
-          tile.image.onload = event => {
-            // not just loaded but also decoded
-            tile.image.decode().then(() => {
-              if (!this.ready.includes(tile.url)) {
-                this.ready.push(tile.url);
-              }
-            });
-            if (previousOnload) {
-              previousOnload.call(tileImage, event);
-            }
-          };
-        }
-      });
-    });
-  }
-
-  @Watch("width")
-  watchWidth() {
-    this.$nextTick(() => this.centerZoom());
-  }
-
-  @Watch("height")
-  watchHeight() {
-    this.$nextTick(() => this.centerZoom());
-  }
-
-  @Watch("imageStack")
-  watchImageStack(value: IImageTile[][]) {
-    this.trackImages(value);
+    return this.store.dataset ? this.store.dataset.height : 1;
   }
 
   mounted() {
     this.refsMounted = true;
-    this.updateContainerSize();
-    this.initZoom();
-    this.trackImages(this.imageStack);
-    this.centerZoom();
-  }
-
-  private d3Element() {
-    return select(this.$el as HTMLElement);
-  }
-
-  private initZoom() {
-    this.d3Element().call(this.zoom);
-  }
-
-  private centerZoom() {
-    const cw = this.containerDimensions.width;
-    const ch = this.containerDimensions.height;
-
-    // transform image such that it is in the center maybe even scaled
-    const k = Math.min(cw / this.width, ch / this.height, 1);
-    const x = (cw - this.width * k) / 2;
-    const y = (ch - this.height * k) / 2;
-
-    this.transform = zoomIdentity.translate(x, y).scale(k);
-    this.zoom.transform(this.d3Element(), this.transform);
-  }
-
-  private zoomed(evt: D3ZoomEvent<HTMLElement, any>) {
-    this.transform = evt.transform;
-  }
-
-  updateContainerSize() {
-    const { width, height } = this.$el.getBoundingClientRect();
-    this.containerDimensions = { width, height };
   }
 
   get reactiveDraw() {
-    if (!this.refsMounted || !this.$refs.canvas) {
+    if (!this.refsMounted || !this.$refs.geojsmap) {
       return;
     }
-    this.draw(this.$refs.canvas);
+    this.draw(this.$refs.geojsmap);
   }
 
-  private get layers() {
-    return this.store.configuration ? this.store.configuration.layers : [];
+  private get layerStackImages() {
+    return this.store.configuration ? this.store.layerStackImages : [];
   }
 
-  private draw(canvas: HTMLCanvasElement) {
-    const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.globalCompositeOperation = this.store.compositionMode;
-
-    const isReady = new Set(this.ready);
-
-    const layers = this.layerStack;
-    this.imageStack.forEach((layer, layerIndex) => {
-      layer.forEach(tile => {
-        if (!isReady.has(tile.url)) {
-          const layerConfig = layers[layerIndex];
-          const filterURL = generateFilterURL(
-            layerConfig.contrast,
-            layerConfig.color,
-            layerConfig._histogram.last
-          );
-          if (filterURL === "") {
-            return;
-          }
-          ctx.filter = `url(${filterURL})`;
-          ctx.drawImage(
-            tile.fullImage,
-            0,
-            0,
-            tile.width,
-            tile.height,
-            tile.x,
-            tile.y,
-            tile.width,
-            tile.height
-          );
-          ctx.filter = "none";
+  private draw(mapElement: HTMLElement) {
+    if ((this.width == this.height && this.width == 1) || !this.dataset) {
+      return;
+    }
+    if (!this.layerStackImages.length) {
+      return;
+    }
+    let unrollCount = this.layerStackImages[0].images.length;
+    const someImage = this.layerStackImages[0].images[0];
+    let unrollW = Math.min(
+      unrollCount,
+      Math.ceil(
+        Math.sqrt(someImage.sizeX * someImage.sizeY * unrollCount) /
+          someImage.sizeX
+      )
+    );
+    let unrollH = Math.ceil(unrollCount / unrollW);
+    let mapWidth = unrollW * someImage.sizeX;
+    let mapHeight = unrollH * someImage.sizeY;
+    let adjustLayers = true;
+    let tileWidth = someImage.tileWidth;
+    let tileHeight = someImage.tileHeight;
+    let params = geojs.util.pixelCoordinateParams(
+      mapElement,
+      someImage.sizeX,
+      someImage.sizeY,
+      tileWidth,
+      tileHeight
+    );
+    params.map.maxBounds.right = mapWidth;
+    params.map.maxBounds.bottom = mapHeight;
+    params.map.min -= Math.ceil(
+      Math.log(Math.max(unrollW, unrollH)) / Math.log(2)
+    );
+    params.map.zoom = params.map.min;
+    params.map.center = { x: mapWidth / 2, y: mapHeight / 2 };
+    params.layer.useCredentials = true;
+    params.layer.autoshareRenderer = false;
+    delete params.layer.tilesMaxBounds;
+    params.layer.url =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+    params.map.max += 1;
+    this.layerParams = params.layer;
+    if (!this.map) {
+      this.map = geojs.map(params.map);
+      // TODO: add annotation layer
+    } else {
+      adjustLayers =
+        Math.abs(this.map.maxBounds(undefined, null).right - mapWidth) >= 0.5 ||
+        Math.abs(this.map.maxBounds(undefined, null).bottom - mapHeight) >= 0.5;
+      if (adjustLayers) {
+        this.map.maxBounds({
+          left: 0,
+          top: 0,
+          right: params.map.maxBounds.right,
+          bottom: params.map.maxBounds.bottom
+        });
+        this.map.zoomRange(params.map);
+      }
+    }
+    const mapnode = this.map.node();
+    if (
+      mapnode.width() != this.map.size().width ||
+      mapnode.height() != this.map.size.height
+    ) {
+      this.map.size({ width: mapnode.width(), height: mapnode.height() });
+    }
+    // adjust number of tile layers
+    while (this.imageLayers.length > this.layerStackImages.length * 2) {
+      this.map.deleteLayer(this.imageLayers.pop());
+    }
+    this.unrollW = unrollW;
+    this.unrollH = unrollH;
+    while (this.imageLayers.length < this.layerStackImages.length * 2) {
+      this.layerParams.tilesAtZoom = (level: number) => {
+        const s = Math.pow(2, someImage.levels - 1 - level);
+        const result = {
+          x:
+            Math.ceil(someImage.sizeX / s / someImage.tileWidth) * this.unrollW,
+          y:
+            Math.ceil(someImage.sizeY / s / someImage.tileHeight) * this.unrollH
+        };
+        return result;
+      };
+      if (this.imageLayers.length >= 12) {
+        this.layerParams.renderer = "canvas";
+      } else {
+        delete this.layerParams.renderer;
+      }
+      this.imageLayers.push(this.map.createLayer("osm", this.layerParams));
+      let layer = this.imageLayers[this.imageLayers.length - 1];
+      if (this.imageLayers.length & 1) {
+        const index = (this.imageLayers.length - 1) / 2;
+        layer.node().css("filter", `url(#recolor-${index})`);
+      }
+      layer.url((x: number, y: number, level: number) => {
+        const s = Math.pow(2, someImage.levels - 1 - level);
+        const txy = {
+          x: Math.ceil(someImage.sizeX / s / someImage.tileWidth),
+          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight)
+        };
+        const imageNum =
+          Math.floor(x / txy.x) + Math.floor(y / txy.y) * this.unrollW;
+        if (!layer._imageUrls || !layer._imageUrls[imageNum]) {
+          return params.layer.url;
+        }
+        const tx = x % txy.x;
+        const ty = y % txy.y;
+        const result = layer._imageUrls[imageNum]
+          .replace("{z}", level)
+          .replace("{x}", tx)
+          .replace("{y}", ty);
+        return result;
+      });
+      const o = layer._tileBounds;
+      layer._tileBounds = (tile: any) => {
+        const s = Math.pow(2, someImage.levels - 1 - tile.index.level);
+        const w = Math.ceil(someImage.sizeX / s),
+          h = Math.ceil(someImage.sizeY / s);
+        const txy = {
+          x: Math.ceil(someImage.sizeX / s / someImage.tileWidth),
+          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight)
+        };
+        const imagexy = {
+          x: Math.floor(tile.index.x / txy.x),
+          y: Math.floor(tile.index.y / txy.y)
+        };
+        const tilexy = {
+          x: tile.index.x % txy.x,
+          y: tile.index.y % txy.y
+        };
+        const result = {
+          left: tilexy.x * tile.size.x + w * imagexy.x,
+          top: tilexy.y * tile.size.y + h * imagexy.y,
+          right: Math.min((tilexy.x + 1) * tile.size.x, w) + w * imagexy.x,
+          bottom: Math.min((tilexy.y + 1) * tile.size.y, h) + h * imagexy.y
+        };
+        return result;
+      };
+      layer.tileAtPoint = (point: any, level: number) => {
+        point = layer.displayToLevel(
+          layer.map().gcsToDisplay(point, null),
+          someImage.levels - 1
+        );
+        const s = Math.pow(2, someImage.levels - 1 - level);
+        const x = point.x,
+          y = point.y;
+        const txy = {
+          x: Math.ceil(someImage.sizeX / s / someImage.tileWidth),
+          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight)
+        };
+        const result = {
+          x:
+            Math.floor(x / someImage.sizeX) * txy.x +
+            Math.floor(
+              (x - Math.floor(x / someImage.sizeX) * someImage.sizeX) /
+                someImage.tileWidth /
+                s
+            ),
+          y:
+            Math.floor(y / someImage.sizeY) * txy.y +
+            Math.floor(
+              (y - Math.floor(y / someImage.sizeY) * someImage.sizeY) /
+                someImage.tileHeight /
+                s
+            )
+        };
+        return result;
+      };
+    }
+    this.ready.layers.splice(this.layerStackImages.length);
+    // set tile urls
+    this.layerStackImages.forEach(
+      (
+        {
+          layer,
+          urls,
+          fullUrls,
+          hist
+        }: { layer: any; urls: string[]; fullUrls: string[]; hist: any },
+        layerIndex: number
+      ) => {
+        let fullLayer = this.imageLayers[layerIndex * 2];
+        let adjLayer = this.imageLayers[layerIndex * 2 + 1];
+        // set fullLayer's transform
+        generateFilterURL(layerIndex, layer.contrast, layer.color, hist);
+        if (!fullUrls[0] || !urls[0]) {
+          fullLayer.visible(false);
+          adjLayer.visible(false);
+          Vue.set(this.ready.layers, layerIndex, true);
           return;
         }
-        ctx.drawImage(
-          tile.image,
-          0,
-          0,
-          tile.width,
-          tile.height,
-          tile.x,
-          tile.y,
-          tile.width,
-          tile.height
-        );
-      });
-    });
+        fullLayer.visible(true);
+        adjLayer.visible(true);
+        // use css visibility so that geojs will still load tiles when not
+        // visible.
+        if (
+          !fullLayer._imageUrls ||
+          fullUrls.length !== fullLayer._imageUrls.length ||
+          fullUrls.some((url, idx) => url !== fullLayer._imageUrls[idx])
+        ) {
+          fullLayer._imageUrls = fullUrls;
+          fullLayer.reset();
+        }
+        if (
+          !adjLayer._imageUrls ||
+          urls.length !== adjLayer._imageUrls.length ||
+          urls.some((url, idx) => url !== adjLayer._imageUrls[idx])
+        ) {
+          adjLayer._imageUrls = urls;
+          adjLayer.reset();
+          adjLayer.map().draw();
+          adjLayer.onIdle(() => {
+            if (
+              fullUrls.every((url, idx) => url === fullLayer._imageUrls[idx]) &&
+              urls.every((url, idx) => url === adjLayer._imageUrls[idx])
+            ) {
+              fullLayer.node().css("visibility", "hidden");
+              adjLayer
+                .node()
+                .css("visibility", layer.visible ? "visible" : "hidden");
+              Vue.set(this.ready.layers, layerIndex, true);
+            }
+          });
+        }
+        const idle = fullLayer.idle && adjLayer.idle;
+        fullLayer
+          .node()
+          .css("visibility", !idle && layer.visible ? "visible" : "hidden");
+        adjLayer
+          .node()
+          .css("visibility", idle && layer.visible ? "visible" : "hidden");
+        Vue.set(this.ready.layers, layerIndex, idle);
+      }
+    );
+    this.map.draw();
   }
 }
 </script>
@@ -289,36 +378,21 @@ export default class ImageViewer extends Vue {
 .image {
   position: relative;
   overflow: hidden;
-  cursor: grab;
 }
-
-.grabbing {
-  cursor: grabbing;
-}
-
-.zoomIn {
-  cursor: nwse-resize;
-  cursor: -moz-zoom-in;
-  cursor: -webkit-zoom-in;
-}
-
-.zoomOut {
-  cursor: nwse-resize;
-  cursor: -moz-zoom-out;
-  cursor: -webkit-zoom-out;
-}
-
 .loading {
-  position: absolute;
-  top: 0;
-  right: 0;
+  color: white;
 }
-
-.canvas {
+.geojs-map {
   position: absolute;
   left: 0;
   top: 0;
-  transform-origin: 0 0;
-  border: 1px solid black;
+  width: 100%;
+  height: 100%;
+  background: black;
+}
+</style>
+<style lang="scss">
+.geojs-map .geojs-layer {
+  mix-blend-mode: lighten;
 }
 </style>
