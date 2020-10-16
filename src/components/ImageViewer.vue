@@ -359,7 +359,7 @@ export default class ImageViewer extends Vue {
             }
           });
         }
-        const idle = fullLayer.idle && adjLayer.idle;
+        const idle = /* fullLayer.idle && */ adjLayer.idle;
         fullLayer
           .node()
           .css("visibility", !idle && layer.visible ? "visible" : "hidden");
