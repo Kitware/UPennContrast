@@ -28,12 +28,16 @@
 </template>
 
 <script lang="ts">
+import axios from "axios";
 import Menu from "./layout/Menu.vue";
 import UserMenu from "./layout/UserMenu.vue";
 import ServerStatus from "./components/ServerStatus.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
+import vMousetrap from "./utils/v-mousetrap";
 import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
+
+Vue.use(vMousetrap);
 
 @Component({
   components: {
@@ -44,7 +48,24 @@ import store from "@/store";
   }
 })
 export default class App extends Vue {
+  readonly store = store;
   drawer = false;
+
+  fetchConfig() {
+    axios
+      .get("config/modes.json")
+      .then(resp => {
+        this.store.setAnnotationModeList(resp.data.annotation_buttons);
+      })
+      .catch(err => {
+        console.log(err); // eslint-disable-line no-console
+        throw err;
+      });
+  }
+
+  mounted() {
+    this.fetchConfig();
+  }
 
   goHome() {
     this.$router.push({ name: "root" });

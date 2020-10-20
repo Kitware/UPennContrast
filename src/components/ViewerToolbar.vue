@@ -1,6 +1,24 @@
 <template>
   <div>
     <div>
+      <v-layout v-if="annotationModeList.length">
+        <v-btn-toggle v-model="annotationMode">
+          <v-btn
+            v-for="mode in annotationModeList"
+            :key="mode.key"
+            :value="mode.key"
+            v-mousetrap="{
+              bind: mode.hotkey,
+              handler: () => {
+                annotationMode = annotationMode === mode.key ? null : mode.key;
+              }
+            }"
+            :title="'Hot key: ' + mode.hotkey"
+            >{{ mode.name }}</v-btn
+          >
+        </v-btn-toggle>
+      </v-layout>
+
       <v-layout>
         <value-slider
           v-model="xy"
@@ -94,6 +112,18 @@ export default class ViewerToolbar extends Vue {
         [param]: value
       }
     });
+  }
+
+  get annotationModeList(): any[] {
+    return this.store.annotationModeList;
+  }
+
+  get annotationMode(): string | null {
+    return this.store.annotationMode;
+  }
+
+  set annotationMode(value: string | null) {
+    this.store.setAnnotationMode(value);
   }
 
   get xy() {

@@ -96,6 +96,7 @@ export default class ImageViewer extends Vue {
 
   private layerParams: any;
   private map: any;
+  private annotationLayer: any;
   private unrollW: number = 1;
   private unrollH: number = 1;
 
@@ -132,6 +133,35 @@ export default class ImageViewer extends Vue {
 
   private get layerStackImages() {
     return this.store.configuration ? this.store.layerStackImages : [];
+  }
+
+  get annotationStyle(): any {
+    const mode = this.store.annotationMode;
+    const list = this.store.annotationModeList.filter(
+      entry => entry.key === mode
+    );
+    return list.length ? list[0] : null;
+  }
+
+  @Watch("annotationStyle")
+  watchAnnotationStyle(value: any | null) {
+    if (this.annotationLayer) {
+      this.annotationLayer.mode(value ? value.mode : null);
+    }
+  }
+
+  handleModeChange(evt: any) {
+    if (evt.mode === null && this.store.annotationMode !== null) {
+      // we could, instead, just deactive the button
+      // this.store.setAnnotationMode(evt.mode);
+      this.annotationLayer.mode(this.annotationStyle.mode);
+    }
+  }
+
+  handleAnnotationChange(evt: any) {
+    if (this.annotationStyle && evt.annotation) {
+      evt.annotation.style(this.annotationStyle.style);
+    }
   }
 
   private draw(mapElement: HTMLElement) {
@@ -174,12 +204,24 @@ export default class ImageViewer extends Vue {
     params.layer.autoshareRenderer = false;
     delete params.layer.tilesMaxBounds;
     params.layer.url =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQIHWNgYAAAAAMAAU9ICq8AAAAASUVORK5CYII=";
     params.map.max += 1;
     this.layerParams = params.layer;
     if (!this.map) {
       this.map = geojs.map(params.map);
-      // TODO: add annotation layer
+      this.annotationLayer = this.map.createLayer("annotation", {
+        annotations: geojs.listAnnotations(),
+        autoshareRenderer: false
+      });
+      this.annotationLayer.node().css({ "mix-blend-mode": "unset" });
+      this.annotationLayer.geoOn(
+        geojs.event.annotation.mode,
+        this.handleModeChange
+      );
+      this.annotationLayer.geoOn(
+        geojs.event.annotation.add,
+        this.handleAnnotationChange
+      );
     } else {
       adjustLayers =
         Math.abs(this.map.maxBounds(undefined, null).right - mapWidth) >= 0.5 ||
@@ -305,6 +347,7 @@ export default class ImageViewer extends Vue {
       };
     }
     this.ready.layers.splice(this.layerStackImages.length);
+    this.annotationLayer.moveToTop();
     // set tile urls
     this.layerStackImages.forEach(
       (
