@@ -47,6 +47,8 @@ export class Main extends VuexModule {
   z: number = 0;
   time: number = 0;
   layerMode: "single" | "multiple" = "multiple";
+  annotationMode: string | null = null;
+  annotationModeList: any[] = [];
 
   unrollXY: boolean = false;
   unrollZ: boolean = false;
@@ -480,6 +482,16 @@ export class Main extends VuexModule {
         layers[index].visible = !layers[index].visible;
         break;
     }
+  }
+
+  @Mutation
+  setAnnotationMode(mode: string | null) {
+    this.annotationMode = mode;
+  }
+
+  @Mutation
+  setAnnotationModeList(modeList: any[]) {
+    this.annotationModeList = modeList;
   }
 
   @Action
