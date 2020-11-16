@@ -6,8 +6,7 @@
   "scripts": {
     "serve": "vue-cli-service serve --host 0.0.0.0",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint",
-    "test": "npm run lint && npm run build"
+    "lint": "vue-cli-service lint"
   },
   "dependencies": {
     "@girder/components": "^2.1.0",

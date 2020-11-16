@@ -1,6 +1,10 @@
 name: node
 
-on: [push]
+on:
+  pull_request:
+  push:
+    branches:
+      - master
 
 jobs:
   build:
@@ -8,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [10.x]
+        node-version: [14.x]
 
     steps:
       - uses: actions/checkout@v1
@@ -16,9 +20,8 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
-      - name: npm install, build, and test
+      - name: yarn install and test
         run: |
-          npm ci
-          npm test
-        env:
-          CI: true
+          yarn install --frozen-lockfile
+          yarn lint
+          yarn build
