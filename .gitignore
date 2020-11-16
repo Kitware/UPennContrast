@@ -1,14 +1,17 @@
 .DS_Store
-node_modules
-/dist
+node_modules/
+client/node_modules
+client/dist
+
+devops/logs
 
 # local env files
 *.local
 
 # Log files
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+client/npm-debug.log*
+client/yarn-debug.log*
+client/yarn-error.log*
 
 # Editor directories and files
 .idea
@@ -18,7 +21,7 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
-src/**/*.map
-src/**/*.js
+client/src/**/*.map
+client/src/**/*.js
 
 /logs
