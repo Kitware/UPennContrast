@@ -53,7 +53,7 @@ export default class App extends Vue {
 
   fetchConfig() {
     axios
-      .get("config/modes.json")
+      .get("/static/contrast/config/modes.json")
       .then(resp => {
         this.store.setAnnotationModeList(resp.data.annotation_buttons);
       })

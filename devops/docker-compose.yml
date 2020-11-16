@@ -1,0 +1,31 @@
+version: "3.2"
+
+services:
+  mongo:
+    image: mongo
+    volumes:
+      - mongo_db:/data/db
+
+  rabbitmq:
+    image: rabbitmq
+
+  girder:
+    build:
+      context: ../
+      dockerfile: devops/girder.Dockerfile
+    volumes:
+      - girder_assetstore:/var/lib/girder/assetstore
+      - "./logs/girder:/root/.girder/logs"
+    depends_on:
+      - mongo
+    ports:
+      - "${GIRDER_PORT-8080}:8080"
+    environment:
+      - GIRDER_MONGO_URI=mongodb://mongo:27017/girder
+      - GIRDER_ADMIN_USER=${GIRDER_ADMIN_USER-admin}
+      - GIRDER_ADMIN_PASS=${GIRDER_ADMIN_PASS-upenn}
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq/
+
+volumes:
+  mongo_db:
+  girder_assetstore:

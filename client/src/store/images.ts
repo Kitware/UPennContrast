@@ -57,7 +57,11 @@ function palette(color: string, steps: number) {
     .range(["#000000", color]);
   const palette: string[] = [];
   for (let i = 0; i < steps; i++) {
-    palette.push(asColor(scale(i))!.hex());
+    const scaled = scale(i) || 0;
+    const color = asColor(scaled.toString());
+    if (color !== null) {
+      palette.push(color.formatHex());
+    }
   }
   return palette;
 }
@@ -81,8 +85,8 @@ export function toStyle(
       .domain([0, 100])
       .rangeRound([hist.min, hist.max]);
     return {
-      min: scale(contrast.blackPoint),
-      max: scale(contrast.whitePoint),
+      min: scale(contrast.blackPoint) || 0,
+      max: scale(contrast.whitePoint) || 255,
       palette: p
     };
   }

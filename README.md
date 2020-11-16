@@ -2,46 +2,34 @@
 
 [![Github Actions][github-actions-image]][github-actions-url]
 
-## Project setup
-
-```
-npm install
-```
-
-## Development environment
+## Running with Docker
 
 ```sh
 git clone https://github.com/Kitware/UPennContrast.git
-cd UPennContrast
-npm install
+cd UPennContrast/devops
 docker-compose up -d
-npm run serve
 ```
 
-### Setup Girder
+Server will be running on `http://localhost:8080`
 
-1. go to http://localhost:8080
-1. create a new account
-1. go to the Admin console and create a File System Asset Store at `/store`
-1. go to the Admin console -> settings -> advanced -> `CORS Allowed Origins` -> `*`
+## Development
 
-1. optional: go to the Admin console -> plugins -> worker: enter the urls `amqp://guest:guest@rabbitmq/` for both broker and backend and `http://girder:8080/api/v1` for the api url
+Install https://github.com/Kitware/ldc
 
-### Compiles and minifies for production
+```bash
+# bring the stack up
+ldc up
 
+# To work on the backend...
+# replace a pre-built image with the development version
+# for example, here's how to work on the girder server code
+ldc dev girder
+
+# To work on the frontend...
+cd client/
+yarn
+yarn serve
+
+# stop all containers and remove their volumes
+ldc clean
 ```
-npm run build
-```
-
-### Lints and fixes files
-
-```
-npm run lint
-```
-
-### Customize configuration
-
-See [Configuration Reference](https://cli.vuejs.org/config/).
-
-[github-actions-image]: https://github.com/Kitware/UPennContrast/workflows/node/badge.svg
-[github-actions-url]: https://github.com/Kitware/UPennContrast/actions

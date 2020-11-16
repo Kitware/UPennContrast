@@ -1,0 +1,54 @@
+[2020-11-16 16:54:57,019] ERROR: Traceback (most recent call last):
+[2020-11-16 16:54:57,020] ERROR:   File "/usr/local/bin/girder", line 33, in <module>
+[2020-11-16 16:54:57,020] ERROR: sys.exit(load_entry_point('girder', 'console_scripts', 'girder')())
+[2020-11-16 16:54:57,020] ERROR:   File "/usr/local/lib/python3.7/dist-packages/click/core.py", line 829, in __call__
+[2020-11-16 16:54:57,021] ERROR: return self.main(*args, **kwargs)
+[2020-11-16 16:54:57,021] ERROR:   File "/usr/local/lib/python3.7/dist-packages/click/core.py", line 782, in main
+[2020-11-16 16:54:57,022] ERROR: rv = self.invoke(ctx)
+[2020-11-16 16:54:57,022] ERROR:   File "/usr/local/lib/python3.7/dist-packages/click/core.py", line 1259, in invoke
+[2020-11-16 16:54:57,023] ERROR: return _process_result(sub_ctx.command.invoke(sub_ctx))
+[2020-11-16 16:54:57,023] ERROR:   File "/usr/local/lib/python3.7/dist-packages/click/core.py", line 1066, in invoke
+[2020-11-16 16:54:57,024] ERROR: return ctx.invoke(self.callback, **ctx.params)
+[2020-11-16 16:54:57,024] ERROR:   File "/usr/local/lib/python3.7/dist-packages/click/core.py", line 610, in invoke
+[2020-11-16 16:54:57,024] ERROR: return callback(*args, **kwargs)
+[2020-11-16 16:54:57,024] ERROR:   File "/girder/girder/cli/serve.py", line 35, in main
+[2020-11-16 16:54:57,025] ERROR: server.setup(mode)
+[2020-11-16 16:54:57,025] ERROR:   File "/girder/girder/utility/server.py", line 153, in setup
+[2020-11-16 16:54:57,025] ERROR: girderWebroot, appconf = configureServer(mode, plugins, curConfig)
+[2020-11-16 16:54:57,025] ERROR:   File "/girder/girder/utility/server.py", line 80, in configureServer
+[2020-11-16 16:54:57,026] ERROR: api_main.addApiToNode(root)
+[2020-11-16 16:54:57,026] ERROR:   File "/girder/girder/api/api_main.py", line 20, in addApiToNode
+[2020-11-16 16:54:57,026] ERROR: _addV1ToNode(node.api)
+[2020-11-16 16:54:57,026] ERROR:   File "/girder/girder/api/api_main.py", line 30, in _addV1ToNode
+[2020-11-16 16:54:57,026] ERROR: node.v1.assetstore = assetstore.Assetstore()
+[2020-11-16 16:54:57,026] ERROR:   File "/girder/girder/api/v1/assetstore.py", line 23, in __init__
+[2020-11-16 16:54:57,027] ERROR: self._model = AssetstoreModel()
+[2020-11-16 16:54:57,027] ERROR:   File "/girder/girder/models/model_base.py", line 70, in __call__
+[2020-11-16 16:54:57,027] ERROR: cls._instance = super().__call__(*args, **kwargs)
+[2020-11-16 16:54:57,027] ERROR:   File "/girder/girder/models/model_base.py", line 103, in __init__
+[2020-11-16 16:54:57,028] ERROR: self.reconnect()
+[2020-11-16 16:54:57,028] ERROR:   File "/girder/girder/models/model_base.py", line 110, in reconnect
+[2020-11-16 16:54:57,028] ERROR: db_connection = getDbConnection()
+[2020-11-16 16:54:57,028] ERROR:   File "/girder/girder/models/__init__.py", line 97, in getDbConnection
+[2020-11-16 16:54:57,028] ERROR: client.server_info()
+[2020-11-16 16:54:57,028] ERROR:   File "/usr/local/lib/python3.7/dist-packages/pymongo/mongo_client.py", line 1874, in server_info
+[2020-11-16 16:54:57,030] ERROR: session=session)
+[2020-11-16 16:54:57,030] ERROR:   File "/usr/local/lib/python3.7/dist-packages/pymongo/database.py", line 737, in command
+[2020-11-16 16:54:57,031] ERROR: read_preference, session) as (sock_info, slave_ok):
+[2020-11-16 16:54:57,031] ERROR:   File "/usr/lib/python3.7/contextlib.py", line 112, in __enter__
+[2020-11-16 16:54:57,031] ERROR: return next(self.gen)
+[2020-11-16 16:54:57,031] ERROR:   File "/usr/local/lib/python3.7/dist-packages/pymongo/mongo_client.py", line 1325, in _socket_for_reads
+[2020-11-16 16:54:57,032] ERROR: server = self._select_server(read_preference, session)
+[2020-11-16 16:54:57,032] ERROR:   File "/usr/local/lib/python3.7/dist-packages/pymongo/mongo_client.py", line 1278, in _select_server
+[2020-11-16 16:54:57,033] ERROR: server = topology.select_server(server_selector)
+[2020-11-16 16:54:57,033] ERROR:   File "/usr/local/lib/python3.7/dist-packages/pymongo/topology.py", line 243, in select_server
+[2020-11-16 16:54:57,033] ERROR: address))
+[2020-11-16 16:54:57,033] ERROR:   File "/usr/local/lib/python3.7/dist-packages/pymongo/topology.py", line 200, in select_servers
+[2020-11-16 16:54:57,034] ERROR: selector, server_timeout, address)
+[2020-11-16 16:54:57,034] ERROR:   File "/usr/local/lib/python3.7/dist-packages/pymongo/topology.py", line 217, in _select_servers_loop
+[2020-11-16 16:54:57,034] ERROR: (self._error_message(selector), timeout, self.description))
+[2020-11-16 16:54:57,034] ERROR: pymongo.errors
+[2020-11-16 16:54:57,034] ERROR: .
+[2020-11-16 16:54:57,035] ERROR: ServerSelectionTimeoutError
+[2020-11-16 16:54:57,035] ERROR: :
+[2020-11-16 16:54:57,035] ERROR: mongo:27017: [Errno -3] Temporary failure in name resolution, Timeout: 20.0s, Topology Description: <TopologyDescription id: 5fb2aecc017016fff93a77c4, topology_type: Single, servers: [<ServerDescription ('mongo', 27017) server_type: Unknown, rtt: None, error=AutoReconnect('mongo:27017: [Errno -3] Temporary failure in name resolution')>]>

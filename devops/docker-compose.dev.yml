@@ -1,0 +1,12 @@
+
+version: "3.2"
+services:
+  girder:
+    volumes:
+      - ../devops/provision:/home/provision
+      - ../server:/home/viame_girder
+    entrypoint: ["/home/provision/girder_entrypoint_dev.sh"]
+
+  mc:
+    image: mongo
+    command: ["mongo", "mongodb://mongo:27017/girder"]

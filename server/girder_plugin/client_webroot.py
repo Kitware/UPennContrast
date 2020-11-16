@@ -1,0 +1,35 @@
+"""
+Serves as a girder-flavored SPA router.
+No matter what page you ask for, you're getting index.html
+"""
+
+import os
+
+from girder import constants
+from girder.utility.webroot import WebrootBase
+
+
+class ClientWebroot(WebrootBase):
+    def __init__(self, templatePath=None):
+        super(ClientWebroot, self).__init__("")
+
+        self.vars = {
+            # 'title' is deprecated use brandName instead
+            "title": "Girder"
+        }
+
+    def GET(self, **params):
+        file = open(os.path.join(constants.STATIC_ROOT_DIR, "contrast", "index.html"), "r")
+        return file.read()
+
+    def DELETE(self, **params):
+        raise Exception(405)
+
+    def PATCH(self, **params):
+        raise Exception(405)
+
+    def POST(self, **params):
+        raise Exception(405)
+
+    def PUT(self, **params):
+        raise Exception(405)

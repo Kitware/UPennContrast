@@ -194,6 +194,9 @@ export default class ContrastHistogram extends Vue {
       this.value.mode === "percentile"
         ? this.percentageToPixel(value)
         : this.histToPixel(value);
+    if (base === undefined) {
+      throw new Error("base is undefined");
+    }
     if (isWhite) {
       return `${this.width - base}px`;
     }
@@ -307,9 +310,9 @@ export default class ContrastHistogram extends Vue {
     copy.mode = value;
 
     const absToPer = (v: number) =>
-      roundPer(this.percentageToPixel.invert(this.histToPixel(v)));
+      roundPer(this.percentageToPixel.invert(this.histToPixel(v) || 0));
     const perToAbs = (v: number) =>
-      roundAbs(this.histToPixel.invert(this.percentageToPixel(v)));
+      roundAbs(this.histToPixel.invert(this.percentageToPixel(v) || 0));
     const converter = value === "percentile" ? absToPer : perToAbs;
 
     copy.blackPoint = converter(copy.blackPoint);
@@ -385,12 +388,11 @@ export default class ContrastHistogram extends Vue {
     const scaleX = scalePoint<number>()
       .domain(bins.map((_, i) => i))
       .range([0, this.width]);
-
     const gen = area<number>()
       .curve(curveStep)
       .x((_, i) => scaleX(i)!)
       .y0(d => scaleY(d)!)
-      .y1(scaleY(0));
+      .y1(scaleY(0) || 0);
     return gen(bins);
   }
 }
