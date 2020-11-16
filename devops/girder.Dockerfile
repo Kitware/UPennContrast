@@ -9,7 +9,6 @@ RUN yarn --frozen-lockfile
 
 # Build client
 COPY client/ /app/
-RUN ls /app/
 RUN yarn build
 
 FROM girder/girder:latest-py3 as runtime
