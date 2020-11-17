@@ -20,8 +20,7 @@ ENV GIRDER_ADMIN_PASSWORD upenn
 ENV CELERY_BROKER_URL amqp://guest:guest@rabbit/
 ENV BROKER_CONNECTION_TIMEOUT 2
 
-# TODO: explain why this is necessary
-# Install Large Image from source instead of pip because ?
+# Install Large Image from source due to dependency on pre-release features.
 WORKDIR /src
 RUN git clone https://github.com/girder/large_image.git
 WORKDIR /src/large_image
