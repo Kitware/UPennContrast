@@ -134,7 +134,61 @@ const colors = [
   "#0000FF",
   "#FFFF00",
   "#FF00FF",
-  "#00FFFF"
+  "#00FFFF",
+  "#FF8000",
+  "#FF0080",
+  "#00FF80",
+  "#80FF00",
+  "#8000FF",
+  "#0080FF",
+  "#FF8080",
+  "#80FF80",
+  "#8080FF",
+  "#FFFF80",
+  "#80FFFF",
+  "#FF80FF",
+  "#FF4000",
+  "#FF0040",
+  "#00FF40",
+  "#40FF00",
+  "#4000FF",
+  "#0040FF",
+  "#FF4040",
+  "#40FF40",
+  "#4040FF",
+  "#FFFF40",
+  "#40FFFF",
+  "#FF40FF",
+  "#FFC000",
+  "#FF00C0",
+  "#00FFC0",
+  "#C0FF00",
+  "#C000FF",
+  "#00C0FF",
+  "#FFC0C0",
+  "#C0FFC0",
+  "#C0C0FF",
+  "#FFFFC0",
+  "#C0FFFF",
+  "#FFC0FF",
+  "#FF8040",
+  "#FF4080",
+  "#40FF80",
+  "#80FF40",
+  "#8040FF",
+  "#4080FF",
+  "#FF80C0",
+  "#FFC080",
+  "#C0FF80",
+  "#80FFC0",
+  "#80C0FF",
+  "#C080FF",
+  "#FFC040",
+  "#FF40C0",
+  "#40FFC0",
+  "#C0FF40",
+  "#C040FF",
+  "#40C0FF",
 ];
 
 // keys should be all uppercase.  Values should have the same case as the
@@ -171,7 +225,7 @@ export function newLayer(
     `Channel ${nextChannel[0] || 0}`;
   let channelColor = channelColors[channelName.toUpperCase()];
   if (!channelColor || usedColors.has(channelColor)) {
-    channelColor = nextColor[0] || colors[0];
+    channelColor = nextColor[0] || colors[layers.length % colors.length];
   }
   let layerName = channelName;
   if (layerName === "" || layers.some(l => l.name === layerName)) {
