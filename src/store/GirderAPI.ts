@@ -258,9 +258,7 @@ export default class GirderAPI {
       images,
       (image: IImage) =>
         this.getHistogram(image.item, {
-          frame: image.frameIndex,
-          width: image.sizeX,
-          height: image.sizeY
+          frame: image.frameIndex
         }),
       { concurrency: HistogramConcurrency }
     ).then((histograms: ITileHistogram[]) => mergeHistograms(histograms));
