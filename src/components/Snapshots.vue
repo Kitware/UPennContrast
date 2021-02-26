@@ -146,10 +146,17 @@ export default class Snapshots extends Vue {
       opts.layers = Vue.prototype.$currentMap
         .layers()
         .filter((l: any) => l instanceof geojs.osmLayer);
-      if (this.exportLayer !== "all") {
-        const layerIndex = parseInt(this.exportLayer);
-        opts.layers = opts.layers.slice(layerIndex * 2, layerIndex * 2 + 2);
-      }
+      opts.layers = opts.layers.filter((_l: any, i: number) => {
+        var layerIndex = Math.floor(i / 2);
+        if (
+          !(i % 2) ||
+          (this.exportLayer !== "all" &&
+            layerIndex != parseInt(this.exportLayer))
+        ) {
+          return false;
+        }
+        return store.configuration!.layers[layerIndex].visible;
+      });
       Vue.prototype.$currentMap.screenshot(opts).then((res: any) => {
         const link = document.createElement("a");
         link.href = res;
