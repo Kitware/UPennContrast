@@ -188,7 +188,7 @@ const colors = [
   "#40FFC0",
   "#C0FF40",
   "#C040FF",
-  "#40C0FF",
+  "#40C0FF"
 ];
 
 // keys should be all uppercase.  Values should have the same case as the
