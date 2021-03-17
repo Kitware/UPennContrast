@@ -209,6 +209,7 @@ export default class ImageViewer extends Vue {
     this.layerParams = params.layer;
     if (!this.map) {
       this.map = geojs.map(params.map);
+      Vue.prototype.$currentMap = this.map;
       this.annotationLayer = this.map.createLayer("annotation", {
         annotations: geojs.listAnnotations(),
         autoshareRenderer: false

@@ -7,6 +7,7 @@
       >
       <bread-crumbs />
       <v-spacer />
+      <snapshots />
       <user-menu />
       <server-status />
     </v-app-bar>
@@ -32,6 +33,7 @@ import axios from "axios";
 import Menu from "./layout/Menu.vue";
 import UserMenu from "./layout/UserMenu.vue";
 import ServerStatus from "./components/ServerStatus.vue";
+import Snapshots from "./components/Snapshots.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import vMousetrap from "./utils/v-mousetrap";
 import { Vue, Component, Prop } from "vue-property-decorator";
@@ -44,7 +46,8 @@ Vue.use(vMousetrap);
     Menu,
     UserMenu,
     BreadCrumbs,
-    ServerStatus
+    ServerStatus,
+    Snapshots
   }
 })
 export default class App extends Vue {
