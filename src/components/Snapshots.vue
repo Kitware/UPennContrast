@@ -120,10 +120,7 @@ export default class Snapshots extends Vue {
   }
 
   get layerList(): object[] {
-    let results = [];
-    if (this.area !== "screen") {
-      results.push({ name: "All", key: "all" });
-    }
+    let results = [{ name: "All", key: "all" }];
     if (store.configuration && store.configuration.layers) {
       store.configuration.layers.forEach((layer, idx) => {
         if (layer.visible) {
