@@ -242,6 +242,16 @@ export default class GirderAPI {
       .then(() => config);
   }
 
+  updateSnapshots(
+    config: IDatasetConfiguration
+  ): Promise<IDatasetConfiguration> {
+    return this.client
+      .put(`/item/${config.id}/metadata`, {
+        snapshots: config.snapshots! || []
+      })
+      .then(() => config);
+  }
+
   deleteConfiguration(
     config: IDatasetConfiguration
   ): Promise<IDatasetConfiguration> {
@@ -317,7 +327,8 @@ function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
     _girder: item,
     name: item.name,
     description: item.description,
-    layers: item.meta.layers || []
+    layers: item.meta.layers || [],
+    snapshots: item.meta.snapshots || []
   };
 }
 

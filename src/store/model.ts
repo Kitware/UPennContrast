@@ -70,6 +70,8 @@ export interface IDatasetConfiguration {
   description: string;
 
   layers: IDisplayLayer[];
+
+  snapshots?: any[];
 }
 
 export declare type DisplaySliceType =

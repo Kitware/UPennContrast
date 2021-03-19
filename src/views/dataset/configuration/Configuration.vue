@@ -49,6 +49,11 @@ export default routeMapper(
       get: () => store.layerMode,
       set: (value: string) =>
         store.setLayerMode(value === "single" ? "single" : "multiple")
+    },
+    snapshot: {
+      parse: v => v,
+      get: () => store.snapshot,
+      set: (value: string) => store.setSnapshot(value)
     }
   }
 );

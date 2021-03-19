@@ -9,9 +9,86 @@
 
       <v-card>
         <v-card-title class="headline">
-          Download
+          Snapshot View
         </v-card-title>
-        <v-card-text class="pb-0">
+        <v-card-text
+          class="pb-0"
+          title="Add a name, description, or tags to filter the list of snapshots or to create a new snapshot."
+        >
+          <v-row>
+            <v-col cols="8" class="py-0">
+              <v-select
+                v-model="selectedSnapshot"
+                :items="snapshotList()"
+                label="Current snapshot"
+                item-text="name"
+                item-value="key"
+                dense
+              ></v-select>
+            </v-col>
+            <v-col cols="4" class="py-0">
+              <v-btn
+                color="primary"
+                text
+                @click="loadSnapshot"
+                :disabled="!selectedSnapshot || selectedSnapshot === '__none__'"
+              >
+                Load View
+              </v-btn>
+            </v-col>
+          </v-row>
+          <v-row>
+            <v-col cols="8" class="py-0">
+              <v-btn color="primary" text :to="snapshotRoute">
+                {{ store.snapshot }}
+              </v-btn>
+            </v-col>
+            <v-col cols="4" class="py-0">
+              <v-btn
+                color="primary"
+                text
+                @click="removeSnapshot"
+                :disabled="!selectedSnapshot || selectedSnapshot === '__none__'"
+              >
+                Delete View
+              </v-btn>
+            </v-col>
+          </v-row>
+          <v-row>
+            <v-col cols="8" class="py-0">
+              <!-- add :rules="validationFunc" -->
+              <v-text-field
+                label="Snapshot name"
+                v-model="newName"
+                dense
+              ></v-text-field>
+            </v-col>
+            <v-col cols="4" class="py-0">
+              <v-btn
+                color="primary"
+                text
+                :disabled="!newName.trim()"
+                @click="saveSnapshot"
+              >
+                Save View
+              </v-btn>
+            </v-col>
+          </v-row>
+          <v-row>
+            <v-col class="py-0">
+              <!-- render existing tags here -->
+              <v-text-field label="Tags" v-model="newTag" dense></v-text-field>
+            </v-col>
+          </v-row>
+          <v-row>
+            <v-col class="py-0">
+              <v-text-field
+                label="Snapshot description"
+                v-model="newDescription"
+                dense
+              ></v-text-field>
+            </v-col>
+          </v-row>
           <div class="group-label" :totalarea="markCurrentArea()">
             Resolution and Area:
           </div>
@@ -87,6 +164,14 @@
               </v-btn>
             </v-col>
           </v-row>
+        </v-card-text>
+
+        <v-divider></v-divider>
+
+        <v-card-title class="headline">
+          Download
+        </v-card-title>
+        <v-card-text class="pb-0">
           <v-row>
             <v-col class="pa-2">
               <v-text-field
@@ -125,7 +210,6 @@
             </v-col>
           </v-row>
         </v-card-text>
-
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn
@@ -158,6 +242,12 @@ export default class Snapshots extends Vue {
 
   dialog = false;
   drawingBoundingBox = false;
+
+  newName: string = "";
+  newDescription: string = "";
+  newTag: string = "";
+  newTags: string[] = [];
+  selectedSnapshot: string = store.snapshot || "__none__";
 
   area: string = "full";
   maxResolution: number | null = null;
@@ -428,6 +518,116 @@ export default class Snapshots extends Vue {
     this.bboxLayer.mode(null).draw();
     this.dialog = true;
     this.drawingBoundingBox = false;
+  }
+
+  snapshotList(): object[] {
+    let results = [{ name: "None", key: "__none__" }];
+    if (store.configuration && store.configuration.snapshots) {
+      store.configuration.snapshots.forEach(s => {
+        results.push({ name: s.name, key: s.name });
+      });
+    }
+    return results;
+  }
+
+  async loadSnapshot() {
+    var snapshot = await this.store.loadSnapshot(this.selectedSnapshot);
+    this.newName = snapshot.name || "";
+    this.newDescription = snapshot.description || "";
+    this.newTags = snapshot.tags!.slice();
+    this.area = snapshot.screenshot!.area;
+    this.format = snapshot.screenshot!.format;
+    this.bboxLeft = snapshot.screenshot!.bbox!.left;
+    this.bboxTop = snapshot.screenshot!.bbox!.top;
+    this.bboxRight = snapshot.screenshot!.bbox!.right;
+    this.bboxBottom = snapshot.screenshot!.bbox!.bottom;
+    this.maxResolution = snapshot.screenshot!.maxResolution;
+    /*
+    const map = Vue.prototype.$currentMap;
+    map.bounds({
+      left: Math.min(
+        snapshot.viewport.tl.x,
+        snapshot.viewport.tr.x,
+        snapshot.viewport.bl.x,
+        snapshot.viewport.tr.x
+      ),
+      right: Math.max(
+        snapshot.viewport.tl.x,
+        snapshot.viewport.tr.x,
+        snapshot.viewport.bl.x,
+        snapshot.viewport.tr.x
+      ),
+      top: Math.max(
+        snapshot.viewport.tl.y,
+        snapshot.viewport.tr.y,
+        snapshot.viewport.bl.y,
+        snapshot.viewport.tr.y
+      ),
+      bottom: Math.min(
+        snapshot.viewport.tl.y,
+        snapshot.viewport.tr.y,
+        snapshot.viewport.bl.y,
+        snapshot.viewport.tr.y
+      )
+    });
+    map.rotation(snapshot.rotation || 0);
+    */
+  }
+
+  saveSnapshot(): void {
+    if (!this.newName.trim()) {
+      return;
+    }
+    const map = Vue.prototype.$currentMap;
+    let params = this.getBasicDownloadParams();
+    let snapshot = {
+      name: this.newName.trim(),
+      description: this.newDescription.trim(),
+      tags: this.newTags.slice(),
+      created: Date.now(),
+      viewport: {
+        tl: map.displayToGcs({ x: 0, y: 0 }),
+        tr: map.displayToGcs({ x: map.size().width, y: 0 }),
+        bl: map.displayToGcs({ x: 0, y: map.size().height }),
+        br: map.displayToGcs({ x: map.size().width, y: map.size().height })
+      },
+      rotation: map.rotation(),
+      unrollXY: store.unrollXY,
+      unrollZ: store.unrollZ,
+      unrollT: store.unrollT,
+      xy: store.xy,
+      z: store.z,
+      time: store.time,
+      layerMode: store.layerMode,
+      layers: store.configuration!.layers.map(l =>
+        Object.fromEntries(
+          Object.entries(l).filter(([k]) => !k.startsWith("_"))
+        )
+      ),
+      screenshot: {
+        area: this.area,
+        format: this.format,
+        bbox: {
+          left: this.bboxLeft,
+          top: this.bboxTop,
+          right: this.bboxRight,
+          bottom: this.bboxBottom
+        },
+        maxResolution: this.maxResolution
+      }
+    };
+    this.store.addSnapshot(snapshot);
+  }
+
+  removeSnapshot(): void {
+    this.store.removeSnapshot(this.selectedSnapshot);
+    this.selectedSnapshot = "__none__";
+  }
+
+  get snapshotRoute(): string {
+    // DWM::
+    console.log("snapshotRoute");
+    return "";
   }
 }
 </script>
