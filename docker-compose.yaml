@@ -8,7 +8,9 @@ services:
   girder:
     build:
       context: ./devops/girder
-    command: "-d mongodb://mongodb:27017/girder --host 0.0.0.0"
+    privileged: true
+    entrypoint: bash
+    command: -c "girder mount /mnt/fuse -d mongodb://mongodb:27017/girder && girder serve -d mongodb://mongodb:27017/girder --host 0.0.0.0"
     ports:
       - "${GIRDER_PORT-8080}:8080"
     links:
