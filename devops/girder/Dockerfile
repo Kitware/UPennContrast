@@ -10,3 +10,8 @@ WORKDIR /src/large_image
 RUN pip install -e . -rrequirements-dev.txt girder[mount] --find-links https://girder.github.io/large_image_wheels
 
 RUN girder build
+
+COPY ./provision.py /src/provision.py
+COPY ./girder.cfg /etc/girder.cfg
+
+ENTRYPOINT ["bash"]

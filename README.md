@@ -18,14 +18,11 @@ docker-compose up -d
 npm run serve
 ```
 
-### Setup Girder
+### Girder Defaults
 
-1. go to http://localhost:8080
-1. create a new account
-1. go to the Admin console and create a File System Asset Store at `/store`
-1. go to the Admin console -> settings -> advanced -> `CORS Allowed Origins` -> `*`
+By default, a admin user will be created with the name `admin` and the password `password`.  To use a different admin user, register a new user, log in as the `admin` user and make the new user an admin, then delete the original `admin` user.
 
-1. optional: go to the Admin console -> plugins -> worker: enter the urls `amqp://guest:guest@rabbitmq/` for both broker and backend and `http://girder:8080/api/v1` for the api url
+A default assetstore is also created.
 
 ### Compiles and minifies for production
 
