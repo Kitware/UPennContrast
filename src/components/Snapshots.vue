@@ -12,7 +12,9 @@
           Download
         </v-card-title>
         <v-card-text class="pb-0">
-          <div class="group-label">Resolution and Area:</div>
+          <div class="group-label" :totalarea="totalArea">
+            Resolution and Area:
+          </div>
           <v-radio-group v-model="area" row>
             <v-radio
               label="Screen"
@@ -155,6 +157,7 @@ export default class Snapshots extends Vue {
   readonly store = store;
 
   dialog = false;
+  drawingBoundingBox = false;
 
   area: string = "full";
   maxResolution: number | null = null;
@@ -202,39 +205,7 @@ export default class Snapshots extends Vue {
     return results;
   }
 
-  getDownload() {
-    if (this.area === "screen") {
-      let opts: any = {
-        type: this.format === "png" ? "image/png" : "image/jpeg",
-        wait: "idle"
-      };
-      if (this.format !== "png") {
-        opts.encoderOptions = parseInt(this.format.substr(5), 10) * 0.01;
-      }
-      opts.layers = Vue.prototype.$currentMap
-        .layers()
-        .filter((l: any) => l instanceof geojs.osmLayer);
-      opts.layers = opts.layers.filter((_l: any, i: number) => {
-        var layerIndex = Math.floor(i / 2);
-        if (
-          !(i % 2) ||
-          (this.exportLayer !== "all" &&
-            layerIndex != parseInt(this.exportLayer))
-        ) {
-          return false;
-        }
-        return store.configuration!.layers[layerIndex].visible;
-      });
-      Vue.prototype.$currentMap.screenshot(opts).then((res: any) => {
-        const link = document.createElement("a");
-        link.href = res;
-        link.download = "screenshot." + (this.format === "png" ? "png" : "jpg");
-        link.click();
-        URL.revokeObjectURL(res);
-      });
-      return;
-    }
-    let url = store.layerStackImages[0].urls[0].split("/zxy/")[0] + "/region";
+  getBasicDownloadParams() {
     let w = store.dataset!.width;
     let h = store.dataset!.height;
     let params: any = {
@@ -271,6 +242,43 @@ export default class Snapshots extends Vue {
     }
     params.width = max;
     params.height = max;
+    return params;
+  }
+
+  getDownload() {
+    if (this.area === "screen") {
+      let opts: any = {
+        type: this.format === "png" ? "image/png" : "image/jpeg",
+        wait: "idle"
+      };
+      if (this.format !== "png") {
+        opts.encoderOptions = parseInt(this.format.substr(5), 10) * 0.01;
+      }
+      opts.layers = Vue.prototype.$currentMap
+        .layers()
+        .filter((l: any) => l instanceof geojs.osmLayer);
+      opts.layers = opts.layers.filter((_l: any, i: number) => {
+        var layerIndex = Math.floor(i / 2);
+        if (
+          !(i % 2) ||
+          (this.exportLayer !== "all" &&
+            layerIndex != parseInt(this.exportLayer))
+        ) {
+          return false;
+        }
+        return store.configuration!.layers[layerIndex].visible;
+      });
+      Vue.prototype.$currentMap.screenshot(opts).then((res: any) => {
+        const link = document.createElement("a");
+        link.href = res;
+        link.download = "screenshot." + (this.format === "png" ? "png" : "jpg");
+        link.click();
+        URL.revokeObjectURL(res);
+      });
+      return;
+    }
+    let url = store.layerStackImages[0].urls[0].split("/zxy/")[0] + "/region";
+    let params = this.getBasicDownloadParams();
     let bands: any = [];
     store.configuration!.layers.forEach((layer, idx) => {
       if (
@@ -300,6 +308,9 @@ export default class Snapshots extends Vue {
   }
 
   showDialog(show: boolean) {
+    if (this.drawingBoundingBox) {
+      return this.doneBoundingBox();
+    }
     this.dialog = show;
     const map = Vue.prototype.$currentMap;
     if (show) {
@@ -314,38 +325,77 @@ export default class Snapshots extends Vue {
         this.bboxLayer = map.createLayer("annotation", {
           autoshareRenderer: false
         });
-        this.bboxAnnotation = null;
+        this.bboxAnnotation = geojs.annotation.rectangleAnnotation({
+          layer: this.bboxLayer,
+          corners: [
+            { x: this.bboxLeft, y: this.bboxTop },
+            { x: this.bboxRight, y: this.bboxTop },
+            { x: this.bboxRight, y: this.bboxBottom },
+            { x: this.bboxLeft, y: this.bboxBottom }
+          ],
+          editHandleStyle: {
+            handles: { rotate: false }
+          },
+          editStyle: {
+            fillOpacity: 0.125,
+            strokeColor: { r: 0, g: 0, b: 1 },
+            strokeWidth: 2
+          },
+          style: {
+            fillOpacity: 0.125,
+            strokeColor: { r: 0, g: 0, b: 1 },
+            strokeWidth: 2
+          }
+        });
+        this.bboxLayer.addAnnotation(this.bboxAnnotation);
+        map.draw();
       }
     } else {
       if (this.bboxLayer) {
         map.deleteLayer(this.bboxLayer);
         this.bboxLayer = null;
         this.bboxAnnotation = null;
+        map.draw();
       }
     }
+  }
+
+  get totalArea() {
+    // this updates the shown screenshot area
+    let w = store.dataset!.width;
+    let h = store.dataset!.height;
+    let params = this.getBasicDownloadParams();
+    let coordinates = [
+      { x: 0, y: 0 },
+      { x: w, y: 0 },
+      { x: w, y: h },
+      { x: 0, y: h }
+    ];
+    if (params.left !== undefined) {
+      coordinates = [
+        { x: params.left, y: params.top },
+        { x: params.right, y: params.top },
+        { x: params.right, y: params.bottom },
+        { x: params.left, y: params.bottom }
+      ];
+    }
+    if (this.bboxLayer && this.bboxAnnotation) {
+      this.bboxLayer.visible(this.area !== "screen");
+      const map = Vue.prototype.$currentMap;
+      coordinates = geojs.transform.transformCoordinates(
+        map.ingcs(),
+        map.gcs(),
+        coordinates
+      );
+      this.bboxAnnotation.options("corners", coordinates).draw();
+    }
+    return w * h;
   }
 
   drawBoundingBox() {
     this.area = "bbox";
     this.dialog = false;
-    this.bboxAnnotation = geojs.annotation.rectangleAnnotation({
-      layer: this.bboxLayer,
-      corners: [
-        { x: this.bboxLeft, y: this.bboxTop },
-        { x: this.bboxRight, y: this.bboxTop },
-        { x: this.bboxRight, y: this.bboxBottom },
-        { x: this.bboxLeft, y: this.bboxBottom }
-      ],
-      editHandleStyle: {
-        handles: { rotate: false }
-      },
-      editStyle: {
-        fillOpacity: 0.125,
-        strokeColor: { r: 0, g: 0, b: 1 },
-        strokeWidth: 2
-      }
-    });
-    this.bboxLayer.addAnnotation(this.bboxAnnotation);
+    this.drawingBoundingBox = true;
     this.bboxLayer.mode(this.bboxLayer.modes.edit, this.bboxAnnotation).draw();
     const map = Vue.prototype.$currentMap;
     map.geoOn(geojs.event.annotation.mode, this.doneBoundingBox);
@@ -361,10 +411,11 @@ export default class Snapshots extends Vue {
     this.bboxTop = Math.max(0, Math.round(Math.min(coord[0].y, coord[2].y)));
     this.bboxRight = Math.min(w, Math.round(Math.max(coord[0].x, coord[2].x)));
     this.bboxBottom = Math.min(h, Math.round(Math.max(coord[0].y, coord[2].y)));
-    this.bboxLayer.removeAnnotation(this.bboxAnnotation);
-    this.bboxLayer.draw();
-    this.bboxAnnotation = null;
+    // this.bboxLayer.removeAnnotation(this.bboxAnnotation);
+    this.bboxLayer.mode(null).draw();
+    // this.bboxAnnotation = null;
     this.dialog = true;
+    this.drawingBoundingBox = false;
   }
 }
 </script>
