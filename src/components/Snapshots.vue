@@ -39,7 +39,7 @@
             type="number"
             :max="
               Math.min(
-                10000,
+                format === 'tiff' ? 1e8 : 10000,
                 Math.max(store.dataset.width, store.dataset.height)
               )
             "
@@ -103,12 +103,19 @@ export default class Snapshots extends Vue {
   exportLayer: string = "all";
   format: string = "png";
 
-  readonly formatList: object[] = [
-    { name: "PNG", key: "png" },
-    { name: "JPEG - Quality 95", key: "jpeg-95" },
-    { name: "JPEG - Quality 90", key: "jpeg-90" },
-    { name: "JPEG - Quality 80", key: "jpeg-80" }
-  ];
+  get formatList(): object[] {
+    let fullList = [
+      { name: "PNG", key: "png" },
+      { name: "JPEG - Quality 95", key: "jpeg-95" },
+      { name: "JPEG - Quality 90", key: "jpeg-90" },
+      { name: "JPEG - Quality 80", key: "jpeg-80" },
+      { name: "TIFF", key: "tiff" }
+    ];
+    if (this.area === "screen") {
+      return fullList.slice(0, fullList.length - 1);
+    }
+    return fullList;
+  }
 
   get isUnrolled(): boolean {
     return store.unrollZ || store.unrollXY || store.unrollT;
@@ -167,7 +174,12 @@ export default class Snapshots extends Vue {
     let w = store.dataset!.width;
     let h = store.dataset!.height;
     let params: any = {
-      encoding: this.format === "png" ? "PNG" : "JPEG",
+      encoding:
+        this.format === "png"
+          ? "PNG"
+          : this.format === "tiff"
+          ? "TILED"
+          : "JPEG",
       contentDisposition: "attachment"
     };
     if (this.format !== "png") {
@@ -182,10 +194,10 @@ export default class Snapshots extends Vue {
       w = params.right - params.left;
       h = params.bottom - params.top;
     }
-    let max = Math.min(
-      Math.min(this.maxResolution || 1e8, 10000),
-      Math.max(w, h)
-    );
+    let max = Math.max(w, h);
+    if (this.format !== "tiff") {
+      Math.min(max, Math.min(this.maxResolution || 1e8, 10000));
+    }
     params.width = max;
     params.height = max;
     let bands: any = [];
