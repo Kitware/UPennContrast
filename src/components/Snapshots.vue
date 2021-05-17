@@ -12,7 +12,7 @@
           Download
         </v-card-title>
         <v-card-text class="pb-0">
-          <div class="group-label" :totalarea="totalArea">
+          <div class="group-label" :totalarea="markCurrentArea()">
             Resolution and Area:
           </div>
           <v-radio-group v-model="area" row>
@@ -317,10 +317,19 @@ export default class Snapshots extends Vue {
       const bounds = map.bounds();
       const w = store.dataset!.width;
       const h = store.dataset!.height;
-      this.bboxLeft = Math.max(0, Math.round(bounds.left));
-      this.bboxRight = Math.min(w, Math.round(bounds.right));
-      this.bboxTop = Math.max(0, Math.round(bounds.top));
-      this.bboxBottom = Math.min(h, Math.round(bounds.bottom));
+      const screenBounds = map.gcsToDisplay([
+        { x: bounds.left, y: bounds.top },
+        { x: bounds.right, y: bounds.bottom }
+      ]);
+      const shrinkIn = 20;
+      const innerBounds = map.displayToGcs([
+        { x: screenBounds[0].x + shrinkIn, y: screenBounds[0].y + shrinkIn },
+        { x: screenBounds[1].x - shrinkIn, y: screenBounds[1].y - shrinkIn }
+      ]);
+      this.bboxLeft = Math.max(0, Math.round(innerBounds[0].x));
+      this.bboxRight = Math.min(w, Math.round(innerBounds[1].x));
+      this.bboxTop = Math.max(0, Math.round(innerBounds[0].y));
+      this.bboxBottom = Math.min(h, Math.round(innerBounds[1].y));
       if (!this.bboxLayer) {
         this.bboxLayer = map.createLayer("annotation", {
           autoshareRenderer: false
@@ -334,16 +343,17 @@ export default class Snapshots extends Vue {
             { x: this.bboxLeft, y: this.bboxBottom }
           ],
           editHandleStyle: {
+            strokeColor: { r: 1, g: 0, b: 0 },
             handles: { rotate: false }
           },
           editStyle: {
-            fillOpacity: 0.125,
-            strokeColor: { r: 0, g: 0, b: 1 },
+            fillOpacity: 0,
+            strokeColor: { r: 1, g: 0, b: 0 },
             strokeWidth: 2
           },
           style: {
-            fillOpacity: 0.125,
-            strokeColor: { r: 0, g: 0, b: 1 },
+            fillOpacity: 0,
+            strokeColor: { r: 1, g: 0, b: 0 },
             strokeWidth: 2
           }
         });
@@ -360,7 +370,7 @@ export default class Snapshots extends Vue {
     }
   }
 
-  get totalArea() {
+  markCurrentArea() {
     // this updates the shown screenshot area
     let w = store.dataset!.width;
     let h = store.dataset!.height;
@@ -399,6 +409,7 @@ export default class Snapshots extends Vue {
     this.bboxLayer.mode(this.bboxLayer.modes.edit, this.bboxAnnotation).draw();
     const map = Vue.prototype.$currentMap;
     map.geoOn(geojs.event.annotation.mode, this.doneBoundingBox);
+    this.markCurrentArea();
   }
 
   doneBoundingBox() {
@@ -411,9 +422,7 @@ export default class Snapshots extends Vue {
     this.bboxTop = Math.max(0, Math.round(Math.min(coord[0].y, coord[2].y)));
     this.bboxRight = Math.min(w, Math.round(Math.max(coord[0].x, coord[2].x)));
     this.bboxBottom = Math.min(h, Math.round(Math.max(coord[0].y, coord[2].y)));
-    // this.bboxLayer.removeAnnotation(this.bboxAnnotation);
     this.bboxLayer.mode(null).draw();
-    // this.bboxAnnotation = null;
     this.dialog = true;
     this.drawingBoundingBox = false;
   }
