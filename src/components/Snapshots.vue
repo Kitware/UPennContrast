@@ -1,17 +1,17 @@
 <template>
   <div class="snapshots">
     <v-dialog v-model="dialog" width="500" v-if="store.configuration">
-      <template v-slot:activator="{ on, attrs }">
-        <v-btn v-bind="attrs" v-on="on">
+      <template v-slot:activator="{ on: { click }, attrs }">
+        <v-btn v-bind="attrs" v-on:click="showDialog(true)">
           Snapshot
         </v-btn>
       </template>
 
       <v-card>
         <v-card-title class="headline">
-          Snapshot
+          Download
         </v-card-title>
-        <v-card-text>
+        <v-card-text class="pb-0">
           <div class="group-label">Resolution and Area:</div>
           <v-radio-group v-model="area" row>
             <v-radio
@@ -26,59 +26,117 @@
               title="The visible area of the screen, but rendered from the source image.  This can be higher resolution than the screen."
             ></v-radio>
             <v-radio
+              label="Bounding box"
+              value="bbox"
+              v-if="!isRotated() && !isUnrolled"
+              title="A selected bounding box"
+            ></v-radio>
+            <v-radio
               label="Full"
               value="full"
               v-if="!isUnrolled"
               title="The entire image"
             ></v-radio>
           </v-radio-group>
-          <v-text-field
-            label="Maximum resolution"
-            :disabled="area == 'screen'"
-            v-model="maxResolution"
-            type="number"
-            :max="
-              Math.min(
-                format === 'tiff' ? 1e8 : 10000,
-                Math.max(store.dataset.width, store.dataset.height)
-              )
-            "
-            dense
-          ></v-text-field>
-          <v-select
-            v-model="exportLayer"
-            :items="layerList"
-            label="Layer"
-            item-text="name"
-            item-value="key"
-            dense
-            single-line
-          ></v-select>
-          <v-select
-            v-model="format"
-            :items="formatList"
-            label="Format"
-            item-text="name"
-            item-value="key"
-            dense
-            single-line
-          ></v-select>
+          <v-row>
+            <v-col class="pa-2">
+              <v-text-field
+                label="Left"
+                :disabled="area !== 'bbox'"
+                v-model="bboxLeft"
+                type="number"
+                :max="store.dataset.width"
+                dense
+              ></v-text-field>
+            </v-col>
+            <v-col class="pa-2">
+              <v-text-field
+                label="Top"
+                :disabled="area !== 'bbox'"
+                v-model="bboxTop"
+                type="number"
+                :max="store.dataset.height"
+                dense
+              ></v-text-field>
+            </v-col>
+            <v-col class="pa-2">
+              <v-text-field
+                label="Right"
+                :disabled="area !== 'bbox'"
+                v-model="bboxRight"
+                type="number"
+                :max="store.dataset.width"
+                dense
+              ></v-text-field>
+            </v-col>
+            <v-col class="pa-2">
+              <v-text-field
+                label="Bottom"
+                :disabled="area !== 'bbox'"
+                v-model="bboxBottom"
+                type="number"
+                :max="store.dataset.height"
+                dense
+              ></v-text-field>
+            </v-col>
+            <v-col class="pa-2">
+              <v-btn color="primary" text @click="drawBoundingBox()">
+                Draw
+              </v-btn>
+            </v-col>
+          </v-row>
+          <v-row>
+            <v-col class="pa-2">
+              <v-text-field
+                label="Maximum resolution"
+                :disabled="area == 'screen'"
+                v-model="maxResolution"
+                type="number"
+                :max="
+                  Math.min(
+                    format === 'tiff' ? 1e8 : 10000,
+                    Math.max(store.dataset.width, store.dataset.height)
+                  )
+                "
+                dense
+              ></v-text-field>
+            </v-col>
+            <v-col class="pa-2">
+              <v-select
+                v-model="exportLayer"
+                :items="layerList"
+                label="Layer"
+                item-text="name"
+                item-value="key"
+                dense
+              ></v-select>
+            </v-col>
+            <v-col class="pa-2">
+              <v-select
+                v-model="format"
+                :items="formatList"
+                label="Format"
+                item-text="name"
+                item-value="key"
+                dense
+              ></v-select>
+            </v-col>
+          </v-row>
         </v-card-text>
 
-        <v-divider></v-divider>
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn
             color="primary"
             text
             @click="
-              dialog = false;
+              showDialog(false);
               getDownload();
             "
           >
             Download
           </v-btn>
-          <v-btn color="primary" text @click="dialog = false">
+          <v-btn color="primary" text @click="showDialog(false)">
             Close
           </v-btn>
         </v-card-actions>
@@ -100,6 +158,12 @@ export default class Snapshots extends Vue {
 
   area: string = "full";
   maxResolution: number | null = null;
+  bboxLeft: number | null = null;
+  bboxTop: number | null = null;
+  bboxRight: number | null = null;
+  bboxBottom: number | null = null;
+  bboxLayer: any;
+  bboxAnnotation: any;
   exportLayer: string = "all";
   format: string = "png";
 
@@ -193,6 +257,13 @@ export default class Snapshots extends Vue {
       params.bottom = Math.min(h, Math.round(bounds.bottom));
       w = params.right - params.left;
       h = params.bottom - params.top;
+    } else if (this.area === "bbox") {
+      params.left = this.bboxLeft;
+      params.right = this.bboxRight;
+      params.top = this.bboxTop;
+      params.bottom = this.bboxBottom;
+      w = params.right - params.left;
+      h = params.bottom - params.top;
     }
     let max = Math.max(w, h);
     if (this.format !== "tiff") {
@@ -226,6 +297,74 @@ export default class Snapshots extends Vue {
     link.download = "screenshot." + (this.format === "png" ? "png" : "jpg");
     link.href = url;
     link.click();
+  }
+
+  showDialog(show: boolean) {
+    this.dialog = show;
+    const map = Vue.prototype.$currentMap;
+    if (show) {
+      const bounds = map.bounds();
+      const w = store.dataset!.width;
+      const h = store.dataset!.height;
+      this.bboxLeft = Math.max(0, Math.round(bounds.left));
+      this.bboxRight = Math.min(w, Math.round(bounds.right));
+      this.bboxTop = Math.max(0, Math.round(bounds.top));
+      this.bboxBottom = Math.min(h, Math.round(bounds.bottom));
+      if (!this.bboxLayer) {
+        this.bboxLayer = map.createLayer("annotation", {
+          autoshareRenderer: false
+        });
+        this.bboxAnnotation = null;
+      }
+    } else {
+      if (this.bboxLayer) {
+        map.deleteLayer(this.bboxLayer);
+        this.bboxLayer = null;
+        this.bboxAnnotation = null;
+      }
+    }
+  }
+
+  drawBoundingBox() {
+    this.area = "bbox";
+    this.dialog = false;
+    this.bboxAnnotation = geojs.annotation.rectangleAnnotation({
+      layer: this.bboxLayer,
+      corners: [
+        { x: this.bboxLeft, y: this.bboxTop },
+        { x: this.bboxRight, y: this.bboxTop },
+        { x: this.bboxRight, y: this.bboxBottom },
+        { x: this.bboxLeft, y: this.bboxBottom }
+      ],
+      editHandleStyle: {
+        handles: { rotate: false }
+      },
+      editStyle: {
+        fillOpacity: 0.125,
+        strokeColor: { r: 0, g: 0, b: 1 },
+        strokeWidth: 2
+      }
+    });
+    this.bboxLayer.addAnnotation(this.bboxAnnotation);
+    this.bboxLayer.mode(this.bboxLayer.modes.edit, this.bboxAnnotation).draw();
+    const map = Vue.prototype.$currentMap;
+    map.geoOn(geojs.event.annotation.mode, this.doneBoundingBox);
+  }
+
+  doneBoundingBox() {
+    let w = store.dataset!.width;
+    let h = store.dataset!.height;
+    const map = Vue.prototype.$currentMap;
+    map.geoOff(geojs.event.annotation.mode, this.doneBoundingBox);
+    const coord = this.bboxAnnotation.coordinates();
+    this.bboxLeft = Math.max(0, Math.round(Math.min(coord[0].x, coord[2].x)));
+    this.bboxTop = Math.max(0, Math.round(Math.min(coord[0].y, coord[2].y)));
+    this.bboxRight = Math.min(w, Math.round(Math.max(coord[0].x, coord[2].x)));
+    this.bboxBottom = Math.min(h, Math.round(Math.max(coord[0].y, coord[2].y)));
+    this.bboxLayer.removeAnnotation(this.bboxAnnotation);
+    this.bboxLayer.draw();
+    this.bboxAnnotation = null;
+    this.dialog = true;
   }
 }
 </script>
