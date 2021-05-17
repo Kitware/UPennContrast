@@ -96,7 +96,7 @@
                 type="number"
                 :max="
                   Math.min(
-                    format === 'tiff' ? 1e8 : 10000,
+                    format === 'tiled' ? 1e8 : 10000,
                     Math.max(store.dataset.width, store.dataset.height)
                   )
                 "
@@ -176,7 +176,8 @@ export default class Snapshots extends Vue {
       { name: "JPEG - Quality 95", key: "jpeg-95" },
       { name: "JPEG - Quality 90", key: "jpeg-90" },
       { name: "JPEG - Quality 80", key: "jpeg-80" },
-      { name: "TIFF", key: "tiff" }
+      { name: "TIFF", key: "tiff" },
+      { name: "TIFF - Tiled (for huge images)", key: "tiled" }
     ];
     if (this.area === "screen") {
       return fullList.slice(0, fullList.length - 1);
@@ -213,6 +214,8 @@ export default class Snapshots extends Vue {
         this.format === "png"
           ? "PNG"
           : this.format === "tiff"
+          ? "TIFF"
+          : this.format === "tiled"
           ? "TILED"
           : "JPEG",
       contentDisposition: "attachment"
@@ -237,7 +240,7 @@ export default class Snapshots extends Vue {
       h = params.bottom - params.top;
     }
     let max = Math.max(w, h);
-    if (this.format !== "tiff") {
+    if (this.format !== "tiled") {
       Math.min(max, Math.min(this.maxResolution || 1e8, 10000));
     }
     params.width = max;
