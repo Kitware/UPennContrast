@@ -82,7 +82,7 @@
             ></v-text-field>
           </v-col>
         </v-row>
-        <div class="group-label">
+        <div class="group-label" :currentArea="markCurrentArea()">
           Resolution and Area:
         </div>
         <v-row>
@@ -138,13 +138,6 @@
               :max="store.dataset.height"
               dense
             ></v-text-field>
-          </v-col>
-        </v-row>
-        <v-row>
-          <v-col class="py-0">
-            <v-btn color="primary" text @click="drawBoundingBox()">
-              Draw
-            </v-btn>
           </v-col>
         </v-row>
       </v-card-text>
@@ -224,6 +217,7 @@ export default class Snapshots extends Vue {
     this.showSnapshot(this.snapshotVisible);
     if (this.snapshotVisible) {
       this.markCurrentArea();
+      this.drawBoundingBox();
     }
   }
 
@@ -392,7 +386,7 @@ export default class Snapshots extends Vue {
       }
     } else {
       if (this.bboxLayer) {
-        this.bboxLayer.mode(null);
+        this.doneBoundingBox(true);
         map.deleteLayer(this.bboxLayer);
         this.bboxLayer = null;
         this.bboxAnnotation = null;
@@ -428,7 +422,12 @@ export default class Snapshots extends Vue {
         map.gcs(),
         coordinates
       );
-      this.bboxAnnotation.options("corners", coordinates).draw();
+      this.bboxAnnotation.options("corners", coordinates);
+      console.log(this.bboxLayer.currentAnnotation, params); //DWM::
+      if (this.bboxLayer.currentAnnotation) {
+        this.bboxLayer.currentAnnotation.options("corners", coordinates);
+      }
+      this.bboxLayer.draw();
     }
     return w * h;
   }
@@ -458,22 +457,38 @@ export default class Snapshots extends Vue {
     this.bboxLayer.mode(null);
     this.bboxLayer.mode(this.bboxLayer.modes.edit, this.bboxAnnotation).draw();
     const map = Vue.prototype.$currentMap;
+    map.geoOff(geojs.event.annotation.mode, this.doneBoundingBox);
+    map.geoOff(geojs.event.annotation.coordinates, this.boundingBoxCoordinates);
     map.geoOn(geojs.event.annotation.mode, this.doneBoundingBox);
+    map.geoOn(geojs.event.annotation.coordinates, this.boundingBoxCoordinates);
     this.markCurrentArea();
   }
 
-  doneBoundingBox() {
-    // DWM::
+  boundingBoxCoordinates(event: { [key: string]: any }) {
+    let w = store.dataset!.width;
+    let h = store.dataset!.height;
+    const coord = event.annotation!.coordinates();
+    this.bboxLeft = Math.max(0, Math.round(Math.min(coord[0].x, coord[2].x)));
+    this.bboxTop = Math.max(0, Math.round(Math.min(coord[0].y, coord[2].y)));
+    this.bboxRight = Math.min(w, Math.round(Math.max(coord[0].x, coord[2].x)));
+    this.bboxBottom = Math.min(h, Math.round(Math.max(coord[0].y, coord[2].y)));
+  }
+
+  doneBoundingBox(allDone: boolean) {
     let w = store.dataset!.width;
     let h = store.dataset!.height;
     const map = Vue.prototype.$currentMap;
     map.geoOff(geojs.event.annotation.mode, this.doneBoundingBox);
+    map.geoOff(geojs.event.annotation.coordinates, this.boundingBoxCoordinates);
     const coord = this.bboxAnnotation.coordinates();
     this.bboxLeft = Math.max(0, Math.round(Math.min(coord[0].x, coord[2].x)));
     this.bboxTop = Math.max(0, Math.round(Math.min(coord[0].y, coord[2].y)));
     this.bboxRight = Math.min(w, Math.round(Math.max(coord[0].x, coord[2].x)));
     this.bboxBottom = Math.min(h, Math.round(Math.max(coord[0].y, coord[2].y)));
     this.bboxLayer.mode(null).draw();
+    if (allDone !== true) {
+      this.drawBoundingBox();
+    }
   }
 
   snapshotList(): object[] {
