@@ -313,7 +313,7 @@ export default class Snapshots extends Vue {
     if (this.format !== "png") {
       params.jpeqQuality = parseInt(this.format.substr(5), 10);
     }
-    if (this.area === "view") {
+    if (this.area === "view" && Vue.prototype.$currentMap) {
       const bounds = Vue.prototype.$currentMap.bounds();
       params.left = Math.max(0, Math.round(bounds.left));
       params.right = Math.min(w, Math.round(bounds.right));
@@ -406,7 +406,7 @@ export default class Snapshots extends Vue {
     }
     this.dialog = show;
     const map = Vue.prototype.$currentMap;
-    if (show) {
+    if (show && map) {
       const bounds = map.bounds();
       const w = store.dataset!.width;
       const h = store.dataset!.height;
@@ -542,7 +542,20 @@ export default class Snapshots extends Vue {
     this.bboxRight = snapshot.screenshot!.bbox!.right;
     this.bboxBottom = snapshot.screenshot!.bbox!.bottom;
     this.maxResolution = snapshot.screenshot!.maxResolution;
-    /*
+
+    this.$router.replace({
+      query: {
+        ...this.$route.query,
+        unrollXY: snapshot.unrollXY,
+        unrollZ: snapshot.unrollZ,
+        unrollT: snapshot.unrollT,
+        xy: snapshot.xy,
+        z: snapshot.z,
+        time: snapshot.time,
+        layer: snapshot.layerMode
+      }
+    });
+
     const map = Vue.prototype.$currentMap;
     map.bounds({
       left: Math.min(
@@ -557,13 +570,13 @@ export default class Snapshots extends Vue {
         snapshot.viewport.bl.x,
         snapshot.viewport.tr.x
       ),
-      top: Math.max(
+      top: Math.min(
         snapshot.viewport.tl.y,
         snapshot.viewport.tr.y,
         snapshot.viewport.bl.y,
         snapshot.viewport.tr.y
       ),
-      bottom: Math.min(
+      bottom: Math.max(
         snapshot.viewport.tl.y,
         snapshot.viewport.tr.y,
         snapshot.viewport.bl.y,
@@ -571,7 +584,6 @@ export default class Snapshots extends Vue {
       )
     });
     map.rotation(snapshot.rotation || 0);
-    */
   }
 
   saveSnapshot(): void {

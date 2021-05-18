@@ -762,17 +762,15 @@ export class Main extends VuexModule {
     await this.syncSnapshots();
   }
 
-  private changeQuery(component: any, param: string, value: string) {
-    const old = component!.$route!.query[param];
-    if (old === value) {
-      return;
-    }
-    component!.$router!.replace({
-      query: {
-        ...component!.$route!.query,
-        [param]: value
-      }
-    });
+  @Mutation
+  public loadSnapshotImpl(snapshot: { [key: string]: any }) {
+    this.unrollXY = snapshot.unrollXY;
+    this.unrollZ = snapshot.unrollZ;
+    this.unrollT = snapshot.unrollT;
+    this.xy = snapshot.xy;
+    this.z = snapshot.z;
+    this.time = snapshot.time;
+    this.layerMode = snapshot.layerMode;
   }
 
   @Action
@@ -788,28 +786,15 @@ export class Main extends VuexModule {
     }
     let snapshot = snapshots[0];
     while (this.configuration.layers.length) {
-      this.removeLayer(0);
+      this.removeLayerImpl(0);
     }
     snapshot.layers.forEach((sslayer: { [key: string]: any }) => {
       var layer = newLayer(this.dataset!, this.configuration!.layers!);
       Object.assign(layer, sslayer);
       this.pushLayer(layer);
     });
-
-    this.setUnrollXY(snapshot.unrollXY);
-    // this.changeQuery(component, "unrollXY", this.unrollXY.toString());
-    this.setUnrollZ(snapshot.unrollZ);
-    // this.changeQuery(component, "unrollZ", this.unrollZ.toString());
-    this.setUnrollT(snapshot.unrollT);
-    // this.changeQuery(component, "unrollT", this.unrollT.toString());
-    this.setXY(snapshot.xy);
-    // this.changeQuery(component, "xy", this.xy.toString());
-    this.setZ(snapshot.z);
-    // this.changeQuery(component, "z", this.z.toString());
-    this.setTime(snapshot.time);
-    // this.changeQuery(component, "time", this.time.toString());
-    this.setLayerMode(snapshot.layerMode);
-    // this.changeQuery(component, "layer", this.layerMode.toString());
+    this.loadSnapshotImpl(snapshot);
+    await this.syncConfiguration();
     // note that this doesn't set viewport, snapshot name, description, tags,
     // map rotation, or screenshot parameters
     return snapshot;
