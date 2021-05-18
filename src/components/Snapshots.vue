@@ -2,7 +2,7 @@
   <div class="snapshots">
     <div v-if="store.configuration">
       <v-card-title class="headline">
-        Snapshot View
+        Snapshot
       </v-card-title>
       <v-card-text
         class="pb-0"
