@@ -262,7 +262,7 @@ export default class Snapshots extends Vue {
   }
 
   set bboxWidth(value: number) {
-    this.bboxRight = (this.bboxLeft || 0) + parseInt(value, 10);
+    this.bboxRight = (this.bboxLeft || 0) + parseInt("" + value, 10);
   }
 
   get bboxHeight(): number {
@@ -270,7 +270,7 @@ export default class Snapshots extends Vue {
   }
 
   set bboxHeight(value: number) {
-    this.bboxBottom = (this.bboxTop || 0) + parseInt(value, 0);
+    this.bboxBottom = (this.bboxTop || 0) + parseInt("" + value, 0);
   }
 
   get formatList(): object[] {
