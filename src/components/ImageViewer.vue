@@ -97,6 +97,8 @@ export default class ImageViewer extends Vue {
   private layerParams: any;
   private map: any;
   private annotationLayer: any;
+  private uiLayer: any;
+  private scaleWidget: any;
   private unrollW: number = 1;
   private unrollH: number = 1;
 
@@ -223,6 +225,8 @@ export default class ImageViewer extends Vue {
         geojs.event.annotation.add,
         this.handleAnnotationChange
       );
+      this.uiLayer = this.map.createLayer("ui");
+      this.uiLayer.node().css({ "mix-blend-mode": "unset" });
     } else {
       adjustLayers =
         Math.abs(this.map.maxBounds(undefined, null).right - mapWidth) >= 0.5 ||
@@ -250,6 +254,16 @@ export default class ImageViewer extends Vue {
     }
     this.unrollW = unrollW;
     this.unrollH = unrollH;
+    if (this.scaleWidget) {
+      this.uiLayer.deleteWidget(this.scaleWidget);
+      this.scaleWidget = null;
+    }
+    if (someImage.mm_x) {
+      this.scaleWidget = this.uiLayer.createWidget("scale", {
+        scale: someImage.mm_x / 1000,
+        position: { bottom: 20, right: 10 }
+      });
+    }
     while (this.imageLayers.length < this.layerStackImages.length * 2) {
       this.layerParams.tilesAtZoom = (level: number) => {
         const s = Math.pow(2, someImage.levels - 1 - level);
@@ -349,6 +363,7 @@ export default class ImageViewer extends Vue {
     }
     this.ready.layers.splice(this.layerStackImages.length);
     this.annotationLayer.moveToTop();
+    this.uiLayer.moveToTop();
     // set tile urls
     this.layerStackImages.forEach(
       (

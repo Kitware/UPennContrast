@@ -541,6 +541,7 @@ export default class Snapshots extends Vue {
       )
     });
     map.rotation(snapshot.rotation || 0);
+    this.markCurrentArea();
   }
 
   saveSnapshot(): void {

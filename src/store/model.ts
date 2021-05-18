@@ -28,6 +28,8 @@ export interface IImage {
   sizeY: number;
   tileWidth: number;
   tileHeight: number;
+  mm_x: number;
+  mm_y: number;
 }
 
 export interface IImageTile {

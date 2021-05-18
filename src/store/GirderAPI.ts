@@ -465,7 +465,9 @@ function parseTiles(
         sizeX: tile.sizeX,
         sizeY: tile.sizeY,
         tileWidth: tile.tileWidth,
-        tileHeight: tile.tileHeight
+        tileHeight: tile.tileHeight,
+        mm_x: tile.mm_x,
+        mm_y: tile.mm_y
       };
       if (!lookup.has(key)) {
         lookup.set(key, [info]);
