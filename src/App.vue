@@ -1,13 +1,15 @@
 <template>
   <v-app id="inspire">
-    <v-app-bar app clipped-right>
+    <v-app-bar class="elevation-1" app clipped-right>
       <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
       <v-toolbar-title @click="goHome" class="logo"
         >UPenn Contrast</v-toolbar-title
       >
       <bread-crumbs />
       <v-spacer />
-      <snapshots />
+      <v-btn @click.stop="snapshotPanel = !snapshotPanel" id="snapshotButton"
+        >Snapshot</v-btn
+      >
       <user-menu />
       <server-status />
     </v-app-bar>
@@ -19,12 +21,17 @@
     <v-main>
       <router-view />
     </v-main>
-
-    <!-- <v-footer app>
-      <span>Kitware</span>
-      <v-spacer />
-      <span>&copy; 2019</span>
-    </v-footer>-->
+    <v-navigation-drawer
+      v-model="snapshotPanel"
+      app
+      right
+      disable-resize-watcher
+      clipped
+      hide-overlay
+      :width="320"
+    >
+      <snapshots :snapshotVisible="snapshotPanel" />
+    </v-navigation-drawer>
   </v-app>
 </template>
 
@@ -53,6 +60,7 @@ Vue.use(vMousetrap);
 export default class App extends Vue {
   readonly store = store;
   drawer = false;
+  snapshotPanel = false;
 
   fetchConfig() {
     axios
@@ -78,5 +86,13 @@ export default class App extends Vue {
 <style lang="scss" scoped>
 .logo {
   cursor: pointer;
+}
+#snapshotButton {
+  margin-right: 1em;
+}
+</style>
+<style lang="scss">
+body > div {
+  overflow: hidden;
 }
 </style>
