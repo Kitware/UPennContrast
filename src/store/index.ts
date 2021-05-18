@@ -53,6 +53,7 @@ export class Main extends VuexModule {
   unrollXY: boolean = false;
   unrollZ: boolean = false;
   unrollT: boolean = false;
+  snapshot?: string;
 
   get userName() {
     return this.girderUser ? this.girderUser.login : "anonymous";
@@ -714,6 +715,89 @@ export class Main extends VuexModule {
       }
       return layer._histogram.promise;
     };
+  }
+
+  @Mutation
+  public setSnapshotImpl(value?: string) {
+    // check if snapshot is available.  If not, set to undefined
+    this.snapshot = value;
+    // TODO: also load the snapshot
+  }
+
+  @Action
+  async setSnapshot(value?: string) {
+    this.setSnapshotImpl(value);
+  }
+
+  @Action
+  async syncSnapshots() {
+    if (!this.configuration) {
+      return;
+    }
+    await this.api.updateSnapshots(this.configuration);
+  }
+
+  @Action
+  async addSnapshot(snapshot: { [key: string]: any }) {
+    if (!this.configuration) {
+      return;
+    }
+    let snapshots = (this.configuration.snapshots || []).filter(
+      d => d.name !== snapshot.name
+    );
+    snapshots.push(snapshot);
+    this.configuration.snapshots = snapshots;
+    await this.syncSnapshots();
+  }
+
+  @Action
+  async removeSnapshot(name: string) {
+    if (!this.configuration) {
+      return;
+    }
+    let snapshots = (this.configuration.snapshots || []).filter(
+      d => d.name !== name
+    );
+    this.configuration.snapshots = snapshots;
+    await this.syncSnapshots();
+  }
+
+  @Mutation
+  public loadSnapshotImpl(snapshot: { [key: string]: any }) {
+    this.unrollXY = snapshot.unrollXY;
+    this.unrollZ = snapshot.unrollZ;
+    this.unrollT = snapshot.unrollT;
+    this.xy = snapshot.xy;
+    this.z = snapshot.z;
+    this.time = snapshot.time;
+    this.layerMode = snapshot.layerMode;
+  }
+
+  @Action
+  async loadSnapshot(name: string) {
+    if (!this.configuration || !this.dataset) {
+      return {};
+    }
+    let snapshots = (this.configuration.snapshots || []).filter(
+      d => d.name == name
+    );
+    if (!snapshots.length) {
+      return {};
+    }
+    let snapshot = snapshots[0];
+    while (this.configuration.layers.length) {
+      this.removeLayerImpl(0);
+    }
+    snapshot.layers.forEach((sslayer: { [key: string]: any }) => {
+      var layer = newLayer(this.dataset!, this.configuration!.layers!);
+      Object.assign(layer, sslayer);
+      this.pushLayer(layer);
+    });
+    this.loadSnapshotImpl(snapshot);
+    await this.syncConfiguration();
+    // note that this doesn't set viewport, snapshot name, description, tags,
+    // map rotation, or screenshot parameters
+    return snapshot;
   }
 }
 

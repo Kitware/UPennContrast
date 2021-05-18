@@ -28,6 +28,8 @@ export interface IImage {
   sizeY: number;
   tileWidth: number;
   tileHeight: number;
+  mm_x: number;
+  mm_y: number;
 }
 
 export interface IImageTile {
@@ -70,6 +72,8 @@ export interface IDatasetConfiguration {
   description: string;
 
   layers: IDisplayLayer[];
+
+  snapshots?: any[];
 }
 
 export declare type DisplaySliceType =
