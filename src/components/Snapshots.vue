@@ -200,6 +200,7 @@
                 <v-chip
                   v-for="t in s.record.tags"
                   :key="'tag_' + s.name + '_' + t"
+                  @click.stop="snapshotSearch = t"
                   small
                   >{{ t }}</v-chip
                 >
