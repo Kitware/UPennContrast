@@ -31,18 +31,16 @@
         </v-row>
         <v-row>
           <v-col cols="8" class="py-0">
-            <v-btn color="primary" text :to="snapshotRoute">
-              {{ store.snapshot }}
-            </v-btn>
+            <span v-if="modifiedDate" id="modified-date">
+              Last change: {{ new Date(modifiedDate).toLocaleString() }}
+            </span>
           </v-col>
           <v-col cols="4" class="py-0">
             <v-btn
               color="primary"
               text
               @click="removeSnapshot"
-              :disabled="
-                snapshotList().filter(s => s.name === newName).length === 0
-              "
+              :disabled="!currentSnapshot"
             >
               Delete
             </v-btn>
@@ -567,7 +565,7 @@ export default class Snapshots extends Vue {
         );
       }
       snapshots.forEach(s => {
-        results.push({ name: s.name, key: s.name });
+        results.push({ name: s.name, key: s.name, record: s });
       });
     }
     return results;
@@ -655,7 +653,7 @@ export default class Snapshots extends Vue {
       name: this.newName.trim(),
       description: this.newDescription.trim(),
       tags: this.newTags.slice(),
-      created: Date.now(),
+      created: this.currentSnapshot ? this.currentSnapshot.created : Date.now(),
       modified: Date.now(),
       viewport: {
         tl: map.displayToGcs({ x: 0, y: 0 }),
@@ -694,10 +692,22 @@ export default class Snapshots extends Vue {
     this.store.removeSnapshot(this.newName);
   }
 
-  get snapshotRoute(): string {
-    // DWM::
-    console.log("snapshotRoute"); // eslint-disable-line no-console
-    return "";
+  get currentSnapshot(): { [key: string]: any } | undefined {
+    if (store.configuration && store.configuration.snapshots) {
+      return store.configuration.snapshots
+        .slice()
+        .filter(s => s.name === this.newName)[0];
+    }
+    return;
+  }
+
+  get modifiedDate(): number {
+    const snapshot = this.currentSnapshot;
+    if (snapshot) {
+      console.log("md", snapshot, snapshot.modified || snapshot.created); // DWM::
+      return snapshot.modified || snapshot.created;
+    }
+    return 0;
   }
 }
 </script>
@@ -713,5 +723,8 @@ export default class Snapshots extends Vue {
   .group_label {
     margin-right: 1em;
   }
+}
+#modified-date {
+  font-size: 10px;
 }
 </style>
