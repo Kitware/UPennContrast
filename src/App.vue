@@ -29,8 +29,9 @@
       clipped
       hide-overlay
       :width="320"
+      @transitionend="snapshotPanelFull = snapshotPanel"
     >
-      <snapshots :snapshotVisible="snapshotPanel" />
+      <snapshots :snapshotVisible="snapshotPanel && snapshotPanelFull" />
     </v-navigation-drawer>
   </v-app>
 </template>
@@ -61,6 +62,7 @@ export default class App extends Vue {
   readonly store = store;
   drawer = false;
   snapshotPanel = false;
+  snapshotPanelFull = false;
 
   fetchConfig() {
     axios
