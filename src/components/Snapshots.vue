@@ -746,7 +746,6 @@ export default class Snapshots extends Vue {
   get modifiedDate(): number {
     const snapshot = this.currentSnapshot;
     if (snapshot) {
-      console.log("md", snapshot, snapshot.modified || snapshot.created); // DWM::
       return snapshot.modified || snapshot.created;
     }
     return 0;
