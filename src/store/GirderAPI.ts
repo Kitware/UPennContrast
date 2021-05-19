@@ -82,19 +82,22 @@ export default class GirderAPI {
   }
 
   tileTemplateUrl(
-    item: string | IGirderItem,
-    frame: number,
+    image: IImage,
     color: string,
     contrast: IContrast,
-    hist: any
+    hist: any,
+    layer: IDisplayLayer | null,
+    ds: IDataset | null
   ) {
     if (hist === null) {
       return;
     }
-    const url = new URL(`${this.client.apiRoot}/item/${toId(item)}/tiles/zxy`);
+    const url = new URL(
+      `${this.client.apiRoot}/item/${toId(image.item)}/tiles/zxy`
+    );
     url.searchParams.set("encoding", "PNG");
-    url.searchParams.set("frame", frame.toString());
-    const style = toStyle(color, contrast, hist);
+    url.searchParams.set("frame", image.frameIndex.toString());
+    const style = toStyle(color, contrast, hist, layer, ds, image);
     url.searchParams.set("style", JSON.stringify(style));
     url.searchParams.set("edge", "crop");
     return url.href.replace("tiles/zxy", "tiles/zxy/{z}/{x}/{y}");
@@ -372,11 +375,11 @@ interface IOMEInfo {
 
 function toKey(
   z: number | string,
-  zTime: number | string,
+  time: number | string,
   xy: number | string,
   c: number | string
 ) {
-  return `z${z}:t${zTime}:xy${xy}:c${c}`;
+  return `z${z}:t${time}:xy${xy}:c${c}`;
 }
 
 function parseTiles(
@@ -461,6 +464,7 @@ function parseTiles(
         frame,
         levels: tile.levels,
         frameIndex: j,
+        key: { z: z, t: t, xy: xy, c: c },
         item,
         sizeX: tile.sizeX,
         sizeY: tile.sizeY,
@@ -506,15 +510,13 @@ function parseTiles(
     (acc, v) => Math.max(acc, v[1].size),
     0
   );
-  const zTime: number[][] = Array.from({ length: numberOfTimeSlots }).map(() =>
-    zValues.slice()
-  );
+  const timeValues: number[] = Array.from({ length: numberOfTimeSlots });
 
   entries.forEach(([k, v], i) => {
     zValues[i] = k;
     const tValues = Array.from(v).sort((a, b) => a - b);
     tValues.forEach((t, j) => {
-      zTime[j][i] = t;
+      timeValues[j] = t;
     });
   });
 
@@ -533,8 +535,8 @@ function parseTiles(
   }
 
   return {
-    images: (z: number, zTime: number, xy: number, channel: number) =>
-      lookup.get(toKey(z, zTime, xy, channel)) || [],
+    images: (z: number, time: number, xy: number, channel: number) =>
+      lookup.get(toKey(z, time, xy, channel)) || [],
     anyImage: () => {
       const values = lookup.values();
       let it = values.next();
@@ -550,7 +552,7 @@ function parseTiles(
     },
     xy: Array.from(xys).sort((a, b) => a - b),
     z: zValues,
-    time: zTime,
+    time: timeValues,
     channels,
     channelNames,
     width,

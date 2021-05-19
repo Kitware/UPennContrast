@@ -43,7 +43,7 @@
           />
         </template>
       </v-radio>
-      <!-- <v-radio value="max-merge" label="Max Merge" class="smaller" /> -->
+      <v-radio value="max-merge" label="Max Merge" class="smaller" />
     </template>
   </v-radio-group>
 </template>

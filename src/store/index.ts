@@ -642,17 +642,17 @@ export class Main extends VuexModule {
         images,
         urls: images.map(image =>
           this.api.tileTemplateUrl(
-            image.item,
-            image.frameIndex,
+            image,
             layer.color,
             layer.contrast,
-            hist
+            hist,
+            layer,
+            this.dataset
           )
         ),
         fullUrls: images.map(image =>
           this.api.tileTemplateUrl(
-            image.item,
-            image.frameIndex,
+            image,
             "#ffffff",
             {
               mode: "percentile",
@@ -661,7 +661,9 @@ export class Main extends VuexModule {
               savedBlackPoint: 0,
               savedWhitePoint: 100
             },
-            hist
+            hist,
+            layer,
+            this.dataset
           )
         ),
         hist
