@@ -121,6 +121,7 @@
               dense
             ></v-text-field>
           </v-col>
+          <!--
           <v-col class="pa-2">
             <v-text-field
               label="Right"
@@ -134,6 +135,25 @@
             <v-text-field
               label="Bottom"
               v-model="bboxBottom"
+              type="number"
+              :max="store.dataset.height"
+              dense
+            ></v-text-field>
+          </v-col>
+          -->
+          <v-col class="pa-2">
+            <v-text-field
+              label="Width"
+              v-model="bboxWidth"
+              type="number"
+              :max="store.dataset.width"
+              dense
+            ></v-text-field>
+          </v-col>
+          <v-col class="pa-2">
+            <v-text-field
+              label="Height"
+              v-model="bboxHeight"
               type="number"
               :max="store.dataset.height"
               dense
@@ -237,6 +257,22 @@ export default class Snapshots extends Vue {
   exportLayer: string = "all";
   format: string = "png";
 
+  get bboxWidth(): number {
+    return (this.bboxRight || 0) - (this.bboxLeft || 0);
+  }
+
+  set bboxWidth(value: number) {
+    this.bboxRight = (this.bboxLeft || 0) + parseInt("" + value, 10);
+  }
+
+  get bboxHeight(): number {
+    return (this.bboxBottom || 0) - (this.bboxTop || 0);
+  }
+
+  set bboxHeight(value: number) {
+    this.bboxBottom = (this.bboxTop || 0) + parseInt("" + value, 0);
+  }
+
   get formatList(): object[] {
     let fullList = [
       { name: "PNG", key: "png" },
@@ -288,9 +324,10 @@ export default class Snapshots extends Vue {
       params.jpeqQuality = parseInt(this.format.substr(5), 10);
     }
     params.left = this.bboxLeft;
-    params.right = this.bboxRight;
     params.top = this.bboxTop;
+    params.right = this.bboxRight;
     params.bottom = this.bboxBottom;
+
     w = params.right - params.left;
     h = params.bottom - params.top;
     let max = Math.max(w, h);
@@ -333,12 +370,25 @@ export default class Snapshots extends Vue {
     link.click();
   }
 
+  setBoundingBox(left: number, top: number, right: number, bottom: number) {
+    const w = store.dataset!.width;
+    const h = store.dataset!.height;
+    this.bboxLeft = Math.min(w - 1, Math.max(0, Math.round(left)));
+    this.bboxRight = Math.max(
+      this.bboxLeft + 1,
+      Math.min(w, Math.round(right))
+    );
+    this.bboxTop = Math.min(h - 1, Math.max(0, Math.round(top)));
+    this.bboxBottom = Math.max(
+      this.bboxTop + 1,
+      Math.min(h, Math.round(bottom))
+    );
+  }
+
   showSnapshot(show: boolean) {
     const map = Vue.prototype.$currentMap;
     if (show && map) {
       const bounds = map.bounds();
-      const w = store.dataset!.width;
-      const h = store.dataset!.height;
       if (this.bboxLeft === null) {
         const screenBounds = map.gcsToDisplay([
           { x: bounds.left, y: bounds.top },
@@ -349,10 +399,12 @@ export default class Snapshots extends Vue {
           { x: screenBounds[0].x + shrinkIn, y: screenBounds[0].y + shrinkIn },
           { x: screenBounds[1].x - shrinkIn, y: screenBounds[1].y - shrinkIn }
         ]);
-        this.bboxLeft = Math.max(0, Math.round(innerBounds[0].x));
-        this.bboxRight = Math.min(w, Math.round(innerBounds[1].x));
-        this.bboxTop = Math.max(0, Math.round(innerBounds[0].y));
-        this.bboxBottom = Math.min(h, Math.round(innerBounds[1].y));
+        this.setBoundingBox(
+          innerBounds[0].x,
+          innerBounds[0].y,
+          innerBounds[1].x,
+          innerBounds[1].y
+        );
       }
       if (!this.bboxLayer) {
         this.bboxLayer = map.createLayer("annotation", {
@@ -423,7 +475,6 @@ export default class Snapshots extends Vue {
         coordinates
       );
       this.bboxAnnotation.options("corners", coordinates);
-      console.log(this.bboxLayer.currentAnnotation, params); //DWM::
       if (this.bboxLayer.currentAnnotation) {
         this.bboxLayer.currentAnnotation.options("corners", coordinates);
       }
@@ -435,25 +486,15 @@ export default class Snapshots extends Vue {
   setArea(mode: string) {
     const map = Vue.prototype.$currentMap;
     if (mode === "full" && store.dataset) {
-      this.bboxLeft = 0;
-      this.bboxTop = 0;
-      this.bboxRight = store.dataset.width;
-      this.bboxBottom = store.dataset.height;
+      this.setBoundingBox(0, 0, store.dataset.width, store.dataset.height);
     } else if (mode === "viewport" && map && store.dataset) {
       const bounds = map.bounds();
-      this.bboxLeft = Math.max(0, Math.round(bounds.left));
-      this.bboxTop = Math.max(0, Math.round(bounds.top));
-      this.bboxRight = Math.min(store.dataset.width, Math.round(bounds.right));
-      this.bboxBottom = Math.min(
-        store.dataset.height,
-        Math.round(bounds.bottom)
-      );
+      this.setBoundingBox(bounds.left, bounds.top, bounds.right, bounds.bottom);
     }
     this.markCurrentArea();
   }
 
   drawBoundingBox() {
-    // DWM::
     this.bboxLayer.mode(null);
     this.bboxLayer.mode(this.bboxLayer.modes.edit, this.bboxAnnotation).draw();
     const map = Vue.prototype.$currentMap;
@@ -465,26 +506,26 @@ export default class Snapshots extends Vue {
   }
 
   boundingBoxCoordinates(event: { [key: string]: any }) {
-    let w = store.dataset!.width;
-    let h = store.dataset!.height;
     const coord = event.annotation!.coordinates();
-    this.bboxLeft = Math.max(0, Math.round(Math.min(coord[0].x, coord[2].x)));
-    this.bboxTop = Math.max(0, Math.round(Math.min(coord[0].y, coord[2].y)));
-    this.bboxRight = Math.min(w, Math.round(Math.max(coord[0].x, coord[2].x)));
-    this.bboxBottom = Math.min(h, Math.round(Math.max(coord[0].y, coord[2].y)));
+    this.setBoundingBox(
+      Math.min(coord[0].x, coord[2].x),
+      Math.min(coord[0].y, coord[2].y),
+      Math.max(coord[0].x, coord[2].x),
+      Math.max(coord[0].y, coord[2].y)
+    );
   }
 
   doneBoundingBox(allDone: boolean) {
-    let w = store.dataset!.width;
-    let h = store.dataset!.height;
     const map = Vue.prototype.$currentMap;
     map.geoOff(geojs.event.annotation.mode, this.doneBoundingBox);
     map.geoOff(geojs.event.annotation.coordinates, this.boundingBoxCoordinates);
     const coord = this.bboxAnnotation.coordinates();
-    this.bboxLeft = Math.max(0, Math.round(Math.min(coord[0].x, coord[2].x)));
-    this.bboxTop = Math.max(0, Math.round(Math.min(coord[0].y, coord[2].y)));
-    this.bboxRight = Math.min(w, Math.round(Math.max(coord[0].x, coord[2].x)));
-    this.bboxBottom = Math.min(h, Math.round(Math.max(coord[0].y, coord[2].y)));
+    this.setBoundingBox(
+      Math.min(coord[0].x, coord[2].x),
+      Math.min(coord[0].y, coord[2].y),
+      Math.max(coord[0].x, coord[2].x),
+      Math.max(coord[0].y, coord[2].y)
+    );
     this.bboxLayer.mode(null).draw();
     if (allDone !== true) {
       this.drawBoundingBox();
