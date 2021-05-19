@@ -53,6 +53,8 @@
             <v-combobox
               v-model="newTags"
               :items="tagList()"
+              :search-input.sync="tagSearchInput"
+              @change="tagSearchInput = ''"
               label="Tags"
               multiple
               hide-selected
@@ -268,6 +270,7 @@ export default class Snapshots extends Vue {
   newName: string = "";
   newDescription: string = "";
   newTags: string[] = [];
+  tagSearchInput: string = "";
 
   maxResolution: number | null = null;
   bboxLeft: number | null = null;
@@ -554,10 +557,16 @@ export default class Snapshots extends Vue {
     }
   }
 
-  snapshotList(): { [key: string]: any }[] {
+  snapshotList(sortMode?: string): { [key: string]: any }[] {
     let results: { [key: string]: any }[] = [];
     if (store.configuration && store.configuration.snapshots) {
-      store.configuration.snapshots.forEach(s => {
+      let snapshots = store.configuration.snapshots.slice();
+      if (!sortMode) {
+        snapshots.sort(
+          (a, b) => (b.modified || b.created) - (a.modified || a.created)
+        );
+      }
+      snapshots.forEach(s => {
         results.push({ name: s.name, key: s.name });
       });
     }
@@ -647,6 +656,7 @@ export default class Snapshots extends Vue {
       description: this.newDescription.trim(),
       tags: this.newTags.slice(),
       created: Date.now(),
+      modified: Date.now(),
       viewport: {
         tl: map.displayToGcs({ x: 0, y: 0 }),
         tr: map.displayToGcs({ x: map.size().width, y: 0 }),
@@ -686,7 +696,7 @@ export default class Snapshots extends Vue {
 
   get snapshotRoute(): string {
     // DWM::
-    console.log("snapshotRoute");
+    console.log("snapshotRoute"); // eslint-disable-line no-console
     return "";
   }
 }
