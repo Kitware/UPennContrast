@@ -9,68 +9,68 @@
         title="Add a name, description, or tags to filter the list of snapshots or to create a new snapshot."
       >
         <v-row>
-          <v-col cols="7" class="py-0">
-            <v-select
-              v-model="selectedSnapshot"
-              :items="snapshotList()"
-              label="Current snapshot"
-              item-text="name"
-              item-value="key"
-              dense
-            ></v-select>
-          </v-col>
-          <v-col cols="5" class="py-0">
-            <v-btn
-              color="primary"
-              text
-              @click="loadSnapshot"
-              :disabled="!selectedSnapshot || selectedSnapshot === '__none__'"
-            >
-              Load View
-            </v-btn>
-          </v-col>
-        </v-row>
-        <v-row>
-          <v-col cols="7" class="py-0">
-            <v-btn color="primary" text :to="snapshotRoute">
-              {{ store.snapshot }}
-            </v-btn>
-          </v-col>
-          <v-col cols="5" class="py-0">
-            <v-btn
-              color="primary"
-              text
-              @click="removeSnapshot"
-              :disabled="!selectedSnapshot || selectedSnapshot === '__none__'"
-            >
-              Delete View
-            </v-btn>
-          </v-col>
-        </v-row>
-        <v-row>
-          <v-col cols="7" class="py-0">
+          <v-col cols="8" class="py-0">
             <!-- add :rules="validationFunc" -->
             <v-text-field
               label="Snapshot name"
               v-model="newName"
               dense
+              hide-details
             ></v-text-field>
           </v-col>
-          <v-col cols="5" class="py-0">
+          <v-col cols="4" class="py-0">
             <v-btn
               color="primary"
               text
               :disabled="!newName.trim()"
               @click="saveSnapshot"
             >
-              Save View
+              Save
+            </v-btn>
+          </v-col>
+        </v-row>
+        <v-row>
+          <v-col cols="8" class="py-0">
+            <v-btn color="primary" text :to="snapshotRoute">
+              {{ store.snapshot }}
+            </v-btn>
+          </v-col>
+          <v-col cols="4" class="py-0">
+            <v-btn
+              color="primary"
+              text
+              @click="removeSnapshot"
+              :disabled="
+                snapshotList().filter(s => s.name === newName).length === 0
+              "
+            >
+              Delete
             </v-btn>
           </v-col>
         </v-row>
         <v-row>
           <v-col class="py-0">
-            <!-- render existing tags here -->
-            <v-text-field label="Tags" v-model="newTag" dense></v-text-field>
+            <v-combobox
+              v-model="newTags"
+              :items="tagList()"
+              label="Tags"
+              multiple
+              hide-selected
+              small-chips
+              dense
+            >
+              <template v-slot:selection="{ attrs, index, item, parent }">
+                <v-chip
+                  class="pa-2"
+                  v-bind="attrs"
+                  close
+                  small
+                  @click:close="parent.selectItem(item)"
+                >
+                  {{ item }}
+                </v-chip>
+              </template>
+            </v-combobox>
           </v-col>
         </v-row>
         <v-row>
@@ -79,6 +79,7 @@
               label="Snapshot description"
               v-model="newDescription"
               dense
+              hide-details
             ></v-text-field>
           </v-col>
         </v-row>
@@ -110,6 +111,7 @@
               type="number"
               :max="store.dataset.width"
               dense
+              hide-details
             ></v-text-field>
           </v-col>
           <v-col class="pa-2">
@@ -119,6 +121,7 @@
               type="number"
               :max="store.dataset.height"
               dense
+              hide-details
             ></v-text-field>
           </v-col>
           <!--
@@ -129,6 +132,7 @@
               type="number"
               :max="store.dataset.width"
               dense
+              hide-details
             ></v-text-field>
           </v-col>
           <v-col class="pa-2">
@@ -138,6 +142,7 @@
               type="number"
               :max="store.dataset.height"
               dense
+              hide-details
             ></v-text-field>
           </v-col>
           -->
@@ -148,6 +153,7 @@
               type="number"
               :max="store.dataset.width"
               dense
+              hide-details
             ></v-text-field>
           </v-col>
           <v-col class="pa-2">
@@ -157,9 +163,24 @@
               type="number"
               :max="store.dataset.height"
               dense
+              hide-details
             ></v-text-field>
           </v-col>
         </v-row>
+      </v-card-text>
+
+      <v-divider></v-divider>
+
+      <v-card-text>
+        <v-list dense>
+          <v-list-item
+            v-for="s in snapshotList()"
+            :key="'snapshot_' + s.name"
+            :value="s.key"
+            @click="loadSnapshot(s.name)"
+            >{{ s.name }}</v-list-item
+          >
+        </v-list>
       </v-card-text>
 
       <v-divider></v-divider>
@@ -181,6 +202,7 @@
                 )
               "
               dense
+              hide-details
             ></v-text-field>
           </v-col>
           <v-col class="pa-2">
@@ -191,6 +213,7 @@
               item-text="name"
               item-value="key"
               dense
+              hide-details
             ></v-select>
           </v-col>
           <v-col class="pa-2">
@@ -201,6 +224,7 @@
               item-text="name"
               item-value="key"
               dense
+              hide-details
             ></v-select>
           </v-col>
         </v-row>
@@ -243,9 +267,7 @@ export default class Snapshots extends Vue {
 
   newName: string = "";
   newDescription: string = "";
-  newTag: string = "";
   newTags: string[] = [];
-  selectedSnapshot: string = store.snapshot || "__none__";
 
   maxResolution: number | null = null;
   bboxLeft: number | null = null;
@@ -532,8 +554,8 @@ export default class Snapshots extends Vue {
     }
   }
 
-  snapshotList(): object[] {
-    let results = [{ name: "None", key: "__none__" }];
+  snapshotList(): { [key: string]: any }[] {
+    let results: { [key: string]: any }[] = [];
     if (store.configuration && store.configuration.snapshots) {
       store.configuration.snapshots.forEach(s => {
         results.push({ name: s.name, key: s.name });
@@ -542,11 +564,25 @@ export default class Snapshots extends Vue {
     return results;
   }
 
-  async loadSnapshot() {
-    var snapshot = await this.store.loadSnapshot(this.selectedSnapshot);
+  tagList(): string[] {
+    const snapshots = this.snapshotList();
+    const tagSet: { [key: string]: any } = {};
+    if (store.configuration && store.configuration.snapshots) {
+      store.configuration.snapshots.forEach(s => {
+        (s.tags || []).forEach((tag: string) => {
+          tagSet[tag] = true;
+        });
+      });
+    }
+    let tags = Object.keys(tagSet).sort();
+    return tags;
+  }
+
+  async loadSnapshot(name: string) {
+    var snapshot = await this.store.loadSnapshot(name);
     this.newName = snapshot.name || "";
     this.newDescription = snapshot.description || "";
-    this.newTags = snapshot.tags!.slice();
+    this.newTags = (snapshot.tags || []).slice();
     this.format = snapshot.screenshot!.format;
     this.bboxLeft = snapshot.screenshot!.bbox!.left;
     this.bboxTop = snapshot.screenshot!.bbox!.top;
@@ -645,8 +681,7 @@ export default class Snapshots extends Vue {
   }
 
   removeSnapshot(): void {
-    this.store.removeSnapshot(this.selectedSnapshot);
-    this.selectedSnapshot = "__none__";
+    this.store.removeSnapshot(this.newName);
   }
 
   get snapshotRoute(): string {
