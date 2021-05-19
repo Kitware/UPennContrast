@@ -1,5 +1,5 @@
 <template>
-  <div class="snapshots">
+  <div class="snapshots mx-0">
     <div v-if="store.configuration">
       <v-card-title class="headline">
         Snapshot
@@ -171,15 +171,49 @@
 
       <v-divider></v-divider>
 
-      <v-card-text>
+      <v-card-text class="pa-0">
+        <v-row>
+          <v-col class="mx-3 pb-1">
+            <v-text-field
+              label="Search Snapshots"
+              v-model="snapshotSearch"
+              clearable
+              dense
+              hide-details
+            ></v-text-field>
+          </v-col>
+        </v-row>
         <v-list dense>
           <v-list-item
             v-for="s in snapshotList()"
             :key="'snapshot_' + s.name"
             :value="s.key"
             @click="loadSnapshot(s.name)"
-            >{{ s.name }}</v-list-item
+            :title="s.record.description || ''"
+            three-line
           >
+            <v-list-item-content>
+              <v-list-item-title>
+                {{ s.name }}
+              </v-list-item-title>
+              <v-list-item-subtitle>
+                <v-chip
+                  v-for="t in s.record.tags"
+                  :key="'tag_' + s.name + '_' + t"
+                  small
+                  >{{ t }}</v-chip
+                >
+              </v-list-item-subtitle>
+              <v-list-item-subtitle>
+                Last change:
+                {{
+                  new Date(
+                    s.record.modified || s.record.created
+                  ).toLocaleString()
+                }}
+              </v-list-item-subtitle>
+            </v-list-item-content>
+          </v-list-item>
         </v-list>
       </v-card-text>
 
@@ -269,6 +303,8 @@ export default class Snapshots extends Vue {
   newDescription: string = "";
   newTags: string[] = [];
   tagSearchInput: string = "";
+
+  snapshotSearch: string = "";
 
   maxResolution: number | null = null;
   bboxLeft: number | null = null;
@@ -556,6 +592,7 @@ export default class Snapshots extends Vue {
   }
 
   snapshotList(sortMode?: string): { [key: string]: any }[] {
+    let sre = new RegExp(this.snapshotSearch || "", "i");
     let results: { [key: string]: any }[] = [];
     if (store.configuration && store.configuration.snapshots) {
       let snapshots = store.configuration.snapshots.slice();
@@ -565,14 +602,19 @@ export default class Snapshots extends Vue {
         );
       }
       snapshots.forEach(s => {
-        results.push({ name: s.name, key: s.name, record: s });
+        if (
+          sre.exec(s.name) ||
+          sre.exec(s.description) ||
+          s.tags.some((t: string) => sre.exec(t))
+        ) {
+          results.push({ name: s.name, key: s.name, record: s });
+        }
       });
     }
     return results;
   }
 
   tagList(): string[] {
-    const snapshots = this.snapshotList();
     const tagSet: { [key: string]: any } = {};
     if (store.configuration && store.configuration.snapshots) {
       store.configuration.snapshots.forEach(s => {
