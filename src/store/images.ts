@@ -114,8 +114,6 @@ export function toStyle(
       layer.z.type === "max-merge" ||
       layer.time.type === "max-merge")
   ) {
-    console.log(layer, ds, image);
-    // DWM::
     var composite: { [key: string]: any }[] = [];
     for (let xyi = 0; xyi < (layer.xy.type === "max-merge" ? ds.xy.length : 1); xyi += 1) {
       let xy = layer.xy.type === "max-merge" ? ds.xy[xyi] : image.key.xy;
