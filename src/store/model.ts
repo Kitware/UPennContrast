@@ -23,6 +23,13 @@ export interface IImage {
   item: IGirderItem;
   levels: number;
   frameIndex: number;
+  key: {
+    z: number;
+    xy: number;
+    t: number;
+    c: number;
+  };
+  keyOffset: number;
   frame: IFrameInfo;
   sizeX: number;
   sizeY: number;
@@ -52,8 +59,7 @@ export interface IDataset {
 
   xy: number[];
   z: number[];
-  time: number[][]; // number of time points, within a set of the time points that reflect valid z-time points
-  // time for t,z -> time[t][z]
+  time: number[];
   channels: number[];
   channelNames: Map<number, string>;
   width: number;

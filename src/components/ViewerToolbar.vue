@@ -28,6 +28,7 @@
           :title="maxXY > 0 ? maxXY + 1 + ' XY Values' : ''"
         />
         <v-checkbox
+          class="ml-3"
           v-model="unrollXY"
           label="Unroll"
           :disabled="!(maxXY > 0 || unrollXY)"
@@ -42,6 +43,7 @@
           :title="maxZ > 0 ? maxZ + 1 + ' Z Values' : ''"
         />
         <v-checkbox
+          class="ml-3"
           v-model="unrollZ"
           label="Unroll"
           :disabled="!(maxZ > 0 || unrollZ)"
@@ -56,6 +58,7 @@
           :title="maxTime > 0 ? maxTime + 1 + ' Time Values' : ''"
         />
         <v-checkbox
+          class="ml-3"
           v-model="unrollT"
           label="Unroll"
           :disabled="!(maxTime > 0 || unrollT)"
