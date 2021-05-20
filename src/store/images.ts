@@ -22,7 +22,9 @@ export function getLayerImages(
       case "offset":
         return value + (slice.value == null ? 0 : slice.value);
       case "max-merge":
-        return 0;
+        // any value can work, but this value relates to the displayed
+        // histogram
+        return value;
       default:
         return value;
     }

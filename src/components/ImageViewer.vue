@@ -430,6 +430,13 @@ export default class ImageViewer extends Vue {
     );
     this.map.draw();
   }
+
+  beforeDestroy() {
+    if (this.map) {
+      this.map.exit();
+      this.map = null;
+    }
+  }
 }
 </script>
 
