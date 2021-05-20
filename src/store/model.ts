@@ -29,6 +29,7 @@ export interface IImage {
     t: number;
     c: number;
   };
+  keyOffset: number;
   frame: IFrameInfo;
   sizeX: number;
   sizeY: number;

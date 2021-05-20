@@ -465,6 +465,7 @@ function parseTiles(
         levels: tile.levels,
         frameIndex: j,
         key: { z: z, t: t, xy: xy, c: c },
+        keyOffset: lookup.has(key) ? lookup.get(key)!.length : 0,
         item,
         sizeX: tile.sizeX,
         sizeY: tile.sizeY,

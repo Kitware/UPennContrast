@@ -106,31 +106,30 @@ export function toStyle(
       palette: p
     };
   }
-  if (
-    layer &&
-    ds &&
-    image &&
-    (layer.xy.type === "max-merge" ||
-      layer.z.type === "max-merge" ||
-      layer.time.type === "max-merge")
-  ) {
-    var composite: { [key: string]: any }[] = [];
-    for (let xyi = 0; xyi < (layer.xy.type === "max-merge" ? ds.xy.length : 1); xyi += 1) {
-      let xy = layer.xy.type === "max-merge" ? ds.xy[xyi] : image.key.xy;
-      for (let ti = 0; ti < (layer.time.type === "max-merge" ? ds.time.length : 1); ti += 1) {
-        let t = layer.time.type === "max-merge" ? ds.time[ti] : image.key.t;
-        for (let zi = 0; zi < (layer.z.type === "max-merge" ? ds.z.length : 1); zi += 1) {
-          let z = layer.z.type === "max-merge" ? ds.z[zi] : image.key.z;
-          composite.push({
-            frame: ds.images(z, t, xy, image.key.c)[0].frameIndex,
-            min: style.min,
-            max: style.max,
-            palette: style.palette
-          });
+  if (layer && ds && image) {
+    let mmxy = layer.xy.type === "max-merge";
+    let mmt = layer.time.type === "max-merge";
+    let mmz = layer.z.type === "max-merge";
+    if (mmxy || mmt || mmz) {
+      var composite: { [key: string]: any }[] = [];
+      for (let xyi = 0; xyi < (mmxy ? ds.xy.length : 1); xyi += 1) {
+        let xy = mmxy ? ds.xy[xyi] : image.key.xy;
+        for (let ti = 0; ti < (mmt ? ds.time.length : 1); ti += 1) {
+          let t = mmt ? ds.time[ti] : image.key.t;
+          for (let zi = 0; zi < (mmz ? ds.z.length : 1); zi += 1) {
+            let z = mmz ? ds.z[zi] : image.key.z;
+            composite.push({
+              frame: ds.images(z, t, xy, image.key.c)[image.keyOffset]
+                .frameIndex,
+              min: style.min,
+              max: style.max,
+              palette: style.palette
+            });
+          }
         }
       }
+      style = { bands: composite };
     }
-    style = { bands: composite };
   }
   return style;
 }
