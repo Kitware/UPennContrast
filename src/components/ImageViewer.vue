@@ -4,6 +4,19 @@
     <div class="loading" v-if="!fullyReady">
       <v-progress-circular indeterminate />
     </div>
+    <div
+      class="loading"
+      v-if="
+        fullyReady && cacheProgress > 0 && cacheProgress < cacheProgressTotal
+      "
+    >
+      <v-progress-linear
+        :value="(100 * cacheProgress) / cacheProgressTotal"
+        color="#CCC"
+        background-color="blue-grey"
+        style="width: 200px"
+      />
+    </div>
     <svg xmlns="http://www.w3.org/2000/svg">
       <defs>
         <filter
@@ -101,6 +114,9 @@ export default class ImageViewer extends Vue {
   private scaleWidget: any;
   private unrollW: number = 1;
   private unrollH: number = 1;
+
+  cacheProgress = 0; // 0 to cacheProgressTotal
+  cacheProgressTotal = 0;
 
   $refs!: {
     geojsmap: HTMLElement;
@@ -254,7 +270,13 @@ export default class ImageViewer extends Vue {
     }
     this.unrollW = unrollW;
     this.unrollH = unrollH;
-    if (this.scaleWidget && !(someImage.mm_x || this.scaleWidget.options('scale') !== someImage.mm_x / 1000)) {
+    if (
+      this.scaleWidget &&
+      !(
+        someImage.mm_x ||
+        this.scaleWidget.options("scale") !== someImage.mm_x / 1000
+      )
+    ) {
       this.uiLayer.deleteWidget(this.scaleWidget);
       this.scaleWidget = null;
     }
@@ -449,6 +471,7 @@ export default class ImageViewer extends Vue {
       !this.map.idle ||
       !this.store.configuration
     ) {
+      this.cacheProgress = 0;
       return;
     }
     let zxy: { [key: string]: any } = {};
@@ -480,6 +503,7 @@ export default class ImageViewer extends Vue {
       axis = "xy";
     } else {
       // only one frame, so no need to buffer others
+      this.cacheProgress = 0;
       return;
     }
     if (
@@ -499,6 +523,11 @@ export default class ImageViewer extends Vue {
     let neededHistograms: IImage[][] = [];
     let maxPromises = 3;
     let addedPromises = 0;
+    let cacheProgressTotal =
+      (this.dataset as any)[axis].length *
+      (1 + 2 * Object.keys(zxy).length) *
+      this.store.configuration.layers.length;
+    let cacheProgress = cacheProgressTotal;
     for (let idx = 0; idx < (this.dataset as any)[axis].length; idx += 1) {
       if (idx === (this.store as any)[axis]) {
         continue;
@@ -509,6 +538,13 @@ export default class ImageViewer extends Vue {
         axis === "z" ? this.dataset[axis][idx] : this.store.z
       );
       neededHistograms = neededHistograms.concat(imageList.neededHistograms);
+      if (imageList.neededHistograms.length) {
+        cacheProgress = Math.min(
+          cacheProgress,
+          (idx + 1) * this.store.configuration.layers.length -
+            neededHistograms.length
+        );
+      }
       if (neededHistograms.length >= maxPromises) {
         break;
       }
@@ -525,6 +561,18 @@ export default class ImageViewer extends Vue {
             fullUrlList.push(url);
           });
         });
+        if (fullUrlList.length) {
+          cacheProgress =
+            Math.min(
+              cacheProgress,
+              (idx + 1) *
+                this.store.configuration.layers.length *
+                Object.keys(zxy).length -
+                fullUrlList.length
+            ) +
+            (this.dataset as any)[axis].length *
+              this.store.configuration.layers.length;
+        }
       }
       if (urlList.length < maxPromises) {
         imageList.urls.forEach(urlTemplate => {
@@ -539,8 +587,27 @@ export default class ImageViewer extends Vue {
             urlList.push(url);
           });
         });
+        if (urlList.length) {
+          cacheProgress =
+            Math.min(
+              cacheProgress,
+              (idx + 1) *
+                this.store.configuration.layers.length *
+                Object.keys(zxy).length -
+                urlList.length
+            ) +
+            (this.dataset as any)[axis].length *
+              (1 + Object.keys(zxy).length) *
+              this.store.configuration.layers.length;
+        }
       }
     }
+    if (neededHistograms.length || fullUrlList.length || urlList.length) {
+      this.cacheProgress = cacheProgress;
+    } else {
+      this.cacheProgress = cacheProgressTotal;
+    }
+    this.cacheProgressTotal = cacheProgressTotal;
     // first prefetch any needed histograms
     neededHistograms.forEach(images => {
       if (addedPromises < maxPromises) {
