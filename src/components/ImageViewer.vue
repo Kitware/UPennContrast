@@ -244,7 +244,7 @@ export default class ImageViewer extends Vue {
     const mapnode = this.map.node();
     if (
       mapnode.width() != this.map.size().width ||
-      mapnode.height() != this.map.size.height
+      mapnode.height() != this.map.size().height
     ) {
       this.map.size({ width: mapnode.width(), height: mapnode.height() });
     }
@@ -254,11 +254,11 @@ export default class ImageViewer extends Vue {
     }
     this.unrollW = unrollW;
     this.unrollH = unrollH;
-    if (this.scaleWidget) {
+    if (this.scaleWidget && !(someImage.mm_x || this.scaleWidget.options('scale') !== someImage.mm_x / 1000)) {
       this.uiLayer.deleteWidget(this.scaleWidget);
       this.scaleWidget = null;
     }
-    if (someImage.mm_x) {
+    if (someImage.mm_x && !this.scaleWidget) {
       this.scaleWidget = this.uiLayer.createWidget("scale", {
         scale: someImage.mm_x / 1000,
         position: { bottom: 20, right: 10 }
