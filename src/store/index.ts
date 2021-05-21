@@ -625,9 +625,14 @@ export class Main extends VuexModule {
 
   get getFullLayerImages() {
     return (time: number, xy: number, z: number) => {
-      let results: { neededHistograms: IImage[][]; urls: string[] } = {
+      let results: {
+        neededHistograms: IImage[][];
+        urls: string[];
+        fullUrls: string[];
+      } = {
         neededHistograms: [],
-        urls: []
+        urls: [],
+        fullUrls: []
       };
       if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
         return results;
@@ -639,8 +644,18 @@ export class Main extends VuexModule {
         if (!hist) {
           results.neededHistograms.push(images);
         } else {
-          images.forEach(image =>
+          images.forEach(image => {
             results.urls.push(
+              this.api.tileTemplateUrl(
+                image,
+                layer.color,
+                layer.contrast,
+                hist,
+                layer,
+                this.dataset
+              )!
+            );
+            results.fullUrls.push(
               this.api.tileTemplateUrl(
                 image,
                 "#ffffff",
@@ -655,8 +670,8 @@ export class Main extends VuexModule {
                 layer,
                 this.dataset
               )!
-            )
-          );
+            );
+          });
         }
       });
       return results;

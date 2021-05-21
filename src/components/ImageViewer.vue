@@ -442,12 +442,15 @@ export default class ImageViewer extends Vue {
   private recentCacheUrls: { [key: string]: number } = {};
 
   cacheWhenIdle() {
-    if (!this.fullyReady || !this.dataset || !this.map || !this.map.idle) {
+    if (
+      !this.fullyReady ||
+      !this.dataset ||
+      !this.map ||
+      !this.map.idle ||
+      !this.store.configuration
+    ) {
       return;
     }
-    // TODO : clear the recentCacheUrls if it grows too large (larger than
-    // the maximum of <some minimum> and
-    // <factor> * <urlList.length * Object.keys(zxy).length >
     let zxy: { [key: string]: any } = {};
     for (
       let layerIndex = 1;
@@ -479,7 +482,20 @@ export default class ImageViewer extends Vue {
       // only one frame, so no need to buffer others
       return;
     }
+    if (
+      Object.keys(this.recentCacheUrls).length >
+      Math.max(
+        5000,
+        Object.keys(zxy).length *
+          (this.dataset as any)[axis].length *
+          this.store.configuration.layers.length *
+          4
+      )
+    ) {
+      this.recentCacheUrls = {};
+    }
     let urlList: string[] = [];
+    let fullUrlList: string[] = [];
     let neededHistograms: IImage[][] = [];
     let maxPromises = 3;
     let addedPromises = 0;
@@ -495,6 +511,20 @@ export default class ImageViewer extends Vue {
       neededHistograms = neededHistograms.concat(imageList.neededHistograms);
       if (neededHistograms.length >= maxPromises) {
         break;
+      }
+      if (fullUrlList.length < maxPromises) {
+        imageList.fullUrls.forEach(urlTemplate => {
+          Object.values(zxy).forEach(tile => {
+            let url = urlTemplate
+              .replace("{z}", tile[0])
+              .replace("{x}", tile[1])
+              .replace("{y}", tile[2]);
+            if (this.recentCacheUrls[url]) {
+              return;
+            }
+            fullUrlList.push(url);
+          });
+        });
       }
       if (urlList.length < maxPromises) {
         imageList.urls.forEach(urlTemplate => {
@@ -519,6 +549,7 @@ export default class ImageViewer extends Vue {
       }
     });
     // load the first tile we haven't seen in a while
+    urlList = fullUrlList.concat(urlList);
     urlList.forEach(url => {
       if (addedPromises < maxPromises) {
         this.map.addPromise(
