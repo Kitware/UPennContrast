@@ -283,6 +283,7 @@
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
 import geojs from "geojs";
+import { formatDate } from "@/utils/date";
 
 @Component
 export default class Snapshots extends Vue {
@@ -369,6 +370,16 @@ export default class Snapshots extends Vue {
   getBasicDownloadParams() {
     let w = store.dataset!.width;
     let h = store.dataset!.height;
+
+    // Determine fileName
+    const datasetName = store.dataset?.name || "unknown";
+    const configurationName = store.configuration?.name || "unknown";
+    const snapshotName = this.newName ? `-${this.newName}` : "";
+    const dateStr = formatDate(new Date());
+    const extension = this.format === "png" ? "png" : "jpg";
+    // Should be dataset-configuration-snapshot-date
+    const fileName = `${datasetName}-${configurationName}${snapshotName}-${dateStr}.${extension}`;
+
     let params: any = {
       encoding:
         this.format === "png"
@@ -378,7 +389,8 @@ export default class Snapshots extends Vue {
           : this.format === "tiled"
           ? "TILED"
           : "JPEG",
-      contentDisposition: "attachment"
+      contentDisposition: "attachment",
+      contentDispositionFilename: fileName
     };
     if (this.format !== "png") {
       params.jpeqQuality = parseInt(this.format.substr(5), 10);
