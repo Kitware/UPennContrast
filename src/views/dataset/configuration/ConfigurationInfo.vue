@@ -68,7 +68,7 @@ export default class ConfigurationInfo extends Vue {
     if (!this.store.configuration) {
       return [];
     }
-    return this.store.configuration.layers;
+    return this.store.configuration.view.layers;
   }
 
   get view() {

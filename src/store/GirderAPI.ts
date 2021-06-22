@@ -14,7 +14,8 @@ import {
   IImage,
   IContrast,
   IImageTile,
-  newLayer
+  newLayer,
+  IViewConfiguration
 } from "./model";
 import {
   toStyle,
@@ -219,11 +220,12 @@ export default class GirderAPI {
     const channels = dataset.channels.slice(0, 6);
     const layers: IDisplayLayer[] = [];
     channels.forEach(() => layers.push(newLayer(dataset, layers)));
+    const view: IViewConfiguration = { layers };
     data.set(
       "metadata",
       JSON.stringify({
         subtype: "contrastConfiguration",
-        layers: layers
+        view
       })
     );
     return this.client
@@ -236,11 +238,13 @@ export default class GirderAPI {
   ): Promise<IDatasetConfiguration> {
     return this.client
       .put(`/item/${config.id}/metadata`, {
-        layers: config.layers.map(l =>
-          Object.fromEntries(
-            Object.entries(l).filter(([k]) => !k.startsWith("_"))
+        view: {
+          layers: config.view.layers.map(l =>
+            Object.fromEntries(
+              Object.entries(l).filter(([k]) => !k.startsWith("_"))
+            )
           )
-        )
+        }
       })
       .then(() => config);
   }
@@ -325,14 +329,15 @@ function asDataset(folder: IGirderFolder): IDataset {
 }
 
 function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
-  return {
+  const configuration = {
     id: item._id,
     _girder: item,
     name: item.name,
     description: item.description,
-    layers: item.meta.layers || [],
+    view: item.meta.view || { layers: item.meta.layers || [] },
     snapshots: item.meta.snapshots || []
   };
+  return configuration;
 }
 
 export interface IHistogramOptions {

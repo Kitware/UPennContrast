@@ -512,7 +512,7 @@ export default class ImageViewer extends Vue {
         5000,
         Object.keys(zxy).length *
           (this.dataset as any)[axis].length *
-          this.store.configuration.layers.length *
+          this.store.configuration.view.layers.length *
           4
       )
     ) {
@@ -526,7 +526,7 @@ export default class ImageViewer extends Vue {
     let cacheProgressTotal =
       (this.dataset as any)[axis].length *
       (1 + 2 * Object.keys(zxy).length) *
-      this.store.configuration.layers.length;
+      this.store.configuration.view.layers.length;
     let cacheProgress = cacheProgressTotal;
     for (let idx = 0; idx < (this.dataset as any)[axis].length; idx += 1) {
       if (idx === (this.store as any)[axis]) {
@@ -541,7 +541,7 @@ export default class ImageViewer extends Vue {
       if (imageList.neededHistograms.length) {
         cacheProgress = Math.min(
           cacheProgress,
-          (idx + 1) * this.store.configuration.layers.length -
+          (idx + 1) * this.store.configuration.view.layers.length -
             neededHistograms.length
         );
       }
@@ -566,12 +566,12 @@ export default class ImageViewer extends Vue {
             Math.min(
               cacheProgress,
               (idx + 1) *
-                this.store.configuration.layers.length *
+                this.store.configuration.view.layers.length *
                 Object.keys(zxy).length -
                 fullUrlList.length
             ) +
             (this.dataset as any)[axis].length *
-              this.store.configuration.layers.length;
+              this.store.configuration.view.layers.length;
         }
       }
       if (urlList.length < maxPromises) {
@@ -592,13 +592,13 @@ export default class ImageViewer extends Vue {
             Math.min(
               cacheProgress,
               (idx + 1) *
-                this.store.configuration.layers.length *
+                this.store.configuration.view.layers.length *
                 Object.keys(zxy).length -
                 urlList.length
             ) +
             (this.dataset as any)[axis].length *
               (1 + Object.keys(zxy).length) *
-              this.store.configuration.layers.length;
+              this.store.configuration.view.layers.length;
         }
       }
     }

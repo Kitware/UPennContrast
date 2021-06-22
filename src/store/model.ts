@@ -70,6 +70,9 @@ export interface IDataset {
   configurations: IDatasetConfiguration[];
 }
 
+export interface IViewConfiguration {
+  layers: IDisplayLayer[];
+}
 export interface IDatasetConfiguration {
   readonly id: string;
   readonly _girder: IGirderItem;
@@ -77,8 +80,7 @@ export interface IDatasetConfiguration {
   name: string;
   description: string;
 
-  layers: IDisplayLayer[];
-
+  view: IViewConfiguration;
   snapshots?: any[];
 }
 
