@@ -4,6 +4,19 @@
     <div class="loading" v-if="!fullyReady">
       <v-progress-circular indeterminate />
     </div>
+    <div
+      class="loading"
+      v-if="
+        fullyReady && cacheProgress > 0 && cacheProgress < cacheProgressTotal
+      "
+    >
+      <v-progress-linear
+        :value="(100 * cacheProgress) / cacheProgressTotal"
+        color="#CCC"
+        background-color="blue-grey"
+        style="width: 200px"
+      />
+    </div>
     <svg xmlns="http://www.w3.org/2000/svg">
       <defs>
         <filter
@@ -35,7 +48,7 @@ import {
   zoomIdentity,
   zoomTransform
 } from "d3-zoom";
-import { IImageTile } from "../store/model";
+import { IImage, IImageTile } from "../store/model";
 
 function generateFilterURL(
   index: number,
@@ -101,6 +114,9 @@ export default class ImageViewer extends Vue {
   private scaleWidget: any;
   private unrollW: number = 1;
   private unrollH: number = 1;
+
+  cacheProgress = 0; // 0 to cacheProgressTotal
+  cacheProgressTotal = 0;
 
   $refs!: {
     geojsmap: HTMLElement;
@@ -244,7 +260,7 @@ export default class ImageViewer extends Vue {
     const mapnode = this.map.node();
     if (
       mapnode.width() != this.map.size().width ||
-      mapnode.height() != this.map.size.height
+      mapnode.height() != this.map.size().height
     ) {
       this.map.size({ width: mapnode.width(), height: mapnode.height() });
     }
@@ -254,11 +270,17 @@ export default class ImageViewer extends Vue {
     }
     this.unrollW = unrollW;
     this.unrollH = unrollH;
-    if (this.scaleWidget) {
+    if (
+      this.scaleWidget &&
+      !(
+        someImage.mm_x ||
+        this.scaleWidget.options("scale") !== someImage.mm_x / 1000
+      )
+    ) {
       this.uiLayer.deleteWidget(this.scaleWidget);
       this.scaleWidget = null;
     }
-    if (someImage.mm_x) {
+    if (someImage.mm_x && !this.scaleWidget) {
       this.scaleWidget = this.uiLayer.createWidget("scale", {
         scale: someImage.mm_x / 1000,
         position: { bottom: 20, right: 10 }
@@ -429,12 +451,189 @@ export default class ImageViewer extends Vue {
       }
     );
     this.map.draw();
+    this.map.onIdle(this.cacheWhenIdle);
   }
 
   beforeDestroy() {
     if (this.map) {
       this.map.exit();
       this.map = null;
+    }
+  }
+
+  private recentCacheUrls: { [key: string]: number } = {};
+
+  cacheWhenIdle() {
+    if (
+      !this.fullyReady ||
+      !this.dataset ||
+      !this.map ||
+      !this.map.idle ||
+      !this.store.configuration
+    ) {
+      this.cacheProgress = 0;
+      return;
+    }
+    let zxy: { [key: string]: any } = {};
+    for (
+      let layerIndex = 1;
+      layerIndex < this.imageLayers.length;
+      layerIndex += 2
+    ) {
+      let adjLayer = this.imageLayers[layerIndex];
+      Object.keys(adjLayer._activeTiles).forEach((tileHash: string) => {
+        if (!zxy[tileHash]) {
+          zxy[tileHash] = tileHash.split("_");
+        }
+      });
+    }
+    let axis: string | undefined;
+    if (
+      this.dataset.z.length > 1 &&
+      this.dataset.z.length >= this.dataset.xy.length &&
+      this.dataset.z.length >= this.dataset.time.length
+    ) {
+      axis = "z";
+    } else if (
+      this.dataset.time.length > 1 &&
+      this.dataset.time.length >= this.dataset.xy.length
+    ) {
+      axis = "time";
+    } else if (this.dataset.xy.length > 1) {
+      axis = "xy";
+    } else {
+      // only one frame, so no need to buffer others
+      this.cacheProgress = 0;
+      return;
+    }
+    if (
+      Object.keys(this.recentCacheUrls).length >
+      Math.max(
+        5000,
+        Object.keys(zxy).length *
+          (this.dataset as any)[axis].length *
+          this.store.configuration.layers.length *
+          4
+      )
+    ) {
+      this.recentCacheUrls = {};
+    }
+    let urlList: string[] = [];
+    let fullUrlList: string[] = [];
+    let neededHistograms: IImage[][] = [];
+    let maxPromises = 3;
+    let addedPromises = 0;
+    let cacheProgressTotal =
+      (this.dataset as any)[axis].length *
+      (1 + 2 * Object.keys(zxy).length) *
+      this.store.configuration.layers.length;
+    let cacheProgress = cacheProgressTotal;
+    for (let idx = 0; idx < (this.dataset as any)[axis].length; idx += 1) {
+      if (idx === (this.store as any)[axis]) {
+        continue;
+      }
+      let imageList = this.store.getFullLayerImages(
+        axis === "time" ? this.dataset[axis][idx] : this.store.time,
+        axis === "xy" ? this.dataset[axis][idx] : this.store.xy,
+        axis === "z" ? this.dataset[axis][idx] : this.store.z
+      );
+      neededHistograms = neededHistograms.concat(imageList.neededHistograms);
+      if (imageList.neededHistograms.length) {
+        cacheProgress = Math.min(
+          cacheProgress,
+          (idx + 1) * this.store.configuration.layers.length -
+            neededHistograms.length
+        );
+      }
+      if (neededHistograms.length >= maxPromises) {
+        break;
+      }
+      if (fullUrlList.length < maxPromises) {
+        imageList.fullUrls.forEach(urlTemplate => {
+          Object.values(zxy).forEach(tile => {
+            let url = urlTemplate
+              .replace("{z}", tile[0])
+              .replace("{x}", tile[1])
+              .replace("{y}", tile[2]);
+            if (this.recentCacheUrls[url]) {
+              return;
+            }
+            fullUrlList.push(url);
+          });
+        });
+        if (fullUrlList.length) {
+          cacheProgress =
+            Math.min(
+              cacheProgress,
+              (idx + 1) *
+                this.store.configuration.layers.length *
+                Object.keys(zxy).length -
+                fullUrlList.length
+            ) +
+            (this.dataset as any)[axis].length *
+              this.store.configuration.layers.length;
+        }
+      }
+      if (urlList.length < maxPromises) {
+        imageList.urls.forEach(urlTemplate => {
+          Object.values(zxy).forEach(tile => {
+            let url = urlTemplate
+              .replace("{z}", tile[0])
+              .replace("{x}", tile[1])
+              .replace("{y}", tile[2]);
+            if (this.recentCacheUrls[url]) {
+              return;
+            }
+            urlList.push(url);
+          });
+        });
+        if (urlList.length) {
+          cacheProgress =
+            Math.min(
+              cacheProgress,
+              (idx + 1) *
+                this.store.configuration.layers.length *
+                Object.keys(zxy).length -
+                urlList.length
+            ) +
+            (this.dataset as any)[axis].length *
+              (1 + Object.keys(zxy).length) *
+              this.store.configuration.layers.length;
+        }
+      }
+    }
+    if (neededHistograms.length || fullUrlList.length || urlList.length) {
+      this.cacheProgress = cacheProgress;
+    } else {
+      this.cacheProgress = cacheProgressTotal;
+    }
+    this.cacheProgressTotal = cacheProgressTotal;
+    // first prefetch any needed histograms
+    neededHistograms.forEach(images => {
+      if (addedPromises < maxPromises) {
+        this.map.addPromise(this.store.api.getLayerHistogram(images));
+        addedPromises += 1;
+      }
+    });
+    // load the first tile we haven't seen in a while
+    urlList = fullUrlList.concat(urlList);
+    urlList.forEach(url => {
+      if (addedPromises < maxPromises) {
+        this.map.addPromise(
+          new Promise((resolve: any, reject: any) => {
+            let img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = url;
+            this.recentCacheUrls[url] = Date.now();
+          })
+        );
+        addedPromises += 1;
+      }
+    });
+    if (addedPromises) {
+      this.map.onIdle(this.cacheWhenIdle);
     }
   }
 }

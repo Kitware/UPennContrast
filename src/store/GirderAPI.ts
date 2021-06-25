@@ -88,7 +88,7 @@ export default class GirderAPI {
     hist: any,
     layer: IDisplayLayer | null,
     ds: IDataset | null
-  ) {
+  ): string | undefined {
     if (hist === null) {
       return;
     }

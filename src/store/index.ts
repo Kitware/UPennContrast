@@ -14,6 +14,7 @@ import {
   IDatasetConfiguration,
   IDatasetConfigurationMeta,
   IDisplayLayer,
+  IImage,
   IImageTile,
   newLayer
 } from "./model";
@@ -620,6 +621,61 @@ export class Main extends VuexModule {
   async removeLayer(index: number) {
     this.removeLayerImpl(index);
     await this.syncConfiguration();
+  }
+
+  get getFullLayerImages() {
+    return (time: number, xy: number, z: number) => {
+      let results: {
+        neededHistograms: IImage[][];
+        urls: string[];
+        fullUrls: string[];
+      } = {
+        neededHistograms: [],
+        urls: [],
+        fullUrls: []
+      };
+      if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
+        return results;
+      }
+      const layers = this.configuration.layers;
+      layers.forEach(layer => {
+        const images = getLayerImages(layer, this.dataset!, time, xy, z);
+        const hist = this.api.getResolvedLayerHistogram(images);
+        if (!hist) {
+          results.neededHistograms.push(images);
+        } else {
+          images.forEach(image => {
+            results.urls.push(
+              this.api.tileTemplateUrl(
+                image,
+                layer.color,
+                layer.contrast,
+                hist,
+                layer,
+                this.dataset
+              )!
+            );
+            results.fullUrls.push(
+              this.api.tileTemplateUrl(
+                image,
+                "#ffffff",
+                {
+                  mode: "percentile",
+                  blackPoint: 0,
+                  whitePoint: 100,
+                  savedBlackPoint: 0,
+                  savedWhitePoint: 100
+                },
+                hist,
+                layer,
+                this.dataset
+              )!
+            );
+          });
+        }
+      });
+      return results;
+    };
   }
 
   get layerStackImages(): any {
