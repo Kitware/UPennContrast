@@ -15,6 +15,15 @@
       <v-btn
         color="primary"
         :to="{
+          name: 'importconfiguration',
+          params: Object.assign({ id: '' }, $route.params)
+        }"
+      >
+        Import Configuration
+      </v-btn>
+      <v-btn
+        color="primary"
+        :to="{
           name: 'newconfiguration',
           params: Object.assign({ id: '' }, $route.params)
         }"

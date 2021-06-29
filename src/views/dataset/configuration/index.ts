@@ -1,5 +1,6 @@
 import Configuration from "./Configuration.vue";
 import ConfigurationInfo from "./ConfigurationInfo.vue";
+import ImportConfiguration from "./ImportConfiguration.vue";
 import NewConfiguration from "./NewConfiguration.vue";
 import Viewer from "./Viewer.vue";
 import { Main } from "@/store";
@@ -12,6 +13,14 @@ const routes: RouteConfig[] = [
     component: NewConfiguration,
     meta: {
       text: "New Configuration"
+    }
+  },
+  {
+    path: "import",
+    name: "importconfiguration",
+    component: ImportConfiguration,
+    meta: {
+      text: "Import an existing configuration"
     }
   },
   {
