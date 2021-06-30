@@ -56,15 +56,19 @@
 <script lang="ts">
 import { Vue, Component, Prop } from "vue-property-decorator";
 import { IDisplaySlice, DisplaySliceType } from "../store/model";
+import store from "@/store";
 
 @Component
 export default class DisplaySlice extends Vue {
+  readonly store = store;
   @Prop()
   readonly value!: IDisplaySlice;
   @Prop()
   readonly maxValue!: number;
   @Prop()
   readonly label!: string;
+  @Prop()
+  readonly displayed!: number;
 
   get labelHint() {
     if (this.maxValue === 0) {
@@ -75,17 +79,25 @@ export default class DisplaySlice extends Vue {
 
   changeSlice(type: DisplaySliceType, value: string | number | null) {
     const v = typeof value === "string" ? parseInt(value, 10) : value;
-    if (this.value.type === type && this.value.value === v) {
+
+    const typeHasChanged = this.value.type !== type;
+    if (!typeHasChanged && this.value.value === v) {
       return;
     }
+
     let validated = v;
     switch (type) {
       case "constant":
-        validated = v == null ? 0 : Math.max(Math.min(v, this.maxValue), 0);
+        validated =
+          v == null || typeHasChanged
+            ? this.displayed
+            : Math.max(Math.min(v, this.maxValue), 0);
         break;
       case "offset":
         validated =
-          v == null ? 0 : Math.max(Math.min(v, this.maxValue), -this.maxValue);
+          v == null || typeHasChanged
+            ? 0
+            : Math.max(Math.min(v, this.maxValue), -this.maxValue);
         break;
       default:
         validated = null;
