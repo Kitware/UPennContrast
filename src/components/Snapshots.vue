@@ -172,50 +172,35 @@
       <v-divider></v-divider>
 
       <v-card-text class="pa-0">
-        <v-row>
-          <v-col class="mx-3 pb-1">
+        <v-data-table
+          :items="snapshotList()"
+          :headers="tableHeaders"
+          :items-per-page="5"
+          item-key="key"
+          class="accent-1"
+          @click:row="(item, unused) => loadSnapshot(item.name)"
+        >
+          <!-- Search bar -->
+          <template v-slot:top>
             <v-text-field
               label="Search Snapshots"
               v-model="snapshotSearch"
               clearable
-              dense
               hide-details
-            ></v-text-field>
-          </v-col>
-        </v-row>
-        <v-list dense>
-          <v-list-item
-            v-for="s in snapshotList()"
-            :key="'snapshot_' + s.name"
-            :value="s.key"
-            @click="loadSnapshot(s.name)"
-            :title="s.record.description || ''"
-            three-line
-          >
-            <v-list-item-content>
-              <v-list-item-title>
-                {{ s.name }}
-              </v-list-item-title>
-              <v-list-item-subtitle>
-                <v-chip
-                  v-for="t in s.record.tags"
-                  :key="'tag_' + s.name + '_' + t"
-                  @click.stop="snapshotSearch = t"
-                  small
-                  >{{ t }}</v-chip
-                >
-              </v-list-item-subtitle>
-              <v-list-item-subtitle>
-                Last change:
-                {{
-                  new Date(
-                    s.record.modified || s.record.created
-                  ).toLocaleString()
-                }}
-              </v-list-item-subtitle>
-            </v-list-item-content>
-          </v-list-item>
-        </v-list>
+              class="ma-2"
+            />
+          </template>
+          <!-- Tags -->
+          <template v-slot:item.tags="{ item }">
+            <v-chip
+              v-for="t in item.record.tags"
+              :key="'tag_' + item.name + '_' + t"
+              @click.stop="snapshotSearch = t"
+              x-small
+              >{{ t }}</v-chip
+            >
+          </template>
+        </v-data-table>
       </v-card-text>
 
       <v-divider></v-divider>
@@ -300,6 +285,24 @@ export default class Snapshots extends Vue {
       this.drawBoundingBox();
     }
   }
+
+  tableHeaders: {
+    text: string;
+    value: string;
+    sortable: boolean;
+    sort?: (a: any, b: any) => number;
+    class?: string;
+  }[] = [
+    { text: "Name", value: "name", sortable: true, class: "text-no-wrap" },
+    {
+      text: "Modified",
+      value: "modified",
+      sortable: true,
+      sort: (a: any, b: any) => Date.parse(a) - Date.parse(b),
+      class: "text-no-wrap"
+    },
+    { text: "Tags", value: "tags", sortable: false, class: "text-no-wrap" }
+  ];
 
   newName: string = "";
   newDescription: string = "";
@@ -620,7 +623,13 @@ export default class Snapshots extends Vue {
           sre.exec(s.description) ||
           s.tags.some((t: string) => sre.exec(t))
         ) {
-          results.push({ name: s.name, key: s.name, record: s });
+          results.push({
+            name: s.name,
+            key: s.name,
+            record: s,
+            // format the date to string
+            modified: formatDate(new Date(s.modified || s.created))
+          });
         }
       });
     }
