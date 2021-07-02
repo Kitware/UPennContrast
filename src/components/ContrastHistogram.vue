@@ -79,11 +79,11 @@
       </v-btn>
       <v-btn
         x-small
-        @click="resetSaved"
+        @click="revertSaved"
         color="secondary"
-        title="Reset to saved points"
+        title="Revert to saved points"
       >
-        Reset to saved
+        Revert to saved
       </v-btn>
       <v-btn
         x-small
@@ -355,7 +355,7 @@ export default class ContrastHistogram extends Vue {
     this.$emit("commit", copy);
   }
 
-  resetSaved() {
+  revertSaved() {
     const copy = Object.assign({}, this.value);
     copy.blackPoint = copy.savedBlackPoint;
     copy.whitePoint = copy.savedWhitePoint;
