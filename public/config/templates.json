@@ -1,0 +1,161 @@
+[
+  {
+    "name": "Create annotation",
+    "type": "create",
+    "interface": [
+      {
+        "name": "Annotation Description",
+        "id": "annotation",
+        "type": "annotation"
+      },
+      {
+        "name": "Connection Restrictions",
+        "id": "connectTo",
+        "type": "restrictTagsAndChannel",
+        "meta": {
+          "tagsLabel": "Connect to nearest",
+          "channelsLabel": "Restrict to channel"
+        }
+      }
+    ]
+  },
+  {
+    "name": "Snap to",
+    "type": "snap",
+    "interface": [
+      {
+        "name": "Annotation Description",
+        "id": "annotation",
+        "type": "annotation"
+      },
+      {
+        "name": "Snap To",
+        "type": "select",
+        "id": "snapTo",
+        "meta": {
+          "items": [
+            { "text": "Snap ellipse to dot", "value": "ellipseToDot" },
+            { "text": "Snap blob to dot", "value": "blobToDot" },
+            {
+              "text": "Snap blob to blob",
+              "value": "blobToBlob",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Threshold",
+                    "id": "threshold",
+                    "type": "text",
+                    "meta": { "type": "number" }
+                  }
+                ]
+              }
+            },
+            { "text": "Snap freehand line to edge", "value": "edge" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "Select",
+    "type": "select",
+    "interface": [
+      {
+        "name": "Selection shape",
+        "type": "select",
+        "id": "selectionType",
+        "meta": {
+          "items": [
+            {
+              "text": "Pointer",
+              "value": "pointer"
+            },
+            {
+              "text": "Lasso",
+              "value": "lasso"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "Edit",
+    "type": "edit",
+    "interface": [
+      {
+        "name": "Edition Type",
+        "type": "select",
+        "id": "editionType",
+        "meta": {
+          "items": [
+            {
+              "text": "Slice",
+              "value": "slice",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Child connections",
+                    "type": "radio",
+                    "id": "childConnections",
+                    "values": [
+                      {
+                        "label": "Remove all child connections",
+                        "value": "removeChildren"
+                      },
+                      {
+                        "label": "Assign child connections by distance",
+                        "value": "assignChildren"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "text": "Join",
+              "value": "join",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Join From",
+                    "id": "joinFrom",
+                    "type": "restrictTagsAndChannel"
+                  },
+                  {
+                    "name": "Join To",
+                    "id": "joinTo",
+                    "type": "restrictTagsAndChannel"
+                  },
+                  {
+                    "name": "Existing Connections",
+                    "id": "overrideConnections",
+                    "type": "checkbox",
+                    "meta": {
+                      "label": "Override Existing Connections"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "text": "Add to annotation",
+              "value": "add",
+              "meta": { "requireSelection": "blob" }
+            },
+            {
+              "text": "Remove part of annotation",
+              "value": "remove",
+              "meta": { "requireSelection": "blob" }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "Segmentation",
+    "type": "segmentation",
+    "interface": []
+  }
+]
