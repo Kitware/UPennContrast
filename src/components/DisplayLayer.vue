@@ -82,6 +82,7 @@
         label="XY-Slice"
         :max-value="maxXY"
         v-if="maxXY > 0"
+        :displayed="displayXY"
       />
       <display-slice
         :value="value.z"
@@ -89,6 +90,7 @@
         label="Z-Slice"
         :max-value="maxZ"
         v-if="maxZ > 0"
+        :displayed="displayZ"
       />
       <display-slice
         :value="value.time"
@@ -96,6 +98,7 @@
         label="Time-Slice"
         :max-value="maxTime"
         v-if="maxTime > 0"
+        :displayed="displayTime"
       />
       <div class="buttons">
         <v-btn color="warning" small @click="removeLayer">Remove</v-btn>
@@ -178,6 +181,18 @@ export default class DisplayLayer extends Vue {
     return this.store.dataset
       ? this.store.dataset.time.length - 1
       : this.value.time.value || 0;
+  }
+
+  get displayXY() {
+    return this.store.xy;
+  }
+
+  get displayZ() {
+    return this.store.z;
+  }
+
+  get displayTime() {
+    return this.store.time;
   }
 
   changeProp(prop: keyof IDisplayLayer, value: any) {
