@@ -51,6 +51,8 @@ export class Main extends VuexModule {
   annotationMode: string | null = null;
   annotationModeList: any[] = [];
 
+  toolTemplateList: any[] = [];
+
   unrollXY: boolean = false;
   unrollZ: boolean = false;
   unrollT: boolean = false;
@@ -494,6 +496,11 @@ export class Main extends VuexModule {
   @Mutation
   setAnnotationModeList(modeList: any[]) {
     this.annotationModeList = modeList;
+  }
+
+  @Mutation
+  setToolTemplateList(templateList: any[]) {
+    this.toolTemplateList = templateList;
   }
 
   @Action

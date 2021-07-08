@@ -2,21 +2,21 @@
   <div>
     <div>
       <v-layout v-if="annotationModeList.length">
-        <v-btn-toggle v-model="annotationMode">
-          <v-btn
-            v-for="mode in annotationModeList"
-            :key="mode.key"
-            :value="mode.key"
-            v-mousetrap="{
-              bind: mode.hotkey,
-              handler: () => {
-                annotationMode = annotationMode === mode.key ? null : mode.key;
-              }
-            }"
-            :title="'Hot key: ' + mode.hotkey"
-            >{{ mode.name }}</v-btn
-          >
-        </v-btn-toggle>
+        <v-dialog>
+          <template v-slot:activator="{ on, attrs }">
+            <v-btn v-on="on" v-bind="attrs">
+              Add tool
+            </v-btn>
+          </template>
+          <v-card>
+            <v-card-title>
+              Add a new tool
+            </v-card-title>
+            <v-card-text>
+              <tool-selection />
+            </v-card-text>
+          </v-card>
+        </v-dialog>
       </v-layout>
 
       <v-layout>
@@ -96,12 +96,14 @@
 import { Vue, Component, Watch } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
+import ToolSelection from "@/tools/ToolSelection.vue";
 import store from "@/store";
 
 @Component({
   components: {
     ValueSlider,
-    SwitchToggle
+    SwitchToggle,
+    ToolSelection
   }
 })
 export default class ViewerToolbar extends Vue {
