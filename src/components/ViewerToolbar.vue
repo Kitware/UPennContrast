@@ -1,23 +1,25 @@
 <template>
   <div>
     <div>
-      <v-layout v-if="annotationModeList.length">
-        <v-dialog>
-          <template v-slot:activator="{ on, attrs }">
-            <v-btn v-on="on" v-bind="attrs">
-              Add tool
-            </v-btn>
-          </template>
-          <v-card>
-            <v-card-title>
-              Add a new tool
-            </v-card-title>
-            <v-card-text>
-              <tool-selection />
-            </v-card-text>
-          </v-card>
-        </v-dialog>
-      </v-layout>
+      <v-container v-if="annotationModeList.length">
+        <v-row>
+          <v-dialog v-model="toolCreationDialogOpen">
+            <template v-slot:activator="{ on, attrs }">
+              <v-btn v-on="on" v-bind="attrs"> Create new tool </v-btn>
+              <!-- <v-btn v-on="on" v-bind="attrs"> Add tool to toolset </v-btn> -->
+            </template>
+            <v-card>
+              <v-card-title> Add a new tool </v-card-title>
+              <v-card-text>
+                <tool-selection @done="toolCreationDialogOpen = false" />
+              </v-card-text>
+            </v-card>
+          </v-dialog>
+        </v-row>
+        <v-row>
+          <toolset></toolset>
+        </v-row>
+      </v-container>
 
       <v-layout>
         <value-slider
@@ -72,8 +74,8 @@
         label="Layers: "
         true-label="Multiple"
         true-value="multiple"
-        false-label="Single"
-        false-value="single"
+        layout
+        layoute-value="single"
         id="layerMode"
       />
     </div>
@@ -97,17 +99,21 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
 import ToolSelection from "@/tools/ToolSelection.vue";
+import Toolset from "@/tools/Toolset.vue";
 import store from "@/store";
 
 @Component({
   components: {
     ValueSlider,
     SwitchToggle,
-    ToolSelection
+    ToolSelection,
+    Toolset
   }
 })
 export default class ViewerToolbar extends Vue {
   readonly store = store;
+
+  toolCreationDialogOpen: boolean = false;
 
   private changeQuery(param: string, value: string) {
     const old = this.$route.query[param];

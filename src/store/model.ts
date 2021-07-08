@@ -74,6 +74,11 @@ export interface IDataset {
 export interface IViewConfiguration {
   layers: IDisplayLayer[];
 }
+
+export interface IToolSet {
+  name: string;
+  toolIds: string[];
+}
 export interface IDatasetConfiguration {
   readonly id: string;
   readonly _girder: IGirderItem;
@@ -82,6 +87,8 @@ export interface IDatasetConfiguration {
   description: string;
 
   view: IViewConfiguration;
+  toolset: IToolSet;
+
   snapshots?: any[];
 }
 

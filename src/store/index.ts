@@ -51,7 +51,11 @@ export class Main extends VuexModule {
   annotationMode: string | null = null;
   annotationModeList: any[] = [];
 
+  selectedToolId: string | null = null;
   toolTemplateList: any[] = [];
+
+  // TODO: tool names as key ?
+  tools: any = {};
 
   unrollXY: boolean = false;
   unrollZ: boolean = false;
@@ -64,6 +68,16 @@ export class Main extends VuexModule {
 
   get isLoggedIn() {
     return this.girderUser != null;
+  }
+
+  @Mutation
+  public addTool({ tool, id }: { tool: any; id: string }) {
+    // TODO: checks
+    this.tools[id] = tool;
+    // TODO: obviously temp
+    console.log("adding ", this.configuration);
+    this.configuration?.toolset.toolIds.push(id);
+    console.log("done adding");
   }
 
   @Mutation
@@ -486,6 +500,11 @@ export class Main extends VuexModule {
         layers[index].visible = !layers[index].visible;
         break;
     }
+  }
+
+  @Mutation
+  setSelectedToolId(id: string | null) {
+    this.selectedToolId = id;
   }
 
   @Mutation

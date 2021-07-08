@@ -12,6 +12,8 @@
     <tool-configuration
       v-if="selectedItemTemplate"
       :template="selectedItemTemplate"
+      v-model="toolValues"
+      @submit="createTool"
     />
   </v-container>
 </template>
@@ -28,12 +30,26 @@ import ToolConfiguration from "@/tools/ToolConfiguration.vue";
 export default class ToolSelection extends Vue {
   readonly store = store;
 
-  selectedItemTemplate: string | null = null;
+  toolValues: any = {};
+
+  selectedItemTemplate: any = null;
   errorMessages: string[] = [];
   successMessages: string[] = [];
 
   get templates() {
     return this.store.toolTemplateList;
+  }
+
+  createTool() {
+    if (this.selectedItemTemplate) {
+      const tool = {
+        type: this.selectedItemTemplate.type,
+        template: this.selectedItemTemplate,
+        values: this.toolValues
+      };
+      console.log(this.store, "tool", tool);
+      this.store.addTool({ id: tool.values.name, tool });
+    }
   }
 }
 </script>

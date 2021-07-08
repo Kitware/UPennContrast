@@ -15,6 +15,7 @@ import {
   IImage,
   IContrast,
   IImageTile,
+  IToolSet,
   newLayer,
   IViewConfiguration
 } from "./model";
@@ -269,11 +270,13 @@ export default class GirderAPI {
     const layers: IDisplayLayer[] = [];
     channels.forEach(() => layers.push(newLayer(dataset, layers)));
     const view: IViewConfiguration = { layers };
+    const toolset: IToolSet = { name: "Default Toolset", toolIds: [] };
     data.set(
       "metadata",
       JSON.stringify({
         subtype: "contrastConfiguration",
-        view
+        view,
+        toolset
       })
     );
     return this.client
@@ -383,6 +386,7 @@ function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
     name: item.name,
     description: item.description,
     view: item.meta.view || { layers: item.meta.layers || [] },
+    toolset: item.meta.toolset,
     snapshots: item.meta.snapshots || []
   };
   return configuration;

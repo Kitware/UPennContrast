@@ -44,6 +44,9 @@
         </v-card-text>
       </v-card>
     </template>
+    <div class="button-bar">
+      <v-btn color="primary" @click="createTool"> ADD TOOL </v-btn>
+    </div>
   </v-form>
 </template>
 
@@ -131,5 +134,13 @@ export default class ToolConfiguration extends Vue {
 
   @Watch("values")
   watchValues() {}
+
+  createTool() {
+    // TODO:   Make sure no tool exists with this name
+    console.log("Submitting values", this.values);
+    this.$emit("input", this.values);
+    this.$emit("change");
+    this.$emit("submit");
+  }
 }
 </script>
