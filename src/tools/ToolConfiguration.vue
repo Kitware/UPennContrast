@@ -138,7 +138,7 @@ export default class ToolConfiguration extends Vue {
   createTool() {
     // TODO:   Make sure no tool exists with this name
     console.log("Submitting values", this.values);
-    this.$emit("input", this.values);
+    this.$emit("input", { ...this.values });
     this.$emit("change");
     this.$emit("submit");
   }

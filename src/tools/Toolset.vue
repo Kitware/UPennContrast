@@ -25,11 +25,12 @@ export default class Toolset extends Vue {
   readonly store = store;
 
   get selectedToolId() {
-    return this.store.selectedToolId;
+    return this.toolset?.toolIds.indexOf(this.store.selectedToolId || "") || 0;
   }
 
-  set selectedToolId(value) {
-    this.store.setSelectedToolId(value);
+  set selectedToolId(value: number) {
+    console.log(value, this.toolset?.toolIds);
+    this.store.setSelectedToolId(this.toolset?.toolIds[value] || null);
   }
 
   get toolset() {

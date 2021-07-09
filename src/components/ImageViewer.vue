@@ -160,6 +160,35 @@ export default class ImageViewer extends Vue {
     return this.store.configuration ? this.store.layerStackImages : [];
   }
 
+  get selectedTool(): any {
+    // TODO: fix this
+    const selectedToolId = this.store.selectedToolId;
+    if (!selectedToolId) {
+      return null;
+    }
+    const tool = this.store.tools[selectedToolId];
+    console.log("got this", tool);
+    return tool;
+  }
+
+  @Watch("selectedTool")
+  watchTool(value: any | null) {
+    // TODO: enum
+    if (this.selectedTool?.type === "create") {
+      const annotation = this.selectedTool.values.annotation;
+      console.log(
+        "selecetdtool",
+        this.selectedTool,
+        annotation.shape,
+        annotation.name
+      );
+      this.annotationLayer.mode(annotation?.shape);
+    } else {
+      // is it that easy to cancel ?
+      this.annotationLayer.mode(null);
+    }
+  }
+
   get annotationStyle(): any {
     const mode = this.store.annotationMode;
     const list = this.store.annotationModeList.filter(
@@ -179,11 +208,27 @@ export default class ImageViewer extends Vue {
     if (evt.mode === null && this.store.annotationMode !== null) {
       // we could, instead, just deactive the button
       // this.store.setAnnotationMode(evt.mode);
-      this.annotationLayer.mode(this.annotationStyle.mode);
+      // TODO: factorize this
+      // A simple get should be able to to give current annotation shape
+      if (this.selectedTool.type === "create") {
+        const annotation = this.selectedTool.values.annotation;
+        console.log(
+          "selecetdtool",
+          this.selectedTool,
+          annotation.shape,
+          annotation.name
+        );
+        this.annotationLayer.mode(annotation?.shape);
+      } else {
+        // is it that easy to cancel ?
+        this.annotationLayer.mode(null);
+      }
+      // this.annotationLayer.mode(this.annotationStyle.mode);
     }
   }
 
   handleAnnotationChange(evt: any) {
+    // TODO: We'll need use this to store annotations
     if (this.annotationStyle && evt.annotation) {
       evt.annotation.style(this.annotationStyle.style);
     }
@@ -241,7 +286,8 @@ export default class ImageViewer extends Vue {
       Vue.prototype.$currentMap = this.map;
       this.annotationLayer = this.map.createLayer("annotation", {
         annotations: geojs.listAnnotations(),
-        autoshareRenderer: false
+        autoshareRenderer: false,
+        keepAdding: true
       });
       this.annotationLayer.node().css({ "mix-blend-mode": "unset" });
       this.annotationLayer.geoOn(

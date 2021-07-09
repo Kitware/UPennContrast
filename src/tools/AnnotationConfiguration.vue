@@ -25,6 +25,13 @@
         </v-chip>
       </template>
     </v-combobox>
+    <v-select
+      label="Shape"
+      :items="availableShapes"
+      v-model="shape"
+      @change="changed"
+    >
+    </v-select>
     <v-container fluid>
       <v-row>
         <v-col v-for="(coordinate, index) in coordinates" :key="index">
@@ -98,7 +105,15 @@ export default class AnnotationConfiguration extends Vue {
   @Prop()
   readonly value!: any;
 
+  // TODO: change ofc
+  availableShapes = [
+    { text: "Point", value: "point" },
+    { text: "Line", value: "line" },
+    { text: "Blob", value: "polygon" }
+  ];
+
   name: string = "";
+  shape: string = "";
   tags: string[] = [];
   coordinates = ["Channel", "XY", "Z", "Time"];
   coordinateAssignments = {};
@@ -106,6 +121,7 @@ export default class AnnotationConfiguration extends Vue {
 
   mounted() {
     this.resetValues();
+    this.changed();
   }
 
   @Watch("value")
@@ -125,6 +141,9 @@ export default class AnnotationConfiguration extends Vue {
     };
     this.name = this.value?.name || "New Annotation";
     this.tags = this.value?.tags || [];
+    this.shape = this.value?.shape || "point";
+    // inf ?
+    // this.changed();
   }
 
   changed() {
@@ -133,7 +152,8 @@ export default class AnnotationConfiguration extends Vue {
       name: this.name,
       tags: this.tags,
       coordinateAssignments: this.coordinateAssignments,
-      assignmentValues: this.assignmentValues
+      assignmentValues: this.assignmentValues,
+      shape: this.shape
     });
     this.$emit("change");
   }
