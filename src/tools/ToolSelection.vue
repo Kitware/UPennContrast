@@ -39,6 +39,17 @@ export default class ToolSelection extends Vue {
   get templates() {
     return this.store.toolTemplateList;
   }
+  mounted() {
+    this.initialize();
+  }
+
+  @Watch("templates")
+  initialize() {
+    // Set initial value
+    if (!this.selectedItemTemplate && this.templates.length) {
+      this.selectedItemTemplate = this.templates[0];
+    }
+  }
 
   createTool() {
     if (this.selectedItemTemplate) {
@@ -49,6 +60,7 @@ export default class ToolSelection extends Vue {
       };
       console.log(this.store, "tool", tool);
       this.store.addTool({ id: tool.values.name, tool });
+      this.$emit("done");
     }
   }
 }
