@@ -3,7 +3,7 @@
     <div>
       <v-container v-if="annotationModeList.length">
         <v-row>
-          <v-dialog v-model="toolCreationDialogOpen">
+          <v-dialog v-model="toolCreationDialogOpen" width="unset">
             <template v-slot:activator="{ on, attrs }">
               <v-btn v-on="on" v-bind="attrs"> Create new tool </v-btn>
               <!-- <v-btn v-on="on" v-bind="attrs"> Add tool to toolset </v-btn> -->
