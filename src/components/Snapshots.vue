@@ -360,8 +360,8 @@ export default class Snapshots extends Vue {
 
   get layerList(): object[] {
     let results = [{ name: "All", key: "all" }];
-    if (store.configuration && store.configuration.layers) {
-      store.configuration.layers.forEach((layer, idx) => {
+    if (store.configuration && store.configuration.view.layers) {
+      store.configuration.view.layers.forEach((layer, idx) => {
         if (layer.visible) {
           results.push({ name: layer.name, key: "" + idx });
         }
@@ -418,7 +418,7 @@ export default class Snapshots extends Vue {
     let url = store.layerStackImages[0].urls[0].split("/zxy/")[0] + "/region";
     let params = this.getBasicDownloadParams();
     let bands: any = [];
-    store.configuration!.layers.forEach((layer, idx) => {
+    store.configuration!.view.layers.forEach((layer, idx) => {
       if (
         layer.visible &&
         (this.exportLayer === "all" || parseInt(this.exportLayer) === idx)
@@ -733,7 +733,7 @@ export default class Snapshots extends Vue {
       z: store.z,
       time: store.time,
       layerMode: store.layerMode,
-      layers: store.configuration!.layers.map(l =>
+      layers: store.configuration!.view.layers.map(l =>
         Object.fromEntries(
           Object.entries(l).filter(([k]) => !k.startsWith("_"))
         )

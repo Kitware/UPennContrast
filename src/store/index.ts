@@ -467,7 +467,7 @@ export class Main extends VuexModule {
 
   @Mutation
   private pushLayer(layer: IDisplayLayer) {
-    this.configuration!.layers.push(layer);
+    this.configuration!.view.layers.push(layer);
   }
 
   @Mutation
@@ -475,7 +475,7 @@ export class Main extends VuexModule {
     if (!this.configuration) {
       return;
     }
-    const layers = this.configuration.layers;
+    const layers = this.configuration.view.layers;
     switch (this.layerMode) {
       case "single":
         layers.forEach((l, i) => (l.visible = i === index));
@@ -515,7 +515,7 @@ export class Main extends VuexModule {
     if (!this.configuration || !this.dataset) {
       return;
     }
-    this.pushLayer(newLayer(this.dataset, this.configuration.layers));
+    this.pushLayer(newLayer(this.dataset, this.configuration.view.layers));
     await this.syncConfiguration();
   }
 
@@ -529,13 +529,13 @@ export class Main extends VuexModule {
     if (!this.configuration) {
       return;
     }
-    const visible = this.configuration.layers.reduce(
+    const visible = this.configuration.view.layers.reduce(
       (acc, l) => acc + (l.visible ? 1 : 0),
       0
     );
     if (visible > 1) {
       let first = true;
-      this.configuration.layers.forEach(l => {
+      this.configuration.view.layers.forEach(l => {
         if (l.visible) {
           l.visible = first;
           first = false;
@@ -560,7 +560,7 @@ export class Main extends VuexModule {
       !this.dataset ||
       !this.configuration ||
       hotKey < 1 ||
-      hotKey > this.configuration.layers.length
+      hotKey > this.configuration.view.layers.length
     ) {
       return;
     }
@@ -586,11 +586,11 @@ export class Main extends VuexModule {
     if (
       !this.configuration ||
       index < 0 ||
-      index >= this.configuration.layers.length
+      index >= this.configuration.view.layers.length
     ) {
       return;
     }
-    Object.assign(this.configuration.layers[index], delta);
+    Object.assign(this.configuration.view.layers[index], delta);
   }
 
   @Action
@@ -610,11 +610,11 @@ export class Main extends VuexModule {
     if (
       !this.configuration ||
       index < 0 ||
-      index >= this.configuration.layers.length
+      index >= this.configuration.view.layers.length
     ) {
       return;
     }
-    this.configuration.layers.splice(index, 1);
+    this.configuration.view.layers.splice(index, 1);
   }
 
   @Action
@@ -637,7 +637,7 @@ export class Main extends VuexModule {
       if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
         return results;
       }
-      const layers = this.configuration.layers;
+      const layers = this.configuration.view.layers;
       layers.forEach(layer => {
         const images = getLayerImages(layer, this.dataset!, time, xy, z);
         const hist = this.api.getResolvedLayerHistogram(images);
@@ -682,7 +682,7 @@ export class Main extends VuexModule {
     if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
       return [];
     }
-    const layers = this.configuration.layers;
+    const layers = this.configuration.view.layers;
 
     return layers.map(layer => {
       const images = getLayerImages(
@@ -843,11 +843,11 @@ export class Main extends VuexModule {
       return {};
     }
     let snapshot = snapshots[0];
-    while (this.configuration.layers.length) {
+    while (this.configuration.view.layers.length) {
       this.removeLayerImpl(0);
     }
     snapshot.layers.forEach((sslayer: { [key: string]: any }) => {
-      var layer = newLayer(this.dataset!, this.configuration!.layers!);
+      var layer = newLayer(this.dataset!, this.configuration!.view.layers!);
       Object.assign(layer, sslayer);
       this.pushLayer(layer);
     });

@@ -3,7 +3,8 @@ import {
   IGirderItem,
   IGirderFolder,
   IGirderFile,
-  IGirderSelectAble
+  IGirderSelectAble,
+  IGirderUser
 } from "@/girder";
 import {
   IDataset,
@@ -14,7 +15,8 @@ import {
   IImage,
   IContrast,
   IImageTile,
-  newLayer
+  newLayer,
+  IViewConfiguration
 } from "./model";
 import {
   toStyle,
@@ -64,10 +66,57 @@ export default class GirderAPI {
     return this.client.get(`folder/${folderId}`).then(r => r.data);
   }
 
-  async getUserPublicFolder(): Promise<IGirderFolder> {
-    const me = await this.client.get("user/me");
+  async getAllUserIds(): Promise<string[]> {
+    const result = await this.client.get("user");
+
+    if (result.status !== 200) {
+      throw new Error(
+        `Could not get a list of all users: ${result.status} ${result.statusText}`
+      );
+    }
+    const users = result.data;
+    return users.map((user: IGirderUser) => user._id);
+  }
+
+  async getAllPublicDatasets(): Promise<IDataset[]> {
+    const userIds = await this.getAllUserIds();
+
+    const promises = userIds.map(id => this.getDatasetsForUser(id));
+    const datasets = await Promise.all(promises);
+    return datasets.reduce(
+      (array, currentDatasets) => [...array, ...currentDatasets],
+      []
+    );
+  }
+
+  async getDatasetsForUser(userId: string = "me"): Promise<IDataset[]> {
+    const publicFolder = await this.getUserPublicFolder(userId);
     const result = await this.client.get(
-      `folder?parentType=user&parentId=${me.data._id}&name=Public`
+      `folder?parentType=folder&parentId=${publicFolder._id}`
+    );
+    if (result.status !== 200) {
+      throw new Error(
+        `Could not get a list of datasets for folder ${publicFolder.name}: ${result.status}: ${result.statusText}`
+      );
+      return [];
+    }
+    if (result.data?.length) {
+      const folders = result.data;
+      const datasetFolders = folders.filter(
+        (folder: IGirderFolder) =>
+          (folder.meta || {}).subtype === "contrastDataset"
+      );
+      return datasetFolders.map((folder: IGirderFolder) => asDataset(folder));
+    }
+    return [];
+  }
+
+  async getUserPublicFolder(userId: string = "me"): Promise<IGirderFolder> {
+    const parentId =
+      userId === "me" ? (await this.client.get("user/me")).data._id : userId;
+
+    const result = await this.client.get(
+      `folder?parentType=user&parentId=${parentId}&name=Public`
     );
     return result.data.length > 0 ? result.data[0] : null;
   }
@@ -219,11 +268,12 @@ export default class GirderAPI {
     const channels = dataset.channels.slice(0, 6);
     const layers: IDisplayLayer[] = [];
     channels.forEach(() => layers.push(newLayer(dataset, layers)));
+    const view: IViewConfiguration = { layers };
     data.set(
       "metadata",
       JSON.stringify({
         subtype: "contrastConfiguration",
-        layers: layers
+        view
       })
     );
     return this.client
@@ -236,11 +286,13 @@ export default class GirderAPI {
   ): Promise<IDatasetConfiguration> {
     return this.client
       .put(`/item/${config.id}/metadata`, {
-        layers: config.layers.map(l =>
-          Object.fromEntries(
-            Object.entries(l).filter(([k]) => !k.startsWith("_"))
+        view: {
+          layers: config.view.layers.map(l =>
+            Object.fromEntries(
+              Object.entries(l).filter(([k]) => !k.startsWith("_"))
+            )
           )
-        )
+        }
       })
       .then(() => config);
   }
@@ -325,14 +377,15 @@ function asDataset(folder: IGirderFolder): IDataset {
 }
 
 function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
-  return {
+  const configuration = {
     id: item._id,
     _girder: item,
     name: item.name,
     description: item.description,
-    layers: item.meta.layers || [],
+    view: item.meta.view || { layers: item.meta.layers || [] },
     snapshots: item.meta.snapshots || []
   };
+  return configuration;
 }
 
 export interface IHistogramOptions {

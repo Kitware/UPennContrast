@@ -15,6 +15,15 @@
       <v-btn
         color="primary"
         :to="{
+          name: 'importconfiguration',
+          params: Object.assign({ id: '' }, $route.params)
+        }"
+      >
+        Import Configuration
+      </v-btn>
+      <v-btn
+        color="primary"
+        :to="{
           name: 'newconfiguration',
           params: Object.assign({ id: '' }, $route.params)
         }"
@@ -71,6 +80,7 @@ import store from "@/store";
 import {
   IDatasetConfiguration,
   IDisplayLayer,
+  IViewConfiguration,
   newLayer
 } from "../../store/model";
 import { formatDate } from "@/utils/date";
@@ -211,7 +221,9 @@ export default class DatasetInfo extends Vue {
       const layers: IDisplayLayer[] = [];
       channels.forEach(() => layers.push(newLayer(dataset, layers)));
 
-      config.layers = layers;
+      const view: IViewConfiguration = { layers };
+      config.view = view;
+
       await store.api.updateConfiguration(config);
 
       this.configuration = [config!];
