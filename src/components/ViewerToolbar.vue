@@ -26,6 +26,7 @@
           :min="0"
           :max="maxXY"
           :title="maxXY > 0 ? maxXY + 1 + ' XY Values' : ''"
+          :offset="1"
         />
         <v-checkbox
           class="ml-3"
@@ -41,6 +42,7 @@
           :min="0"
           :max="maxZ"
           :title="maxZ > 0 ? maxZ + 1 + ' Z Values' : ''"
+          :offset="1"
         />
         <v-checkbox
           class="ml-3"
@@ -56,6 +58,7 @@
           :min="0"
           :max="maxTime"
           :title="maxTime > 0 ? maxTime + 1 + ' Time Values' : ''"
+          :offset="1"
         />
         <v-checkbox
           class="ml-3"
