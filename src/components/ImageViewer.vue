@@ -302,6 +302,9 @@ export default class ImageViewer extends Vue {
       } else {
         delete this.layerParams.renderer;
       }
+      if (this.imageLayers.length) {
+        this.layerParams.queue = this.imageLayers[0].queue;
+      }
       this.imageLayers.push(this.map.createLayer("osm", this.layerParams));
       let layer = this.imageLayers[this.imageLayers.length - 1];
       if (this.imageLayers.length & 1) {
