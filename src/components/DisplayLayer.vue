@@ -83,6 +83,7 @@
         :max-value="maxXY"
         v-if="maxXY > 0"
         :displayed="displayXY"
+        :offset="1"
       />
       <display-slice
         :value="value.z"
@@ -91,6 +92,7 @@
         :max-value="maxZ"
         v-if="maxZ > 0"
         :displayed="displayZ"
+        :offset="1"
       />
       <display-slice
         :value="value.time"
@@ -99,6 +101,7 @@
         :max-value="maxTime"
         v-if="maxTime > 0"
         :displayed="displayTime"
+        :offset="1"
       />
       <div class="buttons">
         <v-btn color="warning" small @click="removeLayer">Remove</v-btn>
