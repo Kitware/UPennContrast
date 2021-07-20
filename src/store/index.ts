@@ -74,9 +74,27 @@ export class Main extends VuexModule {
   @Mutation
   public addTools({ tools }: { tools: IToolConfiguration[] }) {
     this.tools = [...this.tools, ...tools];
-    this.tools.forEach((tool: IToolConfiguration) =>
-      this.configuration?.toolset.toolIds.push(tool.id)
-    );
+  }
+
+  @Mutation
+  public addToolIdsToCurrentToolset({ ids }: { ids: string[] }) {
+    if (this.configuration?.toolset) {
+      this.configuration.toolset.toolIds = [
+        ...this.configuration?.toolset.toolIds,
+        ...ids
+      ];
+    }
+    // TODO: save toolset
+  }
+
+  @Mutation
+  public removeToolIdFromCurrentToolset({ id }: { id: string }) {
+    if (this.configuration?.toolset) {
+      this.configuration.toolset.toolIds = this.configuration.toolset.toolIds.filter(
+        idToFilter => id !== idToFilter
+      );
+    }
+    // TODO: save toolset
   }
 
   @Mutation

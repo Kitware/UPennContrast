@@ -15,6 +15,20 @@
               </v-card-text>
             </v-card>
           </v-dialog>
+          <v-dialog v-model="toolPickerDialogOpen" width="unset">
+            <template v-slot:activator="{ on, attrs }">
+              <v-btn v-on="on" v-bind="attrs"> Add tool </v-btn>
+              <!-- <v-btn v-on="on" v-bind="attrs"> Add tool to toolset </v-btn> -->
+            </template>
+            <v-card>
+              <v-card-title>
+                Choose a tool to add to this toolset
+              </v-card-title>
+              <v-card-text>
+                <tool-picker @done="toolPickerDialogOpen = false" />
+              </v-card-text>
+            </v-card>
+          </v-dialog>
         </v-row>
         <v-row>
           <toolset></toolset>
@@ -99,6 +113,7 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
 import ToolSelection from "@/tools/ToolSelection.vue";
+import ToolPicker from "@/tools/ToolPicker.vue";
 import Toolset from "@/tools/Toolset.vue";
 import store from "@/store";
 
@@ -106,6 +121,7 @@ import store from "@/store";
   components: {
     ValueSlider,
     SwitchToggle,
+    ToolPicker,
     ToolSelection,
     Toolset
   }
@@ -114,6 +130,7 @@ export default class ViewerToolbar extends Vue {
   readonly store = store;
 
   toolCreationDialogOpen: boolean = false;
+  toolPickerDialogOpen: boolean = false;
 
   private changeQuery(param: string, value: string) {
     const old = this.$route.query[param];

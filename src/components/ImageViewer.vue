@@ -166,22 +166,17 @@ export default class ImageViewer extends Vue {
     if (!selectedToolId) {
       return null;
     }
-    const tool = this.store.tools[selectedToolId];
-    console.log("got this", tool);
+    const tool = this.store.tools.find(
+      (tool: IToolConfiguration) => tool.id === selectedToolId
+    );
     return tool;
   }
 
   @Watch("selectedTool")
-  watchTool(value: any | null) {
+  watchTool() {
     // TODO: enum
     if (this.selectedTool?.type === "create") {
       const annotation = this.selectedTool.values.annotation;
-      console.log(
-        "selecetdtool",
-        this.selectedTool,
-        annotation.shape,
-        annotation.name
-      );
       this.annotationLayer.mode(annotation?.shape);
     } else {
       // is it that easy to cancel ?
@@ -212,12 +207,6 @@ export default class ImageViewer extends Vue {
       // A simple get should be able to to give current annotation shape
       if (this.selectedTool.type === "create") {
         const annotation = this.selectedTool.values.annotation;
-        console.log(
-          "selecetdtool",
-          this.selectedTool,
-          annotation.shape,
-          annotation.name
-        );
         this.annotationLayer.mode(annotation?.shape);
       } else {
         // is it that easy to cancel ?
