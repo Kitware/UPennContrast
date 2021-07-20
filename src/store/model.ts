@@ -51,6 +51,32 @@ export interface IImageTile {
   fullImage: HTMLImageElement;
 }
 
+// TODO: type enums, then we can be more strict
+export interface IToolTemplateInterface {
+  id: string;
+  name: string;
+  type: string;
+  meta: any;
+}
+export interface IToolTemplate {
+  name: string;
+  description: string;
+  interface: IToolTemplateInterface[];
+}
+export interface IToolConfiguration {
+  readonly id: string;
+  readonly _girder: IGirderItem;
+
+  name: string;
+  description: string;
+
+  type: string;
+
+  values: any;
+
+  template: IToolTemplate;
+}
+
 export interface IDataset {
   readonly id: string;
   readonly _girder: IGirderFolder;

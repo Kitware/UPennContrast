@@ -79,6 +79,8 @@ export default class App extends Vue {
       console.log(resp);
       this.store.setToolTemplateList(resp.data);
     });
+    // TODO: this should be called when bringing up the toolset interface
+    this.store.fetchAvailableTools();
   }
 
   mounted() {

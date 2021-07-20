@@ -16,7 +16,8 @@ import {
   IDisplayLayer,
   IImage,
   IImageTile,
-  newLayer
+  newLayer,
+  IToolConfiguration
 } from "./model";
 import persister from "./Persister";
 import store from "./root";
@@ -55,7 +56,7 @@ export class Main extends VuexModule {
   toolTemplateList: any[] = [];
 
   // TODO: tool names as key ?
-  tools: any = {};
+  tools: any = [];
 
   unrollXY: boolean = false;
   unrollZ: boolean = false;
@@ -71,13 +72,11 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  public addTool({ tool, id }: { tool: any; id: string }) {
-    // TODO: checks
-    this.tools[id] = tool;
-    // TODO: obviously temp
-    console.log("adding ", this.configuration);
-    this.configuration?.toolset.toolIds.push(id);
-    console.log("done adding");
+  public addTools({ tools }: { tools: IToolConfiguration[] }) {
+    this.tools = [...this.tools, ...tools];
+    this.tools.forEach((tool: IToolConfiguration) =>
+      this.configuration?.toolset.toolIds.push(tool.id)
+    );
   }
 
   @Mutation
@@ -372,6 +371,24 @@ export class Main extends VuexModule {
     return null;
   }
 
+  async createTool({
+    name,
+    description
+  }: {
+    name: string;
+    description: string;
+  }) {
+    try {
+      sync.setSaving(true);
+      const tool = await this.api.createTool(name, description);
+      sync.setSaving(false);
+      return tool;
+    } catch (error) {
+      sync.setSaving(error);
+    }
+    return null;
+  }
+
   @Mutation
   private deleteConfigurationImpl(configuration: IDatasetConfiguration) {
     if (this.configuration === configuration) {
@@ -520,6 +537,29 @@ export class Main extends VuexModule {
   @Mutation
   setToolTemplateList(templateList: any[]) {
     this.toolTemplateList = templateList;
+  }
+
+  @Action
+  async updateTool(tool: IToolConfiguration) {
+    if (!tool) {
+      return;
+    }
+    sync.setSaving(true);
+    try {
+      await this.api.updateTool(tool);
+    } catch (error) {
+      sync.setSaving(error);
+    }
+  }
+
+  @Action
+  async fetchAvailableTools() {
+    try {
+      const tools = await this.api.getAllTools();
+      this.addTools({ tools });
+    } catch (error) {
+      console.error("Unable to fetch a list of available tools", error);
+    }
   }
 
   @Action

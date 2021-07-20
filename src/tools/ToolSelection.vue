@@ -58,9 +58,21 @@ export default class ToolSelection extends Vue {
         template: this.selectedItemTemplate,
         values: this.toolValues
       };
-      console.log(this.store, "tool", tool);
-      this.store.addTool({ id: tool.values.name, tool });
-      this.$emit("done");
+      const name = tool.values.name || "Unnamed Tool";
+      const description = tool.values.description || "";
+      // Create an empty tool to get the id
+      this.store.api.createTool(name, description).then(tool => {
+        if (tool === null) {
+          console.error("Failed to create a new tool on the server");
+          return;
+        }
+        tool.template = this.selectedItemTemplate;
+        tool.values = this.toolValues;
+        tool.type = this.selectedItemTemplate.type;
+        // Update this tool with actual values
+        this.store.updateTool(tool);
+        this.$emit("done");
+      });
     }
   }
 }
