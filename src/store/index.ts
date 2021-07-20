@@ -389,6 +389,7 @@ export class Main extends VuexModule {
     return null;
   }
 
+  @Action
   async createTool({
     name,
     description
@@ -399,6 +400,7 @@ export class Main extends VuexModule {
     try {
       sync.setSaving(true);
       const tool = await this.api.createTool(name, description);
+      this.addTools({ tools: [tool] });
       sync.setSaving(false);
       return tool;
     } catch (error) {

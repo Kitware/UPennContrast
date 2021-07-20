@@ -8,7 +8,7 @@
       >
         <v-list-item-avatar>
           <!-- TODO: procedural icons -->
-          <v-icon>mdi-alert-circle</v-icon>
+          <v-icon>{{ toolTypeToIcon[getToolById(toolId).type] }}</v-icon>
         </v-list-item-avatar>
         <v-list-item-content
           ><v-list-item-title v-text="toolId"></v-list-item-title
@@ -26,12 +26,23 @@
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
+import { IToolConfiguration } from "@/store/model";
+
+// TODO: temporary
 
 @Component({
   components: {}
 })
 export default class Toolset extends Vue {
   readonly store = store;
+
+  toolTypeToIcon = {
+    create: "mdi-shape-plus", // TODO: icon should change based on shape
+    snap: "mdi-arrow-collapse-vertical",
+    select: "mdi-select-drag",
+    edit: "mdi-vector-polygon",
+    segmentation: "mdi-shape-polygon-plus"
+  };
 
   get selectedToolId() {
     return this.store.selectedToolId || "";
@@ -47,6 +58,12 @@ export default class Toolset extends Vue {
 
   get tools() {
     return this.store.tools;
+  }
+
+  getToolById(toolId: string) {
+    return this.store.tools.find(
+      (tool: IToolConfiguration) => tool.id === toolId
+    );
   }
 
   removeToolId(toolId: string) {

@@ -61,7 +61,7 @@ export default class ToolSelection extends Vue {
       const name = tool.values.name || "Unnamed Tool";
       const description = tool.values.description || "";
       // Create an empty tool to get the id
-      this.store.api.createTool(name, description).then(tool => {
+      this.store.createTool({ name, description }).then(tool => {
         if (tool === null) {
           console.error("Failed to create a new tool on the server");
           return;
