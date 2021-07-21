@@ -148,6 +148,32 @@ export interface IDisplayLayer {
   _histogram?: any | undefined;
 }
 
+export interface IGeoJSPoint {
+  x: number;
+  y: number;
+  z: number;
+}
+export interface IAnnotation {
+  id: string;
+  label: string;
+  tags: string[];
+  location: any; // TODO:
+  shape: string; // TODO: enum
+  coordinates: IGeoJSPoint[]; // TODO: does this always work ?
+
+  computedValues: any;
+}
+
+export interface IAnnotationConnection {
+  id: string;
+  label: string;
+  tags: string[];
+  parentId: string;
+  childId: string;
+
+  computedValues: any;
+}
+
 export interface IContrast {
   mode: "percentile" | "absolute";
   blackPoint: number;

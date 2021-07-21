@@ -16,6 +16,8 @@ import {
   IDisplayLayer,
   IImage,
   IImageTile,
+  IAnnotation,
+  IAnnotationConnection,
   newLayer,
   IToolConfiguration
 } from "./model";
@@ -51,6 +53,9 @@ export class Main extends VuexModule {
   layerMode: "single" | "multiple" = "multiple";
   annotationMode: string | null = null;
   annotationModeList: any[] = [];
+
+  annotations: IAnnotation[] = [];
+  annotationConnections: IAnnotationConnection[] = [];
 
   selectedToolId: string | null = null;
   toolTemplateList: any[] = [];
@@ -326,9 +331,14 @@ export class Main extends VuexModule {
   async refreshToolsInCurrentToolset() {
     if (this.configuration?.toolset) {
       this.configuration.toolset.toolIds.forEach(toolId => {
-        this.api.getTool(toolId).then(tool => {
-          this.addTools({ tools: [tool] });
-        });
+        this.api
+          .getTool(toolId)
+          .then(tool => {
+            this.addTools({ tools: [tool] });
+          })
+          .catch(e => {
+            console.error("Could not fetch tool: ", e);
+          });
       });
     }
   }
@@ -912,6 +922,16 @@ export class Main extends VuexModule {
       }
       return layer._histogram.promise;
     };
+  }
+
+  @Mutation
+  public addAnnotation(value: IAnnotation) {
+    this.annotations = [...this.annotations, value];
+  }
+
+  @Mutation
+  public addConnection(value: IAnnotationConnection) {
+    this.annotationConnections = [...this.annotationConnections, value];
   }
 
   @Mutation

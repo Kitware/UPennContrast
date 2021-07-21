@@ -160,28 +160,36 @@ export default class ImageViewer extends Vue {
     return this.store.configuration ? this.store.layerStackImages : [];
   }
 
+  get selectedToolId() {
+    return this.store.selectedToolId;
+  }
+
   get selectedTool(): any {
-    // TODO: fix this
-    const selectedToolId = this.store.selectedToolId;
-    if (!selectedToolId) {
+    if (!this.selectedToolId) {
       return null;
     }
     const tool = this.store.tools.find(
-      (tool: IToolConfiguration) => tool.id === selectedToolId
+      (tool: IToolConfiguration) => tool.id === this.selectedToolId
     );
     return tool;
   }
 
-  @Watch("selectedTool")
-  watchTool() {
-    // TODO: enum
+  refreshAnnotationMode() {
     if (this.selectedTool?.type === "create") {
       const annotation = this.selectedTool.values.annotation;
       this.annotationLayer.mode(annotation?.shape);
+    } else if (this.selectedTool.type === "edit") {
+      // TODO: PH, need to look at subtype
+      // TODO: Create a new annotation layer ?
     } else {
       // is it that easy to cancel ?
       this.annotationLayer.mode(null);
     }
+  }
+
+  @Watch("selectedTool")
+  watchTool() {
+    this.refreshAnnotationMode();
   }
 
   get annotationStyle(): any {
@@ -200,26 +208,112 @@ export default class ImageViewer extends Vue {
   }
 
   handleModeChange(evt: any) {
-    if (evt.mode === null && this.store.annotationMode !== null) {
-      // we could, instead, just deactive the button
-      // this.store.setAnnotationMode(evt.mode);
-      // TODO: factorize this
-      // A simple get should be able to to give current annotation shape
-      if (this.selectedTool.type === "create") {
-        const annotation = this.selectedTool.values.annotation;
-        this.annotationLayer.mode(annotation?.shape);
-      } else {
-        // is it that easy to cancel ?
-        this.annotationLayer.mode(null);
-      }
-      // this.annotationLayer.mode(this.annotationStyle.mode);
+    if (evt.mode === null) {
+      this.refreshAnnotationMode();
     }
   }
 
+  private placeholderCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
+    const sums: IGeoJSPoint = { x: 0, y: 0, z: 0 };
+    coordinates.forEach(({ x, y, z }) => {
+      sums.x += x;
+      sums.y += y;
+      sums.z += z;
+    });
+    return {
+      x: sums.x / coordinates.length,
+      y: sums.y / coordinates.length,
+      z: sums.z / coordinates.length
+    };
+  }
+
+  private addAnnotationFromGeoJsAnnotation(annotation: any) {
+    if (
+      !annotation ||
+      !annotation.coordinates() ||
+      !annotation.coordinates().length
+    ) {
+      return;
+    }
+    const toolAnnotation = this.selectedTool.values.annotation;
+    // Create the new annotation
+    const newAnnotation: IAnnotation = {
+      id: `${Date.now()}`, // TODO: uuid
+      label: toolAnnotation.name, // TODO: rename one of these
+      tags: toolAnnotation.tags,
+      shape: toolAnnotation.shape,
+      location: {}, // TODO:
+      coordinates: annotation.coordinates(),
+      computedValues: {} // TODO: if blob, should at least compute centroid
+    };
+
+    // TODO: factorize
+
+    const connectTo = this.selectedTool.values.connectTo;
+    // Look for connections
+    if (connectTo && connectTo.tags && connectTo.tags.length) {
+      const annotations = this.store.annotations;
+      // Find eligible annotations (matching tags and channel)
+      const eligibleAnnotations = annotations.filter((value: IAnnotation) => {
+        return value.tags.some(tag => connectTo.tags.includes(tag)); // TODO: check channel as well
+      });
+      if (eligibleAnnotations.length) {
+        // TODO: change distance and centroid functions based on shapes. for now this assumes distance from blob to point
+        // Find the closest eligible annotation
+        const dist = (a: IGeoJSPoint, b: IGeoJSPoint): number =>
+          Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+        const sortedAnnotations = eligibleAnnotations.sort(
+          (valueA: IAnnotation, valueB: IAnnotation) => {
+            const centroidA = this.placeholderCentroid(valueA.coordinates);
+            const centroidB = this.placeholderCentroid(valueB.coordinates);
+            const point = newAnnotation.coordinates[0];
+            const distanceA = dist(centroidA, point);
+            const distanceB = dist(centroidB, point);
+            return distanceA - distanceB;
+          }
+        );
+        const [closest] = sortedAnnotations;
+
+        // Create and add the new connection
+        const newConnection: IAnnotationConnection = {
+          id: `${Date.now()}`,
+          tags: [], // TODO: nothing is speced for connection tags right now
+          label: "A Connection",
+          parentId: closest.id,
+          childId: newAnnotation.id,
+          computedValues: {
+            distance: dist(
+              this.placeholderCentroid(closest.coordinates),
+              newAnnotation.coordinates[0]
+            )
+          }
+        };
+        this.store.addConnection(newConnection);
+
+        // TEMP: Draw lines as a way to show the connections
+        const pA = this.placeholderCentroid(closest.coordinates);
+        const pB = newAnnotation.coordinates[0];
+        const line = geojs.annotation.lineAnnotation();
+        line.options("vertices", [pA, pB]);
+        this.annotationLayer.addAnnotation(line);
+      }
+    }
+
+    this.store.addAnnotation(newAnnotation);
+  }
+
   handleAnnotationChange(evt: any) {
-    // TODO: We'll need use this to store annotations
-    if (this.annotationStyle && evt.annotation) {
-      evt.annotation.style(this.annotationStyle.style);
+    // if (this.annotationStyle && evt.annotation) {
+    //   evt.annotation.style(this.annotationStyle.style); // TODO: ask about annotation style
+    // }
+    switch (evt.event) {
+      case "geo_annotation_state":
+        if (this.selectedTool.type === "create") {
+          this.addAnnotationFromGeoJsAnnotation(evt.annotation);
+        }
+        break;
+      default:
+        break;
     }
   }
 
@@ -285,6 +379,14 @@ export default class ImageViewer extends Vue {
       );
       this.annotationLayer.geoOn(
         geojs.event.annotation.add,
+        this.handleAnnotationChange
+      );
+      this.annotationLayer.geoOn(
+        geojs.event.annotation.update,
+        this.handleAnnotationChange
+      );
+      this.annotationLayer.geoOn(
+        geojs.event.annotation.state,
         this.handleAnnotationChange
       );
       this.uiLayer = this.map.createLayer("ui");
