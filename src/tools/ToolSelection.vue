@@ -70,7 +70,9 @@ export default class ToolSelection extends Vue {
         tool.values = this.toolValues;
         tool.type = this.selectedItemTemplate.type;
         // Update this tool with actual values
-        this.store.updateTool(tool);
+        this.store.updateTool(tool).then(() => {
+          this.store.syncConfiguration();
+        });
         this.$emit("done");
       });
     }

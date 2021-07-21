@@ -54,6 +54,7 @@ export default class ToolConfiguration extends Vue {
       this.store.addToolIdsToCurrentToolset({
         ids: this.selectedTools.map(idx => this.tools[idx].id)
       });
+      this.store.syncConfiguration();
       this.selectedTools = [];
       this.$emit("done");
     }
