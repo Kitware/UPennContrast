@@ -3,20 +3,21 @@
     <v-card-text>
       <v-list>
         <v-list-item-group v-model="selectedTools" multiple>
-          <v-list-item v-for="tool in tools" :key="tool.id">
-            <v-list-item-title>{{ tool.name }}</v-list-item-title>
-          </v-list-item>
+          <template v-for="tool in tools">
+            <v-list-item :value="tool.id" :key="tool.id">
+              <v-list-item-title>{{ tool.name }}</v-list-item-title>
+            </v-list-item>
+          </template>
         </v-list-item-group>
       </v-list>
     </v-card-text>
 
     <v-card-actions>
-    <div class="button-bar">
-      <v-btn color="primary" :enabled="selectedTools.length" @click="confirm">
-        CONFIRM
-      </v-btn>
-    </div>
-
+      <div class="button-bar">
+        <v-btn color="primary" :enabled="selectedTools.length" @click="confirm">
+          CONFIRM
+        </v-btn>
+      </div>
     </v-card-actions>
   </v-card>
 </template>
@@ -38,7 +39,7 @@ import TagAndChannelRestriction from "@/tools/TagAndChannelRestriction.vue";
 export default class ToolsetPicker extends Vue {
   readonly store = store;
 
-  selectedTools: number[] = [];
+  selectedTools: string[] = [];
 
   get toolsetIds() {
     if (this.store.configuration?.toolset) {
@@ -47,15 +48,13 @@ export default class ToolsetPicker extends Vue {
     return [];
   }
   get tools() {
-    return this.store.tools.filter(({id}) => !this.toolsetIds.includes(id));
+    return this.store.tools.filter(({ id }) => !this.toolsetIds.includes(id));
   }
 
   confirm() {
     console.log(this.selectedTools);
     if (this.selectedTools.length) {
-      this.store.addToolIdsToCurrentToolset({
-        ids: this.selectedTools.map(idx => this.tools[idx].id)
-      });
+      this.store.addToolIdsToCurrentToolset({ ids: this.selectedTools });
       this.store.syncConfiguration();
       this.selectedTools = [];
       this.$emit("done");
