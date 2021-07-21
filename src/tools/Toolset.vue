@@ -68,6 +68,10 @@ export default class Toolset extends Vue {
     return this.store.tools;
   }
 
+  get configuration() {
+    return this.store.configuration;
+  }
+
   getToolById(toolId: string) {
     return this.store.tools.find(
       (tool: IToolConfiguration) => tool.id === toolId
@@ -79,6 +83,15 @@ export default class Toolset extends Vue {
       this.selectedToolId = "";
     }
     this.store.removeToolIdFromCurrentToolset({ id: toolId });
+  }
+
+  mounted() {
+    this.store.refreshToolsInCurrentToolset();
+  }
+
+  @Watch("configuration")
+  toolsetChanged() {
+    this.store.refreshToolsInCurrentToolset();
   }
 }
 </script>

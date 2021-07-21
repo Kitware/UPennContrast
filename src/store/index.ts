@@ -56,7 +56,7 @@ export class Main extends VuexModule {
   toolTemplateList: any[] = [];
 
   // TODO: tool names as key ?
-  tools: any = [];
+  tools: IToolConfiguration[] = [];
 
   unrollXY: boolean = false;
   unrollZ: boolean = false;
@@ -73,7 +73,14 @@ export class Main extends VuexModule {
 
   @Mutation
   public addTools({ tools }: { tools: IToolConfiguration[] }) {
-    this.tools = [...this.tools, ...tools];
+    this.tools = [
+      // If duplicates are found, make sure we only keep the latest ones
+      ...this.tools.filter(
+        (existingTool: IToolConfiguration) =>
+          !tools.find(newTool => existingTool.id === newTool.id)
+      ),
+      ...tools
+    ];
   }
 
   @Mutation
@@ -313,6 +320,19 @@ export class Main extends VuexModule {
       sync.setLoading(false);
     } catch (error) {
       sync.setLoading(error);
+    }
+  }
+
+  // We don't need to fetch all tools unless the user wants to add new ones
+  // This only fetches the tools in the current toolset
+  @Action
+  async refreshToolsInCurrentToolset() {
+    if (this.configuration?.toolset) {
+      this.configuration.toolset.toolIds.forEach(toolId => {
+        this.api.getTool(toolId).then(tool => {
+          this.addTools({ tools: [tool] });
+        });
+      });
     }
   }
 
