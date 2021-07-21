@@ -83,6 +83,7 @@ export default class Toolset extends Vue {
       this.selectedToolId = "";
     }
     this.store.removeToolIdFromCurrentToolset({ id: toolId });
+    this.store.syncConfiguration();
   }
 
   mounted() {
