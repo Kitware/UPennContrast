@@ -55,7 +55,6 @@ export class Main extends VuexModule {
   selectedToolId: string | null = null;
   toolTemplateList: any[] = [];
 
-  // TODO: tool names as key ?
   tools: IToolConfiguration[] = [];
 
   unrollXY: boolean = false;
@@ -91,7 +90,6 @@ export class Main extends VuexModule {
         ...ids
       ];
     }
-    // TODO: save toolset
   }
 
   @Mutation
@@ -101,7 +99,6 @@ export class Main extends VuexModule {
         idToFilter => id !== idToFilter
       );
     }
-    // TODO: save toolset
   }
 
   @Mutation

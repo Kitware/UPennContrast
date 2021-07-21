@@ -25,7 +25,7 @@
                 Choose a tool to add to this toolset
               </v-card-title>
               <v-card-text>
-                <tool-picker @done="toolPickerDialogOpen = false" />
+                <toolset-picker @done="toolPickerDialogOpen = false" />
               </v-card-text>
             </v-card>
           </v-dialog>
@@ -113,7 +113,7 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
 import ToolSelection from "@/tools/ToolSelection.vue";
-import ToolPicker from "@/tools/ToolPicker.vue";
+import ToolsetPicker from "@/tools/ToolsetPicker.vue";
 import Toolset from "@/tools/Toolset.vue";
 import store from "@/store";
 
@@ -121,7 +121,7 @@ import store from "@/store";
   components: {
     ValueSlider,
     SwitchToggle,
-    ToolPicker,
+    ToolsetPicker,
     ToolSelection,
     Toolset
   }

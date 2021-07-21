@@ -9,7 +9,6 @@
           v-if="getToolById(toolId)"
         >
           <v-list-item-avatar>
-            <!-- TODO: procedural icons -->
             <v-icon>{{ toolTypeToIcon[getToolById(toolId).type] }}</v-icon>
           </v-list-item-avatar>
           <v-list-item-content
@@ -35,8 +34,6 @@
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import { IToolConfiguration } from "@/store/model";
-
-// TODO: temporary
 
 @Component({
   components: {}

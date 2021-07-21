@@ -10,11 +10,14 @@
       </v-list>
     </v-card-text>
 
+    <v-card-actions>
     <div class="button-bar">
       <v-btn color="primary" :enabled="selectedTools.length" @click="confirm">
         CONFIRM
       </v-btn>
     </div>
+
+    </v-card-actions>
   </v-card>
 </template>
 <script lang="ts">
@@ -25,19 +28,17 @@ import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
 import AnnotationConfiguration from "@/tools/AnnotationConfiguration.vue";
 import TagAndChannelRestriction from "@/tools/TagAndChannelRestriction.vue";
 
-// TODO: don't show tools that already are in the toolset
 // TODO: two columns, user tools / all other accessible tools ? (need to track creator name)
 // TODO: search bars
 // TODO: cancel button
-// TODO: rename to toolsetpicker
 
 @Component({
   components: {}
 })
-export default class ToolConfiguration extends Vue {
+export default class ToolsetPicker extends Vue {
   readonly store = store;
 
-  selectedTools: string[] = [];
+  selectedTools: number[] = [];
 
   get toolsetIds() {
     if (this.store.configuration?.toolset) {
@@ -46,10 +47,11 @@ export default class ToolConfiguration extends Vue {
     return [];
   }
   get tools() {
-    return this.store.tools.filter(id => !this.toolsetIds.includes(id));
+    return this.store.tools.filter(({id}) => !this.toolsetIds.includes(id));
   }
 
   confirm() {
+    console.log(this.selectedTools);
     if (this.selectedTools.length) {
       this.store.addToolIdsToCurrentToolset({
         ids: this.selectedTools.map(idx => this.tools[idx].id)
@@ -61,8 +63,6 @@ export default class ToolConfiguration extends Vue {
   }
 
   mounted() {
-    // TODO: this should be called when bringing up the toolset interface
-    // TODO: async
     this.store.fetchAvailableTools();
   }
 }
