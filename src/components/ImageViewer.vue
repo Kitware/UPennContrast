@@ -287,7 +287,7 @@ export default class ImageViewer extends Vue {
           parentId: closest.id,
           childId: newAnnotation.id,
           computedValues: {
-            distance: dist(
+            length: dist(
               this.placeholderCentroid(closest.coordinates),
               newAnnotation.coordinates[0]
             )
