@@ -18,7 +18,9 @@ import {
   IToolSet,
   newLayer,
   IViewConfiguration,
-  IToolConfiguration
+  IToolConfiguration,
+  IAnnotation,
+  IAnnotationConnection
 } from "./model";
 import {
   toStyle,
@@ -271,6 +273,17 @@ export default class GirderAPI {
 
   getDatasetConfiguration(id: string): Promise<IDatasetConfiguration> {
     return this.getItem(id).then(asConfigurationItem);
+  }
+
+  async setAnnotationsToDataset(
+    annotations: IAnnotation[],
+    connections: IAnnotationConnection[],
+    dataset: IDataset
+  ) {
+    return this.client.put(`/folder/${dataset._girder._id}/metadata`, {
+      annotations,
+      connections
+    });
   }
 
   async createTool(

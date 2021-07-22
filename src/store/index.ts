@@ -624,6 +624,25 @@ export class Main extends VuexModule {
   }
 
   @Action
+  // Very inefficient, but will work for now
+  async syncAnnotations() {
+    if (!this.dataset) {
+      return;
+    }
+    sync.setSaving(true);
+    try {
+      await this.api.setAnnotationsToDataset(
+        this.annotations,
+        this.annotationConnections,
+        this.dataset
+      );
+      sync.setSaving(false);
+    } catch (error) {
+      sync.setSaving(error);
+    }
+  }
+
+  @Action
   async addLayer() {
     if (!this.configuration || !this.dataset) {
       return;

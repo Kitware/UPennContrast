@@ -300,6 +300,7 @@ export default class ImageViewer extends Vue {
     }
 
     this.store.addAnnotation(newAnnotation);
+    this.store.syncAnnotations();
   }
 
   handleAnnotationChange(evt: any) {
