@@ -236,18 +236,15 @@ export default class ImageViewer extends Vue {
       return;
     }
     const toolAnnotation = this.selectedTool.values.annotation;
-    const location = {
-      xy: this.store.xy,
-      z: this.store.z,
-      time: this.store.time
-    };
+
     // Create the new annotation
     const newAnnotation: IAnnotation = {
       id: `${Date.now()}`, // TODO: uuid
       label: toolAnnotation.name, // TODO: rename one of these
       tags: toolAnnotation.tags,
       shape: toolAnnotation.shape,
-      location, // TODO:
+      assignment: toolAnnotation.assignment,
+      XY: this.store.xy,
       coordinates: annotation.coordinates(),
       computedValues: {} // TODO: if blob, should at least compute centroid
     };

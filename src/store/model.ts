@@ -169,6 +169,7 @@ export interface IAnnotation {
       value: 1;
     };
   };
+  XY: number;
   shape: string; // TODO: enum
   coordinates: IGeoJSPoint[]; // TODO: does this always work ?
 
