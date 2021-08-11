@@ -62,7 +62,6 @@ export default class TagAndLayerRestriction extends Vue {
     return this.layers.map(layer => layer.name);
   }
 
-
   tagList = []; // TODO: keep a list of existing tags from existing annotations
   // channels = ["ch1", "brightField", "uiaeuaie"];
 

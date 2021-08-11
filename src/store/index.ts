@@ -630,11 +630,14 @@ export class Main extends VuexModule {
       return;
     }
     sync.setSaving(true);
+    if (!this.configuration) {
+      return;
+    }
     try {
-      await this.api.setAnnotationsToDataset(
+      await this.api.setAnnotationsToConfiguration(
         this.annotations,
         this.annotationConnections,
-        this.dataset
+        this.configuration
       );
       sync.setSaving(false);
     } catch (error) {

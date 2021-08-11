@@ -275,12 +275,13 @@ export default class GirderAPI {
     return this.getItem(id).then(asConfigurationItem);
   }
 
-  async setAnnotationsToDataset(
+  async setAnnotationsToConfiguration(
     annotations: IAnnotation[],
     connections: IAnnotationConnection[],
-    dataset: IDataset
+    configuration: IDatasetConfiguration
   ) {
-    return this.client.put(`/folder/${dataset._girder._id}/metadata`, {
+    // get dataset
+    return this.client.put(`/item/${configuration._girder._id}/metadata`, {
       annotations,
       connections
     });

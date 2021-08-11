@@ -250,7 +250,6 @@ export default class ImageViewer extends Vue {
     };
 
     // TODO: factorize
-
     const connectTo = this.selectedTool.values.connectTo;
     // Look for connections
     if (connectTo && connectTo.tags && connectTo.tags.length) {
