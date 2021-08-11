@@ -28,9 +28,9 @@
       </v-col>
       <v-col>
         <v-select
-          v-model="selectedChannel"
-          :items="channels"
-          :label="channelLabelWithDefault"
+          v-model="selectedLayer"
+          :items="layerNames"
+          :label="layerLabelWithDefault"
           @change="changed"
         >
         </v-select>
@@ -46,7 +46,7 @@ import store from "@/store";
 @Component({
   components: {}
 })
-export default class TagAndChannelRestriction extends Vue {
+export default class TagAndLayerRestriction extends Vue {
   readonly store = store;
 
   get dataset() {
@@ -54,21 +54,21 @@ export default class TagAndChannelRestriction extends Vue {
   }
 
   // TODO: add "ALL", -1 ?
-  get channels() {
-    return (
-      this.dataset?.channels.map(channelId => ({
-        value: channelId,
-        text: this.dataset?.channelNames.get(channelId)
-      })) || []
-    );
+  get layers() {
+    return this.store.configuration?.view.layers || [];
   }
+
+  get layerNames() {
+    return this.layers.map(layer => layer.name);
+  }
+
 
   tagList = []; // TODO: keep a list of existing tags from existing annotations
   // channels = ["ch1", "brightField", "uiaeuaie"];
 
   tagSearchInput: string = "";
   newTags: string[] = [];
-  selectedChannel: string = "";
+  selectedLayer: string = "";
 
   @Prop()
   readonly template!: any;
@@ -77,19 +77,19 @@ export default class TagAndChannelRestriction extends Vue {
   readonly tagsLabel!: string;
 
   @Prop()
-  readonly channelsLabel!: string;
+  readonly layerLabel!: string;
 
   get tagsLabelWithDefault() {
     return this.tagsLabel || "Restrict to Tags";
   }
 
-  get channelLabelWithDefault() {
-    return this.channelsLabel || "Restrict to channel";
+  get layerLabelWithDefault() {
+    return this.layerLabel || "Restrict to layer";
   }
 
   changed() {
     this.tagSearchInput = "";
-    this.$emit("input", { tags: this.newTags, channel: this.selectedChannel });
+    this.$emit("input", { tags: this.newTags, layer: this.selectedLayer });
     this.$emit("change");
   }
 }

@@ -11,10 +11,10 @@
       {
         "name": "Connection Restrictions",
         "id": "connectTo",
-        "type": "restrictTagsAndChannel",
+        "type": "restrictTagsAndLayer",
         "meta": {
           "tagsLabel": "Connect to nearest",
-          "channelsLabel": "Restrict to channel"
+          "layerLabel": "Restrict to Layer"
         }
       }
     ]
@@ -120,12 +120,12 @@
                   {
                     "name": "Join From",
                     "id": "joinFrom",
-                    "type": "restrictTagsAndChannel"
+                    "type": "restrictTagsAndLayer"
                   },
                   {
                     "name": "Join To",
                     "id": "joinTo",
-                    "type": "restrictTagsAndChannel"
+                    "type": "restrictTagsAndLayer"
                   },
                   {
                     "name": "Existing Connections",

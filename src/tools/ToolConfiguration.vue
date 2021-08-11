@@ -54,7 +54,7 @@ import store from "@/store";
 // Manually import those vuetify components that might be used procedurally
 import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
 import AnnotationConfiguration from "@/tools/AnnotationConfiguration.vue";
-import TagAndChannelRestriction from "@/tools/TagAndChannelRestriction.vue";
+import TagAndLayerRestriction from "@/tools/TagAndLayerRestriction.vue";
 
 const defaultValues = {
   name: "New Tool",
@@ -64,7 +64,7 @@ const defaultValues = {
 @Component({
   components: {
     AnnotationConfiguration,
-    TagAndChannelRestriction,
+    TagAndLayerRestriction,
     VSelect,
     VCheckbox,
     VTextField,
@@ -79,7 +79,7 @@ export default class ToolConfiguration extends Vue {
   typeToComponentName = {
     select: "v-select",
     annotation: "annotation-configuration",
-    restrictTagsAndChannel: "tag-and-channel-restriction",
+    restrictTagsAndLayer: "tag-and-layer-restriction",
     checkbox: "v-checkbox",
     radio: "v-radio-group", // TODO: custom component ?
     text: "v-text-field"
