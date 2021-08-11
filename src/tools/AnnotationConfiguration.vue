@@ -37,7 +37,8 @@
         <v-col>
           <v-subheader>Layer</v-subheader>
           <v-select
-            :items="layerNames"
+            :items="layerItems"
+            item-text="label"
             dense
             label="Choose a layer"
             v-model="coordinateAssignments.layer"
@@ -102,8 +103,11 @@ export default class AnnotationConfiguration extends Vue {
     return this.store.configuration?.view.layers || [];
   }
 
-  get layerNames() {
-    return this.layers.map(layer => layer.name);
+  get layerItems() {
+    return this.layers.map((layer, index) => ({
+      label: layer.name,
+      value: index
+    }));
   }
 
   tagSearchInput: string = "";
@@ -127,7 +131,7 @@ export default class AnnotationConfiguration extends Vue {
 
   coordinates = ["Z", "Time"];
   coordinateAssignments = {
-    layer: this.layerNames.length ? this.layerNames[0] : "",
+    layer: 0,
     Z: { type: "layer", value: 1 },
     Time: { type: "layer", value: 1 }
   };
@@ -141,7 +145,7 @@ export default class AnnotationConfiguration extends Vue {
   resetValues() {
     // Set internal values to the current input, or defaults
     this.coordinateAssignments = this.value?.coordinateAssignments || {
-      layer: this.layerNames.length ? this.layerNames[0] : "",
+      layer: 0,
       Z: { type: "layer", value: 1 },
       Time: { type: "layer", value: 1 }
     };

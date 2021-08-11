@@ -27,7 +27,7 @@ import store from "@/store";
 // Manually import those vuetify components that might be used procedurally
 import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
 import AnnotationConfiguration from "@/tools/AnnotationConfiguration.vue";
-import TagAndChannelRestriction from "@/tools/TagAndChannelRestriction.vue";
+import TagAndChannelRestriction from "@/tools/TagAndLayerRestriction.vue";
 
 // TODO: two columns, user tools / all other accessible tools ? (need to track creator name)
 // TODO: search bars

@@ -275,6 +275,17 @@ export default class GirderAPI {
     return this.getItem(id).then(asConfigurationItem);
   }
 
+  async getAnnotationsForConfiguration(configuration: IDatasetConfiguration) {
+    const config = await this.getDatasetConfiguration(configuration.id);
+    if (config && config._girder.meta) {
+      return {
+        annotations: config._girder.meta.annotations || [],
+        annotationConnections: config._girder.meta.connections || []
+      };
+    }
+    return { annotations: [], annotationConnections: [] };
+  }
+
   async setAnnotationsToConfiguration(
     annotations: IAnnotation[],
     connections: IAnnotationConnection[],

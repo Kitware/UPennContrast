@@ -646,6 +646,26 @@ export class Main extends VuexModule {
   }
 
   @Action
+  async fetchAnnotations() {
+    this.setAnnotations([]);
+    this.setConnections([]);
+    if (!this.dataset || !this.configuration) {
+      return;
+    }
+    try {
+      const results = await this.api.getAnnotationsForConfiguration(
+        this.configuration
+      );
+      if (results) {
+        this.setAnnotations(results.annotations);
+        this.setConnections(results.annotationConnections);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  @Action
   async addLayer() {
     if (!this.configuration || !this.dataset) {
       return;
@@ -952,8 +972,18 @@ export class Main extends VuexModule {
   }
 
   @Mutation
+  public setAnnotations(values: IAnnotation[]) {
+    this.annotations = values;
+  }
+
+  @Mutation
   public addConnection(value: IAnnotationConnection) {
     this.annotationConnections = [...this.annotationConnections, value];
+  }
+
+  @Mutation
+  public setConnections(values: IAnnotationConnection[]) {
+    this.annotationConnections = values;
   }
 
   @Mutation

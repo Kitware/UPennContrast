@@ -159,7 +159,7 @@ export interface IAnnotation {
   label: string;
   tags: string[];
   assignment: {
-    layer: string;
+    layer: number;
     Z: {
       type: string; // Either "layer", or "assign"
       value: 1;

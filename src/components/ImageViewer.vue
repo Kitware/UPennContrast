@@ -129,6 +129,32 @@ export default class ImageViewer extends Vue {
     geojsmap: HTMLElement;
   };
 
+  get configuration() {
+    return this.store.configuration;
+  }
+
+  get layers() {
+    return this.configuration?.view.layers || [];
+  }
+
+  // Fetch annotations for the current configuration
+  @Watch("configuration")
+  fetchAnnotations() {
+    this.store.fetchAnnotations();
+  }
+
+  // All annotations available for the currently enabled layers
+  get layerAnnotations() {
+    return this.store.annotations.filter(
+      annotation => this.layers[annotation.assignment.layer].visible
+    );
+  }
+
+  @Watch("layerAnnotations")
+  displayAnnotations() {
+    console.log("displaying", this.store.annotations); // TODO: display these annotations in geojs
+  }
+
   get fullyReady() {
     return this.ready.layers.every(d => d);
   }
@@ -243,7 +269,7 @@ export default class ImageViewer extends Vue {
       label: toolAnnotation.name, // TODO: rename one of these
       tags: toolAnnotation.tags,
       shape: toolAnnotation.shape,
-      assignment: toolAnnotation.assignment,
+      assignment: toolAnnotation.coordinateAssignments,
       XY: this.store.xy,
       coordinates: annotation.coordinates(),
       computedValues: {} // TODO: if blob, should at least compute centroid
