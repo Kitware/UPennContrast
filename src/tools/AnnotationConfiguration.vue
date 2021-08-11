@@ -34,34 +34,35 @@
     </v-select>
     <v-container fluid>
       <v-row>
+        <v-col>
+          <v-subheader>Layer</v-subheader>
+          <v-select
+            :items="layerNames"
+            dense
+            label="Choose a layer"
+            v-model="coordinateAssignments.layer"
+            @change="changed"
+          />
+        </v-col>
         <v-col v-for="(coordinate, index) in coordinates" :key="index">
           <v-radio-group
             @change="changed"
             :label="coordinate"
-            v-model="coordinateAssignments[coordinate]"
+            v-model="coordinateAssignments[coordinate].type"
             :key="`${index}Radio`"
           >
-            <v-radio value="current" label="Current"></v-radio>
+            <v-radio value="layer" label="From Layer"></v-radio>
             <v-radio value="assign">
               <template v-slot:label>
                 <span>Assign</span>
-                <v-select
-                  :key="`${index}Select`"
-                  :disabled="coordinateAssignments[coordinate] === 'current'"
-                  :items="channels"
-                  v-model="assignmentValues[coordinate]"
-                  v-if="coordinate === 'Channel'"
-                  class="pl-12"
-                />
                 <!-- TODO: make sure we have numbers -->
                 <v-text-field
-                  v-else
                   type="number"
                   :min="0"
                   class="pl-12"
-                  v-model="assignmentValues[coordinate]"
+                  v-model="coordinateAssignments[coordinate].value"
                   @change="changed"
-                  :disabled="coordinateAssignments[coordinate] === 'current'"
+                  :disabled="coordinateAssignments[coordinate].type === 'layer'"
                 />
                 <!-- TODO: min/max/increment, default at current slice -->
               </template>
@@ -97,6 +98,14 @@ export default class AnnotationConfiguration extends Vue {
     );
   }
 
+  get layers() {
+    return this.store.configuration?.view.layers || [];
+  }
+
+  get layerNames() {
+    return this.layers.map(layer => layer.name);
+  }
+
   tagSearchInput: string = "";
 
   @Prop()
@@ -115,9 +124,13 @@ export default class AnnotationConfiguration extends Vue {
   name: string = "";
   shape: string = "";
   tags: string[] = [];
-  coordinates = ["Channel", "XY", "Z", "Time"];
-  coordinateAssignments = {};
-  assignmentValues = {};
+
+  coordinates = ["Z", "Time"];
+  coordinateAssignments = {
+    layer: this.layerNames.length ? this.layerNames[0] : "",
+    Z: { type: "layer", value: 1 },
+    Time: { type: "layer", value: 1 }
+  };
 
   mounted() {
     this.resetValues();
@@ -128,17 +141,11 @@ export default class AnnotationConfiguration extends Vue {
   resetValues() {
     // Set internal values to the current input, or defaults
     this.coordinateAssignments = this.value?.coordinateAssignments || {
-      Channel: "current",
-      XY: "current",
-      Z: "current",
-      Time: "current"
+      layer: this.layerNames.length ? this.layerNames[0] : "",
+      Z: { type: "layer", value: 1 },
+      Time: { type: "layer", value: 1 }
     };
-    this.assignmentValues = this.value?.assignmentValues || {
-      Channel: 0,
-      XY: 0,
-      Z: 0,
-      Time: 0
-    };
+
     this.name = this.value?.name || "New Annotation";
     this.tags = this.value?.tags || [];
     this.shape = this.value?.shape || "point";
@@ -152,7 +159,6 @@ export default class AnnotationConfiguration extends Vue {
       name: this.name,
       tags: this.tags,
       coordinateAssignments: this.coordinateAssignments,
-      assignmentValues: this.assignmentValues,
       shape: this.shape
     });
     this.$emit("change");

@@ -153,11 +153,22 @@ export interface IGeoJSPoint {
   y: number;
   z: number;
 }
+
 export interface IAnnotation {
   id: string;
   label: string;
   tags: string[];
-  location: any; // TODO:
+  assignment: {
+    layer: string;
+    Z: {
+      type: string; // Either "layer", or "assign"
+      value: 1;
+    };
+    Time: {
+      type: string;
+      value: 1;
+    };
+  };
   shape: string; // TODO: enum
   coordinates: IGeoJSPoint[]; // TODO: does this always work ?
 
