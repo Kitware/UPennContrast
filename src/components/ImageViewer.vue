@@ -150,9 +150,58 @@ export default class ImageViewer extends Vue {
     );
   }
 
+  drawAnnotations() {
+    if (!this.annotationLayer) {
+      return;
+    }
+    // We want to ignore these already displayed annotations
+    const displayedIds = this.annotationLayer
+      .annotations()
+      .map((a: any) => a.options("internalId"));
+
+    // First remove undesired annotations (layer was disabled)
+    this.annotationLayer.annotations().forEach((annotation: any) => {
+      const id = annotation.options("internalId");
+      if (!id) {
+        return;
+      }
+      const foundAnnotation = this.layerAnnotations.find(
+        layerAnnotation => layerAnnotation.id === id
+      );
+      if (!foundAnnotation) {
+        this.annotationLayer.removeAnnotation(annotation);
+      }
+    });
+    // Then draw the new annotations
+    this.layerAnnotations
+      .filter(annotation => !displayedIds.includes(annotation.id))
+      .forEach(annotation => {
+        // Display a new annotation
+        let newGeoJSAnnotation = null;
+        switch (annotation.shape) {
+          case "point":
+            newGeoJSAnnotation = geojs.annotation.pointAnnotation();
+            newGeoJSAnnotation.options("position", annotation.coordinates[0]);
+            break;
+          case "polygon":
+            newGeoJSAnnotation = geojs.annotation.polygonAnnotation();
+            newGeoJSAnnotation.options("vertices", annotation.coordinates);
+            break;
+          case "line":
+            newGeoJSAnnotation = geojs.annotation.lineAnnotation();
+            newGeoJSAnnotation.options("vertices", annotation.coordinates);
+            break;
+          default:
+            console.error("Unsupported annotation shape", annotation.shape);
+        }
+        newGeoJSAnnotation.options("internalId", annotation.id);
+        this.annotationLayer.addAnnotation(newGeoJSAnnotation);
+      });
+  }
+
   @Watch("layerAnnotations")
-  displayAnnotations() {
-    console.log("displaying", this.store.annotations); // TODO: display these annotations in geojs
+  onLayerAnnotationsChanged() {
+    this.drawAnnotations();
   }
 
   get fullyReady() {
@@ -326,8 +375,13 @@ export default class ImageViewer extends Vue {
       }
     }
 
+    // Make sure we know which annotation this geojs object is associated to
+    annotation.options("internalId", newAnnotation.id);
+
+    // Save the new annotation
     this.store.addAnnotation(newAnnotation);
     this.store.syncAnnotations();
+    // TODO: set new annotation style here
   }
 
   handleAnnotationChange(evt: any) {
@@ -419,6 +473,7 @@ export default class ImageViewer extends Vue {
       );
       this.uiLayer = this.map.createLayer("ui");
       this.uiLayer.node().css({ "mix-blend-mode": "unset" });
+      this.drawAnnotations();
     } else {
       adjustLayers =
         Math.abs(this.map.maxBounds(undefined, null).right - mapWidth) >= 0.5 ||
