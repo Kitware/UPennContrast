@@ -326,14 +326,6 @@ export default class ImageViewer extends Vue {
     this.refreshAnnotationMode();
   }
 
-  get annotationStyle(): any {
-    const mode = this.store.annotationMode;
-    const list = this.store.annotationModeList.filter(
-      entry => entry.key === mode
-    );
-    return list.length ? list[0] : null;
-  }
-
   @Watch("annotationStyle")
   watchAnnotationStyle(value: any | null) {
     if (this.annotationLayer) {

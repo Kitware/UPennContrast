@@ -51,8 +51,6 @@ export class Main extends VuexModule {
   z: number = 0;
   time: number = 0;
   layerMode: "single" | "multiple" = "multiple";
-  annotationMode: string | null = null;
-  annotationModeList: any[] = [];
 
   annotations: IAnnotation[] = [];
   annotationConnections: IAnnotationConnection[] = [];
@@ -584,16 +582,6 @@ export class Main extends VuexModule {
   @Mutation
   setSelectedToolId(id: string | null) {
     this.selectedToolId = id;
-  }
-
-  @Mutation
-  setAnnotationMode(mode: string | null) {
-    this.annotationMode = mode;
-  }
-
-  @Mutation
-  setAnnotationModeList(modeList: any[]) {
-    this.annotationModeList = modeList;
   }
 
   @Mutation

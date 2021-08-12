@@ -1,7 +1,7 @@
 <template>
   <div>
     <div>
-      <v-container v-if="annotationModeList.length">
+      <v-container>
         <v-row>
           <v-dialog v-model="toolCreationDialogOpen" width="unset">
             <template v-slot:activator="{ on, attrs }">
@@ -143,18 +143,6 @@ export default class ViewerToolbar extends Vue {
         [param]: value
       }
     });
-  }
-
-  get annotationModeList(): any[] {
-    return this.store.annotationModeList;
-  }
-
-  get annotationMode(): string | null {
-    return this.store.annotationMode;
-  }
-
-  set annotationMode(value: string | null) {
-    this.store.setAnnotationMode(value);
   }
 
   get xy() {

@@ -66,17 +66,14 @@ export default class App extends Vue {
 
   fetchConfig() {
     axios
-      .get("config/modes.json")
+      .get("config/templates.json")
       .then(resp => {
-        this.store.setAnnotationModeList(resp.data.annotation_buttons);
+        this.store.setToolTemplateList(resp.data);
       })
       .catch(err => {
         console.log(err); // eslint-disable-line no-console
         throw err;
       });
-    axios.get("config/templates.json").then(resp => {
-      this.store.setToolTemplateList(resp.data);
-    });
   }
 
   mounted() {
