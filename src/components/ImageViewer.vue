@@ -182,7 +182,26 @@ export default class ImageViewer extends Vue {
       .map((a: any) => a.options("internalId"));
 
     const shouldDisplayAnnotation = (annotation: IAnnotation) => {
-      return annotation.XY === this.store.xy;
+      if (!annotation.assignment) {
+        return false;
+      }
+      const layer = this.layers[annotation.assignment.layer];
+      if (!layer) {
+        return false;
+      }
+      const indexes = this.store.layerSliceIndexes(layer);
+      if (!indexes) {
+        return false;
+      }
+      const { xyIndex, zIndex, tIndex } = indexes;
+      if (
+        annotation.location.XY !== xyIndex ||
+        annotation.location.Z !== zIndex ||
+        annotation.location.Time !== tIndex
+      ) {
+        return false;
+      }
+      return true;
     };
 
     // First remove undesired annotations (layer was disabled, uneligible coordinates...)
@@ -194,7 +213,7 @@ export default class ImageViewer extends Vue {
       const foundAnnotation = this.layerAnnotations.find(
         layerAnnotation => layerAnnotation.id === id
       );
-      if (!foundAnnotation || !shouldDisplayAnnotation(annotation)) {
+      if (!foundAnnotation || !shouldDisplayAnnotation(foundAnnotation)) {
         this.annotationLayer.removeAnnotation(annotation);
       }
     });
@@ -352,6 +371,23 @@ export default class ImageViewer extends Vue {
     }
     const toolAnnotation = this.selectedTool.values.annotation;
 
+    // Find location in the assigned layer
+    const location = {
+      XY: this.store.xy,
+      Z: this.store.z,
+      Time: this.store.time
+    };
+    const layer = this.layers[toolAnnotation.coordinateAssignments.layer];
+    if (layer) {
+      const indexes = this.store.layerSliceIndexes(layer);
+      if (indexes) {
+        const { xyIndex, zIndex, tIndex } = indexes;
+        location.XY = xyIndex;
+        location.Z = zIndex;
+        location.Time = tIndex;
+      }
+    }
+
     // Create the new annotation
     const newAnnotation: IAnnotation = {
       id: `${Date.now()}`, // TODO: uuid
@@ -359,7 +395,7 @@ export default class ImageViewer extends Vue {
       tags: toolAnnotation.tags,
       shape: toolAnnotation.shape,
       assignment: toolAnnotation.coordinateAssignments,
-      XY: this.store.xy,
+      location,
       coordinates: annotation.coordinates(),
       computedValues: {} // TODO: if blob, should at least compute centroid
     };

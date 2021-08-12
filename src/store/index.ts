@@ -8,7 +8,7 @@ import {
   VuexModule
 } from "vuex-module-decorators";
 import GirderAPI from "./GirderAPI";
-import { getLayerImages } from "./images";
+import { getLayerImages, getLayerSliceIndexes } from "./images";
 import {
   IDataset,
   IDatasetConfiguration,
@@ -73,6 +73,21 @@ export class Main extends VuexModule {
 
   get isLoggedIn() {
     return this.girderUser != null;
+  }
+
+  get layerSliceIndexes() {
+    return (layer: IDisplayLayer) => {
+      if (!this.dataset) {
+        return null;
+      }
+      return getLayerSliceIndexes(
+        layer,
+        this.dataset,
+        this.time,
+        this.xy,
+        this.z
+      );
+    };
   }
 
   @Mutation
