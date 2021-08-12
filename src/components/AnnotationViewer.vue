@@ -214,20 +214,6 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-  private placeholderCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
-    const sums: IGeoJSPoint = { x: 0, y: 0, z: 0 };
-    coordinates.forEach(({ x, y, z }) => {
-      sums.x += x;
-      sums.y += y;
-      sums.z += z;
-    });
-    return {
-      x: sums.x / coordinates.length,
-      y: sums.y / coordinates.length,
-      z: sums.z / coordinates.length
-    };
-  }
-
   private addAnnotationFromGeoJsAnnotation(annotation: any) {
     if (
       !annotation ||
@@ -323,6 +309,60 @@ export default class AnnotationViewer extends Vue {
     this.bind();
   }
 
+  private placeholderCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
+    const sums: IGeoJSPoint = { x: 0, y: 0, z: 0 };
+    coordinates.forEach(({ x, y, z }) => {
+      sums.x += x;
+      sums.y += y;
+      sums.z += z;
+    });
+    return {
+      x: sums.x / coordinates.length,
+      y: sums.y / coordinates.length,
+      z: sums.z / coordinates.length
+    };
+  }
+
+  private annotationDistance(a: IAnnotation, b: IAnnotation) {
+    // For now, polyLines are treated as polygons for the sake of computing distances
+    const dist = (a: IGeoJSPoint, b: IGeoJSPoint): number =>
+      Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+    // Point to point
+    if (a.shape === "point" || b.shape === "point") {
+      return dist(a.coordinates[0], b.coordinates[0]);
+    }
+
+    // Point to poly
+    if (
+      (a.shape === "point" && (b.shape === "polygon" || b.shape === "line")) ||
+      ((a.shape === "polygon" || b.shape === "line") && b.shape === "point")
+    ) {
+      const point = a.shape === "point" ? a : b;
+      const poly = a.shape === "point" ? b : a;
+
+      // Go through all vertices to find the closest
+      const shortestDistance = poly.coordinates
+        .map(val => dist(val, point.coordinates[0]))
+        .sort()[0];
+      return shortestDistance;
+    }
+
+    // Poly to poly
+    if (
+      (a.shape === "polygon" || b.shape === "line") &&
+      (b.shape === "polygon" || b.shape === "line")
+    ) {
+      // Use centroids for now
+      const centroidA = this.placeholderCentroid(a.coordinates);
+      const centroidB = this.placeholderCentroid(b.coordinates);
+      return dist(centroidA, centroidB);
+    }
+
+    // Should not happen
+    console.error("Unsupported annotation shapes for distance calculations");
+    return Number.POSITIVE_INFINITY;
+  }
+
   private findAnnotationConnections(annotation: IAnnotation) {
     const connectTo = this.selectedTool.values.connectTo;
     // Look for connections
@@ -346,17 +386,11 @@ export default class AnnotationViewer extends Vue {
         return value.tags.some(tag => connectTo.tags.includes(tag)); // TODO: check channel as well
       });
       if (eligibleAnnotations.length) {
-        // TODO: change distance and centroid functions based on shapes. for now this assumes distance from blob to point
         // Find the closest eligible annotation
-        const dist = (a: IGeoJSPoint, b: IGeoJSPoint): number =>
-          Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
         const sortedAnnotations = eligibleAnnotations.sort(
           (valueA: IAnnotation, valueB: IAnnotation) => {
-            const centroidA = this.placeholderCentroid(valueA.coordinates);
-            const centroidB = this.placeholderCentroid(valueB.coordinates);
-            const point = annotation.coordinates[0];
-            const distanceA = dist(centroidA, point);
-            const distanceB = dist(centroidB, point);
+            const distanceA = this.annotationDistance(valueA, annotation);
+            const distanceB = this.annotationDistance(valueB, annotation);
             return distanceA - distanceB;
           }
         );
@@ -370,17 +404,14 @@ export default class AnnotationViewer extends Vue {
           parentId: closest.id,
           childId: annotation.id,
           computedValues: {
-            length: dist(
-              this.placeholderCentroid(closest.coordinates),
-              annotation.coordinates[0]
-            )
+            length: this.annotationDistance(closest, annotation)
           }
         };
         this.store.addConnection(newConnection);
 
         // TEMP: Draw lines as a way to show the connections
         const pA = this.placeholderCentroid(closest.coordinates);
-        const pB = annotation.coordinates[0];
+        const pB = this.placeholderCentroid(annotation.coordinates);
         const line = geojs.annotation.lineAnnotation();
         line.options("vertices", [pA, pB]);
         line.options("isConnection", true);
