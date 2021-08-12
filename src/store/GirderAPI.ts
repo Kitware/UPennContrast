@@ -126,7 +126,7 @@ export default class GirderAPI {
     );
     if (toolsResult.status !== 200) {
       throw new Error(
-        `Could not get a list of tools for folder ${toolsFolder.name}: ${toolsResult.status}: ${result.statusText}`
+        `Could not get a list of tools for folder ${toolsFolder.name}: ${toolsResult.status}: ${toolsResult.statusText}`
       );
       return [];
     }

@@ -95,7 +95,7 @@ export default class ToolConfiguration extends Vue {
     return [
       ...(this.template?.interface || []),
       ...Object.entries(this.valueTemplates)
-        .map(([key, value]: any[]) => value)
+        .map(([, value]: any[]) => value)
         .reduce((arr: any[], interfaceList: any[]) => {
           return [...arr, ...interfaceList];
         }, [])
