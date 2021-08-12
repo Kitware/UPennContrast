@@ -93,3 +93,10 @@ export default class Toolset extends Vue {
   }
 }
 </script>
+<style scoped>
+.v-list {
+  width: 100%;
+  height: 30vh;
+  overflow-y: auto;
+}
+</style>
