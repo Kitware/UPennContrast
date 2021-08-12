@@ -181,7 +181,11 @@ export default class ImageViewer extends Vue {
       .annotations()
       .map((a: any) => a.options("internalId"));
 
-    // First remove undesired annotations (layer was disabled)
+    const shouldDisplayAnnotation = (annotation: IAnnotation) => {
+      return annotation.XY === this.store.xy;
+    };
+
+    // First remove undesired annotations (layer was disabled, uneligible coordinates...)
     this.annotationLayer.annotations().forEach((annotation: any) => {
       const id = annotation.options("internalId");
       if (!id) {
@@ -190,13 +194,17 @@ export default class ImageViewer extends Vue {
       const foundAnnotation = this.layerAnnotations.find(
         layerAnnotation => layerAnnotation.id === id
       );
-      if (!foundAnnotation) {
+      if (!foundAnnotation || !shouldDisplayAnnotation(annotation)) {
         this.annotationLayer.removeAnnotation(annotation);
       }
     });
+
     // Then draw the new annotations
     this.layerAnnotations
+      // Check for annotation that have not been displayed yet
       .filter(annotation => !displayedIds.includes(annotation.id))
+      // Check for valid coordinates
+      .filter(shouldDisplayAnnotation)
       .forEach(annotation => {
         // Display a new annotation
         let newGeoJSAnnotation = null;
@@ -226,6 +234,11 @@ export default class ImageViewer extends Vue {
       });
   }
 
+  get xy() {
+    return this.store.xy;
+  }
+
+  @Watch("xy")
   @Watch("layerAnnotations")
   onLayerAnnotationsChanged() {
     this.drawAnnotations();
