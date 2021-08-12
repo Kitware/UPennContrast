@@ -152,7 +152,17 @@ export default class AnnotationViewer extends Vue {
     return this.store.xy;
   }
 
+  get z() {
+    return this.store.z;
+  }
+
+  get time() {
+    return this.store.time;
+  }
+
   @Watch("xy")
+  @Watch("z")
+  @Watch("time")
   @Watch("layerAnnotations")
   onLayerAnnotationsChanged() {
     this.drawAnnotations();
