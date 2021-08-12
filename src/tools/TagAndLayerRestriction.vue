@@ -70,7 +70,6 @@ export default class TagAndLayerRestriction extends Vue {
   }
 
   tagList = []; // TODO: keep a list of existing tags from existing annotations
-  // channels = ["ch1", "brightField", "uiaeuaie"];
 
   tagSearchInput: string = "";
   newTags: string[] = [];

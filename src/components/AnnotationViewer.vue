@@ -63,6 +63,32 @@ export default class AnnotationViewer extends Vue {
     return style;
   }
 
+  createGeoJSAnnotation(annotation: IAnnotation) {
+    let newGeoJSAnnotation = null;
+    switch (annotation.shape) {
+      case "point":
+        newGeoJSAnnotation = geojs.annotation.pointAnnotation();
+        newGeoJSAnnotation.options("position", annotation.coordinates[0]);
+        break;
+      case "polygon":
+        newGeoJSAnnotation = geojs.annotation.polygonAnnotation();
+        newGeoJSAnnotation.options("vertices", annotation.coordinates);
+        break;
+      case "line":
+        newGeoJSAnnotation = geojs.annotation.lineAnnotation();
+        newGeoJSAnnotation.options("vertices", annotation.coordinates);
+        break;
+      default:
+        console.error("Unsupported annotation shape", annotation.shape);
+    }
+    newGeoJSAnnotation.options("internalId", annotation.id);
+
+    const style = newGeoJSAnnotation.options("style");
+    const newStyle = this.getAnnotationStyle(annotation);
+    newGeoJSAnnotation.options("style", Object.assign({}, style, newStyle));
+    return newGeoJSAnnotation;
+  }
+
   drawAnnotations() {
     if (!this.annotationLayer) {
       return;
@@ -113,6 +139,7 @@ export default class AnnotationViewer extends Vue {
         this.annotationLayer.removeAnnotation(annotation);
       }
     });
+
     // Then draw the new annotations
     this.layerAnnotations
       // Check for annotation that have not been displayed yet
@@ -120,30 +147,7 @@ export default class AnnotationViewer extends Vue {
       // Check for valid coordinates
       .filter(shouldDisplayAnnotation)
       .forEach(annotation => {
-        // Display a new annotation
-        let newGeoJSAnnotation = null;
-        switch (annotation.shape) {
-          case "point":
-            newGeoJSAnnotation = geojs.annotation.pointAnnotation();
-            newGeoJSAnnotation.options("position", annotation.coordinates[0]);
-            break;
-          case "polygon":
-            newGeoJSAnnotation = geojs.annotation.polygonAnnotation();
-            newGeoJSAnnotation.options("vertices", annotation.coordinates);
-            break;
-          case "line":
-            newGeoJSAnnotation = geojs.annotation.lineAnnotation();
-            newGeoJSAnnotation.options("vertices", annotation.coordinates);
-            break;
-          default:
-            console.error("Unsupported annotation shape", annotation.shape);
-        }
-        newGeoJSAnnotation.options("internalId", annotation.id);
-
-        const style = newGeoJSAnnotation.options("style");
-        const newStyle = this.getAnnotationStyle(annotation);
-        newGeoJSAnnotation.options("style", Object.assign({}, style, newStyle));
-
+        const newGeoJSAnnotation = this.createGeoJSAnnotation(annotation);
         this.annotationLayer.addAnnotation(newGeoJSAnnotation);
       });
   }
@@ -202,13 +206,6 @@ export default class AnnotationViewer extends Vue {
   @Watch("selectedTool")
   watchTool() {
     this.refreshAnnotationMode();
-  }
-
-  @Watch("annotationStyle")
-  watchAnnotationStyle(value: any | null) {
-    if (this.annotationLayer) {
-      this.annotationLayer.mode(value ? value.mode : null);
-    }
   }
 
   handleModeChange(evt: any) {
@@ -271,56 +268,7 @@ export default class AnnotationViewer extends Vue {
     };
 
     // TODO: factorize
-    const connectTo = this.selectedTool.values.connectTo;
-    // Look for connections
-    if (connectTo && connectTo.tags && connectTo.tags.length) {
-      const annotations = this.store.annotations;
-      // Find eligible annotations (matching tags and channel)
-      const eligibleAnnotations = annotations.filter((value: IAnnotation) => {
-        return value.tags.some(tag => connectTo.tags.includes(tag)); // TODO: check channel as well
-      });
-      if (eligibleAnnotations.length) {
-        // TODO: change distance and centroid functions based on shapes. for now this assumes distance from blob to point
-        // Find the closest eligible annotation
-        const dist = (a: IGeoJSPoint, b: IGeoJSPoint): number =>
-          Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
-        const sortedAnnotations = eligibleAnnotations.sort(
-          (valueA: IAnnotation, valueB: IAnnotation) => {
-            const centroidA = this.placeholderCentroid(valueA.coordinates);
-            const centroidB = this.placeholderCentroid(valueB.coordinates);
-            const point = newAnnotation.coordinates[0];
-            const distanceA = dist(centroidA, point);
-            const distanceB = dist(centroidB, point);
-            return distanceA - distanceB;
-          }
-        );
-        const [closest] = sortedAnnotations;
-
-        // Create and add the new connection
-        const newConnection: IAnnotationConnection = {
-          id: `${Date.now()}`,
-          tags: [], // TODO: nothing is speced for connection tags right now
-          label: "A Connection",
-          parentId: closest.id,
-          childId: newAnnotation.id,
-          computedValues: {
-            length: dist(
-              this.placeholderCentroid(closest.coordinates),
-              newAnnotation.coordinates[0]
-            )
-          }
-        };
-        this.store.addConnection(newConnection);
-
-        // TEMP: Draw lines as a way to show the connections
-        const pA = this.placeholderCentroid(closest.coordinates);
-        const pB = newAnnotation.coordinates[0];
-        const line = geojs.annotation.lineAnnotation();
-        line.options("vertices", [pA, pB]);
-        line.options("isConnection", true);
-        this.annotationLayer.addAnnotation(line);
-      }
-    }
+    this.findAnnotationConnections(newAnnotation);
 
     // Make sure we know which annotation this geojs object is associated to
     annotation.options("internalId", newAnnotation.id);
@@ -373,6 +321,59 @@ export default class AnnotationViewer extends Vue {
   mounted() {
     this.fetchAnnotations();
     this.bind();
+  }
+
+  private findAnnotationConnections(annotation: IAnnotation) {
+    const connectTo = this.selectedTool.values.connectTo;
+    // Look for connections
+    if (connectTo && connectTo.tags && connectTo.tags.length) {
+      const annotations = this.store.annotations;
+      // Find eligible annotations (matching tags and channel)
+      const eligibleAnnotations = annotations.filter((value: IAnnotation) => {
+        return value.tags.some(tag => connectTo.tags.includes(tag)); // TODO: check channel as well
+      });
+      if (eligibleAnnotations.length) {
+        // TODO: change distance and centroid functions based on shapes. for now this assumes distance from blob to point
+        // Find the closest eligible annotation
+        const dist = (a: IGeoJSPoint, b: IGeoJSPoint): number =>
+          Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+        const sortedAnnotations = eligibleAnnotations.sort(
+          (valueA: IAnnotation, valueB: IAnnotation) => {
+            const centroidA = this.placeholderCentroid(valueA.coordinates);
+            const centroidB = this.placeholderCentroid(valueB.coordinates);
+            const point = annotation.coordinates[0];
+            const distanceA = dist(centroidA, point);
+            const distanceB = dist(centroidB, point);
+            return distanceA - distanceB;
+          }
+        );
+        const [closest] = sortedAnnotations;
+
+        // Create and add the new connection
+        const newConnection: IAnnotationConnection = {
+          id: `${Date.now()}`,
+          tags: [], // TODO: nothing is speced for connection tags right now
+          label: "A Connection",
+          parentId: closest.id,
+          childId: annotation.id,
+          computedValues: {
+            length: dist(
+              this.placeholderCentroid(closest.coordinates),
+              annotation.coordinates[0]
+            )
+          }
+        };
+        this.store.addConnection(newConnection);
+
+        // TEMP: Draw lines as a way to show the connections
+        const pA = this.placeholderCentroid(closest.coordinates);
+        const pB = annotation.coordinates[0];
+        const line = geojs.annotation.lineAnnotation();
+        line.options("vertices", [pA, pB]);
+        line.options("isConnection", true);
+        this.annotationLayer.addAnnotation(line);
+      }
+    }
   }
 }
 </script>
