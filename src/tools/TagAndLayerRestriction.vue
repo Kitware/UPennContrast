@@ -29,7 +29,8 @@
       <v-col>
         <v-select
           v-model="selectedLayer"
-          :items="layerNames"
+          :items="layerItems"
+          item-text="label"
           :label="layerLabelWithDefault"
           @change="changed"
         >
@@ -58,8 +59,14 @@ export default class TagAndLayerRestriction extends Vue {
     return this.store.configuration?.view.layers || [];
   }
 
-  get layerNames() {
-    return this.layers.map(layer => layer.name);
+  get layerItems() {
+    return [
+      ...this.layers.map((layer, index) => ({
+        label: layer.name,
+        value: index
+      })),
+      { label: "All", value: null }
+    ];
   }
 
   tagList = []; // TODO: keep a list of existing tags from existing annotations
@@ -67,7 +74,7 @@ export default class TagAndLayerRestriction extends Vue {
 
   tagSearchInput: string = "";
   newTags: string[] = [];
-  selectedLayer: string = "";
+  selectedLayer: number | null = null;
 
   @Prop()
   readonly template!: any;
