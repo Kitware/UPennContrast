@@ -25,7 +25,7 @@ import persister from "./Persister";
 import store from "./root";
 import sync from "./sync";
 import { MAX_NUMBER_OF_RECENT_CONFIGURATIONS } from "./constants";
-
+import Vue from "vue";
 export { default as store } from "./root";
 
 @Module({ dynamic: true, store, name: "main" })
@@ -760,7 +760,11 @@ export class Main extends VuexModule {
     ) {
       return;
     }
-    Object.assign(this.configuration.view.layers[index], delta);
+    Vue.set(
+      this.configuration.view.layers,
+      index,
+      Object.assign({}, this.configuration.view.layers[index], delta)
+    );
   }
 
   @Action
