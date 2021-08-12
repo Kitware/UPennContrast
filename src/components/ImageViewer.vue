@@ -150,6 +150,28 @@ export default class ImageViewer extends Vue {
     );
   }
 
+  getAnnotationStyle(annotation: IAnnotation) {
+    const style = {
+      stroke: true,
+      strokeColor: "black",
+      strokeOpacity: 1,
+      strokeWidth: 2,
+      fillColor: "#green",
+      fillOpacity: 0.5,
+      fill: true,
+      radius: 10
+    };
+    if (!this.layers.length) {
+      return style;
+    }
+    const layer = this.layers[annotation.assignment.layer];
+    if (layer) {
+      style.fillColor = layer.color;
+      style.strokeColor = layer.color;
+    }
+    return style;
+  }
+
   drawAnnotations() {
     if (!this.annotationLayer) {
       return;
@@ -195,6 +217,11 @@ export default class ImageViewer extends Vue {
             console.error("Unsupported annotation shape", annotation.shape);
         }
         newGeoJSAnnotation.options("internalId", annotation.id);
+
+        const style = newGeoJSAnnotation.options("style");
+        const newStyle = this.getAnnotationStyle(annotation);
+        newGeoJSAnnotation.options("style", Object.assign({}, style, newStyle));
+
         this.annotationLayer.addAnnotation(newGeoJSAnnotation);
       });
   }
@@ -378,10 +405,13 @@ export default class ImageViewer extends Vue {
     // Make sure we know which annotation this geojs object is associated to
     annotation.options("internalId", newAnnotation.id);
 
+    const style = annotation.options("style");
+    const newStyle = this.getAnnotationStyle(newAnnotation);
+    annotation.options("style", Object.assign({}, style, newStyle));
+
     // Save the new annotation
     this.store.addAnnotation(newAnnotation);
     this.store.syncAnnotations();
-    // TODO: set new annotation style here
   }
 
   handleAnnotationChange(evt: any) {
