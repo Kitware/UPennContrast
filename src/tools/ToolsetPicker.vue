@@ -52,7 +52,6 @@ export default class ToolsetPicker extends Vue {
   }
 
   confirm() {
-    console.log(this.selectedTools);
     if (this.selectedTools.length) {
       this.store.addToolIdsToCurrentToolset({ ids: this.selectedTools });
       this.store.syncConfiguration();

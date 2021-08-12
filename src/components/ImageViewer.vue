@@ -206,6 +206,11 @@ export default class ImageViewer extends Vue {
 
     // First remove undesired annotations (layer was disabled, uneligible coordinates...)
     this.annotationLayer.annotations().forEach((annotation: any) => {
+      // TODO: this is temporary to debug connections
+      if (annotation.options("isConnection")) {
+        return;
+      }
+
       const id = annotation.options("internalId");
       if (!id) {
         return;
@@ -439,6 +444,7 @@ export default class ImageViewer extends Vue {
         const pB = newAnnotation.coordinates[0];
         const line = geojs.annotation.lineAnnotation();
         line.options("vertices", [pA, pB]);
+        line.options("isConnection", true);
         this.annotationLayer.addAnnotation(line);
       }
     }
