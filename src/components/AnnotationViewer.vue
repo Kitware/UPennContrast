@@ -330,6 +330,19 @@ export default class AnnotationViewer extends Vue {
       const annotations = this.store.annotations;
       // Find eligible annotations (matching tags and channel)
       const eligibleAnnotations = annotations.filter((value: IAnnotation) => {
+        if (
+          connectTo.layer !== null &&
+          value.assignment.layer !== connectTo.layer
+        ) {
+          return false;
+        }
+        if (
+          annotation.location.XY !== value.location.XY ||
+          annotation.location.Z !== value.location.Z ||
+          annotation.location.Time !== value.location.Time
+        ) {
+          return false;
+        }
         return value.tags.some(tag => connectTo.tags.includes(tag)); // TODO: check channel as well
       });
       if (eligibleAnnotations.length) {
