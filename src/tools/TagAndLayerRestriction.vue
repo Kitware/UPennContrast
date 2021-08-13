@@ -54,7 +54,6 @@ export default class TagAndLayerRestriction extends Vue {
     return this.store.dataset;
   }
 
-  // TODO: add "ALL", -1 ?
   get layers() {
     return this.store.configuration?.view.layers || [];
   }

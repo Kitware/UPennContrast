@@ -253,8 +253,7 @@ export default class AnnotationViewer extends Vue {
       computedValues: {} // TODO: if blob, should at least compute centroid
     };
 
-    // TODO: factorize
-    this.findAnnotationConnections(newAnnotation);
+    this.addAnnotationConnections(newAnnotation);
 
     // Make sure we know which annotation this geojs object is associated to
     annotation.options("internalId", newAnnotation.id);
@@ -269,9 +268,6 @@ export default class AnnotationViewer extends Vue {
   }
 
   handleAnnotationChange(evt: any) {
-    // if (this.annotationStyle && evt.annotation) {
-    //   evt.annotation.style(this.annotationStyle.style); // TODO: ask about annotation style
-    // }
     switch (evt.event) {
       case "geo_annotation_state":
         if (this.selectedTool.type === "create") {
@@ -363,7 +359,7 @@ export default class AnnotationViewer extends Vue {
     return Number.POSITIVE_INFINITY;
   }
 
-  private findAnnotationConnections(annotation: IAnnotation) {
+  private addAnnotationConnections(annotation: IAnnotation) {
     const connectTo = this.selectedTool.values.connectTo;
     // Look for connections
     if (connectTo && connectTo.tags && connectTo.tags.length) {
@@ -383,7 +379,7 @@ export default class AnnotationViewer extends Vue {
         ) {
           return false;
         }
-        return value.tags.some(tag => connectTo.tags.includes(tag)); // TODO: check channel as well
+        return value.tags.some(tag => connectTo.tags.includes(tag));
       });
       if (eligibleAnnotations.length) {
         // Find the closest eligible annotation

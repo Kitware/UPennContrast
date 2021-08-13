@@ -169,7 +169,5 @@ export default class AnnotationConfiguration extends Vue {
   }
 
   // TODO: validation
-  // TODO: shape selection
-  // TODO: color selection
 }
 </script>

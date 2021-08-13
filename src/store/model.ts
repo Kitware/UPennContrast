@@ -175,7 +175,7 @@ export interface IAnnotation {
     Time: number;
   };
   shape: string; // TODO: enum
-  coordinates: IGeoJSPoint[]; // TODO: does this always work ?
+  coordinates: IGeoJSPoint[];
 
   computedValues: any;
 }
