@@ -11,6 +11,9 @@
         <v-list-item-group v-model="selectedTools" multiple>
           <template v-for="tool in queriedTools">
             <v-list-item :value="tool.id" :key="tool.id">
+              <v-list-item-icon>
+                <tool-icon :tool="tool"></tool-icon>
+              </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title>{{ tool.name }}</v-list-item-title>
                 <v-list-item-subtitle v-if="tool.description.length">{{
@@ -39,10 +42,11 @@ import store from "@/store";
 import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
 import AnnotationConfiguration from "@/tools/AnnotationConfiguration.vue";
 import TagAndChannelRestriction from "@/tools/TagAndLayerRestriction.vue";
+import ToolIcon from "@/tools/ToolIcon.vue";
 import { IToolConfiguration } from "@/store/model";
 
 @Component({
-  components: {}
+  components: { ToolIcon }
 })
 export default class ToolsetPicker extends Vue {
   readonly store = store;

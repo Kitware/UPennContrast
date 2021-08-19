@@ -9,7 +9,7 @@
           v-if="getToolById(toolId)"
         >
           <v-list-item-avatar>
-            <v-icon>{{ toolTypeToIcon[getToolById(toolId).type] }}</v-icon>
+            <tool-icon :tool="getToolById(toolId)" />
           </v-list-item-avatar>
           <v-list-item-content
             ><v-list-item-title>{{
@@ -34,20 +34,13 @@
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import { IToolConfiguration } from "@/store/model";
+import ToolIcon from "@/tools/ToolIcon.vue";
 
 @Component({
-  components: {}
+  components: { ToolIcon }
 })
 export default class Toolset extends Vue {
   readonly store = store;
-
-  toolTypeToIcon = {
-    create: "mdi-shape-plus",
-    snap: "mdi-arrow-collapse-vertical",
-    select: "mdi-select-drag",
-    edit: "mdi-vector-polygon",
-    segmentation: "mdi-shape-polygon-plus"
-  };
 
   get selectedToolId() {
     return this.store.selectedToolId || "";
