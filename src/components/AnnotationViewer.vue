@@ -328,13 +328,18 @@ export default class AnnotationViewer extends Vue {
       Time: this.store.time
     };
     const layer = this.layers[toolAnnotation.coordinateAssignments.layer];
+    const assign = toolAnnotation.coordinateAssignments;
     if (layer) {
       const indexes = this.store.layerSliceIndexes(layer);
       if (indexes) {
         const { xyIndex, zIndex, tIndex } = indexes;
         location.XY = xyIndex;
-        location.Z = zIndex;
-        location.Time = tIndex;
+        location.Z =
+          assign.Z.type === "layer" ? zIndex : Number.parseInt(assign.Z.value);
+        location.Time =
+          assign.Time.type === "layer"
+            ? tIndex
+            : Number.parseInt(assign.Time.value);
       }
     }
 
