@@ -94,9 +94,12 @@ export default class GirderAPI {
     );
   }
   async getTool(toolId: string): Promise<IToolConfiguration> {
-    // TODO: check for failure
-    const item = await this.getItem(toolId);
-    return asToolConfiguration(item);
+    try {
+      const item = await this.getItem(toolId);
+      return asToolConfiguration(item);
+    } catch (e) {
+      throw e;
+    }
   }
 
   async getAllTools(): Promise<IToolConfiguration[]> {

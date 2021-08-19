@@ -350,7 +350,12 @@ export class Main extends VuexModule {
             this.addTools({ tools: [tool] });
           })
           .catch(e => {
-            console.error("Could not fetch tool: ", e);
+            if (this.configuration?.toolset.toolIds) {
+              this.configuration.toolset.toolIds = this.configuration.toolset.toolIds.filter(
+                id => id !== toolId
+              );
+              console.error("Could not fetch tool: ", e);
+            }
           });
       });
     }
