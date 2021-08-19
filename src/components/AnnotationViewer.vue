@@ -20,6 +20,12 @@ export default class AnnotationViewer extends Vue {
   @Prop()
   readonly annotationLayer: any;
 
+  @Prop()
+  readonly unrollH: any;
+
+  @Prop()
+  readonly unrollW: any;
+
   get configuration() {
     return this.store.configuration;
   }
@@ -63,20 +69,82 @@ export default class AnnotationViewer extends Vue {
     return style;
   }
 
+  unrollIndex(
+    XY: number,
+    Z: number,
+    Time: number,
+    unrollXY: boolean,
+    unrollZ: boolean,
+    unrollT: boolean
+  ) {
+    const images = this.store.dataset?.images(
+      unrollZ ? -1 : Z,
+      unrollT ? -1 : Time,
+      unrollXY ? -1 : XY,
+      0
+    );
+
+    if (!images) {
+      return 0;
+    }
+
+    const matchingImage = images.find(image => {
+      return (
+        image.frame.IndexZ === Z &&
+        image.frame.IndexT === Time &&
+        image.frame.IndexXY === XY
+      );
+    });
+
+    return matchingImage?.keyOffset || 0;
+  }
   createGeoJSAnnotation(annotation: IAnnotation) {
+    if (!this.store.dataset) {
+      return;
+    }
+
+    const anyImage = this.store.dataset?.anyImage();
+    if (!anyImage) {
+      return;
+    }
+
+    const tileW = anyImage?.sizeX;
+    const tileH = anyImage?.sizeY;
+
     let newGeoJSAnnotation = null;
+    let coordinates = annotation.coordinates;
+    if (this.unrolling) {
+      const location = this.unrollIndex(
+        annotation.location.XY,
+        annotation.location.Z,
+        annotation.location.Time,
+        this.store.unrollXY,
+        this.store.unrollZ,
+        this.store.unrollT
+      );
+
+      const tileX = Math.floor(location % this.unrollW);
+      const tileY = Math.floor(location / this.unrollW);
+
+      coordinates = coordinates.map((point: IGeoJSPoint) => ({
+        x: tileW * tileX + point.x,
+        y: tileH * tileY + point.y,
+        z: point.z
+      }));
+    }
+
     switch (annotation.shape) {
       case "point":
         newGeoJSAnnotation = geojs.annotation.pointAnnotation();
-        newGeoJSAnnotation.options("position", annotation.coordinates[0]);
+        newGeoJSAnnotation.options("position", coordinates[0]);
         break;
       case "polygon":
         newGeoJSAnnotation = geojs.annotation.polygonAnnotation();
-        newGeoJSAnnotation.options("vertices", annotation.coordinates);
+        newGeoJSAnnotation.options("vertices", coordinates);
         break;
       case "line":
         newGeoJSAnnotation = geojs.annotation.lineAnnotation();
-        newGeoJSAnnotation.options("vertices", annotation.coordinates);
+        newGeoJSAnnotation.options("vertices", coordinates);
         break;
       default:
         console.error("Unsupported annotation shape", annotation.shape);
@@ -87,6 +155,10 @@ export default class AnnotationViewer extends Vue {
     const newStyle = this.getAnnotationStyle(annotation);
     newGeoJSAnnotation.options("style", Object.assign({}, style, newStyle));
     return newGeoJSAnnotation;
+  }
+
+  get unrolling() {
+    return this.store.unrollXY || this.store.unrollZ || this.store.unrollT;
   }
 
   drawAnnotations() {
@@ -112,9 +184,9 @@ export default class AnnotationViewer extends Vue {
       }
       const { xyIndex, zIndex, tIndex } = indexes;
       if (
-        annotation.location.XY !== xyIndex ||
-        annotation.location.Z !== zIndex ||
-        annotation.location.Time !== tIndex
+        (annotation.location.XY !== xyIndex && !this.store.unrollXY) ||
+        (annotation.location.Z !== zIndex && !this.store.unrollZ) ||
+        (annotation.location.Time !== tIndex && !this.store.unrollT)
       ) {
         return false;
       }
@@ -168,6 +240,8 @@ export default class AnnotationViewer extends Vue {
   @Watch("z")
   @Watch("time")
   @Watch("layerAnnotations")
+  @Watch("unrollH")
+  @Watch("unrollW")
   onLayerAnnotationsChanged() {
     this.drawAnnotations();
   }

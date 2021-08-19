@@ -3,6 +3,8 @@
     <annotation-viewer
       v-if="annotationLayer"
       :annotationLayer="annotationLayer"
+      :unrollH="unrollH"
+      :unrollW="unrollW"
     ></annotation-viewer>
     <div id="map" ref="geojsmap" :data-update="reactiveDraw" />
     <div class="loading" v-if="!fullyReady">
