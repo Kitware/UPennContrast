@@ -189,8 +189,12 @@ export default class ImageViewer extends Vue {
     if (!this.layerStackImages.length) {
       return;
     }
-    let unrollCount = this.layerStackImages[0].images.length;
-    const someImage = this.layerStackImages[0].images[0];
+    const someImages = this.layerStackImages.find((lsi: any) => lsi.images[0]);
+    if (!someImages) {
+      return;
+    }
+    let unrollCount = someImages.images.length;
+    const someImage = someImages.images[0];
     let unrollW = Math.min(
       unrollCount,
       Math.ceil(
