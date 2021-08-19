@@ -4,7 +4,8 @@
       Add a new tool
     </v-card-title>
     <v-card-text>
-      <tool-selection v-model="selectedItemTemplate"> </tool-selection>
+      <tool-type-selection v-model="selectedItemTemplate">
+      </tool-type-selection>
       <tool-configuration
         v-if="selectedItemTemplate"
         :template="selectedItemTemplate"
@@ -28,8 +29,8 @@
 <script lang="ts">
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
-import ToolConfiguration from "@/tools/ToolConfiguration.vue";
-import ToolSelection from "@/tools/ToolSelection.vue";
+import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
+import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";
 
 const defaultValues = {
   name: "New Tool",
@@ -39,7 +40,7 @@ const defaultValues = {
 @Component({
   components: {
     ToolConfiguration,
-    ToolSelection
+    ToolTypeSelection
   }
 })
 export default class ToolCreation extends Vue {

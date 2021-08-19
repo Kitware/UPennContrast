@@ -12,14 +12,14 @@
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
-import ToolConfiguration from "@/tools/ToolConfiguration.vue";
+import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 
 @Component({
   components: {
     ToolConfiguration
   }
 })
-export default class ToolSelection extends Vue {
+export default class ToolTypeSelection extends Vue {
   readonly store = store;
 
   @Prop()

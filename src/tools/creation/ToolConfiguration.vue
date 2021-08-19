@@ -53,8 +53,8 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 // Manually import those vuetify components that might be used procedurally
 import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
-import AnnotationConfiguration from "@/tools/AnnotationConfiguration.vue";
-import TagAndLayerRestriction from "@/tools/TagAndLayerRestriction.vue";
+import AnnotationConfiguration from "@/tools/creation/templates/AnnotationConfiguration.vue";
+import TagAndLayerRestriction from "@/tools/creation/templates/TagAndLayerRestriction.vue";
 
 @Component({
   components: {

@@ -107,9 +107,9 @@
 import { Vue, Component, Watch } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
-import ToolCreation from "@/tools/ToolCreation.vue";
-import ToolsetPicker from "@/tools/ToolsetPicker.vue";
-import Toolset from "@/tools/Toolset.vue";
+import ToolCreation from "@/tools/creation/ToolCreation.vue";
+import ToolsetPicker from "@/tools/toolsets/ToolsetPicker.vue";
+import Toolset from "@/tools/toolsets/Toolset.vue";
 import store from "@/store";
 
 @Component({
