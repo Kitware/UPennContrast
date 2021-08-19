@@ -73,7 +73,7 @@ export default class ToolCreation extends Vue {
         this.store.updateTool(tool).then(() => {
           this.store.syncConfiguration();
         });
-        this.$emit("done");
+        this.close();
       });
     }
   }
