@@ -37,6 +37,7 @@ export interface IImage {
   tileHeight: number;
   mm_x: number;
   mm_y: number;
+  tileinfo: any;
 }
 
 export interface IImageTile {
