@@ -119,7 +119,22 @@ export default class ToolConfiguration extends Vue {
   initializeToolValues() {
     this.toolValues = { ...this.value };
     this.valueTemplates = {};
+    this.clearUnusedValues();
+    this.setDefaultValues();
     this.updateInterface();
+  }
+
+  setDefaultValues() {
+    this.internalTemplate.forEach(item => {
+      if (item.type === "select") {
+        if (item?.meta?.items.length) {
+          const [firstItem] = item.meta.items;
+          if (!this.toolValues[item.id]) {
+            this.toolValues[item.id] = { ...firstItem };
+          }
+        }
+      }
+    });
   }
 
   updateInterface() {
@@ -132,7 +147,8 @@ export default class ToolConfiguration extends Vue {
         };
       }
     });
-
+  }
+  clearUnusedValues() {
     // Clear values we can't find the interface for
     Object.keys(this.toolValues).forEach((key: string) => {
       if (
