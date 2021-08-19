@@ -87,6 +87,7 @@ export default class ToolConfiguration extends Vue {
   // dynamic interface elements that depend on various values being selected
   valueTemplates: any = {};
 
+  // All interface elements that should be displayed
   get internalTemplate() {
     return [
       ...(this.template?.interface || []),
@@ -104,34 +105,46 @@ export default class ToolConfiguration extends Vue {
   @Watch("template")
   watchTemplate() {
     this.$emit("reset");
-    this.initializeToolValues();
+    this.initialize();
   }
 
   @Watch("value")
   watchValue() {
-    this.initializeToolValues();
+    this.initialize();
   }
 
   mounted() {
-    this.initializeToolValues();
+    this.initialize();
   }
 
-  initializeToolValues() {
+  //
+  initialize() {
     this.toolValues = { ...this.value };
     this.valueTemplates = {};
+    // Remove values from outdated template
     this.clearUnusedValues();
+    // Add default values
     this.setDefaultValues();
+    // Add interface elements from current values
     this.updateInterface();
+    // Add default values to new elements
+    this.setDefaultValues();
   }
 
   setDefaultValues() {
     this.internalTemplate.forEach(item => {
+      if (this.toolValues[item.id]) {
+        return;
+      }
       if (item.type === "select") {
         if (item?.meta?.items.length) {
-          const [firstItem] = item.meta.items;
-          if (!this.toolValues[item.id]) {
-            this.toolValues[item.id] = { ...firstItem };
-          }
+          const [firstValue] = item.meta.items;
+          this.toolValues[item.id] = { ...firstValue };
+        }
+      } else if (item.type === "radio") {
+        if (item.values?.length) {
+          const [firstValue] = item.values;
+          this.toolValues[item.id] = firstValue.value;
         }
       }
     });
@@ -148,6 +161,7 @@ export default class ToolConfiguration extends Vue {
       }
     });
   }
+
   clearUnusedValues() {
     // Clear values we can't find the interface for
     Object.keys(this.toolValues).forEach((key: string) => {
