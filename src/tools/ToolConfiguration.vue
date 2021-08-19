@@ -1,13 +1,17 @@
 <template>
-  <v-form v-if="internalTemplate">
+  <v-form v-if="internalTemplate && toolValues">
     <v-card pa-3>
       <v-card-title>General Tool Properties</v-card-title>
       <v-card-text>
-        <v-text-field label="Tool Name" v-model="values.name" @change="changed">
+        <v-text-field
+          label="Tool Name"
+          v-model="toolValues.name"
+          @change="changed"
+        >
         </v-text-field>
         <v-text-field
           label="Tool Description"
-          v-model="values.description"
+          v-model="toolValues.description"
           @change="changed"
         >
           <!-- TODO: hotkeys -->
@@ -28,7 +32,7 @@
           <component
             :is="typeToComponentName[item.type]"
             v-bind="item.meta"
-            v-model="values[item.id]"
+            v-model="toolValues[item.id]"
             return-object
             @change="changed"
           >
@@ -42,9 +46,6 @@
         </v-card-text>
       </v-card>
     </template>
-    <div class="button-bar">
-      <v-btn color="primary" @click="createTool"> ADD TOOL </v-btn>
-    </div>
   </v-form>
 </template>
 
@@ -55,11 +56,6 @@ import store from "@/store";
 import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
 import AnnotationConfiguration from "@/tools/AnnotationConfiguration.vue";
 import TagAndLayerRestriction from "@/tools/TagAndLayerRestriction.vue";
-
-const defaultValues = {
-  name: "New Tool",
-  description: ""
-};
 
 @Component({
   components: {
@@ -74,7 +70,10 @@ const defaultValues = {
 export default class ToolConfiguration extends Vue {
   readonly store = store;
 
-  values: any = { ...defaultValues };
+  @Prop()
+  readonly value!: any;
+
+  toolValues: any = null;
 
   typeToComponentName = {
     select: "v-select",
@@ -84,9 +83,6 @@ export default class ToolConfiguration extends Vue {
     radio: "v-radio-group", // TODO: custom component ?
     text: "v-text-field"
   };
-
-  @Prop()
-  readonly template!: any;
 
   // dynamic interface elements that depend on various values being selected
   valueTemplates: any = {};
@@ -102,16 +98,33 @@ export default class ToolConfiguration extends Vue {
     ];
   }
 
+  @Prop()
+  readonly template!: any;
+
   @Watch("template")
   watchTemplate() {
-    this.valueTemplates = {};
-    this.values = { ...defaultValues };
+    this.$emit("reset");
+    this.initializeToolValues();
   }
 
-  changed() {
+  @Watch("value")
+  watchValue() {
+    this.initializeToolValues();
+  }
+
+  mounted() {
+    this.initializeToolValues();
+  }
+
+  initializeToolValues() {
+    this.toolValues = { ...this.value };
     this.valueTemplates = {};
+    this.updateInterface();
+  }
+
+  updateInterface() {
     // Go through values to see if additional interface elements need to be added
-    Object.entries(this.values).forEach(([key, value]: any[]) => {
+    Object.entries(this.toolValues).forEach(([key, value]: any[]) => {
       if (value.meta?.interface) {
         this.valueTemplates = {
           ...this.valueTemplates,
@@ -119,25 +132,22 @@ export default class ToolConfiguration extends Vue {
         };
       }
     });
+
     // Clear values we can't find the interface for
-    Object.keys(this.values).forEach((key: string) => {
+    Object.keys(this.toolValues).forEach((key: string) => {
       if (
         !this.internalTemplate.find(template => template.id === key) &&
         !["name", "description"].includes(key)
       ) {
-        delete this.values[key];
+        delete this.toolValues[key];
       }
     });
   }
 
-  @Watch("values")
-  watchValues() {}
-
-  createTool() {
-    // TODO:   Make sure no tool exists with this name
-    this.$emit("input", { ...this.values });
-    this.$emit("change");
-    this.$emit("submit");
+  changed() {
+    this.valueTemplates = {};
+    this.updateInterface();
+    this.$emit("input", { ...this.toolValues });
   }
 }
 </script>

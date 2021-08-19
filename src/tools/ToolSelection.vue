@@ -1,24 +1,16 @@
 <template>
-  <v-container>
-    <v-select
-      v-model="selectedItemTemplate"
-      :items="templates"
-      item-text="name"
-      item-value="type"
-      label="Select a tool type to add"
-      return-object
-    >
-    </v-select>
-    <tool-configuration
-      v-if="selectedItemTemplate"
-      :template="selectedItemTemplate"
-      v-model="toolValues"
-      @submit="createTool"
-    />
-  </v-container>
+  <v-select
+    v-model="content"
+    :items="templates"
+    item-text="name"
+    item-value="type"
+    label="Select a tool type to add"
+    return-object
+  >
+  </v-select>
 </template>
 <script lang="ts">
-import { Vue, Component, Watch } from "vue-property-decorator";
+import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import ToolConfiguration from "@/tools/ToolConfiguration.vue";
 
@@ -30,51 +22,35 @@ import ToolConfiguration from "@/tools/ToolConfiguration.vue";
 export default class ToolSelection extends Vue {
   readonly store = store;
 
-  toolValues: any = {};
+  @Prop()
+  private value: any;
 
-  selectedItemTemplate: any = null;
-  errorMessages: string[] = [];
-  successMessages: string[] = [];
+  content: any = null;
+
+  @Watch("content")
+  handleChange() {
+    this.$emit("input", this.content);
+  }
+
+  mounted() {
+    if (this.value) {
+      this.content = this.value;
+    } else {
+      this.initialize();
+    }
+  }
 
   get templates() {
     return this.store.toolTemplateList;
   }
-  mounted() {
-    this.initialize();
-  }
 
   @Watch("templates")
+  @Watch("value")
   initialize() {
     // Set initial value
-    if (!this.selectedItemTemplate && this.templates.length) {
-      this.selectedItemTemplate = this.templates[0];
-    }
-  }
-
-  createTool() {
-    if (this.selectedItemTemplate) {
-      const tool = {
-        type: this.selectedItemTemplate.type,
-        template: this.selectedItemTemplate,
-        values: this.toolValues
-      };
-      const name = tool.values.name || "Unnamed Tool";
-      const description = tool.values.description || "";
-      // Create an empty tool to get the id
-      this.store.createTool({ name, description }).then(tool => {
-        if (tool === null) {
-          console.error("Failed to create a new tool on the server");
-          return;
-        }
-        tool.template = this.selectedItemTemplate;
-        tool.values = this.toolValues;
-        tool.type = this.selectedItemTemplate.type;
-        // Update this tool with actual values
-        this.store.updateTool(tool).then(() => {
-          this.store.syncConfiguration();
-        });
-        this.$emit("done");
-      });
+    if (!this.value && this.templates.length) {
+      this.content = this.templates[0];
+      this.handleChange();
     }
   }
 }

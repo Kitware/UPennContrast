@@ -50,6 +50,31 @@ import store from "@/store";
 export default class TagAndLayerRestriction extends Vue {
   readonly store = store;
 
+  newTags: string[] = [];
+  selectedLayer: number | null = null;
+
+  @Prop()
+  readonly value!: any;
+
+  @Watch("value")
+  watchValue() {
+    this.initialize();
+  }
+
+  mounted() {
+    this.initialize();
+  }
+
+  initialize() {
+    if (this.value) {
+      this.newTags = this.value.tags;
+      this.selectedLayer = this.value.layer;
+    } else {
+      this.newTags = [];
+      this.selectedLayer = null;
+    }
+  }
+
   get dataset() {
     return this.store.dataset;
   }
@@ -69,10 +94,7 @@ export default class TagAndLayerRestriction extends Vue {
   }
 
   tagList = []; // TODO: keep a list of existing tags from existing annotations
-
   tagSearchInput: string = "";
-  newTags: string[] = [];
-  selectedLayer: number | null = null;
 
   @Prop()
   readonly template!: any;
