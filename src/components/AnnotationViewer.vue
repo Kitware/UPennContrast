@@ -98,6 +98,7 @@ export default class AnnotationViewer extends Vue {
 
     return matchingImage?.keyOffset || 0;
   }
+
   createGeoJSAnnotation(annotation: IAnnotation) {
     if (!this.store.dataset) {
       return;
@@ -149,7 +150,7 @@ export default class AnnotationViewer extends Vue {
       default:
         console.error("Unsupported annotation shape", annotation.shape);
     }
-    newGeoJSAnnotation.options("internalId", annotation.id);
+    newGeoJSAnnotation.options("girderId", annotation.id);
 
     const style = newGeoJSAnnotation.options("style");
     const newStyle = this.getAnnotationStyle(annotation);
@@ -161,67 +162,80 @@ export default class AnnotationViewer extends Vue {
     return this.store.unrollXY || this.store.unrollZ || this.store.unrollT;
   }
 
-  drawAnnotations() {
-    if (!this.annotationLayer) {
-      return;
+  shouldDisplayAnnotation(annotation: IAnnotation) {
+    if (!annotation.assignment) {
+      return false;
     }
-    // We want to ignore these already displayed annotations
-    const displayedIds = this.annotationLayer
-      .annotations()
-      .map((a: any) => a.options("internalId"));
+    const layer = this.layers[annotation.assignment.layer];
+    if (!layer) {
+      return false;
+    }
+    const indexes = this.store.layerSliceIndexes(layer);
+    if (!indexes) {
+      return false;
+    }
+    const { xyIndex, zIndex, tIndex } = indexes;
+    if (
+      (annotation.location.XY !== xyIndex && !this.store.unrollXY) ||
+      (annotation.location.Z !== zIndex && !this.store.unrollZ) ||
+      (annotation.location.Time !== tIndex && !this.store.unrollT)
+    ) {
+      return false;
+    }
+    return true;
+  }
 
-    const shouldDisplayAnnotation = (annotation: IAnnotation) => {
-      if (!annotation.assignment) {
-        return false;
-      }
-      const layer = this.layers[annotation.assignment.layer];
-      if (!layer) {
-        return false;
-      }
-      const indexes = this.store.layerSliceIndexes(layer);
-      if (!indexes) {
-        return false;
-      }
-      const { xyIndex, zIndex, tIndex } = indexes;
-      if (
-        (annotation.location.XY !== xyIndex && !this.store.unrollXY) ||
-        (annotation.location.Z !== zIndex && !this.store.unrollZ) ||
-        (annotation.location.Time !== tIndex && !this.store.unrollT)
-      ) {
-        return false;
-      }
-      return true;
-    };
-
-    // First remove undesired annotations (layer was disabled, uneligible coordinates...)
+  clearOldAnnotations(clearAll = false) {
     this.annotationLayer.annotations().forEach((annotation: any) => {
+      if (clearAll) {
+        this.annotationLayer.removeAnnotation(annotation);
+        return;
+      }
+
       // TODO: this is temporary to debug connections
       if (annotation.options("isConnection")) {
         return;
       }
 
-      const id = annotation.options("internalId");
+      const id = annotation.options("girderId");
       if (!id) {
         return;
       }
       const foundAnnotation = this.layerAnnotations.find(
         layerAnnotation => layerAnnotation.id === id
       );
-      if (!foundAnnotation || !shouldDisplayAnnotation(foundAnnotation)) {
+      if (!foundAnnotation || !this.shouldDisplayAnnotation(foundAnnotation)) {
         this.annotationLayer.removeAnnotation(annotation);
       }
     });
+  }
 
-    // Then draw the new annotations
+  addNewAnnotations(annotationIds: string[]) {
     this.layerAnnotations
       // Check for annotation that have not been displayed yet
-      .filter(annotation => !displayedIds.includes(annotation.id))
+      .filter(annotation => !annotationIds.includes(annotation.id))
       // Check for valid coordinates
-      .filter(shouldDisplayAnnotation)
+      .filter(this.shouldDisplayAnnotation)
       .forEach(annotation => {
         const newGeoJSAnnotation = this.createGeoJSAnnotation(annotation);
         this.annotationLayer.addAnnotation(newGeoJSAnnotation);
       });
+  }
+
+  updateAnnotations() {
+    if (!this.annotationLayer) {
+      return;
+    }
+    // We want to ignore these already displayed annotations
+    const displayedIds = this.annotationLayer
+      .annotations()
+      .map((a: any) => a.options("girderId"));
+
+    // First remove undesired annotations (layer was disabled, uneligible coordinates...)
+    this.clearOldAnnotations();
+
+    // Then draw the new annotations
+    this.addNewAnnotations(displayedIds);
   }
 
   get xy() {
@@ -240,10 +254,15 @@ export default class AnnotationViewer extends Vue {
   @Watch("z")
   @Watch("time")
   @Watch("layerAnnotations")
+  onLayerAnnotationsChanged() {
+    this.updateAnnotations();
+  }
+
   @Watch("unrollH")
   @Watch("unrollW")
-  onLayerAnnotationsChanged() {
-    this.drawAnnotations();
+  onUnrollChanged() {
+    this.clearOldAnnotations(true);
+    this.updateAnnotations();
   }
 
   get dataset() {
@@ -330,7 +349,7 @@ export default class AnnotationViewer extends Vue {
     this.addAnnotationConnections(newAnnotation);
 
     // Make sure we know which annotation this geojs object is associated to
-    annotation.options("internalId", newAnnotation.id);
+    annotation.options("girderId", newAnnotation.id);
 
     const style = annotation.options("style");
     const newStyle = this.getAnnotationStyle(newAnnotation);
@@ -371,7 +390,7 @@ export default class AnnotationViewer extends Vue {
       geojs.event.annotation.state,
       this.handleAnnotationChange
     );
-    this.drawAnnotations();
+    this.updateAnnotations();
   }
 
   mounted() {
