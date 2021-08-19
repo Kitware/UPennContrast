@@ -346,13 +346,15 @@ export default class AnnotationViewer extends Vue {
     // Create the new annotation
     const newAnnotation: IAnnotation = {
       id: uuidv4(),
-      label: toolAnnotation.label, // TODO: rename one of these
+      label: toolAnnotation.label,
       tags: toolAnnotation.tags,
       shape: toolAnnotation.shape,
       assignment: toolAnnotation.coordinateAssignments,
       location,
       coordinates: annotation.coordinates(),
-      computedValues: {} // TODO: if blob, should at least compute centroid
+      computedValues: {
+        centroid: this.simpleCentroid(annotation.coordinates())
+      }
     };
 
     this.addAnnotationConnections(newAnnotation);
@@ -407,7 +409,7 @@ export default class AnnotationViewer extends Vue {
     this.bind();
   }
 
-  private placeholderCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
+  private simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
     const sums: IGeoJSPoint = { x: 0, y: 0, z: 0 };
     coordinates.forEach(({ x, y, z }) => {
       sums.x += x;
@@ -451,8 +453,8 @@ export default class AnnotationViewer extends Vue {
       (b.shape === "polygon" || b.shape === "line")
     ) {
       // Use centroids for now
-      const centroidA = this.placeholderCentroid(a.coordinates);
-      const centroidB = this.placeholderCentroid(b.coordinates);
+      const centroidA = this.simpleCentroid(a.coordinates);
+      const centroidB = this.simpleCentroid(b.coordinates);
       return dist(centroidA, centroidB);
     }
 
@@ -508,8 +510,8 @@ export default class AnnotationViewer extends Vue {
         this.store.addConnection(newConnection);
 
         // TEMP: Draw lines as a way to show the connections
-        const pA = this.placeholderCentroid(closest.coordinates);
-        const pB = this.placeholderCentroid(annotation.coordinates);
+        const pA = this.simpleCentroid(closest.coordinates);
+        const pB = this.simpleCentroid(annotation.coordinates);
         const line = geojs.annotation.lineAnnotation();
         line.options("vertices", [pA, pB]);
         line.options("isConnection", true);

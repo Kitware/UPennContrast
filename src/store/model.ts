@@ -51,7 +51,6 @@ export interface IImageTile {
   fullImage: HTMLImageElement;
 }
 
-// TODO: type enums, then we can be more strict
 export interface IToolTemplateInterface {
   id: string;
   name: string;
@@ -174,7 +173,7 @@ export interface IAnnotation {
     Z: number;
     Time: number;
   };
-  shape: string; // TODO: enum
+  shape: string;
   coordinates: IGeoJSPoint[];
 
   computedValues: any;

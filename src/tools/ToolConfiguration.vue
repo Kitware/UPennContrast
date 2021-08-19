@@ -80,7 +80,7 @@ export default class ToolConfiguration extends Vue {
     annotation: "annotation-configuration",
     restrictTagsAndLayer: "tag-and-layer-restriction",
     checkbox: "v-checkbox",
-    radio: "v-radio-group", // TODO: custom component ?
+    radio: "v-radio-group",
     text: "v-text-field"
   };
 

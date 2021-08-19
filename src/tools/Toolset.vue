@@ -42,7 +42,7 @@ export default class Toolset extends Vue {
   readonly store = store;
 
   toolTypeToIcon = {
-    create: "mdi-shape-plus", // TODO: icon should change based on shape
+    create: "mdi-shape-plus",
     snap: "mdi-arrow-collapse-vertical",
     select: "mdi-select-drag",
     edit: "mdi-vector-polygon",

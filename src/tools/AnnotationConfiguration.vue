@@ -56,7 +56,6 @@
             <v-radio value="assign">
               <template v-slot:label>
                 <span>Assign</span>
-                <!-- TODO: make sure we have numbers -->
                 <v-text-field
                   type="number"
                   :min="0"
@@ -118,7 +117,6 @@ export default class AnnotationConfiguration extends Vue {
   @Prop()
   readonly value!: any;
 
-  // TODO: change ofc
   availableShapes = [
     { text: "Point", value: "point" },
     { text: "Line", value: "line" },
@@ -167,7 +165,5 @@ export default class AnnotationConfiguration extends Vue {
     });
     this.$emit("change");
   }
-
-  // TODO: validation
 }
 </script>
