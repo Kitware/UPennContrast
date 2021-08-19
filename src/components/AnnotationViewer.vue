@@ -288,6 +288,7 @@ export default class AnnotationViewer extends Vue {
   refreshAnnotationMode() {
     if (!this.selectedTool) {
       this.annotationLayer.mode(null);
+      return;
     }
     switch (this.selectedTool?.type) {
       case "create":
