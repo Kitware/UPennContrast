@@ -9,13 +9,13 @@
           @change="changed"
         >
         </v-text-field>
-        <v-text-field
+        <v-textarea
           label="Tool Description"
           v-model="toolValues.description"
           @change="changed"
         >
           <!-- TODO: hotkeys -->
-        </v-text-field>
+        </v-textarea>
       </v-card-text>
     </v-card>
     <template v-for="(item, index) in internalTemplate">
