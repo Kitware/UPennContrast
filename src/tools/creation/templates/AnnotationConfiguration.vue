@@ -51,8 +51,13 @@
             :label="coordinate"
             v-model="coordinateAssignments[coordinate].type"
             :key="`${index}Radio`"
+            mandatory
           >
-            <v-radio value="layer" label="From Layer"></v-radio>
+            <v-radio
+              value="layer"
+              label="From Layer"
+              v-if="!isMaxMerge(coordinate, coordinateAssignments.layer)"
+            ></v-radio>
             <v-radio value="assign">
               <template v-slot:label>
                 <span>Assign</span>
@@ -139,6 +144,15 @@ export default class AnnotationConfiguration extends Vue {
 
   get maxTime() {
     return this.store.dataset?.time.length || 0;
+  }
+
+  isMaxMerge(axis: string, layerIndex: number) {
+    const layer = this.layers[layerIndex];
+    if (!layer) {
+      return false;
+    }
+    const key = axis === "Z" ? "z" : "time";
+    return layer[key].type === "max-merge";
   }
 
   coordinates = ["Z", "Time"];
