@@ -1,5 +1,5 @@
 <template>
-  <v-form>
+  <v-form ref="form">
     <v-text-field label="Annotation Name" v-model="label" @change="changed" />
     <v-combobox
       v-model="tags"
@@ -63,8 +63,12 @@
                   v-model="coordinateAssignments[coordinate].value"
                   @change="changed"
                   :disabled="coordinateAssignments[coordinate].type === 'layer'"
+                  :rules="[
+                    val =>
+                      Number.parseInt(val) <
+                      coordinateAssignments[coordinate].max
+                  ]"
                 />
-                <!-- TODO: min/max/increment, default at current slice -->
               </template>
             </v-radio>
           </v-radio-group>
@@ -77,6 +81,8 @@
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
+
+type VForm = Vue & { validate: () => boolean };
 
 @Component({
   components: {}
@@ -127,11 +133,19 @@ export default class AnnotationConfiguration extends Vue {
   shape: string = "";
   tags: string[] = [];
 
+  get maxZ() {
+    return this.store.dataset?.z.length || 0;
+  }
+
+  get maxTime() {
+    return this.store.dataset?.time.length || 0;
+  }
+
   coordinates = ["Z", "Time"];
   coordinateAssignments = {
     layer: 0,
-    Z: { type: "layer", value: 1 },
-    Time: { type: "layer", value: 1 }
+    Z: { type: "layer", value: 1, max: this.maxZ },
+    Time: { type: "layer", value: 1, max: this.maxTime }
   };
 
   mounted() {
@@ -144,8 +158,8 @@ export default class AnnotationConfiguration extends Vue {
     // Set internal values to the current input, or defaults
     this.coordinateAssignments = this.value?.coordinateAssignments || {
       layer: 0,
-      Z: { type: "layer", value: 1 },
-      Time: { type: "layer", value: 1 }
+      Z: { type: "layer", value: 1, max: this.maxZ },
+      Time: { type: "layer", value: 1, max: this.maxTime }
     };
 
     this.label = this.value?.label || "New Annotation";
@@ -156,6 +170,15 @@ export default class AnnotationConfiguration extends Vue {
   }
 
   changed() {
+    const form = this.$refs.form as VForm;
+    if (!form?.validate()) {
+      if (this.coordinateAssignments.Z.value > this.maxZ) {
+        this.coordinateAssignments.Z.value = this.maxZ;
+      }
+      if (this.coordinateAssignments.Time.value > this.maxTime) {
+        this.coordinateAssignments.Time.value = this.maxTime;
+      }
+    }
     this.tagSearchInput = "";
     this.$emit("input", {
       label: this.label,
