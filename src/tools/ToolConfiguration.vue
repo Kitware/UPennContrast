@@ -14,7 +14,6 @@
           v-model="toolValues.description"
           @change="changed"
         >
-          <!-- TODO: hotkeys -->
         </v-textarea>
       </v-card-text>
     </v-card>
