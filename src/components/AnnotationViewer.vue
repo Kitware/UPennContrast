@@ -284,15 +284,16 @@ export default class AnnotationViewer extends Vue {
   }
 
   refreshAnnotationMode() {
-    if (this.selectedTool?.type === "create") {
-      const annotation = this.selectedTool.values.annotation;
-      this.annotationLayer.mode(annotation?.shape);
-    } else if (this.selectedTool.type === "edit") {
-      // TODO: PH, need to look at subtype
-      // TODO: Create a new annotation layer ?
-    } else {
-      // is it that easy to cancel ?
+    if (!this.selectedTool) {
       this.annotationLayer.mode(null);
+    }
+    switch (this.selectedTool?.type) {
+      case "create":
+        const annotation = this.selectedTool.values.annotation;
+        this.annotationLayer.mode(annotation?.shape);
+        break;
+      default:
+        console.warn(`${this.selectedTool.type} tools are not supported yet`);
     }
   }
 
