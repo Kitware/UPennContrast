@@ -1,11 +1,22 @@
 <template>
   <v-card>
     <v-card-text>
+      <v-text-field
+        v-model="query"
+        prepend-icon="mdi-magnify"
+        clearable
+        clear-icon="mdi-close"
+      ></v-text-field>
       <v-list>
         <v-list-item-group v-model="selectedTools" multiple>
-          <template v-for="tool in tools">
+          <template v-for="tool in queriedTools">
             <v-list-item :value="tool.id" :key="tool.id">
-              <v-list-item-title>{{ tool.name }}</v-list-item-title>
+              <v-list-item-content>
+                <v-list-item-title>{{ tool.name }}</v-list-item-title>
+                <v-list-item-subtitle v-if="tool.description.length">{{
+                  tool.description
+                }}</v-list-item-subtitle>
+              </v-list-item-content>
             </v-list-item>
           </template>
         </v-list-item-group>
@@ -28,10 +39,7 @@ import store from "@/store";
 import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
 import AnnotationConfiguration from "@/tools/AnnotationConfiguration.vue";
 import TagAndChannelRestriction from "@/tools/TagAndLayerRestriction.vue";
-
-// TODO: two columns, user tools / all other accessible tools ? (need to track creator name)
-// TODO: search bars
-// TODO: cancel button
+import { IToolConfiguration } from "@/store/model";
 
 @Component({
   components: {}
@@ -50,6 +58,22 @@ export default class ToolsetPicker extends Vue {
   get tools() {
     return this.store.tools.filter(({ id }) => !this.toolsetIds.includes(id));
   }
+
+  get queriedTools() {
+    if (!this.query?.length) {
+      return this.tools;
+    }
+
+    const query = this.query.toLowerCase();
+
+    const matchesQuery = (tool: IToolConfiguration, query: string) =>
+      tool.name.toLowerCase().indexOf(query) > -1 ||
+      tool.description.toLowerCase().indexOf(query) > -1;
+
+    return this.tools.filter(tool => matchesQuery(tool, query));
+  }
+
+  query: string = "";
 
   confirm() {
     if (this.selectedTools.length) {
