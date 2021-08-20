@@ -1,35 +1,7 @@
 <template>
   <div>
     <div>
-      <v-container>
-        <v-row>
-          <v-dialog v-model="toolCreationDialogOpen" width="unset">
-            <template v-slot:activator="{ on, attrs }">
-              <v-btn v-on="on" v-bind="attrs"> Create new tool </v-btn>
-              <!-- <v-btn v-on="on" v-bind="attrs"> Add tool to toolset </v-btn> -->
-            </template>
-            <tool-creation @done="toolCreationDialogOpen = false" />
-          </v-dialog>
-          <v-dialog v-model="toolPickerDialogOpen" width="unset">
-            <template v-slot:activator="{ on, attrs }">
-              <v-btn v-on="on" v-bind="attrs"> Add tool </v-btn>
-              <!-- <v-btn v-on="on" v-bind="attrs"> Add tool to toolset </v-btn> -->
-            </template>
-            <v-card>
-              <v-card-title>
-                Choose a tool to add to this toolset
-              </v-card-title>
-              <v-card-text>
-                <toolset-picker @done="toolPickerDialogOpen = false" />
-              </v-card-text>
-            </v-card>
-          </v-dialog>
-        </v-row>
-        <v-row>
-          <toolset></toolset>
-        </v-row>
-      </v-container>
-
+      <toolset></toolset>
       <v-layout>
         <value-slider
           v-model="xy"
@@ -107,8 +79,6 @@
 import { Vue, Component, Watch } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
-import ToolCreation from "@/tools/creation/ToolCreation.vue";
-import ToolsetPicker from "@/tools/toolsets/ToolsetPicker.vue";
 import Toolset from "@/tools/toolsets/Toolset.vue";
 import store from "@/store";
 
@@ -116,16 +86,11 @@ import store from "@/store";
   components: {
     ValueSlider,
     SwitchToggle,
-    ToolsetPicker,
-    ToolCreation,
     Toolset
   }
 })
 export default class ViewerToolbar extends Vue {
   readonly store = store;
-
-  toolCreationDialogOpen: boolean = false;
-  toolPickerDialogOpen: boolean = false;
 
   private changeQuery(param: string, value: string) {
     const old = this.$route.query[param];

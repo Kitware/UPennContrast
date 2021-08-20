@@ -1,33 +1,79 @@
 <template>
-  <v-list v-if="toolset && toolset.toolIds" dense>
-    <v-list-item-group v-model="selectedToolId">
-      <template v-for="(toolId, index) in toolset.toolIds">
-        <v-list-item
-          dense
-          :key="index"
-          :value="toolId"
-          v-if="getToolById(toolId)"
-        >
-          <v-list-item-avatar>
-            <tool-icon :tool="getToolById(toolId)" />
-          </v-list-item-avatar>
-          <v-list-item-content
-            ><v-list-item-title>{{
-              getToolById(toolId).name
-            }}</v-list-item-title>
-            <v-list-item-subtitle>
-              {{ getToolById(toolId).description }}
-            </v-list-item-subtitle>
-          </v-list-item-content>
-          <v-list-item-action
-            ><v-btn icon @click="removeToolId(toolId)"
-              ><v-icon>mdi-close</v-icon></v-btn
-            ></v-list-item-action
+  <v-card>
+    <v-app-bar dense>
+      <v-toolbar-title>
+        Current Toolset
+      </v-toolbar-title>
+      <v-spacer></v-spacer>
+      <!-- Tool creation -->
+      <v-dialog v-model="toolCreationDialogOpen" width="unset">
+        <template v-slot:activator="{ on: dialog }">
+          <v-tooltip top>
+            <template v-slot:activator="{ on: tooltip }">
+              <v-btn icon v-on="{ ...dialog, ...tooltip }">
+                <v-icon>
+                  {{ "mdi-file-star-outline" }}
+                </v-icon>
+              </v-btn>
+            </template>
+            <span>Create new tool</span>
+          </v-tooltip>
+        </template>
+        <tool-creation @done="toolCreationDialogOpen = false" />
+      </v-dialog>
+      <!-- Add tools to the toolset -->
+      <v-dialog v-model="toolPickerDialogOpen" width="unset">
+        <template v-slot:activator="{ on: dialog }">
+          <v-tooltip top>
+            <template v-slot:activator="{ on: tooltip }">
+              <v-btn icon v-on="{ ...tooltip, ...dialog }">
+                <v-icon round medium>{{ "mdi-plus" }}</v-icon>
+              </v-btn>
+            </template>
+            <span>Add existing tools</span>
+          </v-tooltip>
+        </template>
+        <v-card>
+          <v-card-title>
+            Choose a tool to add to this toolset
+          </v-card-title>
+          <v-card-text>
+            <toolset-picker @done="toolPickerDialogOpen = false" />
+          </v-card-text>
+        </v-card>
+      </v-dialog>
+    </v-app-bar>
+    <v-card-actions> </v-card-actions>
+    <v-list v-if="toolset && toolset.toolIds" dense>
+      <v-list-item-group v-model="selectedToolId">
+        <template v-for="(toolId, index) in toolset.toolIds">
+          <v-list-item
+            dense
+            :key="index"
+            :value="toolId"
+            v-if="getToolById(toolId)"
           >
-        </v-list-item>
-      </template>
-    </v-list-item-group>
-  </v-list>
+            <v-list-item-avatar>
+              <tool-icon :tool="getToolById(toolId)" />
+            </v-list-item-avatar>
+            <v-list-item-content
+              ><v-list-item-title>{{
+                getToolById(toolId).name
+              }}</v-list-item-title>
+              <v-list-item-subtitle>
+                {{ getToolById(toolId).description }}
+              </v-list-item-subtitle>
+            </v-list-item-content>
+            <v-list-item-action
+              ><v-btn icon @click="removeToolId(toolId)"
+                ><v-icon>mdi-close</v-icon></v-btn
+              ></v-list-item-action
+            >
+          </v-list-item>
+        </template>
+      </v-list-item-group>
+    </v-list>
+  </v-card>
 </template>
 
 <script lang="ts">
@@ -35,9 +81,11 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import { IToolConfiguration } from "@/store/model";
 import ToolIcon from "@/tools/ToolIcon.vue";
+import ToolsetPicker from "@/tools/toolsets/ToolsetPicker.vue";
+import ToolCreation from "@/tools/creation/ToolCreation.vue";
 
 @Component({
-  components: { ToolIcon }
+  components: { ToolCreation, ToolIcon, ToolsetPicker }
 })
 export default class Toolset extends Vue {
   readonly store = store;
@@ -61,6 +109,9 @@ export default class Toolset extends Vue {
   get configuration() {
     return this.store.configuration;
   }
+
+  toolCreationDialogOpen: boolean = false;
+  toolPickerDialogOpen: boolean = false;
 
   getToolById(toolId: string) {
     return this.store.tools.find(
