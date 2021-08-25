@@ -83,8 +83,14 @@ function generateFilterURL(
     const wpP = wp;
     const bpP = bp;
 
-    el.setAttribute("slope", `${levelP / (wpP - bpP)}`);
-    el.setAttribute("intercept", `${-(levelP * bpP) / (wpP - bpP)}`);
+    const slope = `${levelP / (wpP - bpP)}`;
+    const intercept = `${-(levelP * bpP) / (wpP - bpP)}`;
+    if (slope != el.getAttribute("slope")) {
+      el.setAttribute("slope", slope);
+    }
+    if (intercept != el.getAttribute("intercept")) {
+      el.setAttribute("intercept", intercept);
+    }
   };
 
   const scalePoint = (val: number, mode: string) =>
@@ -429,6 +435,7 @@ export default class ImageViewer extends Vue {
             fullLayer.visible(false);
           }
           adjLayer.visible(false);
+          adjLayer.node().css("visibility", "hidden");
           Vue.set(this.ready.layers, layerIndex, true);
           return;
         }
