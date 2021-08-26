@@ -58,7 +58,7 @@ export class Main extends VuexModule {
   selectedToolId: string | null = null;
   toolTemplateList: any[] = [];
 
-  availableTools: IToolConfiguration[] = [];
+  userTools: IToolConfiguration[] = [];
 
   unrollXY: boolean = false;
   unrollZ: boolean = false;
@@ -89,7 +89,7 @@ export class Main extends VuexModule {
   }
 
   get tools(): IToolConfiguration[] {
-    return this.availableTools.filter(
+    return this.userTools.filter(
       (tool: IToolConfiguration) =>
         this.dataset &&
         tool.datasetId === this.dataset.id &&
@@ -100,10 +100,10 @@ export class Main extends VuexModule {
 
   @Mutation
   public addTools({ tools }: { tools: IToolConfiguration[] }) {
-    this.availableTools = [
+    this.userTools = [
       // If duplicates are found, make sure we only keep the latest ones
       // Only keep tools for the current dataset configuration
-      ...this.availableTools.filter(
+      ...this.userTools.filter(
         (existingTool: IToolConfiguration) =>
           !tools.find(newTool => existingTool.id === newTool.id)
       ),
