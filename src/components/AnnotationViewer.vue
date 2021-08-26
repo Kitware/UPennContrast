@@ -287,8 +287,13 @@ export default class AnnotationViewer extends Vue {
     return tool;
   }
 
+  @Watch("unrolling")
+  toggleAnnotationModeWhenUnrolling() {
+    this.refreshAnnotationMode();
+  }
+
   refreshAnnotationMode() {
-    if (!this.selectedTool) {
+    if (!this.selectedTool || this.unrolling) {
       this.annotationLayer.mode(null);
       return;
     }
