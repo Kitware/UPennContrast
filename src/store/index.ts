@@ -21,6 +21,9 @@ import {
   newLayer,
   IToolConfiguration
 } from "./model";
+
+import { warning, error } from "@/utils/log";
+
 import persister from "./Persister";
 import store from "./root";
 import sync from "./sync";
@@ -365,7 +368,7 @@ export class Main extends VuexModule {
               this.configuration.toolset.toolIds = this.configuration.toolset.toolIds.filter(
                 id => id !== toolId
               );
-              console.error("Could not fetch tool: ", e);
+              warning(`Could not fetch tool: ${e.message}`);
             }
           });
       });
@@ -632,7 +635,7 @@ export class Main extends VuexModule {
       const tools = await this.api.getAllTools();
       this.addTools({ tools });
     } catch (error) {
-      console.error("Unable to fetch a list of available tools", error);
+      error(`Unable to fetch a list of available tools: ${error.message}`);
     }
   }
 
@@ -688,7 +691,7 @@ export class Main extends VuexModule {
         this.setConnections(results.annotationConnections);
       }
     } catch (error) {
-      console.error(error);
+      error(error.message);
     }
   }
 

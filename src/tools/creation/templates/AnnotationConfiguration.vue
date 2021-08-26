@@ -95,7 +95,7 @@ type VForm = Vue & { validate: () => boolean };
 export default class AnnotationConfiguration extends Vue {
   readonly store = store;
 
-  tagList = []; // TODO: keep list of existing annotation tags ?
+  tagList = [];
 
   get dataset() {
     return this.store.dataset;

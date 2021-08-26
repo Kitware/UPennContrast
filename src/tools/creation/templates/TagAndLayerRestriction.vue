@@ -93,7 +93,7 @@ export default class TagAndLayerRestriction extends Vue {
     ];
   }
 
-  tagList = []; // TODO: keep a list of existing tags from existing annotations
+  tagList = [];
   tagSearchInput: string = "";
 
   @Prop()

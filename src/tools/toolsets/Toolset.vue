@@ -43,29 +43,21 @@
         </v-card>
       </v-dialog>
     </v-app-bar>
-    <v-card-actions> </v-card-actions>
-    <v-list v-if="toolset && toolset.toolIds" dense>
+    <v-list v-if="toolset && toolset.toolIds && toolsetTools.length" dense>
       <v-list-item-group v-model="selectedToolId">
-        <template v-for="(toolId, index) in toolset.toolIds">
-          <v-list-item
-            dense
-            :key="index"
-            :value="toolId"
-            v-if="getToolById(toolId)"
-          >
+        <template v-for="(tool, index) in toolsetTools">
+          <v-list-item dense :key="index" :value="tool.id">
             <v-list-item-avatar>
-              <tool-icon :tool="getToolById(toolId)" />
+              <tool-icon :tool="tool" />
             </v-list-item-avatar>
             <v-list-item-content
-              ><v-list-item-title>{{
-                getToolById(toolId).name
-              }}</v-list-item-title>
+              ><v-list-item-title>{{ tool.name }}</v-list-item-title>
               <v-list-item-subtitle>
-                {{ getToolById(toolId).description }}
+                {{ tool.description }}
               </v-list-item-subtitle>
             </v-list-item-content>
             <v-list-item-action
-              ><v-btn icon @click="removeToolId(toolId)"
+              ><v-btn icon @click="removeToolId(tool.id)"
                 ><v-icon>mdi-close</v-icon></v-btn
               ></v-list-item-action
             >
@@ -73,6 +65,11 @@
         </template>
       </v-list-item-group>
     </v-list>
+    <v-card-subtitle v-else>
+      <v-subheader>
+        No tools in the current toolset.
+      </v-subheader>
+    </v-card-subtitle>
   </v-card>
 </template>
 
@@ -104,6 +101,12 @@ export default class Toolset extends Vue {
 
   get tools() {
     return this.store.tools;
+  }
+
+  get toolsetTools() {
+    return (
+      this.toolset?.toolIds.map(this.getToolById).filter(tool => !!tool) || []
+    );
   }
 
   get configuration() {

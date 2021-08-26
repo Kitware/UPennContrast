@@ -13,6 +13,8 @@ import {
   IToolConfiguration
 } from "../store/model";
 
+import { warning, error } from "@/utils/log";
+
 import { v4 as uuidv4 } from "uuid";
 
 @Component
@@ -150,7 +152,7 @@ export default class AnnotationViewer extends Vue {
         newGeoJSAnnotation.options("vertices", coordinates);
         break;
       default:
-        console.error("Unsupported annotation shape", annotation.shape);
+        error(`Unsupported annotation shape: ${annotation.shape}`);
     }
     newGeoJSAnnotation.options("girderId", annotation.id);
 
@@ -296,7 +298,7 @@ export default class AnnotationViewer extends Vue {
         this.annotationLayer.mode(annotation?.shape);
         break;
       default:
-        console.warn(`${this.selectedTool.type} tools are not supported yet`);
+        warning(`${this.selectedTool.type} tools are not supported yet`);
     }
   }
 
@@ -459,7 +461,7 @@ export default class AnnotationViewer extends Vue {
     }
 
     // Should not happen
-    console.error("Unsupported annotation shapes for distance calculations");
+    error("Unsupported annotation shapes for distance calculations");
     return Number.POSITIVE_INFINITY;
   }
 

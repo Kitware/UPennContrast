@@ -7,23 +7,28 @@
         clearable
         clear-icon="mdi-close"
       ></v-text-field>
-      <v-list>
-        <v-list-item-group v-model="selectedTools" multiple>
-          <template v-for="tool in queriedTools">
-            <v-list-item :value="tool.id" :key="tool.id">
-              <v-list-item-icon>
-                <tool-icon :tool="tool"></tool-icon>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title>{{ tool.name }}</v-list-item-title>
-                <v-list-item-subtitle v-if="tool.description.length">{{
-                  tool.description
-                }}</v-list-item-subtitle>
-              </v-list-item-content>
-            </v-list-item>
-          </template>
-        </v-list-item-group>
-      </v-list>
+      <template v-if="queriedTools && queriedTools.length">
+        <v-list>
+          <v-list-item-group v-model="selectedTools" multiple>
+            <template v-for="tool in queriedTools">
+              <v-list-item :value="tool.id" :key="tool.id">
+                <v-list-item-icon>
+                  <tool-icon :tool="tool"></tool-icon>
+                </v-list-item-icon>
+                <v-list-item-content>
+                  <v-list-item-title>{{ tool.name }}</v-list-item-title>
+                  <v-list-item-subtitle v-if="tool.description.length">{{
+                    tool.description
+                  }}</v-list-item-subtitle>
+                </v-list-item-content>
+              </v-list-item>
+            </template>
+          </v-list-item-group>
+        </v-list>
+      </template>
+      <v-subheader v-else>
+        No tools found.
+      </v-subheader>
     </v-card-text>
 
     <v-card-actions>
