@@ -74,6 +74,9 @@ export interface IToolConfiguration {
   values: any;
 
   template: IToolTemplate;
+
+  configurationId: string;
+  datasetId: string;
 }
 
 export interface IDataset {

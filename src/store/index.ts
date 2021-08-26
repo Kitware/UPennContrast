@@ -442,9 +442,17 @@ export class Main extends VuexModule {
     name: string;
     description: string;
   }) {
+    if (!this.dataset || !this.configuration) {
+      return null;
+    }
     try {
       sync.setSaving(true);
-      const tool = await this.api.createTool(name, description);
+      const tool = await this.api.createTool(
+        name,
+        description,
+        this.dataset,
+        this.configuration
+      );
       this.addTools({ tools: [tool] });
       sync.setSaving(false);
       return tool;

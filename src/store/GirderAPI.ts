@@ -303,7 +303,9 @@ export default class GirderAPI {
 
   async createTool(
     name: string,
-    description: string
+    description: string,
+    dataset: IDataset,
+    configuration: IDatasetConfiguration
   ): Promise<IToolConfiguration> {
     const toolFolderName = "TOOLS";
     // Create a tools directory if not created
@@ -333,7 +335,9 @@ export default class GirderAPI {
     itemData.set(
       "metadata",
       JSON.stringify({
-        subtype: "toolConfiguration"
+        subtype: "toolConfiguration",
+        datasetId: dataset.id,
+        configurationId: configuration.id
       })
     );
 
@@ -509,7 +513,7 @@ function asDataset(folder: IGirderFolder): IDataset {
 }
 
 function asToolConfiguration(item: IGirderItem): IToolConfiguration {
-  const { values, template, type } = item.meta;
+  const { values, template, type, datasetId, configurationId } = item.meta;
   const tool = {
     id: item._id,
     _girder: item,
@@ -517,7 +521,9 @@ function asToolConfiguration(item: IGirderItem): IToolConfiguration {
     description: item.description,
     type,
     values,
-    template
+    template,
+    configurationId,
+    datasetId
   };
   return tool;
 }
