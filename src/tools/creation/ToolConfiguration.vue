@@ -1,7 +1,6 @@
 <template>
   <v-form v-if="internalTemplate && toolValues">
     <v-card pa-3>
-      <v-card-title>General Tool Properties</v-card-title>
       <v-card-text>
         <v-text-field
           label="Tool Name"
@@ -13,13 +12,15 @@
           label="Tool Description"
           v-model="toolValues.description"
           @change="changed"
+          auto-grow
+          rows="2"
         >
         </v-textarea>
       </v-card-text>
     </v-card>
     <template v-for="(item, index) in internalTemplate">
       <v-card :key="index" class="my-3">
-        <v-card-title>
+        <v-card-title v-if="item.name && item.name.length">
           {{ item.name }}
         </v-card-title>
         <v-card-text>

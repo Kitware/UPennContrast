@@ -80,7 +80,7 @@ export default class TagAndLayerRestriction extends Vue {
         label: layer.name,
         value: index
       })),
-      { label: "All", value: null }
+      { label: "Any", value: null }
     ];
   }
 

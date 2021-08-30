@@ -4,16 +4,16 @@
     "type": "create",
     "interface": [
       {
-        "name": "Annotation Description",
+        "name": "",
         "id": "annotation",
         "type": "annotation"
       },
       {
-        "name": "Connection Restrictions",
+        "name": "Connect to Nearest Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
         "meta": {
-          "tagsLabel": "Connect to nearest",
+          "tagsLabel": "Connect to nearest tags...",
           "layerLabel": "Restrict to Layer"
         }
       }
@@ -24,9 +24,18 @@
     "type": "snap",
     "interface": [
       {
-        "name": "Annotation Description",
+        "name": "",
         "id": "annotation",
         "type": "annotation"
+      },
+      {
+        "name": "Connect to Nearest Tag",
+        "id": "connectTo",
+        "type": "restrictTagsAndLayer",
+        "meta": {
+          "tagsLabel": "Connect to nearest tags...",
+          "layerLabel": "Restrict to Layer"
+        }
       },
       {
         "name": "Snap To",

@@ -2,7 +2,7 @@
   <v-card>
     <v-app-bar dense>
       <v-toolbar-title>
-        Current Toolset
+        Annotation Tools
       </v-toolbar-title>
       <v-spacer></v-spacer>
       <!-- Tool creation -->
