@@ -19,7 +19,10 @@
             <span>Create new tool</span>
           </v-tooltip>
         </template>
-        <tool-creation @done="toolCreationDialogOpen = false" />
+        <tool-creation
+          @done="toolCreationDialogOpen = false"
+          :open="toolCreationDialogOpen"
+        />
       </v-dialog>
       <!-- Add tools to the toolset -->
       <v-dialog v-model="toolPickerDialogOpen" width="unset">

@@ -12,6 +12,7 @@
         v-model="toolValues"
         @submit="createTool"
         @reset="reset"
+        ref="toolConfiguration"
       />
     </v-card-text>
     <v-card-actions>
@@ -20,14 +21,13 @@
         <v-btn class="mr-4" color="primary" @click="createTool">
           ADD TOOL
         </v-btn>
-        <v-btn class="mr-4" color="secondary" @click="reset">RESET</v-btn>
         <v-btn class="mr-4" color="warning" @click="close">CANCEL</v-btn>
       </div>
     </v-card-actions>
   </v-card>
 </template>
 <script lang="ts">
-import { Vue, Component, Watch } from "vue-property-decorator";
+import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";
@@ -52,6 +52,9 @@ export default class ToolCreation extends Vue {
   selectedItemTemplate: any = null;
   errorMessages: string[] = [];
   successMessages: string[] = [];
+
+  @Prop()
+  readonly open: any;
 
   createTool() {
     if (this.selectedItemTemplate) {
@@ -80,8 +83,16 @@ export default class ToolCreation extends Vue {
     }
   }
 
+  @Watch("open")
   reset() {
-    this.toolValues = { ...defaultValues };
+    if (!this.$refs.toolConfiguration) {
+      return;
+    }
+
+    const toolConfiguration = this.$refs.toolConfiguration as ToolConfiguration;
+    if (toolConfiguration) {
+      toolConfiguration.reset();
+    }
   }
 
   close() {

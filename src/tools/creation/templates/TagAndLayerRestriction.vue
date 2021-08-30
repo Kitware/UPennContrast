@@ -56,23 +56,14 @@ export default class TagAndLayerRestriction extends Vue {
   @Prop()
   readonly value!: any;
 
-  @Watch("value")
-  watchValue() {
-    this.initialize();
-  }
-
   mounted() {
-    this.initialize();
+    this.reset();
   }
 
-  initialize() {
-    if (this.value) {
-      this.newTags = this.value.tags;
-      this.selectedLayer = this.value.layer;
-    } else {
+  reset() {
       this.newTags = [];
       this.selectedLayer = null;
-    }
+    this.changed();
   }
 
   get dataset() {

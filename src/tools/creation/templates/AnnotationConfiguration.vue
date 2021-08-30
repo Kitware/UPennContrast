@@ -163,24 +163,21 @@ export default class AnnotationConfiguration extends Vue {
   };
 
   mounted() {
-    this.resetValues();
-    this.changed();
+    this.reset();
   }
 
-  @Watch("value")
-  resetValues() {
+  reset() {
     // Set internal values to the current input, or defaults
-    this.coordinateAssignments = this.value?.coordinateAssignments || {
+    this.coordinateAssignments = {
       layer: 0,
       Z: { type: "layer", value: 1, max: this.maxZ },
       Time: { type: "layer", value: 1, max: this.maxTime }
     };
+    this.label = "New Annotation";
+    this.tags = [];
+    this.shape = "point";
 
-    this.label = this.value?.label || "New Annotation";
-    this.tags = this.value?.tags || [];
-    this.shape = this.value?.shape || "point";
-    // inf ?
-    // this.changed();
+    this.changed();
   }
 
   changed() {

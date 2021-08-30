@@ -32,6 +32,7 @@
             :is="typeToComponentName[item.type]"
             v-bind="item.meta"
             v-model="toolValues[item.id]"
+            :ref="item.id"
             return-object
             @change="changed"
           >
@@ -103,22 +104,14 @@ export default class ToolConfiguration extends Vue {
 
   @Watch("template")
   watchTemplate() {
-    this.$emit("reset");
-    this.initialize();
-  }
-
-  @Watch("value")
-  watchValue() {
-    this.initialize();
+    this.reset();
   }
 
   mounted() {
-    this.initialize();
+    this.reset();
   }
 
-  //
   initialize() {
-    this.toolValues = { ...this.value };
     this.valueTemplates = {};
     // Remove values from outdated template
     this.clearUnusedValues();
@@ -128,6 +121,23 @@ export default class ToolConfiguration extends Vue {
     this.updateInterface();
     // Add default values to new elements
     this.setDefaultValues();
+  }
+
+  reset() {
+    this.toolValues = { name: "New Tool", description: "" };
+    this.initialize();
+    this.changed();
+  }
+
+  changed() {
+    this.valueTemplates = {};
+    this.updateInterface();
+    this.setDefaultValues();
+    this.$emit("input", { ...this.toolValues });
+  }
+
+  @Watch("toolValues") updateValues() {
+    this.changed();
   }
 
   setDefaultValues() {
@@ -144,6 +154,26 @@ export default class ToolConfiguration extends Vue {
         if (item.values?.length) {
           const [firstValue] = item.values;
           this.toolValues[item.id] = firstValue.value;
+        }
+      } else if (item.type === "text") {
+        if (item.meta?.type === "number") {
+          this.toolValues[item.id] = "0.0";
+        } else {
+          this.toolValues[item.id] = "";
+        }
+      } else if (this.$refs[item.id]) {
+        if (item.type === "annotation") {
+          const [annotation] = this.$refs[item.id] as [AnnotationConfiguration];
+          if (annotation) {
+            this.toolValues[item.id] = {};
+            annotation.reset();
+          }
+        } else if (item.type === "restrictTagsAndLayer") {
+          const [restrict] = this.$refs[item.id] as [TagAndLayerRestriction];
+          if (restrict) {
+            this.toolValues[item.id] = {};
+            restrict.reset();
+          }
         }
       }
     });
@@ -171,12 +201,6 @@ export default class ToolConfiguration extends Vue {
         delete this.toolValues[key];
       }
     });
-  }
-
-  changed() {
-    this.valueTemplates = {};
-    this.updateInterface();
-    this.$emit("input", { ...this.toolValues });
   }
 }
 </script>
