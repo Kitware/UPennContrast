@@ -317,17 +317,14 @@ export default class AnnotationViewer extends Vue {
       this.refreshAnnotationMode();
     }
   }
-
-  private addAnnotationFromGeoJsAnnotation(annotation: any) {
-    if (
-      !annotation ||
-      !annotation.coordinates() ||
-      !annotation.coordinates().length
-    ) {
-      return;
+  private createAnnotationFromGeoJSCoordinatesAndTool(
+    coordinates: IGeoJSPoint[],
+    tool: IToolConfiguration
+  ) {
+    if (!coordinates || !coordinates.length) {
+      return null;
     }
-    const toolAnnotation = this.selectedTool.values.annotation;
-
+    const toolAnnotation = tool.values.annotation;
     // Find location in the assigned layer
     const location = {
       XY: this.store.xy,
@@ -358,12 +355,28 @@ export default class AnnotationViewer extends Vue {
       shape: toolAnnotation.shape,
       assignment: toolAnnotation.coordinateAssignments,
       location,
-      coordinates: annotation.coordinates(),
+      coordinates: coordinates,
       computedValues: {
-        centroid: this.simpleCentroid(annotation.coordinates())
+        centroid: this.simpleCentroid(coordinates)
       }
     };
+    return newAnnotation;
+  }
 
+  private addAnnotationFromGeoJsAnnotation(annotation: any) {
+    if (!annotation) {
+      return;
+    }
+
+    // Create the new annotation
+    const newAnnotation: IAnnotation | null = this.createAnnotationFromGeoJSCoordinatesAndTool(
+      annotation.coordinates(),
+      this.selectedTool
+    );
+
+    if (!newAnnotation) {
+      return;
+    }
     this.addAnnotationConnections(newAnnotation);
 
     // Make sure we know which annotation this geojs object is associated to
