@@ -61,8 +61,8 @@ export default class TagAndLayerRestriction extends Vue {
   }
 
   reset() {
-      this.newTags = [];
-      this.selectedLayer = null;
+    this.newTags = [];
+    this.selectedLayer = null;
     this.changed();
   }
 

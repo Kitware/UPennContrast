@@ -19,7 +19,7 @@
       <div class="button-bar">
         <v-spacer></v-spacer>
         <v-btn class="mr-4" color="primary" @click="createTool">
-          ADD TOOL
+          ADD TOOL TO THE CURRENT TOOLSET
         </v-btn>
         <v-btn class="mr-4" color="warning" @click="close">CANCEL</v-btn>
       </div>
@@ -78,6 +78,11 @@ export default class ToolCreation extends Vue {
         this.store.updateTool(tool).then(() => {
           this.store.syncConfiguration();
         });
+
+        // Add this tool to the current toolset
+        this.store.addToolIdsToCurrentToolset({ ids: [tool.id] });
+        this.store.syncConfiguration();
+
         this.close();
       });
     }
