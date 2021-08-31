@@ -86,6 +86,7 @@
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
+import { IToolConfiguration } from "@/store/model";
 
 type VForm = Vue & { validate: () => boolean };
 
@@ -94,8 +95,6 @@ type VForm = Vue & { validate: () => boolean };
 })
 export default class AnnotationConfiguration extends Vue {
   readonly store = store;
-
-  tagList = [];
 
   get dataset() {
     return this.store.dataset;
@@ -118,6 +117,17 @@ export default class AnnotationConfiguration extends Vue {
       label: layer.name,
       value: index
     }));
+  }
+
+  get tagList(): string[] {
+    return this.store.tools
+      .filter(
+        (tool: IToolConfiguration) =>
+          (tool.type === "create" || tool.type === "snap") &&
+          tool.values.annotation
+      )
+      .map((tool: IToolConfiguration) => tool.values.annotation.tags)
+      .flat();
   }
 
   tagSearchInput: string = "";
@@ -164,6 +174,9 @@ export default class AnnotationConfiguration extends Vue {
 
   mounted() {
     this.reset();
+    if (!this.store.tools?.length) {
+      this.store.fetchAvailableTools();
+    }
   }
 
   reset() {

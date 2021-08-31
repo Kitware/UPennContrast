@@ -43,6 +43,7 @@
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
+import { IToolConfiguration } from "@/store/model";
 
 @Component({
   components: {}
@@ -84,7 +85,17 @@ export default class TagAndLayerRestriction extends Vue {
     ];
   }
 
-  tagList = [];
+  get tagList(): string[] {
+    return this.store.tools
+      .filter(
+        (tool: IToolConfiguration) =>
+          (tool.type === "create" || tool.type === "snap") &&
+          tool.values.annotation
+      )
+      .map((tool: IToolConfiguration) => tool.values.annotation.tags)
+      .flat();
+  }
+
   tagSearchInput: string = "";
 
   @Prop()
