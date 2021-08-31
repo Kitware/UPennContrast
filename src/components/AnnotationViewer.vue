@@ -10,6 +10,7 @@ import {
   IAnnotation,
   IAnnotationConnection,
   IGeoJSPoint,
+  IImage,
   IToolConfiguration
 } from "../store/model";
 
@@ -103,21 +104,9 @@ export default class AnnotationViewer extends Vue {
     return matchingImage?.keyOffset || 0;
   }
 
-  createGeoJSAnnotation(annotation: IAnnotation) {
-    if (!this.store.dataset) {
-      return;
-    }
-
-    const anyImage = this.store.dataset?.anyImage();
-    if (!anyImage) {
-      return;
-    }
-
-    const tileW = anyImage?.sizeX;
-    const tileH = anyImage?.sizeY;
-
-    let newGeoJSAnnotation = null;
-    let coordinates = annotation.coordinates;
+  unrolledCoordinates(annotation: IAnnotation, image: IImage) {
+    const tileW = image.sizeX;
+    const tileH = image.sizeY;
     if (this.unrolling) {
       const location = this.unrollIndex(
         annotation.location.XY,
@@ -131,13 +120,28 @@ export default class AnnotationViewer extends Vue {
       const tileX = Math.floor(location % this.unrollW);
       const tileY = Math.floor(location / this.unrollW);
 
-      coordinates = coordinates.map((point: IGeoJSPoint) => ({
+      return annotation.coordinates.map((point: IGeoJSPoint) => ({
         x: tileW * tileX + point.x,
         y: tileH * tileY + point.y,
         z: point.z
       }));
     }
+    return annotation.coordinates;
+  }
 
+  createGeoJSAnnotation(annotation: IAnnotation) {
+    if (!this.store.dataset) {
+      return;
+    }
+
+    const anyImage = this.store.dataset?.anyImage();
+    if (!anyImage) {
+      return;
+    }
+
+    const coordinates = this.unrolledCoordinates(annotation, anyImage);
+
+    let newGeoJSAnnotation = null;
     switch (annotation.shape) {
       case "point":
         newGeoJSAnnotation = geojs.annotation.pointAnnotation();
@@ -189,6 +193,28 @@ export default class AnnotationViewer extends Vue {
     return true;
   }
 
+  addGeoJSAnnotationFromConnection(
+    connection: IAnnotationConnection,
+    parent: IAnnotation,
+    child: IAnnotation
+  ) {
+    // TEMP: Draw lines as a way to show the connections
+    const anyImage = this.store.dataset?.anyImage();
+
+    if (!anyImage) {
+      return;
+    }
+
+    const pA = this.simpleCentroid(this.unrolledCoordinates(child, anyImage));
+    const pB = this.simpleCentroid(this.unrolledCoordinates(parent, anyImage));
+    const line = geojs.annotation.lineAnnotation();
+    line.options("vertices", [pA, pB]);
+    line.options("isConnection", true);
+    line.options("childId", connection.childId);
+    line.options("parentId", connection.parentId);
+    this.annotationLayer.addAnnotation(line);
+  }
+
   clearOldAnnotations(clearAll = false) {
     this.annotationLayer.annotations().forEach((annotation: any) => {
       if (clearAll) {
@@ -198,6 +224,18 @@ export default class AnnotationViewer extends Vue {
 
       // TODO: this is temporary to debug connections
       if (annotation.options("isConnection")) {
+        const childId = annotation.options("childId");
+        const parentId = annotation.options("parentId");
+        const parent = this.store.annotations.find(({ id }) => id === parentId);
+        const child = this.store.annotations.find(({ id }) => id === childId);
+        if (
+          !parent ||
+          !child ||
+          !this.shouldDisplayAnnotation(parent) ||
+          !this.shouldDisplayAnnotation(child)
+        ) {
+          this.annotationLayer.removeAnnotation(annotation);
+        }
         return;
       }
 
@@ -223,6 +261,30 @@ export default class AnnotationViewer extends Vue {
       .forEach(annotation => {
         const newGeoJSAnnotation = this.createGeoJSAnnotation(annotation);
         this.annotationLayer.addAnnotation(newGeoJSAnnotation);
+
+        // TEMP: find and draw connections for this annotation
+        this.store.annotationConnections
+          .filter(
+            (connection: IAnnotationConnection) =>
+              connection.parentId === annotation.id
+          )
+          .forEach((connection: IAnnotationConnection) => {
+            // TEMP: Draw lines as a way to show the connections
+            const childAnnotation = this.store.annotations.find(
+              (child: IAnnotation) => child.id === connection.childId
+            );
+            if (
+              !childAnnotation ||
+              !this.shouldDisplayAnnotation(childAnnotation)
+            ) {
+              return;
+            }
+            this.addGeoJSAnnotationFromConnection(
+              connection,
+              childAnnotation,
+              annotation
+            );
+          });
       });
   }
 
@@ -528,14 +590,11 @@ export default class AnnotationViewer extends Vue {
           }
         };
         this.store.addConnection(newConnection);
-
-        // TEMP: Draw lines as a way to show the connections
-        const pA = this.simpleCentroid(closest.coordinates);
-        const pB = this.simpleCentroid(annotation.coordinates);
-        const line = geojs.annotation.lineAnnotation();
-        line.options("vertices", [pA, pB]);
-        line.options("isConnection", true);
-        this.annotationLayer.addAnnotation(line);
+        this.addGeoJSAnnotationFromConnection(
+          newConnection,
+          annotation,
+          closest
+        );
       }
     }
   }
