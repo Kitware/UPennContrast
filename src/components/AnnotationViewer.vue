@@ -439,18 +439,17 @@ export default class AnnotationViewer extends Vue {
     if (!newAnnotation) {
       return;
     }
-    this.addAnnotationConnections(newAnnotation);
-
-    // Make sure we know which annotation this geojs object is associated to
-    annotation.options("girderId", newAnnotation.id);
-
-    const style = annotation.options("style");
-    const newStyle = this.getAnnotationStyle(newAnnotation);
-    annotation.options("style", Object.assign({}, style, newStyle));
 
     // Save the new annotation
     this.store.addAnnotation(newAnnotation);
     this.store.syncAnnotations();
+
+    this.addAnnotationConnections(newAnnotation);
+
+    // Display the new annotation
+    const newGeoJSAnnotation = this.createGeoJSAnnotation(newAnnotation);
+    this.annotationLayer.removeAnnotation(annotation);
+    this.annotationLayer.addAnnotation(newGeoJSAnnotation);
   }
 
   handleAnnotationChange(evt: any) {
