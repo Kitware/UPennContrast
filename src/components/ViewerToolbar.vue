@@ -56,7 +56,8 @@
         true-label="Multiple"
         true-value="multiple"
         layout
-        layoute-value="single"
+        false-label="Single"
+        false-value="single"
         id="layerMode"
       />
     </div>
