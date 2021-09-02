@@ -31,7 +31,7 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";
-import { error } from "@/utils/log";
+import { logError } from "@/utils/log";
 
 const defaultValues = {
   name: "New Tool",
@@ -68,7 +68,7 @@ export default class ToolCreation extends Vue {
       // Create an empty tool to get the id
       this.store.createTool({ name, description }).then(tool => {
         if (tool === null) {
-          error("Failed to create a new tool on the server");
+          logError("Failed to create a new tool on the server");
           return;
         }
         tool.template = this.selectedItemTemplate;

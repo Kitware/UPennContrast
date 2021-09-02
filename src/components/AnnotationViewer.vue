@@ -14,7 +14,7 @@ import {
   IToolConfiguration
 } from "../store/model";
 
-import { warning, error } from "@/utils/log";
+import { logWarning } from "@/utils/log";
 
 import {
   getAnnotationStyleFromLayer,
@@ -435,7 +435,7 @@ export default class AnnotationViewer extends Vue {
         this.annotationLayer.mode(annotation?.shape);
         break;
       default:
-        warning(`${this.selectedTool.type} tools are not supported yet`);
+        logWarning(`${this.selectedTool.type} tools are not supported yet`);
     }
   }
 

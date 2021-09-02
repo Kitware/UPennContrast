@@ -1,6 +1,6 @@
 import { IAnnotation, IDisplayLayer, IImage, IGeoJSPoint } from "@/store/model";
 import geojs from "geojs";
-import { error } from "@/utils/log";
+import { logError } from "@/utils/log";
 
 export function getAnnotationStyleFromLayer(layer: IDisplayLayer) {
   const style = {
@@ -59,7 +59,7 @@ export function geojsAnnotationFactory(
       newGeoJSAnnotation.options("vertices", coordinates);
       break;
     default:
-      error(`Unsupported annotation shape: ${shape}`);
+      logError(`Unsupported annotation shape: ${shape}`);
   }
   return newGeoJSAnnotation;
 }
@@ -114,6 +114,6 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
   }
 
   // Should not happen
-  error("Unsupported annotation shapes for distance calculations");
+  logError("Unsupported annotation shapes for distance calculations");
   return Number.POSITIVE_INFINITY;
 }

@@ -22,7 +22,7 @@ import {
   IToolConfiguration
 } from "./model";
 
-import { warning, error } from "@/utils/log";
+import { logWarning } from "@/utils/log";
 
 import persister from "./Persister";
 import store from "./root";
@@ -368,7 +368,8 @@ export class Main extends VuexModule {
               this.configuration.toolset.toolIds = this.configuration.toolset.toolIds.filter(
                 id => id !== toolId
               );
-              warning(`Could not fetch tool: ${e.message}`);
+
+              logWarning(`Could not fetch tool: ${e.message}`);
             }
           });
       });

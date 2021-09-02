@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
 
-export function warning(message: string) {
+export function logWarning(message: string) {
   console.warn(message);
 }
 
-export function error(message: string) {
+export function logError(message: string) {
   console.error(message);
 }
