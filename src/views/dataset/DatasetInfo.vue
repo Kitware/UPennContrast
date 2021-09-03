@@ -8,7 +8,7 @@
               Dataset
             </v-toolbar-title>
             <v-spacer></v-spacer>
-            <v-dialog v-model="removeConfirm" max-width="33vw">
+            <v-dialog v-model="removeDatasetConfirm" max-width="33vw">
               <template #activator="{ on }">
                 <v-btn color="warning" v-on="on" :disabled="!store.dataset">
                   <v-icon left>mdi-close</v-icon>
@@ -20,8 +20,8 @@
                   >Are you sure to remove "{{ name }}"?</v-card-title
                 >
                 <v-card-actions class="button-bar">
-                  <v-btn @click="removeConfirm = false">Cancel</v-btn>
-                  <v-btn @click="remove" color="warning">Remove</v-btn>
+                  <v-btn @click="removeDatasetConfirm = false">Cancel</v-btn>
+                  <v-btn @click="removeDataset" color="warning">Remove</v-btn>
                 </v-card-actions>
               </v-card>
             </v-dialog>
@@ -62,6 +62,27 @@
             >
           </v-toolbar>
           <v-card-text>
+            <v-dialog
+              v-model="removeConfigurationConfirm"
+              max-width="33vw"
+              v-if="configurationToRemove"
+            >
+              <v-card>
+                <v-card-title
+                  >Are you sure to remove "{{
+                    configurationToRemove.name
+                  }}"?</v-card-title
+                >
+                <v-card-actions class="button-bar">
+                  <v-btn @click="removeDatasetConfirm = false">Cancel</v-btn>
+                  <v-btn
+                    @click="removeConfiguration(configurationToRemove)"
+                    color="warning"
+                    >Remove</v-btn
+                  >
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
             <v-list two-line>
               <v-list-item
                 v-for="c in configurations"
@@ -75,9 +96,17 @@
                   }}</v-list-item-subtitle>
                 </v-list-item-content>
                 <v-list-item-action>
-                  <v-btn color="primary" :to="toRoute(c)">
-                    view
-                  </v-btn>
+                  <span class="button-bar">
+                    <v-btn
+                      color="warning"
+                      v-on:click.stop="openRemoveConfigurationDialog(c)"
+                      ><v-icon left>mdi-close</v-icon>remove</v-btn
+                    >
+                    <v-btn color="primary" :to="toRoute(c)">
+                      <v-icon left>mdi-eye</v-icon>
+                      view
+                    </v-btn>
+                  </span>
                 </v-list-item-action>
               </v-list-item>
             </v-list>
@@ -102,7 +131,11 @@ import { formatDate } from "@/utils/date";
 export default class DatasetInfo extends Vue {
   readonly store = store;
 
-  removeConfirm = false;
+  removeDatasetConfirm = false;
+
+  removeConfigurationConfirm = false;
+  configurationToRemove: IDatasetConfiguration | null = null;
+
   configuration: IDatasetConfiguration[] = [];
 
   readonly headers = [
@@ -194,12 +227,24 @@ export default class DatasetInfo extends Vue {
     };
   }
 
-  remove() {
+  removeDataset() {
     this.store.deleteDataset(this.store.dataset!).then(() => {
-      this.removeConfirm = false;
+      this.removeDatasetConfirm = false;
       this.$router.push({
         name: "root"
       });
+    });
+  }
+
+  openRemoveConfigurationDialog(configuration: IDatasetConfiguration) {
+    this.removeConfigurationConfirm = true;
+    this.configurationToRemove = configuration;
+  }
+
+  removeConfiguration(c: IDatasetConfiguration) {
+    this.store.deleteConfiguration(c).then(() => {
+      this.removeConfigurationConfirm = false;
+      this.configurationToRemove = null;
     });
   }
 
