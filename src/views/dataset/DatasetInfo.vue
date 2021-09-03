@@ -223,7 +223,7 @@ export default class DatasetInfo extends Vue {
   toRoute(c: IDatasetConfiguration) {
     return {
       name: "view",
-      params: Object.assign({ config: c.id }, this.$route.params)
+      params: Object.assign({}, this.$route.params, { config: c.id })
     };
   }
 
