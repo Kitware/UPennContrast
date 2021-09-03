@@ -1,77 +1,90 @@
 <template>
-  <v-container>
+  <v-container flex>
     <v-row>
-      <v-data-table
-        :headers="headers"
-        :items="report"
-        class="elevation-3"
-        hide-default-header
-        hide-default-footer
-      />
-    </v-row>
-
-    <v-subheader>
-      <span class="grow">Configurations</span>
-      <v-btn
-        color="primary"
-        :to="{
-          name: 'importconfiguration',
-          params: Object.assign({ id: '' }, $route.params)
-        }"
-      >
-        Import Configuration
-      </v-btn>
-      <v-btn
-        color="primary"
-        :to="{
-          name: 'newconfiguration',
-          params: Object.assign({ id: '' }, $route.params)
-        }"
-        >Add Configuration</v-btn
-      >
-    </v-subheader>
-    <v-list two-line>
-      <v-list-item
-        v-for="c in configurations"
-        :key="c.name"
-        @click="$router.push(toRoute(c))"
-      >
-        <v-list-item-content>
-          <v-list-item-title>{{ c.name }}</v-list-item-title>
-          <v-list-item-subtitle>{{ c.description }}</v-list-item-subtitle>
-        </v-list-item-content>
-        <v-list-item-action>
-          <v-btn icon :to="toRoute(c)">
-            <v-icon>mdi-eye</v-icon>
-          </v-btn>
-        </v-list-item-action>
-      </v-list-item>
-    </v-list>
-    <div class="button-bar">
-      <v-dialog v-model="removeConfirm" max-width="33vw">
-        <template #activator="{ on }">
-          <v-btn color="warning" v-on="on" :disabled="!store.dataset">
-            <v-icon left>mdi-close</v-icon>
-            Remove
-          </v-btn>
-        </template>
-        <v-card>
-          <v-card-title>Are you sure to remove "{{ name }}"?</v-card-title>
-          <v-card-actions class="button-bar">
-            <v-btn @click="removeConfirm = false">Cancel</v-btn>
-            <v-btn @click="remove" color="warning">Remove</v-btn>
-          </v-card-actions>
+      <v-col cols="4">
+        <v-card class="my-3">
+          <v-toolbar>
+            <v-toolbar-title>
+              Dataset
+            </v-toolbar-title>
+            <v-spacer></v-spacer>
+            <v-dialog v-model="removeConfirm" max-width="33vw">
+              <template #activator="{ on }">
+                <v-btn color="warning" v-on="on" :disabled="!store.dataset">
+                  <v-icon left>mdi-close</v-icon>
+                  Remove Dataset
+                </v-btn>
+              </template>
+              <v-card>
+                <v-card-title
+                  >Are you sure to remove "{{ name }}"?</v-card-title
+                >
+                <v-card-actions class="button-bar">
+                  <v-btn @click="removeConfirm = false">Cancel</v-btn>
+                  <v-btn @click="remove" color="warning">Remove</v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+          </v-toolbar>
+          <v-card-text>
+            <v-data-table
+              :headers="headers"
+              :items="report"
+              class="elevation-3 ma-2"
+              hide-default-header
+              hide-default-footer
+            />
+          </v-card-text>
         </v-card>
-      </v-dialog>
-      <v-btn
-        color="primary"
-        :to="configurations.length > 0 ? toRoute(configurations[0]) : undefined"
-        :disabled="configurations.length === 0"
-      >
-        <v-icon left>mdi-eye</v-icon>
-        View
-      </v-btn>
-    </div>
+      </v-col>
+      <v-col>
+        <v-card class="my-3">
+          <v-toolbar>
+            <v-toolbar-title>Configurations</v-toolbar-title>
+            <v-spacer></v-spacer>
+            <v-btn
+              color="primary"
+              :to="{
+                name: 'importconfiguration',
+                params: Object.assign({ id: '' }, $route.params)
+              }"
+            >
+              Import Configuration
+            </v-btn>
+            <v-btn
+              class="mx-2"
+              color="primary"
+              :to="{
+                name: 'newconfiguration',
+                params: Object.assign({ id: '' }, $route.params)
+              }"
+              >Add Configuration</v-btn
+            >
+          </v-toolbar>
+          <v-card-text>
+            <v-list two-line>
+              <v-list-item
+                v-for="c in configurations"
+                :key="c.name"
+                @click="$router.push(toRoute(c))"
+              >
+                <v-list-item-content>
+                  <v-list-item-title>{{ c.name }}</v-list-item-title>
+                  <v-list-item-subtitle>{{
+                    c.description
+                  }}</v-list-item-subtitle>
+                </v-list-item-content>
+                <v-list-item-action>
+                  <v-btn color="primary" :to="toRoute(c)">
+                    view
+                  </v-btn>
+                </v-list-item-action>
+              </v-list-item>
+            </v-list>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
   </v-container>
 </template>
 <script lang="ts">
