@@ -294,7 +294,6 @@ export default class GirderAPI {
     connections: IAnnotationConnection[],
     configuration: IDatasetConfiguration
   ) {
-    // get dataset
     return this.client.put(`/item/${configuration._girder._id}/metadata`, {
       annotations,
       connections
@@ -308,6 +307,7 @@ export default class GirderAPI {
     configuration: IDatasetConfiguration
   ): Promise<IToolConfiguration> {
     const toolFolderName = "TOOLS";
+
     // Create a tools directory if not created
     const publicFolder = await this.getUserPublicFolder();
 
@@ -326,7 +326,7 @@ export default class GirderAPI {
     const resp = await this.client.post("folder", toolsFolderData);
     const toolsFolder: IGirderFolder = resp.data;
 
-    // Use this directiory as parent for all items
+    // Use this directory as parent for all items
     const itemData = new FormData();
     itemData.set("folderId", toolsFolder._id);
     itemData.set("name", name);

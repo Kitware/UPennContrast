@@ -57,11 +57,13 @@ export interface IToolTemplateInterface {
   type: string;
   meta: any;
 }
+
 export interface IToolTemplate {
   name: string;
   description: string;
   interface: IToolTemplateInterface[];
 }
+
 export interface IToolConfiguration {
   readonly id: string;
   readonly _girder: IGirderItem;
@@ -107,6 +109,7 @@ export interface IToolSet {
   name: string;
   toolIds: string[];
 }
+
 export interface IDatasetConfiguration {
   readonly id: string;
   readonly _girder: IGirderItem;

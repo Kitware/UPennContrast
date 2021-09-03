@@ -55,7 +55,6 @@
         label="Layers: "
         true-label="Multiple"
         true-value="multiple"
-        layout
         false-label="Single"
         false-value="single"
         id="layerMode"

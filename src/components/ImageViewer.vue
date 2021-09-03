@@ -217,8 +217,7 @@ export default class ImageViewer extends Vue {
       Vue.prototype.$currentMap = this.map;
       this.annotationLayer = this.map.createLayer("annotation", {
         annotations: geojs.listAnnotations(),
-        autoshareRenderer: false,
-        keepAdding: true
+        autoshareRenderer: false
       });
       this.annotationLayer.node().css({ "mix-blend-mode": "unset" });
       this.uiLayer = this.map.createLayer("ui");

@@ -24,11 +24,6 @@
           {{ item.name }}
         </v-card-title>
         <v-card-text>
-          <!-- <v-radio-group v-else-if="item.type === 'radio'">
-            <v-radio v-for="(value, index) in item.values" :key="index">
-              {{ value }}
-            </v-radio>
-          </v-radio-group> -->
           <component
             :is="typeToComponentName[item.type]"
             v-bind="item.meta"
