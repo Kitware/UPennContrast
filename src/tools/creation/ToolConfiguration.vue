@@ -1,23 +1,5 @@
 <template>
   <v-form v-if="internalTemplate && toolValues">
-    <v-card pa-3>
-      <v-card-text>
-        <v-text-field
-          label="Tool Name"
-          v-model="toolValues.name"
-          @change="changed"
-        >
-        </v-text-field>
-        <v-textarea
-          label="Tool Description"
-          v-model="toolValues.description"
-          @change="changed"
-          auto-grow
-          rows="2"
-        >
-        </v-textarea>
-      </v-card-text>
-    </v-card>
     <template v-for="(item, index) in internalTemplate">
       <v-card :key="index" class="my-3">
         <v-card-title v-if="item.name && item.name.length">

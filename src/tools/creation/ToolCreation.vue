@@ -1,30 +1,44 @@
 <template>
-  <v-card>
-    <v-card-title>
-      Add a new tool
-    </v-card-title>
-    <v-card-text>
-      <tool-type-selection v-model="selectedItemTemplate">
-      </tool-type-selection>
-      <tool-configuration
-        v-if="selectedItemTemplate"
-        :template="selectedItemTemplate"
-        v-model="toolValues"
-        @submit="createTool"
-        @reset="reset"
-        ref="toolConfiguration"
-      />
-    </v-card-text>
-    <v-card-actions>
-      <div class="button-bar">
-        <v-spacer></v-spacer>
-        <v-btn class="mr-4" color="primary" @click="createTool">
-          ADD TOOL TO THE CURRENT TOOLSET
-        </v-btn>
-        <v-btn class="mr-4" color="warning" @click="close">CANCEL</v-btn>
-      </div>
-    </v-card-actions>
-  </v-card>
+  <div>
+    <v-card pa-3>
+      <v-card-title>
+        Add a new tool
+      </v-card-title>
+      <v-card-text>
+        <v-text-field label="Tool Name" v-model="toolName"> </v-text-field>
+        <v-textarea
+          label="Tool Description"
+          v-model="toolDescription"
+          auto-grow
+          rows="2"
+        >
+        </v-textarea>
+        <tool-type-selection v-model="selectedItemTemplate">
+        </tool-type-selection>
+      </v-card-text>
+    </v-card>
+    <v-card>
+      <v-card-text>
+        <tool-configuration
+          v-if="selectedItemTemplate"
+          :template="selectedItemTemplate"
+          v-model="toolValues"
+          @submit="createTool"
+          @reset="reset"
+          ref="toolConfiguration"
+        />
+      </v-card-text>
+      <v-card-actions>
+        <div class="button-bar">
+          <v-spacer></v-spacer>
+          <v-btn class="mr-4" color="primary" @click="createTool">
+            ADD TOOL TO THE CURRENT TOOLSET
+          </v-btn>
+          <v-btn class="mr-4" color="warning" @click="close">CANCEL</v-btn>
+        </div>
+      </v-card-actions>
+    </v-card>
+  </div>
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
@@ -53,6 +67,9 @@ export default class ToolCreation extends Vue {
   errorMessages: string[] = [];
   successMessages: string[] = [];
 
+  toolName = "New Tool";
+  toolDescription = "";
+
   @Prop()
   readonly open: any;
 
@@ -63,8 +80,8 @@ export default class ToolCreation extends Vue {
         template: this.selectedItemTemplate,
         values: this.toolValues
       };
-      const name = tool.values.name || "Unnamed Tool";
-      const description = tool.values.description || "";
+      const name = this.toolName || "Unnamed Tool";
+      const description = this.toolDescription || "";
       // Create an empty tool to get the id
       this.store.createTool({ name, description }).then(tool => {
         if (tool === null) {
@@ -90,6 +107,9 @@ export default class ToolCreation extends Vue {
 
   @Watch("open")
   reset() {
+    this.toolName = "New Tool";
+    this.toolDescription = "";
+
     if (!this.$refs.toolConfiguration) {
       return;
     }
