@@ -161,7 +161,6 @@ export interface IGeoJSPoint {
 
 export interface IAnnotation {
   id: string;
-  label: string;
   tags: string[];
   assignment: {
     layer: number;

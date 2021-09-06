@@ -1,6 +1,5 @@
 <template>
   <v-form ref="form">
-    <v-text-field label="Annotation Name" v-model="label" @change="changed" />
     <v-combobox
       v-model="tags"
       :items="tagList"
@@ -186,7 +185,6 @@ export default class AnnotationConfiguration extends Vue {
       Z: { type: "layer", value: 1, max: this.maxZ },
       Time: { type: "layer", value: 1, max: this.maxTime }
     };
-    this.label = "New Annotation";
     this.tags = [];
     this.shape = "point";
 
@@ -205,7 +203,6 @@ export default class AnnotationConfiguration extends Vue {
     }
     this.tagSearchInput = "";
     this.$emit("input", {
-      label: this.label,
       tags: this.tags,
       coordinateAssignments: this.coordinateAssignments,
       shape: this.shape

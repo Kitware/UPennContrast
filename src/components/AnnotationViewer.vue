@@ -330,7 +330,6 @@ export default class AnnotationViewer extends Vue {
     // Create the new annotation
     const newAnnotation: IAnnotation = {
       id: uuidv4(),
-      label: toolAnnotation.label,
       tags: toolAnnotation.tags,
       shape: toolAnnotation.shape,
       assignment: toolAnnotation.coordinateAssignments,
