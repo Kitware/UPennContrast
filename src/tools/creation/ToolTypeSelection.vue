@@ -49,7 +49,7 @@ export default class ToolTypeSelection extends Vue {
   initialize() {
     // Set initial value
     if (!this.value && this.templates.length) {
-      this.content = this.templates[0];
+      this.content = null;
       this.handleChange();
     }
   }

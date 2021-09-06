@@ -1,6 +1,6 @@
 [
   {
-    "name": "Create annotation",
+    "name": "Manual annotation tool",
     "type": "create",
     "interface": [
       {
@@ -20,7 +20,7 @@
     ]
   },
   {
-    "name": "Snap to",
+    "name": "\"Snap to\" manual annotation tools",
     "type": "snap",
     "interface": [
       {
@@ -66,7 +66,7 @@
     ]
   },
   {
-    "name": "Select",
+    "name": "Select annotation tools",
     "type": "select",
     "interface": [
       {
@@ -89,7 +89,7 @@
     ]
   },
   {
-    "name": "Edit",
+    "name": "Annotation edit tools",
     "type": "edit",
     "interface": [
       {
@@ -158,7 +158,7 @@
     ]
   },
   {
-    "name": "Segmentation",
+    "name": "Automated annotation tools",
     "type": "segmentation",
     "interface": []
   }
