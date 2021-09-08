@@ -49,6 +49,11 @@ export class Main extends VuexModule {
   time: number = 0;
   layerMode: "single" | "multiple" = "multiple";
 
+  drawAnnotations: boolean = true;
+  restrictAnnotationsToFilters: boolean = true;
+  restrictAnnotationsToActive: boolean = true;
+  drawAnnotationConnections: boolean = true;
+
   unrollXY: boolean = false;
   unrollZ: boolean = false;
   unrollT: boolean = false;
