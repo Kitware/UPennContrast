@@ -11,6 +11,9 @@
         >Snapshot</v-btn
       >
       <user-menu />
+      <v-btn @click.stop="annotationPanel = !annotationPanel"
+        >Browse Annotations</v-btn
+      >
       <server-status />
     </v-app-bar>
 
@@ -33,6 +36,18 @@
     >
       <snapshots :snapshotVisible="snapshotPanel && snapshotPanelFull" />
     </v-navigation-drawer>
+
+    <v-navigation-drawer
+      v-model="annotationPanel"
+      app
+      right
+      disable-resize-watcher
+      clipped
+      hide-overlay
+      :width="640"
+    >
+      <annotation-browser></annotation-browser>
+    </v-navigation-drawer>
   </v-app>
 </template>
 
@@ -42,6 +57,7 @@ import Menu from "./layout/Menu.vue";
 import UserMenu from "./layout/UserMenu.vue";
 import ServerStatus from "./components/ServerStatus.vue";
 import Snapshots from "./components/Snapshots.vue";
+import AnnotationBrowser from "@/components/AnnotationBrowser/AnnotationBrowser.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import vMousetrap from "./utils/v-mousetrap";
 import { Vue, Component, Prop } from "vue-property-decorator";
@@ -51,6 +67,7 @@ Vue.use(vMousetrap);
 
 @Component({
   components: {
+    AnnotationBrowser,
     Menu,
     UserMenu,
     BreadCrumbs,
@@ -63,6 +80,8 @@ export default class App extends Vue {
   drawer = false;
   snapshotPanel = false;
   snapshotPanelFull = false;
+
+  annotationPanel = false;
 
   fetchConfig() {
     // Fetch the list of available tool templates
@@ -103,5 +122,9 @@ export default class App extends Vue {
 <style lang="scss">
 body > div {
   overflow: hidden;
+}
+
+.v-navigation-drawer {
+  z-index: 100;
 }
 </style>
