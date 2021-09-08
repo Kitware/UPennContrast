@@ -1,6 +1,6 @@
 <template>
   <v-form>
-    <v-text-field label="Annotation Name" v-model="name" @change="changed" />
+    <v-text-field label="Annotation Name" v-model="label" @change="changed" />
     <v-combobox
       v-model="tags"
       :items="tagList"
@@ -125,7 +125,7 @@ export default class AnnotationConfiguration extends Vue {
     { text: "Blob", value: "polygon" }
   ];
 
-  name: string = "";
+  label: string = "";
   shape: string = "";
   tags: string[] = [];
 
@@ -150,7 +150,7 @@ export default class AnnotationConfiguration extends Vue {
       Time: { type: "layer", value: 1 }
     };
 
-    this.name = this.value?.name || "New Annotation";
+    this.label = this.value?.label || "New Annotation";
     this.tags = this.value?.tags || [];
     this.shape = this.value?.shape || "point";
     // inf ?
@@ -160,7 +160,7 @@ export default class AnnotationConfiguration extends Vue {
   changed() {
     this.tagSearchInput = "";
     this.$emit("input", {
-      name: this.name,
+      label: this.label,
       tags: this.tags,
       coordinateAssignments: this.coordinateAssignments,
       shape: this.shape
