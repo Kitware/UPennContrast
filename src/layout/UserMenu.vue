@@ -49,6 +49,7 @@
       offset-y
       :close-on-content-click="store.isLoggedIn"
       transition="slide-y"
+      style="z-index: 20"
     >
       <template #activator="{ on }">
         <v-btn v-on="on">{{ store.userName }}</v-btn>
