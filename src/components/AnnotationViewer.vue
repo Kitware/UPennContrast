@@ -13,6 +13,8 @@ import {
   IToolConfiguration
 } from "../store/model";
 
+import { v4 as uuidv4 } from 'uuid';
+
 @Component
 export default class AnnotationViewer extends Vue {
   readonly store = store;
@@ -337,7 +339,7 @@ export default class AnnotationViewer extends Vue {
 
     // Create the new annotation
     const newAnnotation: IAnnotation = {
-      id: `${Date.now()}`, // TODO: uuid
+      id: uuidv4(),
       label: toolAnnotation.name, // TODO: rename one of these
       tags: toolAnnotation.tags,
       shape: toolAnnotation.shape,
