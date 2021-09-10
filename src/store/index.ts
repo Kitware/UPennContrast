@@ -693,7 +693,12 @@ export class Main extends VuexModule {
         this.z
       );
       const hist = this.api.getResolvedLayerHistogram(images);
-      return {
+      const singleFrame =
+        layer.xy.type !== "max-merge" &&
+        layer.time.type !== "max-merge" &&
+        layer.z.type !== "max-merge" &&
+        images.length === 1;
+      const results: { [key: string]: any } = {
         layer,
         images,
         urls: images.map(image =>
@@ -722,8 +727,39 @@ export class Main extends VuexModule {
             this.dataset
           )
         ),
-        hist
+        hist,
+        singleFrame: singleFrame ? images[0].frameIndex : null
       };
+      if (results.fullUrls && results.fullUrls.length && results.fullUrls[0]) {
+        results.baseQuadOptions = {
+          baseUrl: results.fullUrls[0].split("/tiles")[0] + "/tiles",
+          // maxTextures: 8,
+          query:
+            "style=" +
+            encodeURIComponent(
+              JSON.stringify({
+                min: "min",
+                max: "max",
+                palette: ["#000000", "#ffffff"]
+              })
+            ) +
+            "&cache=true"
+        };
+        let anyImage = this.dataset!.anyImage();
+        if (
+          anyImage &&
+          anyImage.tileinfo &&
+          anyImage.tileinfo.IndexStride &&
+          anyImage.tileinfo.IndexStride.IndexC === 1 &&
+          anyImage.tileinfo.IndexRange &&
+          anyImage.tileinfo.IndexRange.IndexC > 1
+        ) {
+          results.baseQuadOptions.frameBase = layer.channel;
+          results.baseQuadOptions.frameStride =
+            anyImage.tileinfo.IndexRange.IndexC;
+        }
+      }
+      return results;
     });
   }
 

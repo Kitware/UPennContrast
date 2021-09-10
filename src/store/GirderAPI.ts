@@ -524,6 +524,7 @@ function parseTiles(
         sizeY: tile.sizeY,
         tileWidth: tile.tileWidth,
         tileHeight: tile.tileHeight,
+        tileinfo: tile,
         mm_x: tile.mm_x,
         mm_y: tile.mm_y
       };

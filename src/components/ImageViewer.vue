@@ -17,7 +17,7 @@
         style="width: 200px"
       />
     </div>
-    <svg xmlns="http://www.w3.org/2000/svg">
+    <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position: absolute; top: -1px; left: -1px">
       <defs>
         <filter
           :id="'recolor-' + index"
@@ -49,6 +49,7 @@ import {
   zoomTransform
 } from "d3-zoom";
 import { IImage, IImageTile } from "../store/model";
+import setFrameQuad from "../utils/setFrameQuad.js";
 
 function generateFilterURL(
   index: number,
@@ -82,8 +83,14 @@ function generateFilterURL(
     const wpP = wp;
     const bpP = bp;
 
-    el.setAttribute("slope", `${levelP / (wpP - bpP)}`);
-    el.setAttribute("intercept", `${-(levelP * bpP) / (wpP - bpP)}`);
+    const slope = `${levelP / (wpP - bpP)}`;
+    const intercept = `${-(levelP * bpP) / (wpP - bpP)}`;
+    if (slope != el.getAttribute("slope")) {
+      el.setAttribute("slope", slope);
+    }
+    if (intercept != el.getAttribute("intercept")) {
+      el.setAttribute("intercept", intercept);
+    }
   };
 
   const scalePoint = (val: number, mode: string) =>
@@ -391,8 +398,10 @@ export default class ImageViewer extends Vue {
       };
     }
     this.ready.layers.splice(this.layerStackImages.length);
-    this.annotationLayer.moveToTop();
-    this.uiLayer.moveToTop();
+    if (this.annotationLayer.zIndex() !== this.layerStackImages.length * 2 || this.uiLayer.zIndex() !== this.layerStackImages.length * 2 + 1) {
+      this.annotationLayer.moveToTop();
+      this.uiLayer.moveToTop();
+    }
     // set tile urls
     this.layerStackImages.forEach(
       (
@@ -400,20 +409,39 @@ export default class ImageViewer extends Vue {
           layer,
           urls,
           fullUrls,
-          hist
-        }: { layer: any; urls: string[]; fullUrls: string[]; hist: any },
+          hist,
+          singleFrame,
+          baseQuadOptions
+        }: {
+          layer: any;
+          urls: string[];
+          fullUrls: string[];
+          hist: any;
+          singleFrame: number | null;
+          baseQuadOptions: any;
+        },
         layerIndex: number
       ) => {
         let fullLayer = this.imageLayers[layerIndex * 2];
         let adjLayer = this.imageLayers[layerIndex * 2 + 1];
         // set fullLayer's transform
-        generateFilterURL(layerIndex, layer.contrast, layer.color, hist);
         if (!fullUrls[0] || !urls[0]) {
-          fullLayer.visible(false);
+          if (singleFrame !== null && fullLayer.setFrameQuad) {
+            fullLayer.setFrameQuad(singleFrame);
+            fullLayer.visible(true);
+            fullLayer
+              .node()
+              .css("visibility", layer.visible ? "visible" : "hidden");
+            adjLayer.node().css("visibility", "hidden");
+          } else {
+            fullLayer.visible(false);
+          }
           adjLayer.visible(false);
+          adjLayer.node().css("visibility", "hidden");
           Vue.set(this.ready.layers, layerIndex, true);
           return;
         }
+        generateFilterURL(layerIndex, layer.contrast, layer.color, hist);
         fullLayer.visible(true);
         adjLayer.visible(true);
         // use css visibility so that geojs will still load tiles when not
@@ -425,6 +453,15 @@ export default class ImageViewer extends Vue {
         ) {
           fullLayer._imageUrls = fullUrls;
           fullLayer.reset();
+          // or max-merge
+          if (fullUrls.length !== 1 || singleFrame === null) {
+            fullLayer.baseQuad = null;
+          } else {
+            if (!fullLayer.setFrameQuad) {
+              setFrameQuad(someImage.tileinfo, fullLayer, baseQuadOptions);
+            }
+            fullLayer.setFrameQuad(singleFrame);
+          }
         }
         if (
           !adjLayer._imageUrls ||
@@ -447,7 +484,7 @@ export default class ImageViewer extends Vue {
             }
           });
         }
-        const idle = /* fullLayer.idle && */ adjLayer.idle;
+        const idle = adjLayer.idle;
         fullLayer
           .node()
           .css("visibility", !idle && layer.visible ? "visible" : "hidden");
