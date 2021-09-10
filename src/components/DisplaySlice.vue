@@ -14,9 +14,9 @@
           <span>Constant</span>
           <v-text-field
             v-show="value.type === 'constant'"
-            :value="value.value || 0"
-            min="0"
-            :max="maxValue"
+            :value="(value.value || 0) + offset"
+            :min="offset"
+            :max="maxValue + offset"
             type="number"
             dense
             hide-details
@@ -36,8 +36,8 @@
             :value="value.value || 0"
             type="number"
             dense
-            :min="-maxValue"
-            :max="maxValue"
+            :min="minOffsetValue"
+            :max="maxOffsetValue"
             hide-details
             @input="changeSlice('offset', $event)"
           />
@@ -54,7 +54,7 @@
 </style>
 
 <script lang="ts">
-import { Vue, Component, Prop } from "vue-property-decorator";
+import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import { IDisplaySlice, DisplaySliceType } from "../store/model";
 import store from "@/store";
 
@@ -69,6 +69,16 @@ export default class DisplaySlice extends Vue {
   readonly label!: string;
   @Prop()
   readonly displayed!: number;
+  @Prop()
+  readonly offset!: number;
+
+  get maxOffsetValue() {
+    return this.maxValue;
+  }
+
+  get minOffsetValue() {
+    return -this.maxValue;
+  }
 
   get labelHint() {
     if (this.maxValue === 0) {
@@ -78,29 +88,39 @@ export default class DisplaySlice extends Vue {
   }
 
   changeSlice(type: DisplaySliceType, value: string | number | null) {
-    const v = typeof value === "string" ? parseInt(value, 10) : value;
+    const inputValue =
+      typeof value === "string" ? parseInt(value, 10) : value || 0;
 
     const typeHasChanged = this.value.type !== type;
-    if (!typeHasChanged && this.value.value === v) {
+    if (
+      (!typeHasChanged && this.value.value === value) ||
+      (!inputValue && inputValue !== 0)
+    ) {
       return;
     }
 
-    let validated = v;
+    let validated = inputValue;
     switch (type) {
       case "constant":
+        const constantValue =
+          inputValue !== null ? inputValue - this.offset : null;
+
         validated =
-          v == null || typeHasChanged
+          constantValue == null || typeHasChanged
             ? this.displayed
-            : Math.max(Math.min(v, this.maxValue), 0);
+            : Math.max(Math.min(constantValue, this.maxValue), 0);
         break;
       case "offset":
         validated =
-          v == null || typeHasChanged
+          inputValue == null || typeHasChanged
             ? 0
-            : Math.max(Math.min(v, this.maxValue), -this.maxValue);
+            : Math.max(
+                Math.min(inputValue, this.maxOffsetValue),
+                this.minOffsetValue
+              );
         break;
       default:
-        validated = null;
+        validated = 0;
         break;
     }
     this.$emit("change", {

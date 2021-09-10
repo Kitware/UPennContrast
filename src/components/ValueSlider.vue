@@ -69,9 +69,17 @@ export default class ValueSlider extends Vue {
     this.$emit("input", numberValue - this.offset);
   }
 
+  private updateInternalValue() {
+    this.internalValue = this.value + this.offset;
+  }
+
+  mounted() {
+    this.updateInternalValue();
+  }
+
   @Watch("value")
-  watchValue(value: number) {
-    this.internalValue = value + this.offset;
+  watchValue() {
+    this.updateInternalValue();
   }
 }
 </script>
