@@ -12,6 +12,10 @@
           >{{ tag }}</v-chip
         >
       </template>
+      <!-- Index -->
+      <template v-slot:item.id="{ item }">
+        <span>{{ annotations.indexOf(item) }}</span>
+      </template>
     </v-data-table>
   </div>
 </template>
@@ -43,7 +47,7 @@ export default class AnnotationList extends Vue {
 
   headers = [
     {
-      text: "Annotation ID",
+      text: "Annotation Index",
       value: "id"
     },
     {
