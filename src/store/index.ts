@@ -83,6 +83,16 @@ export class Main extends VuexModule {
   }
 
   @Mutation
+  public setDrawAnnotations(value: boolean) {
+    this.drawAnnotations = value;
+  }
+
+  @Mutation
+  public setDrawAnnotationConnections(value: boolean) {
+    this.drawAnnotationConnections = value;
+  }
+
+  @Mutation
   protected loggedIn({
     girderUrl,
     girderRest

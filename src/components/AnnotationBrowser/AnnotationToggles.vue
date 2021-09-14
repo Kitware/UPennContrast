@@ -3,18 +3,34 @@
     <v-subheader>Annotation Controls</v-subheader>
     <v-list dense>
       <v-list-item>
-        <v-checkbox dense label="Show Annotations"></v-checkbox>
+        <v-checkbox
+          v-model="drawAnnotations"
+          dense
+          label="Show Annotations"
+        ></v-checkbox>
       </v-list-item>
     </v-list>
     <v-list dense value="true">
       <v-list-item>
-        <v-checkbox dense label="Restrict to Filters"></v-checkbox>
+        <v-checkbox
+          :disabled="!drawAnnotations"
+          dense
+          label="Restrict to Filters"
+        ></v-checkbox>
       </v-list-item>
       <v-list-item>
-        <v-checkbox dense label="Show Only Active "></v-checkbox>
+        <v-checkbox
+          :disabled="!drawAnnotations"
+          dense
+          label="Show Only Active "
+        ></v-checkbox>
       </v-list-item>
       <v-list-item>
-        <v-checkbox dense label="Show Connections"></v-checkbox>
+        <v-checkbox
+          :disabled="!drawAnnotations"
+          dense
+          label="Show Connections"
+        ></v-checkbox>
       </v-list-item>
     </v-list>
   </div>
@@ -29,5 +45,21 @@ import store from "@/store";
 })
 export default class AnnotationToggles extends Vue {
   readonly store = store;
+
+  get drawAnnotations() {
+    return this.store.drawAnnotations;
+  }
+
+  set drawAnnotations(value: boolean) {
+    this.store.setDrawAnnotations(value);
+  }
+
+  get drawConnections() {
+    return this.store.drawAnnotationConnections;
+  }
+
+  set drawConnections(value: boolean) {
+    this.store.setDrawAnnotationConnections(value);
+  }
 }
 </script>
