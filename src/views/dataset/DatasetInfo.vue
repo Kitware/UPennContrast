@@ -102,6 +102,10 @@
                       v-on:click.stop="openRemoveConfigurationDialog(c)"
                       ><v-icon left>mdi-close</v-icon>remove</v-btn
                     >
+                    <v-btn color="primary" @click="duplicateConfiguration(c)">
+                      <v-icon left>mdi-content-duplicate</v-icon>
+                      duplicate
+                    </v-btn>
                     <v-btn color="primary" :to="toRoute(c)">
                       <v-icon left>mdi-eye</v-icon>
                       view
@@ -250,6 +254,26 @@ export default class DatasetInfo extends Vue {
 
   mounted() {
     this.ensureDefaultConfiguration();
+  }
+
+  async duplicateConfiguration(c: IDatasetConfiguration) {
+    const config = await this.store.createConfiguration({
+      name: c.name,
+      description: c.description
+    });
+    if (!config) {
+      return;
+    }
+
+    const view: IViewConfiguration = { layers: c.view.layers };
+    config.view = view;
+
+    await store.api.updateConfiguration(config);
+
+    this.$router.push({
+      name: "configuration",
+      params: Object.assign({ config: config.id }, this.$route.params)
+    });
   }
 
   async ensureDefaultConfiguration() {
