@@ -1,26 +1,39 @@
 <template>
   <div>
-    <v-card pa-3>
+    <v-card class="pa-1">
       <v-card-title>
         Add a new tool
       </v-card-title>
-      <v-card-text>
-        <v-text-field label="Tool Name" v-model="toolName"> </v-text-field>
-        <v-textarea
-          label="Tool Description"
-          v-model="toolDescription"
-          auto-grow
-          rows="2"
-        >
-        </v-textarea>
-        <tool-type-selection v-model="selectedItemTemplate">
-        </tool-type-selection>
-      </v-card-text>
-    </v-card>
-    <v-card>
-      <v-card-text>
+      <v-card-text class="pa-1">
+        <v-card>
+          <v-card-text class="pa-1">
+            <v-container>
+              <v-row>
+                <v-col>
+                  <v-text-field label="Tool Name" v-model="toolName" dense>
+                  </v-text-field>
+                </v-col>
+                <v-col>
+                  <tool-type-selection v-model="selectedItemTemplate">
+                  </tool-type-selection>
+                </v-col>
+              </v-row>
+              <v-row>
+                <v-col>
+                  <v-textarea
+                    label="Tool Description"
+                    v-model="toolDescription"
+                    auto-grow
+                    rows="2"
+                    dense
+                  >
+                  </v-textarea>
+                </v-col>
+              </v-row>
+            </v-container>
+          </v-card-text>
+        </v-card>
         <tool-configuration
-          v-if="selectedItemTemplate"
           :template="selectedItemTemplate"
           v-model="toolValues"
           @submit="createTool"

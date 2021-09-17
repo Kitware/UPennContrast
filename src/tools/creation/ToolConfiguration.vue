@@ -1,26 +1,34 @@
 <template>
   <v-form v-if="internalTemplate && toolValues">
     <template v-for="(item, index) in internalTemplate">
-      <v-card :key="index" class="my-3">
-        <v-card-title v-if="item.name && item.name.length">
+      <v-card :key="index" class="my-1">
+        <v-card-title v-if="item.name && item.name.length" class="py-1">
           {{ item.name }}
         </v-card-title>
-        <v-card-text>
-          <component
-            :is="typeToComponentName[item.type]"
-            v-bind="item.meta"
-            v-model="toolValues[item.id]"
-            :ref="item.id"
-            return-object
-            @change="changed"
-          >
-            <v-radio
-              v-for="(value, index) in item.values"
-              :key="index"
-              v-bind="value"
-            >
-            </v-radio>
-          </component>
+        <v-card-text class="pa-1">
+          <v-container>
+            <v-row class="pa-0">
+              <v-col :cols="item.type === 'select' ? 6 : 12" class="py-0">
+                <component
+                  :is="typeToComponentName[item.type]"
+                  v-bind="item.meta"
+                  v-model="toolValues[item.id]"
+                  :ref="item.id"
+                  return-object
+                  @change="changed"
+                  dense
+                  small
+                >
+                  <v-radio
+                    v-for="(value, index) in item.values"
+                    :key="index"
+                    v-bind="value"
+                  >
+                  </v-radio>
+                </component>
+              </v-col>
+            </v-row>
+          </v-container>
         </v-card-text>
       </v-card>
     </template>

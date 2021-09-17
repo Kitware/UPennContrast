@@ -1,56 +1,67 @@
 <template>
   <v-form ref="form">
-    <v-combobox
-      v-model="tags"
-      :items="tagList"
-      :search-input.sync="tagSearchInput"
-      @change="changed"
-      label="Assign Tags"
-      multiple
-      hide-selected
-      small-chips
-      dense
-    >
-      <template v-slot:selection="{ attrs, index, item, parent }">
-        <v-chip
-          :key="index"
-          class="pa-2"
-          v-bind="attrs"
-          close
-          small
-          @click:close="parent.selectItem(item)"
-        >
-          {{ item }}
-        </v-chip>
-      </template>
-    </v-combobox>
-    <v-select
-      label="Shape"
-      :items="availableShapes"
-      v-model="shape"
-      @change="changed"
-    >
-    </v-select>
-    <v-container fluid>
+    <v-container>
       <v-row>
         <v-col>
-          <v-subheader>Layer</v-subheader>
+          <v-combobox
+            v-model="tags"
+            :items="tagList"
+            :search-input.sync="tagSearchInput"
+            @change="changed"
+            label="Tags"
+            multiple
+            hide-selected
+            small-chips
+            dense
+          >
+            <template v-slot:selection="{ attrs, index, item, parent }">
+              <v-chip
+                :key="index"
+                class="pa-2"
+                v-bind="attrs"
+                close
+                small
+                @click:close="parent.selectItem(item)"
+              >
+                {{ item }}
+              </v-chip>
+            </template>
+          </v-combobox>
+        </v-col>
+        <v-col>
+          <v-select
+            label="Shape"
+            :items="availableShapes"
+            v-model="shape"
+            @change="changed"
+            dense
+          >
+          </v-select>
+        </v-col>
+      </v-row>
+      <v-row>
+        <v-col class="py-0">
+          <v-subheader class="pa-0">Layer</v-subheader>
           <v-select
             :items="layerItems"
             item-text="label"
             dense
-            label="Choose a layer"
             v-model="coordinateAssignments.layer"
             @change="changed"
           />
         </v-col>
-        <v-col v-for="(coordinate, index) in coordinates" :key="index">
+        <v-col
+          v-for="(coordinate, index) in coordinates"
+          :key="index"
+          class="py-0"
+        >
           <v-radio-group
             @change="changed"
             :label="coordinate"
             v-model="coordinateAssignments[coordinate].type"
             :key="`${index}Radio`"
             mandatory
+            dense
           >
             <v-radio
               value="layer"
@@ -61,12 +72,14 @@
               <template v-slot:label>
                 <span>Assign</span>
                 <v-text-field
+                  dense
                   type="number"
                   :min="0"
-                  class="pl-12"
+                  class="pl-4"
                   v-model="coordinateAssignments[coordinate].value"
                   @change="changed"
                   :disabled="coordinateAssignments[coordinate].type === 'layer'"
+                  :style="{ width: 'min-content' }"
                   :rules="[
                     val =>
                       Number.parseInt(val) <

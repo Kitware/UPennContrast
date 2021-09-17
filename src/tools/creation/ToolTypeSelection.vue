@@ -6,6 +6,7 @@
     item-value="type"
     label="Select a tool type to add"
     return-object
+    dense
   >
   </v-select>
 </template>

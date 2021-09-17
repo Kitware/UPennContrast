@@ -11,6 +11,7 @@
           multiple
           hide-selected
           small-chips
+          dense
         >
           <template v-slot:selection="{ attrs, index, item, parent }">
             <v-chip
@@ -33,6 +34,7 @@
           item-text="label"
           :label="layerLabelWithDefault"
           @change="changed"
+          dense
         >
         </v-select>
       </v-col>
