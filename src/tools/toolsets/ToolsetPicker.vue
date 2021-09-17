@@ -41,15 +41,12 @@
   </v-card>
 </template>
 <script lang="ts">
-import { Vue, Component, Watch, Prop } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
-// Manually import those vuetify components that might be used procedurally
-import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
-import AnnotationConfiguration from "@/tools/creation/templates/AnnotationConfiguration.vue";
-import TagAndChannelRestriction from "@/tools/creation/templates/TagAndLayerRestriction.vue";
 import ToolIcon from "@/tools/ToolIcon.vue";
 import { IToolConfiguration } from "@/store/model";
 
+// Interface for adding tools to the current toolset
 @Component({
   components: { ToolIcon }
 })

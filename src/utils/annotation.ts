@@ -2,6 +2,7 @@ import { IAnnotation, IDisplayLayer, IImage, IGeoJSPoint } from "@/store/model";
 import geojs from "geojs";
 import { logError } from "@/utils/log";
 
+// Which style an annotation should have, depending on its layer (color change)
 export function getAnnotationStyleFromLayer(layer: IDisplayLayer) {
   const style = {
     stroke: true,
@@ -23,6 +24,7 @@ export function getAnnotationStyleFromLayer(layer: IDisplayLayer) {
   return style;
 }
 
+// Get the tile's index in unrolled layer based on its XY/Z/Time location
 export function unrollIndexFromImages(
   XY: number,
   Z: number,
@@ -40,6 +42,7 @@ export function unrollIndexFromImages(
   return matchingImage?.keyOffset || 0;
 }
 
+// Create a geojs annotation depending on its shape
 export function geojsAnnotationFactory(
   shape: string,
   coordinates: IGeoJSPoint[]

@@ -2,6 +2,7 @@
   <v-container>
     <v-row>
       <v-col>
+        <!-- tags -->
         <v-combobox
           v-model="newTags"
           :items="tagList"
@@ -28,6 +29,7 @@
         </v-combobox>
       </v-col>
       <v-col>
+        <!-- layers -->
         <v-select
           v-model="selectedLayer"
           :items="layerItems"
@@ -47,6 +49,7 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import { IToolConfiguration } from "@/store/model";
 
+// Tool creation interface element for picking tags and layers for connections
 @Component({
   components: {}
 })
@@ -77,6 +80,7 @@ export default class TagAndLayerRestriction extends Vue {
     return this.store.configuration?.view.layers || [];
   }
 
+  // map layers to v-select items
   get layerItems() {
     return [
       ...this.layers.map((layer, index) => ({
@@ -87,6 +91,7 @@ export default class TagAndLayerRestriction extends Vue {
     ];
   }
 
+  // list of existing tags for autocomplete
   get tagList(): string[] {
     return this.store.tools
       .filter(

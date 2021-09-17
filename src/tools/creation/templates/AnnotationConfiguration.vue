@@ -3,6 +3,7 @@
     <v-container>
       <v-row>
         <v-col>
+          <!-- tags -->
           <v-combobox
             v-model="tags"
             :items="tagList"
@@ -29,6 +30,7 @@
           </v-combobox>
         </v-col>
         <v-col>
+          <!-- shape selection -->
           <v-select
             label="Shape"
             :items="availableShapes"
@@ -39,9 +41,11 @@
           </v-select>
         </v-col>
       </v-row>
+      <!-- location -->
       <v-row>
         <v-col class="py-0">
           <v-subheader class="pa-0">Layer</v-subheader>
+          <!-- layer -->
           <v-select
             :items="layerItems"
             item-text="label"
@@ -50,6 +54,7 @@
             @change="changed"
           />
         </v-col>
+        <!-- Z and Time assignments -->
         <v-col
           v-for="(coordinate, index) in coordinates"
           :key="index"
@@ -96,12 +101,13 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Watch, Prop } from "vue-property-decorator";
+import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
 import { IToolConfiguration } from "@/store/model";
 
 type VForm = Vue & { validate: () => boolean };
 
+// Interface element for configuring an annotation creation tool
 @Component({
   components: {}
 })

@@ -14,6 +14,7 @@
                   </v-text-field>
                 </v-col>
                 <v-col>
+                  <!-- Pick which template should be used for the tool configuration -->
                   <tool-type-selection v-model="selectedItemTemplate">
                   </tool-type-selection>
                 </v-col>
@@ -33,6 +34,7 @@
             </v-container>
           </v-card-text>
         </v-card>
+        <!-- Form elements generated from the template -->
         <tool-configuration
           :template="selectedItemTemplate"
           v-model="toolValues"
@@ -65,6 +67,7 @@ const defaultValues = {
   description: ""
 };
 
+// Popup for new tool configuration
 @Component({
   components: {
     ToolConfiguration,
@@ -111,6 +114,8 @@ export default class ToolCreation extends Vue {
 
         // Add this tool to the current toolset
         this.store.addToolIdsToCurrentToolset({ ids: [tool.id] });
+
+        // Save
         this.store.syncConfiguration();
 
         this.close();

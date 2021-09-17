@@ -46,6 +46,7 @@
         </v-card>
       </v-dialog>
     </v-app-bar>
+    <!-- List toolset tools -->
     <v-list v-if="toolset && toolset.toolIds && toolsetTools.length" dense>
       <v-list-item-group v-model="selectedToolId">
         <template v-for="(tool, index) in toolsetTools">
@@ -84,6 +85,7 @@ import ToolIcon from "@/tools/ToolIcon.vue";
 import ToolsetPicker from "@/tools/toolsets/ToolsetPicker.vue";
 import ToolCreation from "@/tools/creation/ToolCreation.vue";
 
+// Lists tools from a toolset, allows selecting a tool from the list, and adding new tools
 @Component({
   components: { ToolCreation, ToolIcon, ToolsetPicker }
 })

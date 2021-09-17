@@ -65,6 +65,13 @@ export default class App extends Vue {
   snapshotPanelFull = false;
 
   fetchConfig() {
+    // Fetch the list of available tool templates
+    // It consists of a json file containing a list of items, each item describing
+    // the interface elements for a different tool type:
+    // * name: Name of the tool type
+    // * type: Type of tool to be added
+    // * interface: List of various form components necessary to configure the tool
+    // Interface elements have a name, an id, a type (see ToolConfiguration) and a type-dependent meta field
     axios
       .get("config/templates.json")
       .then(resp => {

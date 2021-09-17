@@ -26,6 +26,7 @@ import {
 
 import { v4 as uuidv4 } from "uuid";
 
+// Draws annotations on the given layer, and provides functionnality for the user selected tool.
 @Component
 export default class AnnotationViewer extends Vue {
   readonly store = store;
@@ -78,14 +79,14 @@ export default class AnnotationViewer extends Vue {
     return this.store.selectedToolId;
   }
 
-  get selectedTool(): any {
+  get selectedTool(): IToolConfiguration | null {
     if (!this.selectedToolId) {
       return null;
     }
     const tool = this.store.tools.find(
       (tool: IToolConfiguration) => tool.id === this.selectedToolId
     );
-    return tool;
+    return tool || null;
   }
 
   getAnnotationStyle(annotation: IAnnotation) {
@@ -93,6 +94,7 @@ export default class AnnotationViewer extends Vue {
     return getAnnotationStyleFromLayer(layer);
   }
 
+  // Get the index of the tile an annotation should be drawn in.
   unrollIndex(
     XY: number,
     Z: number,
@@ -113,6 +115,7 @@ export default class AnnotationViewer extends Vue {
     return unrollIndexFromImages(XY, Z, Time, images);
   }
 
+  // Transform an annotation's coordiantes, taking unrolling into account.
   unrolledCoordinates(annotation: IAnnotation, image: IImage) {
     const tileW = image.sizeX;
     const tileH = image.sizeY;
@@ -154,7 +157,7 @@ export default class AnnotationViewer extends Vue {
     this.drawNewAnnotations(displayedIds);
   }
 
-  shouldDisplayAnnotation(annotation: IAnnotation) {
+  shouldDisplayAnnotation(annotation: IAnnotation): boolean {
     if (!annotation.assignment) {
       return false;
     }
@@ -177,6 +180,7 @@ export default class AnnotationViewer extends Vue {
     return true;
   }
 
+  // Remove from the layer annotations that should no longer be renderered (index change, layer change...)
   clearOldAnnotations(clearAll = false) {
     this.annotationLayer.annotations().forEach((annotation: any) => {
       if (clearAll) {
@@ -184,7 +188,7 @@ export default class AnnotationViewer extends Vue {
         return;
       }
 
-      // TODO: this is temporary to debug connections
+      // Check for connections
       if (annotation.options("isConnection")) {
         const childId = annotation.options("childId");
         const parentId = annotation.options("parentId");
@@ -214,24 +218,24 @@ export default class AnnotationViewer extends Vue {
     });
   }
 
-  drawNewAnnotations(annotationIds: string[]) {
+  // Add to the layer annotations that should be rendered and have not already been added.
+  drawNewAnnotations(existingIds: string[]) {
     this.layerAnnotations
       // Check for annotation that have not been displayed yet
-      .filter(annotation => !annotationIds.includes(annotation.id))
+      .filter(annotation => !existingIds.includes(annotation.id))
       // Check for valid coordinates
       .filter(this.shouldDisplayAnnotation)
       .forEach(annotation => {
         const newGeoJSAnnotation = this.createGeoJSAnnotation(annotation);
         this.annotationLayer.addAnnotation(newGeoJSAnnotation);
 
-        // TEMP: find and draw connections for this annotation
         this.store.annotationConnections
           .filter(
             (connection: IAnnotationConnection) =>
               connection.parentId === annotation.id
           )
           .forEach((connection: IAnnotationConnection) => {
-            // TEMP: Draw lines as a way to show the connections
+            // Draw lines as a way to show the connections
             const childAnnotation = this.store.annotations.find(
               (child: IAnnotation) => child.id === connection.childId
             );
@@ -275,12 +279,12 @@ export default class AnnotationViewer extends Vue {
     return newGeoJSAnnotation;
   }
 
+  // Draw lines as a way to show the connections
   drawGeoJSAnnotationFromConnection(
     connection: IAnnotationConnection,
     parent: IAnnotation,
     child: IAnnotation
   ) {
-    // TEMP: Draw lines as a way to show the connections
     const anyImage = this.store.dataset?.anyImage();
 
     if (!anyImage) {
@@ -343,7 +347,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   private addAnnotationFromGeoJsAnnotation(annotation: any) {
-    if (!annotation) {
+    if (!annotation || !this.selectedTool) {
       return;
     }
 
@@ -370,6 +374,9 @@ export default class AnnotationViewer extends Vue {
   }
 
   private addAnnotationConnections(annotation: IAnnotation) {
+    if (!this.selectedTool) {
+      return;
+    }
     const connectTo = this.selectedTool.values.connectTo;
     // Look for connections
     if (connectTo && connectTo.tags && connectTo.tags.length) {
@@ -392,7 +399,7 @@ export default class AnnotationViewer extends Vue {
         return value.tags.some(tag => connectTo.tags.includes(tag));
       });
       if (eligibleAnnotations.length) {
-        // Find the closest eligible annotation
+        // Find the closest among eligible annotation
         const sortedAnnotations = eligibleAnnotations.sort(
           (valueA: IAnnotation, valueB: IAnnotation) => {
             const distanceA = annotationDistance(valueA, annotation);
@@ -405,7 +412,7 @@ export default class AnnotationViewer extends Vue {
         // Create and add the new connection
         const newConnection: IAnnotationConnection = {
           id: `${Date.now()}`,
-          tags: [], // TODO: nothing is speced for connection tags right now
+          tags: [],
           label: "A Connection",
           parentId: closest.id,
           childId: annotation.id,
@@ -428,13 +435,14 @@ export default class AnnotationViewer extends Vue {
       this.annotationLayer.mode(null);
       return;
     }
-    switch (this.selectedTool?.type) {
+    switch (this.selectedTool.type) {
       case "create":
         const annotation = this.selectedTool.values.annotation;
         this.annotationLayer.mode(annotation?.shape);
         break;
       default:
         logWarning(`${this.selectedTool.type} tools are not supported yet`);
+        this.annotationLayer.mode(null);
     }
   }
 
@@ -445,6 +453,10 @@ export default class AnnotationViewer extends Vue {
   }
 
   handleAnnotationChange(evt: any) {
+    if (!this.selectedTool) {
+      return;
+    }
+
     switch (evt.event) {
       case "geo_annotation_state":
         if (this.selectedTool.type === "create") {
