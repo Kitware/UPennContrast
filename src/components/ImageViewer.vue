@@ -44,17 +44,14 @@
 <script lang="ts">
 // in cosole debugging, you can access the map via
 //  $('.geojs-map').data('data-geojs-map')
-import { Vue, Component, Watch } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
 import geojs from "geojs";
-import {
-  zoom as d3Zoom,
-  D3ZoomEvent,
-  zoomIdentity,
-  zoomTransform
-} from "d3-zoom";
-import { IImage, IImageTile } from "../store/model";
+
+import { IImage } from "../store/model";
 import setFrameQuad from "../utils/setFrameQuad.js";
+
+import AnnotationViewer from "@/components/AnnotationViewer.vue";
 
 function generateFilterURL(
   index: number,
