@@ -23,7 +23,12 @@
         style="width: 200px"
       />
     </div>
-    <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position: absolute; top: -1px; left: -1px">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="0"
+      height="0"
+      style="position: absolute; top: -1px; left: -1px"
+    >
       <defs>
         <filter
           :id="'recolor-' + index"
@@ -364,7 +369,10 @@ export default class ImageViewer extends Vue {
       };
     }
     this.ready.layers.splice(this.layerStackImages.length);
-    if (this.annotationLayer.zIndex() !== this.layerStackImages.length * 2 || this.uiLayer.zIndex() !== this.layerStackImages.length * 2 + 1) {
+    if (
+      this.annotationLayer.zIndex() !== this.layerStackImages.length * 2 ||
+      this.uiLayer.zIndex() !== this.layerStackImages.length * 2 + 1
+    ) {
       this.annotationLayer.moveToTop();
       this.uiLayer.moveToTop();
     }
