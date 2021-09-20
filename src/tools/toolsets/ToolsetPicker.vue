@@ -43,6 +43,8 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
+import toolsStore from "@/store/tool";
+
 import ToolIcon from "@/tools/ToolIcon.vue";
 import { IToolConfiguration } from "@/store/model";
 
@@ -52,6 +54,7 @@ import { IToolConfiguration } from "@/store/model";
 })
 export default class ToolsetPicker extends Vue {
   readonly store = store;
+  readonly toolsStore = toolsStore;
 
   selectedTools: string[] = [];
 
@@ -62,7 +65,9 @@ export default class ToolsetPicker extends Vue {
     return [];
   }
   get tools() {
-    return this.store.tools.filter(({ id }) => !this.toolsetIds.includes(id));
+    return this.toolsStore.tools.filter(
+      ({ id }) => !this.toolsetIds.includes(id)
+    );
   }
 
   get queriedTools() {
@@ -83,7 +88,7 @@ export default class ToolsetPicker extends Vue {
 
   confirm() {
     if (this.selectedTools.length) {
-      this.store.addToolIdsToCurrentToolset({ ids: this.selectedTools });
+      this.toolsStore.addToolIdsToCurrentToolset({ ids: this.selectedTools });
       this.store.syncConfiguration();
       this.selectedTools = [];
       this.$emit("done");
@@ -91,7 +96,7 @@ export default class ToolsetPicker extends Vue {
   }
 
   mounted() {
-    this.store.fetchAvailableTools();
+    this.toolsStore.fetchAvailableTools();
   }
 }
 </script>

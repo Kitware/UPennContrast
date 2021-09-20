@@ -45,7 +45,7 @@ import Snapshots from "./components/Snapshots.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import vMousetrap from "./utils/v-mousetrap";
 import { Vue, Component, Prop } from "vue-property-decorator";
-import store from "@/store";
+import toolsStore from "@/store/tool";
 
 Vue.use(vMousetrap);
 
@@ -59,7 +59,7 @@ Vue.use(vMousetrap);
   }
 })
 export default class App extends Vue {
-  readonly store = store;
+  readonly toolsStore = toolsStore;
   drawer = false;
   snapshotPanel = false;
   snapshotPanelFull = false;
@@ -75,7 +75,7 @@ export default class App extends Vue {
     axios
       .get("config/templates.json")
       .then(resp => {
-        this.store.setToolTemplateList(resp.data);
+        this.toolsStore.setToolTemplateList(resp.data);
       })
       .catch(err => {
         console.log(err); // eslint-disable-line no-console

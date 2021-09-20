@@ -4,6 +4,9 @@
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
+import annotationStore from "@/store/annotation";
+import toolsStore from "@/store/tool";
+
 import geojs from "geojs";
 
 import {
@@ -30,6 +33,8 @@ import { v4 as uuidv4 } from "uuid";
 @Component
 export default class AnnotationViewer extends Vue {
   readonly store = store;
+  readonly annotationStore = annotationStore;
+  readonly toolsStore = toolsStore;
 
   @Prop()
   readonly annotationLayer: any;
@@ -50,7 +55,7 @@ export default class AnnotationViewer extends Vue {
 
   // All annotations available for the currently enabled layers
   get layerAnnotations() {
-    return this.store.annotations.filter(
+    return this.annotationStore.annotations.filter(
       annotation => this.layers[annotation.assignment.layer].visible
     );
   }
@@ -76,14 +81,14 @@ export default class AnnotationViewer extends Vue {
   }
 
   get selectedToolId() {
-    return this.store.selectedToolId;
+    return this.toolsStore.selectedToolId;
   }
 
   get selectedTool(): IToolConfiguration | null {
     if (!this.selectedToolId) {
       return null;
     }
-    const tool = this.store.tools.find(
+    const tool = this.toolsStore.tools.find(
       (tool: IToolConfiguration) => tool.id === this.selectedToolId
     );
     return tool || null;
@@ -192,8 +197,12 @@ export default class AnnotationViewer extends Vue {
       if (annotation.options("isConnection")) {
         const childId = annotation.options("childId");
         const parentId = annotation.options("parentId");
-        const parent = this.store.annotations.find(({ id }) => id === parentId);
-        const child = this.store.annotations.find(({ id }) => id === childId);
+        const parent = this.annotationStore.annotations.find(
+          ({ id }) => id === parentId
+        );
+        const child = this.annotationStore.annotations.find(
+          ({ id }) => id === childId
+        );
         if (
           !parent ||
           !child ||
@@ -229,14 +238,14 @@ export default class AnnotationViewer extends Vue {
         const newGeoJSAnnotation = this.createGeoJSAnnotation(annotation);
         this.annotationLayer.addAnnotation(newGeoJSAnnotation);
 
-        this.store.annotationConnections
+        this.annotationStore.annotationConnections
           .filter(
             (connection: IAnnotationConnection) =>
               connection.parentId === annotation.id
           )
           .forEach((connection: IAnnotationConnection) => {
             // Draw lines as a way to show the connections
-            const childAnnotation = this.store.annotations.find(
+            const childAnnotation = this.annotationStore.annotations.find(
               (child: IAnnotation) => child.id === connection.childId
             );
             if (
@@ -362,8 +371,8 @@ export default class AnnotationViewer extends Vue {
     }
 
     // Save the new annotation
-    this.store.addAnnotation(newAnnotation);
-    this.store.syncAnnotations();
+    this.annotationStore.addAnnotation(newAnnotation);
+    this.annotationStore.syncAnnotations();
 
     this.addAnnotationConnections(newAnnotation);
 
@@ -380,7 +389,7 @@ export default class AnnotationViewer extends Vue {
     const connectTo = this.selectedTool.values.connectTo;
     // Look for connections
     if (connectTo && connectTo.tags && connectTo.tags.length) {
-      const annotations = this.store.annotations;
+      const annotations = this.annotationStore.annotations;
       // Find eligible annotations (matching tags and channel)
       const eligibleAnnotations = annotations.filter((value: IAnnotation) => {
         if (
@@ -420,7 +429,7 @@ export default class AnnotationViewer extends Vue {
             length: annotationDistance(closest, annotation)
           }
         };
-        this.store.addConnection(newConnection);
+        this.annotationStore.addConnection(newConnection);
         this.drawGeoJSAnnotationFromConnection(
           newConnection,
           annotation,
@@ -476,7 +485,7 @@ export default class AnnotationViewer extends Vue {
   // Fetch annotations for the current configuration
   @Watch("configuration")
   fetchAnnotations() {
-    this.store.fetchAnnotations();
+    this.annotationStore.fetchAnnotations();
   }
 
   @Watch("xy")

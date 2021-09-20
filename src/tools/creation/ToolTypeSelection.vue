@@ -12,7 +12,7 @@
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
-import store from "@/store";
+import toolsStore from "@/store/tool";
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 
 @Component({
@@ -21,7 +21,7 @@ import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
   }
 })
 export default class ToolTypeSelection extends Vue {
-  readonly store = store;
+  readonly store = toolsStore;
 
   @Prop()
   private value: any;

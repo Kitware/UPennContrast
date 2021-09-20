@@ -58,6 +58,7 @@
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
+import toolsStore from "@/store/tool";
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";
 import { logError } from "@/utils/log";
@@ -76,6 +77,7 @@ const defaultValues = {
 })
 export default class ToolCreation extends Vue {
   readonly store = store;
+  readonly toolsStore = toolsStore;
 
   toolValues: any = { ...defaultValues };
 
@@ -99,7 +101,7 @@ export default class ToolCreation extends Vue {
       const name = this.toolName || "Unnamed Tool";
       const description = this.toolDescription || "";
       // Create an empty tool to get the id
-      this.store.createTool({ name, description }).then(tool => {
+      this.toolsStore.createTool({ name, description }).then(tool => {
         if (tool === null) {
           logError("Failed to create a new tool on the server");
           return;
@@ -108,12 +110,12 @@ export default class ToolCreation extends Vue {
         tool.values = this.toolValues;
         tool.type = this.selectedItemTemplate.type;
         // Update this tool with actual values
-        this.store.updateTool(tool).then(() => {
+        this.toolsStore.updateTool(tool).then(() => {
           this.store.syncConfiguration();
         });
 
         // Add this tool to the current toolset
-        this.store.addToolIdsToCurrentToolset({ ids: [tool.id] });
+        this.toolsStore.addToolIdsToCurrentToolset({ ids: [tool.id] });
 
         // Save
         this.store.syncConfiguration();

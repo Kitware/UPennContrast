@@ -15,14 +15,8 @@ import {
   IDatasetConfigurationMeta,
   IDisplayLayer,
   IImage,
-  IImageTile,
-  IAnnotation,
-  IAnnotationConnection,
-  newLayer,
-  IToolConfiguration
+  newLayer
 } from "./model";
-
-import { logWarning } from "@/utils/log";
 
 import persister from "./Persister";
 import store from "./root";
@@ -55,14 +49,6 @@ export class Main extends VuexModule {
   time: number = 0;
   layerMode: "single" | "multiple" = "multiple";
 
-  annotations: IAnnotation[] = [];
-  annotationConnections: IAnnotationConnection[] = [];
-
-  selectedToolId: string | null = null;
-  toolTemplateList: any[] = [];
-
-  userTools: IToolConfiguration[] = [];
-
   unrollXY: boolean = false;
   unrollZ: boolean = false;
   unrollT: boolean = false;
@@ -89,48 +75,6 @@ export class Main extends VuexModule {
         this.z
       );
     };
-  }
-
-  get tools(): IToolConfiguration[] {
-    return this.userTools.filter(
-      (tool: IToolConfiguration) =>
-        this.dataset &&
-        tool.datasetId === this.dataset.id &&
-        this.configuration &&
-        tool.configurationId === this.configuration.id
-    );
-  }
-
-  @Mutation
-  public addTools({ tools }: { tools: IToolConfiguration[] }) {
-    this.userTools = [
-      // If duplicates are found, make sure we only keep the latest ones
-      // Only keep tools for the current dataset configuration
-      ...this.userTools.filter(
-        (existingTool: IToolConfiguration) =>
-          !tools.find(newTool => existingTool.id === newTool.id)
-      ),
-      ...tools
-    ];
-  }
-
-  @Mutation
-  public addToolIdsToCurrentToolset({ ids }: { ids: string[] }) {
-    if (this.configuration?.toolset) {
-      this.configuration.toolset.toolIds = [
-        ...this.configuration?.toolset.toolIds,
-        ...ids
-      ];
-    }
-  }
-
-  @Mutation
-  public removeToolIdFromCurrentToolset({ id }: { id: string }) {
-    if (this.configuration?.toolset) {
-      this.configuration.toolset.toolIds = this.configuration.toolset.toolIds.filter(
-        idToFilter => id !== idToFilter
-      );
-    }
   }
 
   @Mutation
@@ -352,30 +296,6 @@ export class Main extends VuexModule {
     }
   }
 
-  // We don't need to fetch all tools unless the user wants to add new ones
-  // This only fetches the tools in the current toolset
-  @Action
-  async refreshToolsInCurrentToolset() {
-    if (this.configuration?.toolset) {
-      this.configuration.toolset.toolIds.forEach(toolId => {
-        this.api
-          .getTool(toolId)
-          .then(tool => {
-            this.addTools({ tools: [tool] });
-          })
-          .catch(e => {
-            if (this.configuration?.toolset.toolIds) {
-              this.configuration.toolset.toolIds = this.configuration.toolset.toolIds.filter(
-                id => id !== toolId
-              );
-
-              logWarning(`Could not fetch tool: ${e.message}`);
-            }
-          });
-      });
-    }
-  }
-
   @Action
   async setSelectedConfiguration(id: string | null) {
     if (!this.isLoggedIn || !id) {
@@ -443,34 +363,6 @@ export class Main extends VuexModule {
       );
       sync.setSaving(false);
       return config;
-    } catch (error) {
-      sync.setSaving(error);
-    }
-    return null;
-  }
-
-  @Action
-  async createTool({
-    name,
-    description
-  }: {
-    name: string;
-    description: string;
-  }) {
-    if (!this.dataset || !this.configuration) {
-      return null;
-    }
-    try {
-      sync.setSaving(true);
-      const tool = await this.api.createTool(
-        name,
-        description,
-        this.dataset,
-        this.configuration
-      );
-      this.addTools({ tools: [tool] });
-      sync.setSaving(false);
-      return tool;
     } catch (error) {
       sync.setSaving(error);
     }
@@ -607,39 +499,6 @@ export class Main extends VuexModule {
     }
   }
 
-  @Mutation
-  setSelectedToolId(id: string | null) {
-    this.selectedToolId = id;
-  }
-
-  @Mutation
-  setToolTemplateList(templateList: any[]) {
-    this.toolTemplateList = templateList;
-  }
-
-  @Action
-  async updateTool(tool: IToolConfiguration) {
-    if (!tool) {
-      return;
-    }
-    sync.setSaving(true);
-    try {
-      await this.api.updateTool(tool);
-    } catch (error) {
-      sync.setSaving(error);
-    }
-  }
-
-  @Action
-  async fetchAvailableTools() {
-    try {
-      const tools = await this.api.getAllTools();
-      this.addTools({ tools });
-    } catch (error) {
-      error(`Unable to fetch a list of available tools: ${error.message}`);
-    }
-  }
-
   @Action
   async syncConfiguration() {
     if (!this.configuration) {
@@ -651,48 +510,6 @@ export class Main extends VuexModule {
       sync.setSaving(false);
     } catch (error) {
       sync.setSaving(error);
-    }
-  }
-
-  @Action
-  // Very inefficient, but will work for now
-  async syncAnnotations() {
-    if (!this.dataset) {
-      return;
-    }
-    sync.setSaving(true);
-    if (!this.configuration) {
-      return;
-    }
-    try {
-      await this.api.setAnnotationsToConfiguration(
-        this.annotations,
-        this.annotationConnections,
-        this.configuration
-      );
-      sync.setSaving(false);
-    } catch (error) {
-      sync.setSaving(error);
-    }
-  }
-
-  @Action
-  async fetchAnnotations() {
-    this.setAnnotations([]);
-    this.setConnections([]);
-    if (!this.dataset || !this.configuration) {
-      return;
-    }
-    try {
-      const results = await this.api.getAnnotationsForConfiguration(
-        this.configuration
-      );
-      if (results) {
-        this.setAnnotations(results.annotations);
-        this.setConnections(results.annotationConnections);
-      }
-    } catch (error) {
-      error(error.message);
     }
   }
 
@@ -999,26 +816,6 @@ export class Main extends VuexModule {
       }
       return layer._histogram.promise;
     };
-  }
-
-  @Mutation
-  public addAnnotation(value: IAnnotation) {
-    this.annotations = [...this.annotations, value];
-  }
-
-  @Mutation
-  public setAnnotations(values: IAnnotation[]) {
-    this.annotations = values;
-  }
-
-  @Mutation
-  public addConnection(value: IAnnotationConnection) {
-    this.annotationConnections = [...this.annotationConnections, value];
-  }
-
-  @Mutation
-  public setConnections(values: IAnnotationConnection[]) {
-    this.annotationConnections = values;
   }
 
   @Mutation

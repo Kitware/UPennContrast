@@ -80,6 +80,7 @@
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
+import toolsStore from "@/store/tool";
 import { IToolConfiguration } from "@/store/model";
 import ToolIcon from "@/tools/ToolIcon.vue";
 import ToolsetPicker from "@/tools/toolsets/ToolsetPicker.vue";
@@ -91,13 +92,14 @@ import ToolCreation from "@/tools/creation/ToolCreation.vue";
 })
 export default class Toolset extends Vue {
   readonly store = store;
+  readonly toolsStore = toolsStore;
 
   get selectedToolId() {
-    return this.store.selectedToolId || "";
+    return this.toolsStore.selectedToolId || "";
   }
 
   set selectedToolId(id: string) {
-    this.store.setSelectedToolId(id);
+    this.toolsStore.setSelectedToolId(id);
   }
 
   get toolset() {
@@ -105,7 +107,7 @@ export default class Toolset extends Vue {
   }
 
   get tools() {
-    return this.store.tools;
+    return this.toolsStore.tools;
   }
 
   get toolsetTools() {
@@ -122,7 +124,7 @@ export default class Toolset extends Vue {
   toolPickerDialogOpen: boolean = false;
 
   getToolById(toolId: string) {
-    return this.store.tools.find(
+    return this.toolsStore.tools.find(
       (tool: IToolConfiguration) => tool.id === toolId
     );
   }
@@ -131,17 +133,17 @@ export default class Toolset extends Vue {
     if (toolId === this.selectedToolId) {
       this.selectedToolId = "";
     }
-    this.store.removeToolIdFromCurrentToolset({ id: toolId });
+    this.toolsStore.removeToolIdFromCurrentToolset({ id: toolId });
     this.store.syncConfiguration();
   }
 
   mounted() {
-    this.store.refreshToolsInCurrentToolset();
+    this.toolsStore.refreshToolsInCurrentToolset();
   }
 
   @Watch("configuration")
   toolsetChanged() {
-    this.store.refreshToolsInCurrentToolset();
+    this.toolsStore.refreshToolsInCurrentToolset();
   }
 }
 </script>

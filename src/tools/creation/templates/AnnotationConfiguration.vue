@@ -103,6 +103,8 @@
 <script lang="ts">
 import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
+import toolsStore from "@/store/tool";
+
 import { IToolConfiguration } from "@/store/model";
 
 type VForm = Vue & { validate: () => boolean };
@@ -113,6 +115,7 @@ type VForm = Vue & { validate: () => boolean };
 })
 export default class AnnotationConfiguration extends Vue {
   readonly store = store;
+  readonly toolsStore = toolsStore;
 
   get dataset() {
     return this.store.dataset;
@@ -138,7 +141,7 @@ export default class AnnotationConfiguration extends Vue {
   }
 
   get tagList(): string[] {
-    return this.store.tools
+    return this.toolsStore.tools
       .filter(
         (tool: IToolConfiguration) =>
           (tool.type === "create" || tool.type === "snap") &&
@@ -192,8 +195,8 @@ export default class AnnotationConfiguration extends Vue {
 
   mounted() {
     this.reset();
-    if (!this.store.tools?.length) {
-      this.store.fetchAvailableTools();
+    if (!this.toolsStore.tools?.length) {
+      this.toolsStore.fetchAvailableTools();
     }
   }
 
