@@ -194,6 +194,30 @@ export interface IAnnotationConnection {
   computedValues: any;
 }
 
+export interface IAnnotationFilter {
+  check: (annotation: IAnnotation) => boolean;
+}
+
+export interface ITagAnnotationFilter extends IAnnotationFilter {
+  tags: string[];
+  exclusive: boolean;
+  // TODO: Might be redundant
+  enabled: boolean;
+}
+
+export interface IPropertyAnnotationFilter extends IAnnotationFilter {
+  propertyId: string;
+  range: {
+    min: number;
+    max: number;
+  };
+  // these two fields should be exclusive
+  log: boolean;
+  cdf: boolean;
+  // Whether to exclude or include annotations that don't have the property
+  exclusive: boolean;
+}
+
 export interface IContrast {
   mode: "percentile" | "absolute";
   blackPoint: number;
