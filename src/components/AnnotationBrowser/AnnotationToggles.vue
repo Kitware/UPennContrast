@@ -4,6 +4,7 @@
     <v-list dense>
       <v-list-item>
         <v-checkbox
+          hide-details
           v-model="drawAnnotations"
           dense
           label="Show Annotations"
@@ -13,6 +14,7 @@
     <v-list dense value="true">
       <v-list-item>
         <v-checkbox
+          hide-details
           :disabled="!drawAnnotations"
           dense
           label="Restrict to Filters"
@@ -20,6 +22,7 @@
       </v-list-item>
       <v-list-item>
         <v-checkbox
+          hide-details
           :disabled="!drawAnnotations"
           dense
           label="Show Only Active "
@@ -27,6 +30,7 @@
       </v-list-item>
       <v-list-item>
         <v-checkbox
+          hide-details
           :disabled="!drawAnnotations"
           dense
           label="Show Connections"

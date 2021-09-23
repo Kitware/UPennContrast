@@ -10,7 +10,14 @@ import store from "./root";
 import main from "./index";
 import sync from "./sync";
 
-import { IAnnotation, IAnnotationConnection } from "./model";
+import {
+  IAnnotation,
+  IAnnotationConnection,
+  IAnnotationFilter,
+  ITagAnnotationFilter,
+  IPropertyAnnotationFilter,
+  IROIAnnotationFilter
+} from "./model";
 
 @Module({ dynamic: true, store, name: "annotation" })
 export class Annotations extends VuexModule {

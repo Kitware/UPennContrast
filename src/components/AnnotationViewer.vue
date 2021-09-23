@@ -6,6 +6,7 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
 import toolsStore from "@/store/tool";
+import propertiesStore from "@/store/properties";
 
 import geojs from "geojs";
 
@@ -36,6 +37,7 @@ export default class AnnotationViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
   readonly toolsStore = toolsStore;
+  readonly propertiesStore = propertiesStore;
 
   @Prop()
   readonly annotationLayer: any;
@@ -379,10 +381,7 @@ export default class AnnotationViewer extends Vue {
         Time: assign.Time
       },
       location,
-      coordinates: coordinates,
-      computedValues: {
-        centroid: simpleCentroid(coordinates)
-      }
+      coordinates: coordinates
     };
     return newAnnotation;
   }
@@ -416,7 +415,7 @@ export default class AnnotationViewer extends Vue {
 
   private addAnnotationConnections(annotation: IAnnotation) {
     if (!this.selectedTool) {
-      return;
+      return [];
     }
     const connectTo = this.selectedTool.values.connectTo;
     // Look for connections
@@ -468,8 +467,11 @@ export default class AnnotationViewer extends Vue {
           annotation,
           closest
         );
+
+        return [newConnection];
       }
     }
+    return [];
   }
 
   refreshAnnotationMode() {

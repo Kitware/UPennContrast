@@ -81,13 +81,16 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
   };
 }
 
+export function pointDistance(a: IGeoJSPoint, b: IGeoJSPoint) {
+  return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+}
+
 export function annotationDistance(a: IAnnotation, b: IAnnotation) {
   // For now, polyLines are treated as polygons for the sake of computing distances
-  const dist = (a: IGeoJSPoint, b: IGeoJSPoint): number =>
-    Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+
   // Point to point
   if (a.shape === "point" || b.shape === "point") {
-    return dist(a.coordinates[0], b.coordinates[0]);
+    return pointDistance(a.coordinates[0], b.coordinates[0]);
   }
 
   // Point to poly
@@ -100,7 +103,7 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
 
     // Go through all vertices to find the closest
     const shortestDistance = poly.coordinates
-      .map(val => dist(val, point.coordinates[0]))
+      .map(val => pointDistance(val, point.coordinates[0]))
       .sort()[0];
     return shortestDistance;
   }
@@ -113,7 +116,7 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
     // Use centroids for now
     const centroidA = simpleCentroid(a.coordinates);
     const centroidB = simpleCentroid(b.coordinates);
-    return dist(centroidA, centroidB);
+    return pointDistance(centroidA, centroidB);
   }
 
   // Should not happen
