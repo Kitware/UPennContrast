@@ -46,13 +46,7 @@
         <v-col class="py-0">
           <v-subheader class="pa-0">Layer</v-subheader>
           <!-- layer -->
-          <v-select
-            :items="layerItems"
-            item-text="label"
-            dense
-            v-model="coordinateAssignments.layer"
-            @change="changed"
-          />
+          <layer-select v-model="coordinateAssignments.layer"></layer-select>
         </v-col>
         <!-- Z and Time assignments -->
         <v-col
@@ -104,6 +98,7 @@
 import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
+import LayerSelect from "@/components/LayerSelect.vue";
 
 import { IToolConfiguration } from "@/store/model";
 
@@ -111,7 +106,9 @@ type VForm = Vue & { validate: () => boolean };
 
 // Interface element for configuring an annotation creation tool
 @Component({
-  components: {}
+  components: {
+    LayerSelect
+  }
 })
 export default class AnnotationConfiguration extends Vue {
   readonly store = store;
@@ -127,17 +124,6 @@ export default class AnnotationConfiguration extends Vue {
         text: this.dataset?.channelNames.get(channelId)
       })) || []
     );
-  }
-
-  get layers() {
-    return this.store.configuration?.view.layers || [];
-  }
-
-  get layerItems() {
-    return this.layers.map((layer, index) => ({
-      label: layer.name,
-      value: index
-    }));
   }
 
   get tagList(): string[] {

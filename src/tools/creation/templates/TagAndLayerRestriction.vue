@@ -30,15 +30,11 @@
       </v-col>
       <v-col>
         <!-- layers -->
-        <v-select
-          v-model="selectedLayer"
-          :items="layerItems"
-          item-text="label"
+        <layer-select
+          any
           :label="layerLabelWithDefault"
-          @change="changed"
-          dense
-        >
-        </v-select>
+          v-model="selectedLayer"
+        ></layer-select>
       </v-col>
     </v-row>
   </v-container>
@@ -49,10 +45,13 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
 import { IToolConfiguration } from "@/store/model";
+import LayerSelect from "@/components/LayerSelect.vue";
 
 // Tool creation interface element for picking tags and layers for connections
 @Component({
-  components: {}
+  components: {
+    LayerSelect
+  }
 })
 export default class TagAndLayerRestriction extends Vue {
   readonly store = store;
