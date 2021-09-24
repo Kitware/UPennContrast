@@ -4,30 +4,7 @@
       <v-row>
         <v-col>
           <!-- tags -->
-          <v-combobox
-            v-model="tags"
-            :items="tagList"
-            :search-input.sync="tagSearchInput"
-            @change="changed"
-            label="Tags"
-            multiple
-            hide-selected
-            small-chips
-            dense
-          >
-            <template v-slot:selection="{ attrs, index, item, parent }">
-              <v-chip
-                :key="index"
-                class="pa-2"
-                v-bind="attrs"
-                close
-                small
-                @click:close="parent.selectItem(item)"
-              >
-                {{ item }}
-              </v-chip>
-            </template>
-          </v-combobox>
+          <tag-picker v-model="tags"></tag-picker>
         </v-col>
         <v-col>
           <!-- shape selection -->
@@ -95,10 +72,11 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop } from "vue-property-decorator";
+import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
 import LayerSelect from "@/components/LayerSelect.vue";
+import TagPicker from "@/components/TagPicker.vue";
 
 import { IToolConfiguration } from "@/store/model";
 
@@ -107,7 +85,8 @@ type VForm = Vue & { validate: () => boolean };
 // Interface element for configuring an annotation creation tool
 @Component({
   components: {
-    LayerSelect
+    LayerSelect,
+    TagPicker
   }
 })
 export default class AnnotationConfiguration extends Vue {
@@ -124,17 +103,6 @@ export default class AnnotationConfiguration extends Vue {
         text: this.dataset?.channelNames.get(channelId)
       })) || []
     );
-  }
-
-  get tagList(): string[] {
-    return this.toolsStore.tools
-      .filter(
-        (tool: IToolConfiguration) =>
-          (tool.type === "create" || tool.type === "snap") &&
-          tool.values.annotation
-      )
-      .map((tool: IToolConfiguration) => tool.values.annotation.tags)
-      .flat();
   }
 
   tagSearchInput: string = "";
@@ -154,6 +122,10 @@ export default class AnnotationConfiguration extends Vue {
   label: string = "";
   shape: string = "";
   tags: string[] = [];
+
+  get layers() {
+    return this.store.configuration?.view.layers || [];
+  }
 
   get maxZ() {
     return this.store.dataset?.z.length || 0;
@@ -199,6 +171,8 @@ export default class AnnotationConfiguration extends Vue {
     this.changed();
   }
 
+  @Watch("coordinateAssignments")
+  @Watch("tags")
   changed() {
     const form = this.$refs.form as VForm;
     if (!form?.validate()) {

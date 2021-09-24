@@ -3,30 +3,7 @@
     <v-row>
       <v-col>
         <!-- tags -->
-        <v-combobox
-          v-model="newTags"
-          :items="tagList"
-          :search-input.sync="tagSearchInput"
-          @change="changed"
-          :label="tagsLabelWithDefault"
-          multiple
-          hide-selected
-          small-chips
-          dense
-        >
-          <template v-slot:selection="{ attrs, index, item, parent }">
-            <v-chip
-              :key="index"
-              class="pa-2"
-              v-bind="attrs"
-              close
-              small
-              @click:close="parent.selectItem(item)"
-            >
-              {{ item }}
-            </v-chip>
-          </template>
-        </v-combobox>
+        <tag-picker v-model="newTags"></tag-picker>
       </v-col>
       <v-col>
         <!-- layers -->
@@ -46,11 +23,13 @@ import store from "@/store";
 import toolsStore from "@/store/tool";
 import { IToolConfiguration } from "@/store/model";
 import LayerSelect from "@/components/LayerSelect.vue";
+import TagPicker from "@/components/TagPicker.vue";
 
 // Tool creation interface element for picking tags and layers for connections
 @Component({
   components: {
-    LayerSelect
+    LayerSelect,
+    TagPicker
   }
 })
 export default class TagAndLayerRestriction extends Vue {
@@ -75,21 +54,6 @@ export default class TagAndLayerRestriction extends Vue {
 
   get dataset() {
     return this.store.dataset;
-  }
-
-  get layers() {
-    return this.store.configuration?.view.layers || [];
-  }
-
-  // map layers to v-select items
-  get layerItems() {
-    return [
-      ...this.layers.map((layer, index) => ({
-        label: layer.name,
-        value: index
-      })),
-      { label: "Any", value: null }
-    ];
   }
 
   // list of existing tags for autocomplete
@@ -123,6 +87,7 @@ export default class TagAndLayerRestriction extends Vue {
     return this.layerLabel || "Restrict to layer";
   }
 
+  @Watch("newTags")
   changed() {
     this.tagSearchInput = "";
     this.$emit("input", { tags: this.newTags, layer: this.selectedLayer });

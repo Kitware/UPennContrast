@@ -24,10 +24,10 @@ export default class LayerSelect extends Vue {
 
   // Adds an "Any" selection choice
   @Prop()
-  readonly any = undefined;
+  readonly any: any;
 
   @Prop()
-  readonly label = "";
+  readonly label: any;
 
   @VModel({ type: Number }) layer!: Number;
 
