@@ -3,13 +3,13 @@ import geojs from "geojs";
 import { logError } from "@/utils/log";
 
 // Which style an annotation should have, depending on its layer (color change)
-export function getAnnotationStyleFromLayer(layer: IDisplayLayer) {
+export function getAnnotationStyleFromLayer(layer: IDisplayLayer | undefined) {
   const style = {
     stroke: true,
     strokeColor: "black",
     strokeOpacity: 1,
     strokeWidth: 2,
-    fillColor: "#green",
+    fillColor: "#white",
     fillOpacity: 0.5,
     fill: true,
     radius: 10

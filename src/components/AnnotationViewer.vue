@@ -12,6 +12,7 @@ import geojs from "geojs";
 import {
   IAnnotation,
   IAnnotationConnection,
+  IDisplayLayer,
   IGeoJSPoint,
   IImage,
   IToolConfiguration
@@ -53,10 +54,19 @@ export default class AnnotationViewer extends Vue {
     return this.configuration?.view.layers || [];
   }
 
+  get visibleChannels() {
+    return this.layers.reduce((channels: number[], layer: IDisplayLayer) => {
+      if (layer.visible && !channels.includes(layer.channel)) {
+        return [...channels, layer.channel];
+      }
+      return [];
+    }, []);
+  }
+
   // All annotations available for the currently enabled layers
   get layerAnnotations() {
-    return this.annotationStore.annotations.filter(
-      annotation => this.layers[annotation.assignment.layer].visible
+    return this.annotationStore.annotations.filter(annotation =>
+      this.visibleChannels.includes(annotation.assignment.channel)
     );
   }
 
@@ -94,8 +104,14 @@ export default class AnnotationViewer extends Vue {
     return tool || null;
   }
 
+  getAnyLayerForChannel(channel: number) {
+    return this.layers.find(
+      (layer: IDisplayLayer) => channel === layer.channel
+    );
+  }
+
   getAnnotationStyle(annotation: IAnnotation) {
-    const layer = this.layers[annotation.assignment.layer];
+    const layer = this.getAnyLayerForChannel(annotation.assignment.channel);
     return getAnnotationStyleFromLayer(layer);
   }
 
@@ -166,19 +182,10 @@ export default class AnnotationViewer extends Vue {
     if (!annotation.assignment) {
       return false;
     }
-    const layer = this.layers[annotation.assignment.layer];
-    if (!layer) {
-      return false;
-    }
-    const indexes = this.store.layerSliceIndexes(layer);
-    if (!indexes) {
-      return false;
-    }
-    const { xyIndex, zIndex, tIndex } = indexes;
     if (
-      (annotation.location.XY !== xyIndex && !this.store.unrollXY) ||
-      (annotation.location.Z !== zIndex && !this.store.unrollZ) ||
-      (annotation.location.Time !== tIndex && !this.store.unrollT)
+      (annotation.location.XY !== this.store.xy && !this.store.unrollXY) ||
+      (annotation.location.Z !== this.store.z && !this.store.unrollZ) ||
+      (annotation.location.Time !== this.store.time && !this.store.unrollT)
     ) {
       return false;
     }
@@ -325,6 +332,7 @@ export default class AnnotationViewer extends Vue {
       Time: this.store.time
     };
     const layer = this.layers[toolAnnotation.coordinateAssignments.layer];
+    const channel = layer.channel;
     const assign = toolAnnotation.coordinateAssignments;
     if (layer) {
       const indexes = this.store.layerSliceIndexes(layer);
@@ -345,7 +353,11 @@ export default class AnnotationViewer extends Vue {
       id: uuidv4(),
       tags: toolAnnotation.tags,
       shape: toolAnnotation.shape,
-      assignment: toolAnnotation.coordinateAssignments,
+      assignment: {
+        channel,
+        Z: assign.Z,
+        Time: assign.Time
+      },
       location,
       coordinates: coordinates,
       computedValues: {
@@ -391,10 +403,11 @@ export default class AnnotationViewer extends Vue {
     if (connectTo && connectTo.tags && connectTo.tags.length) {
       const annotations = this.annotationStore.annotations;
       // Find eligible annotations (matching tags and channel)
+      const connectToChannel = this.layers[connectTo.layer].channel;
       const eligibleAnnotations = annotations.filter((value: IAnnotation) => {
         if (
           connectTo.layer !== null &&
-          value.assignment.layer !== connectTo.layer
+          value.assignment.channel !== connectToChannel
         ) {
           return false;
         }

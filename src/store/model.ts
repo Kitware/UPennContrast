@@ -163,7 +163,7 @@ export interface IAnnotation {
   id: string;
   tags: string[];
   assignment: {
-    layer: number;
+    channel: number;
     Z: {
       type: string; // Either "layer", or "assign"
       value: 1;
