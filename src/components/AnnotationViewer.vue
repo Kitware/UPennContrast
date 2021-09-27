@@ -179,7 +179,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   shouldDisplayAnnotation(annotation: IAnnotation): boolean {
-    if (!annotation.assignment) {
+    if (!annotation.location) {
       return false;
     }
     if (
