@@ -21,6 +21,10 @@ def provision(opts):
         # on subsequent starts.
         Setting().set('core.cors.allow_origin', '*')
 
+        # Increase the allowed files that can be cached, as this is used for
+        # tiled frames
+        Setting().set('large_image.max_thumbnail_files', 400)
+
     # Make sure we have an assetstore
     if Assetstore().findOne() is None:
         Assetstore().createFilesystemAssetstore('Assetstore', '/assetstore')

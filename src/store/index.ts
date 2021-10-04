@@ -733,7 +733,8 @@ export class Main extends VuexModule {
       if (results.fullUrls && results.fullUrls.length && results.fullUrls[0]) {
         results.baseQuadOptions = {
           baseUrl: results.fullUrls[0].split("/tiles")[0] + "/tiles",
-          // maxTextures: 8,
+          maxTextures: 32,
+          maxTextureSize: 4096,
           query:
             "style=" +
             encodeURIComponent(
