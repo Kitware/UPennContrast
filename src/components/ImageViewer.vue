@@ -495,7 +495,10 @@ export default class ImageViewer extends Vue {
       }
     );
     this.map.draw();
+    /* Disable running cacneWhenIdle; it doesn't help much now that we have
+     * tile frame previews
     this.map.onIdle(this.cacheWhenIdle);
+     */
   }
 
   beforeDestroy() {
