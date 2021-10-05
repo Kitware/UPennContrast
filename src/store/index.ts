@@ -51,6 +51,7 @@ export class Main extends VuexModule {
 
   drawAnnotations: boolean = true;
   filteredDraw: boolean = false;
+  drawActive: boolean = false;
 
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
@@ -90,8 +91,13 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  setFilteredDraw(value: boolean) {
+  public setFilteredDraw(value: boolean) {
     this.filteredDraw = value;
+  }
+
+  @Mutation
+  public setDrawActive(value: boolean) {
+    this.drawActive = value;
   }
 
   @Mutation

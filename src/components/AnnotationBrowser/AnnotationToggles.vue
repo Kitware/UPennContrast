@@ -26,6 +26,7 @@
           hide-details
           :disabled="!drawAnnotations"
           dense
+          v-model="drawActive"
           label="Show Only Active "
         ></v-checkbox>
       </v-list-item>
@@ -34,6 +35,7 @@
           hide-details
           :disabled="!drawAnnotations"
           dense
+          v-model="drawConnections"
           label="Show Connections"
         ></v-checkbox>
       </v-list-item>
@@ -65,6 +67,14 @@ export default class AnnotationToggles extends Vue {
 
   set filteredDraw(value: boolean) {
     this.store.setFilteredDraw(value);
+  }
+
+  get drawActive() {
+    return this.store.drawActive;
+  }
+
+  set drawActive(value: boolean) {
+    this.store.setDrawActive(value);
   }
 
   get drawConnections() {

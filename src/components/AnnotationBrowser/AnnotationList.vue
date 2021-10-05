@@ -23,6 +23,14 @@
         <span>{{ annotations.indexOf(item) }}</span>
       </template>
 
+      <!-- Active -->
+      <template v-slot:item.active="{ item }">
+        <v-checkbox
+          :value="isAnnotationActive(item)"
+          @click="toggleActive(item)"
+        ></v-checkbox>
+      </template>
+
       <template
         v-for="propertyId in propertyIds"
         v-slot:[`item.${propertyId}`]="{ item }"
@@ -76,6 +84,15 @@ export default class AnnotationList extends Vue {
     return this.propertyStore.annotationListIds;
   }
 
+  isAnnotationActive(annotation: IAnnotation) {
+    return this.annotationStore.activeAnnotationIds.includes(annotation.id);
+  }
+
+  toggleActive(annotation: IAnnotation) {
+    // TODO: have an "activeAnnotation" array instead ?
+    this.annotationStore.toggleActiveAnnotation(annotation.id);
+  }
+
   getPropertyValueForAnnotation(annotation: IAnnotation, propertyId: string) {
     const { annotationIds, values } = this.propertyStore.computedValues[
       propertyId
@@ -96,6 +113,10 @@ export default class AnnotationList extends Vue {
 
   get headers() {
     return [
+      {
+        text: "Active",
+        value: "active"
+      },
       {
         text: "Annotation Index",
         value: "id"

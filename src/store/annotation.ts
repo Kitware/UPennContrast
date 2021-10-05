@@ -27,6 +27,18 @@ export class Annotations extends VuexModule {
   annotationConnections: IAnnotationConnection[] = [];
 
   selectedAnnotations: IAnnotation[] = [];
+  activeAnnotationIds: string[] = [];
+
+  @Mutation
+  public toggleActiveAnnotation(id: string) {
+    if (!this.activeAnnotationIds.includes(id)) {
+      this.activeAnnotationIds = [...this.activeAnnotationIds, id];
+    } else {
+      this.activeAnnotationIds = this.activeAnnotationIds.filter(
+        (activeId: string) => activeId !== id
+      );
+    }
+  }
 
   @Mutation
   public setSelected(selected: IAnnotation[]) {
