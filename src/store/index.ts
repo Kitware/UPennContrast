@@ -50,6 +50,8 @@ export class Main extends VuexModule {
   layerMode: "single" | "multiple" = "multiple";
 
   drawAnnotations: boolean = true;
+  filteredDraw: boolean = false;
+
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
   drawAnnotationConnections: boolean = true;
@@ -85,6 +87,11 @@ export class Main extends VuexModule {
   @Mutation
   public setDrawAnnotations(value: boolean) {
     this.drawAnnotations = value;
+  }
+
+  @Mutation
+  setFilteredDraw(value: boolean) {
+    this.filteredDraw = value;
   }
 
   @Mutation

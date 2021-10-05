@@ -17,6 +17,7 @@
           hide-details
           :disabled="!drawAnnotations"
           dense
+          v-model="filteredDraw"
           label="Restrict to Filters"
         ></v-checkbox>
       </v-list-item>
@@ -56,6 +57,14 @@ export default class AnnotationToggles extends Vue {
 
   set drawAnnotations(value: boolean) {
     this.store.setDrawAnnotations(value);
+  }
+
+  get filteredDraw() {
+    return this.store.filteredDraw;
+  }
+
+  set filteredDraw(value: boolean) {
+    this.store.setFilteredDraw(value);
   }
 
   get drawConnections() {

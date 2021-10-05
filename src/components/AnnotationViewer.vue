@@ -7,6 +7,7 @@ import store from "@/store";
 import annotationStore from "@/store/annotation";
 import toolsStore from "@/store/tool";
 import propertiesStore from "@/store/properties";
+import filterStore from "@/store/filters";
 
 import geojs from "geojs";
 
@@ -38,6 +39,7 @@ export default class AnnotationViewer extends Vue {
   readonly annotationStore = annotationStore;
   readonly toolsStore = toolsStore;
   readonly propertiesStore = propertiesStore;
+  readonly filterStore = filterStore;
 
   @Prop()
   readonly annotationLayer: any;
@@ -65,9 +67,15 @@ export default class AnnotationViewer extends Vue {
     }, []);
   }
 
+  get annotations() {
+    return this.store.filteredDraw
+      ? this.filterStore.filteredAnnotations
+      : this.annotationStore.annotations;
+  }
+
   // All annotations available for the currently enabled layers
   get layerAnnotations() {
-    return this.annotationStore.annotations.filter(annotation =>
+    return this.annotations.filter(annotation =>
       this.visibleChannels.includes(annotation.assignment.channel)
     );
   }
