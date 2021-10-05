@@ -15,6 +15,13 @@
             :propertyId="propertyId"
           ></property-filter-histogram>
         </v-row>
+        <v-row v-if="selectionFilterEnabled">
+          <v-col>
+            <v-btn dense @click="clearSelection">
+              Clear selection filter
+            </v-btn>
+          </v-col>
+        </v-row>
       </v-container>
     </v-card-text>
   </v-card>
@@ -55,6 +62,14 @@ export default class AnnotationFilter extends Vue {
 
   get propertyFilters() {
     return this.filterStore.propertyFilters;
+  }
+
+  get selectionFilterEnabled() {
+    return this.filterStore.selectionFilter.enabled;
+  }
+
+  clearSelection() {
+    this.filterStore.clearSelection();
   }
 }
 </script>

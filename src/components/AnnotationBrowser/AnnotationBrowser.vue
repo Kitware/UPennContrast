@@ -4,6 +4,13 @@
       <property-list></property-list>
     </v-row>
     <v-row><annotation-toggles /></v-row>
+    <v-row
+      ><v-col
+        ><v-btn @click="filterBySelection"
+          >Add current selection as filter</v-btn
+        ></v-col
+      ><v-col><v-btn>Add new ROI filter</v-btn></v-col></v-row
+    >
     <v-row><annotation-filters /></v-row>
     <v-row><annotation-list @clickedTag="clickedTag"></annotation-list> </v-row>
   </v-container>
@@ -29,6 +36,10 @@ export default class AnnotationBrowser extends Vue {
   readonly filterStore = filterStore;
   clickedTag(tag: string) {
     this.filterStore.addTagToTagFilter(tag);
+  }
+
+  filterBySelection() {
+    this.filterStore.addSelectionAsFilter();
   }
 }
 </script>

@@ -1,7 +1,13 @@
 <template>
   <div>
     <v-subheader>Annotation List</v-subheader>
-    <v-data-table :items="filtered" :headers="headers">
+    <v-data-table
+      :items="filtered"
+      :headers="headers"
+      item-key="id"
+      v-model="selected"
+      show-select
+    >
       <!-- Tags -->
       <template v-slot:item.tags="{ item }">
         <v-chip
@@ -28,7 +34,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop, Emit } from "vue-property-decorator";
+import { Vue, Component, Prop, Watch, Emit } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
@@ -48,6 +54,15 @@ export default class AnnotationList extends Vue {
   readonly annotationStore = annotationStore;
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
+
+  // TODO: clean up selected after filter changes
+  get selected() {
+    return this.annotationStore.selectedAnnotations;
+  }
+
+  set selected(selected: IAnnotation[]) {
+    this.annotationStore.setSelected(selected);
+  }
 
   get annotations() {
     return this.annotationStore.annotations;

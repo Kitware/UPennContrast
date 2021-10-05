@@ -18,7 +18,8 @@ import {
   IAnnotationFilter,
   ITagAnnotationFilter,
   IPropertyAnnotationFilter,
-  IROIAnnotationFilter
+  IROIAnnotationFilter,
+  IIdAnnotationFilter
 } from "./model";
 
 @Module({ dynamic: true, store, name: "filters" })
@@ -36,6 +37,13 @@ export class Filters extends VuexModule {
 
   roiFilters: IROIAnnotationFilter[] = [];
 
+  selectionFilter: IIdAnnotationFilter = {
+    enabled: false,
+    exclusive: true,
+    id: "selection",
+    annotationIds: []
+  };
+
   filterIds: string[] = [];
 
   @Mutation
@@ -52,6 +60,29 @@ export class Filters extends VuexModule {
     }
   }
 
+  @Mutation
+  addSelectionAsFilter() {
+    const selection = annotation.selectedAnnotations.map(
+      (value: IAnnotation) => value.id
+    );
+    this.selectionFilter = {
+      enabled: true,
+      exclusive: true,
+      id: "selection",
+      annotationIds: selection
+    };
+  }
+
+  @Mutation
+  clearSelection() {
+    this.selectionFilter = {
+      enabled: false,
+      exclusive: true,
+      id: "selection",
+      annotationIds: []
+    };
+  }
+
   get filteredAnnotations() {
     return annotation.annotations.filter((annotation: IAnnotation) => {
       // tag filter
@@ -61,6 +92,16 @@ export class Filters extends VuexModule {
       if (annotation.shape !== this.tagFilter.shape) {
         return false;
       }
+
+      // Selection filter
+      if (
+        this.selectionFilter.enabled &&
+        !this.selectionFilter.annotationIds.includes(annotation.id)
+      ) {
+        return false;
+      }
+
+      // Tag filter
       const hasAllTags = this.tagFilter.tags.reduce(
         (val: boolean, tag: string) => val && annotation.tags.includes(tag),
         true
@@ -78,6 +119,7 @@ export class Filters extends VuexModule {
         return false;
       }
 
+      // Property filters
       const matchesProperties = this.propertyFilters
         .filter((filter: IPropertyAnnotationFilter) => filter.enabled)
         .reduce((val: boolean, filter: IPropertyAnnotationFilter) => {

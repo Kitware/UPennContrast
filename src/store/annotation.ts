@@ -26,6 +26,13 @@ export class Annotations extends VuexModule {
   // Connections from the current dataset and configuration
   annotationConnections: IAnnotationConnection[] = [];
 
+  selectedAnnotations: IAnnotation[] = [];
+
+  @Mutation
+  public setSelected(selected: IAnnotation[]) {
+    this.selectedAnnotations = selected;
+  }
+
   @Mutation
   public addAnnotation(value: IAnnotation) {
     this.annotations = [...this.annotations, value];
