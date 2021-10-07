@@ -6,6 +6,11 @@
     <v-card-text class="pa-2">
       <v-container>
         <v-row>
+          <v-col>
+            <roi-filters></roi-filters>
+          </v-col>
+        </v-row>
+        <v-row>
           <v-col class="pa-0">
             <tag-filter-editor v-model="tagFilter"></tag-filter-editor>
           </v-col>
@@ -35,11 +40,12 @@ import filterStore from "@/store/filters";
 import { IPropertyAnnotationFilter, ITagAnnotationFilter } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import PropertyFilterHistogram from "@/components/AnnotationBrowser/AnnotationProperties/PropertyFilterHistogram.vue";
-
+import roiFilters from "@/components/AnnotationBrowser/ROIFilters.vue";
 @Component({
   components: {
     TagFilterEditor,
-    PropertyFilterHistogram
+    PropertyFilterHistogram,
+    roiFilters
   }
 })
 export default class AnnotationFilter extends Vue {

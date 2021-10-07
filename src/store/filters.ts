@@ -19,8 +19,11 @@ import {
   ITagAnnotationFilter,
   IPropertyAnnotationFilter,
   IROIAnnotationFilter,
-  IIdAnnotationFilter
+  IIdAnnotationFilter,
+  IGeoJSPoint
 } from "./model";
+
+import geo from "geojs";
 
 @Module({ dynamic: true, store, name: "filters" })
 export class Filters extends VuexModule {
@@ -36,6 +39,7 @@ export class Filters extends VuexModule {
   propertyFilters: IPropertyAnnotationFilter[] = [];
 
   roiFilters: IROIAnnotationFilter[] = [];
+  emptyROIFilter: IROIAnnotationFilter | null = null;
 
   selectionFilter: IIdAnnotationFilter = {
     enabled: false,
@@ -81,6 +85,45 @@ export class Filters extends VuexModule {
       id: "selection",
       annotationIds: []
     };
+  }
+
+  @Mutation
+  newROIFilter() {
+    this.emptyROIFilter = {
+      id: `ROI Filter ${this.roiFilters.length}`,
+      exclusive: true,
+      enabled: true,
+      roi: []
+    };
+  }
+
+  @Mutation
+  validateNewROIFilter(roi: IGeoJSPoint[]) {
+    if (!this.emptyROIFilter) {
+      return;
+    }
+    this.roiFilters = [...this.roiFilters, { ...this.emptyROIFilter, roi }];
+    this.emptyROIFilter = null;
+  }
+
+  @Mutation
+  cancelROISelection() {
+    this.emptyROIFilter = null;
+  }
+
+  @Mutation
+  toggleRoiFilterEnabled(id: string) {
+    const filter = this.roiFilters.find(
+      (filter: IROIAnnotationFilter) => filter.id === id
+    );
+    if (filter) {
+      this.roiFilters = [
+        ...this.roiFilters.filter(
+          (value: IROIAnnotationFilter) => value.id !== id
+        ),
+        { ...filter, enabled: !filter.enabled }
+      ];
+    }
   }
 
   get filteredAnnotations() {
@@ -133,7 +176,32 @@ export class Filters extends VuexModule {
           const value = 0; // Temporary
           return value >= filter.range.min && value <= filter.range.max;
         }, true);
-      return matchesProperties;
+
+      if (!matchesProperties) {
+        return true;
+      }
+
+      const roiFilters = this.roiFilters.filter(
+        (filter: IROIAnnotationFilter) => filter.enabled
+      );
+      if (!roiFilters.length) {
+        return true;
+      }
+      const isInROI = roiFilters.reduce(
+        (isIn, filter: IROIAnnotationFilter) => {
+          return (
+            isIn ||
+            annotation.coordinates.reduce(
+              (onePointIn: boolean, point: IGeoJSPoint) =>
+                onePointIn || geo.util.pointInPolygon(point, filter.roi),
+              false
+            )
+          );
+        },
+        false
+      );
+
+      return isInROI;
     });
   }
 

@@ -41,6 +41,10 @@ export default class AnnotationViewer extends Vue {
   readonly propertiesStore = propertiesStore;
   readonly filterStore = filterStore;
 
+  get roiFilter() {
+    return this.filterStore.emptyROIFilter;
+  }
+
   @Prop()
   readonly annotationLayer: any;
 
@@ -436,7 +440,8 @@ export default class AnnotationViewer extends Vue {
     if (connectTo && connectTo.tags && connectTo.tags.length) {
       const annotations = this.annotationStore.annotations;
       // Find eligible annotations (matching tags and channel)
-      const connectToChannel = this.layers[connectTo.layer].channel;
+      const connectToChannel =
+        connectTo.layer === null ? null : this.layers[connectTo.layer].channel;
       const eligibleAnnotations = annotations.filter((value: IAnnotation) => {
         if (
           connectTo.layer !== null &&
@@ -489,17 +494,30 @@ export default class AnnotationViewer extends Vue {
   }
 
   refreshAnnotationMode() {
-    if (!this.selectedTool || this.unrolling) {
+    if (this.unrolling) {
       this.annotationLayer.mode(null);
       return;
     }
-    switch (this.selectedTool.type) {
+
+    if (this.roiFilter) {
+      if (this.selectedTool) {
+        this.toolsStore.setSelectedToolId(null);
+      }
+      this.annotationLayer.mode("polygon");
+      return;
+    }
+
+    switch (this.selectedTool?.type) {
       case "create":
         const annotation = this.selectedTool.values.annotation;
         this.annotationLayer.mode(annotation?.shape);
         break;
+      case null:
+      case undefined:
+        this.annotationLayer.mode(null);
+        break;
       default:
-        logWarning(`${this.selectedTool.type} tools are not supported yet`);
+        logWarning(`${this.selectedTool?.type} tools are not supported yet`);
         this.annotationLayer.mode(null);
     }
   }
@@ -511,14 +529,18 @@ export default class AnnotationViewer extends Vue {
   }
 
   handleAnnotationChange(evt: any) {
-    if (!this.selectedTool) {
+    if (!this.selectedTool && !this.roiFilter) {
       return;
     }
 
     switch (evt.event) {
       case "geo_annotation_state":
-        if (this.selectedTool.type === "create") {
-          this.addAnnotationFromGeoJsAnnotation(evt.annotation);
+        if (this.selectedTool) {
+          if (this.selectedTool.type === "create") {
+            this.addAnnotationFromGeoJsAnnotation(evt.annotation);
+          }
+        } else if (evt.annotation) {
+          this.filterStore.validateNewROIFilter(evt.annotation.coordinates());
         }
         break;
       default:
@@ -561,6 +583,13 @@ export default class AnnotationViewer extends Vue {
   @Watch("selectedTool")
   watchTool() {
     this.refreshAnnotationMode();
+  }
+
+  @Watch("roiFilter")
+  watchFilter() {
+    if (this.roiFilter) {
+      this.refreshAnnotationMode();
+    }
   }
 
   @Watch("annotationLayer")
