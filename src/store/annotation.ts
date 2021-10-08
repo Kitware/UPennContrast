@@ -29,15 +29,58 @@ export class Annotations extends VuexModule {
   selectedAnnotations: IAnnotation[] = [];
   activeAnnotationIds: string[] = [];
 
+  get selectedAnnotationIds() {
+    return this.selectedAnnotations.map(
+      (annotation: IAnnotation) => annotation.id
+    );
+  }
+
+  get inactiveAnnotationIds() {
+    return this.annotations
+      .map((annotation: IAnnotation) => annotation.id)
+      .filter((id: string) => !this.activeAnnotationIds.includes(id));
+  }
+
   @Mutation
+  public activateAnnotations(ids: string[]) {
+    this.activeAnnotationIds = [
+      ...this.activeAnnotationIds,
+      ...ids.filter((id: string) => !this.activeAnnotationIds.includes(id))
+    ];
+  }
+
+  @Mutation
+  public deactivateAnnotations(ids: string[]) {
+    this.activeAnnotationIds = this.activeAnnotationIds.filter(
+      (id: string) => !ids.includes(id)
+    );
+  }
+
+  @Action
+  public toggleActiveAnnotations(ids: string[]) {
+    const toRemove = ids.filter((id: string) =>
+      this.activeAnnotationIds.includes(id)
+    );
+    const toAdd = ids.filter(
+      (id: string) => !this.activeAnnotationIds.includes(id)
+    );
+    this.activateAnnotations(toAdd);
+    this.deactivateAnnotations(toRemove);
+  }
+
+  @Action
   public toggleActiveAnnotation(id: string) {
-    if (!this.activeAnnotationIds.includes(id)) {
-      this.activeAnnotationIds = [...this.activeAnnotationIds, id];
-    } else {
-      this.activeAnnotationIds = this.activeAnnotationIds.filter(
-        (activeId: string) => activeId !== id
-      );
-    }
+    this.toggleActiveAnnotations([id]);
+  }
+
+  @Action
+  public activateSelectedAnnotations() {
+    this.activateAnnotations(this.selectedAnnotationIds);
+  }
+
+  @Action
+  public deactivateSelectedAnnotations() {
+    this.deactivateAnnotations(this.selectedAnnotationIds);
   }
 
   @Mutation
@@ -63,6 +106,25 @@ export class Annotations extends VuexModule {
   @Mutation
   public setConnections(values: IAnnotationConnection[]) {
     this.annotationConnections = values;
+  }
+
+  @Mutation
+  public deleteAnnotations(ids: string[]) {
+    this.annotations = this.annotations.filter(
+      (annotation: IAnnotation) => !ids.includes(annotation.id)
+    );
+  }
+
+  @Action
+  public deleteSelectedAnnotations() {
+    this.deleteAnnotations(this.selectedAnnotationIds);
+    this.syncAnnotations();
+  }
+
+  @Action
+  public deleteInactiveAnnotations() {
+    this.deleteAnnotations(this.inactiveAnnotationIds);
+    this.syncAnnotations();
   }
 
   @Action

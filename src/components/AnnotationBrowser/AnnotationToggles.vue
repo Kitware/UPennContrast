@@ -1,46 +1,50 @@
 <template>
-  <div>
-    <v-subheader>Annotation Controls</v-subheader>
-    <v-list dense>
-      <v-list-item>
-        <v-checkbox
-          hide-details
-          v-model="drawAnnotations"
-          dense
-          label="Show Annotations"
-        ></v-checkbox>
-      </v-list-item>
-    </v-list>
-    <v-list dense value="true">
-      <v-list-item>
-        <v-checkbox
-          hide-details
-          :disabled="!drawAnnotations"
-          dense
-          v-model="filteredDraw"
-          label="Restrict to Filters"
-        ></v-checkbox>
-      </v-list-item>
-      <v-list-item>
-        <v-checkbox
-          hide-details
-          :disabled="!drawAnnotations"
-          dense
-          v-model="drawActive"
-          label="Show Only Active "
-        ></v-checkbox>
-      </v-list-item>
-      <v-list-item>
-        <v-checkbox
-          hide-details
-          :disabled="!drawAnnotations"
-          dense
-          v-model="drawConnections"
-          label="Show Connections"
-        ></v-checkbox>
-      </v-list-item>
-    </v-list>
-  </div>
+  <v-card>
+    <v-card-title class="py-1">
+      Annotation Controls
+    </v-card-title>
+    <v-card-text>
+      <v-list dense class="py-0">
+        <v-list-item>
+          <v-checkbox
+            hide-details
+            v-model="drawAnnotations"
+            dense
+            label="Show Annotations"
+          ></v-checkbox>
+        </v-list-item>
+      </v-list>
+      <v-list dense value="true" class="py-0">
+        <v-list-item>
+          <v-checkbox
+            hide-details
+            :disabled="!drawAnnotations"
+            dense
+            v-model="filteredDraw"
+            label="Restrict to Filters"
+          ></v-checkbox>
+        </v-list-item>
+        <v-list-item>
+          <v-checkbox
+            hide-details
+            :disabled="!drawAnnotations"
+            dense
+            v-model="drawActive"
+            label="Show Only Active "
+          ></v-checkbox>
+        </v-list-item>
+        <v-list-item>
+          <v-checkbox
+            hide-details
+            :disabled="!drawAnnotations"
+            dense
+            v-model="drawConnections"
+            label="Show Connections"
+          ></v-checkbox>
+        </v-list-item>
+      </v-list>
+    </v-card-text>
+  </v-card>
 </template>
 
 <script lang="ts">

@@ -8,10 +8,6 @@
         v-model="enabled"
         :indeterminate="indeterminate"
       ></v-checkbox>
-      <!-- <v-checkbox
-      dense hide-details v-else indeterminate>
-
-      </v-checkbox> -->
     </v-col>
     <!-- In list (???) -->
     <v-col class="pa-0">
@@ -31,7 +27,7 @@
         @click="toggleFilter"
       ></v-checkbox>
     </v-col>
-    <v-col class="pa-0" cols="8">
+    <v-col class="pa-0" cols="7">
       <v-row>
         <v-col class="pa-0 d-flex align-center">
           <div class="text-subtitle-2 mb-0.875rem" v-text="property.name"></div>
