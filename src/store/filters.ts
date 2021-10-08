@@ -129,10 +129,7 @@ export class Filters extends VuexModule {
   get filteredAnnotations() {
     return annotation.annotations.filter((annotation: IAnnotation) => {
       // tag filter
-      if (!this.tagFilter.enabled) {
-        return true;
-      }
-      if (annotation.shape !== this.tagFilter.shape) {
+      if (this.tagFilter.enabled && annotation.shape !== this.tagFilter.shape) {
         return false;
       }
 
@@ -145,21 +142,24 @@ export class Filters extends VuexModule {
       }
 
       // Tag filter
-      const hasAllTags = this.tagFilter.tags.reduce(
-        (val: boolean, tag: string) => val && annotation.tags.includes(tag),
-        true
-      );
-      if (this.tagFilter.exclusive) {
-        return (
+      if (this.tagFilter.enabled) {
+        const hasAllTags = this.tagFilter.tags.reduce(
+          (val: boolean, tag: string) => val && annotation.tags.includes(tag),
+          true
+        );
+        if (
           hasAllTags &&
-          annotation.tags
+          this.tagFilter.exclusive &&
+          !annotation.tags
             .map((tag: string) => this.tagFilter.tags.includes(tag))
             .every((val: boolean) => val)
-        );
-      }
+        ) {
+          return false;
+        }
 
-      if (!hasAllTags) {
-        return false;
+        if (!hasAllTags) {
+          return false;
+        }
       }
 
       // Property filters
@@ -181,6 +181,7 @@ export class Filters extends VuexModule {
         return true;
       }
 
+      // ROI filters
       const roiFilters = this.roiFilters.filter(
         (filter: IROIAnnotationFilter) => filter.enabled
       );
