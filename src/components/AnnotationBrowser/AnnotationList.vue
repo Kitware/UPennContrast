@@ -18,6 +18,7 @@
               :key="item.id"
               @mouseover="hover(item.id)"
               @mouseleave="hover(null)"
+              :class="item.id === hoveredId ? 'is-hovered' : ''"
             >
               <td>
                 <v-checkbox
@@ -154,6 +155,10 @@ export default class AnnotationList extends Vue {
     ];
   }
 
+  get hoveredId() {
+    return this.annotationStore.hoveredAnnotationId;
+  }
+
   @Emit("clickedTag")
   clickedTag(tag: string) {
     return tag;
@@ -164,3 +169,10 @@ export default class AnnotationList extends Vue {
   }
 }
 </script>
+<style>
+tbody tr:hover,
+tbody tr.is-hovered,
+tbody tr.is-hovered:hover {
+  background-color: #616161;
+}
+</style>

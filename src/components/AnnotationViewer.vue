@@ -555,7 +555,44 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
+  handleMouseOver(evt: any) {
+    if (!evt || this.selectedTool) {
+      return;
+    }
+    let annotation = evt?.data?.annotation;
+    if (!annotation && evt?.data?.length) {
+      annotation = evt.data[0][2].annotation;
+    }
+    if (annotation && annotation.options("girderId")) {
+      this.annotationStore.setHoveredAnnoationId(
+        annotation.options("girderId")
+      );
+    }
+  }
+
+  handleMouseOff(evt: any) {
+    let annotation = evt?.data?.annotation;
+    if (!annotation && evt?.data?.length) {
+      annotation = evt.data[0][2].annotation;
+    }
+    if (
+      annotation &&
+      annotation.options("girderId") &&
+      this.hoveredAnnotationId === annotation.options("girderId")
+    ) {
+      this.annotationStore.setHoveredAnnoationId(null);
+    }
+  }
+
   handleAnnotationChange(evt: any) {
+    this.annotationLayer
+      .features()
+      .filter((feature: any) => !feature.selectionAPI())
+      .forEach((feature: any) => {
+        feature.selectionAPI(true);
+        feature.geoOn(geojs.event.feature.mouseon, this.handleMouseOver);
+        feature.geoOn(geojs.event.feature.mouseoff, this.handleMouseOff);
+      });
     if (!this.selectedTool && !this.roiFilter) {
       return;
     }
