@@ -11,34 +11,48 @@
         v-model="selected"
         show-select
       >
-        <!-- Tags -->
-        <template v-slot:item.tags="{ item }">
-          <v-chip
-            v-for="tag in item.tags"
-            :key="tag"
-            x-small
-            @click="clickedTag(tag)"
-            >{{ tag }}</v-chip
-          >
-        </template>
-        <!-- Index -->
-        <template v-slot:item.id="{ item }">
-          <span>{{ annotations.indexOf(item) }}</span>
-        </template>
-
-        <!-- Active -->
-        <template v-slot:item.active="{ item }">
-          <v-checkbox
-            :value="isAnnotationActive(item)"
-            @click="toggleActive(item)"
-          ></v-checkbox>
-        </template>
-
-        <template
-          v-for="propertyId in propertyIds"
-          v-slot:[`item.${propertyId}`]="{ item }"
-        >
-          {{ getPropertyValueForAnnotation(item, propertyId) }}
+        <template v-slot:body="{ items }">
+          <tbody>
+            <tr
+              v-for="item in items"
+              :key="item.id"
+              @mouseover="hover(item.id)"
+              @mouseleave="hover(null)"
+            >
+              <td>
+                <v-checkbox
+                  multiple
+                  v-model="selected"
+                  :value="item"
+                  hide-details
+                ></v-checkbox>
+              </td>
+              <td>
+                <v-checkbox
+                  :value="isAnnotationActive(item)"
+                  @click="toggleActive(item)"
+                ></v-checkbox>
+              </td>
+              <td>
+                <span>{{ annotations.indexOf(item) }}</span>
+              </td>
+              <td>
+                {{ item.shape }}
+              </td>
+              <td>
+                <v-chip
+                  v-for="tag in item.tags"
+                  :key="tag"
+                  x-small
+                  @click="clickedTag(tag)"
+                  >{{ tag }}</v-chip
+                >
+              </td>
+              <td v-for="propertyId in propertyIds" :key="propertyId">
+                {{ getPropertyValueForAnnotation(item, propertyId) }}
+              </td>
+            </tr>
+          </tbody>
         </template>
       </v-data-table>
     </v-card-text>
@@ -143,6 +157,10 @@ export default class AnnotationList extends Vue {
   @Emit("clickedTag")
   clickedTag(tag: string) {
     return tag;
+  }
+
+  hover(annotationId: string | null) {
+    this.annotationStore.setHoveredAnnoationId(annotationId);
   }
 }
 </script>

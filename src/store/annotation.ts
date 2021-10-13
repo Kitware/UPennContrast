@@ -41,6 +41,13 @@ export class Annotations extends VuexModule {
       .filter((id: string) => !this.activeAnnotationIds.includes(id));
   }
 
+  hoveredAnnotationId: string | null = null;
+
+  @Mutation
+  public setHoveredAnnoationId(id: string | null) {
+    this.hoveredAnnotationId = id;
+  }
+
   @Mutation
   public activateAnnotations(ids: string[]) {
     this.activeAnnotationIds = [

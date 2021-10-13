@@ -3,7 +3,10 @@ import geojs from "geojs";
 import { logError } from "@/utils/log";
 
 // Which style an annotation should have, depending on its layer (color change)
-export function getAnnotationStyleFromLayer(layer: IDisplayLayer | undefined) {
+export function getAnnotationStyleFromLayer(
+  layer: IDisplayLayer | undefined,
+  isHovered: boolean = false
+) {
   const style = {
     stroke: true,
     strokeColor: "black",
@@ -17,7 +20,11 @@ export function getAnnotationStyleFromLayer(layer: IDisplayLayer | undefined) {
   if (!layer) {
     return style;
   }
-  if (layer) {
+  if (isHovered) {
+    style.fillColor = "gray";
+    style.strokeColor = "gray";
+    style.strokeWidth = 4;
+  } else if (layer) {
     style.fillColor = layer.color;
     style.strokeColor = layer.color;
   }

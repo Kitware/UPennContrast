@@ -124,6 +124,10 @@ export default class AnnotationViewer extends Vue {
     return tool || null;
   }
 
+  get hoveredAnnotationId() {
+    return this.annotationStore.hoveredAnnotationId;
+  }
+
   getAnyLayerForChannel(channel: number) {
     return this.layers.find(
       (layer: IDisplayLayer) => channel === layer.channel
@@ -140,7 +144,10 @@ export default class AnnotationViewer extends Vue {
 
   getAnnotationStyle(annotation: IAnnotation) {
     const layer = this.getAnyLayerForChannel(annotation.assignment.channel);
-    return getAnnotationStyleFromLayer(layer);
+    return getAnnotationStyleFromLayer(
+      layer,
+      annotation.id === this.hoveredAnnotationId
+    );
   }
 
   // Get the index of the tile an annotation should be drawn in.
@@ -200,13 +207,14 @@ export default class AnnotationViewer extends Vue {
       return;
     }
 
+    // First remove undesired annotations (layer was disabled, uneligible coordinates...)
+    this.clearOldAnnotations();
+
     // We want to ignore these already displayed annotations
     const displayedIds = this.annotationLayer
       .annotations()
-      .map((a: any) => a.options("girderId"));
-
-    // First remove undesired annotations (layer was disabled, uneligible coordinates...)
-    this.clearOldAnnotations();
+      .map((a: any) => a.options("girderId"))
+      .filter((id: string) => id !== this.hoveredAnnotationId);
 
     // Then draw the new annotations
     this.drawNewAnnotations(displayedIds);
@@ -215,6 +223,9 @@ export default class AnnotationViewer extends Vue {
   shouldDisplayAnnotation(annotation: IAnnotation): boolean {
     if (!annotation.location) {
       return false;
+    }
+    if (annotation.id === this.hoveredAnnotationId) {
+      return true;
     }
     if (
       (annotation.location.XY !== this.store.xy && !this.store.unrollXY) ||
@@ -232,6 +243,18 @@ export default class AnnotationViewer extends Vue {
       if (clearAll) {
         this.annotationLayer.removeAnnotation(annotation);
         return;
+      }
+
+      if (
+        annotation.options("girderId") === this.hoveredAnnotationId &&
+        !annotation.options("isHovered")
+      ) {
+        this.annotationLayer.removeAnnotation(annotation);
+      } else if (
+        annotation.options("girderId") !== this.hoveredAnnotationId &&
+        annotation.options("isHovered")
+      ) {
+        this.annotationLayer.removeAnnotation(annotation);
       }
 
       // Check for connections
@@ -324,6 +347,10 @@ export default class AnnotationViewer extends Vue {
       coordinates
     );
     newGeoJSAnnotation.options("girderId", annotation.id);
+
+    if (annotation.id === this.hoveredAnnotationId) {
+      newGeoJSAnnotation.options("isHovered", true);
+    }
 
     const style = newGeoJSAnnotation.options("style");
     const newStyle = this.getAnnotationStyle(annotation);
@@ -577,6 +604,11 @@ export default class AnnotationViewer extends Vue {
   @Watch("unrollW")
   onUnrollChanged() {
     this.clearOldAnnotations(true);
+    this.drawAnnotations();
+  }
+
+  @Watch("hoveredAnnotationId")
+  onHovered() {
     this.drawAnnotations();
   }
 
