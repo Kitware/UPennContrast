@@ -4,10 +4,18 @@
       {{ property.name }}
     </v-row>
     <v-row>
-      <v-col cols="6">
+      <v-col class="wrapper" ref="wrapper" :style="{width: `${width}px`}">
         <svg :width="width" :height="height">
           <path class="path" :d="area" />
         </svg>
+        <div class="min-hint" :style="{ width: toValue(minValue) }" />
+        <div class="max-hint" :style="{ width: toValue(maxValue, true) }" />
+        <div ref="min" class="min" :style="{ left: toValue(minValue) }" />
+        <div
+          ref="max"
+          class="max"
+          :style="{ right: toValue(maxValue, true) }"
+        />
       </v-col>
       <v-col>
         <v-checkbox v-model="useCDF" label="CDF"></v-checkbox>
@@ -44,6 +52,8 @@ import { Vue, Component, Prop, Watch, VModel } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
+import { selectAll, event as d3Event } from "d3-selection";
+import { drag, D3DragEvent } from "d3-drag";
 
 import {
   IAnnotation,
@@ -66,14 +76,28 @@ export default class AnnotationFilter extends Vue {
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
 
-  width = 200;
+  width = 300;
   height = 60;
 
   useLog: boolean = false;
   useCDF: boolean = false;
 
   defaultMinMax: boolean = true;
-  max = 0;
+
+  get histToPixel() {
+    const scale = scaleLinear()
+      .range([0, this.width])
+      .domain([this.defaultMin, this.defaultMax]);
+    return scale;
+  }
+
+  toValue(val: number, isMax: boolean = false) {
+    const base = this.histToPixel(val);
+    if (isMax) {
+      return `${this.width - base}px`;
+    }
+    return `${base}px`;
+  }
 
   get minValue() {
     return this.defaultMinMax ? this.defaultMin : this.propertyFilter.range.min;
@@ -109,7 +133,6 @@ export default class AnnotationFilter extends Vue {
       ...this.propertyFilter,
       range: { min: this.minValue, max }
     });
-    this.max = Number(value);
   }
 
   get defaultMin() {
@@ -205,6 +228,15 @@ export default class AnnotationFilter extends Vue {
     }
   }
 
+  private updateMinMax(which: "min" | "max", pixel: number) {
+    const val = Math.round(this.histToPixel.invert(pixel));
+    if (which === "min") {
+      this.minValue = Math.min(this.maxValue, val);
+    } else {
+      this.maxValue = Math.max(this.minValue, val);
+    }
+  }
+
   mounted() {
     if (!this.propertyFilter.enabled) {
       this.filterStore.updatePropertyFilter({
@@ -212,19 +244,119 @@ export default class AnnotationFilter extends Vue {
         enabled: true
       });
     }
+    if (this.$refs.min && this.$refs.max) {
+      selectAll([this.$refs.min, this.$refs.max])
+        .data(["min", "max"])
+        .call(
+          drag<HTMLElement, any>().on("drag", (which: "min" | "max") => {
+            const evt = d3Event as D3DragEvent<HTMLElement, any, any>;
+            this.updateMinMax(which, Math.max(0, Math.min(evt.x, this.width)));
+          })
+        );
+    }
   }
 }
 </script>
 <style scoped lang="scss">
+.wrapper {
+  margin-top: 0.5em;
+  position: relative;
+  display: flex;
+
+  &:hover {
+    > .min {
+      border-right-width: 5px;
+    }
+
+    > .max {
+      border-left-width: 5px;
+    }
+  }
+}
+.min,
+.max {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  transition: border-width 0.2s ease;
+  width: 1px;
+  cursor: ew-resize;
+}
+
+.max {
+  right: 0;
+  border-right: none;
+}
+
+$savedHint: 7px;
+.min-hint,
+.max-hint {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  user-select: none;
+  pointer-events: none;
+}
+
+.min-hint {
+  left: 0;
+}
+
+.max-hint {
+  right: 0;
+}
+
 .theme--dark {
   .path {
     fill: #c2c2c2;
+  }
+
+  .min {
+    border-right: 1px solid lightgray;
+  }
+
+  .max {
+    border-left: 1px solid lightgray;
+  }
+
+  .saved-min,
+  .saved-max {
+    border-top: $savedHint solid lightgray;
+  }
+
+  .min-hint,
+  .max-hint {
+    background: repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.5),
+      rgba(255, 255, 255, 0.5) 5px,
+      #696969 5px,
+      #696969 10px
+    );
   }
 }
 
 .theme--light {
   .path {
     fill: #c2c2c2;
+  }
+  .min {
+    border-right: 1px solid darkgray;
+  }
+
+  .max {
+    border-left: 1px solid darkgray;
+  }
+
+  .min-hint,
+  .max-hint {
+    background: repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.5),
+      rgba(255, 255, 255, 0.5) 5px,
+      #bdbdbd 5px,
+      #bdbdbd 10px
+    );
   }
 }
 </style>
