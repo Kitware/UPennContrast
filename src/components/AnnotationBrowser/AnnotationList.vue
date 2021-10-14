@@ -49,6 +49,16 @@
                   >{{ tag }}</v-chip
                 >
               </td>
+              <td>
+                <v-text-field
+                  hide-details
+                  :value="item.name || ''"
+                  dense
+                  flat
+                  @change="updateAnnotationName($event, item.id)"
+                >
+                </v-text-field>
+              </td>
               <td v-for="propertyId in propertyIds" :key="propertyId">
                 {{ getPropertyValueForAnnotation(item, propertyId) }}
               </td>
@@ -103,6 +113,10 @@ export default class AnnotationList extends Vue {
     return this.propertyStore.annotationListIds;
   }
 
+  updateAnnotationName(name: string, id: string) {
+    this.annotationStore.updateAnnotationName({ name, id });
+  }
+
   isAnnotationActive(annotation: IAnnotation) {
     return this.annotationStore.activeAnnotationIds.includes(annotation.id);
   }
@@ -117,11 +131,11 @@ export default class AnnotationList extends Vue {
       propertyId
     ];
     if (!annotationIds || !values) {
-      return "N/A";
+      return "-";
     }
     const index = annotationIds.indexOf(annotation.id);
     if (index === -1) {
-      return "N/A";
+      return "-";
     }
     return values[index];
   }
@@ -147,6 +161,10 @@ export default class AnnotationList extends Vue {
       {
         text: "Tags",
         value: "tags"
+      },
+      {
+        text: "Name",
+        value: "name"
       },
       ...this.properties.map((property: IAnnotationProperty) => ({
         text: property.name,

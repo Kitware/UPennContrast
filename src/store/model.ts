@@ -162,6 +162,7 @@ export interface IGeoJSPoint {
 export interface IAnnotation {
   id: string;
   tags: string[];
+  name: string | null;
   assignment: {
     channel: number;
     Z: {

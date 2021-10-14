@@ -4,7 +4,7 @@
       {{ property.name }}
     </v-row>
     <v-row>
-      <v-col class="wrapper" ref="wrapper" :style="{width: `${width}px`}">
+      <v-col class="wrapper" ref="wrapper" :style="{ width: `${width}px` }">
         <svg :width="width" :height="height">
           <path class="path" :d="area" />
         </svg>

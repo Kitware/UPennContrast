@@ -19,6 +19,8 @@ import {
   IROIAnnotationFilter
 } from "./model";
 
+import Vue from "vue";
+
 @Module({ dynamic: true, store, name: "annotation" })
 export class Annotations extends VuexModule {
   // Annotations from the current dataset and configuration
@@ -98,6 +100,31 @@ export class Annotations extends VuexModule {
   @Mutation
   public addAnnotation(value: IAnnotation) {
     this.annotations = [...this.annotations, value];
+  }
+
+  @Mutation
+  public setAnnotation({
+    annotation,
+    index
+  }: {
+    annotation: IAnnotation;
+    index: number;
+  }) {
+    Vue.set(this.annotations, index, annotation);
+  }
+
+  @Action
+  public updateAnnotationName({ name, id }: { name: string; id: string }) {
+    const annotation = this.annotations.find(
+      (annotation: IAnnotation) => annotation.id === id
+    );
+    if (annotation) {
+      this.setAnnotation({
+        annotation: { ...annotation, name },
+        index: this.annotations.indexOf(annotation)
+      });
+      this.syncAnnotations();
+    }
   }
 
   @Mutation

@@ -103,7 +103,7 @@ const methods: {
       annotation.coordinates[0],
       annotation.coordinates[annotation.coordinates.length - 1]
     );
-    return sum;
+    return Math.round(sum);
   },
   numberOfConnected: (
     annotation: IAnnotation,
