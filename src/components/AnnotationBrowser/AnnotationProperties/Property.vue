@@ -33,17 +33,22 @@
           <div class="text-subtitle-2 mb-0.875rem" v-text="property.name"></div>
         </v-col>
         <v-col cols="7" class="pa-0">
-          <layer-select
-            v-if="propertyLayer !== undefined"
-            v-model="propertyLayer"
-            label=""
-            :any="false"
-          ></layer-select>
-          <tag-filter-editor
-            v-if="propertyFilter !== undefined"
-            v-model="propertyFilter"
-            property="true"
-          ></tag-filter-editor>
+          <v-row>
+            <layer-select
+              v-if="propertyLayer !== undefined"
+              v-model="propertyLayer"
+              label=""
+              :any="false"
+            ></layer-select>
+            <tag-filter-editor
+              v-if="propertyFilter !== undefined"
+              v-model="propertyFilter"
+              property="true"
+            ></tag-filter-editor> </v-row
+          ><v-row v-if="propertyLayer !== undefined">
+            <v-text-field dense label="Property Name" v-model="customName">
+            </v-text-field>
+          </v-row>
         </v-col>
       </v-row>
     </v-col>
@@ -55,9 +60,10 @@ import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue"
 import LayerSelect from "@/components/LayerSelect.vue";
 
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
+import store from "@/store";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
-import { ITagAnnotationFilter } from "@/store/model";
+import { IDisplayLayer, ITagAnnotationFilter } from "@/store/model";
 
 @Component({
   components: {
@@ -68,9 +74,30 @@ import { ITagAnnotationFilter } from "@/store/model";
 export default class AnnotationProperty extends Vue {
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
-
+  readonly store = store;
   @Prop()
   private readonly property!: any;
+
+  get customName() {
+    if (this.propertyLayer !== undefined) {
+      if (this.property.customName) {
+        return this.property.customName;
+      }
+      if (this.propertyLayer !== null) {
+        const layer = (this.store.configuration?.view.layers || [])[
+          this.propertyLayer
+        ];
+        if (layer) {
+          return `${this.property.name} ${layer.name}`;
+        }
+      }
+    }
+    return this.property.name;
+  }
+
+  set customName(name: string) {
+    this.propertyStore.replaceProperty({ ...this.property, customName: name });
+  }
 
   get propertyFilter() {
     return this.property.filter;

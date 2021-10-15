@@ -80,6 +80,7 @@ import filterStore from "@/store/filters";
 import {
   IAnnotation,
   IAnnotationProperty,
+  ILayerDependentAnnotationProperty,
   IPropertyAnnotationFilter
 } from "@/store/model";
 
@@ -167,7 +168,9 @@ export default class AnnotationList extends Vue {
         value: "name"
       },
       ...this.properties.map((property: IAnnotationProperty) => ({
-        text: property.name,
+        text:
+          (property as ILayerDependentAnnotationProperty).customName ||
+          property.name,
         value: property.id
       }))
     ];

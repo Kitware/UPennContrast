@@ -238,6 +238,7 @@ export interface IAnnotationProperty {
 
 export interface ILayerDependentAnnotationProperty extends IAnnotationProperty {
   layer: number | null; // If null, use annotation's default layer
+  customName: string | null;
 }
 
 export interface IRelationalAnnotationProperty extends IAnnotationProperty {
