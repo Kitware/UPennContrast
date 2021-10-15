@@ -758,6 +758,18 @@ export class Main extends VuexModule {
           results.baseQuadOptions.frameBase = layer.channel;
           results.baseQuadOptions.frameStride =
             anyImage.tileinfo.IndexRange.IndexC;
+          results.baseQuadOptions.frameGroup =
+            anyImage.tileinfo.IndexRange.IndexZ || 1;
+          if (
+            (anyImage.tileinfo.IndexStride || {}).IndexZ &&
+            (anyImage.tileinfo.IndexStride || {}).IndexC &&
+            anyImage.tileinfo.IndexStride.IndexZ >
+              anyImage.tileinfo.IndexRange.IndexC
+          ) {
+            results.baseQuadOptions.frameGroupStride =
+              anyImage.tileinfo.IndexStride.IndexZ /
+              anyImage.tileinfo.IndexRange.IndexC;
+          }
         }
       }
       return results;
