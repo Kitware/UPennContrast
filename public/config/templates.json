@@ -1,0 +1,165 @@
+[
+  {
+    "name": "Manual annotation tool",
+    "type": "create",
+    "interface": [
+      {
+        "name": "",
+        "id": "annotation",
+        "type": "annotation"
+      },
+      {
+        "name": "Connect to Nearest Tag",
+        "id": "connectTo",
+        "type": "restrictTagsAndLayer",
+        "meta": {
+          "tagsLabel": "Connect to nearest tags...",
+          "layerLabel": "Restrict to Layer"
+        }
+      }
+    ]
+  },
+  {
+    "name": "\"Snap to\" manual annotation tools",
+    "type": "snap",
+    "interface": [
+      {
+        "name": "",
+        "id": "annotation",
+        "type": "annotation"
+      },
+      {
+        "name": "Connect to Nearest Tag",
+        "id": "connectTo",
+        "type": "restrictTagsAndLayer",
+        "meta": {
+          "tagsLabel": "Connect to nearest tags...",
+          "layerLabel": "Restrict to Layer"
+        }
+      },
+      {
+        "name": "Snap To",
+        "type": "select",
+        "id": "snapTo",
+        "meta": {
+          "items": [
+            { "text": "Snap ellipse to dot", "value": "ellipseToDot" },
+            { "text": "Snap blob to dot", "value": "blobToDot" },
+            {
+              "text": "Snap blob to blob",
+              "value": "blobToBlob",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Threshold",
+                    "id": "threshold",
+                    "type": "text",
+                    "meta": { "type": "number" }
+                  }
+                ]
+              }
+            },
+            { "text": "Snap freehand line to edge", "value": "edge" }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "Select annotation tools",
+    "type": "select",
+    "interface": [
+      {
+        "name": "Selection shape",
+        "type": "select",
+        "id": "selectionType",
+        "meta": {
+          "items": [
+            {
+              "text": "Pointer",
+              "value": "pointer"
+            },
+            {
+              "text": "Lasso",
+              "value": "lasso"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "Annotation edit tools",
+    "type": "edit",
+    "interface": [
+      {
+        "name": "Edition Type",
+        "type": "select",
+        "id": "editionType",
+        "meta": {
+          "items": [
+            {
+              "text": "Slice",
+              "value": "slice",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Child connections",
+                    "type": "radio",
+                    "id": "childConnections",
+                    "values": [
+                      {
+                        "label": "Remove all child connections",
+                        "value": "removeChildren"
+                      },
+                      {
+                        "label": "Assign child connections by distance",
+                        "value": "assignChildren"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "text": "Join",
+              "value": "join",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Join From",
+                    "id": "joinFrom",
+                    "type": "restrictTagsAndLayer"
+                  },
+                  {
+                    "name": "Join To",
+                    "id": "joinTo",
+                    "type": "restrictTagsAndLayer"
+                  },
+                  {
+                    "name": "Existing Connections",
+                    "id": "overrideConnections",
+                    "type": "checkbox",
+                    "meta": {
+                      "label": "Override Existing Connections"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "text": "Edit annotations",
+              "value": "edit",
+              "meta": { "requireSelection": "blob" }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "Automated annotation tools",
+    "type": "segmentation",
+    "interface": []
+  }
+]

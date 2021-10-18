@@ -8,6 +8,45 @@ import {
   IImage
 } from "./model";
 
+const resolveSlice = (slice: IDisplaySlice, value: number) => {
+  switch (slice.type) {
+    case "constant":
+      return slice.value == null ? 0 : slice.value;
+    case "offset":
+      return value + (slice.value == null ? 0 : slice.value);
+    case "max-merge":
+      // any value can work, but this value relates to the displayed
+      // histogram
+      return value;
+    default:
+      return value;
+  }
+};
+
+export function getLayerSliceIndexes(
+  layer: IDisplayLayer,
+  ds: IDataset,
+  time: number,
+  xy: number,
+  z: number
+): { xyIndex: number; zIndex: number; tIndex: number } | null {
+  const xyIndex = ds.xy.length > 1 ? resolveSlice(layer.xy, xy) : 0;
+  // invalid slices
+  if (xyIndex < 0 || xyIndex >= ds.xy.length) {
+    return null;
+  }
+  const zIndex = ds.z.length > 1 ? resolveSlice(layer.z, z) : 0;
+  // invalid slices
+  if (zIndex < 0 || zIndex >= ds.z.length) {
+    return null;
+  }
+  const tIndex = ds.time.length > 1 ? resolveSlice(layer.time, time) : 0;
+  if (tIndex < 0 || tIndex >= ds.time.length) {
+    return null;
+  }
+  return { xyIndex, zIndex, tIndex };
+}
+
 export function getLayerImages(
   layer: IDisplayLayer,
   ds: IDataset,
@@ -15,35 +54,11 @@ export function getLayerImages(
   xy: number,
   z: number
 ) {
-  const resolveSlice = (slice: IDisplaySlice, value: number) => {
-    switch (slice.type) {
-      case "constant":
-        return slice.value == null ? 0 : slice.value;
-      case "offset":
-        return value + (slice.value == null ? 0 : slice.value);
-      case "max-merge":
-        // any value can work, but this value relates to the displayed
-        // histogram
-        return value;
-      default:
-        return value;
-    }
-  };
-
-  const xyIndex = ds.xy.length > 1 ? resolveSlice(layer.xy, xy) : 0;
-  // invalid slices
-  if (xyIndex < 0 || xyIndex >= ds.xy.length) {
+  const indexes = getLayerSliceIndexes(layer, ds, time, xy, z);
+  if (!indexes) {
     return [];
   }
-  const zIndex = ds.z.length > 1 ? resolveSlice(layer.z, z) : 0;
-  // invalid slices
-  if (zIndex < 0 || zIndex >= ds.z.length) {
-    return [];
-  }
-  const tIndex = ds.time.length > 1 ? resolveSlice(layer.time, time) : 0;
-  if (tIndex < 0 || tIndex >= ds.time.length) {
-    return [];
-  }
+  const { xyIndex, zIndex, tIndex } = indexes;
 
   return ds.images(
     ds.z[zIndex],

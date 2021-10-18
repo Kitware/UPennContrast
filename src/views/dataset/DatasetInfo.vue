@@ -80,6 +80,7 @@ import store from "@/store";
 import {
   IDatasetConfiguration,
   IDisplayLayer,
+  IToolSet,
   IViewConfiguration,
   newLayer
 } from "../../store/model";
@@ -224,6 +225,8 @@ export default class DatasetInfo extends Vue {
       const view: IViewConfiguration = { layers };
       config.view = view;
 
+      const toolset: IToolSet = { name: "Default toolset", toolIds: [] };
+      config.toolset = toolset;
       await store.api.updateConfiguration(config);
 
       this.configuration = [config!];

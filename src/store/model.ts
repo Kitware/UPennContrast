@@ -51,6 +51,36 @@ export interface IImageTile {
   fullImage: HTMLImageElement;
 }
 
+export interface IToolTemplateInterface {
+  id: string;
+  name: string;
+  type: string;
+  meta: any;
+}
+
+export interface IToolTemplate {
+  name: string;
+  description: string;
+  interface: IToolTemplateInterface[];
+}
+
+export interface IToolConfiguration {
+  readonly id: string;
+  readonly _girder: IGirderItem;
+
+  name: string;
+  description: string;
+
+  type: string;
+
+  values: any;
+
+  template: IToolTemplate;
+
+  configurationId: string;
+  datasetId: string;
+}
+
 export interface IDataset {
   readonly id: string;
   readonly _girder: IGirderFolder;
@@ -74,6 +104,12 @@ export interface IDataset {
 export interface IViewConfiguration {
   layers: IDisplayLayer[];
 }
+
+export interface IToolSet {
+  name: string;
+  toolIds: string[];
+}
+
 export interface IDatasetConfiguration {
   readonly id: string;
   readonly _girder: IGirderItem;
@@ -82,6 +118,8 @@ export interface IDatasetConfiguration {
   description: string;
 
   view: IViewConfiguration;
+  toolset: IToolSet;
+
   snapshots?: any[];
 }
 
@@ -113,6 +151,47 @@ export interface IDisplayLayer {
   contrast: IContrast;
 
   _histogram?: any | undefined;
+}
+
+export interface IGeoJSPoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface IAnnotation {
+  id: string;
+  tags: string[];
+  assignment: {
+    channel: number;
+    Z: {
+      type: string; // Either "layer", or "assign"
+      value: 1;
+    };
+    Time: {
+      type: string;
+      value: 1;
+    };
+  };
+  location: {
+    XY: number;
+    Z: number;
+    Time: number;
+  };
+  shape: string;
+  coordinates: IGeoJSPoint[];
+
+  computedValues: any;
+}
+
+export interface IAnnotationConnection {
+  id: string;
+  label: string;
+  tags: string[];
+  parentId: string;
+  childId: string;
+
+  computedValues: any;
 }
 
 export interface IContrast {

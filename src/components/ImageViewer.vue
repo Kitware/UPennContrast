@@ -1,5 +1,11 @@
 <template>
   <div class="image">
+    <annotation-viewer
+      v-if="annotationLayer"
+      :annotationLayer="annotationLayer"
+      :unrollH="unrollH"
+      :unrollW="unrollW"
+    ></annotation-viewer>
     <div id="map" ref="geojsmap" :data-update="reactiveDraw" />
     <div class="loading" v-if="!fullyReady">
       <v-progress-circular indeterminate />
@@ -43,18 +49,14 @@
 <script lang="ts">
 // in cosole debugging, you can access the map via
 //  $('.geojs-map').data('data-geojs-map')
-import { Vue, Component, Watch } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
-import { select, event as d3Event } from "d3-selection";
 import geojs from "geojs";
-import {
-  zoom as d3Zoom,
-  D3ZoomEvent,
-  zoomIdentity,
-  zoomTransform
-} from "d3-zoom";
-import { IImage, IImageTile } from "../store/model";
+
+import { IImage } from "../store/model";
 import setFrameQuad from "../utils/setFrameQuad.js";
+
+import AnnotationViewer from "@/components/AnnotationViewer.vue";
 
 function generateFilterURL(
   index: number,
@@ -109,7 +111,7 @@ function generateFilterURL(
   setSlopeIntercept(index, "func-b", whitePoint, blackPoint, blue);
 }
 
-@Component
+@Component({ components: { AnnotationViewer } })
 export default class ImageViewer extends Vue {
   readonly store = store;
 
@@ -121,7 +123,7 @@ export default class ImageViewer extends Vue {
 
   private layerParams: any;
   private map: any;
-  private annotationLayer: any;
+  private annotationLayer: any = null;
   private uiLayer: any;
   private scaleWidget: any;
   private unrollW: number = 1;
@@ -163,35 +165,6 @@ export default class ImageViewer extends Vue {
 
   private get layerStackImages() {
     return this.store.configuration ? this.store.layerStackImages : [];
-  }
-
-  get annotationStyle(): any {
-    const mode = this.store.annotationMode;
-    const list = this.store.annotationModeList.filter(
-      entry => entry.key === mode
-    );
-    return list.length ? list[0] : null;
-  }
-
-  @Watch("annotationStyle")
-  watchAnnotationStyle(value: any | null) {
-    if (this.annotationLayer) {
-      this.annotationLayer.mode(value ? value.mode : null);
-    }
-  }
-
-  handleModeChange(evt: any) {
-    if (evt.mode === null && this.store.annotationMode !== null) {
-      // we could, instead, just deactive the button
-      // this.store.setAnnotationMode(evt.mode);
-      this.annotationLayer.mode(this.annotationStyle.mode);
-    }
-  }
-
-  handleAnnotationChange(evt: any) {
-    if (this.annotationStyle && evt.annotation) {
-      evt.annotation.style(this.annotationStyle.style);
-    }
   }
 
   private draw(mapElement: HTMLElement) {
@@ -246,17 +219,10 @@ export default class ImageViewer extends Vue {
       Vue.prototype.$currentMap = this.map;
       this.annotationLayer = this.map.createLayer("annotation", {
         annotations: geojs.listAnnotations(),
-        autoshareRenderer: false
+        autoshareRenderer: false,
+        continuousCloseProximity: true
       });
       this.annotationLayer.node().css({ "mix-blend-mode": "unset" });
-      this.annotationLayer.geoOn(
-        geojs.event.annotation.mode,
-        this.handleModeChange
-      );
-      this.annotationLayer.geoOn(
-        geojs.event.annotation.add,
-        this.handleAnnotationChange
-      );
       this.uiLayer = this.map.createLayer("ui");
       this.uiLayer.node().css({ "mix-blend-mode": "unset" });
     } else {

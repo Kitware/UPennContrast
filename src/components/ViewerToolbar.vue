@@ -1,24 +1,7 @@
 <template>
   <div>
     <div>
-      <v-layout v-if="annotationModeList.length">
-        <v-btn-toggle v-model="annotationMode">
-          <v-btn
-            v-for="mode in annotationModeList"
-            :key="mode.key"
-            :value="mode.key"
-            v-mousetrap="{
-              bind: mode.hotkey,
-              handler: () => {
-                annotationMode = annotationMode === mode.key ? null : mode.key;
-              }
-            }"
-            :title="'Hot key: ' + mode.hotkey"
-            >{{ mode.name }}</v-btn
-          >
-        </v-btn-toggle>
-      </v-layout>
-
+      <toolset></toolset>
       <v-layout>
         <value-slider
           v-model="xy"
@@ -96,12 +79,14 @@
 import { Vue, Component, Watch } from "vue-property-decorator";
 import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
+import Toolset from "@/tools/toolsets/Toolset.vue";
 import store from "@/store";
 
 @Component({
   components: {
     ValueSlider,
-    SwitchToggle
+    SwitchToggle,
+    Toolset
   }
 })
 export default class ViewerToolbar extends Vue {
@@ -118,18 +103,6 @@ export default class ViewerToolbar extends Vue {
         [param]: value
       }
     });
-  }
-
-  get annotationModeList(): any[] {
-    return this.store.annotationModeList;
-  }
-
-  get annotationMode(): string | null {
-    return this.store.annotationMode;
-  }
-
-  set annotationMode(value: string | null) {
-    this.store.setAnnotationMode(value);
   }
 
   get xy() {

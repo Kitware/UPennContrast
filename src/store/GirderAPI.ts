@@ -15,8 +15,12 @@ import {
   IImage,
   IContrast,
   IImageTile,
+  IToolSet,
   newLayer,
-  IViewConfiguration
+  IViewConfiguration,
+  IToolConfiguration,
+  IAnnotation,
+  IAnnotationConnection
 } from "./model";
 import {
   toStyle,
@@ -26,6 +30,7 @@ import {
 } from "./images";
 import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
+import { VTreeviewNode } from "vuetify/lib";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
 // using HTML 2 might improve that slightly).  For a single layer, if we set
@@ -87,6 +92,56 @@ export default class GirderAPI {
       (array, currentDatasets) => [...array, ...currentDatasets],
       []
     );
+  }
+  async getTool(toolId: string): Promise<IToolConfiguration> {
+    try {
+      const item = await this.getItem(toolId);
+      return asToolConfiguration(item);
+    } catch (e) {
+      throw e;
+    }
+  }
+
+  async getAllTools(): Promise<IToolConfiguration[]> {
+    const userIds = await this.getAllUserIds();
+    const promises = userIds.map(id => this.getToolsForUser(id));
+    const tools = await Promise.all(promises);
+    return tools.reduce(
+      (array, currentTools) => [...array, ...currentTools],
+      []
+    );
+  }
+
+  async getToolsForUser(userId: string = "me"): Promise<IToolConfiguration[]> {
+    const publicFolder = await this.getUserPublicFolder(userId);
+
+    const toolFolderName = "TOOLS";
+    const toolsFolderResult = await this.client.get(
+      `folder?parentType=folder&parentId=${publicFolder._id}&name=${toolFolderName}`
+    );
+    const toolsFolder: IGirderFolder = toolsFolderResult.data[0];
+    if (toolsFolder?.meta?.subtype !== "toolFolder") {
+      return [];
+    }
+
+    const toolsResult = await this.client.get(
+      `item?folderId=${toolsFolder._id}`
+    );
+    if (toolsResult.status !== 200) {
+      throw new Error(
+        `Could not get a list of tools for folder ${toolsFolder.name}: ${toolsResult.status}: ${toolsResult.statusText}`
+      );
+      return [];
+    }
+
+    if (toolsResult.data?.length) {
+      const items = toolsResult.data;
+      const toolItems = items.filter(
+        (item: IGirderItem) => (item.meta || {}).subtype === "toolConfiguration"
+      );
+      return toolItems.map((item: IGirderItem) => asToolConfiguration(item));
+    }
+    return [];
   }
 
   async getDatasetsForUser(userId: string = "me"): Promise<IDataset[]> {
@@ -223,6 +278,84 @@ export default class GirderAPI {
     return this.getItem(id).then(asConfigurationItem);
   }
 
+  async getAnnotationsForConfiguration(configuration: IDatasetConfiguration) {
+    const config = await this.getDatasetConfiguration(configuration.id);
+    if (config && config._girder.meta) {
+      return {
+        annotations: config._girder.meta.annotations || [],
+        annotationConnections: config._girder.meta.connections || []
+      };
+    }
+    return { annotations: [], annotationConnections: [] };
+  }
+
+  async setAnnotationsToConfiguration(
+    annotations: IAnnotation[],
+    connections: IAnnotationConnection[],
+    configuration: IDatasetConfiguration
+  ) {
+    return this.client.put(`/item/${configuration._girder._id}/metadata`, {
+      annotations,
+      connections
+    });
+  }
+
+  async createTool(
+    name: string,
+    description: string,
+    dataset: IDataset,
+    configuration: IDatasetConfiguration
+  ): Promise<IToolConfiguration> {
+    const toolFolderName = "TOOLS";
+
+    // Create a tools directory if not created
+    const publicFolder = await this.getUserPublicFolder();
+
+    // Create tools folder
+    const toolsFolderData = new FormData();
+    toolsFolderData.set("parentType", publicFolder._modelType);
+    toolsFolderData.set("parentId", publicFolder._id);
+    toolsFolderData.set("name", toolFolderName);
+    toolsFolderData.set(
+      "description",
+      "A directory for all tools that were created by this user"
+    );
+    toolsFolderData.set("reuseExisting", "true");
+    toolsFolderData.set("metadata", JSON.stringify({ subtype: "toolFolder" }));
+
+    const resp = await this.client.post("folder", toolsFolderData);
+    const toolsFolder: IGirderFolder = resp.data;
+
+    // Use this directory as parent for all items
+    const itemData = new FormData();
+    itemData.set("folderId", toolsFolder._id);
+    itemData.set("name", name);
+    itemData.set("description", description);
+    itemData.set("reuseExisting", "false");
+    itemData.set(
+      "metadata",
+      JSON.stringify({
+        subtype: "toolConfiguration",
+        datasetId: dataset.id,
+        configurationId: configuration.id
+      })
+    );
+
+    return this.client
+      .post("item", itemData)
+      .then(r => asToolConfiguration(r.data));
+  }
+
+  updateTool(tool: IToolConfiguration): Promise<IToolConfiguration> {
+    return this.client
+      .put(`/item/${tool.id}/metadata`, {
+        type: tool.type,
+        template: tool.template,
+        values: tool.values
+      })
+      .then(() => tool);
+  }
+
   createDataset(
     name: string,
     description: string,
@@ -269,11 +402,13 @@ export default class GirderAPI {
     const layers: IDisplayLayer[] = [];
     channels.forEach(() => layers.push(newLayer(dataset, layers)));
     const view: IViewConfiguration = { layers };
+    const toolset: IToolSet = { name: "Default Toolset", toolIds: [] };
     data.set(
       "metadata",
       JSON.stringify({
         subtype: "contrastConfiguration",
-        view
+        view,
+        toolset
       })
     );
     return this.client
@@ -292,7 +427,8 @@ export default class GirderAPI {
               Object.entries(l).filter(([k]) => !k.startsWith("_"))
             )
           )
-        }
+        },
+        toolset: config.toolset
       })
       .then(() => config);
   }
@@ -376,6 +512,22 @@ function asDataset(folder: IGirderFolder): IDataset {
   };
 }
 
+function asToolConfiguration(item: IGirderItem): IToolConfiguration {
+  const { values, template, type, datasetId, configurationId } = item.meta;
+  const tool = {
+    id: item._id,
+    _girder: item,
+    name: item.name,
+    description: item.description,
+    type,
+    values,
+    template,
+    configurationId,
+    datasetId
+  };
+  return tool;
+}
+
 function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
   const configuration = {
     id: item._id,
@@ -383,6 +535,7 @@ function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
     name: item.name,
     description: item.description,
     view: item.meta.view || { layers: item.meta.layers || [] },
+    toolset: item.meta.toolset || { name: "Default toolset", toolIds: [] },
     snapshots: item.meta.snapshots || []
   };
   return configuration;

@@ -8,21 +8,21 @@ import {
   VuexModule
 } from "vuex-module-decorators";
 import GirderAPI from "./GirderAPI";
-import { getLayerImages } from "./images";
+import { getLayerImages, getLayerSliceIndexes } from "./images";
 import {
   IDataset,
   IDatasetConfiguration,
   IDatasetConfigurationMeta,
   IDisplayLayer,
   IImage,
-  IImageTile,
   newLayer
 } from "./model";
+
 import persister from "./Persister";
 import store from "./root";
 import sync from "./sync";
 import { MAX_NUMBER_OF_RECENT_CONFIGURATIONS } from "./constants";
-
+import Vue from "vue";
 export { default as store } from "./root";
 
 @Module({ dynamic: true, store, name: "main" })
@@ -48,8 +48,6 @@ export class Main extends VuexModule {
   z: number = 0;
   time: number = 0;
   layerMode: "single" | "multiple" = "multiple";
-  annotationMode: string | null = null;
-  annotationModeList: any[] = [];
 
   unrollXY: boolean = false;
   unrollZ: boolean = false;
@@ -62,6 +60,21 @@ export class Main extends VuexModule {
 
   get isLoggedIn() {
     return this.girderUser != null;
+  }
+
+  get layerSliceIndexes() {
+    return (layer: IDisplayLayer) => {
+      if (!this.dataset) {
+        return null;
+      }
+      return getLayerSliceIndexes(
+        layer,
+        this.dataset,
+        this.time,
+        this.xy,
+        this.z
+      );
+    };
   }
 
   @Mutation
@@ -486,16 +499,6 @@ export class Main extends VuexModule {
     }
   }
 
-  @Mutation
-  setAnnotationMode(mode: string | null) {
-    this.annotationMode = mode;
-  }
-
-  @Mutation
-  setAnnotationModeList(modeList: any[]) {
-    this.annotationModeList = modeList;
-  }
-
   @Action
   async syncConfiguration() {
     if (!this.configuration) {
@@ -590,7 +593,11 @@ export class Main extends VuexModule {
     ) {
       return;
     }
-    Object.assign(this.configuration.view.layers[index], delta);
+    Vue.set(
+      this.configuration.view.layers,
+      index,
+      Object.assign({}, this.configuration.view.layers[index], delta)
+    );
   }
 
   @Action

@@ -45,7 +45,7 @@ import Snapshots from "./components/Snapshots.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import vMousetrap from "./utils/v-mousetrap";
 import { Vue, Component, Prop } from "vue-property-decorator";
-import store from "@/store";
+import toolsStore from "@/store/tool";
 
 Vue.use(vMousetrap);
 
@@ -59,16 +59,23 @@ Vue.use(vMousetrap);
   }
 })
 export default class App extends Vue {
-  readonly store = store;
+  readonly toolsStore = toolsStore;
   drawer = false;
   snapshotPanel = false;
   snapshotPanelFull = false;
 
   fetchConfig() {
+    // Fetch the list of available tool templates
+    // It consists of a json file containing a list of items, each item describing
+    // the interface elements for a different tool type:
+    // * name: Name of the tool type
+    // * type: Type of tool to be added
+    // * interface: List of various form components necessary to configure the tool
+    // Interface elements have a name, an id, a type (see ToolConfiguration) and a type-dependent meta field
     axios
-      .get("config/modes.json")
+      .get("config/templates.json")
       .then(resp => {
-        this.store.setAnnotationModeList(resp.data.annotation_buttons);
+        this.toolsStore.setToolTemplateList(resp.data);
       })
       .catch(err => {
         console.log(err); // eslint-disable-line no-console
