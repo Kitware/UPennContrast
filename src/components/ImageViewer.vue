@@ -432,7 +432,16 @@ export default class ImageViewer extends Vue {
             fullLayer.baseQuad = null;
           } else {
             if (!fullLayer.setFrameQuad) {
-              setFrameQuad(someImage.tileinfo, fullLayer, baseQuadOptions);
+              setFrameQuad(someImage.tileinfo, fullLayer, {
+                ...baseQuadOptions,
+                progress: () => {
+                  if (this.cacheProgress < this.cacheProgressTotal) {
+                    this.cacheProgress += 1;
+                  }
+                }
+              });
+              this.cacheProgressTotal +=
+                fullLayer.setFrameQuad.status.images.length;
             }
             fullLayer.setFrameQuad(singleFrame);
           }
