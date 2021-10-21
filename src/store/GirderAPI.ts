@@ -21,6 +21,7 @@ import {
 import {
   toStyle,
   ITileOptions,
+  ITileOptionsBands,
   mergeHistograms,
   ITileHistogram
 } from "./images";
@@ -145,8 +146,14 @@ export default class GirderAPI {
       `${this.client.apiRoot}/item/${toId(image.item)}/tiles/zxy`
     );
     url.searchParams.set("encoding", "PNG");
-    url.searchParams.set("frame", image.frameIndex.toString());
-    const style = toStyle(color, contrast, hist, layer, ds, image);
+    const style = <ITileOptionsBands>(
+      toStyle(color, contrast, hist, layer, ds, image)
+    );
+    if (style.bands && style.bands.length > 1 && style.bands[0].frame) {
+      url.searchParams.set("frame", style.bands[0].frame.toString());
+    } else {
+      url.searchParams.set("frame", image.frameIndex.toString());
+    }
     url.searchParams.set("style", JSON.stringify(style));
     url.searchParams.set("edge", "crop");
     return url.href.replace("tiles/zxy", "tiles/zxy/{z}/{x}/{y}");
