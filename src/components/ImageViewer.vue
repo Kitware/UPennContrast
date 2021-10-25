@@ -20,8 +20,15 @@
         :value="(100 * cacheProgress) / cacheProgressTotal"
         color="#CCC"
         background-color="blue-grey"
-        style="width: 200px"
-      />
+        style="width: 200px; height: 20px"
+      >
+        <template v-slot:default>
+          <strong>
+            {{ ((100 * cacheProgress) / cacheProgressTotal).toFixed(1) }}%
+            cached
+          </strong>
+        </template>
+      </v-progress-linear>
     </div>
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -676,6 +683,7 @@ export default class ImageViewer extends Vue {
 }
 .loading {
   color: white;
+  font-size: 12px;
 }
 .geojs-map {
   position: absolute;
