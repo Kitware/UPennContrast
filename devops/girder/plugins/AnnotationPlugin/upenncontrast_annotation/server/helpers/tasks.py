@@ -24,7 +24,7 @@ def computeProperty(property, datasetId, params):
         (image,),
         kwargs={
             'pull_image': False,
-            'container_args': ['--datasetId', datasetId, '--apiUrl', "http://localhost:8080/api/v1", '--token', getCurrentToken()['_id'], params],
+            'container_args': ['--datasetId', datasetId, '--apiUrl', "http://localhost:8080/api/v1", '--token', getCurrentToken()['_id'], '--parameters', params],
             'remove_container': True,
             'name': "{}_{}_{}".format(property['name'], datasetId, datetime.datetime.now().timestamp()),
             # TODO: figure out network configuration and api url discovery
