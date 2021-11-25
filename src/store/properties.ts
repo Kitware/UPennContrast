@@ -7,164 +7,52 @@ import {
 } from "vuex-module-decorators";
 import store from "./root";
 
-import sync from "./sync";
-import annotation from "./annotation";
-
 import {
   IAnnotation,
   IAnnotationConnection,
-  IMorphologicAnnotationProperty,
-  IAnnotationProperty,
-  IRelationalAnnotationProperty,
-  ILayerDependentAnnotationProperty,
-  IAnnotationPropertyComputeParameters,
-  ITagAnnotationFilter
+  IAnnotationProperty
 } from "./model";
-import { values } from "lodash-es";
-import { logWarning } from "@/utils/log";
+
+import Vue from "vue";
+
+import main from "./index";
 
 // TODO: mutations for properties
 // TODO: this means we probably need to regroup them all under one array
 @Module({ dynamic: true, store, name: "properties" })
 export class Properties extends VuexModule {
-  computedValues: {
-    [propertyId: string]: { annotationIds: string[]; values: number[] };
-  } = {};
-  morphologicProperties: IMorphologicAnnotationProperty[] = [
-    {
-      id: "length",
-      name: "Length",
+  propertiesAPI = main.propertiesAPI;
 
-      enabled: false,
-      computed: false,
-
-      requiredShape: "line"
-    },
-    {
-      id: "perimeter",
-      name: "Perimeter",
-
-      enabled: false,
-      computed: false,
-      requiredShape: "polygon"
-    }
-  ];
-
-  relationalProperties: IRelationalAnnotationProperty[] = [
-    {
-      id: "numberOfConnected",
-      name: "Number Of Connected",
-
-      enabled: false,
-      computed: false,
-
-      independant: true,
-
-      filter: {
-        id: "numberOfConnectedFilter",
-        tags: [],
-        shape: "polygon",
-        exclusive: true,
-        enabled: true
-      }
-    },
-    {
-      id: "distanceToNearest",
-      name: "Distance To Nearest",
-
-      enabled: false,
-      computed: false,
-
-      independant: false,
-
-      filter: {
-        id: "distanceToNearestFilter",
-        tags: [],
-        shape: "polygon",
-        exclusive: true,
-        enabled: true
-      }
-    }
-  ];
-
-  layerDependantProperties: ILayerDependentAnnotationProperty[] = [
-    {
-      id: "averageIntensity",
-      name: "Average Intensity",
-
-      enabled: false,
-      computed: false,
-
-      layer: 0
-    }
-  ];
+  properties: IAnnotationProperty[] = [];
 
   annotationListIds: string[] = [];
 
-  @Mutation
-  addAnnotationListId(id: string) {
-    if (!this.annotationListIds.includes(id)) {
-      this.annotationListIds = [...this.annotationListIds, id];
-    }
-  }
+  propertyValues: {
+    [annotationId: string]: { [propertyId: string]: number };
+  } = {};
 
   @Mutation
-  removeAnnotationListId(id: string) {
-    if (this.annotationListIds.includes(id)) {
-      this.annotationListIds = this.annotationListIds.filter(
-        testId => id !== testId
-      );
-    }
-  }
-
-  get properties(): IAnnotationProperty[] {
-    return [
-      ...this.morphologicProperties,
-      ...this.relationalProperties,
-      ...this.layerDependantProperties
-    ];
+  updatePropertyValues(values: {
+    [annotationId: string]: { [propertyId: string]: number };
+  }) {
+    // TODO: merge instead
+    this.propertyValues = values;
   }
 
   @Mutation
   replaceProperty(property: IAnnotationProperty) {
-    // TODO: ideally conserve index so the list doesn't shuffle around
-    // TODO: or sort alphabetically
     const find = (prop: IAnnotationProperty) => prop.id === property.id;
-    const filter = (prop: IAnnotationProperty) => prop.id !== property.id;
-    if (this.morphologicProperties.find(find)) {
-      this.morphologicProperties = [
-        ...this.morphologicProperties.filter(filter),
-        property as IMorphologicAnnotationProperty
-      ];
-    } else if (this.relationalProperties.find(find)) {
-      this.relationalProperties = [
-        ...this.relationalProperties.filter(filter),
-        property as IRelationalAnnotationProperty
-      ];
-    } else if (this.layerDependantProperties) {
-      this.layerDependantProperties = [
-        ...this.layerDependantProperties.filter(filter),
-        property as ILayerDependentAnnotationProperty
-      ];
+    const prev = this.properties.find(find);
+    if (!prev) {
+      return;
     }
+    Vue.set(this.properties, this.properties.indexOf(prev), property);
   }
 
   get getPropertyById() {
     return (id: string) => {
       const find = (prop: IAnnotationProperty) => prop.id === id;
-      const morph = this.morphologicProperties.find(find);
-      if (morph) {
-        return morph as IAnnotationProperty;
-      }
-      const relational = this.relationalProperties.find(find);
-      if (relational) {
-        return relational as IAnnotationProperty;
-      }
-      const layer = this.layerDependantProperties.find(find);
-      if (layer) {
-        return layer as IAnnotationProperty;
-      }
-      return null;
+      return this.properties.find(find) || null;
     };
   }
 
@@ -183,34 +71,83 @@ export class Properties extends VuexModule {
     }
   }
 
-  get eligibleAnnotationsForPropertyId() {
-    return (id: string) => {
-      const morph = this.morphologicProperties.find(
-        (property: IMorphologicAnnotationProperty) => property.id === id
+  @Mutation
+  addAnnotationListId(id: string) {
+    if (!this.annotationListIds.includes(id)) {
+      this.annotationListIds = [...this.annotationListIds, id];
+    }
+  }
+
+  @Mutation
+  removeAnnotationListId(id: string) {
+    if (this.annotationListIds.includes(id)) {
+      this.annotationListIds = this.annotationListIds.filter(
+        testId => id !== testId
       );
-      if (morph && morph.requiredShape) {
-        return annotation.annotations.filter(
-          (annotation: IAnnotation) => annotation.shape === morph.requiredShape
-        );
-      }
-      return annotation.annotations;
-    };
+    }
   }
 
   @Action
   async computeProperty(property: IAnnotationProperty) {
-    if (!property.enabled) {
+    if (!property.enabled || !main.dataset?.id) {
       return;
     }
-    this.replaceProperty({ ...property, computed: false });
+    this.propertiesAPI.computeProperty(property.name, main.dataset.id, {
+      ...property
+    });
+  }
+
+  @Mutation
+  setProperties(properties: IAnnotationProperty[]) {
+    this.properties = [...properties];
+  }
+  @Action
+  async fetchProperties() {
+    const properties = await this.propertiesAPI.getProperties();
+    if (properties && properties.length) {
+      this.setProperties(properties);
+    }
   }
 
   @Action
-  async handleNewAnnotation(
-    newAnnotation: IAnnotation,
-    newConnections: IAnnotationConnection[],
-    image: any
-  ) {}
+  async handleNewAnnotation() // newAnnotation: IAnnotation,
+  // newConnections: IAnnotationConnection[],
+  // image: any
+  {
+    // TODO:
+    // For all enabled and valid properties
+    // Send a compute request for only this annotation ?
+    // Or do this in the backend with annotation creation hooks ?
+  }
+
+  @Action
+  async fetchPropertyValues() {
+    if (!main.dataset?.id) {
+      return;
+    }
+    const values = await this.propertiesAPI.getPropertyValues(main.dataset.id);
+    this.updatePropertyValues(values);
+  }
+
+  @Action
+  async createProperty({
+    name,
+    image,
+    type
+  }: {
+    name: string;
+    image: string;
+    type: "layer" | "morphology" | "relational";
+  }) {
+    const newProperty = await this.propertiesAPI.createProperty(
+      name,
+      image,
+      type
+    );
+    if (newProperty) {
+      this.setProperties([...this.properties, newProperty]);
+    }
+  }
 }
 
 export default getModule(Properties);

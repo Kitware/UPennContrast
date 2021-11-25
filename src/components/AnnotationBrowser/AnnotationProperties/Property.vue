@@ -35,17 +35,17 @@
         <v-col cols="7" class="pa-0">
           <v-row>
             <layer-select
-              v-if="propertyLayer !== undefined"
+              v-if="property.propertyType === 'layer'"
               v-model="propertyLayer"
               label=""
               :any="false"
             ></layer-select>
             <tag-filter-editor
-              v-if="propertyFilter !== undefined"
+              v-if="property.propertyType === 'relational'"
               v-model="propertyFilter"
               property="true"
             ></tag-filter-editor> </v-row
-          ><v-row v-if="propertyLayer !== undefined">
+          ><v-row v-if="property.propertyType === 'layer'">
             <v-text-field dense label="Property Name" v-model="customName">
             </v-text-field>
           </v-row>
@@ -59,11 +59,11 @@
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
 
-import { Vue, Component, Watch, Prop } from "vue-property-decorator";
+import { Vue, Component, Watch, Prop, VModel } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
-import { IDisplayLayer, ITagAnnotationFilter } from "@/store/model";
+import { ITagAnnotationFilter } from "@/store/model";
 
 @Component({
   components: {
@@ -79,18 +79,18 @@ export default class AnnotationProperty extends Vue {
   private readonly property!: any;
 
   get customName() {
+    if (this.property.customName) {
+      return this.property.customName;
+    }
+
     if (this.propertyLayer !== undefined) {
-      if (this.property.customName) {
-        return this.property.customName;
-      }
-      if (this.propertyLayer !== null) {
-        const layer = (this.store.configuration?.view.layers || [])[
-          this.propertyLayer
-        ];
-        if (layer) {
-          return `${this.property.name} ${layer.name}`;
-        }
-      }
+      const layer =
+        this.propertyLayer === null
+          ? { name: "Any" }
+          : (this.store.configuration?.view.layers || [])[this.propertyLayer];
+
+      const name = `${this.property.name} ${layer.name}`;
+      return name;
     }
     return this.property.name;
   }
@@ -100,11 +100,11 @@ export default class AnnotationProperty extends Vue {
   }
 
   get propertyFilter() {
-    return this.property.filter;
+    return this.property.tags;
   }
 
   set propertyFilter(value: ITagAnnotationFilter) {
-    this.propertyStore.replaceProperty({ ...this.property, filter: value });
+    this.propertyStore.replaceProperty({ ...this.property, tags: value });
   }
 
   get propertyLayer() {

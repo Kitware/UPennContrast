@@ -1,6 +1,29 @@
 <template>
   <v-card>
-    <v-card-title class="py-1"> Property Calculator </v-card-title>
+    <v-card-title class="py-1">
+      Property Calculator
+      <v-btn icon @click="refreshPropertyValues"
+        ><v-icon>mdi-refresh</v-icon></v-btn
+      >
+      <v-dialog v-model="propertyCreationDialogOpen" width="unset">
+        <template v-slot:activator="{ on: dialog }">
+          <v-tooltip top>
+            <template v-slot:activator="{ on: tooltip }">
+              <v-btn icon v-on="{ ...dialog, ...tooltip }">
+                <v-icon>
+                  {{ "mdi-plus" }}
+                </v-icon>
+              </v-btn>
+            </template>
+            <span>Create new property</span>
+          </v-tooltip>
+        </template>
+        <property-creation
+          @done="propertyCreationDialogOpen = false"
+          :open="propertyCreationDialogOpen"
+        />
+      </v-dialog>
+    </v-card-title>
     <v-card-subtitle class="py-1"
       >Layer dependent properties
       <v-btn icon @click="showLayer = !showLayer">
@@ -92,38 +115,55 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Watch, Prop } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
+import filterStore from "@/store/filters";
 
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import AnnotationProperty from "@/components/AnnotationBrowser/AnnotationProperties/Property.vue";
+import PropertyCreation from "@/components/AnnotationBrowser/AnnotationProperties/PropertyCreation.vue";
+
+import { IAnnotationProperty } from "@/store/model";
 
 @Component({
   components: {
     TagFilterEditor,
-    AnnotationProperty
+    AnnotationProperty,
+    PropertyCreation
   }
 })
 export default class PropertyList extends Vue {
   readonly store = store;
   readonly propertyStore = propertyStore;
+  readonly filterStore = filterStore;
 
+  propertyCreationDialogOpen = false;
   private headers = ["Computed", "List", "As filter"];
 
   showMorphologic = false;
   showLayer = false;
   showRelational = false;
 
+  get properties() {
+    return propertyStore.properties;
+  }
+
   get morphologicProperties() {
-    return propertyStore.morphologicProperties;
+    return this.properties.filter(
+      (property: IAnnotationProperty) => property.propertyType === "morphology"
+    );
   }
 
   get layerDependantProperties() {
-    return propertyStore.layerDependantProperties;
+    return this.properties.filter(
+      (property: IAnnotationProperty) => property.propertyType === "layer"
+    );
   }
   get relationalProperties() {
-    return propertyStore.relationalProperties;
+    return this.properties.filter(
+      (property: IAnnotationProperty) => property.propertyType === "relational"
+    );
   }
 
   get layers() {
@@ -135,6 +175,12 @@ export default class PropertyList extends Vue {
       label: layer.name,
       value: index
     }));
+  }
+  // TODO: put this somewhere else/automatize
+  refreshPropertyValues() {
+    this.propertyStore.fetchProperties();
+    this.propertyStore.fetchPropertyValues(); // TODO: not here
+    this.filterStore.updateHistograms();
   }
 }
 </script>

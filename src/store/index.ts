@@ -7,6 +7,9 @@ import {
   Mutation,
   VuexModule
 } from "vuex-module-decorators";
+import AnnotationsAPI from "./AnnotationsAPI";
+import PropertiesAPI from "./PropertiesAPI";
+
 import GirderAPI from "./GirderAPI";
 import { getLayerImages, getLayerSliceIndexes } from "./images";
 import {
@@ -32,6 +35,9 @@ export class Main extends VuexModule {
     apiRoot: `${this.girderUrl}/api/v1`
   });
   api = new GirderAPI(this.girderRest);
+  annotationsAPI = new AnnotationsAPI(this.girderRest);
+  propertiesAPI = new PropertiesAPI(this.girderRest);
+
   girderUser: IGirderUser | null = this.girderRest.user;
 
   selectedDatasetId: string | null = null;
@@ -117,6 +123,8 @@ export class Main extends VuexModule {
     this.girderRest = girderRest;
     this.girderUser = girderRest.user;
     this.api = new GirderAPI(this.girderRest);
+    this.annotationsAPI = new AnnotationsAPI(this.girderRest);
+    this.propertiesAPI = new PropertiesAPI(this.girderRest);
   }
 
   @Mutation

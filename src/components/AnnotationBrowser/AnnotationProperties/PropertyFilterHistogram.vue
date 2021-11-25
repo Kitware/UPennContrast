@@ -5,7 +5,7 @@
     </v-row>
     <v-row>
       <v-col class="wrapper" ref="wrapper" :style="{ width: `${width}px` }">
-        <svg :width="width" :height="height">
+        <svg :width="width" :height="height" v-if="hist">
           <path class="path" :d="area" />
         </svg>
         <div class="min-hint" :style="{ width: toValue(minValue) }" />
@@ -48,23 +48,18 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop, Watch, VModel } from "vue-property-decorator";
+import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 import { selectAll, event as d3Event } from "d3-selection";
 import { drag, D3DragEvent } from "d3-drag";
 
-import {
-  IAnnotation,
-  ITagAnnotationFilter,
-  IPropertyAnnotationFilter
-} from "@/store/model";
+import { IPropertyAnnotationFilter } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
-import { bin } from "d3-array";
 import { area, curveStep } from "d3-shape";
 
-import { scaleLinear, scalePoint, scaleSymlog, ScaleSymLog } from "d3-scale";
+import { scaleLinear, scalePoint, scaleSymlog } from "d3-scale";
 
 @Component({
   components: {
@@ -173,7 +168,11 @@ export default class AnnotationFilter extends Vue {
   }
 
   get values() {
-    return [];
+    return Object.entries(this.propertyStore.propertyValues).map(
+      ([_, propertyValues]: [string, { [propertyId: string]: number }]) => {
+        return propertyValues[this.propertyId];
+      }
+    );
   }
 
   get cdf() {
@@ -186,8 +185,16 @@ export default class AnnotationFilter extends Vue {
     return data;
   }
 
+  get hist() {
+    return this.filterStore.histograms[this.propertyId];
+  }
+
   get bins() {
-    return bin()(this.values).map((bin: number[]) => bin.length);
+    const hist = this.hist;
+    if (!hist) {
+      return [];
+    }
+    return hist.map(({ count }: { count: number }) => count);
   }
 
   get curve() {
@@ -195,7 +202,7 @@ export default class AnnotationFilter extends Vue {
   }
 
   get area() {
-    if (!this.curve) {
+    if (!this.curve?.length) {
       return "";
     }
     const scaleY = this.useLog
@@ -237,23 +244,35 @@ export default class AnnotationFilter extends Vue {
     }
   }
 
+  @Watch("hist")
+  initializeHandles() {
+    if (this.$refs.min && this.$refs.max) {
+      const min = this.$refs.min as HTMLElement;
+      const max = this.$refs.max as HTMLElement;
+
+      const onDrag = (which: "min" | "max") => {
+        const evt = d3Event as D3DragEvent<HTMLElement, any, any>;
+        this.updateMinMax(which, Math.max(0, Math.min(evt.x, this.width)));
+      };
+
+      const dragBehavior = drag<HTMLElement, any>().on("drag", onDrag);
+
+      selectAll([min, max])
+        .data(["min", "max"])
+        .call(dragBehavior);
+    }
+  }
+
   mounted() {
+    // TODO: should update only the related histogram
+    this.filterStore.updateHistograms();
     if (!this.propertyFilter.enabled) {
       this.filterStore.updatePropertyFilter({
         ...this.propertyFilter,
         enabled: true
       });
     }
-    if (this.$refs.min && this.$refs.max) {
-      selectAll([this.$refs.min, this.$refs.max])
-        .data(["min", "max"])
-        .call(
-          drag<HTMLElement, any>().on("drag", (which: "min" | "max") => {
-            const evt = d3Event as D3DragEvent<HTMLElement, any, any>;
-            this.updateMinMax(which, Math.max(0, Math.min(evt.x, this.width)));
-          })
-        );
-    }
+    this.initializeHandles();
   }
 }
 </script>

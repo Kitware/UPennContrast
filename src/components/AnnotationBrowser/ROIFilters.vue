@@ -19,11 +19,10 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop, Watch, VModel } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 
 import filterStore from "@/store/filters";
 
-import { IPropertyAnnotationFilter, ITagAnnotationFilter } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import PropertyFilterHistogram from "@/components/AnnotationBrowser/AnnotationProperties/PropertyFilterHistogram.vue";
 

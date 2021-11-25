@@ -71,18 +71,13 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop, Watch, Emit } from "vue-property-decorator";
+import { Vue, Component, Emit } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 
-import {
-  IAnnotation,
-  IAnnotationProperty,
-  ILayerDependentAnnotationProperty,
-  IPropertyAnnotationFilter
-} from "@/store/model";
+import { IAnnotation, IAnnotationProperty } from "@/store/model";
 
 @Component({
   components: {}
@@ -128,21 +123,21 @@ export default class AnnotationList extends Vue {
   }
 
   getPropertyValueForAnnotation(annotation: IAnnotation, propertyId: string) {
-    const { annotationIds, values } = this.propertyStore.computedValues[
-      propertyId
-    ];
-    if (!annotationIds || !values) {
+    const values = this.propertyStore.propertyValues[annotation.id];
+    if (!values) {
       return "-";
     }
-    const index = annotationIds.indexOf(annotation.id);
-    if (index === -1) {
+
+    if (!Object.keys(values).includes(propertyId)) {
       return "-";
     }
-    return values[index];
+    return values[propertyId];
   }
 
   get properties() {
-    return {};
+    return this.propertyStore.properties.filter(
+      (property: IAnnotationProperty) => this.propertyIds.includes(property.id)
+    );
   }
 
   get headers() {
@@ -168,9 +163,7 @@ export default class AnnotationList extends Vue {
         value: "name"
       },
       ...this.properties.map((property: IAnnotationProperty) => ({
-        text:
-          (property as ILayerDependentAnnotationProperty).customName ||
-          property.name,
+        text: property.customName || property.name,
         value: property.id
       }))
     ];

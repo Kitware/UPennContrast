@@ -163,17 +163,7 @@ export interface IAnnotation {
   id: string;
   tags: string[];
   name: string | null;
-  assignment: {
-    channel: number;
-    Z: {
-      type: string; // Either "layer", or "assign"
-      value: 1;
-    };
-    Time: {
-      type: string;
-      value: 1;
-    };
-  };
+  channel: number;
   location: {
     XY: number;
     Z: number;
@@ -181,6 +171,7 @@ export interface IAnnotation {
   };
   shape: string;
   coordinates: IGeoJSPoint[];
+  datasetId: string;
 }
 
 export interface IAnnotationConnection {
@@ -189,8 +180,6 @@ export interface IAnnotationConnection {
   tags: string[];
   parentId: string;
   childId: string;
-
-  computedValues: any;
 }
 
 export interface IAnnotationFilter {
@@ -231,28 +220,21 @@ export interface IAnnotationPropertyComputeParameters {
 export interface IAnnotationProperty {
   id: string;
   name: string;
+  image: string;
+  propertyType: "layer" | "morphology" | "relational";
 
+  layer: number | null;
+  tags: {
+    tags: string[];
+    exclusive: boolean;
+  };
+  independant: boolean;
+  shape: "point" | "line" | "polygon" | null;
+  customName: string | null;
+
+  // TODO: maybe move ?
   enabled: boolean;
   computed: boolean;
-}
-
-export interface ILayerDependentAnnotationProperty extends IAnnotationProperty {
-  layer: number | null; // If null, use annotation's default layer
-  customName: string | null;
-}
-
-export interface IRelationalAnnotationProperty extends IAnnotationProperty {
-  filter: ITagAnnotationFilter;
-
-  // If false, everytime an annotation is changed or created,
-  // needs to recompute, for all existing annotations as well.
-  // If true, only recompute for new/changed annotations
-  // TODO: not necessary for morphologic/layerDependant ?
-  independant: boolean;
-}
-
-export interface IMorphologicAnnotationProperty extends IAnnotationProperty {
-  requiredShape: "point" | "polygon" | "line" | null;
 }
 
 export interface IContrast {

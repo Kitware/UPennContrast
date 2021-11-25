@@ -10,19 +10,14 @@ import store from "./root";
 import main from "./index";
 import sync from "./sync";
 
-import {
-  IAnnotation,
-  IAnnotationConnection,
-  IAnnotationFilter,
-  ITagAnnotationFilter,
-  IPropertyAnnotationFilter,
-  IROIAnnotationFilter
-} from "./model";
+import { IAnnotation, IAnnotationConnection, IGeoJSPoint } from "./model";
 
 import Vue from "vue";
 
 @Module({ dynamic: true, store, name: "annotation" })
 export class Annotations extends VuexModule {
+  annotationsAPI = main.annotationsAPI;
+
   // Annotations from the current dataset and configuration
   annotations: IAnnotation[] = [];
   // Connections from the current dataset and configuration
@@ -97,6 +92,35 @@ export class Annotations extends VuexModule {
     this.selectedAnnotations = selected;
   }
 
+  @Action
+  public async createAnnotation({
+    tags,
+    shape,
+    channel,
+    location,
+    coordinates,
+    datasetId
+  }: {
+    tags: string[];
+    shape: string;
+    channel: number;
+    location: { XY: number; Z: number; Time: number };
+    coordinates: IGeoJSPoint[];
+    datasetId: string;
+  }): Promise<IAnnotation | null> {
+    sync.setSaving(true);
+    const newAnnotation: IAnnotation | null = await this.annotationsAPI.createAnnotation(
+      tags,
+      shape,
+      channel,
+      location,
+      coordinates,
+      datasetId
+    );
+    sync.setSaving(false);
+    return newAnnotation;
+  }
+
   @Mutation
   public addAnnotation(value: IAnnotation) {
     this.annotations = [...this.annotations, value];
@@ -119,17 +143,43 @@ export class Annotations extends VuexModule {
       (annotation: IAnnotation) => annotation.id === id
     );
     if (annotation) {
+      this.annotationsAPI.updateAnnotation({ ...annotation, name });
       this.setAnnotation({
         annotation: { ...annotation, name },
         index: this.annotations.indexOf(annotation)
       });
-      this.syncAnnotations();
     }
   }
 
   @Mutation
   public setAnnotations(values: IAnnotation[]) {
     this.annotations = values;
+  }
+
+  @Action
+  public async createConnection({
+    parentId,
+    childId,
+    label,
+    tags,
+    datasetId
+  }: {
+    parentId: string;
+    childId: string;
+    label: string;
+    tags: string[];
+    datasetId: string;
+  }): Promise<IAnnotationConnection | null> {
+    sync.setSaving(true);
+    const newConnection: IAnnotationConnection | null = await this.annotationsAPI.createConnection(
+      parentId,
+      childId,
+      label,
+      tags,
+      datasetId
+    );
+    sync.setSaving(false);
+    return newConnection;
   }
 
   @Mutation
@@ -142,45 +192,27 @@ export class Annotations extends VuexModule {
     this.annotationConnections = values;
   }
 
-  @Mutation
-  public deleteAnnotations(ids: string[]) {
-    this.annotations = this.annotations.filter(
-      (annotation: IAnnotation) => !ids.includes(annotation.id)
+  @Action
+  public async deleteAnnotations(ids: string[]) {
+    sync.setSaving(true);
+    await Promise.all(ids.map(id => this.annotationsAPI.deleteAnnotation(id)));
+    sync.setSaving(false);
+
+    this.setAnnotations(
+      this.annotations.filter(
+        (annotation: IAnnotation) => !ids.includes(annotation.id)
+      )
     );
   }
 
   @Action
   public deleteSelectedAnnotations() {
     this.deleteAnnotations(this.selectedAnnotationIds);
-    this.syncAnnotations();
   }
 
   @Action
   public deleteInactiveAnnotations() {
     this.deleteAnnotations(this.inactiveAnnotationIds);
-    this.syncAnnotations();
-  }
-
-  @Action
-  // Very inefficient, but will work for now
-  async syncAnnotations() {
-    if (!main.dataset) {
-      return;
-    }
-    sync.setSaving(true);
-    if (!main.configuration) {
-      return;
-    }
-    try {
-      await main.api.setAnnotationsToConfiguration(
-        this.annotations,
-        this.annotationConnections,
-        main.configuration
-      );
-      sync.setSaving(false);
-    } catch (error) {
-      sync.setSaving(error);
-    }
   }
 
   @Action
@@ -191,13 +223,26 @@ export class Annotations extends VuexModule {
       return;
     }
     try {
-      const results = await main.api.getAnnotationsForConfiguration(
-        main.configuration
+      const promises: [
+        Promise<IAnnotation[]>,
+        Promise<IAnnotationConnection[]>
+      ] = [
+        this.annotationsAPI.getAnnotationsForDatasetId(main.dataset.id),
+        this.annotationsAPI.getConnectionsForDatasetId(main.dataset.id)
+      ];
+      Promise.all(promises).then(
+        ([annotations, connections]: [
+          IAnnotation[],
+          IAnnotationConnection[]
+        ]) => {
+          if (connections?.length) {
+            this.setConnections(connections);
+          }
+          if (annotations?.length) {
+            this.setAnnotations(annotations);
+          }
+        }
       );
-      if (results) {
-        this.setAnnotations(results.annotations);
-        this.setConnections(results.annotationConnections);
-      }
     } catch (error) {
       error(error.message);
     }

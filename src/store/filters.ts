@@ -8,14 +8,13 @@ import {
 import store from "./root";
 
 import main from "./index";
-import sync from "./sync";
 import annotation from "./annotation";
 import properties from "./properties";
 
+import Vue from "vue";
+
 import {
   IAnnotation,
-  IAnnotationConnection,
-  IAnnotationFilter,
   ITagAnnotationFilter,
   IPropertyAnnotationFilter,
   IROIAnnotationFilter,
@@ -31,7 +30,7 @@ export class Filters extends VuexModule {
   tagFilter: ITagAnnotationFilter = {
     id: "tagFilter",
     exclusive: false,
-    enabled: true,
+    enabled: false,
     tags: [],
     shape: "polygon"
   };
@@ -49,6 +48,10 @@ export class Filters extends VuexModule {
   };
 
   filterIds: string[] = [];
+
+  histograms: {
+    [propertyId: string]: { count: number; min: number; max: number }[];
+  } = {};
 
   @Mutation
   addFilterId(id: string) {
@@ -163,17 +166,17 @@ export class Filters extends VuexModule {
       }
 
       // Property filters
+      const propertyValues = properties.propertyValues[annotation.id];
       const matchesProperties = this.propertyFilters
         .filter((filter: IPropertyAnnotationFilter) => filter.enabled)
         .reduce((val: boolean, filter: IPropertyAnnotationFilter) => {
           if (!val) {
             return false;
           }
-          const index = -1; // Temporary until we can get property values from girder
-          if (index === -1) {
+          if (!Object.keys(propertyValues).includes(filter.propertyId)) {
             return false;
           }
-          const value = 0; // Temporary
+          const value = propertyValues[filter.propertyId];
           return value >= filter.range.min && value <= filter.range.max;
         }, true);
 
@@ -230,6 +233,31 @@ export class Filters extends VuexModule {
     }
     this.tagFilter = Object.assign({}, this.tagFilter, {
       tags: [...this.tagFilter.tags, tag]
+    });
+  }
+
+  @Mutation
+  public setPropertyHistogram({
+    propertyId,
+    histogram
+  }: {
+    propertyId: string;
+    histogram: { count: number; min: number; max: number }[];
+  }) {
+    Vue.set(this.histograms, propertyId, histogram);
+  }
+
+  @Action
+  async updateHistograms() {
+    this.filterIds.forEach((id: string) => {
+      if (!main.dataset) {
+        return;
+      }
+      properties.propertiesAPI
+        .getPropertyHistogram(main.dataset.id, id)
+        .then((histogram: { count: number; min: number; max: number }[]) => {
+          this.setPropertyHistogram({ propertyId: id, histogram });
+        });
     });
   }
 }
