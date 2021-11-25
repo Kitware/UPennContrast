@@ -5,6 +5,7 @@ services:
     image: mongo
     volumes:
       - "./db:/data/db"
+
   girder:
     build:
       context: ./devops/girder
@@ -18,8 +19,32 @@ services:
     volumes:
       - "./assetstore:/assetstore"
       - "./logs/girder:/root/.girder/logs"
+    env_file:
+      - "./docker.env"
+    depends_on:
+      - "mongodb"
+      - "broker"
+    container_name: 'girder'
+
   memcached:
     image: memcached
     # Set the item size to bigger than our uncompressed tiles and the memory
     # allocation to 4 Gb.
     command: -m 256 --max-item-size 8M
+
+  broker:
+    image: rabbitmq:3
+    env_file: './docker.env'
+
+  worker:
+    image: girder/girder_worker
+    env_file:
+      - "./docker.env"
+    links:
+      - girder
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    depends_on:
+      - broker
+    container_name: "worker"
+    user: root
