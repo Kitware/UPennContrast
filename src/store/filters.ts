@@ -166,7 +166,7 @@ export class Filters extends VuexModule {
       }
 
       // Property filters
-      const propertyValues = properties.propertyValues[annotation.id];
+      const propertyValues = properties.propertyValues[annotation.id] || {};
       const matchesProperties = this.propertyFilters
         .filter((filter: IPropertyAnnotationFilter) => filter.enabled)
         .reduce((val: boolean, filter: IPropertyAnnotationFilter) => {
