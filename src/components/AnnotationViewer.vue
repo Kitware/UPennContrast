@@ -17,7 +17,8 @@ import {
   IDisplayLayer,
   IGeoJSPoint,
   IImage,
-  IToolConfiguration
+  IToolConfiguration,
+  IROIAnnotationFilter
 } from "../store/model";
 
 import { logWarning } from "@/utils/log";
@@ -41,6 +42,12 @@ export default class AnnotationViewer extends Vue {
 
   get roiFilter() {
     return this.filterStore.emptyROIFilter;
+  }
+
+  get enabledRoiFilters() {
+    return this.filterStore.roiFilters.filter(
+      (filter: IROIAnnotationFilter) => filter.enabled
+    );
   }
 
   @Prop()
@@ -530,6 +537,15 @@ export default class AnnotationViewer extends Vue {
     return [];
   }
 
+  handleNewROIFilter(geojsAnnotation: any) {
+    if (!this.roiFilter) {
+      return;
+    }
+    const id = this.roiFilter.id;
+    this.filterStore.validateNewROIFilter(geojsAnnotation.coordinates());
+    this.annotationLayer.removeAnnotation(geojsAnnotation);
+  }
+
   refreshAnnotationMode() {
     if (this.unrolling) {
       this.annotationLayer.mode(null);
@@ -614,7 +630,7 @@ export default class AnnotationViewer extends Vue {
             this.addAnnotationFromGeoJsAnnotation(evt.annotation);
           }
         } else if (evt.annotation) {
-          this.filterStore.validateNewROIFilter(evt.annotation.coordinates());
+          this.handleNewROIFilter(evt.annotation);
         }
         break;
       default:
@@ -669,6 +685,28 @@ export default class AnnotationViewer extends Vue {
     if (this.roiFilter) {
       this.refreshAnnotationMode();
     }
+  }
+
+  @Watch("enabledRoiFilters")
+  drawRoiFilters() {
+    this.annotationLayer
+      .annotations()
+      .filter((annotation: any) => annotation.options("isRoiFilter"))
+      .forEach((annotation: any) => {
+        this.annotationLayer.removeAnnotation(annotation);
+      });
+    this.enabledRoiFilters.forEach((filter: IROIAnnotationFilter) => {
+      const newGeoJSAnnotation = geojsAnnotationFactory("polygon", filter.roi);
+      newGeoJSAnnotation.options("id", filter.id);
+      newGeoJSAnnotation.options("isRoiFilter", true);
+
+      newGeoJSAnnotation.style({
+        fill: false,
+        strokeWidth: 3,
+        strokeColor: "black"
+      });
+      this.annotationLayer.addAnnotation(newGeoJSAnnotation);
+    });
   }
 
   @Watch("annotationLayer")

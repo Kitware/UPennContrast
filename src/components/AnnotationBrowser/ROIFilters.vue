@@ -3,11 +3,14 @@
     <v-row v-for="filter in filters" :key="filter.id">
       <v-checkbox
         :value="filter.enabled"
+        :input-value="filter.enabled"
         @click="toggleEnabled(filter.id)"
       ></v-checkbox>
       <v-col>{{ filter.id }}</v-col>
       <v-col
-        ><v-btn icon small><v-icon>mdi-close</v-icon></v-btn></v-col
+        ><v-btn icon small @click="removeFilter(filter.id)"
+          ><v-icon>mdi-close</v-icon></v-btn
+        ></v-col
       >
     </v-row>
     <v-row>
@@ -37,6 +40,10 @@ export default class ROIFilters extends Vue {
 
   addNewFilter() {
     this.filterStore.newROIFilter();
+  }
+
+  removeFilter(id: string) {
+    this.filterStore.removeROIFilter(id);
   }
 
   get filters() {
