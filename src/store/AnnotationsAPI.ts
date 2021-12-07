@@ -1,11 +1,5 @@
-import {
-  RestClientInstance,
-} from "@/girder";
-import {
-  IAnnotation,
-  IAnnotationConnection,
-  IGeoJSPoint
-} from "./model";
+import { RestClientInstance } from "@/girder";
+import { IAnnotation, IAnnotationConnection, IGeoJSPoint } from "./model";
 import { Promise } from "bluebird";
 
 import { logError } from "@/utils/log";
@@ -76,7 +70,7 @@ export default class AnnotationsAPI {
       location,
       coordinates,
       _id,
-      datasetId,
+      datasetId
     } = item;
     return {
       name,
