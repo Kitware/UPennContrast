@@ -216,6 +216,9 @@ export default class AnnotationViewer extends Vue {
 
     // Then draw the new annotations
     this.drawNewAnnotations(displayedIds);
+    if (this.shouldDrawConnections) {
+      this.drawNewConnections(displayedIds);
+    }
   }
 
   shouldDisplayAnnotation(annotation: IAnnotation): boolean {
@@ -300,30 +303,42 @@ export default class AnnotationViewer extends Vue {
       .forEach(annotation => {
         const newGeoJSAnnotation = this.createGeoJSAnnotation(annotation);
         this.annotationLayer.addAnnotation(newGeoJSAnnotation);
+      });
+  }
 
-        if (this.shouldDrawConnections) {
-          this.annotationStore.annotationConnections
-            .filter(
-              (connection: IAnnotationConnection) =>
-                connection.parentId === annotation.id
-            )
-            .forEach((connection: IAnnotationConnection) => {
-              // Draw lines as a way to show the connections
-              const childAnnotation = this.annotationStore.annotations.find(
-                (child: IAnnotation) => child.id === connection.childId
-              );
-              if (
-                !childAnnotation ||
-                !this.shouldDisplayAnnotation(childAnnotation)
-              ) {
-                return;
-              }
-              this.drawGeoJSAnnotationFromConnection(
-                connection,
-                childAnnotation,
-                annotation
-              );
-            });
+  drawNewConnections(existingIds: string[]) {
+    const layerAnnotationIds = this.layerAnnotations.map(
+      (annotation: IAnnotation) => annotation.id
+    );
+
+    this.annotationStore.annotationConnections
+      .filter(
+        (connection: IAnnotationConnection) =>
+          !existingIds.includes(connection.id) &&
+          (layerAnnotationIds.includes(connection.parentId) ||
+            layerAnnotationIds.includes(connection.childId))
+      )
+      .forEach((connection: IAnnotationConnection) => {
+        {
+          const childAnnotation = this.annotationStore.annotations.find(
+            (child: IAnnotation) => child.id === connection.childId
+          );
+          const parentAnnotation = this.annotationStore.annotations.find(
+            (parent: IAnnotation) => parent.id === connection.parentId
+          );
+          if (
+            !childAnnotation ||
+            !parentAnnotation ||
+            !this.shouldDisplayAnnotation(childAnnotation) ||
+            !this.shouldDisplayAnnotation(parentAnnotation)
+          ) {
+            return;
+          }
+          this.drawGeoJSAnnotationFromConnection(
+            connection,
+            childAnnotation,
+            parentAnnotation
+          );
         }
       });
   }
@@ -378,6 +393,7 @@ export default class AnnotationViewer extends Vue {
     line.options("isConnection", true);
     line.options("childId", connection.childId);
     line.options("parentId", connection.parentId);
+    line.options("girderId", connection.id);
     this.annotationLayer.addAnnotation(line);
   }
 
