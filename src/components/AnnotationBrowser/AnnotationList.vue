@@ -35,7 +35,7 @@
                 ></v-checkbox>
               </td>
               <td>
-                <span>{{ annotations.indexOf(item) }}</span>
+                <span>{{ getAnnotationIndex(item.id) }}</span>
               </td>
               <td>
                 {{ item.shape }}
@@ -60,7 +60,7 @@
                 </v-text-field>
               </td>
               <td v-for="propertyId in propertyIds" :key="propertyId">
-                {{ getPropertyValueForAnnotation(item, propertyId) }}
+                {{ item[propertyId] }}
               </td>
             </tr>
           </tbody>
@@ -102,11 +102,28 @@ export default class AnnotationList extends Vue {
   }
 
   get filtered() {
-    return this.filterStore.filteredAnnotations;
+    return this.filterStore.filteredAnnotations.map(
+      (annotation: IAnnotation) => {
+        const item: any = { ...annotation };
+        this.properties.forEach((property: IAnnotationProperty) => {
+          item[property.id] = this.getPropertyValueForAnnotation(
+            annotation,
+            property.id
+          );
+        });
+        return item;
+      }
+    );
   }
 
   get propertyIds() {
     return this.propertyStore.annotationListIds;
+  }
+
+  getAnnotationIndex(id: string) {
+    return this.annotationStore.annotations.findIndex(
+      (annotation: IAnnotation) => annotation.id === id
+    );
   }
 
   updateAnnotationName(name: string, id: string) {
