@@ -2,9 +2,6 @@
   <v-card>
     <v-card-title class="py-1">
       Property Calculator
-      <v-btn icon @click="refreshPropertyValues"
-        ><v-icon>mdi-refresh</v-icon></v-btn
-      >
       <v-dialog v-model="propertyCreationDialogOpen" width="unset">
         <template v-slot:activator="{ on: dialog }">
           <v-tooltip top>
@@ -175,12 +172,6 @@ export default class PropertyList extends Vue {
       label: layer.name,
       value: index
     }));
-  }
-  // TODO: put this somewhere else/automatize
-  refreshPropertyValues() {
-    this.propertyStore.fetchProperties();
-    this.propertyStore.fetchPropertyValues(); // TODO: not here
-    this.filterStore.updateHistograms();
   }
 }
 </script>

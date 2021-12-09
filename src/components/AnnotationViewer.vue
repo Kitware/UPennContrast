@@ -741,6 +741,10 @@ export default class AnnotationViewer extends Vue {
   mounted() {
     this.fetchAnnotations();
     this.bind();
+
+    this.propertiesStore.fetchProperties();
+    this.propertiesStore.fetchPropertyValues();
+    this.filterStore.updateHistograms();
   }
 }
 </script>
