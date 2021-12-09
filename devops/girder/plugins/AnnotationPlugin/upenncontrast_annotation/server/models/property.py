@@ -1,7 +1,7 @@
 from girder.models.model_base import AccessControlledModel
 from girder.exceptions import AccessException, ValidationException
 from girder.constants import AccessType
-from ..helpers.tasks import computeProperty
+from ..helpers.tasks import runComputeJob
 
 from bson.objectid import ObjectId
 import jsonschema
@@ -92,5 +92,5 @@ class AnnotationProperty(AccessControlledModel):
         property = self.findOne(query)
 
         if property:
-            return computeProperty(property, datasetId, params)
+            return runComputeJob(property, datasetId, params)
         return {}

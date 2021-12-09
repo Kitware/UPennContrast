@@ -237,6 +237,13 @@ export interface IAnnotationProperty {
   computed: boolean;
 }
 
+export interface IPropertyComputeJob {
+  jobId: string;
+  propertyId: string;
+  annotationIds: string[];
+  datasetId: string;
+}
+
 export interface IContrast {
   mode: "percentile" | "absolute";
   blackPoint: number;

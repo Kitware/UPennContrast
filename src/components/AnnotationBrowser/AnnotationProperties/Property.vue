@@ -140,7 +140,10 @@ export default class AnnotationProperty extends Vue {
   }
 
   get computed() {
-    return this.property.computed;
+    return (
+      this.enabled &&
+      !this.propertyStore.isJobRunningForProperty(this.property.id)
+    );
   }
 
   get indeterminate() {

@@ -31,7 +31,6 @@ class AnnotationProperty(Resource):
         datasetId = params.get('datasetId', None)
         if datasetId and id:
             return self._propertyModel.compute(id, datasetId, self.getBodyJson())
-        # else error
         return {}
 
     @access.user

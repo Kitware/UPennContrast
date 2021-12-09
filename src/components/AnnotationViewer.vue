@@ -467,7 +467,14 @@ export default class AnnotationViewer extends Vue {
     // Save the new annotation
     this.annotationStore.addAnnotation(newAnnotation);
 
-    this.addAnnotationConnections(newAnnotation);
+    this.addAnnotationConnections(newAnnotation).then(
+      (connections: IAnnotationConnection[]) => {
+        this.propertiesStore.handleNewAnnotation({
+          newAnnotation,
+          newConnections: connections
+        });
+      }
+    );
 
     // Display the new annotation
     const newGeoJSAnnotation = this.createGeoJSAnnotation(newAnnotation);
@@ -531,6 +538,7 @@ export default class AnnotationViewer extends Vue {
             annotation,
             closest
           );
+          return [newConnection];
         }
       }
     }

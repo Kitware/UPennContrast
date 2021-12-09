@@ -77,6 +77,12 @@ export default class AnnotationsAPI {
       });
   }
 
+  subscribeToNotifications(): EventSource | null {
+    return new EventSource(
+      `${this.client.apiRoot}/notification/stream?token=${this.client.token}`
+    );
+  }
+
   toProperty(item: any): IAnnotationProperty {
     const { _id, name, image, propertyType } = item;
     return {

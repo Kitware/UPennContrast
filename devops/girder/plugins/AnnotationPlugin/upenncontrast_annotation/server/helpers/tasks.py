@@ -15,7 +15,7 @@ import json
 # )
 
 
-def computeProperty(property, datasetId, params):
+def runComputeJob(property, datasetId, params):
     image = property['image']
 
     params = json.dumps(params)
@@ -29,7 +29,8 @@ def computeProperty(property, datasetId, params):
             'name': "{}_{}_{}".format(property['name'], datasetId, datetime.datetime.now().timestamp()),
             # TODO: figure out network configuration and api url discovery
             'network_mode': 'host'
+            # 'girder_result_hooks': [testHook]
         }
     ).job,
 
-    print("RUNNING ", job)
+    return job
