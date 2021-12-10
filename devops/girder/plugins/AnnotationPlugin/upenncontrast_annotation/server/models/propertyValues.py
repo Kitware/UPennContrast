@@ -53,7 +53,7 @@ class AnnotationPropertyValues(AccessControlledModel):
             document['values'] = existingValues
             self.remove(existingProperties)
         
-        # TODO: create sparse index on properties if nonexisting https://docs.mongodb.com/manual/reference/operator/query/exists/
+        # TODO(performance): create sparse index on properties if nonexisting https://docs.mongodb.com/manual/reference/operator/query/exists/
 
         return document
 
@@ -66,7 +66,7 @@ class AnnotationPropertyValues(AccessControlledModel):
         match = {
             '$match': {
                         'datasetId': datasetId,
-                        valueKey: { '$exists': True, '$ne': None }, # TODO: sparse index see above
+                        valueKey: { '$exists': True, '$ne': None }, # TODO(performance): sparse index see above
                     }
             }
 

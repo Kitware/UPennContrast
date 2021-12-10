@@ -28,7 +28,7 @@ class ConnectionSchema:
 
 class AnnotationConnection(AccessControlledModel):
   # TODO: write lock
-  # TODO: indexing
+  # TODO(performance): indexing
 
   validator = jsonschema.Draft4Validator(
         ConnectionSchema.connectionSchema

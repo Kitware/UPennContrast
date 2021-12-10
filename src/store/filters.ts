@@ -223,7 +223,6 @@ export class Filters extends VuexModule {
 
   @Mutation
   public updatePropertyFilter(value: IPropertyAnnotationFilter) {
-    // TODO: keep order, or sort alphabetically in interface
     this.propertyFilters = [
       ...this.propertyFilters.filter(
         (filter: IPropertyAnnotationFilter) =>

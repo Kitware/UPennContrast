@@ -45,7 +45,6 @@ export default class AnnotationsAPI {
     );
   }
 
-  // TODO: fetch all if empty, then update based on SSE ?
   async getPropertyValues(datasetId: string) {
     return this.client
       .get(`annotation_property_values?datasetId=${datasetId}&limit=1000`)

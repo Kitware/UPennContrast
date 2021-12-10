@@ -52,7 +52,7 @@ export class Properties extends VuexModule {
   updatePropertyValues(values: {
     [annotationId: string]: { [propertyId: string]: number };
   }) {
-    // TODO: merge instead
+    // TODO(performance): merge instead
     this.propertyValues = values;
   }
 

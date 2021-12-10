@@ -74,7 +74,6 @@ export default class AnnotationsAPI {
   }
 
   async deleteAnnotation(id: string): Promise<void> {
-    // TODO: check response
     return this.client.delete(`upenn_annotation/${id}`);
   }
 
@@ -166,7 +165,6 @@ export default class AnnotationsAPI {
   }
 
   async deleteConnection(id: string): Promise<void> {
-    // TODO: check response
     return this.client.delete(`annotation_connection/${id}`);
   }
 

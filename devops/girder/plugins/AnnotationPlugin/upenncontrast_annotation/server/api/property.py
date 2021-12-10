@@ -48,7 +48,6 @@ class AnnotationProperty(Resource):
     def delete(self, property, params):
         self._propertyModel.remove(property)
 
-    # TODO: update should not be implemented this way
     @describeRoute(Description("Update an existing property")
     .param('id', 'The ID of the property.', paramType='path')
     .param('body', 'A JSON object containing the property.',
@@ -62,11 +61,9 @@ class AnnotationProperty(Resource):
         property.update(self.getBodyJson())
         self._propertyModel.update(property)
 
-    # TODO: do we need find ?
     @access.user
     @describeRoute(Description("Search for properties")
         .responseClass('property')
-        # TODO: what parameters would we like ?
         .pagingParams(defaultSort='_id')
         .errorResponse()
     )

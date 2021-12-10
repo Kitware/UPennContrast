@@ -12,8 +12,6 @@ class UPennContrastDataset:
       Helper class to get tile images from a single dataset in a remote UPennContrast girder instance.
       Most methods simply send a translated request to the girder API and return the result. No particular checks are done.
     """
-    # TODO: get schemas from girder and validate here ? Though validation is already done server-side
-
     def __init__(self, apiUrl, token, datasetId):
         """
         The constructor will initialize the client, and fetch necessary dataset information

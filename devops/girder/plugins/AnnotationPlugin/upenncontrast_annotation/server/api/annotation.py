@@ -22,10 +22,9 @@ class Annotation(Resource):
 
     # TODO: anytime a dataset is mentioned, load the dataset and check for existence and that the user has access to it
     # TODO: creation date, update date, creatorId
-    # TODO: all plugin/collection/entry names are temporary
     # TODO: find annotations by roi, tag, childOf and parentOf
-    # TODO: smarter indexing
-    # TODO: use objectId whenever possible
+    # TODO(performance): smarter indexing
+    # TODO(performance): use objectId whenever possible
     # TODO: error handling and documentation
 
     @access.user

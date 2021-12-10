@@ -20,7 +20,6 @@ class UPennContrastAnnotationClient:
     Helper class to exchange annotation related information from a remote UPennContrast girder instance.
     Most methods simply send a translated request to the girder API and return the result. No particular checks are done.
     """
-    # TODO: get schemas from girder and validate here ?
 
     def __init__(self, apiUrl, token):
         """
@@ -35,7 +34,7 @@ class UPennContrastAnnotationClient:
 
     # Annotations
 
-    def getAnnotationsByDatasetId(self, datasetId, shape=None): # TODO: shape
+    def getAnnotationsByDatasetId(self, datasetId, shape=None):
         """
         Get the list of all annotations in the specified dataset
 

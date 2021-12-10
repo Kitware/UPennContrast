@@ -46,7 +46,6 @@ export default class AnnotationActions extends Vue {
   }
 
   deleteInactive() {
-    // TODO: probably "delete inactive within filters"
     this.annotationStore.deleteInactiveAnnotations();
   }
 

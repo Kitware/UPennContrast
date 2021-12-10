@@ -72,10 +72,8 @@ class Annotation(AccessControlledModel):
   '''
   # TODO: write lock
   # TODO: save creatorId, creation and update dates
-  # TODO: indexing
+  # TODO(performance): indexing
   # TODO: add remove hooks to also remove related connections
-  # TODO: smarter find methods
-  # TODO: schema endpoint
 
   validator = jsonschema.Draft4Validator(
         AnnotationSchema.annotationSchema

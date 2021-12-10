@@ -150,7 +150,7 @@ export default class AnnotationFilter extends Vue {
       const newFilter: IPropertyAnnotationFilter = {
         range: { min: this.defaultMin, max: this.defaultMax },
 
-        id: this.propertyId, // TODO: check this
+        id: this.propertyId,
         propertyId: this.propertyId,
         exclusive: false,
         enabled: true
@@ -264,7 +264,7 @@ export default class AnnotationFilter extends Vue {
   }
 
   mounted() {
-    // TODO: should update only the related histogram
+    // TODO(performance): should update only the related histogram
     this.filterStore.updateHistograms();
     if (!this.propertyFilter.enabled) {
       this.filterStore.updatePropertyFilter({

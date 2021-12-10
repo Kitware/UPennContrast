@@ -13,7 +13,7 @@ class PropertySchema:
         'id': '/girder/plugins/upenncontrast_annotation/models/annotation',
         'type': 'object',
         'properties': {
-            'name': { # should be unique TODO: enforce
+            'name': {
                 'type': 'string'
             },
             'image': {
@@ -43,7 +43,7 @@ class PropertySchema:
                     'independant': {
                         'type': 'boolean'
                     },
-                    'shape': { # TODO: deduplicate
+                    'shape': {
                         'type': 'string',
                         'enum': ['point', 'line', 'polygon']
                     },
@@ -55,6 +55,7 @@ class PropertySchema:
 
 
 class AnnotationProperty(AccessControlledModel):
+    # TODO: write lock
     # TODO: delete hooks: remove all computed values if the property is deleted ? (big operation)
 
     validator = jsonschema.Draft4Validator(
@@ -86,8 +87,6 @@ class AnnotationProperty(AccessControlledModel):
       return self.load(id)
 
     def compute(self, propertyId, datasetId, params):
-        # TODO: validate params from property
-        # TODO: validate dataset existence, has at least one annotation
         query = { 'name': propertyId }
         property = self.findOne(query)
 

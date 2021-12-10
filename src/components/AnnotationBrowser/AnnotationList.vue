@@ -135,7 +135,6 @@ export default class AnnotationList extends Vue {
   }
 
   toggleActive(annotation: IAnnotation) {
-    // TODO: have an "activeAnnotation" array instead ?
     this.annotationStore.toggleActiveAnnotation(annotation.id);
   }
 

@@ -20,8 +20,8 @@ class PropertyValues(Resource):
 
     # TODO: anytime a dataset is mentioned, load the dataset and check for existence and that the user has access to it
     # TODO: creation date, update date, creatorId ?
-    # TODO: proper indexing
-    # TODO: use objectId whenever possible
+    # TODO(performance): proper indexing
+    # TODO(performance): use objectId whenever possible
 
     @access.user
     @describeRoute(Description("Save computed property values").param('body', 'Property values', paramType='body')

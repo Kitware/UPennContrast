@@ -188,7 +188,6 @@ export interface IAnnotationFilter {
   enabled: boolean;
 }
 
-// TODO: these really should be classes
 export interface ITagAnnotationFilter extends IAnnotationFilter {
   tags: string[];
   shape: string;
@@ -210,12 +209,6 @@ export interface IIdAnnotationFilter extends IAnnotationFilter {
 export interface IROIAnnotationFilter extends IAnnotationFilter {
   roi: IGeoJSPoint[];
 }
-export interface IAnnotationPropertyComputeParameters {
-  annotationsToCompute: IAnnotation[];
-  additionalAnnotations: IAnnotation[];
-  connections?: IAnnotationConnection[];
-  image?: any; // TODO: arraybuffer?
-}
 
 export interface IAnnotationProperty {
   id: string;
@@ -232,7 +225,6 @@ export interface IAnnotationProperty {
   shape: "point" | "line" | "polygon" | null;
   customName: string | null;
 
-  // TODO: maybe move ?
   enabled: boolean;
   computed: boolean;
 }
