@@ -19,7 +19,7 @@ import Vue from "vue";
 import main from "./index";
 
 import { logError } from "@/utils/log";
-import filters from './filters';
+import filters from "./filters";
 
 const jobStates = {
   inactive: 0,
@@ -285,20 +285,8 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  async createProperty({
-    name,
-    image,
-    type
-  }: {
-    name: string;
-    image: string;
-    type: "layer" | "morphology" | "relational";
-  }) {
-    const newProperty = await this.propertiesAPI.createProperty(
-      name,
-      image,
-      type
-    );
+  async createProperty(property: IAnnotationProperty) {
+    const newProperty = await this.propertiesAPI.createProperty(property);
     if (newProperty) {
       this.setProperties([...this.properties, newProperty]);
     }

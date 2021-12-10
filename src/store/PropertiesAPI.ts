@@ -13,19 +13,11 @@ export default class AnnotationsAPI {
   histogramsLoaded = 0;
 
   async createProperty(
-    name: string,
-    image: string,
-    type: "layer" | "morphology" | "relational"
+    property: IAnnotationProperty
   ): Promise<IAnnotationProperty> {
-    return this.client
-      .post("annotation_property", {
-        name,
-        image,
-        propertyType: type
-      })
-      .then(res => {
-        return this.toProperty(res.data);
-      });
+    return this.client.post("annotation_property", property).then(res => {
+      return this.toProperty(res.data);
+    });
   }
 
   async getProperties(): Promise<IAnnotationProperty[]> {

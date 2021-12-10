@@ -12,7 +12,7 @@
                 <v-col>
                   <v-text-field
                     label="Property Name"
-                    v-model="propertyName"
+                    v-model="deduplicatedName"
                     dense
                   >
                   </v-text-field>
@@ -30,10 +30,34 @@
               <v-row>
                 <v-col>
                   <v-select
-                    :items="propertyTypes"
+                    :items="propertyTypeItems"
                     v-model="propertyType"
+                    item-text="label"
                     dense
                   ></v-select>
+                </v-col>
+              </v-row>
+              <v-row>
+                <v-col>
+                  <layer-select
+                    v-if="propertyType === 'layer'"
+                    v-model="propertyLayer"
+                    label=""
+                    :any="false"
+                  ></layer-select>
+                  <tag-filter-editor
+                    v-if="propertyType === 'relational'"
+                    v-model="propertyTags"
+                    property="true"
+                  ></tag-filter-editor>
+                  <v-select
+                    v-if="propertyType === 'morphology'"
+                    :items="shapeItems"
+                    label="Shape restriction"
+                    v-model="propertyShape"
+                    item-text="label"
+                  >
+                  </v-select>
                 </v-col>
               </v-row>
             </v-container>
@@ -56,37 +80,98 @@
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import propertiesStore from "@/store/properties";
+import { IAnnotationProperty, ITagAnnotationFilter } from "@/store/model";
+import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
+import LayerSelect from "@/components/LayerSelect.vue";
 
 // Popup for new tool configuration
-@Component({})
-export default class ToolCreation extends Vue {
+@Component({ components: { LayerSelect, TagFilterEditor } })
+export default class PropertyCreation extends Vue {
   readonly store = store;
   readonly propertiesStore = propertiesStore;
 
-  propertyTypes = ["layer", "morphology", "relational"];
+  propertyTypeItems = [
+    { value: "layer", label: "Intensity property (layer dependant)" },
+    { value: "morphology", label: "Morphology property (shape dependant)" },
+    { value: "relational", label: "Relational Property (neighbor dependant)" }
+  ];
 
-  propertyName = "New Property";
+  originalName = "New Property";
+
+  get deduplicatedName() {
+    const escapedName = this.originalName.replace(
+      /[-\/\\^$*+?.()|[\]{}]/g,
+      "\\$&"
+    );
+    const re = new RegExp(`^${escapedName}( \([0-9]*\))?$`);
+    const count = this.propertiesStore.properties
+      .map((property: IAnnotationProperty) => property.name)
+      .map((id: string) => re.test(id))
+      .filter((value: boolean) => value).length;
+    if (count) {
+      return `${this.originalName} (${count})`;
+    }
+    return this.originalName;
+  }
+
+  set deduplicatedName(value) {
+    if (
+      this.originalName !== this.deduplicatedName &&
+      value === this.deduplicatedName
+    ) {
+      return;
+    }
+    this.originalName = value;
+  }
+
   propertyType: "layer" | "morphology" | "relational" = "layer";
   dockerImage = "repo/image:tag";
 
   @Prop()
   readonly open: any;
 
+  propertyLayer: number | null = null;
+  propertyTags: ITagAnnotationFilter = {
+    tags: [],
+    exclusive: false,
+    shape: "point",
+    enabled: false,
+    id: "Relational property tags"
+  };
+  propertyShape: "point" | "polygon" | "line" | null = null;
+  shapeItems: { label: string; value: string | null }[] = [
+    {
+      label: "Points",
+      value: "point"
+    },
+    { label: "Polygons (blobs)", value: "polygon" },
+    { label: "Lines", value: "line" },
+    { label: "No restrictions", value: null }
+  ];
+
   createProperty() {
-    // call api with new property
-    // check response. if it has an id, success
-    // report failure
     this.propertiesStore.createProperty({
-      name: this.propertyName,
+      id: this.deduplicatedName,
+      name: this.deduplicatedName,
       image: this.dockerImage,
-      type: this.propertyType
+      propertyType: this.propertyType,
+      layer: this.propertyLayer,
+      tags: {
+        tags: this.propertyTags.tags,
+        exclusive: this.propertyTags.exclusive
+      },
+      independant: false,
+      shape: this.propertyShape,
+      customName: null,
+      enabled: false,
+      computed: false
     });
     this.close();
   }
 
   @Watch("open")
   reset() {
-    this.propertyName = "New Property";
+    this.originalName = "New Property";
     this.dockerImage = "repo/image:tag";
     this.propertyType = "layer";
   }
