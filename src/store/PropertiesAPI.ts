@@ -21,7 +21,7 @@ export default class AnnotationsAPI {
   }
 
   async getProperties(): Promise<IAnnotationProperty[]> {
-    return this.client.get("annotation_property").then(res => {
+    return this.client.get("annotation_property?limit=1000").then(res => {
       return res.data.map(this.toProperty);
     });
   }
@@ -48,7 +48,7 @@ export default class AnnotationsAPI {
   // TODO: fetch all if empty, then update based on SSE ?
   async getPropertyValues(datasetId: string) {
     return this.client
-      .get(`annotation_property_values?datasetId=${datasetId}`)
+      .get(`annotation_property_values?datasetId=${datasetId}&limit=1000`)
       .then(res => {
         // map values by annotation id
         const annotationMapping: {

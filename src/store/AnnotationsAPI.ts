@@ -37,17 +37,40 @@ export default class AnnotationsAPI {
       });
   }
 
-  getAnnotationsForDatasetId(id: string): Promise<IAnnotation[]> {
-    return this.client
-      .get(`upenn_annotation?datasetId=${id}`)
-      .then(res => {
-        const totalCount = Number(res.headers["girder-total-count"]);
-        return res.data.map(this.toAnnotation);
-      })
-      .catch(err => {
-        logError(`Could not get annotations for dataset ${id}: ${err}`);
-        return [];
-      });
+  async getAnnotationsForDatasetId(id: string): Promise<IAnnotation[]> {
+    const annotations: IAnnotation[] = [];
+    const limit = 25;
+    let totalCount = -1;
+
+    const fetchPage = (offset: number) =>
+      this.client
+        .get(
+          `upenn_annotation?datasetId=${id}&limit=${limit}&offset=${offset}&sort=_id`
+        )
+        .then(res => {
+          totalCount = Number(res.headers["girder-total-count"]);
+          const newAnnotations = res.data.map(this.toAnnotation);
+          annotations.push(...newAnnotations);
+        })
+        .catch(err => {
+          throw err;
+        });
+
+    // Fetch first page
+    await fetchPage(0);
+
+    // Fetch remaining pages if needed
+    const promises = [];
+    for (let offset = limit; offset < totalCount; offset += limit) {
+      promises.push(fetchPage(offset));
+    }
+    try {
+      await Promise.all(promises);
+    } catch (err) {
+      logError(`Could not get annotations for dataset ${id}: ${err}`);
+      return [];
+    }
+    return annotations;
   }
 
   async deleteAnnotation(id: string): Promise<void> {
@@ -106,14 +129,40 @@ export default class AnnotationsAPI {
       });
   }
 
-  getConnectionsForDatasetId(id: string): Promise<IAnnotationConnection[]> {
-    return this.client
-      .get(`annotation_connection?datasetId=${id}`)
-      .then(res => res.data.map(this.toConnection))
-      .catch(err => {
-        logError(`Could not get connections for dataset ${id}: ${err}`);
-        return [];
-      });
+  async getConnectionsForDatasetId(id: string): Promise<IAnnotationConnection[]> {
+    const connections: IAnnotationConnection[] = [];
+    const limit = 1;
+    let totalCount = -1;
+
+    const fetchPage = (offset: number) =>
+      this.client
+        .get(
+          `annotation_connection?datasetId=${id}&limit=${limit}&offset=${offset}&sort=_id`
+        )
+        .then(res => {
+          totalCount = Number(res.headers["girder-total-count"]);
+          const newConnections = res.data.map(this.toConnection);
+          connections.push(...newConnections);
+        })
+        .catch(err => {
+          throw err;
+        });
+
+    // Fetch first page
+    await fetchPage(0);
+
+    // Fetch remaining pages if needed
+    const promises = [];
+    for (let offset = limit; offset < totalCount; offset += limit) {
+      promises.push(fetchPage(offset));
+    }
+    try {
+      await Promise.all(promises);
+    } catch (err) {
+      logError(`Could not get connections for dataset ${id}: ${err}`);
+      return [];
+    }
+    return connections;
   }
 
   async deleteConnection(id: string): Promise<void> {
