@@ -2,6 +2,11 @@
   <v-card>
     <v-card-title class="py-1">
       Annotation List
+      <v-spacer></v-spacer>
+      <annotation-csv-dialog
+        :annotations="filtered"
+        :propertyIds="propertyIds"
+      ></annotation-csv-dialog>
     </v-card-title>
     <v-card-text>
       <v-data-table
@@ -79,8 +84,12 @@ import filterStore from "@/store/filters";
 
 import { IAnnotation, IAnnotationProperty } from "@/store/model";
 
+import AnnotationCsvDialog from "@/components/AnnotationBrowser/AnnotationCSVDialog.vue";
+
 @Component({
-  components: {}
+  components: {
+    AnnotationCsvDialog
+  }
 })
 export default class AnnotationList extends Vue {
   readonly store = store;
