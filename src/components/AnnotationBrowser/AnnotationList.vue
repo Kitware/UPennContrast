@@ -126,7 +126,9 @@ export default class AnnotationList extends Vue {
   }
 
   get propertyIds() {
-    return this.propertyStore.annotationListIds;
+    return this.propertyStore.annotationListIds.sort((a: string, b: string) =>
+      b.localeCompare(a)
+    );
   }
 
   getAnnotationIndex(id: string) {
