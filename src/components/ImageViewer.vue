@@ -20,8 +20,15 @@
         :value="(100 * cacheProgress) / cacheProgressTotal"
         color="#CCC"
         background-color="blue-grey"
-        style="width: 200px"
-      />
+        style="width: 200px; height: 20px"
+      >
+        <template v-slot:default>
+          <strong>
+            {{ ((100 * cacheProgress) / cacheProgressTotal).toFixed(1) }}%
+            cached
+          </strong>
+        </template>
+      </v-progress-linear>
     </div>
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -432,7 +439,16 @@ export default class ImageViewer extends Vue {
             fullLayer.baseQuad = null;
           } else {
             if (!fullLayer.setFrameQuad) {
-              setFrameQuad(someImage.tileinfo, fullLayer, baseQuadOptions);
+              setFrameQuad(someImage.tileinfo, fullLayer, {
+                ...baseQuadOptions,
+                progress: () => {
+                  if (this.cacheProgress < this.cacheProgressTotal) {
+                    this.cacheProgress += 1;
+                  }
+                }
+              });
+              this.cacheProgressTotal +=
+                fullLayer.setFrameQuad.status.images.length;
             }
             fullLayer.setFrameQuad(singleFrame);
           }
@@ -667,6 +683,7 @@ export default class ImageViewer extends Vue {
 }
 .loading {
   color: white;
+  font-size: 12px;
 }
 .geojs-map {
   position: absolute;
