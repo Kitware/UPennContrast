@@ -5,6 +5,9 @@ from .propertyValues import AnnotationPropertyValues as PropertiesModel
 from girder import events, logprint, logger, auditLogger
 
 from bson.objectid import ObjectId
+
+from girder.models.folder import Folder
+
 import jsonschema
 
 class AnnotationSchema:
@@ -64,6 +67,7 @@ class AnnotationSchema:
             'shape': shapeSchema,
             'datasetId': {'type': 'string', 'minLength': 1},
         },
+        'required': ['coordinates', 'tags', 'channel', 'location', 'shape', 'datasetId']
     }
 
 class Annotation(AccessControlledModel):
@@ -104,6 +108,12 @@ class Annotation(AccessControlledModel):
     except jsonschema.ValidationError as exp:
       raise ValidationException(exp)
 
+    folder = Folder().load(document['datasetId'], force=True)
+    if folder is None:
+      raise ValidationException('Dataset does not exist')
+    if 'meta' not in folder or folder['meta'].get('subtype', None) != 'contrastDataset':
+      raise ValidationException('Folder is not a dataset')
+
     return document
 
   def create(self, creator, annotation):
@@ -113,8 +123,8 @@ class Annotation(AccessControlledModel):
   def delete(self, annotation):
     self.remove(self.find(annotation))
 
-  def getAnnotationById(self, id):
-    return self.load(id)
+  def getAnnotationById(self, id, user=None):
+    return self.load(id, user=user)
 
   def update(self, annotation):
     return self.save(annotation)
