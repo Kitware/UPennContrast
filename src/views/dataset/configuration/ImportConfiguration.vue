@@ -16,7 +16,7 @@
       No compatible configurations were found for this dataset.
     </v-alert>
     <div class="button-bar">
-      <v-btn color="warning" class="mr-4" @click="cancel">Back</v-btn>
+      <v-btn color="warning" class="mr-4" @click="cancel">Cancel</v-btn>
       <v-btn
         :disabled="active.length === 0"
         color="primary"
