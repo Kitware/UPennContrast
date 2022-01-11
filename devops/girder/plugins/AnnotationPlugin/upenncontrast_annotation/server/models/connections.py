@@ -4,6 +4,10 @@ from girder.constants import AccessType
 from girder import events
 
 from bson.objectid import ObjectId
+from girder.models.folder import Folder
+
+from .annotation import Annotation
+
 import jsonschema
 
 class ConnectionSchema:
@@ -25,6 +29,7 @@ class ConnectionSchema:
             'datasetId': {'type': 'string'},
             'tags': tagsSchema
         },
+        'required': ['parentId', 'childId', 'datasetId', 'tags']
     }
 
 class AnnotationConnection(AccessControlledModel):
@@ -59,6 +64,21 @@ class AnnotationConnection(AccessControlledModel):
       self.validator.validate(document)
     except jsonschema.ValidationError as exp:
         raise ValidationException(exp)
+
+    folder = Folder().load(document['datasetId'], force=True)
+    if folder is None:
+      raise ValidationException('Dataset does not exist')
+    if 'meta' not in folder or folder['meta'].get('subtype', None) != 'contrastDataset':
+      raise ValidationException('Folder is not a dataset')
+
+    child = Annotation().load(document['childId'], force=True)
+    if child is None:
+      raise ValidationException('Child does not exist')
+
+    parent = Annotation().load(document['parentId'], force=True)
+    if parent is None:
+      raise ValidationException('Parent does not exist')
+
     return document
 
   def create(self, creator, connection):
