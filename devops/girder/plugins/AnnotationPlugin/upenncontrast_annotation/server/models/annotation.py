@@ -84,6 +84,15 @@ class Annotation(AccessControlledModel):
 
   def initialize(self):
     self.name="upenn_annotation"
+    events.bind('model.folder.remove', 'upenn.annotations.clean.orphaned', self.cleanOrphaned)
+
+  def cleanOrphaned(self, event):
+    if event.info and event.info['_id']:
+      folderId = str(event.info['_id'])
+      query = {
+        "datasetId": folderId,
+      }
+      self.removeWithQuery(query)
 
   def save(self, document, validate=True, triggerEvents=True):
     '''
