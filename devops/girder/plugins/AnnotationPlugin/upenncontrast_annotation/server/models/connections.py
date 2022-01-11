@@ -40,7 +40,7 @@ class AnnotationConnection(AccessControlledModel):
         ConnectionSchema.connectionSchema
     )
 
-  def cleanOrphaned(self, event):
+  def cleanOrphanedAnnotation(self, event):
     if event.info and event.info['_id']:
       annotationId = str(event.info['_id'])
       query = {
@@ -55,9 +55,18 @@ class AnnotationConnection(AccessControlledModel):
       }
       self.removeWithQuery(query)
 
+  def cleanOrphanedDataset(self, event):
+    if event.info and event.info['_id']:
+      folderId = str(event.info['_id'])
+      query = {
+        "datasetId": folderId,
+      }
+      self.removeWithQuery(query)
+
   def initialize(self):
     self.name="annotation_connection"
-    events.bind('model.upenn_annotation.remove', 'connections.clean.orphans', self.cleanOrphaned)
+    events.bind('model.upenn_annotation.remove', 'upenn.connections.clean.orphans.annotation', self.cleanOrphanedAnnotation)
+    events.bind('model.folder.remove', 'upenn.connections.clean.orphans.dataset', self.cleanOrphanedDataset)
 
   def validate(self, document):
     try:
