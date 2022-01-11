@@ -83,8 +83,8 @@ class AnnotationProperty(AccessControlledModel):
     def update(self, property):
       return self.save(property)
 
-    def getPropertyById(self, id):
-      return self.load(id)
+    def getPropertyById(self, id, user=None):
+      return self.load(id, user=user)
 
     def compute(self, propertyId, datasetId, params):
         query = { 'name': propertyId }
