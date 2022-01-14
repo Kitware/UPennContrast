@@ -9,6 +9,7 @@
     hide-details
     small-chips
     dense
+    label="Tags"
   >
     <template v-slot:selection="{ attrs, index, item, parent }">
       <v-chip

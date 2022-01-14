@@ -1,5 +1,10 @@
 import { RestClientInstance } from "@/girder";
-import { IAnnotation, IAnnotationConnection, IGeoJSPoint } from "./model";
+import {
+  IAnnotation,
+  IAnnotationConnection,
+  IGeoJSPoint,
+  IToolConfiguration
+} from "./model";
 import { Promise } from "bluebird";
 
 import { logError } from "@/utils/log";
@@ -128,7 +133,9 @@ export default class AnnotationsAPI {
       });
   }
 
-  async getConnectionsForDatasetId(id: string): Promise<IAnnotationConnection[]> {
+  async getConnectionsForDatasetId(
+    id: string
+  ): Promise<IAnnotationConnection[]> {
     const connections: IAnnotationConnection[] = [];
     const limit = 1;
     let totalCount = -1;
@@ -172,6 +179,35 @@ export default class AnnotationsAPI {
     const newConnection = { ...connection };
     delete newConnection.id;
     this.client.put(`annotation_connection/${connection.id}`, newConnection);
+  }
+
+  async computeAnnotationWithWorker(
+    tool: IToolConfiguration,
+    datasetId: string,
+    metadata: {
+      channel: Number;
+      location: { XY: Number; Z: Number; Time: Number };
+      tile: { XY: Number; Z: Number; Time: Number };
+    }
+  ) {
+    const { configurationId, description, id, name, type, values } = tool;
+    const image = values.image.image;
+    const { annotation, connectTo } = values;
+    const params = {
+      configurationId,
+      datasetId,
+      description,
+      type,
+      id,
+      name,
+      image,
+      channel: metadata.channel,
+      assignment: metadata.location,
+      tags: annotation.tags,
+      tile: metadata.tile,
+      connectTo
+    };
+    this.client.post(`upenn_annotation/compute?datasetId=${datasetId}`, params);
   }
 
   toConnection = (item: any): IAnnotationConnection => {
