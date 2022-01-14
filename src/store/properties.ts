@@ -20,6 +20,7 @@ import main from "./index";
 
 import { logError } from "@/utils/log";
 import filters from "./filters";
+import annotation from './annotation';
 
 const jobStates = {
   inactive: 0,

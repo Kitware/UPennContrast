@@ -160,6 +160,30 @@
   {
     "name": "Automated annotation tools",
     "type": "segmentation",
-    "interface": []
+    "comment": "TODO: ROI selection, auto annotation tags    ",
+    "interface": [
+      {
+        "name": "Docker image",
+        "id": "image",
+        "type": "dockerImage"
+      },
+      {
+        "name": "",
+        "id": "annotation",
+        "type": "annotation",
+        "meta": {
+          "hideShape": true
+        }
+      },
+      {
+        "name": "Connect to Nearest Tag",
+        "id": "connectTo",
+        "type": "restrictTagsAndLayer",
+        "meta": {
+          "tagsLabel": "Connect to nearest tags...",
+          "layerLabel": "Restrict to Layer"
+        }
+      }
+    ]
   }
 ]

@@ -6,7 +6,7 @@
           <!-- tags -->
           <tag-picker v-model="tags"></tag-picker>
         </v-col>
-        <v-col>
+        <v-col v-if="!hideShape">
           <!-- shape selection -->
           <v-select
             label="Shape"
@@ -109,6 +109,9 @@ export default class AnnotationConfiguration extends Vue {
 
   @Prop()
   readonly template!: any;
+
+  @Prop()
+  readonly hideShape!: string;
 
   @Prop()
   readonly value!: any;

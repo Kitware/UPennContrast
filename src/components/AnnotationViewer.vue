@@ -1,5 +1,10 @@
 <template>
-  <div></div>
+  <div>
+    <annotation-worker-menu
+      v-model="annotationWorkerMenu"
+      :tool="selectedTool"
+    ></annotation-worker-menu>
+  </div>
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
@@ -22,6 +27,8 @@ import {
   IROIAnnotationFilter
 } from "../store/model";
 
+import AnnotationWorkerMenu from "@/components/AnnotationWorkerMenu.vue";
+
 import { logWarning } from "@/utils/log";
 
 import {
@@ -33,13 +40,15 @@ import {
 } from "@/utils/annotation";
 
 // Draws annotations on the given layer, and provides functionnality for the user selected tool.
-@Component
+@Component({ components: { AnnotationWorkerMenu } })
 export default class AnnotationViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
   readonly toolsStore = toolsStore;
   readonly propertiesStore = propertiesStore;
   readonly filterStore = filterStore;
+
+  annotationWorkerMenu = false;
 
   get roiFilter() {
     return this.filterStore.emptyROIFilter;
@@ -421,6 +430,10 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.addAnnotation(line, undefined, false);
   }
 
+  private getAnnotationLocationFromTool(tool: IToolConfiguration) {
+    return this.annotationStore.getAnnotationLocationFromTool(tool);
+  }
+
   private async createAnnotationFromTool(
     coordinates: IGeoJSPoint[],
     tool: IToolConfiguration
@@ -428,31 +441,11 @@ export default class AnnotationViewer extends Vue {
     if (!coordinates || !coordinates.length || !this.dataset) {
       return null;
     }
-    const toolAnnotation = tool.values.annotation;
-    // Find location in the assigned layer
-    const location = {
-      XY: this.store.xy,
-      Z: this.store.z,
-      Time: this.store.time
-    };
-    const layer = this.layers[toolAnnotation.coordinateAssignments.layer];
-    const channel = layer.channel;
-    const assign = toolAnnotation.coordinateAssignments;
-    if (layer) {
-      const indexes = this.store.layerSliceIndexes(layer);
-      if (indexes) {
-        const { xyIndex, zIndex, tIndex } = indexes;
-        location.XY = xyIndex;
-        location.Z =
-          assign.Z.type === "layer" ? zIndex : Number.parseInt(assign.Z.value);
-        location.Time =
-          assign.Time.type === "layer"
-            ? tIndex
-            : Number.parseInt(assign.Time.value);
-      }
-    }
+
+    const { location, channel } = this.getAnnotationLocationFromTool(tool);
 
     // Create the new annotation
+    const toolAnnotation = tool.values.annotation;
     const newAnnotation: IAnnotation | null = await this.annotationStore.createAnnotation(
       {
         tags: toolAnnotation.tags,
@@ -585,10 +578,21 @@ export default class AnnotationViewer extends Vue {
       return;
     }
 
+    let enableWorkerMenu = false;
     switch (this.selectedTool?.type) {
       case "create":
         const annotation = this.selectedTool.values.annotation;
         this.annotationLayer.mode(annotation?.shape);
+        if (this.annotationWorkerMenu) {
+          this.annotationWorkerMenu = false;
+        }
+        break;
+      case "segmentation":
+        // TODO: tool asks for ROI, change layer mode and trigger computation afterwards
+        // TODO: otherwise, trigger computation here
+        // TODO: when computation is triggered, toggle a bool that enables a v-menu
+        // TODO: for now with just a compute button, but later previews, custom forms served from the started worker ?
+        enableWorkerMenu = true;
         break;
       case null:
       case undefined:
@@ -598,6 +602,7 @@ export default class AnnotationViewer extends Vue {
         logWarning(`${this.selectedTool?.type} tools are not supported yet`);
         this.annotationLayer.mode(null);
     }
+    this.annotationWorkerMenu = enableWorkerMenu;
   }
 
   handleModeChange(evt: any) {

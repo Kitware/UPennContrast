@@ -20,11 +20,10 @@
               </v-row>
               <v-row>
                 <v-col>
-                  <v-text-field
-                    label="Docker image"
+                  <docker-image-select
                     dense
                     v-model="dockerImage"
-                  ></v-text-field>
+                  ></docker-image-select>
                 </v-col>
               </v-row>
               <v-row>
@@ -83,9 +82,10 @@ import propertiesStore from "@/store/properties";
 import { IAnnotationProperty, ITagAnnotationFilter } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
+import DockerImageSelect from "@/components/DockerImageSelect.vue";
 
 // Popup for new tool configuration
-@Component({ components: { LayerSelect, TagFilterEditor } })
+@Component({ components: { LayerSelect, TagFilterEditor, DockerImageSelect } })
 export default class PropertyCreation extends Vue {
   readonly store = store;
   readonly propertiesStore = propertiesStore;

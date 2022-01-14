@@ -10,7 +10,12 @@ import store from "./root";
 import main from "./index";
 import sync from "./sync";
 
-import { IAnnotation, IAnnotationConnection, IGeoJSPoint } from "./model";
+import {
+  IAnnotation,
+  IAnnotationConnection,
+  IGeoJSPoint,
+  IToolConfiguration
+} from "./model";
 
 import Vue from "vue";
 
@@ -247,6 +252,56 @@ export class Annotations extends VuexModule {
     } catch (error) {
       error(error.message);
     }
+  }
+
+  @Action
+  public async computeAnnotationsWithWorker(tool: IToolConfiguration) {
+    if (!main.dataset || !main.configuration) {
+      return;
+    }
+    const datasetId = main.dataset.id;
+    const { location, channel } = await this.getAnnotationLocationFromTool(
+      tool
+    );
+    const tile = { XY: main.xy, Z: main.z, Time: main.time };
+    this.annotationsAPI.computeAnnotationWithWorker(tool, datasetId, {
+      location,
+      channel,
+      tile
+    });
+  }
+
+  @Action
+  public getAnnotationLocationFromTool(tool: IToolConfiguration) {
+    const toolAnnotation = tool.values.annotation;
+    // Find location in the assigned layer
+    const location = {
+      XY: main.xy,
+      Z: main.z,
+      Time: main.time
+    };
+    const layers = main.configuration?.view.layers;
+    if (!layers) {
+      return { location, channel: 0 };
+    }
+
+    const layer = layers[toolAnnotation.coordinateAssignments.layer];
+    const channel = layer.channel;
+    const assign = toolAnnotation.coordinateAssignments;
+    if (layer) {
+      const indexes = main.layerSliceIndexes(layer);
+      if (indexes) {
+        const { xyIndex, zIndex, tIndex } = indexes;
+        location.XY = xyIndex;
+        location.Z =
+          assign.Z.type === "layer" ? zIndex : Number.parseInt(assign.Z.value);
+        location.Time =
+          assign.Time.type === "layer"
+            ? tIndex
+            : Number.parseInt(assign.Time.value);
+      }
+    }
+    return { channel, location };
   }
 }
 

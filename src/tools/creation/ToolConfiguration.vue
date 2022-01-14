@@ -43,6 +43,7 @@ import store from "@/store";
 import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
 import AnnotationConfiguration from "@/tools/creation/templates/AnnotationConfiguration.vue";
 import TagAndLayerRestriction from "@/tools/creation/templates/TagAndLayerRestriction.vue";
+import DockerImage from "@/tools/creation/templates/DockerImage.vue";
 
 @Component({
   components: {
@@ -51,7 +52,8 @@ import TagAndLayerRestriction from "@/tools/creation/templates/TagAndLayerRestri
     VSelect,
     VCheckbox,
     VTextField,
-    VRadioGroup
+    VRadioGroup,
+    DockerImage
   }
 })
 // Creates a tool configuration interface based on the current selected template.
@@ -70,7 +72,8 @@ export default class ToolConfiguration extends Vue {
     restrictTagsAndLayer: "tag-and-layer-restriction",
     checkbox: "v-checkbox",
     radio: "v-radio-group",
-    text: "v-text-field"
+    text: "v-text-field",
+    dockerImage: "docker-image"
   };
 
   // Dynamic interface elements that depend on various values being selected
@@ -163,6 +166,12 @@ export default class ToolConfiguration extends Vue {
           if (restrict) {
             this.toolValues[item.id] = {};
             restrict.reset();
+          }
+        } else if (item.type === "dockerImage") {
+          const [dockerImage] = this.$refs[item.id] as [DockerImage];
+          if (dockerImage) {
+            this.toolValues[item.id] = null;
+            dockerImage.reset();
           }
         }
       }
