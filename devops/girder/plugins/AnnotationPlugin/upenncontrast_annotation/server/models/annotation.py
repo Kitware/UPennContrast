@@ -1,5 +1,6 @@
+from ..helpers.tasks import runComputeJob
 from girder.models.model_base import AccessControlledModel
-from girder.exceptions import AccessException, ValidationException
+from girder.exceptions import AccessException, ValidationException, RestException
 from girder.constants import AccessType
 from .propertyValues import AnnotationPropertyValues as PropertiesModel
 from girder import events, logprint, logger, auditLogger
@@ -133,7 +134,16 @@ class Annotation(AccessControlledModel):
     self.remove(self.find(annotation))
 
   def getAnnotationById(self, id, user=None):
-    return self.load(id, user=user)
+    return self.load(id, user=user, level=AccessType.READ)
 
   def update(self, annotation):
     return self.save(annotation)
+
+  def compute(self, datasetId, tool, user=None):
+    dataset = Folder().load(datasetId, user=user, level=AccessType.WRITE)
+    if not dataset:
+        raise RestException(code=500, message="Invalid dataset id in annotation")
+    image = tool.get('image', None)
+    if not image:
+        raise RestException(code=500, message="Invalid segmentation tool: no image")
+    return runComputeJob(image, datasetId, tool)
