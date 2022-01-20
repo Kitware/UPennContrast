@@ -135,13 +135,28 @@ export class Properties extends VuexModule {
       this.initializeNotificationSubscription();
     }
 
-    if (!property.enabled || !main.dataset?.id) {
+    if (
+      !property.enabled ||
+      !main.dataset?.id ||
+      !main.configuration?.view?.layers
+    ) {
       return;
+    }
+
+    // Get channel from layer
+    const layers = main.configuration.view.layers;
+    let channel = null;
+    if (property.layer) {
+      const layer = layers[property.layer];
+      if (layer) {
+        channel = layer.channel;
+      }
     }
     this.propertiesAPI
       .computeProperty(property.name, main.dataset.id, {
         ...property,
-        annotationIds: annotationIds.length ? annotationIds : undefined
+        annotationIds: annotationIds.length ? annotationIds : undefined,
+        channel
       })
       .then((response: any) => {
         // Keep track of running jobs

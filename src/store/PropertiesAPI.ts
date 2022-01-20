@@ -75,16 +75,16 @@ export default class AnnotationsAPI {
   }
 
   toProperty(item: any): IAnnotationProperty {
-    const { _id, name, image, propertyType } = item;
+    const { _id, name, image, propertyType, layer, shape, tags } = item;
     return {
       id: name,
       name,
       image,
       propertyType,
-      layer: null,
-      tags: { tags: [], exclusive: false },
+      layer,
+      tags,
       independant: false,
-      shape: null,
+      shape,
       enabled: false,
       computed: false,
       customName: null

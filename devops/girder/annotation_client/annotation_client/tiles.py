@@ -29,7 +29,7 @@ class UPennContrastDataset:
         self.datasetId = self.dataset['_id']
 
         self.tiles = self.getTilesForDataset(self.datasetId)
-        self.map = self.buildMap(self.tiles['frames'])
+        self.map = self.buildMap(self.tiles.get('frames', None))
 
     def buildMap(self, frames):
         """
@@ -38,8 +38,11 @@ class UPennContrastDataset:
           :return: A dict mapping from [channel][T][Z][XY] to a frame index
           :rtype: dict
         """
-        map = {}
 
+        if not frames:
+            return {0: {0: {0: {0: 0}}}}
+
+        map = {}
         for frame in frames:
             channel = frame['IndexC']
             XY = frame['IndexXY']
