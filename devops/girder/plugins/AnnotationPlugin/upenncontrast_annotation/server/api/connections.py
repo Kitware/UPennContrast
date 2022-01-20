@@ -66,13 +66,13 @@ class AnnotationConnection(Resource):
     def find(self, params):
         limit, offset, sort = self.getPagingParameters(params, 'lowerName')
         query = {}
-        if 'datasetId' in params:
+        if 'datasetId' in params and params['datasetId']:
           query['datasetId'] = params['datasetId']
-        elif 'childId' in params:
+        if 'childId' in params and params['childId']:
             query['childId'] = params['childId']
-        elif 'parentId' in params:
+        if 'parentId' in params and params['parentId']:
             query['parentId'] = params['parentId']
-        elif 'nodeAnnotationId' in params:
+        if 'nodeAnnotationId' in params and params['nodeAnnotationId']:
             query['$or'] = [
                 {
                     'parentId': params['nodeAnnotationId']
@@ -81,12 +81,11 @@ class AnnotationConnection(Resource):
                     'childId': params['nodeAnnotationId']
                 }
             ]
-        print(query)
         return self._connectionModel.findWithPermissions(query, sort=sort, user=self.getCurrentUser(), level=AccessType.READ, limit=limit, offset=offset)
 
     @access.user
     @autoDescribeRoute(Description("Get an connection by its id.")
-                       .param('id', 'The connection\'s id'))
+                       .param('id', 'The connection\'s id', paramType='path'))
     @loadmodel(model='annotation_connection', plugin='upenncontrast_annotation', level=AccessType.READ)
     def get(self, annotation_connection):
         return annotation_connection
