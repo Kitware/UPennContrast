@@ -208,6 +208,7 @@ export class Annotations extends VuexModule {
   @Action
   public deleteSelectedAnnotations() {
     this.deleteAnnotations(this.selectedAnnotationIds);
+    this.setSelected([]);
   }
 
   @Action
