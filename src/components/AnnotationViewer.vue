@@ -72,7 +72,7 @@ export default class AnnotationViewer extends Vue {
       if (layer.visible && !channels.includes(layer.channel)) {
         return [...channels, layer.channel];
       }
-      return [];
+      return [...channels];
     }, []);
   }
 
