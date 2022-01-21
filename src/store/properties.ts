@@ -199,7 +199,7 @@ export class Properties extends VuexModule {
       return;
     }
     const notificationTime = data._girderTime;
-    if (notificationTime <= this.latestNotificationTime) {
+    if (notificationTime < this.latestNotificationTime) {
       return;
     }
     this.setLatestNotificationTime(notificationTime);
