@@ -127,7 +127,7 @@ export default class AnnotationList extends Vue {
 
   get propertyIds() {
     return this.propertyStore.annotationListIds.sort((a: string, b: string) =>
-      b.localeCompare(a)
+      a.localeCompare(b)
     );
   }
 
@@ -189,10 +189,14 @@ export default class AnnotationList extends Vue {
         text: "Name",
         value: "name"
       },
-      ...this.properties.map((property: IAnnotationProperty) => ({
-        text: property.customName || property.name,
-        value: property.id
-      }))
+      ...this.properties
+        .sort((a: IAnnotationProperty, b: IAnnotationProperty) =>
+          a.id.localeCompare(b.id)
+        )
+        .map((property: IAnnotationProperty) => ({
+          text: property.customName || property.name,
+          value: property.id
+        }))
     ];
   }
 
