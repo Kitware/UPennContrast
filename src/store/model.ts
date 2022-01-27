@@ -159,16 +159,18 @@ export interface IGeoJSPoint {
   z: number;
 }
 
+export interface IAnnotationLocation {
+  XY: number;
+  Z: number;
+  Time: number;
+}
+
 export interface IAnnotation {
   id: string;
   tags: string[];
   name: string | null;
   channel: number;
-  location: {
-    XY: number;
-    Z: number;
-    Time: number;
-  };
+  location: IAnnotationLocation;
   shape: string;
   coordinates: IGeoJSPoint[];
   datasetId: string;

@@ -52,20 +52,21 @@ export function unrollIndexFromImages(
 // Create a geojs annotation depending on its shape
 export function geojsAnnotationFactory(
   shape: string,
-  coordinates: IGeoJSPoint[]
+  coordinates: IGeoJSPoint[],
+  options: any,
 ) {
   let newGeoJSAnnotation = null;
   switch (shape) {
     case "point":
-      newGeoJSAnnotation = geojs.annotation.pointAnnotation();
+      newGeoJSAnnotation = geojs.annotation.pointAnnotation(options);
       newGeoJSAnnotation.options("position", coordinates[0]);
       break;
     case "polygon":
-      newGeoJSAnnotation = geojs.annotation.polygonAnnotation();
+      newGeoJSAnnotation = geojs.annotation.polygonAnnotation(options);
       newGeoJSAnnotation.options("vertices", coordinates);
       break;
     case "line":
-      newGeoJSAnnotation = geojs.annotation.lineAnnotation();
+      newGeoJSAnnotation = geojs.annotation.lineAnnotation(options);
       newGeoJSAnnotation.options("vertices", coordinates);
       break;
     default:
