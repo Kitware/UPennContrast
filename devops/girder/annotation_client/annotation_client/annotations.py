@@ -107,16 +107,16 @@ class UPennContrastAnnotationClient:
         """
         query = '?'
         if datasetId:
-            query += 'datasetId=' + datasetId
+            query += 'datasetId=' + str(datasetId) + '&'
 
         if childId:
-            query += 'childId=' + childId
+            query += 'childId=' + str(childId) + '&'
 
         if parentId:
-            query += 'parentId=' + parentId
+            query += 'parentId=' + str(parentId) + '&'
 
         if nodeId:
-            query += 'nodeId=' + nodeId
+            query += 'nodeId=' + str(nodeId) + '&'
 
         return self.client.get(PATHS['connection'] + query, )
 
