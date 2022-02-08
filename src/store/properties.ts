@@ -146,7 +146,7 @@ export class Properties extends VuexModule {
     // Get channel from layer
     const layers = main.configuration.view.layers;
     let channel = null;
-    if (property.layer) {
+    if (property.layer || property.layer === 0) {
       const layer = layers[property.layer];
       if (layer) {
         channel = layer.channel;
