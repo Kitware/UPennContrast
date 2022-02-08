@@ -1,6 +1,7 @@
 from girder.models.model_base import AccessControlledModel
 from girder.exceptions import AccessException, ValidationException
 from girder.constants import AccessType
+from girder import events
 
 from bson.objectid import ObjectId
 import jsonschema
@@ -34,6 +35,16 @@ class AnnotationPropertyValues(AccessControlledModel):
 
     def initialize(self):
         self.name = "annotation_property_values"
+        events.bind('model.upenn_annotation.remove',
+                    'upenn.annotation_values.clean', self.cleanOrphaned)
+
+    def cleanOrphaned(self, event):
+        if event.info and event.info['_id']:
+            annotationId = str(event.info['_id'])
+            query = {
+                'annotationId': annotationId
+            }
+            self.removeWithQuery(query)
 
     def validate(self, document):
         try:
@@ -43,7 +54,7 @@ class AnnotationPropertyValues(AccessControlledModel):
 
         # find existing property values for the annotation id
         annotationId = document['annotationId']
-        query = { 'annotationId': annotationId }
+        query = {'annotationId': annotationId}
         existingProperties = self.findOne(query)
 
         # keep existing values
@@ -52,23 +63,24 @@ class AnnotationPropertyValues(AccessControlledModel):
             existingValues.update(document['values'])
             document['values'] = existingValues
             self.remove(existingProperties)
-        
+
         # TODO(performance): create sparse index on properties if nonexisting https://docs.mongodb.com/manual/reference/operator/query/exists/
 
         return document
 
     def appendValues(self, creator, values, annotationId, datasetId):
-        self.save({'annotationId': annotationId, 'values': values, 'datasetId': datasetId})
+        self.save({'annotationId': annotationId,
+                  'values': values, 'datasetId': datasetId})
 
-    
     def histogram(self, propertyId, datasetId, buckets=255):
         valueKey = 'values.' + propertyId
         match = {
             '$match': {
-                        'datasetId': datasetId,
-                        valueKey: { '$exists': True, '$ne': None }, # TODO(performance): sparse index see above
-                    }
+                'datasetId': datasetId,
+                # TODO(performance): sparse index see above
+                valueKey: {'$exists': True, '$ne': None},
             }
+        }
 
         bucket = {
             '$bucketAuto': {
@@ -85,7 +97,6 @@ class AnnotationPropertyValues(AccessControlledModel):
                 'count': True
             }
         }
-
 
         return self.collection.aggregate([
             match,
