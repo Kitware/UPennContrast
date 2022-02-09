@@ -39,7 +39,7 @@ export default class AnnotationsAPI {
 
   async getAnnotationsForDatasetId(id: string): Promise<IAnnotation[]> {
     const annotations: IAnnotation[] = [];
-    const limit = 25;
+    const limit = 250;
     let totalCount = -1;
 
     const fetchPage = (offset: number) =>
