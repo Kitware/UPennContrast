@@ -52,7 +52,7 @@ function toId(item: string | { _id: string }) {
 }
 
 export default class GirderAPI {
-  private readonly client: RestClientInstance;
+  readonly client: RestClientInstance;
 
   private readonly imageCache = new Map<string, HTMLImageElement>();
   private readonly fullImageCache = new Map<string, HTMLImageElement>();

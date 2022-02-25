@@ -740,7 +740,7 @@ export class Main extends VuexModule {
       if (results.fullUrls && results.fullUrls.length && results.fullUrls[0]) {
         results.baseQuadOptions = {
           baseUrl: results.fullUrls[0].split("/tiles")[0] + "/tiles",
-          restRequest: params =>
+          restRequest: (params: any) =>
             this.api.client
               .get(params.url, { params: params.data })
               .then(data => data.data),
