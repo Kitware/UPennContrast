@@ -19,14 +19,16 @@ services:
       - mongodb
       - memcached
     volumes:
-      - "./assetstore:/assetstore"
-      - "./logs/girder:/root/.girder/logs"
+      # For some versions of Docker on OSX, adding delegated speeds up file
+      # access.  It should do no harm on other systems.
+      - "./assetstore:/assetstore:delegated"
+      - "./logs/girder:/root/.girder/logs:delegated"
     env_file:
       - "./docker.env"
     depends_on:
       - "mongodb"
       - "broker"
-    container_name: 'girder'
+    container_name: "girder"
 
   memcached:
     image: memcached
@@ -36,7 +38,7 @@ services:
 
   broker:
     image: rabbitmq:3
-    env_file: './docker.env'
+    env_file: "./docker.env"
 
   worker:
     image: girder/girder_worker
@@ -45,7 +47,7 @@ services:
     links:
       - girder
     volumes:
-      - '/var/run/docker.sock:/var/run/docker.sock'
+      - "/var/run/docker.sock:/var/run/docker.sock"
     depends_on:
       - broker
     container_name: "worker"
