@@ -22,3 +22,7 @@ src/**/*.map
 src/**/*.js
 
 /logs
+
+*__pycache__*
+*.egg-info
+*.tox

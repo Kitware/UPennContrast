@@ -159,29 +159,21 @@ export interface IGeoJSPoint {
   z: number;
 }
 
+export interface IAnnotationLocation {
+  XY: number;
+  Z: number;
+  Time: number;
+}
+
 export interface IAnnotation {
   id: string;
   tags: string[];
-  assignment: {
-    channel: number;
-    Z: {
-      type: string; // Either "layer", or "assign"
-      value: 1;
-    };
-    Time: {
-      type: string;
-      value: 1;
-    };
-  };
-  location: {
-    XY: number;
-    Z: number;
-    Time: number;
-  };
+  name: string | null;
+  channel: number;
+  location: IAnnotationLocation;
   shape: string;
   coordinates: IGeoJSPoint[];
-
-  computedValues: any;
+  datasetId: string;
 }
 
 export interface IAnnotationConnection {
@@ -190,8 +182,60 @@ export interface IAnnotationConnection {
   tags: string[];
   parentId: string;
   childId: string;
+}
 
-  computedValues: any;
+export interface IAnnotationFilter {
+  id: string;
+  exclusive: boolean;
+  enabled: boolean;
+}
+
+export interface ITagAnnotationFilter extends IAnnotationFilter {
+  tags: string[];
+  shape: string;
+}
+
+export interface IPropertyAnnotationFilter extends IAnnotationFilter {
+  propertyId: string;
+  range: {
+    min: number;
+    max: number;
+  };
+  // Whether to exclude or include annotations that don't have the property
+}
+
+export interface IIdAnnotationFilter extends IAnnotationFilter {
+  annotationIds: string[];
+}
+
+export interface IROIAnnotationFilter extends IAnnotationFilter {
+  roi: IGeoJSPoint[];
+}
+
+export interface IAnnotationProperty {
+  id: string;
+  name: string;
+  image: string;
+  propertyType: "layer" | "morphology" | "relational";
+
+  layer: number | null;
+  tags: {
+    tags: string[];
+    exclusive: boolean;
+  };
+  independant: boolean;
+  shape: "point" | "line" | "polygon" | null;
+  customName: string | null;
+
+  enabled: boolean;
+  computed: boolean;
+}
+
+export interface IPropertyComputeJob {
+  jobId: string;
+  propertyId: string;
+  annotationIds: string[];
+  datasetId: string;
 }
 
 export interface IContrast {

@@ -4,9 +4,9 @@
     v-model="tags"
     :items="tagList"
     :search-input.sync="tagSearchInput"
-    label="Tags"
     multiple
     hide-selected
+    hide-details
     small-chips
     dense
   >
@@ -16,7 +16,8 @@
         class="pa-2"
         v-bind="attrs"
         close
-        small
+        pill
+        x-small
         @click:close="parent.selectItem(item)"
       >
         {{ item }}

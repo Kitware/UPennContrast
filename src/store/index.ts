@@ -7,6 +7,9 @@ import {
   Mutation,
   VuexModule
 } from "vuex-module-decorators";
+import AnnotationsAPI from "./AnnotationsAPI";
+import PropertiesAPI from "./PropertiesAPI";
+
 import GirderAPI from "./GirderAPI";
 import { getLayerImages, getLayerSliceIndexes } from "./images";
 import {
@@ -32,6 +35,9 @@ export class Main extends VuexModule {
     apiRoot: `${this.girderUrl}/api/v1`
   });
   api = new GirderAPI(this.girderRest);
+  annotationsAPI = new AnnotationsAPI(this.girderRest);
+  propertiesAPI = new PropertiesAPI(this.girderRest);
+
   girderUser: IGirderUser | null = this.girderRest.user;
 
   selectedDatasetId: string | null = null;
@@ -48,6 +54,14 @@ export class Main extends VuexModule {
   z: number = 0;
   time: number = 0;
   layerMode: "single" | "multiple" = "multiple";
+
+  drawAnnotations: boolean = true;
+  filteredDraw: boolean = false;
+  drawActive: boolean = false;
+
+  restrictAnnotationsToFilters: boolean = true;
+  restrictAnnotationsToActive: boolean = true;
+  drawAnnotationConnections: boolean = true;
 
   unrollXY: boolean = false;
   unrollZ: boolean = false;
@@ -78,6 +92,26 @@ export class Main extends VuexModule {
   }
 
   @Mutation
+  public setDrawAnnotations(value: boolean) {
+    this.drawAnnotations = value;
+  }
+
+  @Mutation
+  public setFilteredDraw(value: boolean) {
+    this.filteredDraw = value;
+  }
+
+  @Mutation
+  public setDrawActive(value: boolean) {
+    this.drawActive = value;
+  }
+
+  @Mutation
+  public setDrawAnnotationConnections(value: boolean) {
+    this.drawAnnotationConnections = value;
+  }
+
+  @Mutation
   protected loggedIn({
     girderUrl,
     girderRest
@@ -89,6 +123,8 @@ export class Main extends VuexModule {
     this.girderRest = girderRest;
     this.girderUser = girderRest.user;
     this.api = new GirderAPI(this.girderRest);
+    this.annotationsAPI = new AnnotationsAPI(this.girderRest);
+    this.propertiesAPI = new PropertiesAPI(this.girderRest);
   }
 
   @Mutation

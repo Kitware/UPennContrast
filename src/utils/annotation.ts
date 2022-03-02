@@ -3,7 +3,10 @@ import geojs from "geojs";
 import { logError } from "@/utils/log";
 
 // Which style an annotation should have, depending on its layer (color change)
-export function getAnnotationStyleFromLayer(layer: IDisplayLayer | undefined) {
+export function getAnnotationStyleFromLayer(
+  layer: IDisplayLayer | undefined,
+  isHovered: boolean = false
+) {
   const style = {
     stroke: true,
     strokeColor: "black",
@@ -17,7 +20,11 @@ export function getAnnotationStyleFromLayer(layer: IDisplayLayer | undefined) {
   if (!layer) {
     return style;
   }
-  if (layer) {
+  if (isHovered) {
+    style.fillColor = "gray";
+    style.strokeColor = "gray";
+    style.strokeWidth = 4;
+  } else if (layer) {
     style.fillColor = layer.color;
     style.strokeColor = layer.color;
   }
@@ -45,20 +52,21 @@ export function unrollIndexFromImages(
 // Create a geojs annotation depending on its shape
 export function geojsAnnotationFactory(
   shape: string,
-  coordinates: IGeoJSPoint[]
+  coordinates: IGeoJSPoint[],
+  options: any,
 ) {
   let newGeoJSAnnotation = null;
   switch (shape) {
     case "point":
-      newGeoJSAnnotation = geojs.annotation.pointAnnotation();
+      newGeoJSAnnotation = geojs.annotation.pointAnnotation(options);
       newGeoJSAnnotation.options("position", coordinates[0]);
       break;
     case "polygon":
-      newGeoJSAnnotation = geojs.annotation.polygonAnnotation();
+      newGeoJSAnnotation = geojs.annotation.polygonAnnotation(options);
       newGeoJSAnnotation.options("vertices", coordinates);
       break;
     case "line":
-      newGeoJSAnnotation = geojs.annotation.lineAnnotation();
+      newGeoJSAnnotation = geojs.annotation.lineAnnotation(options);
       newGeoJSAnnotation.options("vertices", coordinates);
       break;
     default:
@@ -81,13 +89,16 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
   };
 }
 
+export function pointDistance(a: IGeoJSPoint, b: IGeoJSPoint) {
+  return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+}
+
 export function annotationDistance(a: IAnnotation, b: IAnnotation) {
   // For now, polyLines are treated as polygons for the sake of computing distances
-  const dist = (a: IGeoJSPoint, b: IGeoJSPoint): number =>
-    Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+
   // Point to point
   if (a.shape === "point" || b.shape === "point") {
-    return dist(a.coordinates[0], b.coordinates[0]);
+    return pointDistance(a.coordinates[0], b.coordinates[0]);
   }
 
   // Point to poly
@@ -100,7 +111,7 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
 
     // Go through all vertices to find the closest
     const shortestDistance = poly.coordinates
-      .map(val => dist(val, point.coordinates[0]))
+      .map(val => pointDistance(val, point.coordinates[0]))
       .sort()[0];
     return shortestDistance;
   }
@@ -113,7 +124,7 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
     // Use centroids for now
     const centroidA = simpleCentroid(a.coordinates);
     const centroidB = simpleCentroid(b.coordinates);
-    return dist(centroidA, centroidB);
+    return pointDistance(centroidA, centroidB);
   }
 
   // Should not happen
