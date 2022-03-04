@@ -11,7 +11,9 @@ import {
   IAnnotation,
   IAnnotationConnection,
   IAnnotationProperty,
-  IPropertyComputeJob
+  IPropertyComputeJob,
+  IWorkerInterface,
+  IToolConfiguration
 } from "./model";
 
 import Vue from "vue";
@@ -20,7 +22,7 @@ import main from "./index";
 
 import { logError } from "@/utils/log";
 import filters from "./filters";
-import annotation from './annotation';
+import annotation from "./annotation";
 
 const jobStates = {
   inactive: 0,
@@ -48,6 +50,57 @@ export class Properties extends VuexModule {
   } = {};
 
   runningJobs: IPropertyComputeJob[] = [];
+
+  workerImageList: string[] = [];
+  workerInterfaces: { [image: string]: IWorkerInterface } = {};
+  workerPreviews: { [image: string]: { text: string; image: string } } = {};
+  previewJobIds: { [image: string]: string | null } = {};
+
+  get getWorkerInterface() {
+    return (image: string) => this.workerInterfaces[image];
+  }
+
+  get getWorkerPreview() {
+    return (image: string) => this.workerPreviews[image];
+  }
+
+  @Mutation
+  setWorkerPreview({
+    image,
+    workerPreview
+  }: {
+    image: string;
+    workerPreview: { text: string; image: string };
+  }) {
+    this.workerPreviews = {
+      ...this.workerPreviews,
+      [image]: workerPreview
+    };
+  }
+  @Action
+  async fetchWorkerPreview(image: string) {
+    const workerPreview = await this.propertiesAPI.getWorkerPreview(image);
+    this.setWorkerPreview({ image, workerPreview });
+  }
+  @Mutation
+  setWorkerInterface({
+    image,
+    workerInterface
+  }: {
+    image: string;
+    workerInterface: IWorkerInterface;
+  }) {
+    this.workerInterfaces = {
+      ...this.workerInterfaces,
+      [image]: workerInterface
+    };
+  }
+
+  @Action
+  async fetchWorkerInterface(image: string) {
+    const workerInterface = await this.propertiesAPI.getWorkerInterface(image);
+    this.setWorkerInterface({ image, workerInterface });
+  }
 
   @Mutation
   updatePropertyValues(values: {
@@ -206,26 +259,35 @@ export class Properties extends VuexModule {
     this.setLatestNotificationTime(notificationTime);
 
     const jobData = data.data;
+    const status = jobData.status;
+    if (
+      ![jobStates.cancelled, jobStates.success, jobStates.error].includes(
+        status
+      )
+    ) {
+      return;
+    }
+    const [image] = jobData.args;
+    const jobId = jobData._id;
+    if (this.previewJobIds[image] === jobId) {
+      this.setPreviewJobId({ image, id: null });
+      this.fetchWorkerPreview(image);
+      return;
+    }
     const jobTask = this.runningJobs.find(
       (job: IPropertyComputeJob) => job.jobId === jobData._id
     );
     if (jobTask) {
       const status = jobData.status;
-      if (
-        [jobStates.cancelled, jobStates.success, jobStates.error].includes(
-          status
-        )
-      ) {
-        if (status === jobStates.success) {
-          this.fetchPropertyValues();
-          filters.updateHistograms();
-        } else {
-          logError(
-            `Compute job with id ${jobTask.jobId} for property ${jobTask.propertyId} failed or was cancelled`
-          );
-        }
-        this.removeJob(jobTask.jobId);
+      if (status === jobStates.success) {
+        this.fetchPropertyValues();
+        filters.updateHistograms();
+      } else {
+        logError(
+          `Compute job with id ${jobTask.jobId} for property ${jobTask.propertyId} failed or was cancelled`
+        );
       }
+      this.removeJob(jobTask.jobId);
     }
   }
 
@@ -252,6 +314,12 @@ export class Properties extends VuexModule {
   setProperties(properties: IAnnotationProperty[]) {
     this.properties = [...properties];
   }
+
+  @Mutation
+  setWorkerImageList(list: string[]) {
+    this.workerImageList = list;
+  }
+
   @Action
   async fetchProperties() {
     const properties = await this.propertiesAPI.getProperties();
@@ -306,6 +374,71 @@ export class Properties extends VuexModule {
     if (newProperty) {
       this.setProperties([...this.properties, newProperty]);
     }
+  }
+
+  @Action
+  async fetchWorkerImageList() {
+    const list = await this.propertiesAPI.getWorkerImages();
+    this.setWorkerImageList(list);
+  }
+
+  @Action
+  async requestWorkerInterface(image: string) {
+    this.propertiesAPI.requestWorkerInterface(image);
+  }
+
+  @Mutation
+  setPreviewJobId({ image, id }: { image: string; id: string | null }) {
+    this.previewJobIds = { ...this.previewJobIds, [image]: id };
+  }
+
+  @Action
+  async requestWorkerPreview({
+    image,
+    tool,
+    workerInterface
+  }: {
+    image: string;
+    tool: IToolConfiguration;
+    workerInterface: { [id: string]: { type: string; value: any } };
+  }) {
+    if (this.previewJobIds[image]) {
+      return;
+    }
+    if (!this.isSubscribedToNotifications) {
+      this.initializeNotificationSubscription();
+    }
+    if (!main.dataset || !main.configuration) {
+      return;
+    }
+    const datasetId = main.dataset.id;
+    const { location, channel } = await annotation.context.dispatch(
+      "getAnnotationLocationFromTool",
+      tool
+    );
+    const tile = { XY: main.xy, Z: main.z, Time: main.time };
+    this.propertiesAPI
+      .requestWorkerPreview(image, tool, datasetId, workerInterface, {
+        location,
+        channel,
+        tile
+      })
+      .then((response: any) => {
+        // Keep track of running jobs
+        const job = response.data[0];
+        if (!job) {
+          return;
+        }
+        if (job && job._id) {
+          this.setPreviewJobId({ image, id: job._id });
+          setTimeout(() => {
+            if (this.previewJobIds[image] === job._id) {
+              this.setPreviewJobId({ image, id: null });
+              this.fetchWorkerPreview(image);
+            }
+          }, 5000);
+        }
+      });
   }
 }
 

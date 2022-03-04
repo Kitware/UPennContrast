@@ -255,7 +255,13 @@ export class Annotations extends VuexModule {
   }
 
   @Action
-  public async computeAnnotationsWithWorker(tool: IToolConfiguration) {
+  public async computeAnnotationsWithWorker({
+    tool,
+    workerInterface
+  }: {
+    tool: IToolConfiguration;
+    workerInterface: any;
+  }) {
     if (!main.dataset || !main.configuration) {
       return;
     }
@@ -264,11 +270,16 @@ export class Annotations extends VuexModule {
       tool
     );
     const tile = { XY: main.xy, Z: main.z, Time: main.time };
-    this.annotationsAPI.computeAnnotationWithWorker(tool, datasetId, {
-      location,
-      channel,
-      tile
-    });
+    this.annotationsAPI.computeAnnotationWithWorker(
+      tool,
+      datasetId,
+      {
+        location,
+        channel,
+        tile
+      },
+      workerInterface
+    );
   }
 
   @Action
