@@ -2,7 +2,6 @@
   <div>
     <annotation-worker-menu
       v-model="annotationWorkerMenu"
-      v-if="selectedTool && selectedTool.type === 'segmentation'"
       :tool="selectedTool"
     ></annotation-worker-menu>
   </div>

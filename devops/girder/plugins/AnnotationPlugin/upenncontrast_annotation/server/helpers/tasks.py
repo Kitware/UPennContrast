@@ -20,15 +20,25 @@ def runComputeJob(image, datasetId, params):
     # Make sure name is a valid name for a docker container
     name = ''.join(re.findall('[a-zA-Z0-9_.-]', name))
     params = json.dumps(params)
+
+    containerArgs = [
+        '--apiUrl', "http://localhost:8080/api/v1",
+        '--token', getCurrentToken()['_id'],
+        '--parameters', params
+    ]
+    if (datasetId):
+        containerArgs.append('--datasetId')
+        containerArgs.append(datasetId)
+
     job = docker_run.apply_async(
         (image,),
         kwargs={
             'pull_image': False,
-            'container_args': ['--datasetId', datasetId, '--apiUrl', "http://localhost:8080/api/v1", '--token', getCurrentToken()['_id'], '--parameters', params],
-            'remove_container': True,
+            'container_args': containerArgs,
+            'remove_container': False,
             'name': "{}_{}_{}".format(name, datasetId, datetime.datetime.now().timestamp()),
             # TODO: figure out network configuration and api url discovery
-            'network_mode': 'host'
+            'network_mode': 'host',
             # 'girder_result_hooks': [testHook]
         }
     ).job,

@@ -159,6 +159,15 @@ export interface IGeoJSPoint {
   z: number;
 }
 
+export interface IWorkerInterface {
+  [id: string]: {
+    type: "number" | "text" | "tags" | "layer";
+    min?: number;
+    max?: number;
+    default?: number;
+  };
+}
+
 export interface IAnnotationLocation {
   XY: number;
   Z: number;

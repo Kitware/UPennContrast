@@ -188,7 +188,8 @@ export default class AnnotationsAPI {
       channel: Number;
       location: { XY: Number; Z: Number; Time: Number };
       tile: { XY: Number; Z: Number; Time: Number };
-    }
+    },
+    workerInterface: any
   ) {
     const { configurationId, description, id, name, type, values } = tool;
     const image = values.image.image;
@@ -205,7 +206,8 @@ export default class AnnotationsAPI {
       assignment: metadata.location,
       tags: annotation.tags,
       tile: metadata.tile,
-      connectTo
+      connectTo,
+      workerInterface
     };
     this.client.post(`upenn_annotation/compute?datasetId=${datasetId}`, params);
   }

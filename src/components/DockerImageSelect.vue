@@ -6,19 +6,26 @@
 <script lang="ts">
 import { Vue, Component, VModel } from "vue-property-decorator";
 import store from "@/store";
+import propertiesStore from "@/store/properties";
 
 // Interface element selecting an image
 @Component({
-  components: {},
+  components: {}
 })
 export default class DockerImageSelect extends Vue {
   readonly store = store;
-
-  images = [
-    "boucaud/sample_intensity_worker:latest",
-    "boucaud/spotfinding:latest"
-  ]; // TODO: get from store/api
+  readonly propertyStore = propertiesStore;
 
   @VModel({ type: String }) image!: String;
+
+  get images() {
+    return this.propertyStore.workerImageList;
+  }
+
+  mounted() {
+    if (!this.images.length) {
+      this.propertyStore.fetchWorkerImageList();
+    }
+  }
 }
 </script>
