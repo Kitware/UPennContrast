@@ -33,7 +33,7 @@
         </v-col>
       </v-row>
       <v-row>
-        <v-btn @click="preview">preview</v-btn>
+        <v-btn v-if="canPreview" @click="preview">preview</v-btn>
         <v-spacer></v-spacer>
         <v-btn @click="compute">compute</v-btn>
       </v-row>
@@ -61,6 +61,9 @@ export default class WorkerInterface extends Vue {
 
   @Prop()
   readonly workerInterface!: IWorkerInterface;
+
+  @Prop()
+  readonly canPreview!: boolean;
 
   getDefault(type: string, defaultValue: any = null) {
     if (defaultValue) {
@@ -101,7 +104,9 @@ export default class WorkerInterface extends Vue {
   }
 
   preview() {
-    this.$emit("preview", this.getEntryResult());
+    if (this.canPreview) {
+      this.$emit("preview", this.getEntryResult());
+    }
   }
 
   compute() {

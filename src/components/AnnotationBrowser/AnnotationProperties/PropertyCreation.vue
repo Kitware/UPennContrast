@@ -166,6 +166,7 @@ export default class PropertyCreation extends Vue {
       enabled: false,
       computed: false
     });
+    this.propertiesStore.requestWorkerInterface(this.dockerImage);
     this.close();
   }
 

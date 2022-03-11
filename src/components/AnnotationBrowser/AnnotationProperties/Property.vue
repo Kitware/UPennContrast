@@ -5,7 +5,7 @@
       <v-checkbox
         dense
         hide-details
-        v-model="enabled"
+        :value="enabled"
         :indeterminate="indeterminate"
       ></v-checkbox>
     </v-col>
@@ -65,18 +65,6 @@ export default class AnnotationProperty extends Vue {
 
   get enabled() {
     return this.property.enabled;
-  }
-
-  set enabled(val) {
-    {
-      if (val) {
-        Promise.resolve().then(() =>
-          this.propertyStore.enableProperty(this.property)
-        );
-      } else {
-        this.propertyStore.disableProperty(this.property);
-      }
-    }
   }
 
   get computed() {

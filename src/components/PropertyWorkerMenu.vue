@@ -1,44 +1,34 @@
 <template>
-  <v-expansion-panels>
-    <v-expansion-panel v-model="show" v-if="tool">
-      <v-expansion-panel-header>
-        {{ tool.name }} worker menu
-      </v-expansion-panel-header>
-      <v-expansion-panel-content class="pa-0 ma-0">
-        <v-container class="pa-0 ma-0">
-          <v-row class="pa-0 ma-0">
-            <v-col class="pa-0 ma-0">
-              <v-subheader>Image: {{ tool.values.image.image }}</v-subheader>
-            </v-col>
-          </v-row>
-          <v-row class="pa-0 ma-0">
-            <v-col cols="12">
-              <worker-interface
-                :workerInterface="workerInterface"
-                @preview="preview"
-                @compute="compute"
-                :canPreview="true"
-              >
-              </worker-interface>
-            </v-col>
-            <!-- <v-col cols="6">
+  <v-container class="pa-0 ma-0">
+    <v-row class="pa-0 ma-0">
+      <v-col class="pa-0 ma-0">
+        <v-subheader>Image: {{ image }}</v-subheader>
+      </v-col>
+    </v-row>
+    <v-row class="pa-0 ma-0">
+      <v-col cols="12">
+        <worker-interface
+          :workerInterface="workerInterface"
+          @compute="compute"
+          :canPreview="false"
+        >
+        </worker-interface>
+      </v-col>
+      <!-- <v-col cols="6">
                 <worker-preview
                   v-if="workerPreview"
                   :workerPreview="workerPreview"
                 ></worker-preview>
               </v-col> -->
-          </v-row>
-        </v-container>
-      </v-expansion-panel-content>
-    </v-expansion-panel>
-  </v-expansion-panels>
+    </v-row>
+  </v-container>
 </template>
 
 <script lang="ts">
 import { Vue, Component, Watch, Prop, VModel } from "vue-property-decorator";
 import store from "@/store";
 import annotationsStore from "@/store/annotation";
-import { IToolConfiguration } from "@/store/model";
+import { IAnnotationProperty, IToolConfiguration } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
 import DockerImageSelect from "@/components/DockerImageSelect.vue";
@@ -63,14 +53,14 @@ export default class annotationWorkerMenu extends Vue {
   show: boolean = true;
 
   @Prop()
-  readonly tool!: IToolConfiguration;
+  readonly property!: IAnnotationProperty;
 
   get workerInterface() {
     return this.propertyStore.getWorkerInterface(this.image) || {};
   }
 
   get image() {
-    return this.tool?.values?.image?.image;
+    return this.property?.image;
   }
 
   get workerPreview() {
@@ -83,26 +73,14 @@ export default class annotationWorkerMenu extends Vue {
   }
 
   compute(interfaceValues: any) {
-    this.annotationsStore.computeAnnotationsWithWorker({
-      tool: this.tool,
-      workerInterface: interfaceValues
-    });
-    this.show = false;
-  }
-
-  preview(result: any) {
-    this.propertyStore.requestWorkerPreview({
-      image: this.image,
-      tool: this.tool,
-      workerInterface: result
-    });
+    this.propertyStore.enableProperty(this.property, interfaceValues);
   }
 
   mounted() {
     this.updateInterface();
   }
 
-  @Watch("tool")
+  @Watch("image")
   updateInterface() {
     if (Object.keys(this.workerInterface).length === 0) {
       this.propertyStore.fetchWorkerInterface(this.image);
