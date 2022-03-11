@@ -1,42 +1,42 @@
 <template>
-  <v-container>
-    <v-col>
-      <v-row v-for="item in entries" :key="item.id">
-        <v-subheader>
-          {{ item.id }}
-        </v-subheader>
-        <v-slider
-          v-if="item.type === 'number'"
-          :max="item.max"
-          :min="item.min"
-          v-model="item.value"
-          :step="(item.max - item.min) / 100.0"
-          dense
-          thumb-label="always"
-        ></v-slider>
-
-        <v-text-field
-          v-if="item.type === 'text'"
-          v-model="item.value"
-          dense
-        ></v-text-field>
-        <tag-picker
-          v-if="item.type === 'tags'"
-          v-model="item.value"
-        ></tag-picker>
-        <layer-select
-          v-if="item.type === 'layer'"
-          v-model="item.value"
-        ></layer-select>
+  <v-container class="pa-0 ma-0">
+    <v-col class="pa-0 ma-0">
+      <v-row v-for="item in entries" :key="item.id" class="pa-0 ma-0">
+        <v-col class="pa-0 ma-0">
+          <v-subheader>
+            {{ item.id }}
+          </v-subheader>
+        </v-col>
+        <v-col class="pa-0 ma-0">
+          <v-slider
+            v-if="item.type === 'number'"
+            :max="item.max"
+            :min="item.min"
+            v-model="item.value"
+            :step="(item.max - item.min) / 100.0"
+            dense
+            thumb-label="always"
+          ></v-slider>
+          <v-text-field
+            v-if="item.type === 'text'"
+            v-model="item.value"
+            dense
+          ></v-text-field>
+          <tag-picker
+            v-if="item.type === 'tags'"
+            v-model="item.value"
+          ></tag-picker>
+          <layer-select
+            v-if="item.type === 'layer'"
+            v-model="item.value"
+          ></layer-select>
+        </v-col>
       </v-row>
       <v-row>
         <v-btn @click="preview">preview</v-btn>
         <v-spacer></v-spacer>
         <v-btn @click="compute">compute</v-btn>
       </v-row>
-    </v-col>
-    <v-col cols="8">
-      <div style="display: block;"></div>
     </v-col>
   </v-container>
 </template>

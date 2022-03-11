@@ -1,19 +1,18 @@
 <template>
-  <v-dialog v-model="show" v-if="tool">
-    <v-card v-if="tool">
-      <v-card-title> Annotation Worker Menu </v-card-title>
-      <v-card-text>
-        <v-container>
-          <v-row>
-            <v-col>
-              <v-subheader>Tool: {{ tool.name }}</v-subheader>
-            </v-col>
-            <v-col>
+  <v-expansion-panels>
+    <v-expansion-panel v-model="show" v-if="tool">
+      <v-expansion-panel-header>
+        {{ tool.name }} worker menu
+      </v-expansion-panel-header>
+      <v-expansion-panel-content class="pa-0 ma-0">
+        <v-container class="pa-0 ma-0">
+          <v-row class="pa-0 ma-0">
+            <v-col class="pa-0 ma-0">
               <v-subheader>Image: {{ tool.values.image.image }}</v-subheader>
             </v-col>
           </v-row>
-          <v-row>
-            <v-col cols="6">
+          <v-row class="pa-0 ma-0">
+            <v-col cols="12">
               <worker-interface
                 :workerInterface="workerInterface"
                 @preview="preview"
@@ -21,20 +20,17 @@
               >
               </worker-interface>
             </v-col>
-            <v-col cols="6">
-              <worker-preview
-                v-if="workerPreview"
-                :workerPreview="workerPreview"
-              ></worker-preview>
-            </v-col>
+            <!-- <v-col cols="6">
+                <worker-preview
+                  v-if="workerPreview"
+                  :workerPreview="workerPreview"
+                ></worker-preview>
+              </v-col> -->
           </v-row>
         </v-container>
-      </v-card-text>
-      <v-card-actions>
-        <v-btn @click="show = false">CANCEL</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+      </v-expansion-panel-content>
+    </v-expansion-panel>
+  </v-expansion-panels>
 </template>
 
 <script lang="ts">
@@ -63,8 +59,7 @@ export default class annotationWorkerMenu extends Vue {
   readonly annotationsStore = annotationsStore;
   readonly propertyStore = propertiesStore;
 
-  @VModel()
-  show!: boolean;
+  show: boolean = true;
 
   @Prop()
   readonly tool!: IToolConfiguration;
@@ -102,7 +97,11 @@ export default class annotationWorkerMenu extends Vue {
     });
   }
 
-  @Watch("show")
+  mounted() {
+    this.updateInterface();
+  }
+
+  @Watch("tool")
   updateInterface() {
     if (Object.keys(this.workerInterface).length === 0) {
       this.propertyStore.fetchWorkerInterface(this.image);
