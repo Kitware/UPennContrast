@@ -274,9 +274,9 @@ export default class AnnotationViewer extends Vue {
       }
 
       if (girderId === this.hoveredAnnotationId && !isHovered) {
-        this.annotationLayer.removeAnnotation(annotation);
+        this.annotationLayer.removeAnnotation(annotation, false);
       } else if (girderId !== this.hoveredAnnotationId && isHovered) {
-        this.annotationLayer.removeAnnotation(annotation);
+        this.annotationLayer.removeAnnotation(annotation, false);
       }
 
       // Check for connections
@@ -296,7 +296,7 @@ export default class AnnotationViewer extends Vue {
           !this.shouldDisplayAnnotation(parent) ||
           !this.shouldDisplayAnnotation(child)
         ) {
-          this.annotationLayer.removeAnnotation(annotation);
+          this.annotationLayer.removeAnnotation(annotation, false);
         }
         return;
       }
@@ -307,8 +307,10 @@ export default class AnnotationViewer extends Vue {
       if (this.shouldDisplayAnnotationWithLocation(location)) {
         return;
       }
-      this.annotationLayer.removeAnnotation(annotation);
+      this.annotationLayer.removeAnnotation(annotation, false);
     });
+    this.annotationLayer.modified();
+    this.annotationLayer.draw();
   }
 
   // Add to the layer annotations that should be rendered and have not already been added.
