@@ -1,9 +1,7 @@
 <template>
   <v-card>
     <v-app-bar dense>
-      <v-toolbar-title>
-        Annotation Tools
-      </v-toolbar-title>
+      <v-toolbar-title> Annotation Tools </v-toolbar-title>
       <v-spacer></v-spacer>
       <!-- Tool creation -->
       <v-dialog v-model="toolCreationDialogOpen" width="unset">
@@ -37,9 +35,7 @@
           </v-tooltip>
         </template>
         <v-card>
-          <v-card-title>
-            Choose a tool to add to this toolset
-          </v-card-title>
+          <v-card-title> Choose a tool to add to this toolset </v-card-title>
           <v-card-text>
             <toolset-picker @done="toolPickerDialogOpen = false" />
           </v-card-text>
@@ -68,11 +64,15 @@
           </v-list-item>
         </template>
       </v-list-item-group>
+      <annotation-worker-menu
+        :tool="selectedTool"
+        v-if="selectedTool && selectedTool.type === 'segmentation'"
+      ></annotation-worker-menu>
     </v-list>
-    <v-card-subtitle v-else>
-      <v-subheader>
-        No tools in the current toolset.
-      </v-subheader>
+    <v-card-subtitle
+      v-if="!toolset || !toolset.toolIds || !toolsetTools.length"
+    >
+      <v-subheader> No tools in the current toolset. </v-subheader>
     </v-card-subtitle>
   </v-card>
 </template>
@@ -85,10 +85,11 @@ import { IToolConfiguration } from "@/store/model";
 import ToolIcon from "@/tools/ToolIcon.vue";
 import ToolsetPicker from "@/tools/toolsets/ToolsetPicker.vue";
 import ToolCreation from "@/tools/creation/ToolCreation.vue";
+import AnnotationWorkerMenu from "@/components/AnnotationWorkerMenu.vue";
 
 // Lists tools from a toolset, allows selecting a tool from the list, and adding new tools
 @Component({
-  components: { ToolCreation, ToolIcon, ToolsetPicker }
+  components: { ToolCreation, ToolIcon, ToolsetPicker, AnnotationWorkerMenu }
 })
 export default class Toolset extends Vue {
   readonly store = store;
@@ -118,6 +119,16 @@ export default class Toolset extends Vue {
 
   get configuration() {
     return this.store.configuration;
+  }
+
+  get selectedTool(): IToolConfiguration | null {
+    if (!this.selectedToolId) {
+      return null;
+    }
+    const tool = this.toolsStore.tools.find(
+      (tool: IToolConfiguration) => tool.id === this.selectedToolId
+    );
+    return tool || null;
   }
 
   toolCreationDialogOpen: boolean = false;
@@ -150,7 +161,7 @@ export default class Toolset extends Vue {
 <style scoped>
 .v-list {
   width: 100%;
-  height: 30vh;
+  height: 40vh;
   overflow-y: auto;
 }
 </style>
