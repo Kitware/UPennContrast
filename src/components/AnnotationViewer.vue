@@ -1,6 +1,5 @@
 <template>
-  <div>
-  </div>
+  <div></div>
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
@@ -34,7 +33,7 @@ import {
 } from "@/utils/annotation";
 
 // Draws annotations on the given layer, and provides functionnality for the user selected tool.
-@Component({ components: { } })
+@Component({ components: {} })
 export default class AnnotationViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;

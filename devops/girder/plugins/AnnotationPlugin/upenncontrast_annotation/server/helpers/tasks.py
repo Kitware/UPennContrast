@@ -35,7 +35,7 @@ def runComputeJob(image, datasetId, params):
         kwargs={
             'pull_image': False,
             'container_args': containerArgs,
-            'remove_container': False,
+            'remove_container': True,
             'name': "{}_{}_{}".format(name, datasetId, datetime.datetime.now().timestamp()),
             # TODO: figure out network configuration and api url discovery
             'network_mode': 'host',

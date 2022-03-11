@@ -133,12 +133,16 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  enableProperty(property: IAnnotationProperty) {
+  enableProperty(property: IAnnotationProperty, workerInterface: any) {
     this.replaceProperty({ ...property, enabled: true, computed: false });
 
     const newProp = this.getPropertyById(property.id);
     if (newProp) {
-      this.computeProperty({ property: newProp, annotationIds: [] });
+      this.computeProperty({
+        property: newProp,
+        annotationIds: [],
+        workerInterface
+      });
     }
   }
 
@@ -180,10 +184,12 @@ export class Properties extends VuexModule {
   @Action
   async computeProperty({
     property,
-    annotationIds = []
+    annotationIds = [],
+    workerInterface = {}
   }: {
     property: IAnnotationProperty;
     annotationIds: string[];
+    workerInterface: any;
   }) {
     if (!this.isSubscribedToNotifications) {
       this.initializeNotificationSubscription();
@@ -210,7 +216,8 @@ export class Properties extends VuexModule {
       .computeProperty(property.name, main.dataset.id, {
         ...property,
         annotationIds: annotationIds.length ? annotationIds : undefined,
-        channel
+        channel,
+        workerInterface: workerInterface
       })
       .then((response: any) => {
         // Keep track of running jobs
@@ -329,34 +336,33 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  async handleNewAnnotation({
-    newAnnotation,
-    newConnections
-  }: {
+  async handleNewAnnotation({}: // newAnnotation,
+  // newConnections
+  {
     newAnnotation: IAnnotation;
     newConnections: IAnnotationConnection[];
   }) {
+    // TODO: can't be done without the interface values
     // We also want to recompute properties for connected annotations
-    const relatedIds: string[] = [newAnnotation.id];
-    newConnections.forEach((connection: IAnnotationConnection) => {
-      if (!relatedIds.includes(connection.childId)) {
-        relatedIds.push(connection.childId);
-      }
-      if (!relatedIds.includes(connection.parentId)) {
-        relatedIds.push(connection.parentId);
-      }
-    });
-
-    // For all enabled and valid properties, send a compute request with these annotations
-    this.properties
-      .filter((property: IAnnotationProperty) => property.enabled)
-      .filter(
-        (property: IAnnotationProperty) =>
-          !property.shape || property.shape === newAnnotation.shape
-      )
-      .forEach((property: IAnnotationProperty) =>
-        this.computeProperty({ property, annotationIds: relatedIds })
-      );
+    // const relatedIds: string[] = [newAnnotation.id];
+    // newConnections.forEach((connection: IAnnotationConnection) => {
+    //   if (!relatedIds.includes(connection.childId)) {
+    //     relatedIds.push(connection.childId);
+    //   }
+    //   if (!relatedIds.includes(connection.parentId)) {
+    //     relatedIds.push(connection.parentId);
+    //   }
+    // });
+    // // For all enabled and valid properties, send a compute request with these annotations
+    // this.properties
+    //   .filter((property: IAnnotationProperty) => property.enabled)
+    //   .filter(
+    //     (property: IAnnotationProperty) =>
+    //       !property.shape || property.shape === newAnnotation.shape
+    //   )
+    //   .forEach((property: IAnnotationProperty) =>
+    //     this.computeProperty({ property, annotationIds: relatedIds })
+    //   );
   }
 
   @Action
