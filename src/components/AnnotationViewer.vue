@@ -120,6 +120,16 @@ export default class AnnotationViewer extends Vue {
     return this.toolsStore.selectedToolId;
   }
 
+  get workerImage() {
+    return this.selectedTool?.values?.image?.image;
+  }
+
+  get workerPreview() {
+    return this.workerImage
+      ? this.propertiesStore.getWorkerPreview(this.workerImage)
+      : { text: null, image: "" };
+  }
+
   get selectedTool(): IToolConfiguration | null {
     if (!this.selectedToolId) {
       return null;
