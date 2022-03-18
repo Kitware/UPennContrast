@@ -474,6 +474,37 @@ export default class GirderAPI {
     this.histogramCache.clear();
     this.resolvedHistogramCache.clear();
   }
+
+  scheduleTileFramesComputation(datasetId: string) {
+    return this.getImages(datasetId).then((items: IGirderItem[]) => {
+      return items.map((item: IGirderItem) => {
+        return this.client.get(
+          `/item/${item._id}/tiles/tile_frames/quad_info`,
+          {
+            params: {
+              query:
+                "style" +
+                encodeURIComponent(
+                  JSON.stringify({
+                    min: "min",
+                    max: "max",
+                    palette: ["#000000", "#ffffff"]
+                  })
+                ) +
+                "&cache=true",
+              maxTextureSize: 4096,
+              maxTextures: 32,
+              frameBase: "c",
+              frameStride: "c",
+              frameGroup: "z",
+              frameGroupStride: "auto",
+              cache: "schedule"
+            }
+          }
+        );
+      });
+    });
+  }
 }
 
 function asDataset(folder: IGirderFolder): IDataset {

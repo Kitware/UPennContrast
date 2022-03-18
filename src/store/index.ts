@@ -957,6 +957,11 @@ export class Main extends VuexModule {
     // map rotation, or screenshot parameters
     return snapshot;
   }
+
+  @Action
+  async scheduleTileFramesComputation(datasetId: string) {
+    return this.api.scheduleTileFramesComputation(datasetId);
+  }
 }
 
 const main = getModule(Main);
