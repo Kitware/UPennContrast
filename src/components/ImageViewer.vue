@@ -3,8 +3,11 @@
     <annotation-viewer
       v-if="annotationLayer"
       :annotationLayer="annotationLayer"
+      :workerPreviewFeature="workerPreviewFeature"
       :unrollH="unrollH"
       :unrollW="unrollW"
+      :tileWidth="tileWidth"
+      :tileHeight="tileHeight"
     ></annotation-viewer>
     <div id="map" ref="geojsmap" :data-update="reactiveDraw" />
     <div class="loading" v-if="!fullyReady">
@@ -131,6 +134,11 @@ export default class ImageViewer extends Vue {
   private layerParams: any;
   private map: any;
   private annotationLayer: any = null;
+  private workerPreviewLayer: any = null;
+  private workerPreviewFeature: any = null;
+  tileWidth: number = 0;
+  tileHeight: number = 0;
+
   private uiLayer: any;
   private scaleWidget: any;
   private unrollW: number = 1;
@@ -200,6 +208,9 @@ export default class ImageViewer extends Vue {
     let adjustLayers = true;
     let tileWidth = someImage.tileWidth;
     let tileHeight = someImage.tileHeight;
+    this.tileWidth = tileWidth;
+    this.tileHeight = tileHeight;
+
     let params = geojs.util.pixelCoordinateParams(
       mapElement,
       someImage.sizeX,
@@ -229,7 +240,13 @@ export default class ImageViewer extends Vue {
         autoshareRenderer: false,
         continuousCloseProximity: true
       });
+      this.workerPreviewLayer = this.map.createLayer("feature", {
+        features: ["quad", "quad.image"]
+      });
+      this.workerPreviewFeature = this.workerPreviewLayer.createFeature("quad");
+
       this.annotationLayer.node().css({ "mix-blend-mode": "unset" });
+      this.workerPreviewLayer.node().css({ "mix-blend-mode": "unset" });
       this.uiLayer = this.map.createLayer("ui");
       this.uiLayer.node().css({ "mix-blend-mode": "unset" });
     } else {
@@ -377,9 +394,11 @@ export default class ImageViewer extends Vue {
     }
     this.ready.layers.splice(this.layerStackImages.length);
     if (
-      this.annotationLayer.zIndex() !== this.layerStackImages.length * 2 ||
-      this.uiLayer.zIndex() !== this.layerStackImages.length * 2 + 1
+      this.workerPreviewLayer.zIndex() !== this.layerStackImages.length * 2 ||
+      this.annotationLayer.zIndex() !== this.layerStackImages.length * 2 + 1 ||
+      this.uiLayer.zIndex() !== this.layerStackImages.length * 2 + 2
     ) {
+      this.workerPreviewLayer.moveToTop();
       this.annotationLayer.moveToTop();
       this.uiLayer.moveToTop();
     }

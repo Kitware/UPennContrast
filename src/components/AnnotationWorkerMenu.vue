@@ -21,12 +21,6 @@
               >
               </worker-interface>
             </v-col>
-            <!-- <v-col cols="6">
-                <worker-preview
-                  v-if="workerPreview"
-                  :workerPreview="workerPreview"
-                ></worker-preview>
-              </v-col> -->
           </v-row>
         </v-container>
       </v-expansion-panel-content>
@@ -44,7 +38,6 @@ import LayerSelect from "@/components/LayerSelect.vue";
 import DockerImageSelect from "@/components/DockerImageSelect.vue";
 import propertiesStore from "@/store/properties";
 import WorkerInterface from "@/components/WorkerInterface.vue";
-import WorkerPreview from "@/components/WorkerPreview.vue";
 // Popup for new tool configuration
 @Component({
   components: {
@@ -52,7 +45,6 @@ import WorkerPreview from "@/components/WorkerPreview.vue";
     TagFilterEditor,
     DockerImageSelect,
     WorkerInterface,
-    WorkerPreview
   }
 })
 export default class annotationWorkerMenu extends Vue {
