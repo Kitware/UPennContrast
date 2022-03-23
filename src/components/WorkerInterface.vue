@@ -37,6 +37,12 @@
         <v-spacer></v-spacer>
         <v-btn @click="compute">compute</v-btn>
       </v-row>
+      <v-row>
+        <v-checkbox
+          v-model="displayWorkerPreview"
+          label="Display Previews"
+        ></v-checkbox>
+      </v-row>
     </v-col>
   </v-container>
 </template>
@@ -91,6 +97,14 @@ export default class WorkerInterface extends Vue {
         this.workerInterface[key].default
       )
     }));
+  }
+
+  get displayWorkerPreview() {
+    return this.propertyStore.displayWorkerPreview;
+  }
+
+  set displayWorkerPreview(value: boolean) {
+    this.propertyStore.setDisplayWorkerPreview(value);
   }
 
   getEntryResult() {

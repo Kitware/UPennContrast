@@ -55,10 +55,23 @@ export default class AnnotationViewer extends Vue {
   readonly annotationLayer: any;
 
   @Prop()
+  readonly workerPreviewFeature: any;
+
+  @Prop()
   readonly unrollH: any;
 
   @Prop()
   readonly unrollW: any;
+
+  @Prop()
+  readonly tileWidth: any;
+
+  @Prop()
+  readonly tileHeight: any;
+
+  get displayWorkerPreview() {
+    return this.propertiesStore.displayWorkerPreview;
+  }
 
   get configuration() {
     return this.store.configuration;
@@ -128,6 +141,23 @@ export default class AnnotationViewer extends Vue {
     return this.workerImage
       ? this.propertiesStore.getWorkerPreview(this.workerImage)
       : { text: null, image: "" };
+  }
+
+  @Watch("displayWorkerPreview")
+  @Watch("workerPreview")
+  renderWorkerPreview() {
+    if (this.workerPreview?.image && this.displayWorkerPreview) {
+      this.workerPreviewFeature.data([
+        {
+          ul: { x: 0, y: 0 },
+          lr: { x: this.tileWidth, y: this.tileHeight },
+          image: this.workerPreview.image,
+        }
+      ]);
+    } else {
+      this.workerPreviewFeature.data([]);
+    }
+    this.workerPreviewFeature.draw();
   }
 
   get selectedTool(): IToolConfiguration | null {

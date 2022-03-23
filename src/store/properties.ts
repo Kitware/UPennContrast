@@ -54,6 +54,7 @@ export class Properties extends VuexModule {
   workerImageList: string[] = [];
   workerInterfaces: { [image: string]: IWorkerInterface } = {};
   workerPreviews: { [image: string]: { text: string; image: string } } = {};
+  displayWorkerPreview = true;
   previewJobIds: { [image: string]: string | null } = {};
 
   get getWorkerInterface() {
@@ -94,6 +95,11 @@ export class Properties extends VuexModule {
       ...this.workerInterfaces,
       [image]: workerInterface
     };
+  }
+
+  @Mutation
+  setDisplayWorkerPreview(value: boolean) {
+    this.displayWorkerPreview = value;
   }
 
   @Action
