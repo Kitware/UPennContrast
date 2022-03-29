@@ -151,7 +151,7 @@ export default class AnnotationViewer extends Vue {
         {
           ul: { x: 0, y: 0 },
           lr: { x: this.tileWidth, y: this.tileHeight },
-          image: this.workerPreview.image,
+          image: this.workerPreview.image
         }
       ]);
     } else {
@@ -475,7 +475,9 @@ export default class AnnotationViewer extends Vue {
       return null;
     }
 
-    const { location, channel } = this.getAnnotationLocationFromTool(tool);
+    const { location, channel } = await this.getAnnotationLocationFromTool(
+      tool
+    );
 
     // Create the new annotation
     const toolAnnotation = tool.values.annotation;
