@@ -79,17 +79,24 @@ export function getNumericMetadata(filename: string): NumericMetadata {
 }
 
 export function collectFilenameMetadata(
-  filenames: string[]
+  filenames: string[], sort: boolean = true
 ): { xy: string[]; t: string[]; z: string[]; chan: string[] } {
   const times = filenames.map(parseTime);
   const xys = filenames.map(parseXY);
   const zs = filenames.map(parseZ);
   const channels = filenames.map(parseChannel);
-
+  if (sort) {
+    return {
+      t: times.filter(d => d !== null).sort() as string[],
+      xy: xys.filter(d => d !== null).sort() as string[],
+      z: zs.filter(d => d !== null).sort() as string[],
+      chan: channels.filter(d => d !== null).sort() as string[]
+    };
+  }
   return {
-    t: times.filter(d => d !== null).sort() as string[],
-    xy: xys.filter(d => d !== null).sort() as string[],
-    z: zs.filter(d => d !== null).sort() as string[],
-    chan: channels.filter(d => d !== null).sort() as string[]
+    t: times.filter(d => d !== null) as string[],
+    xy: xys.filter(d => d !== null) as string[],
+    z: zs.filter(d => d !== null) as string[],
+    chan: channels.filter(d => d !== null) as string[]
   };
 }

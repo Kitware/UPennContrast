@@ -43,6 +43,7 @@ export default class AnnotationsAPI {
   }
 
   async computeProperty(propertyId: string, datasetId: string, params: any) {
+    console.log(params);
     return this.client.post(
       `annotation_property/${propertyId}/compute?datasetId=${datasetId}`,
       params
