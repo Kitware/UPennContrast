@@ -175,6 +175,27 @@ export default class GirderAPI {
     return result.data.length > 0 ? result.data[0] : null;
   }
 
+  async generateTiles(itemId: string) {
+    return this.client.post(`item/${itemId}/tiles`);
+  }
+
+  async removeLargeImageForItem(item: IGirderItem) {
+    return this.client.delete(`item/${item._id}/tiles`);
+  }
+
+  async uploadJSONFile(name: string, parentId: string, content: string) {
+    const blob = new Blob([content], { type: "application/json" });
+    return this.client.post(
+      `file?parentId=${parentId}&parentType=folder&name=${name}&size=${blob.size}`,
+      blob,
+      {
+        headers: {
+          "Content-Type": "text/plain"
+        }
+      }
+    );
+  }
+
   getFiles(item: string | IGirderItem): Promise<IGirderFile[]> {
     return this.client.get(`item/${toId(item)}/files`).then(r => r.data);
   }
@@ -238,7 +259,7 @@ export default class GirderAPI {
       .then(r => r.data[0]); // TODO deal with multiple channel data
   }
 
-  private getItems(folderId: string): Promise<IGirderItem[]> {
+  getItems(folderId: string): Promise<IGirderItem[]> {
     return this.client
       .get(`item`, {
         params: {
@@ -546,6 +567,8 @@ export interface IHistogramOptions {
 }
 
 export interface ITileMeta {
+  [x: string]: any;
+  IndexRange: any;
   levels: number;
   magnification: number;
   mm_x: number;

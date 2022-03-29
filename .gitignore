@@ -1,9 +1,12 @@
 .DS_Store
 node_modules
 /dist
-
+multi_data
 # local env files
 *.local
+
+#
+/itk/web-build
 
 # Log files
 npm-debug.log*
@@ -26,3 +29,6 @@ src/**/*.js
 *__pycache__*
 *.egg-info
 *.tox
+
+/assetstore
+/db

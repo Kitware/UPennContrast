@@ -1,4 +1,9 @@
-import { RestClient, RestClientInstance } from "@/girder";
+import {
+  RestClient,
+  RestClientInstance,
+  IGirderFolder,
+  IGirderItem
+} from "@/girder";
 import { IGirderSelectAble, IGirderUser } from "@/girder";
 import {
   Action,
@@ -457,6 +462,26 @@ export class Main extends VuexModule {
       this.recentConfigurations.splice(index, 1);
       persister.set("recentConfigurations", this.recentConfigurations);
     }
+  }
+
+  @Action
+  async addMultiSourceMetadata({
+    parentId,
+    metadata
+  }: {
+    parentId: string;
+    metadata: string;
+  }) {
+    const newFile = (
+      await this.api.uploadJSONFile("multi-source2.json", parentId, metadata)
+    ).data;
+
+    const items = await this.api.getItems(parentId);
+    const promises = items
+      .filter((item: any) => !!item.largeImage && item._id !== newFile.itemId)
+      .map((item: IGirderItem) => this.api.removeLargeImageForItem(item));
+    await Promise.all(promises);
+    return newFile.itemId;
   }
 
   @Action

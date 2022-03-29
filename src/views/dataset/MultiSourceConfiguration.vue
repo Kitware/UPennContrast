@@ -1,0 +1,301 @@
+<template>
+  <v-container>
+    <v-subheader>Variables</v-subheader>
+    <v-data-table :headers="headers" :items="items" item-key="key">
+    </v-data-table>
+    <v-subheader>Assignments</v-subheader>
+    <v-container>
+      <v-row v-for="assignment in assignmentNames" :key="assignment">
+        <v-col>
+          {{ assignment }}
+        </v-col>
+        <v-col>
+          <v-combobox
+            v-model="assignments[assignment]"
+            :items="assignmentItems"
+            :search-input.sync="searchInput"
+            item-text="text"
+            item-value="value"
+            hide-selected
+            hide-details
+            dense
+            @change="print"
+            :disabled="
+              assignments[assignment] &&
+                assignments[assignment].value.source === 'file'
+            "
+          >
+            <template v-slot:selection="{ item }">
+              {{ item.text }}
+            </template>
+          </v-combobox>
+        </v-col>
+        <v-col ncols="2">
+          <v-btn
+            :disabled="
+              !assignments[assignment] ||
+                assignments[assignment].value.source === 'file'
+            "
+            @click="assignments[assignment] = null"
+            >Clear</v-btn
+          >
+        </v-col>
+      </v-row>
+    </v-container>
+    <v-btn @click="generateJson">SUBMIT</v-btn>
+  </v-container>
+</template>
+
+<script lang="ts">
+import { Vue, Component, Watch } from "vue-property-decorator";
+import store from "@/store";
+
+import {
+  collectFilenameMetadata,
+  triggers,
+  makeAlternation,
+  getFilenameMetadata
+} from "@/utils/parsing";
+import { IGirderItem } from "@/girder";
+
+const Sources = {
+  File: "file",
+  Filename: "filename"
+};
+
+interface IDimension {
+  id: string;
+  size: number;
+  name: string | null;
+  source: string;
+}
+
+interface IAssignment {
+  text: string;
+  value: IDimension;
+}
+
+@Component({
+  components: {}
+})
+export default class NewDataset extends Vue {
+  readonly store = store;
+
+  get datasetId() {
+    return this.$route.params.id;
+  }
+
+  get items() {
+    return this.dimensions
+      .filter(dim => dim.size > 0)
+      .map((dim: any) => ({ ...dim, key: `${dim.id}_${dim.source}` }));
+  }
+
+  dimensions: IDimension[] = [];
+
+  print() {
+    console.log(this.assignments);
+  }
+
+  headers = [
+    {
+      text: "Name",
+      value: "name"
+    },
+    {
+      text: "Source",
+      value: "source"
+    },
+    {
+      text: "Size",
+      value: "size"
+    }
+  ];
+
+  assignmentNames = ["XY", "Z", "T", "C"];
+
+  dimensionToAssignmentItem(dimension: IDimension | null): IAssignment | null {
+    if (!dimension) {
+      return null;
+    }
+    return {
+      text: `${dimension.source} ${dimension.name || dimension.id}`,
+      value: dimension
+    };
+  }
+
+  get assignmentItems() {
+    const assignedDimensions = Object.entries(this.assignments)
+      .map(([_, assignment]: [any, any]) => assignment?.value || null)
+      .filter(assignment => !!assignment);
+
+    const isNotAssigned = (dimension: IDimension) => {
+      return !assignedDimensions.find(
+        assignedDimension =>
+          assignedDimension.id === dimension.id &&
+          assignedDimension.source === dimension.source
+      );
+    };
+    return this.items.filter(isNotAssigned).map(this.dimensionToAssignmentItem);
+  }
+
+  assignments: { [dimension: string]: IAssignment | null } = {
+    XY: null,
+    Z: null,
+    T: null,
+    C: null
+  };
+
+  strides: {
+    [id: string]: number | null;
+  } | null = null;
+
+  searchInput: string = "";
+
+  addSizeToDimension(
+    id: string,
+    size: number,
+    source: string,
+    name: string | null = null
+  ) {
+    const dim = this.dimensions.find(
+      dimension => dimension.id === id && dimension.source === source
+    );
+    if (dim) {
+      dim.size = dim.size + size;
+    } else {
+      this.dimensions = [
+        ...this.dimensions,
+        { id, size, name: name ? name : id, source }
+      ];
+    }
+  }
+
+  setDimensionName(id: string, source: string, name: string) {
+    const dim = this.dimensions.find(
+      dimension => dimension.id === id && dimension.source === source
+    );
+    if (dim) {
+      dim.name = name;
+      this.dimensions = [...this.dimensions];
+    }
+  }
+
+  numberOfFrames = 0; // TODO: assume constant
+
+  girderItems: IGirderItem[] = [];
+
+  getDefaultAssignmentItem(assignment: string) {
+    return this.dimensionToAssignmentItem(
+      this.dimensions.find(
+        ({ id, source }) => source === Sources.File && id === assignment
+      ) || null
+    );
+  }
+
+  channels: string[] = [];
+
+  @Watch("datasetId")
+  async mounted() {
+    // Get tile information
+    const items = await this.store.api.getItems(this.datasetId);
+    this.girderItems = items;
+
+    const names = items.map(item => item.name);
+
+    const meta = collectFilenameMetadata(names, false);
+    this.addSizeToDimension("Z", meta.z.length, Sources.Filename);
+    this.addSizeToDimension("C", meta.chan.length, Sources.Filename);
+    this.addSizeToDimension("T", meta.t.length, Sources.Filename);
+    this.addSizeToDimension("XY", meta.xy.length, Sources.Filename);
+
+    const tiles = await Promise.all(
+      items.map(item => this.store.api.getTiles(item))
+    );
+    this.numberOfFrames = tiles[0]?.frames?.length || tiles.length;
+
+    const channels: string[] = [];
+
+    tiles.forEach((tile: any) => {
+      if (!this.strides && tile.IndexStride) {
+        this.strides = {
+          C: tile.IndexStride?.IndexC || null,
+          T: tile.IndexStride?.IndexT || null,
+          XY: tile.IndexStride?.IndexZ || null,
+          Z: tile.IndexStride?.IndexZ || null
+        };
+      }
+      if (tile.IndexRange) {
+        this.addSizeToDimension("Z", tile.IndexRange.IndexZ, Sources.File);
+        this.addSizeToDimension("T", tile.IndexRange.IndexT, Sources.File);
+        this.addSizeToDimension("XY", tile.IndexRange.IndexXY, Sources.File);
+      } else if (!this.dimensions.some(dimension => dimension.size > 0)) {
+        this.addSizeToDimension("Single Image", 1, Sources.Filename);
+      }
+      if (tile.channels) {
+        tile.channels
+          .filter((channel: string) => !channels.includes(channel))
+          .forEach((channel: string) => channels.push(channel));
+      }
+    });
+    this.addSizeToDimension("C", channels.length, Sources.File);
+    const channelName = `{ ${channels.join()} }`;
+    this.setDimensionName("C", Sources.File, channelName);
+    this.channels = channels;
+    if (!this.channels.length) {
+      this.channels = ["Default"];
+    }
+
+    this.assignments.Z = this.getDefaultAssignmentItem("Z");
+    this.assignments.XY = this.getDefaultAssignmentItem("XY");
+    this.assignments.T = this.getDefaultAssignmentItem("T");
+    this.assignments.C = this.getDefaultAssignmentItem("C");
+  }
+
+  async generateJson() {
+    const dimCount: any = {
+      C: 0,
+      Z: 0,
+      XY: 0,
+      T: 0
+    };
+    // First compute strides within files
+    const meta = collectFilenameMetadata(
+      this.girderItems.map(item => item.name),
+      false
+    );
+
+    const description = {
+      channels: this.channels,
+      sources: this.girderItems.map((item: IGirderItem) => {
+        const source: any = { path: item.name };
+        Object.entries(this.assignments)
+          .filter(([_, assignment]) => !!assignment)
+          .forEach(([assignmentId, assignment]) => {
+            source[`${assignmentId.toLowerCase()}Values`] = [
+              dimCount[assignmentId]
+            ];
+            dimCount[assignmentId] +=
+              assignment?.value.source === Sources.Filename
+                ? assignment.value.size / this.girderItems.length
+                : assignment?.value.size || 0;
+          });
+        return source;
+      })
+    };
+    const newItemId = await this.store.addMultiSourceMetadata({
+      parentId: this.datasetId,
+      metadata: JSON.stringify(description)
+    });
+    console.log(JSON.stringify(description), newItemId);
+    this.$router.push({
+      name: "dataset",
+      params: {
+        id: this.datasetId
+      }
+    });
+  }
+
+  // TODO: composite
+}
+</script>

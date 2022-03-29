@@ -5,6 +5,7 @@ import DatasetInfo from "./DatasetInfo.vue";
 import configurationRoutes from "./configuration";
 import { Main } from "@/store";
 import { RouteConfig } from "vue-router";
+import MultiSourceConfiguration from "./MultiSourceConfiguration.vue";
 
 const routes: RouteConfig[] = [
   {
@@ -14,6 +15,11 @@ const routes: RouteConfig[] = [
     meta: {
       text: "Upload New Data"
     }
+  },
+  {
+    path: "/multi/:id",
+    name: "multi",
+    component: MultiSourceConfiguration
   },
   {
     path: "/import",
