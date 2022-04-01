@@ -1,16 +1,21 @@
+import pickle
+
 import girder_client
 
 PATHS = {
     'image': '/item/{datasetId}/tiles/fzxy/{frameIndex}/0/0/0',
     'item': '/item?folderId={datasetId}',
-    'tiles': '/item/{datasetId}/tiles'
+    'region': '/item/{datasetId}/tiles/region',
+    'tiles': '/item/{datasetId}/tiles',
 }
 
 
 class UPennContrastDataset:
     """
-      Helper class to get tile images from a single dataset in a remote UPennContrast girder instance.
-      Most methods simply send a translated request to the girder API and return the result. No particular checks are done.
+    Helper class to get tile images from a single dataset in a remote
+    UPennContrast girder instance. Most methods simply send a translated
+    request to the girder API and return the result. No particular checks
+    are done.
     """
     def __init__(self, apiUrl, token, datasetId):
         """
@@ -33,10 +38,13 @@ class UPennContrastDataset:
 
     def buildMap(self, frames):
         """
-          Maps Channel, XY, Z and Time locations to frame indexes, for easier lookup further on
-          :param frames: List of frames from the /item/{id}/tiles large_image girder endpoint (see getTilesForDataset)
-          :return: A dict mapping from [channel][T][Z][XY] to a frame index
-          :rtype: dict
+        Maps Channel, XY, Z and Time locations to frame indexes, for easier
+        lookup further on
+
+        :param frames: List of frames from the /item/{id}/tiles large_image
+            girder endpoint (see getTilesForDataset)
+        :return: A dict mapping from [channel][T][Z][XY] to a frame index
+        :rtype: dict
         """
 
         if not frames:
@@ -101,3 +109,32 @@ class UPennContrastDataset:
         response = self.client.get(PATHS['image'].format(
             datasetId=self.datasetId, frameIndex=frameIndex), jsonResp=False)
         return response.content
+
+    def getRegion(self, datasetId, **kwargs):
+        """
+        Get a region of the dataset as a numpy array.
+
+        The kwargs can be any value that the large_image item/{id}/tiles/region
+        endpoint supports:
+          Frame number (this gets a specific c/z/xy/t):
+            frame
+          Area in the image:
+            left top right bottom width height units unitsWH
+          Output array size:
+            regionWidth regionHeight magnification mm_x mm_y exact resample
+          Options that you probably don't want in this context:
+            fill style
+
+        :param str datasetId: The dataset id
+        :return: The tiles metadata
+        :rtype: dict
+        """
+        params = kwargs.copy()
+        params['encoding'] = 'pickle:' + str(pickle.HIGHEST_PROTOCOL)
+        params.pop('format', None)
+        return pickle.loads(
+            self.client.get(
+                PATHS['region'].format(datasetId=datasetId),
+                parameters=params,
+                jsonResp=False,
+            ).content)
