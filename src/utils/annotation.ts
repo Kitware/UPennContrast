@@ -53,7 +53,7 @@ export function unrollIndexFromImages(
 export function geojsAnnotationFactory(
   shape: string,
   coordinates: IGeoJSPoint[],
-  options: any,
+  options: any
 ) {
   let newGeoJSAnnotation = null;
   switch (shape) {

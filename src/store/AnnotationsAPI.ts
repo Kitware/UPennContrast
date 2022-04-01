@@ -128,7 +128,9 @@ export default class AnnotationsAPI {
       });
   }
 
-  async getConnectionsForDatasetId(id: string): Promise<IAnnotationConnection[]> {
+  async getConnectionsForDatasetId(
+    id: string
+  ): Promise<IAnnotationConnection[]> {
     const connections: IAnnotationConnection[] = [];
     const limit = 1;
     let totalCount = -1;

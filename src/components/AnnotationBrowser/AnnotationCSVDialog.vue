@@ -49,7 +49,7 @@ import filterStore from "@/store/filters";
 import { IAnnotation } from "@/store/model";
 
 @Component({
-  components: {},
+  components: {}
 })
 export default class AnnotationCsvDialog extends Vue {
   readonly store = store;
