@@ -21,6 +21,7 @@ services:
       # access.  It should do no harm on other systems.
       - "./assetstore:/assetstore:delegated"
       - "./logs/girder:/root/.girder/logs:delegated"
+      - '/var/run/docker.sock:/var/run/docker.sock'
     env_file:
       - "./docker.env"
     depends_on:

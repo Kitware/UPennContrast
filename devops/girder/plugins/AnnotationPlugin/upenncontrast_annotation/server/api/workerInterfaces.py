@@ -2,12 +2,13 @@ from girder.api import access
 from girder.api.describe import Description, describeRoute
 from girder.api.rest import Resource
 from ..models.workerInterfaces import WorkerInterfaceModel as InterfaceModel
-
+import docker
 
 class WorkerInterfaces(Resource):
 
     def __init__(self):
         super().__init__()
+        self.dockerClient = docker.from_env()
         self.resourceName = 'worker_interface'
         self._interfaceModel = InterfaceModel()
 
@@ -34,7 +35,10 @@ class WorkerInterfaces(Resource):
     @access.user
     @describeRoute(Description("List available images"))
     def getAvailableImages(self, params):
-        return ["boucaud/sample_intensity_worker:latest", "boucaud/spotfinding:latest"]
+        images = self.dockerClient.images.list()
+        labelFilter = lambda image : image.labels.get('isUPennContrastWorker', False) and len(image.tags)
+        mapTag = lambda image: image.tags[0]
+        return list (map(mapTag, filter(labelFilter, images)))
 
     @access.user
     @describeRoute(Description("Ask the worker to update its interface data"))
