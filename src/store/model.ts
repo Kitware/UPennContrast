@@ -201,6 +201,9 @@ export interface IAnnotationFilter {
 
 export interface ITagAnnotationFilter extends IAnnotationFilter {
   tags: string[];
+}
+
+export interface IShapeAnnotationFilter extends IAnnotationFilter {
   shape: string;
 }
 

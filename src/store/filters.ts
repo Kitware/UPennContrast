@@ -19,7 +19,8 @@ import {
   IPropertyAnnotationFilter,
   IROIAnnotationFilter,
   IIdAnnotationFilter,
-  IGeoJSPoint
+  IGeoJSPoint,
+  IShapeAnnotationFilter
 } from "./model";
 
 import geo from "geojs";
@@ -32,7 +33,13 @@ export class Filters extends VuexModule {
     exclusive: false,
     enabled: false,
     tags: [],
-    shape: "polygon"
+  };
+
+  shapeFilter: IShapeAnnotationFilter = {
+    id: "shapeFilter",
+    enabled: false,
+    exclusive: true,
+    shape: "point"
   };
 
   propertyFilters: IPropertyAnnotationFilter[] = [];
@@ -143,8 +150,11 @@ export class Filters extends VuexModule {
 
   get filteredAnnotations() {
     return annotation.annotations.filter((annotation: IAnnotation) => {
-      // tag filter
-      if (this.tagFilter.enabled && annotation.shape !== this.tagFilter.shape) {
+      // shape filter
+      if (
+        this.shapeFilter.enabled &&
+        annotation.shape !== this.shapeFilter.shape
+      ) {
         return false;
       }
 
@@ -230,6 +240,11 @@ export class Filters extends VuexModule {
       ),
       value
     ];
+  }
+
+  @Mutation
+  public setShapeFilter(filter: IShapeAnnotationFilter) {
+    this.shapeFilter = filter;
   }
 
   @Mutation

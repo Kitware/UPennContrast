@@ -6,21 +6,20 @@
           <v-checkbox
             dense
             hide-details
-            label="Enable Tag Filter"
+            label="Enable Shape Filter"
             v-model="enabled"
           ></v-checkbox>
         </v-col>
         <v-divider></v-divider>
-        <v-col class="pa-1">
-          <v-checkbox
+        <v-col v-if="!property" class="py-0">
+          <v-select
             dense
             hide-details
-            label="Exclusive"
-            v-model="exclusive"
-          ></v-checkbox>
-        </v-col>
-        <v-col class="pa-1">
-          <tag-picker v-model="tags"> </tag-picker>
+            v-model="shape"
+            :items="shapeItems"
+            item-text="text"
+            item-value="value"
+          ></v-select>
         </v-col>
       </v-row>
     </v-container>
@@ -28,26 +27,29 @@
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop, VModel } from "vue-property-decorator";
-import { ITagAnnotationFilter } from "@/store/model";
-import TagPicker from "@/components/TagPicker.vue";
+import { IShapeAnnotationFilter } from "@/store/model";
 
 @Component({
-  components: {
-    TagPicker
-  }
+  components: {}
 })
 export default class TagFilterEditor extends Vue {
-  @VModel({ type: Object }) filter!: ITagAnnotationFilter;
+  @VModel({ type: Object }) filter!: IShapeAnnotationFilter;
+
+  shapeItems: { value: string; text: string }[] = [
+    { text: "Point", value: "point" },
+    { text: "Blob", value: "polygon" },
+    { text: "Line", value: "line" }
+  ];
 
   @Prop()
   readonly property!: boolean;
 
-  get tags() {
-    return this.filter.tags;
+  get shape() {
+    return this.filter.shape;
   }
 
-  set tags(tags: string[]) {
-    this.filter = { ...this.filter, tags };
+  set shape(shape: string) {
+    this.filter = { ...this.filter, shape };
   }
 
   get enabled() {
@@ -56,14 +58,6 @@ export default class TagFilterEditor extends Vue {
 
   set enabled(enabled: boolean) {
     this.filter = { ...this.filter, enabled };
-  }
-
-  get exclusive() {
-    return this.filter.exclusive;
-  }
-
-  set exclusive(exclusive: boolean) {
-    this.filter = { ...this.filter, exclusive };
   }
 }
 </script>
