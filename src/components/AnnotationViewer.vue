@@ -102,6 +102,10 @@ export default class AnnotationViewer extends Vue {
       : this.annotationStore.annotations;
   }
 
+  get annotationIds() {
+    return this.annotations.map((annotation: IAnnotation) => annotation.id);
+  }
+
   // All annotations available for the currently enabled layers
   get layerAnnotations() {
     return this.annotations.filter(annotation =>
@@ -344,9 +348,14 @@ export default class AnnotationViewer extends Vue {
       if (girderId === this.hoveredAnnotationId) {
         return;
       }
-      if (this.shouldDisplayAnnotationWithLocation(location)) {
+
+      if (
+        this.shouldDisplayAnnotationWithLocation(location) &&
+        (!this.store.filteredDraw || this.annotationIds.includes(girderId))
+      ) {
         return;
       }
+
       this.annotationLayer.removeAnnotation(annotation, false);
     });
     this.annotationLayer.modified();
@@ -695,6 +704,11 @@ export default class AnnotationViewer extends Vue {
       default:
         break;
     }
+  }
+
+  @Watch("annotations")
+  onAnnotationsChanged() {
+    this.drawAnnotations();
   }
 
   @Watch("unrolling")
