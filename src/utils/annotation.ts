@@ -1,4 +1,10 @@
-import { IAnnotation, IDisplayLayer, IImage, IGeoJSPoint } from "@/store/model";
+import {
+  IAnnotation,
+  IDisplayLayer,
+  IImage,
+  IGeoJSPoint,
+  AnnotationShape
+} from "@/store/model";
 import geojs from "geojs";
 import { logError } from "@/utils/log";
 
@@ -57,15 +63,15 @@ export function geojsAnnotationFactory(
 ) {
   let newGeoJSAnnotation = null;
   switch (shape) {
-    case "point":
+    case AnnotationShape.Point:
       newGeoJSAnnotation = geojs.annotation.pointAnnotation(options);
       newGeoJSAnnotation.options("position", coordinates[0]);
       break;
-    case "polygon":
+    case AnnotationShape.Polygon:
       newGeoJSAnnotation = geojs.annotation.polygonAnnotation(options);
       newGeoJSAnnotation.options("vertices", coordinates);
       break;
-    case "line":
+    case AnnotationShape.Line:
       newGeoJSAnnotation = geojs.annotation.lineAnnotation(options);
       newGeoJSAnnotation.options("vertices", coordinates);
       break;
@@ -97,17 +103,19 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
   // For now, polyLines are treated as polygons for the sake of computing distances
 
   // Point to point
-  if (a.shape === "point" || b.shape === "point") {
+  if (a.shape === AnnotationShape.Point && b.shape === AnnotationShape.Point) {
     return pointDistance(a.coordinates[0], b.coordinates[0]);
   }
 
   // Point to poly
   if (
-    (a.shape === "point" && (b.shape === "polygon" || b.shape === "line")) ||
-    ((a.shape === "polygon" || b.shape === "line") && b.shape === "point")
+    (a.shape === AnnotationShape.Point &&
+      (b.shape === AnnotationShape.Polygon || b.shape === AnnotationShape.Line)) ||
+    ((a.shape === AnnotationShape.Polygon || b.shape === AnnotationShape.Line) &&
+      b.shape === AnnotationShape.Point)
   ) {
-    const point = a.shape === "point" ? a : b;
-    const poly = a.shape === "point" ? b : a;
+    const point = a.shape === AnnotationShape.Point ? a : b;
+    const poly = a.shape === AnnotationShape.Point ? b : a;
 
     // Go through all vertices to find the closest
     const shortestDistance = poly.coordinates
@@ -118,8 +126,8 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
 
   // Poly to poly
   if (
-    (a.shape === "polygon" || b.shape === "line") &&
-    (b.shape === "polygon" || b.shape === "line")
+    (a.shape === AnnotationShape.Polygon || b.shape === AnnotationShape.Line) &&
+    (b.shape === AnnotationShape.Polygon || b.shape === AnnotationShape.Line)
   ) {
     // Use centroids for now
     const centroidA = simpleCentroid(a.coordinates);

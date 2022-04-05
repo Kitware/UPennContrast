@@ -27,7 +27,11 @@
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop, VModel } from "vue-property-decorator";
-import { IShapeAnnotationFilter } from "@/store/model";
+import {
+  IShapeAnnotationFilter,
+  AnnotationNames,
+  AnnotationShape
+} from "@/store/model";
 
 @Component({
   components: {}
@@ -36,9 +40,18 @@ export default class TagFilterEditor extends Vue {
   @VModel({ type: Object }) filter!: IShapeAnnotationFilter;
 
   shapeItems: { value: string; text: string }[] = [
-    { text: "Point", value: "point" },
-    { text: "Blob", value: "polygon" },
-    { text: "Line", value: "line" }
+    {
+      text: AnnotationNames[AnnotationShape.Point],
+      value: AnnotationShape.Point
+    },
+    {
+      text: AnnotationNames[AnnotationShape.Polygon],
+      value: AnnotationShape.Polygon
+    },
+    {
+      text: AnnotationNames[AnnotationShape.Line],
+      value: AnnotationShape.Line
+    }
   ];
 
   @Prop()
@@ -48,7 +61,7 @@ export default class TagFilterEditor extends Vue {
     return this.filter.shape;
   }
 
-  set shape(shape: string) {
+  set shape(shape: AnnotationShape) {
     this.filter = { ...this.filter, shape };
   }
 

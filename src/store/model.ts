@@ -168,6 +168,18 @@ export interface IWorkerInterface {
   };
 }
 
+export enum AnnotationShape {
+  Point = "point",
+  Line = "line",
+  Polygon = "polygon"
+}
+
+export const AnnotationNames = {
+  [AnnotationShape.Point]: "Point",
+  [AnnotationShape.Line]: "Line",
+  [AnnotationShape.Polygon]: "Blob"
+};
+
 export interface IAnnotationLocation {
   XY: number;
   Z: number;
@@ -180,7 +192,7 @@ export interface IAnnotation {
   name: string | null;
   channel: number;
   location: IAnnotationLocation;
-  shape: string;
+  shape: AnnotationShape;
   coordinates: IGeoJSPoint[];
   datasetId: string;
 }
@@ -204,7 +216,7 @@ export interface ITagAnnotationFilter extends IAnnotationFilter {
 }
 
 export interface IShapeAnnotationFilter extends IAnnotationFilter {
-  shape: string;
+  shape: AnnotationShape;
 }
 
 export interface IPropertyAnnotationFilter extends IAnnotationFilter {
@@ -236,7 +248,7 @@ export interface IAnnotationProperty {
     exclusive: boolean;
   };
   independant: boolean;
-  shape: "point" | "line" | "polygon" | null;
+  shape: AnnotationShape | null;
   customName: string | null;
 
   enabled: boolean;

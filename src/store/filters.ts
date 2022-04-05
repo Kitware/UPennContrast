@@ -20,7 +20,8 @@ import {
   IROIAnnotationFilter,
   IIdAnnotationFilter,
   IGeoJSPoint,
-  IShapeAnnotationFilter
+  IShapeAnnotationFilter,
+  AnnotationShape
 } from "./model";
 
 import geo from "geojs";
@@ -39,7 +40,7 @@ export class Filters extends VuexModule {
     id: "shapeFilter",
     enabled: false,
     exclusive: true,
-    shape: "point"
+    shape: AnnotationShape.Point
   };
 
   propertyFilters: IPropertyAnnotationFilter[] = [];

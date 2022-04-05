@@ -2,7 +2,7 @@
   <v-card>
     <v-card-title class="py-1">
       Annotation List
-      <v-divider></v-divider>
+      <v-spacer></v-spacer>
       <v-btn v-if="selectionFilterEnabled" @click="clearSelection">
         Clear selection filter
       </v-btn>
@@ -22,6 +22,7 @@
         item-key="id"
         v-model="selected"
         show-select
+        :options="tableOptions"
       >
         <template v-slot:body="{ items }">
           <tbody>
@@ -32,7 +33,7 @@
               @mouseleave="hover(null)"
               :class="item.id === hoveredId ? 'is-hovered' : ''"
             >
-              <td>
+              <td :class="tableItemClass">
                 <v-checkbox
                   multiple
                   v-model="selected"
@@ -40,39 +41,42 @@
                   hide-details
                 ></v-checkbox>
               </td>
-              <td>
-                <v-checkbox
-                  :value="isAnnotationActive(item)"
-                  @click="toggleActive(item)"
-                ></v-checkbox>
-              </td>
-              <td>
+              <td :class="tableItemClass">
                 <span>{{ getAnnotationIndex(item.id) }}</span>
               </td>
-              <td>
-                {{ item.shape }}
+              <td :class="tableItemClass">
+                <span>
+                  {{ item.shape }}
+                </span>
               </td>
-              <td>
-                <v-chip
-                  v-for="tag in item.tags"
-                  :key="tag"
-                  x-small
-                  @click="clickedTag(tag)"
-                  >{{ tag }}</v-chip
-                >
+              <td :class="tableItemClass">
+                <span>
+                  <v-chip
+                    v-for="tag in item.tags"
+                    :key="tag"
+                    x-small
+                    @click="clickedTag(tag)"
+                    >{{ tag }}</v-chip
+                  >
+                </span>
               </td>
-              <td>
+              <td :class="tableItemClass">
                 <v-text-field
                   hide-details
                   :value="item.name || ''"
                   dense
                   flat
+                  outlined
                   @change="updateAnnotationName($event, item.id)"
                 >
                 </v-text-field>
               </td>
-              <td v-for="propertyId in propertyIds" :key="propertyId">
-                {{ item[propertyId] }}
+              <td
+                v-for="propertyId in propertyIds"
+                :key="propertyId"
+                :class="tableItemClass"
+              >
+                <span>{{ item[propertyId] }}</span>
               </td>
             </tr>
           </tbody>
@@ -89,7 +93,11 @@ import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 
-import { IAnnotation, IAnnotationProperty } from "@/store/model";
+import {
+  AnnotationNames,
+  IAnnotation,
+  IAnnotationProperty
+} from "@/store/model";
 
 import AnnotationCsvDialog from "@/components/AnnotationBrowser/AnnotationCSVDialog.vue";
 
@@ -103,6 +111,12 @@ export default class AnnotationList extends Vue {
   readonly annotationStore = annotationStore;
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
+
+  tableItemClass = "px-1"; // To enable dividers, use v-data-table__divider
+
+  tableOptions = {
+    itemsPerPage: 50
+  };
 
   // TODO: clean up selected after filter changes
   get selected() {
@@ -120,7 +134,10 @@ export default class AnnotationList extends Vue {
   get filtered() {
     return this.filterStore.filteredAnnotations.map(
       (annotation: IAnnotation) => {
-        const item: any = { ...annotation };
+        const item: any = {
+          ...annotation,
+          shape: AnnotationNames[annotation.shape]
+        };
         this.properties.forEach((property: IAnnotationProperty) => {
           item[property.id] = this.getPropertyValueForAnnotation(
             annotation,
@@ -148,14 +165,6 @@ export default class AnnotationList extends Vue {
     this.annotationStore.updateAnnotationName({ name, id });
   }
 
-  isAnnotationActive(annotation: IAnnotation) {
-    return this.annotationStore.activeAnnotationIds.includes(annotation.id);
-  }
-
-  toggleActive(annotation: IAnnotation) {
-    this.annotationStore.toggleActiveAnnotation(annotation.id);
-  }
-
   getPropertyValueForAnnotation(annotation: IAnnotation, propertyId: string) {
     const values = this.propertyStore.propertyValues[annotation.id];
     if (!values) {
@@ -177,11 +186,7 @@ export default class AnnotationList extends Vue {
   get headers() {
     return [
       {
-        text: "Active",
-        value: "active"
-      },
-      {
-        text: "Annotation Index",
+        text: "Index",
         value: "id"
       },
       {
@@ -236,5 +241,26 @@ tbody tr:hover,
 tbody tr.is-hovered,
 tbody tr.is-hovered:hover {
   background-color: #616161;
+}
+
+.v-text-field .v-input__control .v-input__slot {
+  min-height: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.v-input--selection-controls {
+  padding: 0px;
+  margin: 0px;
+}
+
+.v-input__slot {
+  justify-content: center;
+}
+
+td span {
+  display: block;
+  text-align: center;
+  margin: auto;
 }
 </style>
