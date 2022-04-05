@@ -144,7 +144,7 @@ export default class PropertyCreation extends Vue {
       label: "Points",
       value: "point"
     },
-    { label: "Polygons (blobs)", value: "polygon" },
+    { label: "Blobs", value: "polygon" },
     { label: "Lines", value: "line" },
     { label: "No restrictions", value: null }
   ];

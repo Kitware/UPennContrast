@@ -23,7 +23,14 @@
         </v-col>
       </v-row>
       <v-row v-if="!property">
-        <v-select dense hide-details v-model="shape" :items="shapes"></v-select>
+        <v-select
+          dense
+          hide-details
+          v-model="shape"
+          :items="shapeItems"
+          item-text="text"
+          item-value="value"
+        ></v-select>
       </v-row>
     </v-container>
   </div>
@@ -41,7 +48,11 @@ import TagPicker from "@/components/TagPicker.vue";
 export default class TagFilterEditor extends Vue {
   @VModel({ type: Object }) filter!: ITagAnnotationFilter;
 
-  shapes: string[] = ["point", "polygon", "line"];
+  shapeItems: { value: string; text: string }[] = [
+    { text: "Point", value: "point" },
+    { text: "Blob", value: "polygon" },
+    { text: "Line", value: "line" }
+  ];
 
   @Prop()
   readonly property!: boolean;
