@@ -6,8 +6,8 @@
     <v-card-text class="pa-1">
       <v-expansion-panels hover multiple v-model="expanded">
         <annotation-toggles></annotation-toggles>
-        <annotation-filters></annotation-filters>
         <property-list></property-list>
+        <annotation-filters></annotation-filters>
         <annotation-actions></annotation-actions>
         <annotation-list @clickedTag="clickedTag"></annotation-list>
       </v-expansion-panels>
