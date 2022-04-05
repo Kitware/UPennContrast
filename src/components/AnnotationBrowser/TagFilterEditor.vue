@@ -2,7 +2,7 @@
   <div v-if="filter">
     <v-container>
       <v-row>
-        <v-col class="pa-1" cols="3" v-if="!property">
+        <v-col class="pa-1" v-if="!property">
           <v-checkbox
             dense
             hide-details
@@ -13,7 +13,7 @@
         <v-col class="pa-1">
           <tag-picker v-model="tags"> </tag-picker>
         </v-col>
-        <v-col class="pa-1" cols="5">
+        <v-col class="pa-1">
           <v-checkbox
             dense
             hide-details
@@ -21,16 +21,16 @@
             v-model="exclusive"
           ></v-checkbox>
         </v-col>
-      </v-row>
-      <v-row v-if="!property">
-        <v-select
-          dense
-          hide-details
-          v-model="shape"
-          :items="shapeItems"
-          item-text="text"
-          item-value="value"
-        ></v-select>
+        <v-col v-if="!property" class="py-0">
+          <v-select
+            dense
+            hide-details
+            v-model="shape"
+            :items="shapeItems"
+            item-text="text"
+            item-value="value"
+          ></v-select>
+        </v-col>
       </v-row>
     </v-container>
   </div>
