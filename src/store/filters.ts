@@ -93,7 +93,7 @@ export class Filters extends VuexModule {
   @Mutation
   newROIFilter() {
     this.emptyROIFilter = {
-      id: `ROI Filter ${this.roiFilters.length}`,
+      id: `Region Filter ${this.roiFilters.length}`,
       exclusive: true,
       enabled: true,
       roi: []
@@ -107,7 +107,7 @@ export class Filters extends VuexModule {
         .filter((filter: IROIAnnotationFilter) => filter.id !== id)
         .map((filter: IROIAnnotationFilter, index) => ({
           ...filter,
-          id: `ROI Filter ${index}`
+          id: `Region Filter ${index}`
         }));
     }
   }
