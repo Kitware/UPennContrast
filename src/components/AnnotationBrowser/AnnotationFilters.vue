@@ -11,13 +11,6 @@
         <v-divider></v-divider>
         <v-card-text>
           <v-container>
-            <v-row
-              ><v-col
-                ><v-btn @click="filterBySelection"
-                  >Add current selection as filter</v-btn
-                ></v-col
-              >
-            </v-row>
             <v-row>
               <v-col>
                 <roi-filters></roi-filters>
@@ -33,17 +26,9 @@
                 :propertyId="propertyId"
               ></property-filter-histogram>
             </v-row>
-            <v-row v-if="selectionFilterEnabled">
-              <v-col>
-                <v-btn dense @click="clearSelection">
-                  Clear selection filter
-                </v-btn>
-              </v-col>
-            </v-row>
           </v-container>
-        </v-card-text>
-      </div></v-expand-transition
-    >
+        </v-card-text></div
+    ></v-expand-transition>
   </v-card>
 </template>
 
@@ -85,17 +70,6 @@ export default class AnnotationFilter extends Vue {
 
   get propertyFilters() {
     return this.filterStore.propertyFilters;
-  }
-
-  get selectionFilterEnabled() {
-    return this.filterStore.selectionFilter.enabled;
-  }
-
-  clearSelection() {
-    this.filterStore.clearSelection();
-  }
-  filterBySelection() {
-    this.filterStore.addSelectionAsFilter();
   }
 }
 </script>

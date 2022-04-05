@@ -2,6 +2,13 @@
   <v-card>
     <v-card-title class="py-1">
       Annotation List
+      <v-divider></v-divider>
+      <v-btn v-if="selectionFilterEnabled" @click="clearSelection">
+        Clear selection filter
+      </v-btn>
+      <v-btn v-else @click="filterBySelection">
+        Use selection as filter
+      </v-btn>
       <v-spacer></v-spacer>
       <annotation-csv-dialog
         :annotations="filtered"
@@ -211,6 +218,16 @@ export default class AnnotationList extends Vue {
 
   hover(annotationId: string | null) {
     this.annotationStore.setHoveredAnnoationId(annotationId);
+  }
+
+  get selectionFilterEnabled() {
+    return this.filterStore.selectionFilter.enabled;
+  }
+  clearSelection() {
+    this.filterStore.clearSelection();
+  }
+  filterBySelection() {
+    this.filterStore.addSelectionAsFilter();
   }
 }
 </script>
