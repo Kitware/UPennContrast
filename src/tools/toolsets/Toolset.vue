@@ -11,7 +11,7 @@
               <template v-slot:activator="{ on: tooltip }">
                 <v-btn icon v-on="{ ...dialog, ...tooltip }">
                   <v-icon>
-                    {{ "mdi-file-star-outline" }}
+                    {{ "mdi-plus" }}
                   </v-icon>
                 </v-btn>
               </template>
@@ -29,7 +29,7 @@
             <v-tooltip top>
               <template v-slot:activator="{ on: tooltip }">
                 <v-btn icon v-on="{ ...tooltip, ...dialog }">
-                  <v-icon rounded medium>{{ "mdi-plus" }}</v-icon>
+                  <v-icon rounded medium>{{ "mdi-magnify" }}</v-icon>
                 </v-btn>
               </template>
               <span>Add existing tools</span>
