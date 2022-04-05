@@ -1,4 +1,4 @@
-# UPenn Contrast
+# NimbusImage
 
 [![Github Actions][github-actions-image]][github-actions-url]
 
