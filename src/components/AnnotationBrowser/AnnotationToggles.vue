@@ -21,16 +21,7 @@
             :disabled="!drawAnnotations"
             dense
             v-model="filteredDraw"
-            label="Restrict to Filters"
-          ></v-checkbox>
-        </v-list-item>
-        <v-list-item>
-          <v-checkbox
-            hide-details
-            :disabled="!drawAnnotations"
-            dense
-            v-model="drawActive"
-            label="Show Only Active "
+            label="Show Only Annotations Passing Filter"
           ></v-checkbox>
         </v-list-item>
         <v-list-item>
