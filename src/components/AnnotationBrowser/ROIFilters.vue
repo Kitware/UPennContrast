@@ -1,5 +1,10 @@
 <template>
   <v-container>
+    <v-row>
+      <v-btn @click="addNewFilter">
+        Add new ROI filter
+      </v-btn>
+    </v-row>
     <v-row v-for="filter in filters" :key="filter.id">
       <v-checkbox
         :value="filter.enabled"
@@ -12,11 +17,6 @@
           ><v-icon>mdi-close</v-icon></v-btn
         ></v-col
       >
-    </v-row>
-    <v-row>
-      <v-btn @click="addNewFilter">
-        Add new ROI filter
-      </v-btn>
     </v-row>
   </v-container>
 </template>

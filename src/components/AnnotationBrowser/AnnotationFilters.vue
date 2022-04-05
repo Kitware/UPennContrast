@@ -12,11 +12,6 @@
         <v-card-text>
           <v-container>
             <v-row>
-              <v-col>
-                <roi-filters></roi-filters>
-              </v-col>
-            </v-row>
-            <v-row>
               <v-col class="pa-0">
                 <tag-filter-editor v-model="tagFilter"></tag-filter-editor>
               </v-col>
@@ -25,6 +20,11 @@
               <property-filter-histogram
                 :propertyId="propertyId"
               ></property-filter-histogram>
+            </v-row>
+            <v-row>
+              <v-col>
+                <roi-filters></roi-filters>
+              </v-col>
             </v-row>
           </v-container>
         </v-card-text></div
