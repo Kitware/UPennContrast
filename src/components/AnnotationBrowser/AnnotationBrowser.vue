@@ -1,23 +1,18 @@
 <template>
-  <v-container>
-    <v-row
-      ><v-col class="py-1"><annotation-toggles /></v-col
-    ></v-row>
-
-    <v-row
-      ><v-col class="py-1"><annotation-filters /></v-col
-    ></v-row>
-    <v-row
-      ><v-col class="py-1"> <property-list></property-list> </v-col
-    ></v-row>
-    <v-row
-      ><v-col class="py-1"
-        ><annotation-list @clickedTag="clickedTag"></annotation-list> </v-col
-    ></v-row>
-    <v-row
-      ><v-col class="py-1"> <annotation-actions></annotation-actions> </v-col
-    ></v-row>
-  </v-container>
+  <v-card class="ma-1">
+    <v-card-title>
+      Annotation Browser
+    </v-card-title>
+    <v-card-text class="pa-1">
+      <v-expansion-panels hover multiple v-model="expanded">
+        <annotation-toggles></annotation-toggles>
+        <annotation-filters></annotation-filters>
+        <property-list></property-list>
+        <annotation-actions></annotation-actions>
+        <annotation-list @clickedTag="clickedTag"></annotation-list>
+      </v-expansion-panels>
+    </v-card-text>
+  </v-card>
 </template>
 
 <script lang="ts">
@@ -40,6 +35,9 @@ import filterStore from "@/store/filters";
 })
 export default class AnnotationBrowser extends Vue {
   readonly filterStore = filterStore;
+
+  expanded: number[] = [4];
+
   clickedTag(tag: string) {
     this.filterStore.addTagToTagFilter(tag);
   }

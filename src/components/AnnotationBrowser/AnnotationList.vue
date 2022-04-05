@@ -1,6 +1,6 @@
 <template>
-  <v-card>
-    <v-card-title class="py-1">
+  <v-expansion-panel>
+    <v-expansion-panel-header class="py-1">
       Annotation List
       <v-spacer></v-spacer>
       <v-btn v-if="selectionFilterEnabled" @click="clearSelection">
@@ -14,8 +14,8 @@
         :annotations="filtered"
         :propertyIds="propertyIds"
       ></annotation-csv-dialog>
-    </v-card-title>
-    <v-card-text>
+    </v-expansion-panel-header>
+    <v-expansion-panel-content>
       <v-data-table
         :items="filtered"
         :headers="headers"
@@ -82,8 +82,8 @@
           </tbody>
         </template>
       </v-data-table>
-    </v-card-text>
-  </v-card>
+    </v-expansion-panel-content>
+  </v-expansion-panel>
 </template>
 
 <script lang="ts">

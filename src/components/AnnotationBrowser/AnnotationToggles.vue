@@ -1,9 +1,9 @@
 <template>
-  <v-card>
-    <v-card-title class="py-1">
+  <v-expansion-panel>
+    <v-expansion-panel-header>
       Annotation Controls
-    </v-card-title>
-    <v-card-text>
+    </v-expansion-panel-header>
+    <v-expansion-panel-content>
       <v-list dense class="py-0">
         <v-list-item>
           <v-checkbox
@@ -34,8 +34,8 @@
           ></v-checkbox>
         </v-list-item>
       </v-list>
-    </v-card-text>
-  </v-card>
+    </v-expansion-panel-content>
+  </v-expansion-panel>
 </template>
 
 <script lang="ts">
