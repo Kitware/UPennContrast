@@ -44,10 +44,10 @@ class UPennContrastDataset:
 
         map = {}
         for frame in frames:
-            channel = frame['IndexC']
-            XY = frame['IndexXY']
-            Z = frame['IndexZ']
-            T = frame['IndexT']
+            channel = frame.get('IndexC', 0)
+            XY = frame.get('IndexXY', 0)
+            Z = frame.get('IndexZ', 0)
+            T = frame.get('IndexT', 0)
             index = frame['Frame']
 
             map.setdefault(channel, {}).setdefault(
