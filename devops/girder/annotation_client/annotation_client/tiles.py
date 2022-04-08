@@ -5,7 +5,7 @@ import girder_client
 PATHS = {
     'image': '/item/{datasetId}/tiles/fzxy/{frameIndex}/0/0/0',
     'item': '/item?folderId={datasetId}',
-    'region': '/item/{datasetId}/tiles/region',
+    'region': '/item/{itemId}/tiles/region',
     'tiles': '/item/{datasetId}/tiles',
 }
 
@@ -110,7 +110,7 @@ class UPennContrastDataset:
             datasetId=self.datasetId, frameIndex=frameIndex), jsonResp=False)
         return response.content
 
-    def getRegion(self, datasetId, **kwargs):
+    def getRegion(self, datasetId=None, **kwargs):
         """
         Get a region of the dataset as a numpy array.
 
@@ -125,16 +125,22 @@ class UPennContrastDataset:
           Options that you probably don't want in this context:
             fill style
 
-        :param str datasetId: The dataset id
+        :param str datasetId: The dataset id.  None to use the value used when
+            instantiating the class.
         :return: The tiles metadata
         :rtype: dict
         """
+        if (datasetId is None or datasetId == self.datasetId or
+                datasetId == self.dataset['folderId']):
+            itemId = self.datasetId
+        else:
+            itemId = self.getDataset(datasetId)['_id']
         params = kwargs.copy()
         params['encoding'] = 'pickle:' + str(pickle.HIGHEST_PROTOCOL)
         params.pop('format', None)
         return pickle.loads(
             self.client.get(
-                PATHS['region'].format(datasetId=datasetId),
+                PATHS['region'].format(itemId=itemId),
                 parameters=params,
                 jsonResp=False,
             ).content)
