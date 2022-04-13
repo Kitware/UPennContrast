@@ -77,17 +77,30 @@ import store from "@/store";
 export default class UserMenu extends Vue {
   readonly store = store;
 
-  userMenu = false;
+  userMenu: boolean | string = "auto";
 
   domain = store.girderUrl;
-  username = "";
-  password = "";
+  username = process.env.VUE_APP_DEFAULT_USER || "";
+  password = process.env.VUE_APP_DEFAULT_PASSWORD || "";
 
   error = "";
 
   mounted() {
     // delay auto open for auto relogin to finish
     setTimeout(() => {
+      // if the environment has a default user and password, login.
+      if (this.userMenu === "auto") {
+        this.userMenu = false;
+        if (this.username && this.password) {
+          this.login();
+        }
+        setTimeout(() => {
+          if (!this.userMenu) {
+            this.userMenu = !store.isLoggedIn;
+          }
+        }, 500);
+        return;
+      }
       if (!this.userMenu) {
         this.userMenu = !store.isLoggedIn;
       }
