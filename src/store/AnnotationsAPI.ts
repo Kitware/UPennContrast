@@ -209,7 +209,10 @@ export default class AnnotationsAPI {
       connectTo,
       workerInterface
     };
-    this.client.post(`upenn_annotation/compute?datasetId=${datasetId}`, params);
+    return this.client.post(
+      `upenn_annotation/compute?datasetId=${datasetId}`,
+      params
+    );
   }
 
   toConnection = (item: any): IAnnotationConnection => {

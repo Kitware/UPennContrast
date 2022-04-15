@@ -9,12 +9,14 @@ import store from "./root";
 
 import main from "./index";
 import sync from "./sync";
+import jobs from "./jobs";
 
 import {
   IAnnotation,
   IAnnotationConnection,
   IGeoJSPoint,
-  IToolConfiguration
+  IToolConfiguration,
+  IAnnotationComputeJob
 } from "./model";
 
 import Vue from "vue";
@@ -257,11 +259,16 @@ export class Annotations extends VuexModule {
   @Action
   public async computeAnnotationsWithWorker({
     tool,
-    workerInterface
+    workerInterface,
+    callback
   }: {
     tool: IToolConfiguration;
     workerInterface: any;
+    callback: (success: boolean) => void;
   }) {
+    if (!jobs.isSubscribedToNotifications) {
+      jobs.initializeNotificationSubscription();
+    }
     if (!main.dataset || !main.configuration) {
       return;
     }
@@ -270,16 +277,32 @@ export class Annotations extends VuexModule {
       tool
     );
     const tile = { XY: main.xy, Z: main.z, Time: main.time };
-    this.annotationsAPI.computeAnnotationWithWorker(
-      tool,
-      datasetId,
-      {
-        location,
-        channel,
-        tile
-      },
-      workerInterface
-    );
+    this.annotationsAPI
+      .computeAnnotationWithWorker(
+        tool,
+        datasetId,
+        {
+          location,
+          channel,
+          tile
+        },
+        workerInterface
+      )
+      .then((response: any) => {
+        const job = response.data[0];
+        if (!job || !job._id) {
+          return;
+        }
+        jobs.addJob({
+          jobId: job._id,
+          datasetId: main.dataset?.id,
+          tool,
+          callback: (success: boolean) => {
+            this.fetchAnnotations();
+            callback(success);
+          }
+        } as IAnnotationComputeJob);
+      });
   }
 
   @Action

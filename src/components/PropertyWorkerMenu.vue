@@ -11,6 +11,8 @@
           :workerInterface="workerInterface"
           @compute="compute"
           :canPreview="false"
+          :running="running"
+          :status="previousRunStatus"
         >
         </worker-interface>
       </v-col>
@@ -44,6 +46,9 @@ export default class annotationWorkerMenu extends Vue {
 
   show: boolean = true;
 
+  running: boolean = false;
+  previousRunStatus: boolean | null = null;
+
   @Prop()
   readonly property!: IAnnotationProperty;
 
@@ -65,9 +70,19 @@ export default class annotationWorkerMenu extends Vue {
   }
 
   compute(interfaceValues: any) {
+    if (this.running) {
+      return;
+    }
+    this.running = true;
+    this.previousRunStatus = null;
+
     this.propertyStore.enableProperty({
       property: this.property,
-      workerInterface: interfaceValues
+      workerInterface: interfaceValues,
+      callback: success => {
+        this.running = false;
+        this.previousRunStatus = success;
+      }
     });
   }
 

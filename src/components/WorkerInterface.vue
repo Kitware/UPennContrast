@@ -49,7 +49,16 @@
       <v-row>
         <v-btn v-if="canPreview" @click="preview">preview</v-btn>
         <v-spacer></v-spacer>
-        <v-btn @click="compute">compute</v-btn>
+        <v-btn @click="compute" :disabled="running"
+          ><v-progress-circular
+            size="16"
+            v-if="running"
+            indeterminate
+          ></v-progress-circular>
+          <v-icon v-if="status === false">mdi-close</v-icon>
+          <v-icon v-if="status === true">mdi-check</v-icon>
+          <span>Compute</span></v-btn
+        >
       </v-row>
       <v-row v-if="canPreview">
         <v-checkbox
@@ -84,6 +93,12 @@ export default class WorkerInterface extends Vue {
 
   @Prop()
   readonly canPreview!: boolean;
+
+  @Prop()
+  readonly running!: boolean;
+
+  @Prop()
+  readonly status!: boolean | null;
 
   getDefault(type: string, defaultValue: any = null) {
     if (defaultValue) {

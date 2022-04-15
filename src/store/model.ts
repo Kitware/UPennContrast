@@ -255,11 +255,17 @@ export interface IAnnotationProperty {
   computed: boolean;
 }
 
-export interface IPropertyComputeJob {
+export interface IComputeJob {
   jobId: string;
+  callback: (success: boolean) => void;
+  datasetId: string;
+}
+export interface IAnnotationComputeJob extends IComputeJob {
+  tool: IToolConfiguration;
+}
+export interface IPropertyComputeJob extends IComputeJob {
   propertyId: string;
   annotationIds: string[];
-  datasetId: string;
 }
 
 export interface IContrast {

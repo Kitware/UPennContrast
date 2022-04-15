@@ -1,6 +1,5 @@
 <template>
   <v-row>
-    <!-- Enabled / Computed -->
     <!-- In list (???) -->
     <v-col class="pa-0">
       <v-checkbox
@@ -57,17 +56,6 @@ export default class AnnotationProperty extends Vue {
 
   get enabled() {
     return this.property.enabled;
-  }
-
-  get computed() {
-    return (
-      this.enabled &&
-      !this.propertyStore.isJobRunningForProperty(this.property.id)
-    );
-  }
-
-  get indeterminate() {
-    return this.enabled && !this.computed;
   }
 
   toggleFilter() {
