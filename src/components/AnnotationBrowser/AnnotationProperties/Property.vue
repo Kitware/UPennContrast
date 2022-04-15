@@ -1,14 +1,6 @@
 <template>
   <v-row>
     <!-- Enabled / Computed -->
-    <v-col class="pa-0">
-      <v-checkbox
-        dense
-        hide-details
-        :value="enabled"
-        :indeterminate="indeterminate"
-      ></v-checkbox>
-    </v-col>
     <!-- In list (???) -->
     <v-col class="pa-0">
       <v-checkbox

@@ -78,7 +78,7 @@ export default class PropertyList extends Vue {
   readonly filterStore = filterStore;
 
   propertyCreationDialogOpen = false;
-  private headers = ["Computed", "List", "As filter"];
+  private headers = ["List", "As filter"];
 
   get properties() {
     return propertyStore.properties;

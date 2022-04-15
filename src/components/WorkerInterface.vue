@@ -37,7 +37,7 @@
         <v-spacer></v-spacer>
         <v-btn @click="compute">compute</v-btn>
       </v-row>
-      <v-row>
+      <v-row v-if="canPreview">
         <v-checkbox
           v-model="displayWorkerPreview"
           label="Display Previews"
