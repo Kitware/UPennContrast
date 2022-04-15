@@ -139,7 +139,13 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  enableProperty(property: IAnnotationProperty, workerInterface: any) {
+  enableProperty({
+    property,
+    workerInterface
+  }: {
+    property: IAnnotationProperty;
+    workerInterface: any;
+  }) {
     this.replaceProperty({ ...property, enabled: true, computed: false });
 
     const newProp = this.getPropertyById(property.id);

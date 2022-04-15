@@ -65,7 +65,10 @@ export default class annotationWorkerMenu extends Vue {
   }
 
   compute(interfaceValues: any) {
-    this.propertyStore.enableProperty(this.property, interfaceValues);
+    this.propertyStore.enableProperty({
+      property: this.property,
+      workerInterface: interfaceValues
+    });
   }
 
   mounted() {
