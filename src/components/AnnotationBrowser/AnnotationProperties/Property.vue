@@ -7,7 +7,7 @@
         dense
         hide-details
         :value="list"
-        @click="toggleList"
+        @click.stop="toggleList"
       ></v-checkbox>
     </v-col>
     <!-- As filter -->
@@ -16,7 +16,7 @@
         dense
         hide-details
         :value="filter"
-        @click="toggleFilter"
+        @click.stop="toggleFilter"
       ></v-checkbox>
     </v-col>
     <v-col class="pa-1" cols="7">
