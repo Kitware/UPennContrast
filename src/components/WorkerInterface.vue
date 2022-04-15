@@ -2,7 +2,7 @@
   <v-container class="pa-0 ma-0">
     <v-col class="pa-0 ma-0">
       <v-row v-for="item in entries" :key="item.id" class="pa-0 ma-0">
-        <v-col class="pa-0 ma-0">
+        <v-col class="pa-0 ma-0" cols="4">
           <v-subheader>
             {{ item.id }}
           </v-subheader>
@@ -14,9 +14,18 @@
             :min="item.min"
             v-model="item.value"
             :step="(item.max - item.min) / 100.0"
-            dense
-            thumb-label="always"
-          ></v-slider>
+            class="align-center"
+          >
+            <template v-slot:append>
+              <v-text-field
+                v-model="item.value"
+                type="number"
+                style="width: 60px"
+                class="mt-0 pt-0"
+              >
+              </v-text-field>
+            </template>
+          </v-slider>
           <v-text-field
             v-if="item.type === 'text'"
             v-model="item.value"
@@ -30,6 +39,11 @@
             v-if="item.type === 'layer'"
             v-model="item.value"
           ></layer-select>
+          <v-select
+            v-if="item.type === 'select'"
+            v-model="item.value"
+            :items="item.items"
+          ></v-select>
         </v-col>
       </v-row>
       <v-row>
