@@ -248,6 +248,19 @@ export default class GirderAPI {
       .then(r => r.data);
   }
 
+  getRecentConfigurations(): Promise<IGirderItem[]> {
+    return this.client
+      .get("item/query", {
+        params: {
+          query: '{"meta.subtype":"contrastConfiguration"}',
+          limit: 5,
+          sort: "updated",
+          sortdir: -1
+        }
+      })
+      .then(r => r.data);
+  }
+
   getImages(folderId: string): Promise<IGirderItem[]> {
     return this.getItems(folderId).then(items =>
       items.filter(d => (d as any).largeImage)

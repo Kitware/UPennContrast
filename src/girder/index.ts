@@ -24,6 +24,7 @@ export interface IGirderItem {
 
   name: string;
   description: string;
+  folderId: string;
   meta: any;
 }
 

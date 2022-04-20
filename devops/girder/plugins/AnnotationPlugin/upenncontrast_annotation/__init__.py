@@ -11,6 +11,7 @@ from girder.plugin import GirderPlugin
 
 from girder.utility.model_importer import ModelImporter
 
+from . import system
 from .server.models.annotation import Annotation as AnnotationModel
 from .server.models.connections import AnnotationConnection as ConnectionModel
 from .server.models.propertyValues import AnnotationPropertyValues as PropertyValuesModel
@@ -33,3 +34,4 @@ class UPennContrastAnnotationAPIPlugin(GirderPlugin):
         info['apiRoot'].annotation_connection = AnnotationConnection()
         info['apiRoot'].annotation_property_values = PropertyValues()
         info['apiRoot'].annotation_property = AnnotationProperty()
+        system.addSystemEndpoints(info['apiRoot'])
