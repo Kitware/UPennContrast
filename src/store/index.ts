@@ -238,6 +238,22 @@ export class Main extends VuexModule {
   }
 
   @Action
+  private async fetchRecentConfigurations() {
+    const confs = await this.api.getRecentConfigurations();
+    let curlen = this.recentConfigurations.length;
+    for (let i = 0; i < 5 - curlen; i += 1) {
+      const folder = await this.api.getFolder(confs[i].folderId);
+      this.recentConfigurations.unshift({
+        id: confs[i]._id,
+        name: confs[i].name,
+        description: confs[i].description,
+        datasetId: confs[i].folderId!,
+        datasetName: folder.name || "Unknown"
+      });
+    }
+  }
+
+  @Action
   async initialize() {
     if (!this.girderRest.token) {
       return;
@@ -253,6 +269,9 @@ export class Main extends VuexModule {
       }
       await this.initFromUrl();
       sync.setLoading(false);
+      if (this.recentConfigurations.length < 5) {
+        await this.fetchRecentConfigurations();
+      }
     } catch (error) {
       sync.setLoading(error);
     }
