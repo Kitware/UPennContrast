@@ -307,7 +307,7 @@ export class Main extends VuexModule {
     username: string;
     password: string;
   }) {
-    this.girderRest.apiRoot = `${domain}/api/v1`;
+    Object.assign(this.girderRest, { apiRoot: `${domain}/api/v1` });
     /* Don't create a new client
     const restClient = new RestClient({
       apiRoot: `${domain}/api/v1`
