@@ -1,6 +1,7 @@
 from girder_worker.docker.tasks import docker_run
 
 from girder.api.rest import getCurrentToken
+from girder.models.setting import Setting
 
 import datetime
 import json
@@ -22,7 +23,7 @@ def runComputeJob(image, datasetId, params):
     params = json.dumps(params)
 
     containerArgs = [
-        '--apiUrl', "http://localhost:8080/api/v1",
+        '--apiUrl', Setting().get('worker.api_url') or 'http://localhost:8080/api/v1',
         '--token', getCurrentToken()['_id'],
         '--parameters', params
     ]
@@ -36,7 +37,7 @@ def runComputeJob(image, datasetId, params):
             'pull_image': False,
             'container_args': containerArgs,
             'remove_container': True,
-            'name': "{}_{}_{}".format(name, datasetId, datetime.datetime.now().timestamp()),
+            'name': '{}_{}_{}'.format(name, datasetId, datetime.datetime.now().timestamp()),
             # TODO: figure out network configuration and api url discovery
             'network_mode': 'host',
             # 'girder_result_hooks': [testHook]
