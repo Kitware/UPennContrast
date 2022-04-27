@@ -125,9 +125,12 @@ export class Main extends VuexModule {
     this.girderUrl = persister.set("girderUrl", girderUrl);
     this.girderRest = girderRest;
     this.girderUser = girderRest.user;
+    // don't replace the api hook with a new one.
+    /*
     this.api = new GirderAPI(this.girderRest);
     this.annotationsAPI = new AnnotationsAPI(this.girderRest);
     this.propertiesAPI = new PropertiesAPI(this.girderRest);
+    */
   }
 
   @Mutation
@@ -304,13 +307,16 @@ export class Main extends VuexModule {
     username: string;
     password: string;
   }) {
+    this.girderRest.apiRoot = `${domain}/api/v1`;
+    /* Don't create a new client
     const restClient = new RestClient({
       apiRoot: `${domain}/api/v1`
     });
+    */
 
     try {
       sync.setLoading(true);
-      await restClient.login(username, password);
+      await this.girderRest.login(username, password);
       sync.setLoading(false);
     } catch (err) {
       if (!err.response || err.response.status !== 401) {
@@ -325,7 +331,7 @@ export class Main extends VuexModule {
 
     this.loggedIn({
       girderUrl: domain,
-      girderRest: restClient
+      girderRest: this.girderRest
     });
 
     await this.initFromUrl();
