@@ -103,12 +103,14 @@ export default class AnnotationsAPI {
   }
 
   async requestWorkerInterface(image: string) {
-    this.client.post(`worker_interface/${encodeURIComponent(image)}/request`);
+    this.client.post(
+      `worker_interface/request?image=${encodeURIComponent(image)}`
+    );
   }
 
   async getWorkerInterface(image: string): Promise<IWorkerInterface> {
     return this.client
-      .get(`worker_interface/${encodeURIComponent(image)}`)
+      .get(`worker_interface?image=${encodeURIComponent(image)}`)
       .then(res => {
         return res.data.interface || {};
       });
@@ -143,9 +145,9 @@ export default class AnnotationsAPI {
       workerInterface
     };
     return this.client.post(
-      `worker_preview/${encodeURIComponent(
+      `worker_preview/request?datasetId=${datasetId}&image=${encodeURIComponent(
         image
-      )}/request?datasetId=${datasetId}`,
+      )}`,
       params
     );
   }
@@ -154,13 +156,13 @@ export default class AnnotationsAPI {
     image: string
   ): Promise<{ text: string; image: string }> {
     return this.client
-      .get(`worker_preview/${encodeURIComponent(image)}`)
+      .get(`worker_preview?image=${encodeURIComponent(image)}`)
       .then(res => {
         return res.data.preview || {};
       });
   }
 
   async clearWorkerPreview(image: string) {
-    this.client.delete(`/worker_preview/${encodeURIComponent(image)}`);
+    this.client.delete(`/worker_preview?image=${encodeURIComponent(image)}`);
   }
 }

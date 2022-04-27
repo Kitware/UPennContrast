@@ -5,8 +5,8 @@ import urllib
 import imageio
 
 PATHS = {
-    'interface': '/worker_interface/{image}',
-    'preview': '/worker_preview/{image}',
+    'interface': '/worker_interface?image={image}',
+    'preview': '/worker_preview?image={image}',
 }
 
 

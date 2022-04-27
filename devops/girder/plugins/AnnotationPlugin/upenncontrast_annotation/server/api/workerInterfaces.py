@@ -2,6 +2,8 @@ from girder.api import access
 from girder.api.describe import Description, describeRoute
 from girder.api.rest import Resource
 from ..models.workerInterfaces import WorkerInterfaceModel as InterfaceModel
+from girder.exceptions import RestException
+
 import docker
 
 class WorkerInterfaces(Resource):
@@ -12,24 +14,30 @@ class WorkerInterfaces(Resource):
         self.resourceName = 'worker_interface'
         self._interfaceModel = InterfaceModel()
 
-        self.route('GET', (':image',), self.find)
+        self.route('GET', (), self.find)
         self.route('GET', ('available',), self.getAvailableImages)
-        self.route('POST', (':image',), self.update)
-        self.route('POST', (':image', 'request',), self.requestWorkerUpdate)
+        self.route('POST', (), self.update)
+        self.route('POST', ('request',), self.requestWorkerUpdate)
 
     @describeRoute(Description("Update an existing image interface")
-                   .param('image', 'The docker image name for the worker.', paramType='path')
+                   .param('image', 'The docker image name for the worker.')
                    .param('body', 'A JSON object describing the interface.',
                           paramType='body'))
     @access.user
-    def update(self, image, params):
+    def update(self, params):
+        if 'image' not in params:
+            raise RestException(code=400, message="Missing 'image' parameter")
+        image = params.get('image')
         return self._interfaceModel.update(self.getCurrentUser(), image, self.getBodyJson())
 
     @access.user
     @describeRoute(Description("Search for image interfaces")
-                   .param('image', 'The docker image name for the worker.', paramType='path')
+                   .param('image', 'The docker image name for the worker.')
                    )
-    def find(self, image, params):
+    def find(self, params):
+        if 'image' not in params:
+            raise RestException(code=400, message="Missing 'image' parameter")
+        image = params.get('image')
         return self._interfaceModel.getImageInterface(image) or {}
 
     @access.user
@@ -41,6 +49,11 @@ class WorkerInterfaces(Resource):
         return list (map(mapTag, filter(labelFilter, images)))
 
     @access.user
-    @describeRoute(Description("Ask the worker to update its interface data"))
-    def requestWorkerUpdate(self, image, params):
+    @describeRoute(Description("Ask the worker to update its interface data")
+                   .param('image', 'The docker image name for the worker.')
+                   )
+    def requestWorkerUpdate(self, params):
+        if 'image' not in params:
+            raise RestException(code=400, message="Missing 'image' parameter")
+        image = params.get('image')
         return self._interfaceModel.requestWorkerUpdate(image)
