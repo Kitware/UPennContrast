@@ -46,7 +46,7 @@ import WorkerInterface from "@/components/WorkerInterface.vue";
     LayerSelect,
     TagFilterEditor,
     DockerImageSelect,
-    WorkerInterface,
+    WorkerInterface
   }
 })
 export default class annotationWorkerMenu extends Vue {

@@ -110,8 +110,10 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
   // Point to poly
   if (
     (a.shape === AnnotationShape.Point &&
-      (b.shape === AnnotationShape.Polygon || b.shape === AnnotationShape.Line)) ||
-    ((a.shape === AnnotationShape.Polygon || b.shape === AnnotationShape.Line) &&
+      (b.shape === AnnotationShape.Polygon ||
+        b.shape === AnnotationShape.Line)) ||
+    ((a.shape === AnnotationShape.Polygon ||
+      b.shape === AnnotationShape.Line) &&
       b.shape === AnnotationShape.Point)
   ) {
     const point = a.shape === AnnotationShape.Point ? a : b;

@@ -33,7 +33,7 @@ export class Filters extends VuexModule {
     id: "tagFilter",
     exclusive: false,
     enabled: false,
-    tags: [],
+    tags: []
   };
 
   shapeFilter: IShapeAnnotationFilter = {
