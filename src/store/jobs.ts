@@ -84,13 +84,7 @@ export class Jobs extends VuexModule {
     ) {
       return;
     }
-    const [image] = jobData.args;
-    const jobId = jobData._id;
-    // if (this.previewJobIds[image] === jobId) { // TODO: callback
-    //   this.setPreviewJobId({ image, id: null });
-    //   this.fetchWorkerPreview(image);
-    //   return;
-    // }
+
     const jobTask = this.runningJobs.find(
       (job: IComputeJob) => job.jobId === jobData._id
     );
