@@ -1,5 +1,9 @@
 import { RestClientInstance } from "@/girder";
-import { IAnnotationProperty } from "./model";
+import {
+  IAnnotationProperty,
+  IWorkerInterface,
+  IToolConfiguration
+} from "./model";
 
 import { Promise } from "bluebird";
 
@@ -89,5 +93,75 @@ export default class AnnotationsAPI {
       computed: false,
       customName: null
     };
+  }
+
+  async getWorkerImages(): Promise<string[]> {
+    return this.client.get("worker_interface/available").then(res => {
+      return res.data;
+    });
+  }
+
+  async requestWorkerInterface(image: string) {
+    this.client.post(
+      `worker_interface/request?image=${encodeURIComponent(image)}`
+    );
+  }
+
+  async getWorkerInterface(image: string): Promise<IWorkerInterface> {
+    return this.client
+      .get(`worker_interface?image=${encodeURIComponent(image)}`)
+      .then(res => {
+        return res.data.interface || {};
+      });
+  }
+
+  async requestWorkerPreview(
+    image: string,
+    tool: IToolConfiguration,
+    datasetId: string,
+    workerInterface: { [id: string]: { type: string; value: any } },
+    metadata: {
+      channel: Number;
+      location: { XY: Number; Z: Number; Time: Number };
+      tile: { XY: Number; Z: Number; Time: Number };
+    }
+  ) {
+    const { configurationId, description, id, name, type, values } = tool;
+    const { annotation, connectTo } = values;
+    const params = {
+      configurationId,
+      datasetId,
+      description,
+      type,
+      id,
+      name,
+      image,
+      channel: metadata.channel,
+      assignment: metadata.location,
+      tags: annotation.tags,
+      tile: metadata.tile,
+      connectTo,
+      workerInterface
+    };
+    return this.client.post(
+      `worker_preview/request?datasetId=${datasetId}&image=${encodeURIComponent(
+        image
+      )}`,
+      params
+    );
+  }
+
+  async getWorkerPreview(
+    image: string
+  ): Promise<{ text: string; image: string }> {
+    return this.client
+      .get(`worker_preview?image=${encodeURIComponent(image)}`)
+      .then(res => {
+        return res.data.preview || {};
+      });
+  }
+
+  async clearWorkerPreview(image: string) {
+    this.client.delete(`/worker_preview?image=${encodeURIComponent(image)}`);
   }
 }

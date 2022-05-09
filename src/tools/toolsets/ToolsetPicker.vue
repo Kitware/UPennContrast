@@ -36,6 +36,8 @@
         <v-btn color="primary" :enabled="selectedTools.length" @click="confirm">
           CONFIRM
         </v-btn>
+        <v-divider></v-divider>
+        <v-btn color="warning" @click="done">CANCEL</v-btn>
       </div>
     </v-card-actions>
   </v-card>
@@ -90,9 +92,13 @@ export default class ToolsetPicker extends Vue {
     if (this.selectedTools.length) {
       this.toolsStore.addToolIdsToCurrentToolset({ ids: this.selectedTools });
       this.store.syncConfiguration();
-      this.selectedTools = [];
-      this.$emit("done");
+      this.done();
     }
+  }
+
+  done() {
+    this.selectedTools = [];
+    this.$emit("done");
   }
 
   mounted() {

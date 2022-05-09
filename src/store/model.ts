@@ -159,6 +159,27 @@ export interface IGeoJSPoint {
   z: number;
 }
 
+export interface IWorkerInterface {
+  [id: string]: {
+    type: "number" | "text" | "tags" | "layer";
+    min?: number;
+    max?: number;
+    default?: number;
+  };
+}
+
+export enum AnnotationShape {
+  Point = "point",
+  Line = "line",
+  Polygon = "polygon"
+}
+
+export const AnnotationNames = {
+  [AnnotationShape.Point]: "Point",
+  [AnnotationShape.Line]: "Line",
+  [AnnotationShape.Polygon]: "Blob"
+};
+
 export interface IAnnotationLocation {
   XY: number;
   Z: number;
@@ -171,7 +192,7 @@ export interface IAnnotation {
   name: string | null;
   channel: number;
   location: IAnnotationLocation;
-  shape: string;
+  shape: AnnotationShape;
   coordinates: IGeoJSPoint[];
   datasetId: string;
 }
@@ -192,7 +213,10 @@ export interface IAnnotationFilter {
 
 export interface ITagAnnotationFilter extends IAnnotationFilter {
   tags: string[];
-  shape: string;
+}
+
+export interface IShapeAnnotationFilter extends IAnnotationFilter {
+  shape: AnnotationShape;
 }
 
 export interface IPropertyAnnotationFilter extends IAnnotationFilter {
@@ -224,18 +248,24 @@ export interface IAnnotationProperty {
     exclusive: boolean;
   };
   independant: boolean;
-  shape: "point" | "line" | "polygon" | null;
+  shape: AnnotationShape | null;
   customName: string | null;
 
   enabled: boolean;
   computed: boolean;
 }
 
-export interface IPropertyComputeJob {
+export interface IComputeJob {
   jobId: string;
+  callback: (success: boolean) => void;
+  datasetId: string;
+}
+export interface IAnnotationComputeJob extends IComputeJob {
+  tool: IToolConfiguration;
+}
+export interface IPropertyComputeJob extends IComputeJob {
   propertyId: string;
   annotationIds: string[];
-  datasetId: string;
 }
 
 export interface IContrast {

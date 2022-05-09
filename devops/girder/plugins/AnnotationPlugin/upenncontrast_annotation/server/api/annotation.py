@@ -19,6 +19,7 @@ class Annotation(Resource):
         self.route('GET', (), self.find)
         self.route('POST', (), self.create)
         self.route('PUT', (':id',), self.update)
+        self.route('POST', ('compute',), self.compute)
 
     # TODO: anytime a dataset is mentioned, load the dataset and check for existence and that the user has access to it
     # TODO: creation date, update date, creatorId
@@ -81,3 +82,13 @@ class Annotation(Resource):
     @loadmodel(model='upenn_annotation', plugin='upenncontrast_annotation', level=AccessType.READ)
     def get(self, upenn_annotation, params):
         return upenn_annotation
+
+    @access.user
+    @describeRoute(Description("Compute annotations from a worker tool")
+                   .param('datasetId', 'The dataset Id', paramType='path')
+                   .param('body', 'A JSON object containing the worker tool', paramType='body'))
+    def compute(self, params):
+        datasetId = params.get('datasetId', None)
+        if not datasetId:
+            raise RestException(code=400, message="Missing datasetId parameter")
+        return self._annotationModel.compute(datasetId, self.getBodyJson(), self.getCurrentUser())

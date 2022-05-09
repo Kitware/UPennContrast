@@ -1,9 +1,9 @@
 <template>
-  <v-card>
-    <v-card-title class="py-1">
+  <v-expansion-panel>
+    <v-expansion-panel-header>
       Annotation Controls
-    </v-card-title>
-    <v-card-text>
+    </v-expansion-panel-header>
+    <v-expansion-panel-content>
       <v-list dense class="py-0">
         <v-list-item>
           <v-checkbox
@@ -21,16 +21,7 @@
             :disabled="!drawAnnotations"
             dense
             v-model="filteredDraw"
-            label="Restrict to Filters"
-          ></v-checkbox>
-        </v-list-item>
-        <v-list-item>
-          <v-checkbox
-            hide-details
-            :disabled="!drawAnnotations"
-            dense
-            v-model="drawActive"
-            label="Show Only Active "
+            label="Show Only Annotations Passing Filter"
           ></v-checkbox>
         </v-list-item>
         <v-list-item>
@@ -43,8 +34,8 @@
           ></v-checkbox>
         </v-list-item>
       </v-list>
-    </v-card-text>
-  </v-card>
+    </v-expansion-panel-content>
+  </v-expansion-panel>
 </template>
 
 <script lang="ts">

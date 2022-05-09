@@ -1,21 +1,12 @@
 <template>
   <v-row>
-    <!-- Enabled / Computed -->
-    <v-col class="pa-0">
-      <v-checkbox
-        dense
-        hide-details
-        v-model="enabled"
-        :indeterminate="indeterminate"
-      ></v-checkbox>
-    </v-col>
     <!-- In list (???) -->
     <v-col class="pa-0">
       <v-checkbox
         dense
         hide-details
         :value="list"
-        @click="toggleList"
+        @click.stop="toggleList"
       ></v-checkbox>
     </v-col>
     <!-- As filter -->
@@ -24,7 +15,7 @@
         dense
         hide-details
         :value="filter"
-        @click="toggleFilter"
+        @click.stop="toggleFilter"
       ></v-checkbox>
     </v-col>
     <v-col class="pa-1" cols="7">
@@ -65,29 +56,6 @@ export default class AnnotationProperty extends Vue {
 
   get enabled() {
     return this.property.enabled;
-  }
-
-  set enabled(val) {
-    {
-      if (val) {
-        Promise.resolve().then(() =>
-          this.propertyStore.enableProperty(this.property)
-        );
-      } else {
-        this.propertyStore.disableProperty(this.property);
-      }
-    }
-  }
-
-  get computed() {
-    return (
-      this.enabled &&
-      !this.propertyStore.isJobRunningForProperty(this.property.id)
-    );
-  }
-
-  get indeterminate() {
-    return this.enabled && !this.computed;
   }
 
   toggleFilter() {

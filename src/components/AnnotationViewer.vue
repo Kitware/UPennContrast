@@ -33,7 +33,7 @@ import {
 } from "@/utils/annotation";
 
 // Draws annotations on the given layer, and provides functionnality for the user selected tool.
-@Component
+@Component({ components: {} })
 export default class AnnotationViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
@@ -55,10 +55,23 @@ export default class AnnotationViewer extends Vue {
   readonly annotationLayer: any;
 
   @Prop()
+  readonly workerPreviewFeature: any;
+
+  @Prop()
   readonly unrollH: any;
 
   @Prop()
   readonly unrollW: any;
+
+  @Prop()
+  readonly tileWidth: any;
+
+  @Prop()
+  readonly tileHeight: any;
+
+  get displayWorkerPreview() {
+    return this.propertiesStore.displayWorkerPreview;
+  }
 
   get configuration() {
     return this.store.configuration;
@@ -87,6 +100,10 @@ export default class AnnotationViewer extends Vue {
     return this.store.filteredDraw
       ? this.filterStore.filteredAnnotations
       : this.annotationStore.annotations;
+  }
+
+  get annotationIds() {
+    return this.annotations.map((annotation: IAnnotation) => annotation.id);
   }
 
   // All annotations available for the currently enabled layers
@@ -118,6 +135,33 @@ export default class AnnotationViewer extends Vue {
 
   get selectedToolId() {
     return this.toolsStore.selectedToolId;
+  }
+
+  get workerImage() {
+    return this.selectedTool?.values?.image?.image;
+  }
+
+  get workerPreview() {
+    return this.workerImage
+      ? this.propertiesStore.getWorkerPreview(this.workerImage)
+      : { text: null, image: "" };
+  }
+
+  @Watch("displayWorkerPreview")
+  @Watch("workerPreview")
+  renderWorkerPreview() {
+    if (this.workerPreview?.image && this.displayWorkerPreview) {
+      this.workerPreviewFeature.data([
+        {
+          ul: { x: 0, y: 0 },
+          lr: { x: this.tileWidth, y: this.tileHeight },
+          image: this.workerPreview.image
+        }
+      ]);
+    } else {
+      this.workerPreviewFeature.data([]);
+    }
+    this.workerPreviewFeature.draw();
   }
 
   get selectedTool(): IToolConfiguration | null {
@@ -274,9 +318,9 @@ export default class AnnotationViewer extends Vue {
       }
 
       if (girderId === this.hoveredAnnotationId && !isHovered) {
-        this.annotationLayer.removeAnnotation(annotation);
+        this.annotationLayer.removeAnnotation(annotation, false);
       } else if (girderId !== this.hoveredAnnotationId && isHovered) {
-        this.annotationLayer.removeAnnotation(annotation);
+        this.annotationLayer.removeAnnotation(annotation, false);
       }
 
       // Check for connections
@@ -296,7 +340,7 @@ export default class AnnotationViewer extends Vue {
           !this.shouldDisplayAnnotation(parent) ||
           !this.shouldDisplayAnnotation(child)
         ) {
-          this.annotationLayer.removeAnnotation(annotation);
+          this.annotationLayer.removeAnnotation(annotation, false);
         }
         return;
       }
@@ -304,11 +348,18 @@ export default class AnnotationViewer extends Vue {
       if (girderId === this.hoveredAnnotationId) {
         return;
       }
-      if (this.shouldDisplayAnnotationWithLocation(location)) {
+
+      if (
+        this.shouldDisplayAnnotationWithLocation(location) &&
+        (!this.store.filteredDraw || this.annotationIds.includes(girderId))
+      ) {
         return;
       }
-      this.annotationLayer.removeAnnotation(annotation);
+
+      this.annotationLayer.removeAnnotation(annotation, false);
     });
+    this.annotationLayer.modified();
+    this.annotationLayer.draw();
   }
 
   // Add to the layer annotations that should be rendered and have not already been added.
@@ -421,6 +472,10 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.addAnnotation(line, undefined, false);
   }
 
+  private getAnnotationLocationFromTool(tool: IToolConfiguration) {
+    return this.annotationStore.getAnnotationLocationFromTool(tool);
+  }
+
   private async createAnnotationFromTool(
     coordinates: IGeoJSPoint[],
     tool: IToolConfiguration
@@ -428,31 +483,13 @@ export default class AnnotationViewer extends Vue {
     if (!coordinates || !coordinates.length || !this.dataset) {
       return null;
     }
-    const toolAnnotation = tool.values.annotation;
-    // Find location in the assigned layer
-    const location = {
-      XY: this.store.xy,
-      Z: this.store.z,
-      Time: this.store.time
-    };
-    const layer = this.layers[toolAnnotation.coordinateAssignments.layer];
-    const channel = layer.channel;
-    const assign = toolAnnotation.coordinateAssignments;
-    if (layer) {
-      const indexes = this.store.layerSliceIndexes(layer);
-      if (indexes) {
-        const { xyIndex, zIndex, tIndex } = indexes;
-        location.XY = xyIndex;
-        location.Z =
-          assign.Z.type === "layer" ? zIndex : Number.parseInt(assign.Z.value);
-        location.Time =
-          assign.Time.type === "layer"
-            ? tIndex
-            : Number.parseInt(assign.Time.value);
-      }
-    }
+
+    const { location, channel } = await this.getAnnotationLocationFromTool(
+      tool
+    );
 
     // Create the new annotation
+    const toolAnnotation = tool.values.annotation;
     const newAnnotation: IAnnotation | null = await this.annotationStore.createAnnotation(
       {
         tags: toolAnnotation.tags,
@@ -590,6 +627,12 @@ export default class AnnotationViewer extends Vue {
         const annotation = this.selectedTool.values.annotation;
         this.annotationLayer.mode(annotation?.shape);
         break;
+      case "segmentation":
+        // TODO: tool asks for ROI, change layer mode and trigger computation afterwards
+        // TODO: otherwise, trigger computation here
+        // TODO: when computation is triggered, toggle a bool that enables a v-menu
+        // TODO: for now with just a compute button, but later previews, custom forms served from the started worker ?
+        break;
       case null:
       case undefined:
         this.annotationLayer.mode(null);
@@ -661,6 +704,11 @@ export default class AnnotationViewer extends Vue {
       default:
         break;
     }
+  }
+
+  @Watch("annotations")
+  onAnnotationsChanged() {
+    this.drawAnnotations();
   }
 
   @Watch("unrolling")

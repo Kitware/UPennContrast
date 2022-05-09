@@ -3,7 +3,7 @@
     <template v-slot:activator="{ on, attrs }">
       <v-btn v-bind="attrs" v-on="on">
         <v-icon>mdi-application-export</v-icon>
-        EXPORT CSV
+        EXPORT CSV
       </v-btn>
     </template>
     <v-card>

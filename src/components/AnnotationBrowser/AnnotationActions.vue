@@ -1,34 +1,20 @@
 <template>
-  <v-card>
-    <v-card-actions>
+  <v-expansion-panel>
+    <v-expansion-panel-header>
+      Actions
+    </v-expansion-panel-header>
+    <v-expansion-panel-content>
       <v-container>
         <v-row
           ><v-col><v-btn @click="deleteSelected">Delete Selected</v-btn></v-col>
-          <v-col
-            ><v-btn @click="deleteInactive">Delete Inactive</v-btn></v-col
-          ></v-row
-        >
-        <v-row
-          ><v-col
-            ><v-btn @click="activateSelected">Activate Selected</v-btn></v-col
-          >
-
-          <v-col
-            ><v-btn @click="inactivateSelected"
-              >Inactivate Selected</v-btn
-            ></v-col
-          ></v-row
-        >
-        <v-row
-          ><v-col><v-btn @click="tagSelected">Tag Selected</v-btn></v-col>
+          <v-col><v-btn @click="tagSelected">Tag Selected</v-btn></v-col>
           <v-col
             ><v-btn @click="connectSelected">Connect Selected</v-btn></v-col
           ></v-row
         >
-        <!-- <v-row><v-btn @click="">Act On Selected</v-btn></v-row> -->
       </v-container>
-    </v-card-actions>
-  </v-card>
+    </v-expansion-panel-content>
+  </v-expansion-panel>
 </template>
 
 <script lang="ts">

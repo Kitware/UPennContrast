@@ -59,6 +59,8 @@
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
+import propertiesStore from "@/store/properties";
+
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";
 import { logError } from "@/utils/log";
@@ -78,6 +80,7 @@ const defaultValues = {
 export default class ToolCreation extends Vue {
   readonly store = store;
   readonly toolsStore = toolsStore;
+  readonly propertyStore = propertiesStore;
 
   toolValues: any = { ...defaultValues };
 
@@ -109,6 +112,11 @@ export default class ToolCreation extends Vue {
         tool.template = this.selectedItemTemplate;
         tool.values = this.toolValues;
         tool.type = this.selectedItemTemplate.type;
+        if (tool.type === "segmentation") {
+          const { image } = tool.values.image;
+          this.propertyStore.requestWorkerInterface(image);
+        }
+
         // Update this tool with actual values
         this.toolsStore.updateTool(tool).then(() => {
           this.store.syncConfiguration();

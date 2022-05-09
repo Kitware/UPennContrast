@@ -3,7 +3,7 @@
     <v-app-bar class="elevation-1" app clipped-right>
       <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
       <v-toolbar-title @click="goHome" class="logo"
-        >UPenn Contrast</v-toolbar-title
+        >NimbusImage</v-toolbar-title
       >
       <bread-crumbs />
       <v-spacer />

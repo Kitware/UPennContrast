@@ -6,7 +6,7 @@
           <!-- tags -->
           <tag-picker v-model="tags"></tag-picker>
         </v-col>
-        <v-col>
+        <v-col v-if="!hideShape">
           <!-- shape selection -->
           <v-select
             label="Shape"
@@ -78,7 +78,7 @@ import toolsStore from "@/store/tool";
 import LayerSelect from "@/components/LayerSelect.vue";
 import TagPicker from "@/components/TagPicker.vue";
 
-import { IToolConfiguration } from "@/store/model";
+import { AnnotationNames, AnnotationShape } from "@/store/model";
 
 type VForm = Vue & { validate: () => boolean };
 
@@ -111,16 +111,28 @@ export default class AnnotationConfiguration extends Vue {
   readonly template!: any;
 
   @Prop()
+  readonly hideShape!: string;
+
+  @Prop()
   readonly value!: any;
 
-  availableShapes = [
-    { text: "Point", value: "point" },
-    { text: "Line", value: "line" },
-    { text: "Blob", value: "polygon" }
+  availableShapes: { value: string; text: string }[] = [
+    {
+      text: AnnotationNames[AnnotationShape.Point],
+      value: AnnotationShape.Point
+    },
+    {
+      text: AnnotationNames[AnnotationShape.Polygon],
+      value: AnnotationShape.Polygon
+    },
+    {
+      text: AnnotationNames[AnnotationShape.Line],
+      value: AnnotationShape.Line
+    }
   ];
 
   label: string = "";
-  shape: string = "";
+  shape: AnnotationShape | null = null;
   tags: string[] = [];
 
   get layers() {
@@ -166,7 +178,7 @@ export default class AnnotationConfiguration extends Vue {
       Time: { type: "layer", value: 1, max: this.maxTime }
     };
     this.tags = [];
-    this.shape = "point";
+    this.shape = AnnotationShape.Point;
 
     this.changed();
   }

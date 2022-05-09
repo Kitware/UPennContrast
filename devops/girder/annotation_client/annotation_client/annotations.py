@@ -34,7 +34,7 @@ class UPennContrastAnnotationClient:
 
     # Annotations
 
-    def getAnnotationsByDatasetId(self, datasetId, shape=None):
+    def getAnnotationsByDatasetId(self, datasetId, shape=None, limit=50, offset=0):
         """
         Get the list of all annotations in the specified dataset
 
@@ -45,7 +45,7 @@ class UPennContrastAnnotationClient:
         url = PATHS['annotation_by_dataset'].format(datasetId=datasetId)
 
         if shape:
-            url = '{url}&shape={shape}'.format(url=url, shape=shape)
+            url = '{url}&shape={shape}&limit={limit}&offset{offset}'.format(url=url, shape=shape, limit=limit, offset=offset)
 
         return self.client.get(url)
 

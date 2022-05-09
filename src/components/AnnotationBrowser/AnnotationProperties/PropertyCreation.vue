@@ -20,11 +20,10 @@
               </v-row>
               <v-row>
                 <v-col>
-                  <v-text-field
-                    label="Docker image"
+                  <docker-image-select
                     dense
                     v-model="dockerImage"
-                  ></v-text-field>
+                  ></docker-image-select>
                 </v-col>
               </v-row>
               <v-row>
@@ -48,7 +47,7 @@
                   <tag-filter-editor
                     v-if="propertyType === 'relational'"
                     v-model="propertyTags"
-                    property="true"
+                    :property="true"
                   ></tag-filter-editor>
                   <v-select
                     v-if="propertyType === 'morphology'"
@@ -80,12 +79,18 @@
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import propertiesStore from "@/store/properties";
-import { IAnnotationProperty, ITagAnnotationFilter } from "@/store/model";
+import {
+  IAnnotationProperty,
+  ITagAnnotationFilter,
+  AnnotationShape,
+  AnnotationNames
+} from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
+import DockerImageSelect from "@/components/DockerImageSelect.vue";
 
 // Popup for new tool configuration
-@Component({ components: { LayerSelect, TagFilterEditor } })
+@Component({ components: { LayerSelect, TagFilterEditor, DockerImageSelect } })
 export default class PropertyCreation extends Vue {
   readonly store = store;
   readonly propertiesStore = propertiesStore;
@@ -134,18 +139,23 @@ export default class PropertyCreation extends Vue {
   propertyTags: ITagAnnotationFilter = {
     tags: [],
     exclusive: false,
-    shape: "point",
     enabled: false,
     id: "Relational property tags"
   };
-  propertyShape: "point" | "polygon" | "line" | null = null;
+  propertyShape: AnnotationShape | null = null;
   shapeItems: { label: string; value: string | null }[] = [
     {
-      label: "Points",
-      value: "point"
+      label: AnnotationNames[AnnotationShape.Point],
+      value: AnnotationShape.Point
     },
-    { label: "Polygons (blobs)", value: "polygon" },
-    { label: "Lines", value: "line" },
+    {
+      label: AnnotationNames[AnnotationShape.Polygon],
+      value: AnnotationShape.Polygon
+    },
+    {
+      label: AnnotationNames[AnnotationShape.Line],
+      value: AnnotationShape.Line
+    },
     { label: "No restrictions", value: null }
   ];
 
@@ -166,6 +176,7 @@ export default class PropertyCreation extends Vue {
       enabled: false,
       computed: false
     });
+    this.propertiesStore.requestWorkerInterface(this.dockerImage);
     this.close();
   }
 

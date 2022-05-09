@@ -1,5 +1,5 @@
 from girder.models.model_base import AccessControlledModel
-from girder.exceptions import AccessException, ValidationException
+from girder.exceptions import AccessException, ValidationException, RestException
 from girder.constants import AccessType
 from ..helpers.tasks import runComputeJob
 
@@ -89,7 +89,10 @@ class AnnotationProperty(AccessControlledModel):
     def compute(self, propertyId, datasetId, params):
         query = { 'name': propertyId }
         property = self.findOne(query)
+        image = property.get('image', None)
+        if not image:
+            raise RestException(code=500, message="Invalid property: no image")
 
         if property:
-            return runComputeJob(property, datasetId, params)
+            return runComputeJob(image, datasetId, params)
         return {}
