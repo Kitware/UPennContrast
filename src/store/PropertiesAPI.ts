@@ -97,7 +97,6 @@ export default class AnnotationsAPI {
 
   async getWorkerImages(): Promise<string[]> {
     return this.client.get("worker_interface/available").then(res => {
-      console.log(res.data);
       return res.data;
     });
   }
