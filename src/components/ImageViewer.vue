@@ -310,6 +310,12 @@ export default class ImageViewer extends Vue {
       }
       if (this.imageLayers.length) {
         this.layerParams.queue = this.imageLayers[0].queue;
+        // note: we should refactor this if we expose the _track parameter
+        // officially.
+        this.imageLayers[0].queue._track = Math.max(
+          this.imageLayers[0].queue._track,
+          (this.imageLayers.length + 1) * 600
+        );
       }
       this.imageLayers.push(this.map.createLayer("osm", this.layerParams));
       let layer = this.imageLayers[this.imageLayers.length - 1];
