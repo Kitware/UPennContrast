@@ -2,7 +2,6 @@ import annotation_client.annotations as annotations
 import annotation_client.tiles as tiles
 import girder_client
 import urllib
-import imageio
 
 PATHS = {
     'interface': '/worker_interface?image={image}',
@@ -106,11 +105,9 @@ class UPennContrastWorkerClient:
             time, {}).setdefault(z, {}).get(xy, None)
 
         if image is None:
-            # Download the image at specified location
-            pngBuffer = self.datasetClient.getRawImage(xy, z, time, channel)
-
-            # Read the png buffer
-            image = imageio.imread(pngBuffer)
+            # Obtain the image at specified location
+            frame = self.datasetClient.coordinatesToFrameIndex(xy, z, time, channel)
+            image = self.datasetClient.getRegion(self.datasetId, frame=frame).squeeze()
 
             # Cache the image
             self.images[channel][time][z][xy] = image
@@ -122,4 +119,3 @@ class UPennContrastWorkerClient:
         property_values = {self.propertyName: values}
 
         self.annotationClient.addAnnotationPropertyValues(self.datasetId, annotation['_id'], property_values)
- 
