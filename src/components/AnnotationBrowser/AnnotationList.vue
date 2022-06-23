@@ -19,8 +19,8 @@
       <v-data-table
         :items="filtered"
         :headers="headers"
-        item-key="id"
         v-model="selected"
+        item-key="id"
         show-select
         :options="tableOptions"
       >
@@ -35,10 +35,10 @@
             >
               <td :class="tableItemClass">
                 <v-checkbox
-                  multiple
-                  v-model="selected"
-                  :value="item"
                   hide-details
+                  multiple
+                  :value="item"
+                  v-model="selected"
                 ></v-checkbox>
               </td>
               <td :class="tableItemClass">
@@ -120,7 +120,15 @@ export default class AnnotationList extends Vue {
 
   // TODO: clean up selected after filter changes
   get selected() {
-    return this.annotationStore.selectedAnnotations;
+    if (!this.filtered) {
+      return [];
+    }
+    const selectedAnnotationsIds = this.annotationStore.selectedAnnotations.map(
+      annotation => annotation.id
+    );
+    return this.filtered.filter(annotation =>
+      selectedAnnotationsIds.includes(annotation.id)
+    );
   }
 
   set selected(selected: IAnnotation[]) {

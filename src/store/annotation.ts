@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import {
   getModule,
   Action,
@@ -97,6 +98,16 @@ export class Annotations extends VuexModule {
   @Mutation
   public setSelected(selected: IAnnotation[]) {
     this.selectedAnnotations = selected;
+  }
+
+  @Mutation
+  public appendSelected(selected: IAnnotation[]) {
+    console.log('appendSelected', selected);
+    const annotationToSelect = selected.filter(
+      annotation => !this.selectedAnnotations.includes(annotation)
+    );
+    this.selectedAnnotations = [...this.selectedAnnotations, ...annotationToSelect];
+    console.log('this.selectedAnnotations', this.selectedAnnotations);
   }
 
   @Action
@@ -235,9 +246,10 @@ export class Annotations extends VuexModule {
         Promise<IAnnotation[]>,
         Promise<IAnnotationConnection[]>
       ] = [
-        this.annotationsAPI.getAnnotationsForDatasetId(main.dataset.id),
-        this.annotationsAPI.getConnectionsForDatasetId(main.dataset.id)
-      ];
+          // eslint-disable-next-line prettier/prettier
+          this.annotationsAPI.getAnnotationsForDatasetId(main.dataset.id),
+          this.annotationsAPI.getConnectionsForDatasetId(main.dataset.id)
+        ];
       Promise.all(promises).then(
         ([annotations, connections]: [
           IAnnotation[],
