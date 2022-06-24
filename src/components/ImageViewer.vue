@@ -231,7 +231,7 @@ export default class ImageViewer extends Vue {
     delete params.layer.tilesMaxBounds;
     params.layer.url =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQIHWNgYAAAAAMAAU9ICq8AAAAASUVORK5CYII=";
-    params.map.max += 4;
+    params.map.max += 5;
     this.layerParams = params.layer;
     if (!this.map) {
       this.map = geojs.map(params.map);
