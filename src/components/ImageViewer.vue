@@ -227,10 +227,11 @@ export default class ImageViewer extends Vue {
     params.map.center = { x: mapWidth / 2, y: mapHeight / 2 };
     params.layer.useCredentials = true;
     params.layer.autoshareRenderer = false;
+    params.layer.nearestPixel = params.layer.maxLevel;
     delete params.layer.tilesMaxBounds;
     params.layer.url =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQIHWNgYAAAAAMAAU9ICq8AAAAASUVORK5CYII=";
-    params.map.max += 1;
+    params.map.max += 5;
     this.layerParams = params.layer;
     if (!this.map) {
       this.map = geojs.map(params.map);
