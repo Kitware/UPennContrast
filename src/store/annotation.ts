@@ -102,12 +102,10 @@ export class Annotations extends VuexModule {
 
   @Mutation
   public appendSelected(selected: IAnnotation[]) {
-    console.log('appendSelected', selected);
     const annotationToSelect = selected.filter(
       annotation => !this.selectedAnnotations.includes(annotation)
     );
     this.selectedAnnotations = [...this.selectedAnnotations, ...annotationToSelect];
-    console.log('this.selectedAnnotations', this.selectedAnnotations);
   }
 
   @Action

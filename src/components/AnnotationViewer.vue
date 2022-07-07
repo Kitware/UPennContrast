@@ -281,8 +281,6 @@ export default class AnnotationViewer extends Vue {
           id !== this.hoveredAnnotationId || !this.isAnnotationSelected(id)
       );
 
-    console.log("displayedIds", displayedIds);
-
     // Then draw the new annotations
     this.drawNewAnnotations(displayedIds);
     if (this.shouldDrawConnections) {
@@ -465,12 +463,10 @@ export default class AnnotationViewer extends Vue {
     newGeoJSAnnotation.options("girderId", annotation.id);
 
     if (annotation.id === this.hoveredAnnotationId) {
-      console.log("HERE");
       newGeoJSAnnotation.options("isHovered", true);
     }
 
     if (this.isAnnotationSelected(annotation.id)) {
-      console.log("SELECTED -- HERE");
       newGeoJSAnnotation.options("isSelected", true);
     }
 
@@ -721,10 +717,16 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
+  private getMapUnitsPerPixel(): number {
+    const map = this.annotationLayer.map();
+    return map.unitsPerPixel(map.zoom());
+  }
+
   shouldSelectAnnotation(
     selectionAnnotationType: AnnotationShape,
     selectionAnnotationCoordinates: any[],
-    annotation: IAnnotation
+    annotation: IAnnotation,
+    unitsPerPixel: number
   ) {
     const annotationCoordinates = annotation.coordinates;
 
@@ -733,36 +735,36 @@ export default class AnnotationViewer extends Vue {
       // Case 1: Annotation to test is a "Point":
       // The distance point to point should be lower than the annotation radius
       // Case 2: Annotation to test is a "Line":
-      // The distance between the line and the point should be lower than the selectionAnnotation radius
+      // The distance between the line and the point should be lower than the lineAnnotation width
       // Case 3: Annotation to test is "Polygon":
       // Check if the selection point is positioned into the Polygon.
 
       const selectionPosition = selectionAnnotationCoordinates[0];
-      const radius = this.getAnnotationStyle(annotation).radius;
+      const { radius, strokeWidth } = this.getAnnotationStyle(annotation);
 
       if (annotation.shape === AnnotationShape.Point) {
+        const annotationRadius = (radius + strokeWidth) * unitsPerPixel;
         const annotationPosition = annotationCoordinates[0];
-        const distance = pointDistance(annotationPosition, selectionPosition);
-        if (distance < radius) {
-          console.log("distance", distance);
-          console.log("radius", radius);
-          console.log("annotation", annotation);
-        }
-        return pointDistance(annotationPosition, selectionPosition) < radius;
+        return (
+          pointDistance(selectionPosition, annotationPosition) <
+          annotationRadius
+        );
       } else if (annotation.shape === AnnotationShape.Line) {
+        // Check if click on points of the line, or on the line directly
+        const width = strokeWidth * unitsPerPixel;
         return annotationCoordinates.reduce(
           (isIn: boolean, point: any, index: number) => {
             let isPointInLine = false;
             if (index === annotationCoordinates.length - 1) {
               // Specific case for the last point that does not have a next point
-              isPointInLine = pointDistance(point, selectionPosition) < radius;
+              isPointInLine = pointDistance(point, selectionPosition) < width;
             } else {
               isPointInLine =
                 geojs.util.distance2dToLineSquared(
                   selectionPosition,
                   point,
                   annotationCoordinates[index + 1]
-                ) < radius;
+                ) < width;
             }
             return isIn || isPointInLine;
           },
@@ -810,6 +812,7 @@ export default class AnnotationViewer extends Vue {
             const selectAnnotation = evt.annotation;
             const coordinates = selectAnnotation.coordinates();
             const type = selectAnnotation.type();
+            const unitsPerPixel = this.getMapUnitsPerPixel();
 
             // Get selected annotations.
             const selectedAnnotations = this.annotations.filter(
@@ -819,7 +822,8 @@ export default class AnnotationViewer extends Vue {
                 return this.shouldSelectAnnotation(
                   type,
                   coordinates,
-                  annotation
+                  annotation,
+                  unitsPerPixel
                 );
               }
             );
