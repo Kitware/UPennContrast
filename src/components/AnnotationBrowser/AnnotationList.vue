@@ -230,7 +230,7 @@ export default class AnnotationList extends Vue {
   }
 
   hover(annotationId: string | null) {
-    this.annotationStore.setHoveredAnnoationId(annotationId);
+    this.annotationStore.setHoveredAnnotationId(annotationId);
   }
 
   get selectionFilterEnabled() {

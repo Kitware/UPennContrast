@@ -49,7 +49,7 @@ export class Annotations extends VuexModule {
   hoveredAnnotationId: string | null = null;
 
   @Mutation
-  public setHoveredAnnoationId(id: string | null) {
+  public setHoveredAnnotationId(id: string | null) {
     this.hoveredAnnotationId = id;
   }
 

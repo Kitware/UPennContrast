@@ -669,7 +669,7 @@ export default class AnnotationViewer extends Vue {
       annotation = evt.data[0][2].annotation;
     }
     if (annotation && annotation.options("girderId")) {
-      this.annotationStore.setHoveredAnnoationId(
+      this.annotationStore.setHoveredAnnotationId(
         annotation.options("girderId")
       );
     }
@@ -685,7 +685,7 @@ export default class AnnotationViewer extends Vue {
       annotation.options("girderId") &&
       this.hoveredAnnotationId === annotation.options("girderId")
     ) {
-      this.annotationStore.setHoveredAnnoationId(null);
+      this.annotationStore.setHoveredAnnotationId(null);
     }
   }
 
