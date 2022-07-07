@@ -149,6 +149,11 @@ export default class AnnotationViewer extends Vue {
       : { text: null, image: "" };
   }
 
+  // Check if an annotation is selected on store using its girderId
+  isAnnotationSelected(annotationId: string) {
+    return this.annotationStore.selectedAnnotationIds.includes(annotationId);
+  }
+
   @Watch("displayWorkerPreview")
   @Watch("workerPreview")
   renderWorkerPreview() {
@@ -180,6 +185,10 @@ export default class AnnotationViewer extends Vue {
     return this.annotationStore.hoveredAnnotationId;
   }
 
+  get selectedAnnotations() {
+    return this.annotationStore.selectedAnnotations;
+  }
+
   getAnyLayerForChannel(channel: number) {
     return this.layers.find(
       (layer: IDisplayLayer) => channel === layer.channel
@@ -198,7 +207,8 @@ export default class AnnotationViewer extends Vue {
     const layer = this.getAnyLayerForChannel(annotation.channel);
     return getAnnotationStyleFromLayer(
       layer,
-      annotation.id === this.hoveredAnnotationId
+      annotation.id === this.hoveredAnnotationId,
+      this.isAnnotationSelected(annotation.id)
     );
   }
 
@@ -266,7 +276,12 @@ export default class AnnotationViewer extends Vue {
     const displayedIds = this.annotationLayer
       .annotations()
       .map((a: any) => a.options("girderId"))
-      .filter((id: string) => id !== this.hoveredAnnotationId);
+      .filter(
+        (id: string) =>
+          id !== this.hoveredAnnotationId || !this.isAnnotationSelected(id)
+      );
+
+    console.log("displayedIds", displayedIds);
 
     // Then draw the new annotations
     this.drawNewAnnotations(displayedIds);
@@ -312,16 +327,27 @@ export default class AnnotationViewer extends Vue {
         girderId,
         isHovered,
         isConnection,
-        location
+        location,
+        isSelected
       } = annotation.options();
 
       if (!girderId) {
         return;
       }
 
+      // Remove (not)hovered annotation
       if (girderId === this.hoveredAnnotationId && !isHovered) {
         this.annotationLayer.removeAnnotation(annotation, false);
       } else if (girderId !== this.hoveredAnnotationId && isHovered) {
+        this.annotationLayer.removeAnnotation(annotation, false);
+      }
+
+      // Remove (un)selected annotation
+      const isSelectedOnStore = this.isAnnotationSelected(girderId);
+      if (
+        (!isSelected && isSelectedOnStore) ||
+        (isSelected && !isSelectedOnStore)
+      ) {
         this.annotationLayer.removeAnnotation(annotation, false);
       }
 
@@ -347,7 +373,7 @@ export default class AnnotationViewer extends Vue {
         return;
       }
 
-      if (girderId === this.hoveredAnnotationId) {
+      if (girderId === this.hoveredAnnotationId || isSelectedOnStore) {
         return;
       }
 
@@ -439,7 +465,13 @@ export default class AnnotationViewer extends Vue {
     newGeoJSAnnotation.options("girderId", annotation.id);
 
     if (annotation.id === this.hoveredAnnotationId) {
+      console.log("HERE");
       newGeoJSAnnotation.options("isHovered", true);
+    }
+
+    if (this.isAnnotationSelected(annotation.id)) {
+      console.log("SELECTED -- HERE");
+      newGeoJSAnnotation.options("isSelected", true);
     }
 
     const style = newGeoJSAnnotation.options("style");
@@ -689,17 +721,7 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-  isAnnotationSelected(selectionAnnotation: any, annotation: IAnnotation) {
-    return this.isAnnotationSelectedInternal(
-      selectionAnnotation,
-      selectionAnnotation.type(),
-      selectionAnnotation.coordinates,
-      annotation
-    );
-  }
-
-  isAnnotationSelectedInternal(
-    selectionAnnotation: any,
+  shouldSelectAnnotation(
     selectionAnnotationType: AnnotationShape,
     selectionAnnotationCoordinates: any[],
     annotation: IAnnotation
@@ -708,18 +730,24 @@ export default class AnnotationViewer extends Vue {
 
     if (selectionAnnotationType === AnnotationShape.Point) {
       // If the selection annotation type is "Point"
-      // Case 1: The type of the annotation to test is a "Point":
+      // Case 1: Annotation to test is a "Point":
       // The distance point to point should be lower than the annotation radius
-      // Case 2: The type of the annotation to test is a "Line":
+      // Case 2: Annotation to test is a "Line":
       // The distance between the line and the point should be lower than the selectionAnnotation radius
-      // Case 3: The type of the annotation to test is "Polygon":
+      // Case 3: Annotation to test is "Polygon":
       // Check if the selection point is positioned into the Polygon.
 
       const selectionPosition = selectionAnnotationCoordinates[0];
-      const radius = this.getAnnotationStyle(selectionAnnotation).radius;
+      const radius = this.getAnnotationStyle(annotation).radius;
 
       if (annotation.shape === AnnotationShape.Point) {
         const annotationPosition = annotationCoordinates[0];
+        const distance = pointDistance(annotationPosition, selectionPosition);
+        if (distance < radius) {
+          console.log("distance", distance);
+          console.log("radius", radius);
+          console.log("annotation", annotation);
+        }
         return pointDistance(annotationPosition, selectionPosition) < radius;
       } else if (annotation.shape === AnnotationShape.Line) {
         return annotationCoordinates.reduce(
@@ -788,8 +816,7 @@ export default class AnnotationViewer extends Vue {
               (annotation: IAnnotation) => {
                 const annotationType = annotation.shape;
                 const isPoint = annotationType === AnnotationShape.Point;
-                return this.isAnnotationSelectedInternal(
-                  selectAnnotation,
+                return this.shouldSelectAnnotation(
                   type,
                   coordinates,
                   annotation
@@ -911,6 +938,11 @@ export default class AnnotationViewer extends Vue {
       geojs.event.annotation.state,
       this.handleAnnotationChange
     );
+    this.drawAnnotations();
+  }
+
+  @Watch("selectedAnnotations")
+  updateSelectedAnnotationsStyle() {
     this.drawAnnotations();
   }
 
