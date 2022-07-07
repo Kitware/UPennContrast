@@ -219,6 +219,10 @@ export default class NewDataset extends Vue {
       this.files.map(f => f.file.name)
     );
 
+    if (this.dataset?.id) {
+      this.store.scheduleTileFramesComputation(this.dataset.id);
+    }
+
     this.$router.push({
       name: "dataset",
       params: {
