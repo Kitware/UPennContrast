@@ -1,9 +1,23 @@
+import io
+import json
+
+import large_image
+import yaml
+from girder import events, logger
 from girder.api import access
 from girder.api.describe import Description, autoDescribeRoute
 from girder.api.rest import boundHandler, filtermodel
-from girder.constants import TokenScope
+from girder.constants import AccessType, TokenScope
+from girder.exceptions import RestException
+from girder.models.file import File
 from girder.models.folder import Folder
 from girder.models.item import Item
+from girder.models.upload import Upload
+from girder.models.user import User
+from girder_jobs.constants import JobStatus
+from girder_large_image.models.image_item import ImageItem
+
+conversionJobs = {}
 
 
 def addSystemEndpoints(apiRoot):
@@ -14,8 +28,14 @@ def addSystemEndpoints(apiRoot):
     """
     # Added to the item route
     apiRoot.item.route('GET', ('query',), getItemsByQuery)
+    apiRoot.item.route('PUT', (':itemId', 'cache_maxmerge'), cacheMaxMerge)
     # Added to the folder route
     apiRoot.folder.route('GET', ('query',), getFoldersByQuery)
+
+    # Also bind some events
+    events.bind('jobs.job.update.after', 'upenncontrast_annotation', _updateJob)
+    events.bind('model.job.save', 'upenncontrast_annotation', _updateJob)
+    events.bind('model.job.remove', 'upenncontrast_annotation', _updateJob)
 
 
 @access.public(scope=TokenScope.DATA_READ)
@@ -48,3 +68,152 @@ def getItemsByQuery(self, query, limit, offset, sort):
 def getFoldersByQuery(self, query, limit, offset, sort):
     user = self.getCurrentUser()
     return Folder().findWithPermissions(query, offset=offset, limit=limit, sort=sort, user=user)
+
+
+@access.user
+@autoDescribeRoute(
+    Description('Create images that cache max-merge values.')
+    .modelParam('itemId', model=Item, level=AccessType.READ)
+    .errorResponse()
+)
+@boundHandler()
+def cacheMaxMerge(self, item):
+    user = self.getCurrentUser()
+    ts = ImageItem._loadTileSource(item, format=large_image.constants.TILE_FORMAT_NUMPY)
+    if ts.tileWidth != ts.tileHeight and (ts.tileWidth < ts.sizeX or ts.tileHeight < ts.sizeY):
+        raise RestException('Cannot generate merge file')
+    metadata = ts.getMetadata()
+    if 'IndexRange' not in metadata or 'IndexStride' not in metadata:
+        raise Exception('Specified item is not multi-frame')
+    sample = ts.getSingleTile()
+    for axis in ['Z', 'T', 'ZT']:
+        if axis != 'ZT':
+            stride = metadata['IndexStride'].get(f'Index{axis}', 1)
+            count = metadata['IndexRange'].get(f'Index{axis}', 0)
+            stride2 = 1
+            count2 = 1
+        else:
+            stride = metadata['IndexStride'].get('IndexZ', 1)
+            count = metadata['IndexRange'].get('IndexZ', 0)
+            stride2 = metadata['IndexStride'].get('IndexT', 1)
+            count2 = metadata['IndexRange'].get('IndexT', 0)
+        if stride and count * count2 > 1:
+            style = {
+                'dtype': str(sample['tile'].dtype),
+                'bands': [{'framedelta': idx * stride, 'min': 'full', 'max': 'full'}
+                          for idx in range(count)],
+            }
+            if sample['tile'].shape[2] == 1:
+                style['axis'] = 0
+            multi = {
+                'tileWidth': ts.tileWidth,
+                'tileHeight': ts.tileHeight,
+                'sources': [{
+                    'path': 'girder://%s' % item['_id'],
+                    'frames': [idx for idx in range(len(metadata['frames']))
+                               if not (idx // stride) % count and not (idx // stride2) % count2],
+                    'style': style,
+                }],
+            }
+            folder = Folder().load(item['folderId'], user=user, level=AccessType.READ)
+            parent = Folder().load(folder['parentId'], user=user, level=AccessType.WRITE)
+            foldername = folder['name'] + '_maxmerge'
+            multi['sources'][0]['path'] = '../%s/%s' % (folder['name'], item['name'])
+            destfolder = Folder().createFolder(
+                parent, foldername, public=folder['public'], creator=user, reuseExisting=True)
+            dest = io.BytesIO()
+            dest.write(yaml.dump(multi).encode())
+            destsize = dest.tell()
+            dest.seek(0)
+            destname = item['name'] + '_maxmerge_' + axis.lower() + '.yaml'
+            destfile = Upload().uploadFromFile(
+                dest, destsize, destname, 'folder', destfolder, user=user)
+            destitem = Item().load(destfile['itemId'], user=user, level=AccessType.READ)
+            ImageItem().delete(destitem)
+            destitem = Item().load(destfile['itemId'], user=user, level=AccessType.READ)
+
+            job = ImageItem().convertImage(
+                destitem, destfile, user, localJob=True,
+                tileSize=max(ts.tileWidth, ts.tileHeight))
+            subs = {}
+            for idx, frame in enumerate(multi['sources'][0]['frames']):
+                framelist = [frame + band['framedelta']
+                             for band in multi['sources'][0]['style']['bands']]
+                subs[json.dumps(framelist, separators=(',', ':'))] = {'frame': idx}
+            conversionJobs[str(job['_id'])] = {
+                'item': item['_id'],
+                'destitem': destitem['_id'],
+                'user': user['_id'],
+                'merge_substitutes': subs,
+            }
+
+
+def _updateJob(event):
+    job = event.info['job'] if event.name == 'jobs.job.update.after' else event.info
+    if '_id' not in job or str(job['_id']) not in conversionJobs:
+        return
+    status = job['status']
+    if event.name == 'model.job.remove' and status not in (
+            JobStatus.ERROR, JobStatus.CANCELED, JobStatus.SUCCESS):
+        status = JobStatus.CANCELED
+    if status not in (JobStatus.ERROR, JobStatus.CANCELED, JobStatus.SUCCESS):
+        return
+    info = conversionJobs.pop(str(job['_id']))
+    user = User().load(info['user'], force=True)
+    try:
+        Item().remove(Item().load(info['destitem'], user=user, level=AccessType.ADMIN))
+    except Exception:
+        pass
+    if status != JobStatus.SUCCESS:
+        return
+    item = Item().load(info['item'], user=user, level=AccessType.WRITE)
+    if 'largeImage' not in item:
+        return
+    item['largeImage'].setdefault('merge_substitutes', {})
+    newFile = File().load(job['results']['file'][0], user=user, level=AccessType.READ)
+    for sub, record in info['merge_substitutes'].items():
+        record['itemId'] = newFile['itemId']
+        item['largeImage']['merge_substitutes'][sub] = record
+    item = Item().save(item)
+
+
+_origImageItem_loadTileSource = ImageItem._loadTileSource
+
+
+@classmethod
+def _loadTileSource(cls, item, **kwargs):
+    ts = _origImageItem_loadTileSource(item, **kwargs)
+    style = getattr(ts, 'style', None)
+    if ('style' in kwargs and style and 'bands' in style and len(style['bands']) > 1 and
+            'merge_substitutes' in item['largeImage']):
+        framelist = []
+        uniform = sub = None
+        for entry in style['bands']:
+            if 'frame' not in entry:
+                uniform = False
+            else:
+                band = entry.copy()
+                framelist.append(band.pop('frame'))
+                if uniform is None:
+                    uniform = band
+                elif uniform != band:
+                    uniform = False
+        if uniform:
+            key = json.dumps(framelist, separators=(',', ':'))
+            sub = item['largeImage']['merge_substitutes'].get(key)
+        if sub:
+            try:
+                subitem = Item().load(sub['itemId'], force=True)
+            except Exception:
+                logger.info('merge substitute file is no longer available')
+                subitem = None
+        if subitem:
+            subkwargs = kwargs.copy()
+            subkwargs.pop('frame', None)
+            uniform['frame'] = sub['frame']
+            subkwargs['style'] = json.dumps({'bands': [uniform]}, separators=(',', ':'))
+            return _origImageItem_loadTileSource(subitem, **subkwargs)
+    return ts
+
+
+ImageItem._loadTileSource = _loadTileSource

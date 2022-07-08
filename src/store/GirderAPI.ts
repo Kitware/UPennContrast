@@ -202,9 +202,7 @@ export default class GirderAPI {
     const style = <ITileOptionsBands>(
       toStyle(color, contrast, hist, layer, ds, image)
     );
-    if (style.bands && style.bands.length > 1 && style.bands[0].frame) {
-      url.searchParams.set("frame", style.bands[0].frame.toString());
-    } else {
+    if (!style.bands || style.bands.length <= 1 || style.bands[0].frame === undefined) {
       url.searchParams.set("frame", image.frameIndex.toString());
     }
     url.searchParams.set("style", JSON.stringify(style));
