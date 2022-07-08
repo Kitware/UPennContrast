@@ -371,7 +371,7 @@ export default class AnnotationViewer extends Vue {
         return;
       }
 
-      if (girderId === this.hoveredAnnotationId || isSelectedOnStore) {
+      if (girderId === this.hoveredAnnotationId) {
         return;
       }
 
