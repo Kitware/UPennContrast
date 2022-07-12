@@ -450,7 +450,8 @@ export default class AnnotationViewer extends Vue {
     const options = {
       girderId: annotation.id,
       isHovered: annotation.id === this.hoveredAnnotationId,
-      location: annotation.location
+      location: annotation.location,
+      isSelected: false
     };
 
     const coordinates = this.unrolledCoordinates(annotation, anyImage);
@@ -531,6 +532,157 @@ export default class AnnotationViewer extends Vue {
       }
     );
     return newAnnotation;
+  }
+
+  private shouldSelectAnnotation(
+    selectionAnnotationType: AnnotationShape,
+    selectionAnnotationCoordinates: any[],
+    annotation: IAnnotation,
+    unitsPerPixel: number
+  ) {
+    const annotationCoordinates = annotation.coordinates;
+
+    if (selectionAnnotationType === AnnotationShape.Point) {
+      // If the selection annotation type is "Point"
+      // Case 1: Annotation to test is a "Point":
+      // The distance point to point should be lower than the annotation radius
+      // Case 2: Annotation to test is a "Line":
+      // The distance between the line and the point should be lower than the lineAnnotation width
+      // Case 3: Annotation to test is "Polygon":
+      // Check if the selection point is positioned into the Polygon.
+
+      const selectionPosition = selectionAnnotationCoordinates[0];
+      const { radius, strokeWidth } = this.getAnnotationStyle(annotation);
+
+      if (annotation.shape === AnnotationShape.Point) {
+        const annotationRadius = (radius + strokeWidth) * unitsPerPixel;
+        const annotationPosition = annotationCoordinates[0];
+        return (
+          pointDistance(selectionPosition, annotationPosition) <
+          annotationRadius
+        );
+      } else if (annotation.shape === AnnotationShape.Line) {
+        // Check if click on points of the line, or on the line directly
+        const width = strokeWidth * unitsPerPixel;
+        return annotationCoordinates.reduce(
+          (isIn: boolean, point: any, index: number) => {
+            let isPointInLine = false;
+            if (index === annotationCoordinates.length - 1) {
+              // Specific case for the last point that does not have a next point
+              isPointInLine = pointDistance(point, selectionPosition) < width;
+            } else {
+              isPointInLine =
+                geojs.util.distance2dToLineSquared(
+                  selectionPosition,
+                  point,
+                  annotationCoordinates[index + 1]
+                ) < width;
+            }
+            return isIn || isPointInLine;
+          },
+          false
+        );
+      } else {
+        return geojs.util.pointInPolygon(
+          selectionPosition,
+          annotationCoordinates
+        );
+      }
+    } else {
+      // If the selection annotation type is "Polygon"
+      // Check if the tested annotation (independently from its type)
+      // is in the defined polygon
+      return annotation.coordinates.reduce((isIn: boolean, point: any) => {
+        const isPointIn = geojs.util.pointInPolygon(
+          point,
+          selectionAnnotationCoordinates
+        );
+        return isIn || isPointIn;
+      }, false);
+    }
+  }
+
+  private getSelectedAnnotationsFromTool(selectAnnotation: any) {
+    const selectLocation = {
+      XY: this.xy,
+      Z: this.z,
+      Time: this.time
+    };
+
+    const coordinates = selectAnnotation.coordinates();
+    const type = selectAnnotation.type();
+
+    // Get general information from the map.
+    // When working with pointAnnotation, unitsPerPixels is necessary to
+    // compute the right value of the radius.
+    const unitsPerPixel = this.getMapUnitsPerPixel();
+
+    // Get selected annotations.
+    // Only select annotations that are located at the same XY and Z
+    return this.annotations
+      .filter((annotation: IAnnotation) => {
+        return (
+          (selectLocation.XY === annotation.location.XY ||
+            this.store.unrollXY) &&
+          (selectLocation.Z === annotation.location.Z || this.store.unrollZ) &&
+          (selectLocation.Time === annotation.location.Time ||
+            this.store.unrollT)
+        );
+      })
+      .filter((annotation: IAnnotation) => {
+        return this.shouldSelectAnnotation(
+          type,
+          coordinates,
+          annotation,
+          unitsPerPixel
+        );
+      });
+  }
+
+  private async selectAnnotations(selectAnnotation: any) {
+    if (!selectAnnotation) {
+      return;
+    }
+
+    const selectLocation = {
+      XY: this.xy,
+      Z: this.z,
+      Time: this.time
+    };
+    const coordinates = selectAnnotation.coordinates();
+    const type = selectAnnotation.type();
+
+    // Get general information from the map.
+    // When working with pointAnnotation, unitsPerPixels is necessary to
+    // compute the right value of the radius.
+    const unitsPerPixel = this.getMapUnitsPerPixel();
+
+    // Get selected annotations.
+    // Only select annotations that are located at the same XY, Z and Time frames
+    const selectedAnnotations = this.annotations
+      .filter((annotation: IAnnotation) => {
+        return (
+          (selectLocation.XY === annotation.location.XY ||
+            this.store.unrollXY) &&
+          (selectLocation.Z === annotation.location.Z || this.store.unrollZ) &&
+          (selectLocation.Time === annotation.location.Time ||
+            this.store.unrollT)
+        );
+      })
+      .filter((annotation: IAnnotation) => {
+        return this.shouldSelectAnnotation(
+          type,
+          coordinates,
+          annotation,
+          unitsPerPixel
+        );
+      });
+
+    // Update annotation store (make sure annotations are selected in the Annotation Browser)
+    this.annotationStore.appendSelected(selectedAnnotations);
+
+    // Remove the selection annotation from layer (do not show the annotation used to select)
+    this.removeSelectionAnnotationFromLayer(selectAnnotation);
   }
 
   private async addAnnotationFromGeoJsAnnotation(annotation: any) {
@@ -722,74 +874,6 @@ export default class AnnotationViewer extends Vue {
     return map.unitsPerPixel(map.zoom());
   }
 
-  shouldSelectAnnotation(
-    selectionAnnotationType: AnnotationShape,
-    selectionAnnotationCoordinates: any[],
-    annotation: IAnnotation,
-    unitsPerPixel: number
-  ) {
-    const annotationCoordinates = annotation.coordinates;
-
-    if (selectionAnnotationType === AnnotationShape.Point) {
-      // If the selection annotation type is "Point"
-      // Case 1: Annotation to test is a "Point":
-      // The distance point to point should be lower than the annotation radius
-      // Case 2: Annotation to test is a "Line":
-      // The distance between the line and the point should be lower than the lineAnnotation width
-      // Case 3: Annotation to test is "Polygon":
-      // Check if the selection point is positioned into the Polygon.
-
-      const selectionPosition = selectionAnnotationCoordinates[0];
-      const { radius, strokeWidth } = this.getAnnotationStyle(annotation);
-
-      if (annotation.shape === AnnotationShape.Point) {
-        const annotationRadius = (radius + strokeWidth) * unitsPerPixel;
-        const annotationPosition = annotationCoordinates[0];
-        return (
-          pointDistance(selectionPosition, annotationPosition) <
-          annotationRadius
-        );
-      } else if (annotation.shape === AnnotationShape.Line) {
-        // Check if click on points of the line, or on the line directly
-        const width = strokeWidth * unitsPerPixel;
-        return annotationCoordinates.reduce(
-          (isIn: boolean, point: any, index: number) => {
-            let isPointInLine = false;
-            if (index === annotationCoordinates.length - 1) {
-              // Specific case for the last point that does not have a next point
-              isPointInLine = pointDistance(point, selectionPosition) < width;
-            } else {
-              isPointInLine =
-                geojs.util.distance2dToLineSquared(
-                  selectionPosition,
-                  point,
-                  annotationCoordinates[index + 1]
-                ) < width;
-            }
-            return isIn || isPointInLine;
-          },
-          false
-        );
-      } else {
-        return geojs.util.pointInPolygon(
-          selectionPosition,
-          annotationCoordinates
-        );
-      }
-    } else {
-      // If the selection annotation type is "Polygon"
-      // Check if the tested annotation (independently from its type)
-      // is in the defined polygon
-      return annotation.coordinates.reduce((isIn: boolean, point: any) => {
-        const isPointIn = geojs.util.pointInPolygon(
-          point,
-          selectionAnnotationCoordinates
-        );
-        return isIn || isPointIn;
-      }, false);
-    }
-  }
-
   handleAnnotationChange(evt: any) {
     this.annotationLayer
       .features()
@@ -809,30 +893,7 @@ export default class AnnotationViewer extends Vue {
           if (this.selectedTool.type === "create") {
             this.addAnnotationFromGeoJsAnnotation(evt.annotation);
           } else if (this.selectedTool.type === "select") {
-            const selectAnnotation = evt.annotation;
-            const coordinates = selectAnnotation.coordinates();
-            const type = selectAnnotation.type();
-            const unitsPerPixel = this.getMapUnitsPerPixel();
-
-            // Get selected annotations.
-            const selectedAnnotations = this.annotations.filter(
-              (annotation: IAnnotation) => {
-                const annotationType = annotation.shape;
-                const isPoint = annotationType === AnnotationShape.Point;
-                return this.shouldSelectAnnotation(
-                  type,
-                  coordinates,
-                  annotation,
-                  unitsPerPixel
-                );
-              }
-            );
-
-            // Update annotation store (make sure annoations are selected in the Annotation Browser)
-            this.annotationStore.appendSelected(selectedAnnotations);
-
-            // Remove the selection annotation from layer (do not show the annotation used to select)
-            this.removeSelectionAnnotationFromLayer(selectAnnotation);
+            this.selectAnnotations(evt.annotation);
           }
         } else if (evt.annotation) {
           this.handleNewROIFilter(evt.annotation);
@@ -961,4 +1022,5 @@ export default class AnnotationViewer extends Vue {
 }
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+</style>

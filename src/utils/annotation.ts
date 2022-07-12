@@ -34,8 +34,8 @@ export function getAnnotationStyleFromLayer(
     style.strokeColor = "gray";
     style.strokeWidth = 4;
   } else if (isSelected) {
-    style.strokeColor = "red";
-    style.strokeWidth = 6;
+    style.strokeColor = layer.color;
+    style.strokeWidth = 5;
   } else if (layer) {
     style.fillColor = layer.color;
     style.strokeColor = layer.color;
