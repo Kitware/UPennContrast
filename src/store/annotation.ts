@@ -101,11 +101,46 @@ export class Annotations extends VuexModule {
   }
 
   @Mutation
-  public appendSelected(selected: IAnnotation[]) {
-    const annotationToSelect = selected.filter(
-      annotation => !this.selectedAnnotations.includes(annotation)
+  public selectAnnotation(annotation: IAnnotation) {
+    if (this.selectedAnnotations.find(a => a.id === annotation.id)) {
+      return;
+    }
+    this.selectedAnnotations = [...this.selectedAnnotations, annotation];
+  }
+
+  @Mutation
+  public selectAnnotations(selected: IAnnotation[]) {
+    const selectedAnnotationIds = this.selectedAnnotations.map((annotation: IAnnotation) => annotation.id);
+    const annotationsToAdd = selected.filter(annotation => !selectedAnnotationIds.includes(annotation.id));
+    this.selectedAnnotations = [...this.selectedAnnotations, ...annotationsToAdd];
+  }
+
+  @Mutation
+  public unselectAnnotation(annotation: IAnnotation) {
+    const index = this.selectedAnnotations.findIndex((a: IAnnotation) => a.id === annotation.id);
+    if (index >= 0) {
+      this.selectedAnnotations.splice(index, 1);
+    }
+  }
+
+  @Mutation
+  public unselectAnnotations(selected: IAnnotation[]) {
+    const selectedAnnotationsIds = selected.map((annotation: IAnnotation) => annotation.id);
+    const annotationsToSelect = this.selectedAnnotations.filter(
+      (annotation: IAnnotation) => !selectedAnnotationsIds.includes(annotation.id)
     );
-    this.selectedAnnotations = [...this.selectedAnnotations, ...annotationToSelect];
+    this.selectedAnnotations = [...annotationsToSelect];
+  }
+
+  @Action
+  public toggleSelected(selected: IAnnotation[]) {
+    selected.forEach(annotation => {
+      if (this.selectedAnnotations.find(a => a.id === annotation.id)) {
+        this.unselectAnnotation(annotation);
+      } else {
+        this.selectAnnotation(annotation);
+      }
+    });
   }
 
   @Action

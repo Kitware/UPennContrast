@@ -678,11 +678,15 @@ export default class AnnotationViewer extends Vue {
         );
       });
 
-    // Update annotation store (make sure annotations are selected in the Annotation Browser)
-    this.annotationStore.appendSelected(selectedAnnotations);
+    // Update annotation store
+    // TODO: should add / Remove / toggle instead of only appending
+
+    // this.annotationStore.selectAnnotations(selectedAnnotations);
+    this.annotationStore.toggleSelected(selectedAnnotations);
+    // this.annotationStore.unselectAnnotations(selectedAnnotations);
 
     // Remove the selection annotation from layer (do not show the annotation used to select)
-    this.removeSelectionAnnotationFromLayer(selectAnnotation);
+    this.annotationLayer.removeAnnotation(selectAnnotation);
   }
 
   private async addAnnotationFromGeoJsAnnotation(annotation: any) {
@@ -825,8 +829,6 @@ export default class AnnotationViewer extends Vue {
       case null:
       case undefined:
         this.annotationLayer.mode(null);
-        // TODO: Check if we want to unselect annotations once the tool has been deselected
-        this.annotationStore.setSelected([]);
         break;
       default:
         logWarning(`${this.selectedTool?.type} tools are not supported yet`);
@@ -902,10 +904,6 @@ export default class AnnotationViewer extends Vue {
       default:
         break;
     }
-  }
-
-  removeSelectionAnnotationFromLayer(annotation: IAnnotation) {
-    this.annotationLayer.removeAnnotation(annotation);
   }
 
   @Watch("annotations")
