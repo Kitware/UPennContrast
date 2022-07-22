@@ -182,9 +182,13 @@ _origImageItem_loadTileSource = ImageItem._loadTileSource
 
 @classmethod
 def _loadTileSource(cls, item, **kwargs):
-    ts = _origImageItem_loadTileSource(item, **kwargs)
-    style = getattr(ts, 'style', None)
-    if ('style' in kwargs and style and 'bands' in style and len(style['bands']) > 1 and
+    style = kwargs.get('style', None)
+    if style and not isinstance(style, dict):
+        try:
+            style = json.loads(style)
+        except Exception:
+            style = None
+    if (style and 'bands' in style and len(style['bands']) > 1 and
             'merge_substitutes' in item['largeImage']):
         framelist = []
         uniform = sub = None
@@ -213,7 +217,7 @@ def _loadTileSource(cls, item, **kwargs):
             uniform['frame'] = sub['frame']
             subkwargs['style'] = json.dumps({'bands': [uniform]}, separators=(',', ':'))
             return _origImageItem_loadTileSource(subitem, **subkwargs)
-    return ts
+    return _origImageItem_loadTileSource(item, **kwargs)
 
 
 ImageItem._loadTileSource = _loadTileSource
