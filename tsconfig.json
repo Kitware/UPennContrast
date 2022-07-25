@@ -19,7 +19,7 @@
     "downlevelIteration": true,
     "sourceMap": true,
     "baseUrl": ".",
-    "types": ["webpack-env", "vuetify", "vue", "geojs", "jest"],
+    "types": ["webpack-env", "vuetify", "vue", "geojs", "jest", "node"],
     "paths": {
       "@/*": ["src/*"]
     },

@@ -52,9 +52,7 @@ import store from "@/store";
 
 import {
   collectFilenameMetadata,
-  triggers,
-  makeAlternation,
-  getFilenameMetadata
+  collectFilenameMetadata2
 } from "@/utils/parsing";
 import { IGirderItem } from "@/girder";
 
@@ -146,6 +144,19 @@ export default class NewDataset extends Vue {
     C: null
   };
 
+  collectedMetadata: {
+    metadata: {
+      [key: string]: string[];
+      t: string[];
+      xy: string[];
+      z: string[];
+      chan: string[];
+    };
+    filesInfo: {
+      [key: string]: { [key: string]: number[] };
+    };
+  } | null = null;
+
   strides: {
     [id: string]: number | null;
   } | null = null;
@@ -169,6 +180,7 @@ export default class NewDataset extends Vue {
         { id, size, name: name ? name : id, source }
       ];
     }
+    console.log("this.dimensions ---- END", this.dimensions);
   }
 
   setDimensionName(id: string, source: string, name: string) {
@@ -201,14 +213,18 @@ export default class NewDataset extends Vue {
     const items = await this.store.api.getItems(this.datasetId);
     this.girderItems = items;
 
+    //  Get info from filename
     const names = items.map(item => item.name);
 
-    const meta = collectFilenameMetadata(names, false);
-    this.addSizeToDimension("Z", meta.z.length, Sources.Filename);
-    this.addSizeToDimension("C", meta.chan.length, Sources.Filename);
-    this.addSizeToDimension("T", meta.t.length, Sources.Filename);
-    this.addSizeToDimension("XY", meta.xy.length, Sources.Filename);
+    // const meta = collectFilenameMetadata(names, false);
+    this.collectedMetadata = collectFilenameMetadata2(names);
+    const { metadata } = this.collectedMetadata;
+    this.addSizeToDimension("Z", metadata.z.length, Sources.Filename);
+    this.addSizeToDimension("C", metadata.chan.length, Sources.Filename);
+    this.addSizeToDimension("T", metadata.t.length, Sources.Filename);
+    this.addSizeToDimension("XY", metadata.xy.length, Sources.Filename);
 
+    // Get info from file
     const tiles = await Promise.all(
       items.map(item => this.store.api.getTiles(item))
     );
@@ -238,10 +254,15 @@ export default class NewDataset extends Vue {
           .forEach((channel: string) => channels.push(channel));
       }
     });
-    this.addSizeToDimension("C", channels.length, Sources.File);
-    const channelName = `{ ${channels.join()} }`;
-    this.setDimensionName("C", Sources.File, channelName);
-    this.channels = channels;
+
+    if (channels.length > 0) {
+      this.addSizeToDimension("C", channels.length, Sources.File);
+      const channelName = `{ ${channels.join()} }`;
+      this.setDimensionName("C", Sources.File, channelName);
+    }
+
+    this.channels = channels.length > 0 ? channels : metadata.chan;
+
     if (!this.channels.length) {
       this.channels = ["Default"];
     }
@@ -260,10 +281,14 @@ export default class NewDataset extends Vue {
       T: 0
     };
     // First compute strides within files
-    const meta = collectFilenameMetadata(
-      this.girderItems.map(item => item.name),
-      false
-    );
+    // const meta = collectFilenameMetadata(
+    //   this.girderItems.map(item => item.name),
+    //   false
+    // );
+
+    const filesInfo = this.collectedMetadata
+      ? this.collectedMetadata.filesInfo
+      : null;
 
     const description = {
       channels: this.channels,
@@ -272,17 +297,27 @@ export default class NewDataset extends Vue {
         Object.entries(this.assignments)
           .filter(([_, assignment]) => !!assignment)
           .forEach(([assignmentId, assignment]) => {
-            source[`${assignmentId.toLowerCase()}Values`] = [
-              dimCount[assignmentId]
-            ];
-            dimCount[assignmentId] +=
-              assignment?.value.source === Sources.Filename
-                ? assignment.value.size / this.girderItems.length
-                : assignment?.value.size || 0;
+            let value = dimCount[assignmentId];
+
+            if (assignment?.value.source === Sources.Filename) {
+              let id = assignment?.value.id;
+              if (id && filesInfo) {
+                id = id === "C" ? "chan" : id;
+                value = filesInfo[item.name][id.toLowerCase()];
+              }
+            } else {
+              dimCount[assignmentId] += assignment?.value.size || 0;
+            }
+            source[`${assignmentId.toLowerCase()}Values`] = value;
+            // dimCount[assignmentId] +=
+            //   assignment?.value.source === Sources.Filename
+            //     ? assignment.value.size / this.girderItems.length
+            //     : assignment?.value.size || 0;
           });
         return source;
       })
     };
+
     const newItemId = await this.store.addMultiSourceMetadata({
       parentId: this.datasetId,
       metadata: JSON.stringify(description)

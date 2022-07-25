@@ -175,7 +175,6 @@ export default class AnnotationList extends Vue {
 
   getPropertyValueForAnnotation(annotation: IAnnotation, propertyId: string) {
     const values = this.propertyStore.propertyValues[annotation.id];
-    console.log(propertyId, annotation.id, annotation.channel, annotation, this.propertyStore.propertyValues, values ? values[propertyId] : '-');
     if (!values) {
       return "-";
     }
