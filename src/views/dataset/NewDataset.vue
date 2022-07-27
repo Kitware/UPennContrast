@@ -221,6 +221,7 @@ export default class NewDataset extends Vue {
 
     if (this.dataset?.id) {
       this.store.scheduleTileFramesComputation(this.dataset.id);
+      this.store.scheduleMaxMergeCache(this.dataset.id);
     }
 
     this.$router.push({

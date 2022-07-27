@@ -990,6 +990,11 @@ export class Main extends VuexModule {
   async scheduleTileFramesComputation(datasetId: string) {
     return this.api.scheduleTileFramesComputation(datasetId);
   }
+
+  @Action
+  async scheduleMaxMergeCache(datasetId: string) {
+    return this.api.scheduleMaxMergeCache(datasetId);
+  }
 }
 
 const main = getModule(Main);
