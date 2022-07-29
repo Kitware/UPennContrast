@@ -596,13 +596,9 @@ export default class AnnotationViewer extends Vue {
       // If the selection annotation type is "Polygon"
       // Check if the tested annotation (independently from its type)
       // is in the defined polygon
-      return annotation.coordinates.reduce((isIn: boolean, point: any) => {
-        const isPointIn = geojs.util.pointInPolygon(
-          point,
-          selectionAnnotationCoordinates
-        );
-        return isIn || isPointIn;
-      }, false);
+      return annotation.coordinates.some((point: any) => {
+        return geojs.util.pointInPolygon(point, selectionAnnotationCoordinates);
+      });
     }
   }
 
@@ -625,29 +621,24 @@ export default class AnnotationViewer extends Vue {
     const unitsPerPixel = this.getMapUnitsPerPixel();
 
     // Get selected annotations.
-    // Only select annotations that are located at the same XY, Z and Time frames
-    const selectedAnnotations = this.annotations
-      .filter((annotation: IAnnotation) => {
+    // Only select annotations that are located at the same XY, Z and Time frames and with a visible channel
+    const selectedAnnotations = this.annotations.filter(
+      (annotation: IAnnotation) => {
         return (
-          (selectLocation.XY === annotation.location.XY ||
-            this.store.unrollXY) &&
-          (selectLocation.Z === annotation.location.Z || this.store.unrollZ) &&
-          (selectLocation.Time === annotation.location.Time ||
-            this.store.unrollT)
+          this.shouldDisplayAnnotationWithLocation(annotation.location) &&
+          this.shouldDisplayAnnotationWithChannel(annotation.channel) &&
+          this.shouldSelectAnnotation(
+            type,
+            coordinates,
+            annotation,
+            unitsPerPixel
+          )
         );
-      })
-      .filter((annotation: IAnnotation) => {
-        return this.shouldSelectAnnotation(
-          type,
-          coordinates,
-          annotation,
-          unitsPerPixel
-        );
-      });
+      }
+    );
 
     // Update annotation store
     // TODO: should add / Remove / toggle instead of only appending
-
     // this.annotationStore.selectAnnotations(selectedAnnotations);
     this.annotationStore.toggleSelected(selectedAnnotations);
     // this.annotationStore.unselectAnnotations(selectedAnnotations);
