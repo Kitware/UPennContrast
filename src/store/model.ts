@@ -426,3 +426,21 @@ export function newLayer(
     }
   };
 }
+
+export enum AnnotationSelectionTypes {
+  ADD = "ADD",
+  TOGGLE = "TOGGLE",
+  REMOVE = "REMOVE"
+}
+
+export const AnnotationSelectionTypesNames = {
+  [AnnotationSelectionTypes.ADD]: "Add",
+  [AnnotationSelectionTypes.TOGGLE]: "Toggle",
+  [AnnotationSelectionTypes.REMOVE]: "Remove"
+};
+
+export const AnnotationSelectionTypesTooltips = {
+  [AnnotationSelectionTypes.ADD]: "Add annotations to selection",
+  [AnnotationSelectionTypes.TOGGLE]: "Toggle annotations selection",
+  [AnnotationSelectionTypes.REMOVE]: "Remove annotation from selection"
+};

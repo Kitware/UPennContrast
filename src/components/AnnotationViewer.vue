@@ -20,7 +20,8 @@ import {
   IImage,
   IToolConfiguration,
   IROIAnnotationFilter,
-  AnnotationShape
+  AnnotationShape,
+  AnnotationSelectionTypes
 } from "../store/model";
 
 import { logWarning } from "@/utils/log";
@@ -42,6 +43,10 @@ export default class AnnotationViewer extends Vue {
   readonly toolsStore = toolsStore;
   readonly propertiesStore = propertiesStore;
   readonly filterStore = filterStore;
+
+  get annotationSelectionType() {
+    return this.store.annotationSelectionType;
+  }
 
   get roiFilter() {
     return this.filterStore.emptyROIFilter;
@@ -638,10 +643,16 @@ export default class AnnotationViewer extends Vue {
     );
 
     // Update annotation store
-    // TODO: should add / Remove / toggle instead of only appending
-    // this.annotationStore.selectAnnotations(selectedAnnotations);
-    this.annotationStore.toggleSelected(selectedAnnotations);
-    // this.annotationStore.unselectAnnotations(selectedAnnotations);
+    switch (this.annotationSelectionType) {
+      case AnnotationSelectionTypes.ADD:
+        this.annotationStore.selectAnnotations(selectedAnnotations);
+        break;
+      case AnnotationSelectionTypes.REMOVE:
+        this.annotationStore.unselectAnnotations(selectedAnnotations);
+        break;
+      case AnnotationSelectionTypes.TOGGLE:
+        this.annotationStore.toggleSelected(selectedAnnotations);
+    }
 
     // Remove the selection annotation from layer (do not show the annotation used to select)
     this.annotationLayer.removeAnnotation(selectAnnotation);
