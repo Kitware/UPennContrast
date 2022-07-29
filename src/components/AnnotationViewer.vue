@@ -289,18 +289,19 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.draw();
   }
 
-  shouldDisplayAnnotationWithLocation(location: IAnnotationLocation) {
-    if (!location) {
-      return false;
-    }
-    if (
-      (location.XY !== this.store.xy && !this.store.unrollXY) ||
-      (location.Z !== this.store.z && !this.store.unrollZ) ||
-      (location.Time !== this.store.time && !this.store.unrollT)
-    ) {
-      return false;
-    }
-    return true;
+  shouldDisplayAnnotationWithChannel(channelId: number): boolean {
+    return this.visibleChannels.includes(channelId);
+  }
+
+  shouldDisplayAnnotationWithLocation(location: IAnnotationLocation): boolean {
+    return (
+      !location ||
+      !(
+        (location.XY !== this.store.xy && !this.store.unrollXY) ||
+        (location.Z !== this.store.z && !this.store.unrollZ) ||
+        (location.Time !== this.store.time && !this.store.unrollT)
+      )
+    );
   }
 
   shouldDisplayAnnotation(annotation: IAnnotation): boolean {
@@ -326,6 +327,7 @@ export default class AnnotationViewer extends Vue {
         isHovered,
         isConnection,
         location,
+        channel,
         isSelected
       } = annotation.options();
 
@@ -377,6 +379,7 @@ export default class AnnotationViewer extends Vue {
 
       if (
         this.shouldDisplayAnnotationWithLocation(location) &&
+        this.shouldDisplayAnnotationWithChannel(channel) &&
         (!this.store.filteredDraw || this.annotationIds.includes(girderId))
       ) {
         return;
@@ -451,6 +454,7 @@ export default class AnnotationViewer extends Vue {
       girderId: annotation.id,
       isHovered: annotation.id === this.hoveredAnnotationId,
       location: annotation.location,
+      channel: annotation.channel,
       isSelected: false
     };
 
@@ -600,43 +604,6 @@ export default class AnnotationViewer extends Vue {
         return isIn || isPointIn;
       }, false);
     }
-  }
-
-  private getSelectedAnnotationsFromTool(selectAnnotation: any) {
-    const selectLocation = {
-      XY: this.xy,
-      Z: this.z,
-      Time: this.time
-    };
-
-    const coordinates = selectAnnotation.coordinates();
-    const type = selectAnnotation.type();
-
-    // Get general information from the map.
-    // When working with pointAnnotation, unitsPerPixels is necessary to
-    // compute the right value of the radius.
-    const unitsPerPixel = this.getMapUnitsPerPixel();
-
-    // Get selected annotations.
-    // Only select annotations that are located at the same XY and Z
-    return this.annotations
-      .filter((annotation: IAnnotation) => {
-        return (
-          (selectLocation.XY === annotation.location.XY ||
-            this.store.unrollXY) &&
-          (selectLocation.Z === annotation.location.Z || this.store.unrollZ) &&
-          (selectLocation.Time === annotation.location.Time ||
-            this.store.unrollT)
-        );
-      })
-      .filter((annotation: IAnnotation) => {
-        return this.shouldSelectAnnotation(
-          type,
-          coordinates,
-          annotation,
-          unitsPerPixel
-        );
-      });
   }
 
   private async selectAnnotations(selectAnnotation: any) {
@@ -1020,5 +987,4 @@ export default class AnnotationViewer extends Vue {
 }
 </script>
 
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>
