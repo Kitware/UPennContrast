@@ -7,7 +7,8 @@
     "serve": "vue-cli-service serve --host 0.0.0.0",
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint",
-    "test": "npm run lint && npm run build"
+    "test": "npm run lint && npm run build",
+    "jest-test": "jest"
   },
   "dependencies": {
     "@girder/components": "^2.1.0",
@@ -43,6 +44,7 @@
     "vuex-module-decorators": "^0.11.0"
   },
   "devDependencies": {
+    "@types/jest": "^27.5.2",
     "@typescript-eslint/eslint-plugin": "^2.10.0",
     "@typescript-eslint/parser": "^2.10.0",
     "@vue/cli": "^4.1.1",
@@ -58,12 +60,14 @@
     "eslint-plugin-prettier": "^3.1.1",
     "eslint-plugin-vue": "^6.0.1",
     "geojs": "^1.10.4",
+    "jest": "^27.0.0",
     "node-sass": "^7.0.1",
     "prettier": "^1.19.1",
     "pug": "^3.0.1",
     "pug-plain-loader": "^1.0.0",
     "sass": "~1.23.7",
     "sass-loader": "^8.0.0",
+    "ts-jest": "^27.1.5",
     "typescript": "~3.8.0",
     "vue-cli-plugin-vuetify": "^2.0.2",
     "vue-template-compiler": "^2.6.10",
