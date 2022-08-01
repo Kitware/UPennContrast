@@ -50,10 +50,7 @@
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 
-import {
-  collectFilenameMetadata,
-  collectFilenameMetadata2
-} from "@/utils/parsing";
+import { collectFilenameMetadata2 } from "@/utils/parsing";
 import { IGirderItem } from "@/girder";
 
 const Sources = {
@@ -216,7 +213,6 @@ export default class NewDataset extends Vue {
     //  Get info from filename
     const names = items.map(item => item.name);
 
-    // const meta = collectFilenameMetadata(names, false);
     this.collectedMetadata = collectFilenameMetadata2(names);
     const { metadata } = this.collectedMetadata;
     this.addSizeToDimension("Z", metadata.z.length, Sources.Filename);
@@ -280,11 +276,6 @@ export default class NewDataset extends Vue {
       XY: 0,
       T: 0
     };
-    // First compute strides within files
-    // const meta = collectFilenameMetadata(
-    //   this.girderItems.map(item => item.name),
-    //   false
-    // );
 
     const filesInfo = this.collectedMetadata
       ? this.collectedMetadata.filesInfo
@@ -309,10 +300,6 @@ export default class NewDataset extends Vue {
               dimCount[assignmentId] += assignment?.value.size || 0;
             }
             source[`${assignmentId.toLowerCase()}Values`] = value;
-            // dimCount[assignmentId] +=
-            //   assignment?.value.source === Sources.Filename
-            //     ? assignment.value.size / this.girderItems.length
-            //     : assignment?.value.size || 0;
           });
         return source;
       })

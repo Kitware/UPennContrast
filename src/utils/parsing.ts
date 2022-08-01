@@ -217,7 +217,6 @@ export function collectFilenameMetadata2(
     let typename: string | undefined = undefined;
     if (numberOfElement > 1) {
       if (isNumeric) {
-        // Consider that a field with a
         typename =
           index > 0 && fieldsElements[index - 1].numberOfElement === 1
             ? getStringType(fieldsElements[index - 1].values[0])

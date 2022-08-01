@@ -1,9 +1,6 @@
 import {
   convertDateToTime,
-  getFilenameMetadata,
   splitFilenames,
-  getStringType,
-  collectFilenameMetadata,
   collectFilenameMetadata2,
   getFields
 } from "./parsing";
