@@ -34,15 +34,61 @@ const output_split_directories: string[][] = [
 ];
 
 const output_directories: {
-  chan: string[];
-  t: string[];
-  xy: string[];
-  z: string[];
+  metadata: {
+    [key: string]: string[];
+    t: string[];
+    xy: string[];
+    z: string[];
+    chan: string[];
+  };
+  filesInfo: {
+    [key: string]: { [key: string]: number[] };
+  };
 } = {
-  chan: ["red", "phase"],
-  t: ["39992", "23011", "20275"],
-  xy: [],
-  z: []
+  metadata: {
+    chan: ["red", "phase"],
+    t: ["39992", "23011", "20275"],
+    xy: [],
+    z: []
+  },
+  filesInfo: {
+    "phase/VID1203_B1_1_14d01h55m.tif": {
+      chan: [1],
+      t: [2],
+      xy: [],
+      z: []
+    },
+    "phase/VID1203_B1_1_15d23h31m.tif": {
+      chan: [1],
+      t: [1],
+      xy: [],
+      z: []
+    },
+    "phase/VID1203_B1_1_27d18h32m.tif": {
+      chan: [1],
+      t: [0],
+      xy: [],
+      z: []
+    },
+    "red/VID1203_B1_1_14d01h55m.tif": {
+      chan: [0],
+      t: [2],
+      xy: [],
+      z: []
+    },
+    "red/VID1203_B1_1_15d23h31m.tif": {
+      chan: [0],
+      t: [1],
+      xy: [],
+      z: []
+    },
+    "red/VID1203_B1_1_27d18h32m.tif": {
+      chan: [0],
+      t: [0],
+      xy: [],
+      z: []
+    }
+  }
 };
 
 const filenames_combined: string[] = [
@@ -84,15 +130,73 @@ const output_getFields_combined: {
   }
 ];
 const output_combined: {
-  chan: string[];
-  t: string[];
-  xy: string[];
-  z: string[];
+  metadata: {
+    [key: string]: string[];
+    t: string[];
+    xy: string[];
+    z: string[];
+    chan: string[];
+  };
+  filesInfo: {
+    [key: string]: { [key: string]: number[] };
+  };
 } = {
-  chan: ["red_B", "phase_B"],
-  t: ["001", "002", "003", "004"],
-  xy: [],
-  z: []
+  metadata: {
+    chan: ["red", "phase"], // TODO: To fix. For now returns red_B and phase_B
+    t: ["001", "002", "003", "004"],
+    xy: [],
+    z: []
+  },
+  filesInfo: {
+    "phase_B1_1_t001.tif": {
+      chan: [1],
+      t: [0],
+      xy: [],
+      z: []
+    },
+    "phase_B1_1_t002.tif": {
+      chan: [1],
+      t: [1],
+      xy: [],
+      z: []
+    },
+    "phase_B1_1_t003.tif": {
+      chan: [1],
+      t: [2],
+      xy: [],
+      z: []
+    },
+    "phase_B1_1_t004.tif": {
+      chan: [1],
+      t: [3],
+      xy: [],
+      z: []
+    },
+    "red_B1_1_t001.tif": {
+      chan: [0],
+      t: [0],
+      xy: [],
+      z: []
+    },
+    "red_B1_1_t002.tif": {
+      chan: [0],
+      t: [1],
+      xy: [],
+      z: []
+    },
+    "red_B1_1_t003.tif": {
+      chan: [0],
+      t: [2],
+      xy: [],
+      z: []
+    },
+    "red_B1_1_t004.tif": {
+      chan: [0],
+      t: [3],
+      xy: [],
+      z: []
+    }
+  }
 };
 
 const filenames_nikon: string[] = [
@@ -104,15 +208,24 @@ const filenames_nikon: string[] = [
   "FT_705_D1_72HR_wE5.nd2"
 ];
 const output_nikon: {
-  chan: string[];
-  t: string[];
-  xy: string[];
-  z: string[];
+  metadata: {
+    [key: string]: string[];
+    t: string[];
+    xy: string[];
+    z: string[];
+    chan: string[];
+  };
+  filesInfo: {
+    [key: string]: { [key: string]: number[] };
+  };
 } = {
-  chan: [],
-  t: [],
-  xy: [],
-  z: []
+  metadata: {
+    chan: [],
+    t: [],
+    xy: [],
+    z: []
+  },
+  filesInfo: {}
 };
 
 const filenames_legacy: string[] = [
@@ -138,15 +251,34 @@ const output_split_legacy: string[][] = [
   ["", "", "alexa", "003"]
 ];
 const output_legacy: {
-  chan: string[];
-  t: string[];
-  xy: string[];
-  z: string[];
+  metadata: {
+    [key: string]: string[];
+    t: string[];
+    xy: string[];
+    z: string[];
+    chan: string[];
+  };
+  filesInfo: {
+    [key: string]: { [key: string]: number[] };
+  };
 } = {
-  chan: ["trans", "gfp", "alexa"],
-  t: [],
-  xy: ["001", "002", "003"],
-  z: []
+  metadata: {
+    chan: ["trans", "gfp", "alexa"],
+    t: [],
+    xy: ["001", "002", "003"],
+    z: []
+  },
+  filesInfo: {
+    "trans001.tif": { t: [], xy: [0], z: [], chan: [0] },
+    "trans002.tif": { t: [], xy: [1], z: [], chan: [0] },
+    "trans003.tif": { t: [], xy: [2], z: [], chan: [0] },
+    "gfp001.tif": { t: [], xy: [0], z: [], chan: [1] },
+    "gfp002.tif": { t: [], xy: [1], z: [], chan: [1] },
+    "gfp003.tif": { t: [], xy: [2], z: [], chan: [1] },
+    "alexa001.tif": { t: [], xy: [0], z: [], chan: [2] },
+    "alexa002.tif": { t: [], xy: [1], z: [], chan: [2] },
+    "alexa003.tif": { t: [], xy: [2], z: [], chan: [2] }
+  }
 };
 
 test("Test convertDateToTime", () => {
@@ -182,15 +314,3 @@ test("Test collectFilenameMetadata2", () => {
     output_legacy
   );
 });
-
-// filesInfo {
-//   'trans001.tif': { t: [], xy: [ 0 ], z: [], chan: [ 0 ] },
-//   'trans002.tif': { t: [], xy: [ 1 ], z: [], chan: [ 0 ] },
-//   'trans003.tif': { t: [], xy: [ 2 ], z: [], chan: [ 0 ] },
-//   'gfp001.tif': { t: [], xy: [ 0 ], z: [], chan: [ 1 ] },
-//   'gfp002.tif': { t: [], xy: [ 1 ], z: [], chan: [ 1 ] },
-//   'gfp003.tif': { t: [], xy: [ 2 ], z: [], chan: [ 1 ] },
-//   'alexa001.tif': { t: [], xy: [ 0 ], z: [], chan: [ 2 ] },
-//   'alexa002.tif': { t: [], xy: [ 1 ], z: [], chan: [ 2 ] },
-//   'alexa003.tif': { t: [], xy: [ 2 ], z: [], chan: [ 2 ] }
-// }
