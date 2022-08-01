@@ -297,7 +297,7 @@ export default class NewDataset extends Vue {
         Object.entries(this.assignments)
           .filter(([_, assignment]) => !!assignment)
           .forEach(([assignmentId, assignment]) => {
-            let value = dimCount[assignmentId];
+            let value = [dimCount[assignmentId]];
 
             if (assignment?.value.source === Sources.Filename) {
               let id = assignment?.value.id;
