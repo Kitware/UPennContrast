@@ -309,7 +309,6 @@ export default class NewDataset extends Vue {
       parentId: this.datasetId,
       metadata: JSON.stringify(description)
     });
-    console.log(JSON.stringify(description), newItemId);
     this.$router.push({
       name: "dataset",
       params: {
