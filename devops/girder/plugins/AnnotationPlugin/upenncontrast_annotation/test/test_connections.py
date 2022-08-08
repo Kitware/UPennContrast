@@ -1,18 +1,24 @@
+from cgi import test
 from jsonschema.validators import create
 import pytest
-
-import random
-import copy
+import math
 
 from upenncontrast_annotation.server.models.annotation import Annotation
 from upenncontrast_annotation.server.models.connections import AnnotationConnection
 from upenncontrast_annotation.server.models import connections
+from upenncontrast_annotation.server.helpers.connections import (
+    annotationToAnnotationDistance,
+    isAPoint,
+    isAPoly,
+    simpleCentroid,
+    pointToPointDistance
+)
 
 from . import girder_utilities as utilities
 from . import upenn_testing_utilities as upenn_utilities
 
 from girder.constants import AccessType
-from girder.exceptions import AccessException, ValidationException
+from girder.exceptions import ValidationException
 from girder.models.folder import Folder
 
 
@@ -157,3 +163,282 @@ class TestConnection:
             parent['_id'], child['_id'], folder['_id'])
         with pytest.raises(ValidationException, match='not a dataset'):
             AnnotationConnection().validate(connection)
+
+
+@pytest.mark.plugin('upenncontrast_annotation')
+class TestConnectToNearest:
+    pointAnnotationRef = {
+        "_id": "0",
+        "channel": 0,
+        "coordinates": [{
+            "x": 11,
+            "y": 8,
+            "z": 0
+        }],
+        "datasetId": "111",
+        "location": {
+            "Time": 0,
+            "XY": 0,
+            "Z": 0
+        },
+        "shape": "point",
+        "tags": [
+            "reference"
+        ]
+    }
+    pointAnnotations = [
+        {
+            "_id": "1",
+            "channel": 0,
+            "coordinates": [
+            {
+                "x": 6,
+                "y": 7,
+                "z": 0
+            }
+            ],
+            "datasetId": "111",
+            "location": {
+                "Time": 0,
+                "XY": 0,
+                "Z": 0
+            },
+            "shape": "point",
+            "tags": [
+                "other"
+            ]
+        },
+        {
+            "_id": "2",
+            "channel": 0,
+            "coordinates": [
+            {
+                "x": 14,
+                "y": 5,
+                "z": 0
+            }
+            ],
+            "datasetId": "111",
+            "location": {
+                "Time": 0,
+                "XY": 0,
+                "Z": 0
+            },
+            "shape": "point",
+            "tags": [
+                "others"
+            ]
+        }
+    ]
+    lineAnnotations = [
+        {
+            "_id": "3",
+            "channel": 0,
+            "coordinates": [
+                {
+                    "x": 2,
+                    "y": 6,
+                    "z": 0
+                },
+                {
+                    "x": 6,
+                    "y": 11,
+                    "z": 0
+                }
+            ],
+            "datasetId": "111",
+            "location": {
+                "Time": 0,
+                "XY": 0,
+                "Z": 0
+            },
+            "shape": "line",
+            "tags": [
+                "other"
+            ]
+        },
+        {
+            "_id": "4",
+            "channel": 0,
+            "coordinates": [
+                {
+                    "x": 20,
+                    "y": 2,
+                    "z": 0
+                },
+                {
+                    "x": 21,
+                    "y": 9,
+                    "z": 0
+                }
+            ],
+            "datasetId": "111",
+            "location": {
+                "Time": 0,
+                "XY": 0,
+                "Z": 0
+            },
+            "shape": "line",
+            "tags": [
+                "others"
+            ]
+        }
+    ]
+    blobAnnotations = [
+        {
+            "_id": "5",
+            "channel": 0,
+            "coordinates": [
+                {
+                    "x": 7,
+                    "y": 3,
+                    "z": 0
+                },
+                {
+                    "x": 9,
+                    "y": 5,
+                    "z": 0
+                },
+                {
+                    "x": 11,
+                    "y": 3,
+                    "z": 0
+                },
+                {
+                    "x": 9,
+                    "y": 1,
+                    "z": 0
+                }
+            ],
+            "datasetId": "111",
+            "location": {
+                "Time": 0,
+                "XY": 0,
+                "Z": 0
+            },
+            "shape": "polygon",
+            "tags": [
+                "other"
+            ]
+        },
+        {
+            "_id": "6",
+            "channel": 0,
+            "coordinates": [
+                {
+                    "x": 16,
+                    "y": 12,
+                    "z": 0
+                },
+                {
+                    "x": 18,
+                    "y": 14,
+                    "z": 0
+                },
+                {
+                    "x": 20,
+                    "y": 12,
+                    "z": 0
+                },
+                {
+                    "x": 18,
+                    "y": 10,
+                    "z": 0
+                }
+            ],
+            "datasetId": "111",
+            "location": {
+                "Time": 0,
+                "XY": 0,
+                "Z": 0
+            },
+            "shape": "polygon",
+            "tags": [
+                "others"
+            ]
+        }
+    ]
+    
+    def testIsAPoint(self):
+        assert isAPoint({"shape": "point"}) == True
+        assert isAPoint({"shape": "line"}) == False
+        assert isAPoint({"shape": "polygon"}) == False
+    
+    def testIsAPoly(self):
+        assert isAPoly({"shape": "point"}) == False
+        assert isAPoly({"shape": "line"}) == True
+        assert isAPoly({"shape": "polygon"}) == True
+
+    def testSimpleCentroid(self):
+        triangleCoordinates = [
+            {
+                "x": 6,
+                "y": 2,
+                "z": 0,
+            },
+            {
+                "x": 5,
+                "y": -9,
+                "z": 0,
+            },
+            {
+                "x": 2,
+                "y": -7,
+                "z": 0,
+            },
+        ]
+        centroid = simpleCentroid(triangleCoordinates)
+        assert centroid["x"] == 4.333333333333333
+        assert centroid["y"] == -4.666666666666667
+        
+    def testPointToPointDistance(self):
+        # TODO: Improve test
+        coordPoint1 = {
+            "x": 0,
+            "y": 0,
+            "z": 0
+        }
+        
+        coordPoint2 = {
+            "x": 2,
+            "y": 0,
+            "z": 0
+        }
+        
+        assert pointToPointDistance(coordPoint1, coordPoint2) == 2
+       
+    def testAnnotationToAnnotationDistance(self):
+        distance = annotationToAnnotationDistance(self.pointAnnotations[0], self.pointAnnotations[1])
+        assert distance == math.sqrt(68)
+        distance = annotationToAnnotationDistance(self.pointAnnotations[0], self.lineAnnotations[0])
+        assert distance == 4
+        distance = annotationToAnnotationDistance(self.blobAnnotations[0], self.blobAnnotations[1])
+        assert distance == math.sqrt(162)
+
+    def testGetClosestAnnotation(self):
+        closest, _ = AnnotationConnection().getClosestAnnotation(self.pointAnnotationRef, self.pointAnnotations)
+        assert closest == self.pointAnnotations[1]
+        
+        closest, _ = AnnotationConnection().getClosestAnnotation(self.pointAnnotationRef, self.lineAnnotations)
+        assert closest == self.lineAnnotations[0]
+        
+        closest, _ = AnnotationConnection().getClosestAnnotation(self.pointAnnotationRef, self.blobAnnotations)
+        assert closest == self.blobAnnotations[0]
+        
+        annotations = self.pointAnnotations + self.lineAnnotations + self.blobAnnotations
+        annotations.append(self.pointAnnotationRef)
+        closest, _ = AnnotationConnection().getClosestAnnotation(self.pointAnnotationRef, annotations)
+        assert closest == self.pointAnnotations[1]
+        
+        closestPoint, minDistanceToPoint = AnnotationConnection().getClosestAnnotation(self.blobAnnotations[0], self.pointAnnotations)
+        assert closestPoint == self.pointAnnotations[0]
+        
+        closestLine, minDistanceToLine = AnnotationConnection().getClosestAnnotation(self.blobAnnotations[0], self.lineAnnotations)
+        assert closestLine == self.lineAnnotations[0]
+        
+        closestBlob, minDistanceToBlob = AnnotationConnection().getClosestAnnotation(self.blobAnnotations[0], self.blobAnnotations)
+        assert closestBlob == self.blobAnnotations[1]
+        
+        closest, minDistance = AnnotationConnection().getClosestAnnotation(self.blobAnnotations[0], annotations)
+        assert minDistance == min(minDistanceToPoint, minDistanceToLine, minDistanceToBlob)
+        assert closest == closestPoint

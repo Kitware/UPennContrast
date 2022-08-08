@@ -19,6 +19,7 @@ class AnnotationConnection(Resource):
         self.route('GET', (), self.find)
         self.route('POST', (), self.create)
         self.route('PUT', (':id',), self.update)
+        self.route('POST',('connectTo',) , self.connectToNearest)
 
     # TODO: anytime a dataset is mentioned, load the dataset and check for existence and that the user has access to it
     # TODO: load both childe and parent annotations, and check that they share existence, access and location
@@ -89,3 +90,12 @@ class AnnotationConnection(Resource):
     @loadmodel(model='annotation_connection', plugin='upenncontrast_annotation', level=AccessType.READ)
     def get(self, annotation_connection):
         return annotation_connection
+
+
+    @access.user
+    @describeRoute(Description("Create connections between annotations").param('body', 'Connection Object', paramType='body'))
+    def connectToNearest(self, params):
+        currentUser = self.getCurrentUser()
+        if not currentUser:
+            raise AccessException('User not found', 'currentUser')
+        return self._connectionModel.connectToNearest(user=currentUser, info=self.getBodyJson())

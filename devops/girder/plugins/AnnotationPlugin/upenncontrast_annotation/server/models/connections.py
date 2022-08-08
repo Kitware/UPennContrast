@@ -7,8 +7,11 @@ from bson.objectid import ObjectId
 from girder.models.folder import Folder
 
 from .annotation import Annotation
+from ..helpers.connections import annotationToAnnotationDistance
 
 import jsonschema
+import math
+import numpy as np
 
 class ConnectionSchema:
     tagsSchema = {
@@ -92,6 +95,7 @@ class AnnotationConnection(AccessControlledModel):
 
   def create(self, creator, connection):
     self.setUserAccess(connection, user=creator, level=AccessType.ADMIN, save=False)
+    a = self.save(connection)
     return self.save(connection)
 
   def delete(self, connection):
@@ -99,3 +103,73 @@ class AnnotationConnection(AccessControlledModel):
 
   def update(self, connection):
     return self.save(connection)
+  
+  def getClosestAnnotation(self, annotationRef, annotations):
+    """Get the closest annotation based on its distance to a reference annotation.
+
+    Args:
+        annotationRef (any): the annotation of reference
+        annotations (any): a list of annotations
+
+    Returns:
+        Tuple(Annotation, Number): Returns a tuple of 2 items: the closest annotation and the minimum distance
+    """
+    
+    annotations2 = [annotation for annotation in annotations if annotation["_id"] != annotationRef["_id"]]
+    distances = np.array([(annotation, annotationToAnnotationDistance(annotationRef, annotation)) for annotation in annotations2])
+    sortDistances = np.argsort(distances[:,1])
+    return distances[sortDistances[0],:]
+    
+  def connectToNearest(self, info, user=None):
+    # annotation ids, a list of tags and a channel index.
+    connections = []
+
+    annotationsIdsToConnect = info['annotationsIds']
+    ids = [ObjectId(id) for id in annotationsIdsToConnect]
+  
+    # Get annotations that match selected tags and channel
+    query = {
+      "_id": {"$nin": ids},
+    }
+    # channelId can be None if not specify
+    channelId = info["channelId"]
+    channelQuery = {"channel": int(channelId)} if channelId is not None else {}
+    query.update(channelQuery)
+
+    tags = info["tags"]
+    tagsQuery = {"tags": {  "$in": tags }} if tags is not None and len(tags) > 0 else {}
+    query.update(tagsQuery)
+
+    # Loop on each annotation to connect
+    # Look for the closest annotation and connect to it
+    for id in ids:
+      annotation = Annotation().getAnnotationById(id, user)
+
+      if annotation is None:
+        print("Annotation not defined", id)
+        continue
+      # Compute distance
+      closestAnnotation = None
+
+      # Only work on annotations that are placed in the same tile
+      location = annotation["location"]
+      tileQuery = {
+        "location": location
+      }
+
+      query.update(tileQuery)
+      annotations = list(Annotation().find(query))
+
+      # Find the closest annotation
+      (closestAnnotation, _) = self.getClosestAnnotation(annotation, annotations)
+      
+      # Define connection
+      connections.append(self.create(creator=user, connection={
+        "tags": [],
+        "label": "A Connection -- automatic",
+        "parentId": str(closestAnnotation['_id']),
+        "childId": str(id),
+        "datasetId": annotation["datasetId"]
+      }))
+
+    return connections

@@ -42,6 +42,22 @@ export default class AnnotationsAPI {
       });
   }
 
+  createConnections(
+    annotationsIds: string[],
+    tags: string[],
+    channelId: number | null
+  ): Promise<IAnnotationConnection[] | null> {
+    return this.client
+      .post("annotation_connection/connectTo", {
+        annotationsIds,
+        tags,
+        channelId
+      })
+      .then(res => {
+        return res.data.map((connection: any) => this.toConnection(connection));
+      });
+  }
+
   async getAnnotationsForDatasetId(id: string): Promise<IAnnotation[]> {
     const annotations: IAnnotation[] = [];
     const limit = 250;
