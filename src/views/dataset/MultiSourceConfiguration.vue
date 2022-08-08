@@ -19,7 +19,6 @@
             hide-selected
             hide-details
             dense
-            @change="print"
             :disabled="
               assignments[assignment] &&
                 assignments[assignment].value.source === 'file'
@@ -87,10 +86,6 @@ export default class NewDataset extends Vue {
   }
 
   dimensions: IDimension[] = [];
-
-  print() {
-    console.log(this.assignments);
-  }
 
   headers = [
     {
@@ -177,7 +172,6 @@ export default class NewDataset extends Vue {
         { id, size, name: name ? name : id, source }
       ];
     }
-    console.log("this.dimensions ---- END", this.dimensions);
   }
 
   setDimensionName(id: string, source: string, name: string) {
