@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import {
   getModule,
   Action,
@@ -48,7 +49,7 @@ export class Annotations extends VuexModule {
   hoveredAnnotationId: string | null = null;
 
   @Mutation
-  public setHoveredAnnoationId(id: string | null) {
+  public setHoveredAnnotationId(id: string | null) {
     this.hoveredAnnotationId = id;
   }
 
@@ -97,6 +98,49 @@ export class Annotations extends VuexModule {
   @Mutation
   public setSelected(selected: IAnnotation[]) {
     this.selectedAnnotations = selected;
+  }
+
+  @Mutation
+  public selectAnnotation(annotation: IAnnotation) {
+    if (this.selectedAnnotations.find(a => a.id === annotation.id)) {
+      return;
+    }
+    this.selectedAnnotations = [...this.selectedAnnotations, annotation];
+  }
+
+  @Mutation
+  public selectAnnotations(selected: IAnnotation[]) {
+    const selectedAnnotationIds = this.selectedAnnotations.map((annotation: IAnnotation) => annotation.id);
+    const annotationsToAdd = selected.filter(annotation => !selectedAnnotationIds.includes(annotation.id));
+    this.selectedAnnotations = [...this.selectedAnnotations, ...annotationsToAdd];
+  }
+
+  @Mutation
+  public unselectAnnotation(annotation: IAnnotation) {
+    const index = this.selectedAnnotations.findIndex((a: IAnnotation) => a.id === annotation.id);
+    if (index >= 0) {
+      this.selectedAnnotations.splice(index, 1);
+    }
+  }
+
+  @Mutation
+  public unselectAnnotations(selected: IAnnotation[]) {
+    const selectedAnnotationsIds = selected.map((annotation: IAnnotation) => annotation.id);
+    const annotationsToSelect = this.selectedAnnotations.filter(
+      (annotation: IAnnotation) => !selectedAnnotationsIds.includes(annotation.id)
+    );
+    this.selectedAnnotations = [...annotationsToSelect];
+  }
+
+  @Action
+  public toggleSelected(selected: IAnnotation[]) {
+    selected.forEach(annotation => {
+      if (this.selectedAnnotations.find(a => a.id === annotation.id)) {
+        this.unselectAnnotation(annotation);
+      } else {
+        this.selectAnnotation(annotation);
+      }
+    });
   }
 
   @Action
@@ -235,9 +279,10 @@ export class Annotations extends VuexModule {
         Promise<IAnnotation[]>,
         Promise<IAnnotationConnection[]>
       ] = [
-        this.annotationsAPI.getAnnotationsForDatasetId(main.dataset.id),
-        this.annotationsAPI.getConnectionsForDatasetId(main.dataset.id)
-      ];
+          // eslint-disable-next-line prettier/prettier
+          this.annotationsAPI.getAnnotationsForDatasetId(main.dataset.id),
+          this.annotationsAPI.getConnectionsForDatasetId(main.dataset.id)
+        ];
       Promise.all(promises).then(
         ([annotations, connections]: [
           IAnnotation[],

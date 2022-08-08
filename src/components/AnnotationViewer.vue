@@ -19,12 +19,15 @@ import {
   IGeoJSPoint,
   IImage,
   IToolConfiguration,
-  IROIAnnotationFilter
+  IROIAnnotationFilter,
+  AnnotationShape,
+  AnnotationSelectionTypes
 } from "../store/model";
 
 import { logWarning } from "@/utils/log";
 
 import {
+  pointDistance,
   getAnnotationStyleFromLayer,
   unrollIndexFromImages,
   geojsAnnotationFactory,
@@ -40,6 +43,10 @@ export default class AnnotationViewer extends Vue {
   readonly toolsStore = toolsStore;
   readonly propertiesStore = propertiesStore;
   readonly filterStore = filterStore;
+
+  get annotationSelectionType() {
+    return this.store.annotationSelectionType;
+  }
 
   get roiFilter() {
     return this.filterStore.emptyROIFilter;
@@ -147,6 +154,11 @@ export default class AnnotationViewer extends Vue {
       : { text: null, image: "" };
   }
 
+  // Check if an annotation is selected on store using its girderId
+  isAnnotationSelected(annotationId: string) {
+    return this.annotationStore.selectedAnnotationIds.includes(annotationId);
+  }
+
   @Watch("displayWorkerPreview")
   @Watch("workerPreview")
   renderWorkerPreview() {
@@ -178,6 +190,10 @@ export default class AnnotationViewer extends Vue {
     return this.annotationStore.hoveredAnnotationId;
   }
 
+  get selectedAnnotations() {
+    return this.annotationStore.selectedAnnotations;
+  }
+
   getAnyLayerForChannel(channel: number) {
     return this.layers.find(
       (layer: IDisplayLayer) => channel === layer.channel
@@ -196,7 +212,8 @@ export default class AnnotationViewer extends Vue {
     const layer = this.getAnyLayerForChannel(annotation.channel);
     return getAnnotationStyleFromLayer(
       layer,
-      annotation.id === this.hoveredAnnotationId
+      annotation.id === this.hoveredAnnotationId,
+      this.isAnnotationSelected(annotation.id)
     );
   }
 
@@ -264,7 +281,10 @@ export default class AnnotationViewer extends Vue {
     const displayedIds = this.annotationLayer
       .annotations()
       .map((a: any) => a.options("girderId"))
-      .filter((id: string) => id !== this.hoveredAnnotationId);
+      .filter(
+        (id: string) =>
+          id !== this.hoveredAnnotationId || !this.isAnnotationSelected(id)
+      );
 
     // Then draw the new annotations
     this.drawNewAnnotations(displayedIds);
@@ -274,18 +294,19 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.draw();
   }
 
-  shouldDisplayAnnotationWithLocation(location: IAnnotationLocation) {
-    if (!location) {
-      return false;
-    }
-    if (
-      (location.XY !== this.store.xy && !this.store.unrollXY) ||
-      (location.Z !== this.store.z && !this.store.unrollZ) ||
-      (location.Time !== this.store.time && !this.store.unrollT)
-    ) {
-      return false;
-    }
-    return true;
+  shouldDisplayAnnotationWithChannel(channelId: number): boolean {
+    return this.visibleChannels.includes(channelId);
+  }
+
+  shouldDisplayAnnotationWithLocation(location: IAnnotationLocation): boolean {
+    return (
+      !location ||
+      !(
+        (location.XY !== this.store.xy && !this.store.unrollXY) ||
+        (location.Z !== this.store.z && !this.store.unrollZ) ||
+        (location.Time !== this.store.time && !this.store.unrollT)
+      )
+    );
   }
 
   shouldDisplayAnnotation(annotation: IAnnotation): boolean {
@@ -310,16 +331,28 @@ export default class AnnotationViewer extends Vue {
         girderId,
         isHovered,
         isConnection,
-        location
+        location,
+        channel,
+        isSelected
       } = annotation.options();
 
       if (!girderId) {
         return;
       }
 
+      // Remove (not)hovered annotation
       if (girderId === this.hoveredAnnotationId && !isHovered) {
         this.annotationLayer.removeAnnotation(annotation, false);
       } else if (girderId !== this.hoveredAnnotationId && isHovered) {
+        this.annotationLayer.removeAnnotation(annotation, false);
+      }
+
+      // Remove (un)selected annotation
+      const isSelectedOnStore = this.isAnnotationSelected(girderId);
+      if (
+        (!isSelected && isSelectedOnStore) ||
+        (isSelected && !isSelectedOnStore)
+      ) {
         this.annotationLayer.removeAnnotation(annotation, false);
       }
 
@@ -351,6 +384,7 @@ export default class AnnotationViewer extends Vue {
 
       if (
         this.shouldDisplayAnnotationWithLocation(location) &&
+        this.shouldDisplayAnnotationWithChannel(channel) &&
         (!this.store.filteredDraw || this.annotationIds.includes(girderId))
       ) {
         return;
@@ -424,7 +458,9 @@ export default class AnnotationViewer extends Vue {
     const options = {
       girderId: annotation.id,
       isHovered: annotation.id === this.hoveredAnnotationId,
-      location: annotation.location
+      location: annotation.location,
+      channel: annotation.channel,
+      isSelected: false
     };
 
     const coordinates = this.unrolledCoordinates(annotation, anyImage);
@@ -438,6 +474,10 @@ export default class AnnotationViewer extends Vue {
 
     if (annotation.id === this.hoveredAnnotationId) {
       newGeoJSAnnotation.options("isHovered", true);
+    }
+
+    if (this.isAnnotationSelected(annotation.id)) {
+      newGeoJSAnnotation.options("isSelected", true);
     }
 
     const style = newGeoJSAnnotation.options("style");
@@ -501,6 +541,121 @@ export default class AnnotationViewer extends Vue {
       }
     );
     return newAnnotation;
+  }
+
+  private shouldSelectAnnotation(
+    selectionAnnotationType: AnnotationShape,
+    selectionAnnotationCoordinates: any[],
+    annotation: IAnnotation,
+    unitsPerPixel: number
+  ) {
+    const annotationCoordinates = annotation.coordinates;
+
+    if (selectionAnnotationType === AnnotationShape.Point) {
+      // If the selection annotation type is "Point"
+      // Case 1: Annotation to test is a "Point":
+      // The distance point to point should be lower than the annotation radius
+      // Case 2: Annotation to test is a "Line":
+      // The distance between the line and the point should be lower than the lineAnnotation width
+      // Case 3: Annotation to test is "Polygon":
+      // Check if the selection point is positioned into the Polygon.
+
+      const selectionPosition = selectionAnnotationCoordinates[0];
+      const { radius, strokeWidth } = this.getAnnotationStyle(annotation);
+
+      if (annotation.shape === AnnotationShape.Point) {
+        const annotationRadius = (radius + strokeWidth) * unitsPerPixel;
+        const annotationPosition = annotationCoordinates[0];
+        return (
+          pointDistance(selectionPosition, annotationPosition) <
+          annotationRadius
+        );
+      } else if (annotation.shape === AnnotationShape.Line) {
+        // Check if click on points of the line, or on the line directly
+        const width = strokeWidth * unitsPerPixel;
+        return annotationCoordinates.reduce(
+          (isIn: boolean, point: any, index: number) => {
+            let isPointInLine = false;
+            if (index === annotationCoordinates.length - 1) {
+              // Specific case for the last point that does not have a next point
+              isPointInLine = pointDistance(point, selectionPosition) < width;
+            } else {
+              isPointInLine =
+                geojs.util.distance2dToLineSquared(
+                  selectionPosition,
+                  point,
+                  annotationCoordinates[index + 1]
+                ) < width;
+            }
+            return isIn || isPointInLine;
+          },
+          false
+        );
+      } else {
+        return geojs.util.pointInPolygon(
+          selectionPosition,
+          annotationCoordinates
+        );
+      }
+    } else {
+      // If the selection annotation type is "Polygon"
+      // Check if the tested annotation (independently from its type)
+      // is in the defined polygon
+      return annotation.coordinates.some((point: any) => {
+        return geojs.util.pointInPolygon(point, selectionAnnotationCoordinates);
+      });
+    }
+  }
+
+  private async selectAnnotations(selectAnnotation: any) {
+    if (!selectAnnotation) {
+      return;
+    }
+
+    const selectLocation = {
+      XY: this.xy,
+      Z: this.z,
+      Time: this.time
+    };
+    const coordinates = selectAnnotation.coordinates();
+    const type = selectAnnotation.type();
+
+    // Get general information from the map.
+    // When working with pointAnnotation, unitsPerPixels is necessary to
+    // compute the right value of the radius.
+    const unitsPerPixel = this.getMapUnitsPerPixel();
+
+    // Get selected annotations.
+    // Only select annotations that are located at the same XY, Z and Time frames and with a visible channel
+    const selectedAnnotations = this.annotations.filter(
+      (annotation: IAnnotation) => {
+        return (
+          this.shouldDisplayAnnotationWithLocation(annotation.location) &&
+          this.shouldDisplayAnnotationWithChannel(annotation.channel) &&
+          this.shouldSelectAnnotation(
+            type,
+            coordinates,
+            annotation,
+            unitsPerPixel
+          )
+        );
+      }
+    );
+
+    // Update annotation store
+    switch (this.annotationSelectionType) {
+      case AnnotationSelectionTypes.ADD:
+        this.annotationStore.selectAnnotations(selectedAnnotations);
+        break;
+      case AnnotationSelectionTypes.REMOVE:
+        this.annotationStore.unselectAnnotations(selectedAnnotations);
+        break;
+      case AnnotationSelectionTypes.TOGGLE:
+        this.annotationStore.toggleSelected(selectedAnnotations);
+    }
+
+    // Remove the selection annotation from layer (do not show the annotation used to select)
+    this.annotationLayer.removeAnnotation(selectAnnotation);
   }
 
   private async addAnnotationFromGeoJsAnnotation(annotation: any) {
@@ -633,6 +788,13 @@ export default class AnnotationViewer extends Vue {
         // TODO: when computation is triggered, toggle a bool that enables a v-menu
         // TODO: for now with just a compute button, but later previews, custom forms served from the started worker ?
         break;
+      case "select":
+        const selectionType =
+          this.selectedTool.values.selectionType.value === "pointer"
+            ? "point"
+            : "polygon";
+        this.annotationLayer.mode(selectionType);
+        break;
       case null:
       case undefined:
         this.annotationLayer.mode(null);
@@ -658,7 +820,7 @@ export default class AnnotationViewer extends Vue {
       annotation = evt.data[0][2].annotation;
     }
     if (annotation && annotation.options("girderId")) {
-      this.annotationStore.setHoveredAnnoationId(
+      this.annotationStore.setHoveredAnnotationId(
         annotation.options("girderId")
       );
     }
@@ -674,8 +836,13 @@ export default class AnnotationViewer extends Vue {
       annotation.options("girderId") &&
       this.hoveredAnnotationId === annotation.options("girderId")
     ) {
-      this.annotationStore.setHoveredAnnoationId(null);
+      this.annotationStore.setHoveredAnnotationId(null);
     }
+  }
+
+  private getMapUnitsPerPixel(): number {
+    const map = this.annotationLayer.map();
+    return map.unitsPerPixel(map.zoom());
   }
 
   handleAnnotationChange(evt: any) {
@@ -696,6 +863,8 @@ export default class AnnotationViewer extends Vue {
         if (this.selectedTool) {
           if (this.selectedTool.type === "create") {
             this.addAnnotationFromGeoJsAnnotation(evt.annotation);
+          } else if (this.selectedTool.type === "select") {
+            this.selectAnnotations(evt.annotation);
           }
         } else if (evt.annotation) {
           this.handleNewROIFilter(evt.annotation);
@@ -801,6 +970,11 @@ export default class AnnotationViewer extends Vue {
       geojs.event.annotation.state,
       this.handleAnnotationChange
     );
+    this.drawAnnotations();
+  }
+
+  @Watch("selectedAnnotations")
+  updateSelectedAnnotationsStyle() {
     this.drawAnnotations();
   }
 

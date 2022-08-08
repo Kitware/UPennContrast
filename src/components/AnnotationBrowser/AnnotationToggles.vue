@@ -33,6 +33,15 @@
             label="Show Connections"
           ></v-checkbox>
         </v-list-item>
+        <v-list-item>
+          <v-select
+            v-model="annotationSelectionType"
+            :items="annotationsSelectionTypeItems"
+            item-text="text"
+            item-value="value"
+            label="Annotation Selection Type"
+          ></v-select>
+        </v-list-item>
       </v-list>
     </v-expansion-panel-content>
   </v-expansion-panel>
@@ -42,11 +51,43 @@
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
 
+import {
+  AnnotationSelectionTypes,
+  AnnotationSelectionTypesNames,
+  AnnotationSelectionTypesTooltips
+} from "../../store/model";
+
 @Component({
   components: {}
 })
 export default class AnnotationToggles extends Vue {
   readonly store = store;
+
+  annotationsSelectionTypeItems: {
+    value: string;
+    text: string;
+  }[] = [
+    {
+      text: AnnotationSelectionTypesNames[AnnotationSelectionTypes.ADD],
+      value: AnnotationSelectionTypes.ADD
+    },
+    {
+      text: AnnotationSelectionTypesNames[AnnotationSelectionTypes.TOGGLE],
+      value: AnnotationSelectionTypes.TOGGLE
+    },
+    {
+      text: AnnotationSelectionTypesNames[AnnotationSelectionTypes.REMOVE],
+      value: AnnotationSelectionTypes.REMOVE
+    }
+  ];
+
+  get annotationSelectionType() {
+    return this.store.annotationSelectionType;
+  }
+
+  set annotationSelectionType(value) {
+    this.store.setAnnotationSelectionType(value);
+  }
 
   get drawAnnotations() {
     return this.store.drawAnnotations;

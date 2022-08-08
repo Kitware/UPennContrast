@@ -18,7 +18,8 @@ import {
   IDatasetConfigurationMeta,
   IDisplayLayer,
   IImage,
-  newLayer
+  newLayer,
+  AnnotationSelectionTypes
 } from "./model";
 
 import persister from "./Persister";
@@ -61,6 +62,8 @@ export class Main extends VuexModule {
   drawAnnotations: boolean = true;
   filteredDraw: boolean = false;
   drawActive: boolean = false;
+  annotationSelectionType: AnnotationSelectionTypes =
+    AnnotationSelectionTypes.TOGGLE;
 
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
@@ -97,6 +100,11 @@ export class Main extends VuexModule {
   @Mutation
   public setDrawAnnotations(value: boolean) {
     this.drawAnnotations = value;
+  }
+
+  @Mutation
+  public setAnnotationSelectionType(value: AnnotationSelectionTypes) {
+    this.annotationSelectionType = value;
   }
 
   @Mutation

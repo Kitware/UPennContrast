@@ -11,7 +11,8 @@ import { logError } from "@/utils/log";
 // Which style an annotation should have, depending on its layer (color change)
 export function getAnnotationStyleFromLayer(
   layer: IDisplayLayer | undefined,
-  isHovered: boolean = false
+  isHovered: boolean = false,
+  isSelected: boolean = false
 ) {
   const style = {
     stroke: true,
@@ -26,10 +27,15 @@ export function getAnnotationStyleFromLayer(
   if (!layer) {
     return style;
   }
+
+  // "Hovered" style should be 1st priority
   if (isHovered) {
     style.fillColor = "gray";
     style.strokeColor = "gray";
     style.strokeWidth = 4;
+  } else if (isSelected) {
+    style.strokeColor = layer.color;
+    style.strokeWidth = 5;
   } else if (layer) {
     style.fillColor = layer.color;
     style.strokeColor = layer.color;
