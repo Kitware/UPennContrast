@@ -225,7 +225,7 @@ export default class NewDataset extends Vue {
     }
 
     this.$router.push({
-      name: "dataset",
+      name: "multi",
       params: {
         id: this.dataset!.id
       }
