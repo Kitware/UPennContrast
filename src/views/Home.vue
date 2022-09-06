@@ -78,7 +78,15 @@ export default class Upload extends Vue {
   location: IGirderLocation = { type: "root" };
 
   get configurations() {
-    return this.store.recentConfigurations;
+    const result = [];
+    const used = {};
+    this.store.recentConfigurations.forEach(conf => {
+      if (!used[conf.id]) {
+        used[conf.id] = true;
+        result.push(conf);
+      }
+    });
+    return result;
   }
 
   onRowClick(data: IGirderSelectAble) {

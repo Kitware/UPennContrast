@@ -118,15 +118,21 @@ export default class ViewerToolbar extends Vue {
   }
 
   set xy(value: number) {
-    this.changeQuery("xy", value.toString());
+    if (value !== this.xy) {
+      this.changeQuery("xy", value.toString());
+    }
   }
 
   set z(value: number) {
-    this.changeQuery("z", value.toString());
+    if (value !== this.z) {
+      this.changeQuery("z", value.toString());
+    }
   }
 
   set time(value: number) {
-    this.changeQuery("time", value.toString());
+    if (value !== this.time) {
+      this.changeQuery("time", value.toString());
+    }
   }
 
   get unrollXY() {
@@ -134,7 +140,9 @@ export default class ViewerToolbar extends Vue {
   }
 
   set unrollXY(value: boolean) {
-    this.changeQuery("unrollXY", value.toString());
+    if (value !== this.unrollXY) {
+      this.changeQuery("unrollXY", value.toString());
+    }
   }
 
   @Watch("unrollXY")
@@ -147,8 +155,9 @@ export default class ViewerToolbar extends Vue {
   }
 
   set unrollZ(value: boolean) {
-    this.store.setUnrollZ(value);
-    this.changeQuery("unrollZ", value.toString());
+    if (value !== this.unrollZ) {
+      this.changeQuery("unrollZ", value.toString());
+    }
   }
 
   @Watch("unrollZ")
@@ -161,7 +170,9 @@ export default class ViewerToolbar extends Vue {
   }
 
   set unrollT(value: boolean) {
-    this.changeQuery("unrollT", value.toString());
+    if (value !== this.unrollT) {
+      this.changeQuery("unrollT", value.toString());
+    }
   }
 
   @Watch("unrollT")
@@ -182,7 +193,9 @@ export default class ViewerToolbar extends Vue {
   }
 
   set layerMode(value: "multiple" | "single") {
-    this.changeQuery("layer", value);
+    if (value !== this.layerMode) {
+      this.changeQuery("layer", value);
+    }
   }
 
   get layerMode() {
