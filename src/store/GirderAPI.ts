@@ -285,9 +285,9 @@ export default class GirderAPI {
   }
 
   getImages(folderId: string): Promise<IGirderItem[]> {
-    return this.getItems(folderId).then(items =>
-      items.filter(d => (d as any).largeImage)
-    );
+    return this.getItems(folderId).then(items => {
+      return items.filter(d => (d as any).largeImage)
+    });
   }
 
   getDataset(
@@ -298,7 +298,8 @@ export default class GirderAPI {
   ): Promise<IDataset> {
     return Promise.all([this.getFolder(id), this.getItems(id)]).then(
       ([folder, items]) => {
-        const images = items.filter(d => (d as any).largeImage);
+        // just use the first image
+        const images = items.filter(d => (d as any).largeImage).slice(0, 1);
         return Promise.all(images.map(item => this.getTiles(item))).then(
           tiles => {
             const configurations = items
@@ -307,7 +308,7 @@ export default class GirderAPI {
             return {
               ...asDataset(folder),
               configurations,
-              ...parseTiles(images, tiles, unrollXY, unrollZ, unrollT)
+              ...parseTiles(images[0], tiles[0], unrollXY, unrollZ, unrollT)
             };
           }
         );
@@ -649,15 +650,12 @@ function toKey(
 }
 
 function parseTiles(
-  items: IGirderItem[],
-  tiles: ITileMeta[],
+  item: IGirderItem,
+  tile: ITileMeta,
   unrollXY: boolean,
   unrollZ: boolean,
   unrollT: boolean
 ) {
-  // t x z x c -> IImage[]
-
-  // z -> times
   const xys = new Set<number>();
   const zs = new Map<number, Set<number>>();
   const cs = new Set<number>();
@@ -667,86 +665,83 @@ function parseTiles(
   let frameChannels: string[] | undefined;
   let unrollCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
   let unrollOrder: string[] = [];
-  tiles.forEach((tile, i) => {
-    const item = items[i]!;
-    const metadata = getNumericMetadata(item.name);
-    if (metadata.chan !== null && !channelInt.has(metadata.chan)) {
-      channelInt.set(metadata.chan, channelInt.size);
+  const metadata = getNumericMetadata(item.name);
+  if (metadata.chan !== null && !channelInt.has(metadata.chan)) {
+    channelInt.set(metadata.chan, channelInt.size);
+  }
+
+  frameChannels = tile.channels;
+
+  if (!tile.frames) {
+    tile.frames = [({ Index: 0, Frame: 0 } as unknown) as IFrameInfo];
+  }
+
+  tile.frames.forEach((frame, j) => {
+    let t = metadata.t !== null ? metadata.t : frame.IndexT;
+    let xy = metadata.xy !== null ? metadata.xy : frame.IndexXY || 0;
+    let z =
+      metadata.z !== null
+        ? metadata.z
+        : frame.IndexZ !== undefined
+        ? frame.IndexZ
+        : frame.PositionZ;
+    if (unrollT) {
+      unrollCount.t = Math.max(unrollCount.t, t + 1);
+      t = -1;
+      if (!unrollOrder.includes("t")) {
+        unrollOrder.push("t");
+      }
     }
-
-    frameChannels = tile.channels;
-
-    if (!tile.frames) {
-      tile.frames = [({ Index: 0, Frame: 0 } as unknown) as IFrameInfo];
+    if (unrollXY) {
+      unrollCount.xy = Math.max(unrollCount.xy, xy + 1);
+      xy = -1;
+      if (!unrollOrder.includes("xy")) {
+        unrollOrder.push("xy");
+      }
     }
-
-    tile.frames.forEach((frame, j) => {
-      let t = metadata.t !== null ? metadata.t : frame.IndexT;
-      let xy = metadata.xy !== null ? metadata.xy : frame.IndexXY || 0;
-      let z =
-        metadata.z !== null
-          ? metadata.z
-          : frame.IndexZ !== undefined
-          ? frame.IndexZ
-          : frame.PositionZ;
-      if (unrollT) {
-        unrollCount.t = Math.max(unrollCount.t, t + 1);
-        t = -1;
-        if (!unrollOrder.includes("t")) {
-          unrollOrder.push("t");
-        }
+    if (unrollZ) {
+      unrollCount.z = Math.max(unrollCount.z, z + 1);
+      z = -1;
+      if (!unrollOrder.includes("z")) {
+        unrollOrder.push("z");
       }
-      if (unrollXY) {
-        unrollCount.xy = Math.max(unrollCount.xy, xy + 1);
-        xy = -1;
-        if (!unrollOrder.includes("xy")) {
-          unrollOrder.push("xy");
-        }
-      }
-      if (unrollZ) {
-        unrollCount.z = Math.max(unrollCount.z, z + 1);
-        z = -1;
-        if (!unrollOrder.includes("z")) {
-          unrollOrder.push("z");
-        }
-      }
-      const metadataChannel =
-        channelInt.size > 1 ? channelInt.get(metadata.chan) : undefined;
-      const c =
-        metadataChannel !== undefined
-          ? metadataChannel
-          : frame.IndexC === undefined
-          ? 0
-          : frame.IndexC;
-      if (zs.has(z)) {
-        zs.get(z)!.add(t);
-      } else {
-        zs.set(z, new Set([t]));
-      }
-      xys.add(xy);
-      cs.add(c);
-      const key = toKey(z, t, xy, c);
-      const info: IImage = {
-        frame,
-        levels: tile.levels,
-        frameIndex: j,
-        key: { z: z, t: t, xy: xy, c: c },
-        keyOffset: lookup.has(key) ? lookup.get(key)!.length : 0,
-        item,
-        sizeX: tile.sizeX,
-        sizeY: tile.sizeY,
-        tileWidth: tile.tileWidth,
-        tileHeight: tile.tileHeight,
-        tileinfo: tile,
-        mm_x: tile.mm_x,
-        mm_y: tile.mm_y
-      };
-      if (!lookup.has(key)) {
-        lookup.set(key, [info]);
-      } else {
-        lookup.get(key)!.push(info);
-      }
-    });
+    }
+    const metadataChannel =
+      channelInt.size > 1 ? channelInt.get(metadata.chan) : undefined;
+    const c =
+      metadataChannel !== undefined
+        ? metadataChannel
+        : frame.IndexC === undefined
+        ? 0
+        : frame.IndexC;
+    if (zs.has(z)) {
+      zs.get(z)!.add(t);
+    } else {
+      zs.set(z, new Set([t]));
+    }
+    xys.add(xy);
+    cs.add(c);
+    const key = toKey(z, t, xy, c);
+    const info: IImage = {
+      frame,
+      levels: tile.levels,
+      frameIndex: j,
+      key: { z: z, t: t, xy: xy, c: c },
+      keyOffset: lookup.has(key) ? lookup.get(key)!.length : 0,
+      item,
+      sizeX: tile.sizeX,
+      sizeY: tile.sizeY,
+      tileWidth: tile.tileWidth,
+      tileHeight: tile.tileHeight,
+      tileinfo: tile,
+      mm_x: tile.mm_x,
+      mm_y: tile.mm_y
+    };
+    if (!lookup.has(key)) {
+      lookup.set(key, [info]);
+    } else {
+      lookup.get(key)!.push(info);
+    }
   });
 
   let width = 0;
