@@ -1,7 +1,12 @@
 FROM girder/girder:latest-py3
 
 RUN apt-get update && \
-    apt-get install --yes --no-install-recommends fuse
+    apt-get install --yes --no-install-recommends \
+    fuse \
+    iptables \
+    dnsutils \
+    && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 RUN mkdir /mnt/fuse
 
 WORKDIR /src
@@ -16,5 +21,8 @@ RUN pip install -e /src/AnnotationPlugin
 
 COPY ./provision.py /src/provision.py
 COPY ./girder.cfg /etc/girder.cfg
+COPY ./test_env.sh /src/test_env.sh
+
+WORKDIR /src/AnnotationPlugin
 
 ENTRYPOINT ["bash"]

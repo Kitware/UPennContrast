@@ -20,7 +20,9 @@ setup(name='upenncontrast_annotation',
       ],
       install_requires=[
           'girder_worker',
-          'girder_worker_utils'
+          'girder_worker_utils',
+          'girder-large-image',
+          'large-image[sources]',
       ],
       extras_require={
           'girder': [
