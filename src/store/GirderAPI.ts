@@ -285,9 +285,9 @@ export default class GirderAPI {
   }
 
   getImages(folderId: string): Promise<IGirderItem[]> {
-    return this.getItems(folderId).then(items => {
-      return items.filter(d => (d as any).largeImage)
-    });
+    return this.getItems(folderId).then(items =>
+      items.filter(d => (d as any).largeImage)
+    );
   }
 
   getDataset(
