@@ -7,11 +7,11 @@
       >
       <bread-crumbs />
       <v-spacer />
-      <v-btn @click.stop="snapshotPanel = !snapshotPanel" id="snapshotButton"
+      <v-btn @click.stop="updateRightPanel('snapshotPanel')" id="snapshotButton"
         >Snapshot</v-btn
       >
       <user-menu />
-      <v-btn @click.stop="annotationPanel = !annotationPanel"
+      <v-btn @click.stop="updateRightPanel('annotationPanel')"
         >Browse Annotations</v-btn
       >
       <server-status />
@@ -83,6 +83,8 @@ export default class App extends Vue {
 
   annotationPanel = false;
 
+  lastRightPanelUpdate: string | undefined;
+
   fetchConfig() {
     // Fetch the list of available tool templates
     // It consists of a json file containing a list of items, each item describing
@@ -108,6 +110,18 @@ export default class App extends Vue {
 
   goHome() {
     this.$router.push({ name: "root" });
+  }
+
+  updateRightPanel(panel: string) {
+    this.$data[panel] = !this.$data[panel];
+    // The last panel updated has to be closed if it is not the currently updated panel
+    if (
+      this.lastRightPanelUpdate !== undefined &&
+      this.lastRightPanelUpdate !== panel
+    ) {
+      this.$data[this.lastRightPanelUpdate] = false;
+    }
+    this.lastRightPanelUpdate = panel;
   }
 }
 </script>
