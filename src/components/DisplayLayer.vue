@@ -157,7 +157,7 @@ export default class DisplayLayer extends Vue {
     if (this.visible === value) {
       return;
     }
-    this.store.handleHotkey(this.index + 1);
+    this.store.toggleLayerVisibility(this.index);
   }
 
   get channel() {

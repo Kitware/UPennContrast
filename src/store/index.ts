@@ -629,18 +629,17 @@ export class Main extends VuexModule {
     if (!this.configuration) {
       return;
     }
-    const visible = this.configuration.view.layers.reduce(
-      (acc, l) => acc + (l.visible ? 1 : 0),
-      0
-    );
-    if (visible > 1) {
-      let first = true;
-      this.configuration.view.layers.forEach(l => {
-        if (l.visible) {
-          l.visible = first;
-          first = false;
+    let first = true;
+    this.configuration.view.layers.forEach(l => {
+      if (l.visible) {
+        if (!first) {
+          l.visible = false;
         }
-      });
+        first = false;
+      }
+    });
+    if (first && this.configuration.view.layers.length) {
+      this.configuration.view.layers[0].visible = true;
     }
   }
 
@@ -672,6 +671,20 @@ export class Main extends VuexModule {
       return;
     }
     this.toggleLayer(hotKey - 1);
+    await this.syncConfiguration();
+  }
+
+  @Action
+  async toggleLayerVisibility(layerIndex: number) {
+    if (
+      !this.dataset ||
+      !this.configuration ||
+      layerIndex < 0 ||
+      layerIndex >= this.configuration.view.layers.length
+    ) {
+      return;
+    }
+    this.toggleLayer(layerIndex);
     await this.syncConfiguration();
   }
 
