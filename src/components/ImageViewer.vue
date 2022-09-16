@@ -235,6 +235,12 @@ export default class ImageViewer extends Vue {
     this.layerParams = params.layer;
     if (!this.map) {
       this.map = geojs.map(params.map);
+      /* remove default key bindings */
+      let interactorOpts = this.map.interactor().options();
+      const actions = interactorOpts.keyboard.actions;
+      /* We can keep some actions, if wanted */
+      interactorOpts.keyboard.actions = {'rotate.0': actions['rotate.0']};
+      this.map.interactor().options(interactorOpts);
       Vue.prototype.$currentMap = this.map;
       this.annotationLayer = this.map.createLayer("annotation", {
         annotations: geojs.listAnnotations(),
