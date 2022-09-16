@@ -1,6 +1,8 @@
 .DS_Store
 node_modules
 /dist
+/assetstore
+/db
 multi_data
 # local env files
 *.local
