@@ -109,6 +109,10 @@ export default class AnnotationViewer extends Vue {
       : this.annotationStore.annotations;
   }
 
+  get annotationsConnections() {
+    return this.annotationStore.annotationConnections;
+  }
+
   get annotationIds() {
     return this.annotations.map((annotation: IAnnotation) => annotation.id);
   }
@@ -414,7 +418,7 @@ export default class AnnotationViewer extends Vue {
       (annotation: IAnnotation) => annotation.id
     );
 
-    this.annotationStore.annotationConnections
+    this.annotationsConnections
       .filter(
         (connection: IAnnotationConnection) =>
           !existingIds.includes(connection.id) &&
@@ -841,6 +845,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   @Watch("annotations")
+  @Watch("annotationsConnections")
   onAnnotationsChanged() {
     this.drawAnnotations();
   }
