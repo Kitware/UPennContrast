@@ -49,24 +49,26 @@
         <!-- List toolset tools -->
         <v-list v-if="toolset && toolset.toolIds && toolsetTools.length" dense>
           <v-list-item-group v-model="selectedToolId">
-            <template v-for="(tool, index) in toolsetTools">
-              <v-list-item dense :key="index" :value="tool.id">
-                <v-list-item-avatar>
-                  <tool-icon :tool="tool" />
-                </v-list-item-avatar>
-                <v-list-item-content
-                  ><v-list-item-title>{{ tool.name }}</v-list-item-title>
-                  <v-list-item-subtitle>
-                    {{ tool.description }}
-                  </v-list-item-subtitle>
-                </v-list-item-content>
-                <v-list-item-action
-                  ><v-btn icon @click="removeToolId(tool.id)"
-                    ><v-icon>mdi-close</v-icon></v-btn
-                  ></v-list-item-action
-                >
-              </v-list-item>
-            </template>
+            <draggable>
+              <template v-for="(tool, index) in toolsetTools">
+                <v-list-item dense :key="index" :value="tool.id">
+                  <v-list-item-avatar>
+                    <tool-icon :tool="tool" />
+                  </v-list-item-avatar>
+                  <v-list-item-content
+                    ><v-list-item-title>{{ tool.name }}</v-list-item-title>
+                    <v-list-item-subtitle>
+                      {{ tool.description }}
+                    </v-list-item-subtitle>
+                  </v-list-item-content>
+                  <v-list-item-action
+                    ><v-btn icon @click="removeToolId(tool.id)"
+                      ><v-icon>mdi-close</v-icon></v-btn
+                    ></v-list-item-action
+                  >
+                </v-list-item>
+              </template>
+            </draggable>
           </v-list-item-group>
           <annotation-worker-menu
             :tool="selectedTool"
@@ -85,6 +87,7 @@
 
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
+import draggable from "vuedraggable";
 import store from "@/store";
 import toolsStore from "@/store/tool";
 import { IToolConfiguration } from "@/store/model";
@@ -95,7 +98,13 @@ import AnnotationWorkerMenu from "@/components/AnnotationWorkerMenu.vue";
 
 // Lists tools from a toolset, allows selecting a tool from the list, and adding new tools
 @Component({
-  components: { ToolCreation, ToolIcon, ToolsetPicker, AnnotationWorkerMenu }
+  components: {
+    ToolCreation,
+    ToolIcon,
+    ToolsetPicker,
+    AnnotationWorkerMenu,
+    draggable
+  }
 })
 export default class Toolset extends Vue {
   readonly store = store;
