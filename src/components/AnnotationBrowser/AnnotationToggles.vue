@@ -38,7 +38,7 @@
             hide-details
             dense
             v-model="drawTooltips"
-            label="Show Tooltips"
+            label="Enable Tooltips (hotkey T)"
           ></v-checkbox>
         </v-list-item>
         <v-list-item>
@@ -46,8 +46,26 @@
             hide-details
             :disabled="!drawTooltips"
             dense
-            v-model="tooltipsOnSelected"
-            label="Show Only Tooltips Selected Annotations"
+            v-model="tooltipOnAll"
+            label="Show All Tooltips"
+          ></v-checkbox>
+        </v-list-item>
+        <v-list-item>
+          <v-checkbox
+            hide-details
+            :disabled="!drawTooltips"
+            dense
+            v-model="tooltipOnHovered"
+            label="Show Hovered Annotation Tooltip"
+          ></v-checkbox>
+        </v-list-item>
+        <v-list-item>
+          <v-checkbox
+            hide-details
+            :disabled="!drawTooltips"
+            dense
+            v-model="tooltipOnSelected"
+            label="Show Selected Annotations Tooltips"
           ></v-checkbox>
         </v-list-item>
         <v-list-item>
@@ -122,12 +140,28 @@ export default class AnnotationToggles extends Vue {
     this.store.setDrawTooltips(value);
   }
 
-  get tooltipsOnSelected() {
-    return this.store.tooltipsOnSelected;
+  get tooltipOnSelected() {
+    return this.store.tooltipOnSelected;
   }
 
-  set tooltipsOnSelected(value: boolean) {
-    this.store.setTooltipsOnSelected(value);
+  set tooltipOnSelected(value: boolean) {
+    this.store.setTooltipOnSelected(value);
+  }
+
+  get tooltipOnHovered() {
+    return this.store.tooltipOnHovered;
+  }
+
+  set tooltipOnHovered(value: boolean) {
+    this.store.setTooltipOnHovered(value);
+  }
+
+  get tooltipOnAll() {
+    return this.store.tooltipOnAll;
+  }
+
+  set tooltipOnAll(value: boolean) {
+    this.store.setTooltipOnAll(value);
   }
 
   get filteredDraw() {

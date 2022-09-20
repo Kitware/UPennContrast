@@ -65,12 +65,15 @@ export class Main extends VuexModule {
   layerMode: "single" | "multiple" = "multiple";
 
   drawAnnotations: boolean = true;
-  drawTooltips: boolean = false;
-  tooltipsOnSelected: boolean = false;
   filteredDraw: boolean = false;
   drawActive: boolean = false;
   annotationSelectionType: AnnotationSelectionTypes =
     AnnotationSelectionTypes.TOGGLE;
+
+  drawTooltips: boolean = true;
+  tooltipOnSelected: boolean = false;
+  tooltipOnHovered: boolean = true;
+  tooltipOnAll: boolean = false;
 
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
@@ -115,8 +118,18 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  public setTooltipsOnSelected(value: boolean) {
-    this.tooltipsOnSelected = value;
+  public setTooltipOnSelected(value: boolean) {
+    this.tooltipOnSelected = value;
+  }
+
+  @Mutation
+  public setTooltipOnHovered(value: boolean) {
+    this.tooltipOnHovered = value;
+  }
+
+  @Mutation
+  public setTooltipOnAll(value: boolean) {
+    this.tooltipOnAll = value;
   }
 
   @Mutation

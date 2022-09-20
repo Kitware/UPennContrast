@@ -215,8 +215,16 @@ export default class AnnotationViewer extends Vue {
     return this.store.drawTooltips;
   }
 
-  get tooltipsOnSelected(): boolean {
-    return this.store.tooltipsOnSelected;
+  get tooltipOnAll(): boolean {
+    return this.store.tooltipOnAll;
+  }
+
+  get tooltipOnSelected(): boolean {
+    return this.store.tooltipOnSelected;
+  }
+
+  get tooltipOnHovered(): boolean {
+    return this.store.tooltipOnHovered;
   }
 
   getAnnotationStyle(annotation: IAnnotation) {
@@ -310,15 +318,21 @@ export default class AnnotationViewer extends Vue {
     const oldFeatures = this.textLayer.features();
 
     if (this.shouldDrawTooltips) {
+      // Avoid checking the store for each annotation
+      const all = this.tooltipOnAll;
+      const selected = this.tooltipOnSelected;
+      const hovered = this.tooltipOnHovered;
+
       const displayedAnnotations = this.annotationLayer
         .annotations()
         .map((a: any) => a.options("storedAnnotation"))
         .filter((a: any) => {
-          // Filter annotations without an option "storedAnnotation"
-          if (!a) {
-            return false;
-          }
-          return !this.tooltipsOnSelected || this.isAnnotationSelected(a.id);
+          return (
+            a &&
+            (all ||
+              (hovered && this.hoveredAnnotationId === a.id) ||
+              (selected && this.isAnnotationSelected(a.id)))
+          );
         });
 
       // One text feature per line as in https://opengeoscience.github.io/geojs/tutorials/text/
@@ -990,7 +1004,10 @@ export default class AnnotationViewer extends Vue {
   }
 
   @Watch("shouldDrawTooltips")
-  @Watch("tooltipsOnSelected")
+  @Watch("tooltipOnAll")
+  @Watch("tooltipOnSelected")
+  @Watch("tooltipOnHovered")
+  @Watch("hoveredAnnotationId")
   onDrawTooltipsChanged() {
     this.drawTooltips();
   }
@@ -999,11 +1016,6 @@ export default class AnnotationViewer extends Vue {
   @Watch("unrollW")
   onUnrollChanged() {
     this.clearOldAnnotations(true);
-    this.drawAnnotations();
-  }
-
-  @Watch("hoveredAnnotationId")
-  onHovered() {
     this.drawAnnotations();
   }
 
@@ -1047,6 +1059,10 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.geoOn(
       geojs.event.annotation.mode,
       this.handleModeChange
+    );
+    this.annotationLayer.geoOn(
+      geojs.event.annotation.mode,
+      this.handleAnnotationChange
     );
     this.annotationLayer.geoOn(
       geojs.event.annotation.add,
