@@ -65,6 +65,8 @@ export class Main extends VuexModule {
   layerMode: "single" | "multiple" = "multiple";
 
   drawAnnotations: boolean = true;
+  drawTooltips: boolean = false;
+  tooltipsOnSelected: boolean = false;
   filteredDraw: boolean = false;
   drawActive: boolean = false;
   annotationSelectionType: AnnotationSelectionTypes =
@@ -105,6 +107,16 @@ export class Main extends VuexModule {
   @Mutation
   public setDrawAnnotations(value: boolean) {
     this.drawAnnotations = value;
+  }
+
+  @Mutation
+  public setDrawTooltips(value: boolean) {
+    this.drawTooltips = value;
+  }
+
+  @Mutation
+  public setTooltipsOnSelected(value: boolean) {
+    this.tooltipsOnSelected = value;
   }
 
   @Mutation

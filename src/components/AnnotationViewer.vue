@@ -62,6 +62,9 @@ export default class AnnotationViewer extends Vue {
   readonly annotationLayer: any;
 
   @Prop()
+  readonly textLayer: any;
+
+  @Prop()
   readonly workerPreviewFeature: any;
 
   @Prop()
@@ -208,6 +211,14 @@ export default class AnnotationViewer extends Vue {
     return this.store.drawAnnotationConnections;
   }
 
+  get shouldDrawTooltips(): boolean {
+    return this.store.drawTooltips;
+  }
+
+  get tooltipsOnSelected(): boolean {
+    return this.store.tooltipsOnSelected;
+  }
+
   getAnnotationStyle(annotation: IAnnotation) {
     const layer = this.getAnyLayerForChannel(annotation.channel);
     return getAnnotationStyleFromLayer(
@@ -292,6 +303,50 @@ export default class AnnotationViewer extends Vue {
       this.drawNewConnections(displayedIds);
     }
     this.annotationLayer.draw();
+    this.drawTooltips();
+  }
+
+  drawTooltips() {
+    const oldFeatures = this.textLayer.features();
+
+    if (this.shouldDrawTooltips) {
+      const displayedAnnotations = this.annotationLayer
+        .annotations()
+        .map((a: any) => a.options("storedAnnotation"))
+        .filter((a: any) => {
+          // Filter annotations without an option "storedAnnotation"
+          if (!a) {
+            return false;
+          }
+          return !this.tooltipsOnSelected || this.isAnnotationSelected(a.id);
+        });
+
+      this.textLayer
+        .createFeature("text")
+        .data(displayedAnnotations)
+        .position((annotation: IAnnotation) => {
+          return simpleCentroid(annotation.coordinates);
+        })
+        .text((annotation: IAnnotation) => {
+          return (
+            "XY=" +
+            annotation.location.XY +
+            ", Z=" +
+            annotation.location.Z +
+            ", T=" +
+            annotation.location.Time +
+            ", [" +
+            annotation.tags.join(", ") +
+            "]"
+          );
+        });
+    }
+
+    // Delete the old feature after displaying the new one to avoid flickering
+    oldFeatures.forEach((feature: any) => {
+      this.textLayer.deleteFeature(feature);
+    });
+    this.textLayer.draw();
   }
 
   shouldDisplayAnnotationWithChannel(channelId: number): boolean {
@@ -457,6 +512,7 @@ export default class AnnotationViewer extends Vue {
     }
     const options = {
       girderId: annotation.id,
+      storedAnnotation: annotation,
       isHovered: annotation.id === this.hoveredAnnotationId,
       location: annotation.location,
       channel: annotation.channel,
@@ -851,6 +907,8 @@ export default class AnnotationViewer extends Vue {
       .filter((feature: any) => !feature.selectionAPI())
       .forEach((feature: any) => {
         feature.selectionAPI(true);
+        feature.geoOff(geojs.event.feature.mouseon, this.handleMouseOver);
+        feature.geoOff(geojs.event.feature.mouseoff, this.handleMouseOff);
         feature.geoOn(geojs.event.feature.mouseon, this.handleMouseOver);
         feature.geoOn(geojs.event.feature.mouseoff, this.handleMouseOff);
       });
@@ -903,6 +961,12 @@ export default class AnnotationViewer extends Vue {
   @Watch("shouldDrawConnections")
   onSettingsChanged() {
     this.drawAnnotations();
+  }
+
+  @Watch("shouldDrawTooltips")
+  @Watch("tooltipsOnSelected")
+  onDrawTooltipsChanged() {
+    this.drawTooltips();
   }
 
   @Watch("unrollH")

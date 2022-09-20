@@ -3,6 +3,7 @@
     <annotation-viewer
       v-if="annotationLayer"
       :annotationLayer="annotationLayer"
+      :textLayer="textLayer"
       :workerPreviewFeature="workerPreviewFeature"
       :unrollH="unrollH"
       :unrollW="unrollW"
@@ -144,6 +145,8 @@ export default class ImageViewer extends Vue {
   private unrollW: number = 1;
   private unrollH: number = 1;
 
+  private textLayer: any;
+
   cacheProgress = 0; // 0 to cacheProgressTotal
   cacheProgressTotal = 0;
 
@@ -248,6 +251,8 @@ export default class ImageViewer extends Vue {
 
       this.annotationLayer.node().css({ "mix-blend-mode": "unset" });
       this.workerPreviewLayer.node().css({ "mix-blend-mode": "unset" });
+      this.textLayer = this.map.createLayer("feature", { features: ["text"] });
+      this.textLayer.node().css({ "mix-blend-mode": "unset" });
       this.uiLayer = this.map.createLayer("ui");
       this.uiLayer.node().css({ "mix-blend-mode": "unset" });
     } else {
@@ -397,10 +402,12 @@ export default class ImageViewer extends Vue {
     if (
       this.workerPreviewLayer.zIndex() !== this.layerStackImages.length * 2 ||
       this.annotationLayer.zIndex() !== this.layerStackImages.length * 2 + 1 ||
-      this.uiLayer.zIndex() !== this.layerStackImages.length * 2 + 2
+      this.textLayer.zIndex() !== this.layerStackImages.length * 2 + 2 ||
+      this.uiLayer.zIndex() !== this.layerStackImages.length * 2 + 3
     ) {
       this.workerPreviewLayer.moveToTop();
       this.annotationLayer.moveToTop();
+      this.textLayer.moveToTop();
       this.uiLayer.moveToTop();
     }
     // set tile urls

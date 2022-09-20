@@ -34,6 +34,23 @@
           ></v-checkbox>
         </v-list-item>
         <v-list-item>
+          <v-checkbox
+            hide-details
+            dense
+            v-model="drawTooltips"
+            label="Show Tooltips"
+          ></v-checkbox>
+        </v-list-item>
+        <v-list-item>
+          <v-checkbox
+            hide-details
+            :disabled="!drawTooltips"
+            dense
+            v-model="tooltipsOnSelected"
+            label="Show Only Tooltips Selected Annotations"
+          ></v-checkbox>
+        </v-list-item>
+        <v-list-item>
           <v-select
             v-model="annotationSelectionType"
             :items="annotationsSelectionTypeItems"
@@ -95,6 +112,22 @@ export default class AnnotationToggles extends Vue {
 
   set drawAnnotations(value: boolean) {
     this.store.setDrawAnnotations(value);
+  }
+
+  get drawTooltips() {
+    return this.store.drawTooltips;
+  }
+
+  set drawTooltips(value: boolean) {
+    this.store.setDrawTooltips(value);
+  }
+
+  get tooltipsOnSelected() {
+    return this.store.tooltipsOnSelected;
+  }
+
+  set tooltipsOnSelected(value: boolean) {
+    this.store.setTooltipsOnSelected(value);
   }
 
   get filteredDraw() {
