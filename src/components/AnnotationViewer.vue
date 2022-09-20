@@ -321,24 +321,50 @@ export default class AnnotationViewer extends Vue {
           return !this.tooltipsOnSelected || this.isAnnotationSelected(a.id);
         });
 
+      // One text feature per line as in https://opengeoscience.github.io/geojs/tutorials/text/
+      // Centroid is computed once per new line (optimization needed?)
+      // TODO: More performance with renderThreshold https://opengeoscience.github.io/geojs/apidocs/geo.textFeature.html#.styleSpec
+      const baseStyle = {
+        fontSize: "12px",
+        fontFamily: "sans-serif",
+        textAlign: "center",
+        textBaseline: "middle",
+        color: "black",
+        textStrokeColor: "#FFF8",
+        textStrokeWidth: 2
+      };
       this.textLayer
         .createFeature("text")
         .data(displayedAnnotations)
         .position((annotation: IAnnotation) => {
           return simpleCentroid(annotation.coordinates);
         })
-        .text((annotation: IAnnotation) => {
-          return (
-            "XY=" +
-            annotation.location.XY +
-            ", Z=" +
-            annotation.location.Z +
-            ", T=" +
-            annotation.location.Time +
-            ", [" +
-            annotation.tags.join(", ") +
-            "]"
-          );
+        .style({
+          text: (annotation: IAnnotation) => {
+            return (
+              "XY, Z, T = " +
+              annotation.location.XY +
+              ", " +
+              annotation.location.Z +
+              ", " +
+              annotation.location.Time
+            );
+          },
+          offset: { x: 0, y: -6 },
+          ...baseStyle
+        });
+      this.textLayer
+        .createFeature("text")
+        .data(displayedAnnotations)
+        .position((annotation: IAnnotation) => {
+          return simpleCentroid(annotation.coordinates);
+        })
+        .style({
+          text: (annotation: IAnnotation) => {
+            return "[ " + annotation.tags.join(", ") + " ]";
+          },
+          offset: { x: 0, y: 6 },
+          ...baseStyle
         });
     }
 
