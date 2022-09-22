@@ -48,7 +48,11 @@ export default routeMapper(
       parse: v => v,
       get: () => store.layerMode,
       set: (value: string) =>
-        store.setLayerMode(value === "single" ? "single" : "multiple")
+        store.setLayerMode(
+          ["single", "multiple", "unroll"].indexOf(value) >= 0
+            ? value
+            : "multiple"
+        )
     },
     snapshot: {
       parse: v => v,

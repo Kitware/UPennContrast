@@ -50,22 +50,26 @@
           :disabled="!(maxTime > 0 || unrollT)"
         />
       </v-layout>
-      <switch-toggle
+      <v-radio-group
         v-model="layerMode"
         label="Layers: "
-        true-label="Multiple"
-        true-value="multiple"
-        false-label="Single"
-        false-value="single"
-        id="layerMode"
-      />
+        mandatory
+        dense
+        row
+        hide-details
+        class="layer-mode-controls"
+      >
+        <v-radio value="single" label="Single" class="smaller" />
+        <v-radio value="multiple" label="Multiple" class="smaller" />
+        <v-radio value="unroll" label="Unroll" class="smaller" />
+      </v-radio-group>
     </div>
     <div class="lowertools">
       <slot></slot>
     </div>
   </div>
 </template>
-<style scoped>
+<style lang="scss" scoped>
 .v-input--selection-controls {
   margin-top: 0;
 }
@@ -73,6 +77,14 @@
   flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
+}
+.layer-mode-controls {
+  ::v-deep .v-radio {
+    margin-right: 10px;
+    > .v-input--selection-controls__input {
+      margin-right: 0;
+    }
+  }
 }
 </style>
 <script lang="ts">
@@ -192,7 +204,7 @@ export default class ViewerToolbar extends Vue {
     return this.store.dataset ? this.store.dataset.time.length - 1 : this.time;
   }
 
-  set layerMode(value: "multiple" | "single") {
+  set layerMode(value: "multiple" | "single" | "unroll") {
     if (value !== this.layerMode) {
       this.changeQuery("layer", value);
     }

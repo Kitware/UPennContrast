@@ -1,16 +1,37 @@
 <template>
   <div class="image">
+    <!-- DWM:: TODO: use multiple annotation layers -->
     <annotation-viewer
-      v-if="annotationLayer"
-      :annotationLayer="annotationLayer"
-      :textLayer="textLayer"
-      :workerPreviewFeature="workerPreviewFeature"
+      v-for="(mapentry, index) in maps.filter(
+        (mapentry, index) =>
+          mapentry.annotationLayer &&
+          mapentry.lowestLayer !== undefined &&
+          mapentry.imageLayers &&
+          mapentry.imageLayers.length
+      )"
+      :annotationLayer="mapentry.annotationLayer"
+      :textLayer="mapentry.textLayer"
+      :workerPreviewFeature="mapentry.workerPreviewFeature"
       :unrollH="unrollH"
       :unrollW="unrollW"
       :tileWidth="tileWidth"
       :tileHeight="tileHeight"
+      :lowestLayer="mapentry.lowestLayer || 0"
+      :layerCount="(mapentry.imageLayers || []).length / 2"
+      :key="'annotation-viewer-' + index"
     ></annotation-viewer>
-    <div id="map" ref="geojsmap" :data-update="reactiveDraw" />
+    <div
+      class="map-layout"
+      ref="geojsmap"
+      :data-update="reactiveDraw"
+      :map-count="mapLayerList.length"
+    >
+      <div
+        v-for="(item, index) in mapLayerList"
+        :id="'map-' + index"
+        :key="'geojsmap-' + index"
+      />
+    </div>
     <div class="loading" v-if="!fullyReady">
       <v-progress-circular indeterminate />
     </div>
@@ -44,7 +65,7 @@
         <filter
           :id="'recolor-' + index"
           color-interpolation-filters="sRGB"
-          v-for="(item, index) in imageLayers"
+          v-for="(item, index) in layerStackImages"
           :key="'recolor-' + index"
         >
           <feComponentTransfer>
@@ -60,7 +81,7 @@
 <script lang="ts">
 // in cosole debugging, you can access the map via
 //  $('.geojs-map').data('data-geojs-map')
-import { Vue, Component } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import geojs from "geojs";
 
@@ -132,16 +153,10 @@ export default class ImageViewer extends Vue {
 
   private imageLayers: any[] = [];
 
-  private layerParams: any;
-  private map: any;
-  private annotationLayer: any = null;
-  private workerPreviewLayer: any = null;
-  private workerPreviewFeature: any = null;
+  private maps: any[] = [];
   tileWidth: number = 0;
   tileHeight: number = 0;
 
-  private uiLayer: any;
-  private scaleWidget: any;
   private unrollW: number = 1;
   private unrollH: number = 1;
 
@@ -185,46 +200,81 @@ export default class ImageViewer extends Vue {
     return this.store.configuration ? this.store.layerStackImages : [];
   }
 
-  private draw(mapElement: HTMLElement) {
-    if ((this.width == this.height && this.width == 1) || !this.dataset) {
-      return;
+  private get mapLayerList() {
+    if (this.store.layerMode !== "unroll") {
+      return [this.layerStackImages];
+    } else {
+      const llist = [[]];
+      let visible = 0;
+      this.layerStackImages.forEach(lsi => {
+        if (visible && lsi.layer.visible) {
+          llist.push([]);
+        }
+        llist[llist.length - 1].push(lsi);
+        if (lsi.layer.visible) {
+          visible += 1;
+        }
+      });
+      return llist;
     }
-    if (!this.layerStackImages.length) {
-      return;
-    }
-    const someImages = this.layerStackImages.find((lsi: any) => lsi.images[0]);
-    if (!someImages) {
-      return;
-    }
-    let unrollCount = someImages.images.length;
-    const someImage = someImages.images[0];
-    let unrollW = Math.min(
-      unrollCount,
-      Math.ceil(
-        Math.sqrt(someImage.sizeX * someImage.sizeY * unrollCount) /
-          someImage.sizeX
-      )
-    );
-    let unrollH = Math.ceil(unrollCount / unrollW);
-    let mapWidth = unrollW * someImage.sizeX;
-    let mapHeight = unrollH * someImage.sizeY;
-    let adjustLayers = true;
-    let tileWidth = someImage.tileWidth;
-    let tileHeight = someImage.tileHeight;
-    this.tileWidth = tileWidth;
-    this.tileHeight = tileHeight;
+  }
 
+  /**
+   * Synchronize all maps on any pan event.
+   */
+  private _handlePan(evt, mapidx) {
+    if (this._inPan !== undefined) {
+      return;
+    }
+    if (!this.maps || this.maps.length < 2) {
+      return;
+    }
+    this._inPan = mapidx;
+    try {
+      const map = this.maps[mapidx].map;
+      this.maps.forEach((mapentry, idx) => {
+        if (idx === mapidx) {
+          return;
+        }
+        mapentry.map.zoom(map.zoom(), true, true);
+        mapentry.map.rotation(map.rotation(), undefined, true);
+        mapentry.map.center(map.center(), undefined, true, true);
+      });
+    } catch (err) {}
+    this._inPan = undefined;
+  }
+
+  @Watch("mapLayerList")
+  updateMapLayerList() {
+    Vue.nextTick(() => {
+      if (!this.refsMounted || !this.$refs.geojsmap) {
+        return;
+      }
+      this.draw(this.$refs.geojsmap);
+    });
+  }
+
+  private blankUrl =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQIHWNgYAAAAAMAAU9ICq8AAAAASUVORK5CYII=";
+
+  private _setupMap(mll, mllidx, parentElement, someImage) {
+    const mapElement = parentElement.querySelector(`#map-${mllidx}`);
+    if (!mapElement) {
+      return;
+    }
+    let mapWidth = this.unrollW * someImage.sizeX;
+    let mapHeight = this.unrollH * someImage.sizeY;
     let params = geojs.util.pixelCoordinateParams(
       mapElement,
       someImage.sizeX,
       someImage.sizeY,
-      tileWidth,
-      tileHeight
+      this.tileWidth,
+      this.tileHeight
     );
     params.map.maxBounds.right = mapWidth;
     params.map.maxBounds.bottom = mapHeight;
     params.map.min -= Math.ceil(
-      Math.log(Math.max(unrollW, unrollH)) / Math.log(2)
+      Math.log(Math.max(this.unrollW, this.unrollH)) / Math.log(2)
     );
     params.map.zoom = params.map.min;
     params.map.center = { x: mapWidth / 2, y: mapHeight / 2 };
@@ -232,80 +282,100 @@ export default class ImageViewer extends Vue {
     params.layer.autoshareRenderer = false;
     params.layer.nearestPixel = params.layer.maxLevel;
     delete params.layer.tilesMaxBounds;
-    params.layer.url =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQIHWNgYAAAAAMAAU9ICq8AAAAASUVORK5CYII=";
+    params.layer.url = this.blankUrl;
     params.map.max += 5;
-    this.layerParams = params.layer;
-    if (!this.map) {
-      this.map = geojs.map(params.map);
+
+    let map, mapentry;
+    if (this.maps.length <= mllidx) {
+      map = geojs.map(params.map);
+      map.geoOn(geojs.event.pan, evt => this._handlePan(evt, mllidx));
+      mapentry = {
+        map: map,
+        imageLayers: [],
+        params: params,
+        layerIndices: []
+      };
+      this.maps.push(mapentry);
+
       /* remove default key bindings */
-      let interactorOpts = this.map.interactor().options();
+      let interactorOpts = map.interactor().options();
       const actions = interactorOpts.keyboard.actions;
       /* We can keep some actions, if wanted */
       interactorOpts.keyboard.actions = { "rotate.0": actions["rotate.0"] };
-      this.map.interactor().options(interactorOpts);
-      Vue.prototype.$currentMap = this.map;
-      this.annotationLayer = this.map.createLayer("annotation", {
+      map.interactor().options(interactorOpts);
+      Vue.prototype.$currentMap = map;
+      mapentry.annotationLayer = map.createLayer("annotation", {
         annotations: geojs.listAnnotations(),
         autoshareRenderer: false,
         continuousCloseProximity: true
       });
-      this.workerPreviewLayer = this.map.createLayer("feature", {
+      mapentry.workerPreviewLayer = map.createLayer("feature", {
+        renderer: mllidx ? "canvas" : undefined,
         features: ["quad", "quad.image"]
       });
-      this.workerPreviewFeature = this.workerPreviewLayer.createFeature("quad");
+      mapentry.workerPreviewFeature = mapentry.workerPreviewLayer.createFeature(
+        "quad"
+      );
 
-      this.annotationLayer.node().css({ "mix-blend-mode": "unset" });
-      this.workerPreviewLayer.node().css({ "mix-blend-mode": "unset" });
-      this.textLayer = this.map.createLayer("feature", { features: ["text"] });
-      this.textLayer.node().css({ "mix-blend-mode": "unset" });
-      this.uiLayer = this.map.createLayer("ui");
-      this.uiLayer.node().css({ "mix-blend-mode": "unset" });
+      mapentry.annotationLayer.node().css({ "mix-blend-mode": "unset" });
+      mapentry.workerPreviewLayer.node().css({ "mix-blend-mode": "unset" });
+      mapentry.textLayer = map.createLayer("feature", { features: ["text"] });
+      mapentry.textLayer.node().css({ "mix-blend-mode": "unset" });
     } else {
-      adjustLayers =
-        Math.abs(this.map.maxBounds(undefined, null).right - mapWidth) >= 0.5 ||
-        Math.abs(this.map.maxBounds(undefined, null).bottom - mapHeight) >= 0.5;
+      mapentry = this.maps[mllidx];
+      mapentry.params = params;
+      map = mapentry.map;
+      const adjustLayers =
+        Math.abs(map.maxBounds(undefined, null).right - mapWidth) >= 0.5 ||
+        Math.abs(map.maxBounds(undefined, null).bottom - mapHeight) >= 0.5;
       if (adjustLayers) {
-        this.map.maxBounds({
+        map.maxBounds({
           left: 0,
           top: 0,
           right: params.map.maxBounds.right,
           bottom: params.map.maxBounds.bottom
         });
-        this.map.zoomRange(params.map);
+        map.zoomRange(params.map);
       }
     }
-    const mapnode = this.map.node();
-    if (
-      mapnode.width() != this.map.size().width ||
-      mapnode.height() != this.map.size().height
-    ) {
-      this.map.size({ width: mapnode.width(), height: mapnode.height() });
+
+    // only have a scale widget on the first map
+    if (!mllidx) {
+      if (!mapentry.uiLayer) {
+        mapentry.uiLayer = map.createLayer("ui");
+        mapentry.uiLayer.node().css({ "mix-blend-mode": "unset" });
+      }
+      if (
+        mapentry.scaleWidget &&
+        !(
+          someImage.mm_x ||
+          mapentry.scaleWidget.options("scale") !== someImage.mm_x / 1000
+        )
+      ) {
+        mapentry.uiLayer.deleteWidget(mapentry.scaleWidget);
+        mapentry.scaleWidget = null;
+      }
+      if (someImage.mm_x && !mapentry.scaleWidget) {
+        mapentry.scaleWidget = mapentry.uiLayer.createWidget("scale", {
+          scale: someImage.mm_x / 1000,
+          position: { bottom: 20, right: 10 }
+        });
+      }
     }
+  }
+
+  /**
+   * Make sure a map has the appropriate tile layers.
+   */
+  private _setupTileLayers(mll, mllidx, someImage, baseLayerIndex) {
+    const mapentry = this.maps[mllidx];
+    const map = mapentry.map;
     // adjust number of tile layers
-    while (this.imageLayers.length > this.layerStackImages.length * 2) {
-      this.map.deleteLayer(this.imageLayers.pop());
+    while (mapentry.imageLayers.length > mll.length * 2) {
+      map.deleteLayer(mapentry.imageLayers.pop());
     }
-    this.unrollW = unrollW;
-    this.unrollH = unrollH;
-    if (
-      this.scaleWidget &&
-      !(
-        someImage.mm_x ||
-        this.scaleWidget.options("scale") !== someImage.mm_x / 1000
-      )
-    ) {
-      this.uiLayer.deleteWidget(this.scaleWidget);
-      this.scaleWidget = null;
-    }
-    if (someImage.mm_x && !this.scaleWidget) {
-      this.scaleWidget = this.uiLayer.createWidget("scale", {
-        scale: someImage.mm_x / 1000,
-        position: { bottom: 20, right: 10 }
-      });
-    }
-    while (this.imageLayers.length < this.layerStackImages.length * 2) {
-      this.layerParams.tilesAtZoom = (level: number) => {
+    while (mapentry.imageLayers.length < mll.length * 2) {
+      mapentry.params.layer.tilesAtZoom = (level: number) => {
         const s = Math.pow(2, someImage.levels - 1 - level);
         const result = {
           x:
@@ -315,18 +385,27 @@ export default class ImageViewer extends Vue {
         };
         return result;
       };
-      if (this.imageLayers.length >= 12) {
-        this.layerParams.renderer = "canvas";
+      const currentImageLayers = this.maps.reduce(
+        (acc, entry) => acc + (entry.imageLayers || []).length,
+        0
+      );
+      /* I thought the number of webgl layesr would be
+       *  imageLayers (mll * 2) + 1 + this.maps.length
+       * but we run out of webgl contexts sooner than that.  Maybe because they
+       * get switched on and off?
+       */
+      if (currentImageLayers + this.maps.length >= 10) {
+        mapentry.params.layer.renderer = "canvas";
       } else {
-        delete this.layerParams.renderer;
+        delete mapentry.params.layer.renderer;
       }
-      if (this.imageLayers.length) {
-        this.layerParams.queue = this.imageLayers[0].queue;
+      if (mapentry.imageLayers.length) {
+        mapentry.params.layer.queue = mapentry.imageLayers[0].queue;
       }
-      this.imageLayers.push(this.map.createLayer("osm", this.layerParams));
-      let layer = this.imageLayers[this.imageLayers.length - 1];
-      if (this.imageLayers.length & 1) {
-        const index = (this.imageLayers.length - 1) / 2;
+      mapentry.imageLayers.push(map.createLayer("osm", mapentry.params.layer));
+      let layer = mapentry.imageLayers[mapentry.imageLayers.length - 1];
+      if (mapentry.imageLayers.length & 1) {
+        const index = (mapentry.imageLayers.length - 1) / 2;
         layer.node().css("filter", `url(#recolor-${index})`);
       }
       layer.url((x: number, y: number, level: number) => {
@@ -338,7 +417,7 @@ export default class ImageViewer extends Vue {
         const imageNum =
           Math.floor(x / txy.x) + Math.floor(y / txy.y) * this.unrollW;
         if (!layer._imageUrls || !layer._imageUrls[imageNum]) {
-          return params.layer.url;
+          return this.blankUrl;
         }
         const tx = x % txy.x;
         const ty = y % txy.y;
@@ -405,19 +484,15 @@ export default class ImageViewer extends Vue {
       };
     }
     this.ready.layers.splice(this.layerStackImages.length);
-    if (
-      this.workerPreviewLayer.zIndex() !== this.layerStackImages.length * 2 ||
-      this.annotationLayer.zIndex() !== this.layerStackImages.length * 2 + 1 ||
-      this.textLayer.zIndex() !== this.layerStackImages.length * 2 + 2 ||
-      this.uiLayer.zIndex() !== this.layerStackImages.length * 2 + 3
-    ) {
-      this.workerPreviewLayer.moveToTop();
-      this.annotationLayer.moveToTop();
-      this.textLayer.moveToTop();
-      this.uiLayer.moveToTop();
-    }
-    // set tile urls
-    this.layerStackImages.forEach(
+  }
+
+  /**
+   * Set tile urls for all tile layers/
+   */
+  private _setTileUrls(mll, mllidx, someImage, baseLayerIndex) {
+    const mapentry = this.maps[mllidx];
+    const map = mapentry.map;
+    mll.forEach(
       (
         {
           layer,
@@ -436,8 +511,10 @@ export default class ImageViewer extends Vue {
         },
         layerIndex: number
       ) => {
-        let fullLayer = this.imageLayers[layerIndex * 2];
-        let adjLayer = this.imageLayers[layerIndex * 2 + 1];
+        let fullLayer = mapentry.imageLayers[layerIndex * 2];
+        let adjLayer = mapentry.imageLayers[layerIndex * 2 + 1];
+        mapentry.lowestLayer = baseLayerIndex;
+        layerIndex += baseLayerIndex;
         // set fullLayer's transform
         if (!fullUrls[0] || !urls[0]) {
           if (singleFrame !== null && fullLayer.setFrameQuad) {
@@ -517,193 +594,78 @@ export default class ImageViewer extends Vue {
         Vue.set(this.ready.layers, layerIndex, idle);
       }
     );
-    this.map.draw();
-    /* Disable running cacneWhenIdle; it doesn't help much now that we have
-     * tile frame previews
-    this.map.onIdle(this.cacheWhenIdle);
-     */
+  }
+
+  private draw(parentElement: HTMLElement) {
+    if ((this.width == this.height && this.width == 1) || !this.dataset) {
+      return;
+    }
+    if (!this.layerStackImages.length) {
+      return;
+    }
+    const someImages = this.layerStackImages.find((lsi: any) => lsi.images[0]);
+    if (!someImages) {
+      return;
+    }
+    let unrollCount = someImages.images.length;
+    const someImage = someImages.images[0];
+    this.unrollW = Math.min(
+      unrollCount,
+      Math.ceil(
+        Math.sqrt(someImage.sizeX * someImage.sizeY * unrollCount) /
+          someImage.sizeX
+      )
+    );
+    this.unrollH = Math.ceil(unrollCount / this.unrollW);
+    let tileWidth = someImage.tileWidth;
+    let tileHeight = someImage.tileHeight;
+    this.tileWidth = tileWidth;
+    this.tileHeight = tileHeight;
+
+    const mapLayerList = this.mapLayerList;
+    while (this.maps.length > mapLayerList.length) {
+      const mapentry = this.maps.pop();
+      mapentry.map.exit();
+    }
+    let baseLayerIndex = 0;
+    mapLayerList.forEach((mll, mllidx) => {
+      this._setupMap(mll, mllidx, parentElement, someImage);
+      const mapentry = this.maps[mllidx];
+      if (!mapentry) {
+        return;
+      }
+      const map = mapentry.map;
+      const mapnode = map.node();
+      if (
+        mapnode.width() != map.size().width ||
+        mapnode.height() != map.size().height
+      ) {
+        map.size({ width: mapnode.width(), height: mapnode.height() });
+      }
+      this._setupTileLayers(mll, mllidx, someImage, baseLayerIndex);
+      if (
+        mapentry.workerPreviewLayer.zIndex() !== mll.length * 2 ||
+        mapentry.annotationLayer.zIndex() !== mll.length * 2 + 1 ||
+        mapentry.textLayer.zIndex() !== mll.length * 2 + 2 ||
+        (mapentry.uiLayer && mapentry.uiLayer.zIndex() !== mll.length * 2 + 3)
+      ) {
+        mapentry.workerPreviewLayer.moveToTop();
+        mapentry.annotationLayer.moveToTop();
+        mapentry.textLayer.moveToTop();
+        if (mapentry.uiLayer) {
+          mapentry.uiLayer.moveToTop();
+        }
+      }
+      this._setTileUrls(mll, mllidx, someImage, baseLayerIndex);
+      baseLayerIndex += mll.length;
+      map.draw();
+    });
   }
 
   beforeDestroy() {
-    if (this.map) {
-      this.map.exit();
-      this.map = null;
-    }
-  }
-
-  private recentCacheUrls: { [key: string]: number } = {};
-
-  cacheWhenIdle() {
-    if (
-      !this.fullyReady ||
-      !this.dataset ||
-      !this.map ||
-      !this.map.idle ||
-      !this.store.configuration
-    ) {
-      this.cacheProgress = 0;
-      return;
-    }
-    let zxy: { [key: string]: any } = {};
-    for (
-      let layerIndex = 1;
-      layerIndex < this.imageLayers.length;
-      layerIndex += 2
-    ) {
-      let adjLayer = this.imageLayers[layerIndex];
-      Object.keys(adjLayer._activeTiles).forEach((tileHash: string) => {
-        if (!zxy[tileHash]) {
-          zxy[tileHash] = tileHash.split("_");
-        }
-      });
-    }
-    let axis: string | undefined;
-    if (
-      this.dataset.z.length > 1 &&
-      this.dataset.z.length >= this.dataset.xy.length &&
-      this.dataset.z.length >= this.dataset.time.length
-    ) {
-      axis = "z";
-    } else if (
-      this.dataset.time.length > 1 &&
-      this.dataset.time.length >= this.dataset.xy.length
-    ) {
-      axis = "time";
-    } else if (this.dataset.xy.length > 1) {
-      axis = "xy";
-    } else {
-      // only one frame, so no need to buffer others
-      this.cacheProgress = 0;
-      return;
-    }
-    if (
-      Object.keys(this.recentCacheUrls).length >
-      Math.max(
-        5000,
-        Object.keys(zxy).length *
-          (this.dataset as any)[axis].length *
-          this.store.configuration.view.layers.length *
-          4
-      )
-    ) {
-      this.recentCacheUrls = {};
-    }
-    let urlList: string[] = [];
-    let fullUrlList: string[] = [];
-    let neededHistograms: IImage[][] = [];
-    let maxPromises = 3;
-    let addedPromises = 0;
-    let cacheProgressTotal =
-      (this.dataset as any)[axis].length *
-      (1 + 2 * Object.keys(zxy).length) *
-      this.store.configuration.view.layers.length;
-    let cacheProgress = cacheProgressTotal;
-    for (let idx = 0; idx < (this.dataset as any)[axis].length; idx += 1) {
-      if (idx === (this.store as any)[axis]) {
-        continue;
-      }
-      let imageList = this.store.getFullLayerImages(
-        axis === "time" ? this.dataset[axis][idx] : this.store.time,
-        axis === "xy" ? this.dataset[axis][idx] : this.store.xy,
-        axis === "z" ? this.dataset[axis][idx] : this.store.z
-      );
-      neededHistograms = neededHistograms.concat(imageList.neededHistograms);
-      if (imageList.neededHistograms.length) {
-        cacheProgress = Math.min(
-          cacheProgress,
-          (idx + 1) * this.store.configuration.view.layers.length -
-            neededHistograms.length
-        );
-      }
-      if (neededHistograms.length >= maxPromises) {
-        break;
-      }
-      if (fullUrlList.length < maxPromises) {
-        imageList.fullUrls.forEach(urlTemplate => {
-          Object.values(zxy).forEach(tile => {
-            let url = urlTemplate
-              .replace("{z}", tile[0])
-              .replace("{x}", tile[1])
-              .replace("{y}", tile[2]);
-            if (this.recentCacheUrls[url]) {
-              return;
-            }
-            fullUrlList.push(url);
-          });
-        });
-        if (fullUrlList.length) {
-          cacheProgress =
-            Math.min(
-              cacheProgress,
-              (idx + 1) *
-                this.store.configuration.view.layers.length *
-                Object.keys(zxy).length -
-                fullUrlList.length
-            ) +
-            (this.dataset as any)[axis].length *
-              this.store.configuration.view.layers.length;
-        }
-      }
-      if (urlList.length < maxPromises) {
-        imageList.urls.forEach(urlTemplate => {
-          Object.values(zxy).forEach(tile => {
-            let url = urlTemplate
-              .replace("{z}", tile[0])
-              .replace("{x}", tile[1])
-              .replace("{y}", tile[2]);
-            if (this.recentCacheUrls[url]) {
-              return;
-            }
-            urlList.push(url);
-          });
-        });
-        if (urlList.length) {
-          cacheProgress =
-            Math.min(
-              cacheProgress,
-              (idx + 1) *
-                this.store.configuration.view.layers.length *
-                Object.keys(zxy).length -
-                urlList.length
-            ) +
-            (this.dataset as any)[axis].length *
-              (1 + Object.keys(zxy).length) *
-              this.store.configuration.view.layers.length;
-        }
-      }
-    }
-    if (neededHistograms.length || fullUrlList.length || urlList.length) {
-      this.cacheProgress = cacheProgress;
-    } else {
-      this.cacheProgress = cacheProgressTotal;
-    }
-    this.cacheProgressTotal = cacheProgressTotal;
-    // first prefetch any needed histograms
-    neededHistograms.forEach(images => {
-      if (addedPromises < maxPromises) {
-        this.map.addPromise(this.store.api.getLayerHistogram(images));
-        addedPromises += 1;
-      }
-    });
-    // load the first tile we haven't seen in a while
-    urlList = fullUrlList.concat(urlList);
-    urlList.forEach(url => {
-      if (addedPromises < maxPromises) {
-        this.map.addPromise(
-          new Promise((resolve: any, reject: any) => {
-            let img = new Image();
-            img.crossOrigin = "anonymous";
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = url;
-            this.recentCacheUrls[url] = Date.now();
-          })
-        );
-        addedPromises += 1;
-      }
-    });
-    if (addedPromises) {
-      this.map.onIdle(this.cacheWhenIdle);
+    if (this.maps) {
+      this.maps.forEach(mapentry => mapentry.exit());
+      this.maps = null;
     }
   }
 }
@@ -718,13 +680,57 @@ export default class ImageViewer extends Vue {
   color: white;
   font-size: 12px;
 }
-.geojs-map {
+.map-layout {
   position: absolute;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
   background: black;
+  line-height: 0;
+}
+.geojs-map {
+  width: 100%;
+  height: 100%;
+}
+.map-layout[map-count="2"] .geojs-map {
+  width: 50%;
+  height: 100%;
+  display: inline-block;
+}
+.map-layout[map-count="3"] .geojs-map,
+.map-layout[map-count="4"] .geojs-map {
+  width: 50%;
+  height: 50%;
+  display: inline-block;
+}
+.map-layout[map-count="5"] .geojs-map,
+.map-layout[map-count="6"] .geojs-map {
+  width: 33%;
+  height: 50%;
+  display: inline-block;
+}
+.map-layout[map-count="7"] .geojs-map,
+.map-layout[map-count="8"] .geojs-map,
+.map-layout[map-count="9"] .geojs-map {
+  width: 33%;
+  height: 33%;
+  display: inline-block;
+}
+.map-layout[map-count="10"] .geojs-map,
+.map-layout[map-count="11"] .geojs-map,
+.map-layout[map-count="12"] .geojs-map {
+  width: 25%;
+  height: 33%;
+  display: inline-block;
+}
+.map-layout[map-count="13"] .geojs-map,
+.map-layout[map-count="14"] .geojs-map,
+.map-layout[map-count="15"] .geojs-map,
+.map-layout[map-count="16"] .geojs-map {
+  width: 25%;
+  height: 25%;
+  display: inline-block;
 }
 </style>
 <style lang="scss">
