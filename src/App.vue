@@ -91,7 +91,7 @@ export default class App extends Vue {
     {
       bind: "t",
       handler: () => {
-        this.store.setDrawTooltips(!this.store.drawTooltips);
+        this.store.setShowTooltips(!this.store.showTooltips);
       }
     }
   ];
