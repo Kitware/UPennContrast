@@ -70,7 +70,7 @@ export class Main extends VuexModule {
   annotationSelectionType: AnnotationSelectionTypes =
     AnnotationSelectionTypes.TOGGLE;
 
-  drawTooltips: boolean = true;
+  showTooltips: boolean = true;
   tooltipOnSelected: boolean = false;
   tooltipOnAll: boolean = false;
 
@@ -112,8 +112,8 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  public setDrawTooltips(value: boolean) {
-    this.drawTooltips = value;
+  public setShowTooltips(value: boolean) {
+    this.showTooltips = value;
   }
 
   @Mutation

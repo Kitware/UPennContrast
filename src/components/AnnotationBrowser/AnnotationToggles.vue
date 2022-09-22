@@ -37,14 +37,14 @@
           <v-checkbox
             hide-details
             dense
-            v-model="drawTooltips"
+            v-model="showTooltips"
             label="Enable Tooltips (hotkey T)"
           ></v-checkbox>
         </v-list-item>
         <v-list-item>
           <v-checkbox
             hide-details
-            :disabled="!drawTooltips"
+            :disabled="!showTooltips"
             dense
             v-model="tooltipOnAll"
             label="Show All Tooltips"
@@ -53,7 +53,7 @@
         <v-list-item>
           <v-checkbox
             hide-details
-            :disabled="!drawTooltips"
+            :disabled="!showTooltips"
             dense
             v-model="tooltipOnSelected"
             label="Show Selected Annotations Tooltips"
@@ -123,12 +123,12 @@ export default class AnnotationToggles extends Vue {
     this.store.setDrawAnnotations(value);
   }
 
-  get drawTooltips() {
-    return this.store.drawTooltips;
+  get showTooltips() {
+    return this.store.showTooltips;
   }
 
-  set drawTooltips(value: boolean) {
-    this.store.setDrawTooltips(value);
+  set showTooltips(value: boolean) {
+    this.store.setShowTooltips(value);
   }
 
   get tooltipOnSelected() {

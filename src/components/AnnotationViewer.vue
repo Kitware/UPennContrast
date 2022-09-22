@@ -211,8 +211,8 @@ export default class AnnotationViewer extends Vue {
     return this.store.drawAnnotationConnections;
   }
 
-  get shouldDrawTooltips(): boolean {
-    return this.store.drawTooltips;
+  get showTooltips(): boolean {
+    return this.store.showTooltips;
   }
 
   get tooltipOnAll(): boolean {
@@ -313,7 +313,7 @@ export default class AnnotationViewer extends Vue {
   drawTooltips() {
     const oldFeatures = this.textLayer.features();
 
-    if (this.shouldDrawTooltips) {
+    if (this.showTooltips) {
       const displayedAnnotations = this.annotationLayer
         .annotations()
         .map((a: any) => a.options("storedAnnotation"))
@@ -993,10 +993,9 @@ export default class AnnotationViewer extends Vue {
     this.drawAnnotations();
   }
 
-  @Watch("shouldDrawTooltips")
+  @Watch("showTooltips")
   @Watch("tooltipOnAll")
   @Watch("tooltipOnSelected")
-  @Watch("hoveredAnnotationId")
   onDrawTooltipsChanged() {
     this.drawTooltips();
   }
