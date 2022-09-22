@@ -208,6 +208,26 @@ export class Annotations extends VuexModule {
   }
 
   @Action
+  public async createConnections({
+    annotationsIds,
+    tags,
+    channelId
+  }: {
+    annotationsIds: string[];
+    tags: string[];
+    channelId: number|null;
+  }) {
+    sync.setSaving(true);
+    const connections = await this.annotationsAPI.createConnections(
+      annotationsIds,
+      tags,
+      channelId
+    );
+    sync.setSaving(false);
+    return connections;
+  }
+
+  @Action
   public async createConnection({
     parentId,
     childId,

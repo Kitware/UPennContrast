@@ -109,6 +109,10 @@ export default class AnnotationViewer extends Vue {
       : this.annotationStore.annotations;
   }
 
+  get annotationsConnections() {
+    return this.annotationStore.annotationConnections;
+  }
+
   get annotationIds() {
     return this.annotations.map((annotation: IAnnotation) => annotation.id);
   }
@@ -414,7 +418,7 @@ export default class AnnotationViewer extends Vue {
       (annotation: IAnnotation) => annotation.id
     );
 
-    this.annotationStore.annotationConnections
+    this.annotationsConnections
       .filter(
         (connection: IAnnotationConnection) =>
           !existingIds.includes(connection.id) &&
@@ -691,64 +695,29 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.addAnnotation(newGeoJSAnnotation, undefined, false);
   }
 
-  private async addAnnotationConnections(annotation: IAnnotation) {
+  private async addAnnotationConnections(
+    annotation: IAnnotation
+  ): Promise<IAnnotationConnection[]> {
     if (!this.selectedTool || !this.dataset) {
       return [];
     }
     const connectTo = this.selectedTool.values.connectTo;
     // Look for connections
     if (connectTo && connectTo.tags && connectTo.tags.length) {
-      const annotations = this.annotationStore.annotations;
       // Find eligible annotations (matching tags and channel)
       const connectToChannel =
         connectTo.layer === null ? null : this.layers[connectTo.layer].channel;
-      const eligibleAnnotations = annotations.filter((value: IAnnotation) => {
-        if (value.id === annotation.id) {
-          return false;
-        }
-        if (connectTo.layer !== null && value.channel !== connectToChannel) {
-          return false;
-        }
-        if (
-          annotation.location.XY !== value.location.XY ||
-          annotation.location.Z !== value.location.Z ||
-          annotation.location.Time !== value.location.Time
-        ) {
-          return false;
-        }
-        return value.tags.some(tag => connectTo.tags.includes(tag));
+      const connections = await this.annotationStore.createConnections({
+        annotationsIds: [annotation.id],
+        tags: this.selectedTool.values.connectTo.tags,
+        channelId: connectToChannel
       });
-      if (eligibleAnnotations.length) {
-        // Find the closest among eligible annotation
-        const sortedAnnotations = eligibleAnnotations.sort(
-          (valueA: IAnnotation, valueB: IAnnotation) => {
-            const distanceA = annotationDistance(valueA, annotation);
-            const distanceB = annotationDistance(valueB, annotation);
-            return distanceA - distanceB;
-          }
-        );
-        const [closest] = sortedAnnotations;
+      if (connections) {
+        connections.forEach((connection: any) => {
+          this.annotationStore.addConnection(connection);
+        });
 
-        // Create and add the new connection
-
-        const newConnection: IAnnotationConnection | null = await this.annotationStore.createConnection(
-          {
-            tags: [],
-            label: "A Connection",
-            parentId: closest.id,
-            childId: annotation.id,
-            datasetId: this.dataset.id
-          }
-        );
-        if (newConnection) {
-          this.annotationStore.addConnection(newConnection);
-          this.drawGeoJSAnnotationFromConnection(
-            newConnection,
-            annotation,
-            closest
-          );
-          return [newConnection];
-        }
+        return connections;
       }
     }
     return [];
@@ -876,6 +845,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   @Watch("annotations")
+  @Watch("annotationsConnections")
   onAnnotationsChanged() {
     this.drawAnnotations();
   }
