@@ -223,10 +223,6 @@ export default class AnnotationViewer extends Vue {
     return this.store.tooltipOnSelected;
   }
 
-  get tooltipOnHovered(): boolean {
-    return this.store.tooltipOnHovered;
-  }
-
   getAnnotationStyle(annotation: IAnnotation) {
     const layer = this.getAnyLayerForChannel(annotation.channel);
     return getAnnotationStyleFromLayer(
@@ -318,20 +314,14 @@ export default class AnnotationViewer extends Vue {
     const oldFeatures = this.textLayer.features();
 
     if (this.shouldDrawTooltips) {
-      // Avoid checking the store for each annotation
-      const all = this.tooltipOnAll;
-      const selected = this.tooltipOnSelected;
-      const hovered = this.tooltipOnHovered;
-
       const displayedAnnotations = this.annotationLayer
         .annotations()
         .map((a: any) => a.options("storedAnnotation"))
         .filter((a: any) => {
           return (
             a &&
-            (all ||
-              (hovered && this.hoveredAnnotationId === a.id) ||
-              (selected && this.isAnnotationSelected(a.id)))
+            (this.tooltipOnAll ||
+              (this.tooltipOnSelected && this.isAnnotationSelected(a.id)))
           );
         });
 
@@ -343,9 +333,9 @@ export default class AnnotationViewer extends Vue {
         fontFamily: "sans-serif",
         textAlign: "center",
         textBaseline: "middle",
-        color: "black",
-        textStrokeColor: "#FFF8",
-        textStrokeWidth: 2
+        color: "white",
+        textStrokeColor: "black",
+        textStrokeWidth: 3
       };
       this.textLayer
         .createFeature("text")
@@ -1006,7 +996,6 @@ export default class AnnotationViewer extends Vue {
   @Watch("shouldDrawTooltips")
   @Watch("tooltipOnAll")
   @Watch("tooltipOnSelected")
-  @Watch("tooltipOnHovered")
   @Watch("hoveredAnnotationId")
   onDrawTooltipsChanged() {
     this.drawTooltips();

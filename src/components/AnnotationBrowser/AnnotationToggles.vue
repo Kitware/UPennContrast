@@ -55,15 +55,6 @@
             hide-details
             :disabled="!drawTooltips"
             dense
-            v-model="tooltipOnHovered"
-            label="Show Hovered Annotation Tooltip"
-          ></v-checkbox>
-        </v-list-item>
-        <v-list-item>
-          <v-checkbox
-            hide-details
-            :disabled="!drawTooltips"
-            dense
             v-model="tooltipOnSelected"
             label="Show Selected Annotations Tooltips"
           ></v-checkbox>
@@ -146,14 +137,6 @@ export default class AnnotationToggles extends Vue {
 
   set tooltipOnSelected(value: boolean) {
     this.store.setTooltipOnSelected(value);
-  }
-
-  get tooltipOnHovered() {
-    return this.store.tooltipOnHovered;
-  }
-
-  set tooltipOnHovered(value: boolean) {
-    this.store.setTooltipOnHovered(value);
   }
 
   get tooltipOnAll() {

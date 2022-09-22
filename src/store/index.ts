@@ -72,7 +72,6 @@ export class Main extends VuexModule {
 
   drawTooltips: boolean = true;
   tooltipOnSelected: boolean = false;
-  tooltipOnHovered: boolean = true;
   tooltipOnAll: boolean = false;
 
   restrictAnnotationsToFilters: boolean = true;
@@ -120,11 +119,6 @@ export class Main extends VuexModule {
   @Mutation
   public setTooltipOnSelected(value: boolean) {
     this.tooltipOnSelected = value;
-  }
-
-  @Mutation
-  public setTooltipOnHovered(value: boolean) {
-    this.tooltipOnHovered = value;
   }
 
   @Mutation
