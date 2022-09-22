@@ -316,12 +316,13 @@ export default class AnnotationViewer extends Vue {
     if (this.showTooltips) {
       const displayedAnnotations = this.annotationLayer
         .annotations()
-        .map((a: any) => a.options("storedAnnotation"))
-        .filter((a: any) => {
+        .map((annotation: any) => annotation.options("storedAnnotation"))
+        .filter((annotation: IAnnotation | undefined) => {
           return (
-            a &&
+            annotation &&
             (this.tooltipOnAll ||
-              (this.tooltipOnSelected && this.isAnnotationSelected(a.id)))
+              (this.tooltipOnSelected &&
+                this.isAnnotationSelected(annotation.id)))
           );
         });
 

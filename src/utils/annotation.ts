@@ -88,6 +88,9 @@ export function geojsAnnotationFactory(
 }
 
 export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
+  if (coordinates.length === 1) {
+    return coordinates[0];
+  }
   const sums: IGeoJSPoint = { x: 0, y: 0, z: 0 };
   coordinates.forEach(({ x, y, z }) => {
     sums.x += x;
