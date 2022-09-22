@@ -95,7 +95,6 @@ class AnnotationConnection(AccessControlledModel):
 
   def create(self, creator, connection):
     self.setUserAccess(connection, user=creator, level=AccessType.ADMIN, save=False)
-    a = self.save(connection)
     return self.save(connection)
 
   def delete(self, connection):
