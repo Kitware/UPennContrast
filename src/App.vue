@@ -1,5 +1,5 @@
 <template>
-  <v-app id="inspire">
+  <v-app v-mousetrap="mousetrapBindings" id="inspire">
     <v-app-bar class="elevation-1" app clipped-right>
       <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
       <v-toolbar-title @click="goHome" class="logo"
@@ -61,6 +61,7 @@ import AnnotationBrowser from "@/components/AnnotationBrowser/AnnotationBrowser.
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import vMousetrap from "./utils/v-mousetrap";
 import { Vue, Component, Prop } from "vue-property-decorator";
+import store from "@/store";
 import toolsStore from "@/store/tool";
 
 Vue.use(vMousetrap);
@@ -76,6 +77,7 @@ Vue.use(vMousetrap);
   }
 })
 export default class App extends Vue {
+  readonly store = store;
   readonly toolsStore = toolsStore;
   drawer = false;
   snapshotPanel = false;
@@ -84,6 +86,15 @@ export default class App extends Vue {
   annotationPanel = false;
 
   lastModifiedRightPanel: string | null = null;
+
+  mousetrapBindings = [
+    {
+      bind: "t",
+      handler: () => {
+        this.store.setShowTooltips(!this.store.showTooltips);
+      }
+    }
+  ];
 
   fetchConfig() {
     // Fetch the list of available tool templates

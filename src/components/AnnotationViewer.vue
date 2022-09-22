@@ -62,6 +62,9 @@ export default class AnnotationViewer extends Vue {
   readonly annotationLayer: any;
 
   @Prop()
+  readonly textLayer: any;
+
+  @Prop()
   readonly workerPreviewFeature: any;
 
   @Prop()
@@ -212,6 +215,18 @@ export default class AnnotationViewer extends Vue {
     return this.store.drawAnnotationConnections;
   }
 
+  get showTooltips(): boolean {
+    return this.store.showTooltips;
+  }
+
+  get tooltipOnAll(): boolean {
+    return this.store.tooltipOnAll;
+  }
+
+  get tooltipOnSelected(): boolean {
+    return this.store.tooltipOnSelected;
+  }
+
   getAnnotationStyle(annotation: IAnnotation) {
     const layer = this.getAnyLayerForChannel(annotation.channel);
     return getAnnotationStyleFromLayer(
@@ -296,6 +311,77 @@ export default class AnnotationViewer extends Vue {
       this.drawNewConnections(displayedIds);
     }
     this.annotationLayer.draw();
+    this.drawTooltips();
+  }
+
+  drawTooltips() {
+    const oldFeatures = this.textLayer.features();
+
+    if (this.showTooltips) {
+      const displayedAnnotations = this.annotationLayer
+        .annotations()
+        .map((annotation: any) => annotation.options("storedAnnotation"))
+        .filter((annotation: IAnnotation | undefined) => {
+          return (
+            annotation &&
+            (this.tooltipOnAll ||
+              (this.tooltipOnSelected &&
+                this.isAnnotationSelected(annotation.id)))
+          );
+        });
+
+      // One text feature per line as in https://opengeoscience.github.io/geojs/tutorials/text/
+      // Centroid is computed once per new line (optimization needed?)
+      // TODO: More performance with renderThreshold https://opengeoscience.github.io/geojs/apidocs/geo.textFeature.html#.styleSpec
+      const baseStyle = {
+        fontSize: "12px",
+        fontFamily: "sans-serif",
+        textAlign: "center",
+        textBaseline: "middle",
+        color: "white",
+        textStrokeColor: "black",
+        textStrokeWidth: 3
+      };
+      this.textLayer
+        .createFeature("text")
+        .data(displayedAnnotations)
+        .position((annotation: IAnnotation) => {
+          return simpleCentroid(annotation.coordinates);
+        })
+        .style({
+          text: (annotation: IAnnotation) => {
+            return (
+              "XY, Z, T = " +
+              annotation.location.XY +
+              ", " +
+              annotation.location.Z +
+              ", " +
+              annotation.location.Time
+            );
+          },
+          offset: { x: 0, y: -6 },
+          ...baseStyle
+        });
+      this.textLayer
+        .createFeature("text")
+        .data(displayedAnnotations)
+        .position((annotation: IAnnotation) => {
+          return simpleCentroid(annotation.coordinates);
+        })
+        .style({
+          text: (annotation: IAnnotation) => {
+            return "[ " + annotation.tags.join(", ") + " ]";
+          },
+          offset: { x: 0, y: 6 },
+          ...baseStyle
+        });
+    }
+
+    // Delete the old feature after displaying the new one to avoid flickering
+    oldFeatures.forEach((feature: any) => {
+      this.textLayer.deleteFeature(feature);
+    });
+    this.textLayer.draw();
   }
 
   shouldDisplayAnnotationWithChannel(channelId: number): boolean {
@@ -461,6 +547,7 @@ export default class AnnotationViewer extends Vue {
     }
     const options = {
       girderId: annotation.id,
+      storedAnnotation: annotation,
       isHovered: annotation.id === this.hoveredAnnotationId,
       location: annotation.location,
       channel: annotation.channel,
@@ -820,6 +907,8 @@ export default class AnnotationViewer extends Vue {
       .filter((feature: any) => !feature.selectionAPI())
       .forEach((feature: any) => {
         feature.selectionAPI(true);
+        feature.geoOff(geojs.event.feature.mouseon, this.handleMouseOver);
+        feature.geoOff(geojs.event.feature.mouseoff, this.handleMouseOff);
         feature.geoOn(geojs.event.feature.mouseon, this.handleMouseOver);
         feature.geoOn(geojs.event.feature.mouseoff, this.handleMouseOff);
       });
@@ -875,15 +964,17 @@ export default class AnnotationViewer extends Vue {
     this.drawAnnotations();
   }
 
+  @Watch("showTooltips")
+  @Watch("tooltipOnAll")
+  @Watch("tooltipOnSelected")
+  onDrawTooltipsChanged() {
+    this.drawTooltips();
+  }
+
   @Watch("unrollH")
   @Watch("unrollW")
   onUnrollChanged() {
     this.clearOldAnnotations(true);
-    this.drawAnnotations();
-  }
-
-  @Watch("hoveredAnnotationId")
-  onHovered() {
     this.drawAnnotations();
   }
 
@@ -927,6 +1018,10 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.geoOn(
       geojs.event.annotation.mode,
       this.handleModeChange
+    );
+    this.annotationLayer.geoOn(
+      geojs.event.annotation.mode,
+      this.handleAnnotationChange
     );
     this.annotationLayer.geoOn(
       geojs.event.annotation.add,

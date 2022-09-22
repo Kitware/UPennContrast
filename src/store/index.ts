@@ -70,6 +70,10 @@ export class Main extends VuexModule {
   annotationSelectionType: AnnotationSelectionTypes =
     AnnotationSelectionTypes.TOGGLE;
 
+  showTooltips: boolean = true;
+  tooltipOnSelected: boolean = false;
+  tooltipOnAll: boolean = false;
+
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
   drawAnnotationConnections: boolean = true;
@@ -105,6 +109,21 @@ export class Main extends VuexModule {
   @Mutation
   public setDrawAnnotations(value: boolean) {
     this.drawAnnotations = value;
+  }
+
+  @Mutation
+  public setShowTooltips(value: boolean) {
+    this.showTooltips = value;
+  }
+
+  @Mutation
+  public setTooltipOnSelected(value: boolean) {
+    this.tooltipOnSelected = value;
+  }
+
+  @Mutation
+  public setTooltipOnAll(value: boolean) {
+    this.tooltipOnAll = value;
   }
 
   @Mutation
