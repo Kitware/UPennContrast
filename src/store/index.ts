@@ -71,8 +71,7 @@ export class Main extends VuexModule {
     AnnotationSelectionTypes.TOGGLE;
 
   showTooltips: boolean = true;
-  tooltipOnSelected: boolean = false;
-  tooltipOnAll: boolean = false;
+  filteredAnnotationTooltips: boolean = false;
 
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
@@ -117,13 +116,8 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  public setTooltipOnSelected(value: boolean) {
-    this.tooltipOnSelected = value;
-  }
-
-  @Mutation
-  public setTooltipOnAll(value: boolean) {
-    this.tooltipOnAll = value;
+  public setFilteredAnnotationTooltips(value: boolean) {
+    this.filteredAnnotationTooltips = value;
   }
 
   @Mutation
