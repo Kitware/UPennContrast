@@ -51,7 +51,7 @@
           <v-list-item-group v-model="selectedToolId">
             <draggable>
               <template v-for="(tool, index) in toolsetTools">
-                <v-menu :key="index" open-on-hover offset-x v-if="tool">
+                <v-tooltip right transition="none" z-index="100" :key="index" v-if="tool">
                   <template v-slot:activator="{ on, attrs }">
                     <v-list-item
                       dense
@@ -75,22 +75,18 @@
                       >
                     </v-list-item>
                   </template>
-                  <v-card float>
-                    <v-card-text>
-                      <div class="d-flex flex-column">
-                        <div style="margin: 5px;">
-                          <div
-                            v-for="(propEntry,
-                            forKey) in getToolPropertiesDescription(tool)"
-                            :key="forKey"
-                          >
-                            {{ propEntry[0] }}: {{ propEntry[1] }}
-                          </div>
-                        </div>
+                  <div class="d-flex flex-column">
+                    <div style="margin: 5px;">
+                      <div
+                        v-for="(propEntry,
+                        forKey) in getToolPropertiesDescription(tool)"
+                        :key="forKey"
+                      >
+                        {{ propEntry[0] }}: {{ propEntry[1] }}
                       </div>
-                    </v-card-text>
-                  </v-card>
-                </v-menu>
+                    </div>
+                  </div>
+                </v-tooltip>
               </template>
             </draggable>
           </v-list-item-group>
