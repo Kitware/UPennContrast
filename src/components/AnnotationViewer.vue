@@ -413,7 +413,7 @@ export default class AnnotationViewer extends Vue {
   clearOldAnnotations(clearAll = false) {
     this.annotationLayer.annotations().forEach((annotation: any) => {
       if (clearAll) {
-        this.annotationLayer.removeAnnotation(annotation);
+        this.annotationLayer.removeAnnotation(annotation, false);
         return;
       }
 
