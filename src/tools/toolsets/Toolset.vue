@@ -51,7 +51,13 @@
           <v-list-item-group v-model="selectedToolId">
             <draggable>
               <template v-for="(tool, index) in toolsetTools">
-                <v-tooltip right transition="none" z-index="100" :key="index" v-if="tool">
+                <v-tooltip
+                  right
+                  transition="none"
+                  z-index="100"
+                  :key="index"
+                  v-if="tool"
+                >
                   <template v-slot:activator="{ on, attrs }">
                     <v-list-item
                       dense

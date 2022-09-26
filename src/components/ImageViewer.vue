@@ -239,7 +239,7 @@ export default class ImageViewer extends Vue {
       let interactorOpts = this.map.interactor().options();
       const actions = interactorOpts.keyboard.actions;
       /* We can keep some actions, if wanted */
-      interactorOpts.keyboard.actions = {'rotate.0': actions['rotate.0']};
+      interactorOpts.keyboard.actions = { "rotate.0": actions["rotate.0"] };
       this.map.interactor().options(interactorOpts);
       Vue.prototype.$currentMap = this.map;
       this.annotationLayer = this.map.createLayer("annotation", {
