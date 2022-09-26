@@ -100,6 +100,10 @@ export default class AnnotationViewer extends Vue {
     }, []);
   }
 
+  get filteredAnnotations() {
+    return this.filterStore.filteredAnnotations;
+  }
+
   get annotations() {
     if (this.store.drawActive) {
       return this.annotationStore.annotations.filter(
@@ -108,7 +112,7 @@ export default class AnnotationViewer extends Vue {
       );
     }
     return this.store.filteredDraw
-      ? this.filterStore.filteredAnnotations
+      ? this.filteredAnnotations
       : this.annotationStore.annotations;
   }
 
@@ -284,7 +288,7 @@ export default class AnnotationViewer extends Vue {
     this.drawTooltips();
   }
 
-  drawAnnotations(){
+  drawAnnotations() {
     if (!this.annotationLayer) {
       return;
     }
@@ -325,9 +329,9 @@ export default class AnnotationViewer extends Vue {
           return (
             annotation &&
             (!this.filteredAnnotationTooltips ||
-            this.filterStore.filteredAnnotations.find(({ id }) => {
-              return id === annotation.id;
-            }))
+              this.filteredAnnotations.find(({ id }) => {
+                return id === annotation.id;
+              }))
           );
         });
 
@@ -967,6 +971,7 @@ export default class AnnotationViewer extends Vue {
 
   @Watch("showTooltips")
   @Watch("filteredAnnotationTooltips")
+  @Watch("filteredAnnotations")
   @Watch("todo")
   onDrawTooltipsChanged() {
     this.drawTooltips();
