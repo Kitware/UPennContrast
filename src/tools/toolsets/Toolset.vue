@@ -51,22 +51,48 @@
           <v-list-item-group v-model="selectedToolId">
             <draggable>
               <template v-for="(tool, index) in toolsetTools">
-                <v-list-item dense :key="index" :value="tool.id">
-                  <v-list-item-avatar>
-                    <tool-icon :tool="tool" />
-                  </v-list-item-avatar>
-                  <v-list-item-content
-                    ><v-list-item-title>{{ tool.name }}</v-list-item-title>
-                    <v-list-item-subtitle>
-                      {{ tool.description }}
-                    </v-list-item-subtitle>
-                  </v-list-item-content>
-                  <v-list-item-action
-                    ><v-btn icon @click="removeToolId(tool.id)"
-                      ><v-icon>mdi-close</v-icon></v-btn
-                    ></v-list-item-action
-                  >
-                </v-list-item>
+                <v-tooltip
+                  right
+                  transition="none"
+                  z-index="100"
+                  :key="index"
+                  v-if="tool"
+                >
+                  <template v-slot:activator="{ on, attrs }">
+                    <v-list-item
+                      dense
+                      :value="tool.id"
+                      v-bind="attrs"
+                      v-on="on"
+                    >
+                      <v-list-item-avatar>
+                        <tool-icon :tool="tool" />
+                      </v-list-item-avatar>
+                      <v-list-item-content
+                        ><v-list-item-title>{{ tool.name }}</v-list-item-title>
+                        <v-list-item-subtitle>
+                          {{ tool.description }}
+                        </v-list-item-subtitle>
+                      </v-list-item-content>
+                      <v-list-item-action
+                        ><v-btn icon @click="removeToolId(tool.id)"
+                          ><v-icon>mdi-close</v-icon></v-btn
+                        ></v-list-item-action
+                      >
+                    </v-list-item>
+                  </template>
+                  <div class="d-flex flex-column">
+                    <div style="margin: 5px;">
+                      <div
+                        v-for="(propEntry,
+                        forKey) in getToolPropertiesDescription(tool)"
+                        :key="forKey"
+                      >
+                        {{ propEntry[0] }}: {{ propEntry[1] }}
+                      </div>
+                    </div>
+                  </div>
+                </v-tooltip>
               </template>
             </draggable>
           </v-list-item-group>
@@ -90,7 +116,11 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import draggable from "vuedraggable";
 import store from "@/store";
 import toolsStore from "@/store/tool";
-import { IToolConfiguration } from "@/store/model";
+import {
+  AnnotationNames,
+  AnnotationShape,
+  IToolConfiguration
+} from "@/store/model";
 import ToolIcon from "@/tools/ToolIcon.vue";
 import ToolsetPicker from "@/tools/toolsets/ToolsetPicker.vue";
 import ToolCreation from "@/tools/creation/ToolCreation.vue";
@@ -155,6 +185,47 @@ export default class Toolset extends Vue {
     return this.toolsStore.tools.find(
       (tool: IToolConfiguration) => tool.id === toolId
     );
+  }
+
+  getToolPropertiesDescription(tool: IToolConfiguration): string[][] {
+    const propDesc: string[][] = [["Name", tool.name]];
+
+    if (tool.description) {
+      propDesc.push(["Description", tool.description]);
+    }
+
+    if (tool.values) {
+      const { values } = tool;
+
+      if (values.selectionType && values.selectionType.text) {
+        propDesc.push(["Selection type", values.selectionType.text]);
+      }
+
+      if (values.annotation) {
+        propDesc.push([
+          "Shape",
+          AnnotationNames[values.annotation.shape as AnnotationShape]
+        ]);
+        if (values.annotation.tags && values.annotation.tags.length) {
+          propDesc.push(["Tag(s)", values.annotation.tags.join(", ")]);
+        }
+      }
+      if (
+        values.connectTo &&
+        values.connectTo.tags &&
+        values.connectTo.tags.length
+      ) {
+        propDesc.push(["Connect to", values.connectTo.tags.join(", ")]);
+        if (values.connectTo.layer && values.connectTo.layer.length) {
+          propDesc.push([
+            "Restrict to layers",
+            values.connectTo.layer.join(", ")
+          ]);
+        }
+      }
+    }
+
+    return propDesc;
   }
 
   removeToolId(toolId: string) {
