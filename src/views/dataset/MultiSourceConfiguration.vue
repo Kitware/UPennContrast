@@ -29,13 +29,15 @@
             </template>
           </v-combobox>
         </v-col>
-        <v-col>
+        <v-col v-if="!areStridesSetFromFile && maxFramesPerItem > 1">
           <v-text-field
-            :rules="[input => input === '' || parseInt(input) > 0]"
+            prefix="Stride"
+            :rules="[
+              input => input === null || input === '' || parseInt(input) > 0
+            ]"
             :disabled="
-              (assignments[assignment] &&
-                assignments[assignment].value.source === 'file') ||
-                maxFramesPerItem <= 1
+              assignments[assignment] &&
+                assignments[assignment].value.source === 'file'
             "
             v-model="strides[assignment]"
             hide-details
@@ -46,10 +48,16 @@
         <v-col>
           <v-btn
             :disabled="
-              !assignments[assignment] ||
-                assignments[assignment].value.source === 'file'
+              (!assignments[assignment] &&
+                (typeof strides[assignment] !== 'string' ||
+                  strides[assignment] === '')) ||
+                (assignments[assignment] &&
+                  assignments[assignment].value.source === 'file')
             "
-            @click="assignments[assignment] = null"
+            @click="
+              assignments[assignment] = null;
+              strides[assignment] = null;
+            "
             >Clear</v-btn
           >
         </v-col>
@@ -155,6 +163,7 @@ export default class NewDataset extends Vue {
     T: null,
     C: null
   };
+  areStridesSetFromFile = false;
 
   collectedMetadata: {
     metadata: {
@@ -240,14 +249,16 @@ export default class NewDataset extends Vue {
     const channels: string[] = [];
 
     this.maxFramesPerItem = 1;
+    this.areStridesSetFromFile = false;
     tiles.forEach((tile: any) => {
       const frames: number = tile.frames?.length || 1;
       this.maxFramesPerItem = Math.max(this.maxFramesPerItem, frames);
-      if (frames > 1 && tile.IndexStride) {
+      if (tile.IndexStride) {
         this.assignmentNames.forEach(key => {
           const stride = tile.IndexStride[`Index${key}`];
-          if (stride) {
+          if (stride && stride > 0) {
             this.strides[key] = stride;
+            this.areStridesSetFromFile = true;
           }
         });
       }
