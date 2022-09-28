@@ -254,10 +254,10 @@ export default class NewDataset extends Vue {
       const frames: number = tile.frames?.length || 1;
       this.maxFramesPerItem = Math.max(this.maxFramesPerItem, frames);
       if (tile.IndexStride) {
-        this.assignmentNames.forEach(key => {
-          const stride = tile.IndexStride[`Index${key}`];
+        this.assignmentNames.forEach(dimension => {
+          const stride = tile.IndexStride[`Index${dimension}`];
           if (stride && stride > 0) {
-            this.strides[key] = stride;
+            this.strides[dimension] = stride;
             this.areStridesSetFromFile = true;
           }
         });
@@ -307,13 +307,13 @@ export default class NewDataset extends Vue {
       : null;
 
     const framesAsAxes: { [dim: string]: number } = {};
-    Object.entries(this.strides).forEach(([key, value]) => {
-      if (value) {
-        if (typeof value === "string") {
-          value = parseInt(value);
+    Object.entries(this.strides).forEach(([dimension, stride]) => {
+      if (stride) {
+        if (typeof stride === "string") {
+          stride = parseInt(stride);
         }
-        if (value > 0) {
-          framesAsAxes[key.toLowerCase()] = value;
+        if (stride > 0) {
+          framesAsAxes[dimension.toLowerCase()] = stride;
         }
       }
     });
