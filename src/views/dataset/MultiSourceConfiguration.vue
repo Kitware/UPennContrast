@@ -29,7 +29,21 @@
             </template>
           </v-combobox>
         </v-col>
-        <v-col ncols="2">
+        <v-col>
+          <v-text-field
+            :rules="[input => input === '' || parseInt(input) > 0]"
+            :disabled="
+              (assignments[assignment] &&
+                assignments[assignment].value.source === 'file') ||
+                maxFramesPerItem <= 1
+            "
+            v-model="strides[assignment]"
+            hide-details
+            single-line
+            type="number"
+          />
+        </v-col>
+        <v-col>
           <v-btn
             :disabled="
               !assignments[assignment] ||
@@ -135,6 +149,12 @@ export default class NewDataset extends Vue {
     T: null,
     C: null
   };
+  strides: { [dimension: string]: number | string | null } = {
+    XY: null,
+    Z: null,
+    T: null,
+    C: null
+  };
 
   collectedMetadata: {
     metadata: {
@@ -147,10 +167,6 @@ export default class NewDataset extends Vue {
     filesInfo: {
       [key: string]: { [key: string]: number[] };
     };
-  } | null = null;
-
-  strides: {
-    [id: string]: number | null;
   } | null = null;
 
   searchInput: string = "";
@@ -185,6 +201,7 @@ export default class NewDataset extends Vue {
   }
 
   numberOfFrames = 0; // TODO: assume constant
+  maxFramesPerItem: number = 1;
 
   girderItems: IGirderItem[] = [];
 
@@ -222,14 +239,17 @@ export default class NewDataset extends Vue {
 
     const channels: string[] = [];
 
+    this.maxFramesPerItem = 1;
     tiles.forEach((tile: any) => {
-      if (!this.strides && tile.IndexStride) {
-        this.strides = {
-          C: tile.IndexStride?.IndexC || null,
-          T: tile.IndexStride?.IndexT || null,
-          XY: tile.IndexStride?.IndexZ || null,
-          Z: tile.IndexStride?.IndexZ || null
-        };
+      const frames: number = tile.frames?.length || 1;
+      this.maxFramesPerItem = Math.max(this.maxFramesPerItem, frames);
+      if (frames > 1 && tile.IndexStride) {
+        this.assignmentNames.forEach(key => {
+          const stride = tile.IndexStride[`Index${key}`];
+          if (stride) {
+            this.strides[key] = stride;
+          }
+        });
       }
       if (tile.IndexRange) {
         this.addSizeToDimension("Z", tile.IndexRange.IndexZ, Sources.File);
@@ -275,6 +295,18 @@ export default class NewDataset extends Vue {
       ? this.collectedMetadata.filesInfo
       : null;
 
+    const framesAsAxes: { [dim: string]: number } = {};
+    Object.entries(this.strides).forEach(([key, value]) => {
+      if (value) {
+        if (typeof value === "string") {
+          value = parseInt(value);
+        }
+        if (value > 0) {
+          framesAsAxes[key.toLowerCase()] = value;
+        }
+      }
+    });
+
     const description = {
       channels: this.channels,
       sources: this.girderItems.map((item: IGirderItem) => {
@@ -295,6 +327,7 @@ export default class NewDataset extends Vue {
             }
             source[`${assignmentId.toLowerCase()}Values`] = value;
           });
+        source.framesAsAxes = framesAsAxes;
         return source;
       })
     };
