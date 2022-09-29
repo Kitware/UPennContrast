@@ -163,7 +163,7 @@ export default class NewDataset extends Vue {
     T: null,
     C: null
   };
-  areStridesSetFromFile = false;
+  areStridesSetFromFile: boolean = false;
 
   collectedMetadata: {
     metadata: {
