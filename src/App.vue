@@ -8,7 +8,7 @@
       <bread-crumbs />
       <v-spacer />
       <v-btn @click.stop="toggleRightPanel('snapshotPanel')" id="snapshotButton"
-        >Snapshot</v-btn
+        >Snapshots</v-btn
       >
       <user-menu />
       <v-btn @click.stop="toggleRightPanel('annotationPanel')"
