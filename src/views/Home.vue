@@ -20,9 +20,7 @@
               "
             >
               <v-list-item-content v-bind="attrs" v-on="on">
-                <v-list-item-title
-                  >{{ d.datasetName }}</v-list-item-title
-                >
+                <v-list-item-title>{{ d.datasetName }}</v-list-item-title>
                 <v-list-item-subtitle>{{ d.name }}</v-list-item-subtitle>
               </v-list-item-content>
               <v-list-item-action>
