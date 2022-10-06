@@ -1,6 +1,5 @@
 <template>
   <div class="image">
-    <!-- DWM:: TODO: use multiple annotation layers -->
     <annotation-viewer
       v-for="(mapentry, index) in maps.filter(
         (mapentry, index) =>
@@ -285,8 +284,14 @@ export default class ImageViewer extends Vue {
     params.layer.url = this.blankUrl;
     params.map.max += 5;
 
+    if (this.maps.length > mllidx && !mapElement.firstChild) {
+      const mapentry = this.maps[mllidx];
+      mapentry.map.exit();
+      this.maps[mllidx] = undefined;
+    }
+
     let map, mapentry;
-    if (this.maps.length <= mllidx) {
+    if (this.maps.length <= mllidx || this.maps[mllidx] === undefined) {
       map = geojs.map(params.map);
       map.geoOn(geojs.event.pan, evt => this._handlePan(evt, mllidx));
       mapentry = {
@@ -295,7 +300,11 @@ export default class ImageViewer extends Vue {
         params: params,
         layerIndices: []
       };
-      this.maps.push(mapentry);
+      if (this.maps.length <= mllidx) {
+        this.maps.push(mapentry);
+      } else {
+        this.maps[mllidx] = mapentry;
+      }
 
       /* remove default key bindings */
       let interactorOpts = map.interactor().options();
@@ -406,7 +415,7 @@ export default class ImageViewer extends Vue {
       let layer = mapentry.imageLayers[mapentry.imageLayers.length - 1];
       if (mapentry.imageLayers.length & 1) {
         const index = (mapentry.imageLayers.length - 1) / 2;
-        layer.node().css("filter", `url(#recolor-${index})`);
+        layer.node().css("filter", `url(#recolor-${index + baseLayerIndex})`);
       }
       layer.url((x: number, y: number, level: number) => {
         const s = Math.pow(2, someImage.levels - 1 - level);
@@ -515,7 +524,8 @@ export default class ImageViewer extends Vue {
         let adjLayer = mapentry.imageLayers[layerIndex * 2 + 1];
         mapentry.lowestLayer = baseLayerIndex;
         layerIndex += baseLayerIndex;
-        // set fullLayer's transform
+        fullLayer.node().css("filter", `url(#recolor-${layerIndex})`);
+        adjLayer.node().css("filter", "none");
         if (!fullUrls[0] || !urls[0]) {
           if (singleFrame !== null && fullLayer.setFrameQuad) {
             fullLayer.setFrameQuad(singleFrame);
