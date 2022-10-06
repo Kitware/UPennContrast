@@ -1,29 +1,5 @@
 <template>
   <v-list dense>
-    <v-list-item :to="{ name: 'newdataset' }" v-if="store.isLoggedIn">
-      <v-list-item-action>
-        <v-icon>mdi-plus-circle</v-icon>
-      </v-list-item-action>
-      <v-list-item-content>
-        <v-list-item-title>Upload Data</v-list-item-title>
-      </v-list-item-content>
-    </v-list-item>
-    <v-list-item
-      :to="{
-        name: 'newconfiguration',
-        params: { id: store.selectedDatasetId }
-      }"
-      v-if="store.dataset"
-    >
-      <v-list-item-action>
-        <v-icon>mdi-plus-circle</v-icon>
-      </v-list-item-action>
-      <v-list-item-content>
-        <v-list-item-title>New Configuration</v-list-item-title>
-      </v-list-item-content>
-    </v-list-item>
-
-    <v-divider />
     <v-list-item>
       <v-list-item-content>
         <v-switch v-model="dark" label="Dark Theme" />
