@@ -1,7 +1,6 @@
 <template>
   <v-app v-mousetrap="mousetrapBindings" id="inspire">
     <v-app-bar class="elevation-1" app clipped-right>
-      <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
       <v-toolbar-title @click="goHome" class="logo"
         >NimbusImage</v-toolbar-title
       >
@@ -16,6 +15,9 @@
         Upload Data
       </v-btn>
       <user-menu class="ml-4" />
+      <v-btn text icon class="ml-4" @click="dark = !dark">
+        <v-icon>mdi-theme-light-dark</v-icon>
+      </v-btn>
       <v-divider class="ml-4" vertical />
       <template v-if="store.dataset && routeName === 'view'">
         <v-btn
@@ -36,10 +38,6 @@
       </template>
       <server-status />
     </v-app-bar>
-
-    <v-navigation-drawer v-model="drawer" app disable-resize-watcher>
-      <Menu />
-    </v-navigation-drawer>
 
     <v-main>
       <router-view />
@@ -73,7 +71,6 @@
 
 <script lang="ts">
 import axios from "axios";
-import Menu from "./layout/Menu.vue";
 import UserMenu from "./layout/UserMenu.vue";
 import ServerStatus from "./components/ServerStatus.vue";
 import Snapshots from "./components/Snapshots.vue";
@@ -83,13 +80,13 @@ import vMousetrap from "./utils/v-mousetrap";
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
+import Persister from "@/store/Persister";
 
 Vue.use(vMousetrap);
 
 @Component({
   components: {
     AnnotationBrowser,
-    Menu,
     UserMenu,
     BreadCrumbs,
     ServerStatus,
@@ -166,6 +163,15 @@ export default class App extends Vue {
     if (this.routeName !== "view") {
       this.toggleRightPanel(null);
     }
+  }
+
+  get dark() {
+    return this.$vuetify.theme.dark;
+  }
+
+  set dark(value: boolean) {
+    Persister.set("theme", value ? "dark" : "light");
+    this.$vuetify.theme.dark = value;
   }
 }
 </script>
