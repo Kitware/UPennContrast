@@ -45,8 +45,6 @@
         drag-enabled
         new-folder-enabled
         :location.sync="location"
-        upload-multiple
-        upload-enabled
         :initial-items-per-page="itemsPerPage"
         :items-per-page-options="itemsPerPageOptions"
         @rowclick="onRowClick"
