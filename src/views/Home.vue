@@ -27,9 +27,7 @@
                 name: 'view',
                 params: { id: d.datasetId, config: d.id }
               }"
-            >
-              <v-icon>mdi-eye</v-icon>
-            </v-btn>
+            />
           </v-list-item-action>
         </v-list-item>
       </v-list>
