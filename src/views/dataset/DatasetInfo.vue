@@ -288,7 +288,7 @@ export default class DatasetInfo extends Vue {
     try {
       const dataset = this.store.dataset;
       if (dataset === null) {
-        throw new Error("dataset was null when it shouldn't be");
+        throw new Error("Dataset not set");
       }
 
       const config = await store.createConfiguration({
@@ -297,7 +297,7 @@ export default class DatasetInfo extends Vue {
       });
 
       if (config === null) {
-        throw new Error("config was null when it shouldn't be");
+        throw new Error("Config not set");
       }
 
       const channels = dataset.channels.slice(0, 6);
