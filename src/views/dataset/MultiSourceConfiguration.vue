@@ -323,7 +323,6 @@ export default class NewDataset extends Vue {
         );
       }
       if (tile.IndexRange) {
-        console.log(tile);
         this.addSizeToDimension("Z", tile.IndexRange.IndexZ, Sources.File);
         this.addSizeToDimension("T", tile.IndexRange.IndexT, Sources.File);
         this.addSizeToDimension("XY", tile.IndexRange.IndexXY, Sources.File);
