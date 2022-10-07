@@ -5,13 +5,14 @@
     </v-data-table>
     <v-subheader>Assignments</v-subheader>
     <v-container>
-      <v-row v-for="assignment in assignmentNames" :key="assignment">
-        <v-col>
-          {{ assignment }}
-        </v-col>
+      <v-row
+        v-for="[dimension, dimensionName] in Object.entries(dimensionNames)"
+        :key="dimension"
+      >
+        <v-col>{{ dimensionName }} ({{ dimension }})</v-col>
         <v-col>
           <v-combobox
-            v-model="assignments[assignment]"
+            v-model="assignments[dimension]"
             :items="assignmentItems"
             :search-input.sync="searchInput"
             item-text="text"
@@ -20,8 +21,8 @@
             hide-details
             dense
             :disabled="
-              assignments[assignment] &&
-                assignments[assignment].value.source === 'file'
+              assignments[dimension] &&
+                assignments[dimension].value.source === 'file'
             "
           >
             <template v-slot:selection="{ item }">
@@ -36,10 +37,10 @@
               input => input === null || input === '' || parseInt(input) > 0
             ]"
             :disabled="
-              assignments[assignment] &&
-                assignments[assignment].value.source === 'file'
+              assignments[dimension] &&
+                assignments[dimension].value.source === 'file'
             "
-            v-model="strides[assignment]"
+            v-model="strides[dimension]"
             hide-details
             single-line
             type="number"
@@ -48,15 +49,15 @@
         <v-col>
           <v-btn
             :disabled="
-              (!assignments[assignment] &&
-                (typeof strides[assignment] !== 'string' ||
-                  strides[assignment] === '')) ||
-                (assignments[assignment] &&
-                  assignments[assignment].value.source === 'file')
+              (!assignments[dimension] &&
+                (typeof strides[dimension] !== 'string' ||
+                  strides[dimension] === '')) ||
+                (assignments[dimension] &&
+                  assignments[dimension].value.source === 'file')
             "
             @click="
-              assignments[assignment] = null;
-              strides[assignment] = null;
+              assignments[dimension] = null;
+              strides[dimension] = null;
             "
             >Clear</v-btn
           >
@@ -82,7 +83,7 @@ const Sources = {
 interface IDimension {
   id: string;
   size: number;
-  name: string | null;
+  name: string;
   source: string;
 }
 
@@ -104,15 +105,45 @@ export default class NewDataset extends Vue {
   get items() {
     return this.dimensions
       .filter(dim => dim.size > 0)
-      .map((dim: any) => ({ ...dim, key: `${dim.id}_${dim.source}` }));
+      .map((dim: IDimension) => {
+        let value = "";
+        const metadataID = this.dimensionTometadataId(dim.id);
+        switch (dim.source) {
+          case Sources.Filename:
+            if (this.collectedMetadata) {
+              const exampleValues = this.collectedMetadata.metadata[metadataID];
+              value = exampleValues.slice(0, 3).join(", ");
+              if (exampleValues.length > 3) {
+                value = String.prototype.concat(value, "...");
+              }
+            }
+            break;
+          case Sources.File:
+            value = "Metadata";
+            break;
+        }
+        return {
+          ...dim,
+          values: value,
+          key: `${dim.id}_${dim.source}`
+        };
+      });
   }
 
   dimensions: IDimension[] = [];
 
   headers = [
     {
-      text: "Name",
+      text: "Variable",
       value: "name"
+    },
+    {
+      text: "Values",
+      value: "values"
+    },
+    {
+      text: "Guess",
+      value: "id"
     },
     {
       text: "Source",
@@ -124,14 +155,18 @@ export default class NewDataset extends Vue {
     }
   ];
 
-  assignmentNames = ["XY", "Z", "T", "C"];
+  dimensionNames = { XY: "Positions", Z: "Z", T: "Time", C: "Channels" };
+
+  dimensionTometadataId(id: string) {
+    return id === "C" ? "chan" : id.toLowerCase();
+  }
 
   dimensionToAssignmentItem(dimension: IDimension | null): IAssignment | null {
     if (!dimension) {
       return null;
     }
     return {
-      text: `${dimension.source} ${dimension.name || dimension.id}`,
+      text: dimension.name,
       value: dimension
     };
   }
@@ -179,6 +214,8 @@ export default class NewDataset extends Vue {
   } | null = null;
 
   searchInput: string = "";
+  filenameVariableCount = 0;
+  fileVariableCount = 0;
 
   addSizeToDimension(
     id: string,
@@ -186,15 +223,34 @@ export default class NewDataset extends Vue {
     source: string,
     name: string | null = null
   ) {
+    if (size === 0) {
+      return;
+    }
     const dim = this.dimensions.find(
       dimension => dimension.id === id && dimension.source === source
     );
     if (dim) {
       dim.size = dim.size + size;
     } else {
+      let computedName = name;
+      if (!computedName) {
+        switch (source) {
+          case Sources.Filename:
+            computedName = `Filename variable ${++this.filenameVariableCount}`;
+            break;
+          case Sources.File:
+            computedName = `Metadata ${++this.fileVariableCount} (${
+              this.dimensionNames[id]
+            }) `;
+            break;
+          default:
+            computedName = String.prototype.concat(id, " ", source);
+            break;
+        }
+      }
       this.dimensions = [
         ...this.dimensions,
-        { id, size, name: name ? name : id, source }
+        { id, size, name: computedName, source }
       ];
     }
   }
@@ -218,7 +274,9 @@ export default class NewDataset extends Vue {
     return this.dimensionToAssignmentItem(
       this.dimensions.find(
         ({ id, source }) => source === Sources.File && id === assignment
-      ) || null
+      ) ||
+        this.dimensions.find(({ id }) => id === assignment) ||
+        null
     );
   }
 
@@ -250,17 +308,19 @@ export default class NewDataset extends Vue {
 
     this.maxFramesPerItem = 1;
     this.areStridesSetFromFile = false;
-    tiles.forEach((tile: any) => {
+    tiles.forEach(tile => {
       const frames: number = tile.frames?.length || 1;
       this.maxFramesPerItem = Math.max(this.maxFramesPerItem, frames);
       if (tile.IndexStride) {
-        this.assignmentNames.forEach(dimension => {
-          const stride = tile.IndexStride[`Index${dimension}`];
-          if (stride && stride > 0) {
-            this.strides[dimension] = stride;
-            this.areStridesSetFromFile = true;
+        Object.keys(this.dimensionNames).forEach(
+          (dimension: string | number) => {
+            const stride = tile.IndexStride[`Index${dimension}`];
+            if (stride && stride > 0) {
+              this.strides[dimension] = stride;
+              this.areStridesSetFromFile = true;
+            }
           }
-        });
+        );
       }
       if (tile.IndexRange) {
         this.addSizeToDimension("Z", tile.IndexRange.IndexZ, Sources.File);
@@ -278,7 +338,7 @@ export default class NewDataset extends Vue {
 
     if (channels.length > 0) {
       this.addSizeToDimension("C", channels.length, Sources.File);
-      const channelName = `{ ${channels.join()} }`;
+      const channelName = `Metadata (Channel): ${channels.join(", ")}`;
       this.setDimensionName("C", Sources.File, channelName);
     }
 
@@ -327,14 +387,17 @@ export default class NewDataset extends Vue {
           .forEach(([assignmentId, assignment]) => {
             let value = [dimCount[assignmentId]];
 
-            if (assignment?.value.source === Sources.Filename) {
-              let id = assignment?.value.id;
-              if (id && filesInfo) {
-                id = id === "C" ? "chan" : id;
-                value = filesInfo[item.name][id.toLowerCase()];
-              }
-            } else {
-              dimCount[assignmentId] += assignment?.value.size || 0;
+            switch (assignment?.value.source) {
+              case Sources.Filename:
+                let id = assignment?.value.id;
+                if (id && filesInfo) {
+                  id = this.dimensionTometadataId(id);
+                  value = filesInfo[item.name][id];
+                }
+                break;
+              case Sources.File:
+                dimCount[assignmentId] += assignment?.value.size || 0;
+                break;
             }
             source[`${assignmentId.toLowerCase()}Values`] = value;
           });

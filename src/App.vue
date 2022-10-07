@@ -1,25 +1,43 @@
 <template>
   <v-app v-mousetrap="mousetrapBindings" id="inspire">
     <v-app-bar class="elevation-1" app clipped-right>
-      <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
       <v-toolbar-title @click="goHome" class="logo"
         >NimbusImage</v-toolbar-title
       >
       <bread-crumbs />
       <v-spacer />
-      <v-btn @click.stop="toggleRightPanel('snapshotPanel')" id="snapshotButton"
-        >Snapshot</v-btn
+      <v-btn
+        color="primary"
+        class="ml-4"
+        :to="{ name: 'newdataset' }"
+        :disabled="!store.isLoggedIn"
       >
-      <user-menu />
-      <v-btn @click.stop="toggleRightPanel('annotationPanel')"
-        >Browse Annotations</v-btn
-      >
+        Upload Data
+      </v-btn>
+      <user-menu class="ml-4" />
+      <v-btn text icon class="ml-4" @click="dark = !dark">
+        <v-icon>mdi-theme-light-dark</v-icon>
+      </v-btn>
+      <v-divider class="ml-4" vertical />
+      <template v-if="store.dataset && routeName === 'view'">
+        <v-btn
+          class="ml-4"
+          :to="{
+            name: 'newconfiguration',
+            params: { id: store.selectedDatasetId }
+          }"
+        >
+          New Configuration
+        </v-btn>
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('snapshotPanel')"
+          >Snapshots</v-btn
+        >
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('annotationPanel')"
+          >Browse Annotations</v-btn
+        >
+      </template>
       <server-status />
     </v-app-bar>
-
-    <v-navigation-drawer v-model="drawer" app disable-resize-watcher>
-      <Menu />
-    </v-navigation-drawer>
 
     <v-main>
       <router-view />
@@ -53,23 +71,22 @@
 
 <script lang="ts">
 import axios from "axios";
-import Menu from "./layout/Menu.vue";
 import UserMenu from "./layout/UserMenu.vue";
 import ServerStatus from "./components/ServerStatus.vue";
 import Snapshots from "./components/Snapshots.vue";
 import AnnotationBrowser from "@/components/AnnotationBrowser/AnnotationBrowser.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import vMousetrap from "./utils/v-mousetrap";
-import { Vue, Component, Prop } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
+import Persister from "@/store/Persister";
 
 Vue.use(vMousetrap);
 
 @Component({
   components: {
     AnnotationBrowser,
-    Menu,
     UserMenu,
     BreadCrumbs,
     ServerStatus,
@@ -123,8 +140,10 @@ export default class App extends Vue {
     this.$router.push({ name: "root" });
   }
 
-  toggleRightPanel(panel: string) {
-    this.$data[panel] = !this.$data[panel];
+  toggleRightPanel(panel: string | null) {
+    if (panel !== null) {
+      this.$data[panel] = !this.$data[panel];
+    }
     // The last panel updated has to be closed if it is not the currently updated panel
     if (
       this.lastModifiedRightPanel !== null &&
@@ -134,14 +153,31 @@ export default class App extends Vue {
     }
     this.lastModifiedRightPanel = panel;
   }
+
+  get routeName() {
+    return this.$route.name;
+  }
+
+  @Watch("routeName")
+  datasetChanged() {
+    if (this.routeName !== "view") {
+      this.toggleRightPanel(null);
+    }
+  }
+
+  get dark() {
+    return this.$vuetify.theme.dark;
+  }
+
+  set dark(value: boolean) {
+    Persister.set("theme", value ? "dark" : "light");
+    this.$vuetify.theme.dark = value;
+  }
 }
 </script>
 <style lang="scss" scoped>
 .logo {
   cursor: pointer;
-}
-#snapshotButton {
-  margin-right: 1em;
 }
 </style>
 <style lang="scss">

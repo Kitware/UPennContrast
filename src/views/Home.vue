@@ -2,36 +2,40 @@
   <v-container>
     <v-alert :value="!store.isLoggedIn" color="info">Login to start</v-alert>
     <section v-if="store.isLoggedIn">
-      <v-subheader>Recent Dataset Configurations</v-subheader>
+      <v-subheader>Recent Dataset</v-subheader>
       <v-list two-line>
-        <v-list-item
+        <v-tooltip
+          top
+          :disabled="!d.description"
           v-for="d in configurations"
           :key="d.id"
-          @click="
-            $router.push({
-              name: 'view',
-              params: { id: d.datasetId, config: d.id }
-            })
-          "
         >
-          <v-list-item-content>
-            <v-list-item-title
-              >{{ d.datasetName }} / {{ d.name }}</v-list-item-title
+          <template v-slot:activator="{ on, attrs }">
+            <v-list-item
+              @click="
+                $router.push({
+                  name: 'view',
+                  params: { id: d.datasetId, config: d.id }
+                })
+              "
             >
-            <v-list-item-subtitle>{{ d.description }}</v-list-item-subtitle>
-          </v-list-item-content>
-          <v-list-item-action>
-            <v-btn
-              icon
-              :to="{
-                name: 'view',
-                params: { id: d.datasetId, config: d.id }
-              }"
-            >
-              <v-icon>mdi-eye</v-icon>
-            </v-btn>
-          </v-list-item-action>
-        </v-list-item>
+              <v-list-item-content v-bind="attrs" v-on="on">
+                <v-list-item-title>{{ d.datasetName }}</v-list-item-title>
+                <v-list-item-subtitle>{{ d.name }}</v-list-item-subtitle>
+              </v-list-item-content>
+              <v-list-item-action>
+                <v-btn
+                  icon
+                  :to="{
+                    name: 'view',
+                    params: { id: d.datasetId, config: d.id }
+                  }"
+                />
+              </v-list-item-action>
+            </v-list-item>
+          </template>
+          {{ d.description }}
+        </v-tooltip>
       </v-list>
     </section>
 
@@ -41,24 +45,11 @@
         drag-enabled
         new-folder-enabled
         :location.sync="location"
-        upload-multiple
-        upload-enabled
         :initial-items-per-page="itemsPerPage"
         :items-per-page-options="itemsPerPageOptions"
         @rowclick="onRowClick"
       />
     </section>
-
-    <v-subheader>Actions</v-subheader>
-    <div class="button-bar">
-      <v-btn
-        color="primary"
-        :to="{ name: 'newdataset' }"
-        :disabled="!store.isLoggedIn"
-      >
-        Upload Data
-      </v-btn>
-    </div>
   </v-container>
 </template>
 
