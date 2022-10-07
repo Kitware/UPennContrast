@@ -83,7 +83,7 @@ const Sources = {
 interface IDimension {
   id: string;
   size: number;
-  name: string | null;
+  name: string;
   source: string;
 }
 
@@ -105,15 +105,45 @@ export default class NewDataset extends Vue {
   get items() {
     return this.dimensions
       .filter(dim => dim.size > 0)
-      .map((dim: any) => ({ ...dim, key: `${dim.id}_${dim.source}` }));
+      .map((dim: IDimension) => {
+        let value = "";
+        const metadataID = this.dimensionTometadataId(dim.id);
+        switch (dim.source) {
+          case Sources.Filename:
+            if (this.collectedMetadata) {
+              const exampleValues = this.collectedMetadata.metadata[metadataID];
+              value = exampleValues.slice(0, 3).join(", ");
+              if (exampleValues.length > 3) {
+                value = String.prototype.concat(value, "...");
+              }
+            }
+            break;
+          case Sources.File:
+            value = "Metadata";
+            break;
+        }
+        return {
+          ...dim,
+          values: value,
+          key: `${dim.id}_${dim.source}`
+        };
+      });
   }
 
   dimensions: IDimension[] = [];
 
   headers = [
     {
-      text: "Name",
+      text: "Variable",
       value: "name"
+    },
+    {
+      text: "Values",
+      value: "values"
+    },
+    {
+      text: "Guess",
+      value: "id"
     },
     {
       text: "Source",
@@ -127,12 +157,16 @@ export default class NewDataset extends Vue {
 
   dimensionNames = { XY: "Positions", Z: "Z", T: "Time", C: "Channels" };
 
+  dimensionTometadataId(id: string) {
+    return id === "C" ? "chan" : id.toLowerCase();
+  }
+
   dimensionToAssignmentItem(dimension: IDimension | null): IAssignment | null {
     if (!dimension) {
       return null;
     }
     return {
-      text: `${dimension.source} ${dimension.name || dimension.id}`,
+      text: dimension.name,
       value: dimension
     };
   }
@@ -180,6 +214,8 @@ export default class NewDataset extends Vue {
   } | null = null;
 
   searchInput: string = "";
+  filenameVariableCount = 0;
+  fileVariableCount = 0;
 
   addSizeToDimension(
     id: string,
@@ -187,15 +223,34 @@ export default class NewDataset extends Vue {
     source: string,
     name: string | null = null
   ) {
+    if (size === 0) {
+      return;
+    }
     const dim = this.dimensions.find(
       dimension => dimension.id === id && dimension.source === source
     );
     if (dim) {
       dim.size = dim.size + size;
     } else {
+      let computedName = name;
+      if (!computedName) {
+        switch (source) {
+          case Sources.Filename:
+            computedName = `Filename variable ${++this.filenameVariableCount}`;
+            break;
+          case Sources.File:
+            computedName = `Metadata ${++this.fileVariableCount} (${
+              this.dimensionNames[id]
+            }) `;
+            break;
+          default:
+            computedName = String.prototype.concat(id, " ", source);
+            break;
+        }
+      }
       this.dimensions = [
         ...this.dimensions,
-        { id, size, name: name ? name : id, source }
+        { id, size, name: computedName, source }
       ];
     }
   }
@@ -219,7 +274,9 @@ export default class NewDataset extends Vue {
     return this.dimensionToAssignmentItem(
       this.dimensions.find(
         ({ id, source }) => source === Sources.File && id === assignment
-      ) || null
+      ) ||
+        this.dimensions.find(({ id }) => id === assignment) ||
+        null
     );
   }
 
@@ -266,6 +323,7 @@ export default class NewDataset extends Vue {
         );
       }
       if (tile.IndexRange) {
+        console.log(tile);
         this.addSizeToDimension("Z", tile.IndexRange.IndexZ, Sources.File);
         this.addSizeToDimension("T", tile.IndexRange.IndexT, Sources.File);
         this.addSizeToDimension("XY", tile.IndexRange.IndexXY, Sources.File);
@@ -281,7 +339,7 @@ export default class NewDataset extends Vue {
 
     if (channels.length > 0) {
       this.addSizeToDimension("C", channels.length, Sources.File);
-      const channelName = `{ ${channels.join()} }`;
+      const channelName = `Metadata (Channel): ${channels.join(", ")}`;
       this.setDimensionName("C", Sources.File, channelName);
     }
 
@@ -330,14 +388,17 @@ export default class NewDataset extends Vue {
           .forEach(([assignmentId, assignment]) => {
             let value = [dimCount[assignmentId]];
 
-            if (assignment?.value.source === Sources.Filename) {
-              let id = assignment?.value.id;
-              if (id && filesInfo) {
-                id = id === "C" ? "chan" : id;
-                value = filesInfo[item.name][id.toLowerCase()];
-              }
-            } else {
-              dimCount[assignmentId] += assignment?.value.size || 0;
+            switch (assignment?.value.source) {
+              case Sources.Filename:
+                let id = assignment?.value.id;
+                if (id && filesInfo) {
+                  id = this.dimensionTometadataId(id);
+                  value = filesInfo[item.name][id];
+                }
+                break;
+              case Sources.File:
+                dimCount[assignmentId] += assignment?.value.size || 0;
+                break;
             }
             source[`${assignmentId.toLowerCase()}Values`] = value;
           });
