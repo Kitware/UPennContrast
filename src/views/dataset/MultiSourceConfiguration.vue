@@ -5,13 +5,14 @@
     </v-data-table>
     <v-subheader>Assignments</v-subheader>
     <v-container>
-      <v-row v-for="assignment in assignmentNames" :key="assignment">
-        <v-col>
-          {{ assignment }}
-        </v-col>
+      <v-row
+        v-for="[dimension, dimensionName] in Object.entries(dimensionNames)"
+        :key="dimension"
+      >
+        <v-col>{{ dimensionName }} ({{ dimension }})</v-col>
         <v-col>
           <v-combobox
-            v-model="assignments[assignment]"
+            v-model="assignments[dimension]"
             :items="assignmentItems"
             :search-input.sync="searchInput"
             item-text="text"
@@ -20,8 +21,8 @@
             hide-details
             dense
             :disabled="
-              assignments[assignment] &&
-                assignments[assignment].value.source === 'file'
+              assignments[dimension] &&
+                assignments[dimension].value.source === 'file'
             "
           >
             <template v-slot:selection="{ item }">
@@ -36,10 +37,10 @@
               input => input === null || input === '' || parseInt(input) > 0
             ]"
             :disabled="
-              assignments[assignment] &&
-                assignments[assignment].value.source === 'file'
+              assignments[dimension] &&
+                assignments[dimension].value.source === 'file'
             "
-            v-model="strides[assignment]"
+            v-model="strides[dimension]"
             hide-details
             single-line
             type="number"
@@ -48,15 +49,15 @@
         <v-col>
           <v-btn
             :disabled="
-              (!assignments[assignment] &&
-                (typeof strides[assignment] !== 'string' ||
-                  strides[assignment] === '')) ||
-                (assignments[assignment] &&
-                  assignments[assignment].value.source === 'file')
+              (!assignments[dimension] &&
+                (typeof strides[dimension] !== 'string' ||
+                  strides[dimension] === '')) ||
+                (assignments[dimension] &&
+                  assignments[dimension].value.source === 'file')
             "
             @click="
-              assignments[assignment] = null;
-              strides[assignment] = null;
+              assignments[dimension] = null;
+              strides[dimension] = null;
             "
             >Clear</v-btn
           >
@@ -124,7 +125,7 @@ export default class NewDataset extends Vue {
     }
   ];
 
-  assignmentNames = ["XY", "Z", "T", "C"];
+  dimensionNames = { XY: "Positions", Z: "Z", T: "Time", C: "Channels" };
 
   dimensionToAssignmentItem(dimension: IDimension | null): IAssignment | null {
     if (!dimension) {
@@ -250,17 +251,19 @@ export default class NewDataset extends Vue {
 
     this.maxFramesPerItem = 1;
     this.areStridesSetFromFile = false;
-    tiles.forEach((tile: any) => {
+    tiles.forEach(tile => {
       const frames: number = tile.frames?.length || 1;
       this.maxFramesPerItem = Math.max(this.maxFramesPerItem, frames);
       if (tile.IndexStride) {
-        this.assignmentNames.forEach(dimension => {
-          const stride = tile.IndexStride[`Index${dimension}`];
-          if (stride && stride > 0) {
-            this.strides[dimension] = stride;
-            this.areStridesSetFromFile = true;
+        Object.keys(this.dimensionNames).forEach(
+          (dimension: string | number) => {
+            const stride = tile.IndexStride[`Index${dimension}`];
+            if (stride && stride > 0) {
+              this.strides[dimension] = stride;
+              this.areStridesSetFromFile = true;
+            }
           }
-        });
+        );
       }
       if (tile.IndexRange) {
         this.addSizeToDimension("Z", tile.IndexRange.IndexZ, Sources.File);
