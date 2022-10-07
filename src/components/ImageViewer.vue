@@ -200,10 +200,9 @@ export default class ImageViewer extends Vue {
   }
 
   private get mapLayerList() {
-    if (this.store.layerMode !== "unroll") {
-      return [this.layerStackImages];
-    } else {
-      const llist = [[]];
+    let llist = [this.layerStackImages];
+    if (this.store.layerMode === "unroll") {
+      llist = [[]];
       let visible = 0;
       this.layerStackImages.forEach(lsi => {
         if (visible && lsi.layer.visible) {
@@ -214,8 +213,8 @@ export default class ImageViewer extends Vue {
           visible += 1;
         }
       });
-      return llist;
     }
+    return llist;
   }
 
   /**
@@ -298,7 +297,7 @@ export default class ImageViewer extends Vue {
         map: map,
         imageLayers: [],
         params: params,
-        layerIndices: []
+        baseLayerIndex: mllidx ? undefined : 0
       };
       if (this.maps.length <= mllidx) {
         this.maps.push(mapentry);
@@ -380,9 +379,10 @@ export default class ImageViewer extends Vue {
     const mapentry = this.maps[mllidx];
     const map = mapentry.map;
     // adjust number of tile layers
-    while (mapentry.imageLayers.length > mll.length * 2) {
+    while (mapentry.imageLayers.length > mll.length * 2 || (mapentry.baseLayerIndex !== baseLayerIndex && mapentry.imageLayers.length)) {
       map.deleteLayer(mapentry.imageLayers.pop());
     }
+    mapentry.baseLayerIndex = baseLayerIndex;
     while (mapentry.imageLayers.length < mll.length * 2) {
       mapentry.params.layer.tilesAtZoom = (level: number) => {
         const s = Math.pow(2, someImage.levels - 1 - level);
@@ -403,7 +403,7 @@ export default class ImageViewer extends Vue {
        * but we run out of webgl contexts sooner than that.  Maybe because they
        * get switched on and off?
        */
-      if (currentImageLayers + this.maps.length >= 10) {
+      if (currentImageLayers + this.maps.length >= 13) {
         mapentry.params.layer.renderer = "canvas";
       } else {
         delete mapentry.params.layer.renderer;
