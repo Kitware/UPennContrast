@@ -20,6 +20,7 @@ class Annotation(Resource):
         self.route('POST', (), self.create)
         self.route('PUT', (':id',), self.update)
         self.route('POST', ('compute',), self.compute)
+        self.route('POST', ('multiple',), self.createMultiple)
 
     # TODO: anytime a dataset is mentioned, load the dataset and check for existence and that the user has access to it
     # TODO: creation date, update date, creatorId
@@ -92,3 +93,14 @@ class Annotation(Resource):
         if not datasetId:
             raise RestException(code=400, message="Missing datasetId parameter")
         return self._annotationModel.compute(datasetId, self.getBodyJson(), self.getCurrentUser())
+
+    @access.user
+    @describeRoute(Description("Create multiple new annotations").param('body', 'Annotation Object', paramType='body'))
+    def createMultiple(self, params):
+        currentUser = self.getCurrentUser()
+        if not currentUser:
+            raise AccessException('User not found', 'currentUser')
+        annotations = self.getBodyJson().get("annotations", None)
+        if not annotations:
+            raise  RestException(code=400, message="Missing annotations to add")
+        return self._annotationModel.createMultiple(currentUser, annotations)

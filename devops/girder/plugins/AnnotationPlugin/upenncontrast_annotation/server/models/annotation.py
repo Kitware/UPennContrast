@@ -147,3 +147,6 @@ class Annotation(AccessControlledModel):
     if not image:
         raise RestException(code=500, message="Invalid segmentation tool: no image")
     return runComputeJob(image, datasetId, tool)
+
+  def createMultiple(self, creator, annotations):
+    return [self.create(creator=creator, annotation=annotation) for annotation in annotations]
