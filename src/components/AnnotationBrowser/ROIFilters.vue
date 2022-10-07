@@ -6,11 +6,13 @@
       </v-btn>
     </v-row>
     <v-row v-for="filter in filters" :key="filter.id">
-      <v-checkbox
-        :value="filter.enabled"
-        :input-value="filter.enabled"
-        @click="toggleEnabled(filter.id)"
-      ></v-checkbox>
+      <v-col>
+        <v-checkbox
+          :value="filter.enabled"
+          :input-value="filter.enabled"
+          @click="toggleEnabled(filter.id)"
+        ></v-checkbox>
+      </v-col>
       <v-col>{{ filter.id }}</v-col>
       <v-col
         ><v-btn icon small @click="removeFilter(filter.id)"
