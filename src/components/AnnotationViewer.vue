@@ -100,6 +100,10 @@ export default class AnnotationViewer extends Vue {
     }, []);
   }
 
+  get filteredAnnotations() {
+    return this.filterStore.filteredAnnotations;
+  }
+
   get annotations() {
     if (this.store.drawActive) {
       return this.annotationStore.annotations.filter(
@@ -108,7 +112,7 @@ export default class AnnotationViewer extends Vue {
       );
     }
     return this.store.filteredDraw
-      ? this.filterStore.filteredAnnotations
+      ? this.filteredAnnotations
       : this.annotationStore.annotations;
   }
 
@@ -219,12 +223,8 @@ export default class AnnotationViewer extends Vue {
     return this.store.showTooltips;
   }
 
-  get tooltipOnAll(): boolean {
-    return this.store.tooltipOnAll;
-  }
-
-  get tooltipOnSelected(): boolean {
-    return this.store.tooltipOnSelected;
+  get filteredAnnotationTooltips(): boolean {
+    return this.store.filteredAnnotationTooltips;
   }
 
   getAnnotationStyle(annotation: IAnnotation) {
@@ -283,12 +283,17 @@ export default class AnnotationViewer extends Vue {
     return annotation.coordinates;
   }
 
+  drawAnnotationsAndTooltips() {
+    this.drawAnnotations();
+    this.drawTooltips();
+  }
+
   drawAnnotations() {
     if (!this.annotationLayer) {
       return;
     }
 
-    if (!this.store.drawAnnotations) {
+    if (!this.shouldDrawAnnotations) {
       this.clearOldAnnotations(true);
       return;
     }
@@ -311,22 +316,22 @@ export default class AnnotationViewer extends Vue {
       this.drawNewConnections(displayedIds);
     }
     this.annotationLayer.draw();
-    this.drawTooltips();
   }
 
   drawTooltips() {
     const oldFeatures = this.textLayer.features();
 
     if (this.showTooltips) {
-      const displayedAnnotations = this.annotationLayer
+      const annotationsToTooltip = this.annotationLayer
         .annotations()
         .map((annotation: any) => annotation.options("storedAnnotation"))
         .filter((annotation: IAnnotation | undefined) => {
           return (
             annotation &&
-            (this.tooltipOnAll ||
-              (this.tooltipOnSelected &&
-                this.isAnnotationSelected(annotation.id)))
+            (!this.filteredAnnotationTooltips ||
+              this.filteredAnnotations.find(({ id }) => {
+                return id === annotation.id;
+              }))
           );
         });
 
@@ -344,7 +349,7 @@ export default class AnnotationViewer extends Vue {
       };
       this.textLayer
         .createFeature("text")
-        .data(displayedAnnotations)
+        .data(annotationsToTooltip)
         .position((annotation: IAnnotation) => {
           return simpleCentroid(annotation.coordinates);
         })
@@ -364,7 +369,7 @@ export default class AnnotationViewer extends Vue {
         });
       this.textLayer
         .createFeature("text")
-        .data(displayedAnnotations)
+        .data(annotationsToTooltip)
         .position((annotation: IAnnotation) => {
           return simpleCentroid(annotation.coordinates);
         })
@@ -936,7 +941,7 @@ export default class AnnotationViewer extends Vue {
   @Watch("annotations")
   @Watch("annotationsConnections")
   onAnnotationsChanged() {
-    this.drawAnnotations();
+    this.drawAnnotationsAndTooltips();
   }
 
   @Watch("unrolling")
@@ -955,18 +960,19 @@ export default class AnnotationViewer extends Vue {
   @Watch("time")
   @Watch("layerAnnotations")
   onLayerAnnotationsChanged() {
-    this.drawAnnotations();
+    this.drawAnnotationsAndTooltips();
   }
 
   @Watch("shouldDrawAnnotations")
   @Watch("shouldDrawConnections")
   onSettingsChanged() {
-    this.drawAnnotations();
+    this.drawAnnotationsAndTooltips();
   }
 
   @Watch("showTooltips")
-  @Watch("tooltipOnAll")
-  @Watch("tooltipOnSelected")
+  @Watch("filteredAnnotationTooltips")
+  @Watch("filteredAnnotations")
+  @Watch("todo")
   onDrawTooltipsChanged() {
     this.drawTooltips();
   }
@@ -975,7 +981,7 @@ export default class AnnotationViewer extends Vue {
   @Watch("unrollW")
   onUnrollChanged() {
     this.clearOldAnnotations(true);
-    this.drawAnnotations();
+    this.drawAnnotationsAndTooltips();
   }
 
   @Watch("selectedTool")
@@ -1035,12 +1041,12 @@ export default class AnnotationViewer extends Vue {
       geojs.event.annotation.state,
       this.handleAnnotationChange
     );
-    this.drawAnnotations();
+    this.drawAnnotationsAndTooltips();
   }
 
   @Watch("selectedAnnotations")
   updateSelectedAnnotationsStyle() {
-    this.drawAnnotations();
+    this.drawAnnotationsAndTooltips();
   }
 
   mounted() {

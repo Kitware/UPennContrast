@@ -13,51 +13,45 @@
             label="Show Annotations"
           ></v-checkbox>
         </v-list-item>
-      </v-list>
-      <v-list dense value="true" class="py-0">
-        <v-list-item>
-          <v-checkbox
-            hide-details
-            :disabled="!drawAnnotations"
-            dense
-            v-model="filteredDraw"
-            label="Show Only Annotations Passing Filter"
-          ></v-checkbox>
-        </v-list-item>
-        <v-list-item>
-          <v-checkbox
-            hide-details
-            :disabled="!drawAnnotations"
-            dense
-            v-model="drawConnections"
-            label="Show Connections"
-          ></v-checkbox>
-        </v-list-item>
-        <v-list-item>
-          <v-checkbox
-            hide-details
-            dense
-            v-model="showTooltips"
-            label="Enable Tooltips (hotkey T)"
-          ></v-checkbox>
-        </v-list-item>
-        <v-list-item>
-          <v-checkbox
-            hide-details
-            :disabled="!showTooltips"
-            dense
-            v-model="tooltipOnAll"
-            label="Show All Tooltips"
-          ></v-checkbox>
-        </v-list-item>
-        <v-list-item>
-          <v-checkbox
-            hide-details
-            :disabled="!showTooltips"
-            dense
-            v-model="tooltipOnSelected"
-            label="Show Selected Annotations Tooltips"
-          ></v-checkbox>
+        <v-list-item v-if="drawAnnotations">
+          <v-list dense class="py-0">
+            <v-list-item>
+              <v-switch
+                hide-details
+                dense
+                v-model="filteredDraw"
+                label="Filtered"
+              ></v-switch>
+            </v-list-item>
+            <v-list-item>
+              <v-checkbox
+                hide-details
+                dense
+                v-model="drawConnections"
+                label="Show Connections"
+              ></v-checkbox>
+            </v-list-item>
+            <v-list-item>
+              <v-checkbox
+                hide-details
+                dense
+                v-model="showTooltips"
+                label="Show Tooltips (hotkey T)"
+              ></v-checkbox>
+            </v-list-item>
+            <v-list-item v-if="showTooltips">
+              <v-list dense class="py-0">
+                <v-list-item>
+                  <v-switch
+                    hide-details
+                    dense
+                    v-model="filteredAnnotationTooltips"
+                    label="Filtered"
+                  ></v-switch>
+                </v-list-item>
+              </v-list>
+            </v-list-item>
+          </v-list>
         </v-list-item>
         <v-list-item>
           <v-select
@@ -131,20 +125,12 @@ export default class AnnotationToggles extends Vue {
     this.store.setShowTooltips(value);
   }
 
-  get tooltipOnSelected() {
-    return this.store.tooltipOnSelected;
+  get filteredAnnotationTooltips() {
+    return this.store.filteredAnnotationTooltips;
   }
 
-  set tooltipOnSelected(value: boolean) {
-    this.store.setTooltipOnSelected(value);
-  }
-
-  get tooltipOnAll() {
-    return this.store.tooltipOnAll;
-  }
-
-  set tooltipOnAll(value: boolean) {
-    this.store.setTooltipOnAll(value);
+  set filteredAnnotationTooltips(value: boolean) {
+    this.store.setFilteredAnnotationTooltips(value);
   }
 
   get filteredDraw() {
