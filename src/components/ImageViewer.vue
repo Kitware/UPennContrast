@@ -379,7 +379,11 @@ export default class ImageViewer extends Vue {
     const mapentry = this.maps[mllidx];
     const map = mapentry.map;
     // adjust number of tile layers
-    while (mapentry.imageLayers.length > mll.length * 2 || (mapentry.baseLayerIndex !== baseLayerIndex && mapentry.imageLayers.length)) {
+    while (
+      mapentry.imageLayers.length > mll.length * 2 ||
+      (mapentry.baseLayerIndex !== baseLayerIndex &&
+        mapentry.imageLayers.length)
+    ) {
       map.deleteLayer(mapentry.imageLayers.pop());
     }
     mapentry.baseLayerIndex = baseLayerIndex;
