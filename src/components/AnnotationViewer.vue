@@ -79,6 +79,12 @@ export default class AnnotationViewer extends Vue {
   @Prop()
   readonly tileHeight: any;
 
+  @Prop()
+  readonly lowestLayer: any;
+
+  @Prop()
+  readonly layerCount: any;
+
   get displayWorkerPreview() {
     return this.propertiesStore.displayWorkerPreview;
   }
@@ -92,12 +98,21 @@ export default class AnnotationViewer extends Vue {
   }
 
   get visibleChannels() {
-    return this.layers.reduce((channels: number[], layer: IDisplayLayer) => {
-      if (layer.visible && !channels.includes(layer.channel)) {
-        return [...channels, layer.channel];
-      }
-      return [...channels];
-    }, []);
+    return this.layers.reduce(
+      (channels: number[], layer: IDisplayLayer, idx: number) => {
+        if (
+          idx < this.lowestLayer ||
+          idx >= this.lowestLayer + this.layerCount
+        ) {
+          return [...channels];
+        }
+        if (layer.visible && !channels.includes(layer.channel)) {
+          return [...channels, layer.channel];
+        }
+        return [...channels];
+      },
+      []
+    );
   }
 
   get filteredAnnotations() {

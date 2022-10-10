@@ -62,7 +62,7 @@ export class Main extends VuexModule {
   xy: number = 0;
   z: number = 0;
   time: number = 0;
-  layerMode: "single" | "multiple" = "multiple";
+  layerMode: "single" | "multiple" | "unroll" = "multiple";
 
   drawAnnotations: boolean = true;
   filteredDraw: boolean = false;
@@ -606,6 +606,9 @@ export class Main extends VuexModule {
       case "multiple":
         layers[index].visible = !layers[index].visible;
         break;
+      case "unroll":
+        layers[index].visible = !layers[index].visible;
+        break;
     }
   }
 
@@ -633,7 +636,7 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  private setLayerModeImpl(mode: "multiple" | "single") {
+  private setLayerModeImpl(mode: "multiple" | "single" | "unroll") {
     this.layerMode = mode;
   }
 
@@ -657,7 +660,7 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async setLayerMode(mode: "multiple" | "single") {
+  async setLayerMode(mode: "multiple" | "single" | "unroll") {
     this.setLayerModeImpl(mode);
 
     if (mode === "single") {
