@@ -30,41 +30,28 @@
             </template>
           </v-combobox>
         </v-col>
-        <v-col v-if="!areStridesSetFromFile && maxFramesPerItem > 1">
-          <v-text-field
-            prefix="Stride"
-            :rules="[
-              input => input === null || input === '' || parseInt(input) > 0
-            ]"
-            :disabled="
-              assignments[dimension] &&
-                assignments[dimension].value.source === 'file'
-            "
-            v-model="strides[dimension]"
-            hide-details
-            single-line
-            type="number"
-          />
-        </v-col>
         <v-col>
           <v-btn
             :disabled="
-              (!assignments[dimension] &&
-                (typeof strides[dimension] !== 'string' ||
-                  strides[dimension] === '')) ||
+              !assignments[dimension] ||
                 (assignments[dimension] &&
                   assignments[dimension].value.source === 'file')
             "
-            @click="
-              assignments[dimension] = null;
-              strides[dimension] = null;
-            "
+            @click="assignments[dimension] = null"
             >Clear</v-btn
           >
         </v-col>
       </v-row>
     </v-container>
-    <v-btn @click="generateJson">SUBMIT</v-btn>
+    <v-btn @click="generateJson" :disabled="areAllVariablesAssigned()"
+      >SUBMIT</v-btn
+    >
+    <v-btn
+      @click="resetDimensionsToDefault"
+      class="ml-4"
+      :disabled="areDimensionsSetToDefault()"
+      >Reset to defaults</v-btn
+    >
   </v-container>
 </template>
 
@@ -77,7 +64,8 @@ import { IGirderItem } from "@/girder";
 
 enum Sources {
   File = "file",
-  Filename = "filename"
+  Filename = "filename",
+  Images = "images"
 }
 
 interface IDimension {
@@ -107,10 +95,10 @@ export default class NewDataset extends Vue {
       .filter(dim => dim.size > 0)
       .map((dim: IDimension) => {
         let values = "";
-        const metadataID = this.dimensionTometadataId(dim.id);
         switch (dim.source) {
           case Sources.Filename:
             if (this.collectedMetadata) {
+              const metadataID = this.dimensionTometadataId(dim.id);
               const exampleValues = this.collectedMetadata.metadata[metadataID];
               values = exampleValues.slice(0, 3).join(", ");
               if (exampleValues.length > 3) {
@@ -192,12 +180,7 @@ export default class NewDataset extends Vue {
     T: null,
     C: null
   };
-  strides: { [dimension: string]: number | string | null } = {
-    XY: null,
-    Z: null,
-    T: null,
-    C: null
-  };
+  strides: { [dimension: string]: number } = {};
   areStridesSetFromFile: boolean = false;
 
   collectedMetadata: {
@@ -216,11 +199,12 @@ export default class NewDataset extends Vue {
   searchInput: string = "";
   filenameVariableCount = 0;
   fileVariableCount = 0;
+  imageVariableCount = 0;
 
   addSizeToDimension(
     id: string,
     size: number,
-    source: string,
+    source: Sources,
     name: string | null = null
   ) {
     if (size === 0) {
@@ -234,6 +218,7 @@ export default class NewDataset extends Vue {
     } else {
       let computedName = name;
       if (!computedName) {
+        computedName = "";
         switch (source) {
           case Sources.Filename:
             computedName = `Filename variable ${++this.filenameVariableCount}`;
@@ -243,8 +228,8 @@ export default class NewDataset extends Vue {
               this.dimensionNames[id]
             }) `;
             break;
-          default:
-            computedName = String.prototype.concat(id, " ", source);
+          case Sources.Images:
+            computedName = `Image variable ${++this.imageVariableCount}`;
             break;
         }
       }
@@ -312,15 +297,13 @@ export default class NewDataset extends Vue {
       const frames: number = tile.frames?.length || 1;
       this.maxFramesPerItem = Math.max(this.maxFramesPerItem, frames);
       if (tile.IndexStride) {
-        Object.keys(this.dimensionNames).forEach(
-          (dimension: string | number) => {
-            const stride = tile.IndexStride[`Index${dimension}`];
-            if (stride && stride > 0) {
-              this.strides[dimension] = stride;
-              this.areStridesSetFromFile = true;
-            }
+        Object.keys(this.dimensionNames).forEach((dimension: string) => {
+          const stride = tile.IndexStride[`Index${dimension}`];
+          if (stride && stride > 0) {
+            this.strides[dimension] = stride;
+            this.areStridesSetFromFile = true;
           }
-        );
+        });
       }
       if (tile.IndexRange) {
         this.addSizeToDimension("Z", tile.IndexRange.IndexZ, Sources.File);
@@ -348,10 +331,39 @@ export default class NewDataset extends Vue {
       this.channels = ["Default"];
     }
 
-    this.assignments.Z = this.getDefaultAssignmentItem("Z");
-    this.assignments.XY = this.getDefaultAssignmentItem("XY");
-    this.assignments.T = this.getDefaultAssignmentItem("T");
-    this.assignments.C = this.getDefaultAssignmentItem("C");
+    this.dimensions = [
+      ...this.dimensions,
+      {
+        id: "Z",
+        size: this.maxFramesPerItem,
+        name: "Frames per image variable",
+        source: Sources.Images
+      }
+    ];
+
+    this.resetDimensionsToDefault();
+  }
+
+  resetDimensionsToDefault() {
+    Object.keys(this.dimensionNames).forEach(
+      dim => (this.assignments[dim] = this.getDefaultAssignmentItem(dim))
+    );
+  }
+
+  areDimensionsSetToDefault() {
+    return Object.keys(this.dimensionNames).every(
+      dim =>
+        this.getDefaultAssignmentItem(dim)?.value ===
+        this.assignments[dim]?.value
+    );
+  }
+
+  areAllVariablesAssigned() {
+    return (
+      Object.entries(this.assignments).filter(
+        ([_, assignment]) => assignment !== null
+      ).length !== this.dimensions.length
+    );
   }
 
   async generateJson() {
@@ -366,17 +378,7 @@ export default class NewDataset extends Vue {
       ? this.collectedMetadata.filesInfo
       : null;
 
-    const framesAsAxes: { [dim: string]: number } = {};
-    Object.entries(this.strides).forEach(([dimension, stride]) => {
-      if (stride) {
-        if (typeof stride === "string") {
-          stride = parseInt(stride);
-        }
-        if (stride > 0) {
-          framesAsAxes[dimension.toLowerCase()] = stride;
-        }
-      }
-    });
+    const framesAsAxes: { [dim: string]: number } = this.strides;
 
     const description = {
       channels: this.channels,
@@ -397,6 +399,9 @@ export default class NewDataset extends Vue {
                 break;
               case Sources.File:
                 dimCount[assignmentId] += assignment?.value.size || 0;
+                break;
+              case Sources.Images:
+                framesAsAxes[assignmentId.toLowerCase()] = 1;
                 break;
             }
             source[`${assignmentId.toLowerCase()}Values`] = value;
