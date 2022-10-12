@@ -75,16 +75,16 @@ import store from "@/store";
 import { collectFilenameMetadata2 } from "@/utils/parsing";
 import { IGirderItem } from "@/girder";
 
-const Sources = {
-  File: "file",
-  Filename: "filename"
-};
+enum Sources {
+  File = "file",
+  Filename = "filename"
+}
 
 interface IDimension {
-  id: string;
-  size: number;
-  name: string;
-  source: string;
+  id: string; // Guessed dimension
+  size: number; // Number of elements on this dimension
+  name: string; // Displayed name
+  source: Sources; // Source of the dimension
 }
 
 interface IAssignment {
@@ -106,25 +106,25 @@ export default class NewDataset extends Vue {
     return this.dimensions
       .filter(dim => dim.size > 0)
       .map((dim: IDimension) => {
-        let value = "";
+        let values = "";
         const metadataID = this.dimensionTometadataId(dim.id);
         switch (dim.source) {
           case Sources.Filename:
             if (this.collectedMetadata) {
               const exampleValues = this.collectedMetadata.metadata[metadataID];
-              value = exampleValues.slice(0, 3).join(", ");
+              values = exampleValues.slice(0, 3).join(", ");
               if (exampleValues.length > 3) {
-                value = String.prototype.concat(value, "...");
+                values = String.prototype.concat(values, "...");
               }
             }
             break;
           case Sources.File:
-            value = "Metadata";
+            values = "Metadata";
             break;
         }
         return {
           ...dim,
-          values: value,
+          values,
           key: `${dim.id}_${dim.source}`
         };
       });
