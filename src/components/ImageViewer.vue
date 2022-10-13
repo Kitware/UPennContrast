@@ -11,6 +11,7 @@
       :annotationLayer="mapentry.annotationLayer"
       :textLayer="mapentry.textLayer"
       :workerPreviewFeature="mapentry.workerPreviewFeature"
+      :maps="maps"
       :unrollH="unrollH"
       :unrollW="unrollW"
       :tileWidth="tileWidth"

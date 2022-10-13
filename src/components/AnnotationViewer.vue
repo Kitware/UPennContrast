@@ -10,6 +10,7 @@ import propertiesStore from "@/store/properties";
 import filterStore from "@/store/filters";
 
 import geojs from "geojs";
+import { snapCoordinates } from "@/utils/itk";
 
 import {
   IAnnotation,
@@ -24,7 +25,7 @@ import {
   AnnotationSelectionTypes
 } from "../store/model";
 
-import { logWarning } from "@/utils/log";
+import { logError, logWarning } from "@/utils/log";
 
 import {
   pointDistance,
@@ -72,6 +73,9 @@ export default class AnnotationViewer extends Vue {
 
   @Prop()
   readonly unrollW: any;
+
+  @Prop()
+  readonly maps: any[] = [];
 
   @Prop()
   readonly tileWidth: any;
@@ -784,22 +788,8 @@ export default class AnnotationViewer extends Vue {
       return;
     }
 
-    // Save the new annotation
-    this.annotationStore.addAnnotation(newAnnotation);
-
-    this.addAnnotationConnections(newAnnotation).then(
-      (connections: IAnnotationConnection[]) => {
-        this.propertiesStore.handleNewAnnotation({
-          newAnnotation,
-          newConnections: connections
-        });
-      }
-    );
-
-    // Display the new annotation
-    const newGeoJSAnnotation = this.createGeoJSAnnotation(newAnnotation);
+    this.addAnnotation(newAnnotation);
     this.annotationLayer.removeAnnotation(annotation);
-    this.annotationLayer.addAnnotation(newGeoJSAnnotation, undefined, false);
   }
 
   private async addAnnotationConnections(
@@ -830,6 +820,75 @@ export default class AnnotationViewer extends Vue {
     return [];
   }
 
+  addAnnotation(newAnnotation: IAnnotation) {
+    // Save the new annotation
+    this.annotationStore.addAnnotation(newAnnotation);
+
+    this.addAnnotationConnections(newAnnotation).then(
+      (connections: IAnnotationConnection[]) => {
+        this.propertiesStore.handleNewAnnotation({
+          newAnnotation,
+          newConnections: connections
+        });
+      }
+    );
+
+    // Display the new annotation
+    const newGeoJSAnnotation = this.createGeoJSAnnotation(newAnnotation);
+    this.annotationLayer.addAnnotation(newGeoJSAnnotation);
+  }
+
+  async addAnnotationFromSnapping(annotation: any) {
+    if (!annotation || this.maps.length !== 1) {
+      return;
+    }
+    const mapentry = this.maps[0];
+    const coordinates = annotation.coordinates();
+    this.annotationLayer.removeAnnotation(annotation);
+    const tool = this.selectedTool;
+    if (!tool) {
+      return;
+    }
+    const location = tool.values.annotation.coordinateAssignments;
+    if (!location) {
+      logError("Invalid snapping tool, annotation was not configured properly");
+      return;
+    }
+    const layer = location.layer;
+    const layerImage = mapentry.imageLayers[layer * 2];
+    if (!layerImage) {
+      return;
+    }
+    // Capture a screenshot of the layer
+    this.annotationLayer.visible(false);
+    const imageUrl: string = await mapentry.map.screenshot(layerImage);
+    this.annotationLayer.visible(true);
+    // Convert the screenshot data-uri to an array
+    const response: Response = await fetch(imageUrl);
+    const blob: Blob = await response.blob();
+    const array = new Uint8Array(await blob.arrayBuffer());
+    // Compute snapped coordinates
+    const snappedCoordinates = await snapCoordinates(
+      coordinates,
+      array,
+      tool,
+      this.map
+    );
+    if (!snappedCoordinates || !snappedCoordinates.length) {
+      logError("Failed to compute new coordinates for the snapping tool");
+      return;
+    }
+    // Create the new annotation
+    const newAnnotation: IAnnotation | null = await this.createAnnotationFromTool(
+      snappedCoordinates,
+      tool
+    );
+    if (!newAnnotation) {
+      return;
+    }
+    this.addAnnotation(newAnnotation);
+  }
+
   handleNewROIFilter(geojsAnnotation: any) {
     if (!this.roiFilter) {
       return;
@@ -857,6 +916,9 @@ export default class AnnotationViewer extends Vue {
       case "create":
         const annotation = this.selectedTool.values.annotation;
         this.annotationLayer.mode(annotation?.shape);
+        break;
+      case "snap":
+        this.annotationLayer.mode("polygon");
         break;
       case "segmentation":
         // TODO: tool asks for ROI, change layer mode and trigger computation afterwards
@@ -939,10 +1001,16 @@ export default class AnnotationViewer extends Vue {
     switch (evt.event) {
       case "geo_annotation_state":
         if (this.selectedTool) {
-          if (this.selectedTool.type === "create") {
-            this.addAnnotationFromGeoJsAnnotation(evt.annotation);
-          } else if (this.selectedTool.type === "select") {
-            this.selectAnnotations(evt.annotation);
+          switch (this.selectedTool.type) {
+            case "create":
+              this.addAnnotationFromGeoJsAnnotation(evt.annotation);
+              break;
+            case "snap":
+              this.addAnnotationFromSnapping(evt.annotation);
+              break;
+            case "select":
+              this.selectAnnotations(evt.annotation);
+              break;
           }
         } else if (evt.annotation) {
           this.handleNewROIFilter(evt.annotation);

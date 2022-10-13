@@ -47,17 +47,7 @@
             { "text": "Snap blob to dot", "value": "blobToDot" },
             {
               "text": "Snap blob to blob",
-              "value": "blobToBlob",
-              "meta": {
-                "interface": [
-                  {
-                    "name": "Threshold",
-                    "id": "threshold",
-                    "type": "text",
-                    "meta": { "type": "number" }
-                  }
-                ]
-              }
+              "value": "blobToBlob"
             },
             { "text": "Snap freehand line to edge", "value": "edge" }
           ]
