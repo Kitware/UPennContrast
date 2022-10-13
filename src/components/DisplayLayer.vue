@@ -7,6 +7,23 @@
         @click.native.stop
         @mousedown.native.stop
         @mouseup.native.stop
+        v-mousetrap="[
+          {
+            bind: zMaxMergeBinding(index),
+            handler: () => (isZMaxMerge = !isZMaxMerge)
+          }
+        ]"
+        class="toggleButton"
+        v-model="isZMaxMerge"
+        :title="`Toggle Z Max Merge (Hotkey ${zMaxMergeBinding(index)})`"
+        :displayed="displayZ"
+        dense
+        hide-details
+      />
+      <v-switch
+        @click.native.stop
+        @mousedown.native.stop
+        @mouseup.native.stop
         class="toggleButton"
         v-model="visible"
         :title="`Toggle Visibility (Hotkey ${index + 1})`"
@@ -111,8 +128,8 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop, Emit } from "vue-property-decorator";
-import { IDisplayLayer, IContrast } from "../store/model";
+import { Vue, Component, Prop, Emit, Watch } from "vue-property-decorator";
+import { IDisplayLayer, IContrast, IDisplaySlice } from "../store/model";
 import DisplaySlice from "./DisplaySlice.vue";
 import ContrastHistogram from "./ContrastHistogram.vue";
 import store from "../store";
@@ -151,6 +168,46 @@ export default class DisplayLayer extends Vue {
 
   get visible() {
     return this.value.visible;
+  }
+
+  alternativeZSlice: IDisplaySlice =
+    this.value.z.type === "max-merge"
+      ? { type: "current", value: null }
+      : { ...this.value.z };
+
+  zMaxMergeBinding(index: number) {
+    return `shift+${index + 1}`;
+  }
+
+  get isZMaxMerge() {
+    return this.zSlice.type === "max-merge";
+  }
+
+  set isZMaxMerge(value: boolean) {
+    if (this.isZMaxMerge === value) {
+      return;
+    }
+    let newVal = {};
+    if (value) {
+      newVal = {
+        type: "max-merge",
+        value: null
+      };
+    } else {
+      newVal = this.alternativeZSlice;
+    }
+    this.changeProp("z", newVal);
+  }
+
+  get zSlice() {
+    return this.value.z;
+  }
+
+  @Watch("zSlice")
+  zSliceChanged() {
+    if (!this.isZMaxMerge) {
+      this.alternativeZSlice = { ...this.zSlice };
+    }
   }
 
   set visible(value: boolean) {
