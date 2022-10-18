@@ -14,6 +14,7 @@ npm install
 git clone https://github.com/Kitware/UPennContrast.git
 cd UPennContrast
 npm install
+npm run build-workers
 docker-compose up -d
 npm run serve
 ```
