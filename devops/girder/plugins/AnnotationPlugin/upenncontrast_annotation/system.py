@@ -3,7 +3,6 @@ import json
 
 import large_image
 import yaml
-from girder import events, logger
 from girder.api import access
 from girder.api.describe import Description, autoDescribeRoute
 from girder.api.rest import boundHandler, filtermodel
@@ -16,6 +15,8 @@ from girder.models.upload import Upload
 from girder.models.user import User
 from girder_jobs.constants import JobStatus
 from girder_large_image.models.image_item import ImageItem
+
+from girder import events, logger
 
 conversionJobs = {}
 
@@ -211,7 +212,7 @@ def _loadTileSource(cls, item, **kwargs):
             except Exception:
                 logger.info('merge substitute file is no longer available')
                 subitem = None
-        if subitem:
+        if sub and subitem:
             subkwargs = kwargs.copy()
             subkwargs.pop('frame', None)
             uniform['frame'] = sub['frame']

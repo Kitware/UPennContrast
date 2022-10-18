@@ -52,8 +52,8 @@ class WorkerPreviews(Resource):
 
     @access.user
     @describeRoute(Description("Ask the worker to update its preview data")
-                   .param('datasetId', 'The dataset Id', paramType='path')
-                   .param('image', 'The docker image name for the worker.')
+                   .param('datasetId', 'The dataset Id', required=False)
+                   .param('image', 'The docker image name for the worker.', required=False)
                    .param('body', 'A JSON object containing the worker parameters', paramType='body'))
     def requestWorkerUpdate(self, params):
         if 'image' not in params:

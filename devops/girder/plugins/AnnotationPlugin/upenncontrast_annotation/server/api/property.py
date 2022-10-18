@@ -24,7 +24,7 @@ class AnnotationProperty(Resource):
     @access.user
     @describeRoute(Description("Compute a property for all annotations in the specified dataset, or a specific list of annotations")
         .param('id', 'The id of the property', paramType="path")
-        .param('datasetId', 'The dataset for whose annotations the property should be computed')
+        .param('datasetId', 'The dataset for whose annotations the property should be computed', required=False)
         .param('body', 'A JSON object containing parameters for the computation', paramType='body')
     )
     def compute(self, id, params):
