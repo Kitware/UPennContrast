@@ -74,8 +74,8 @@ export default class AnnotationViewer extends Vue {
   @Prop()
   readonly unrollW: any;
 
-  @Prop()
-  readonly maps: any[] = [];
+  @Prop({ default: [] })
+  readonly maps!: any[];
 
   @Prop()
   readonly tileWidth: any;
@@ -872,7 +872,7 @@ export default class AnnotationViewer extends Vue {
       coordinates,
       array,
       tool,
-      this.map
+      mapentry.map
     );
     if (!snappedCoordinates || !snappedCoordinates.length) {
       logError("Failed to compute new coordinates for the snapping tool");
