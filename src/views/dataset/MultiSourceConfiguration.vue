@@ -43,9 +43,7 @@
         </v-col>
       </v-row>
     </v-container>
-    <v-btn @click="generateJson" :disabled="areAllVariablesAssigned()"
-      >SUBMIT</v-btn
-    >
+    <v-btn @click="generateJson" :disabled="!canSubmit()">SUBMIT</v-btn>
     <v-btn
       @click="resetDimensionsToDefault"
       class="ml-4"
@@ -90,6 +88,16 @@ export default class NewDataset extends Vue {
     return this.$route.params.id;
   }
 
+  // Create a short string describing the array with some elements from the array
+  // For example: ["foo", "bar", "foobar", "barfoo"] => "foo, bar, foobar..."
+  arrayToExampleValues(arr: string[]) {
+    let values = arr.slice(0, 3).join(", ");
+    if (arr.length > 3) {
+      values = String.prototype.concat(values, "...");
+    }
+    return values;
+  }
+
   get items() {
     return this.dimensions
       .filter(dim => dim.size > 0)
@@ -100,10 +108,7 @@ export default class NewDataset extends Vue {
             if (this.collectedMetadata) {
               const metadataID = this.dimensionTometadataId(dim.id);
               const exampleValues = this.collectedMetadata.metadata[metadataID];
-              values = exampleValues.slice(0, 3).join(", ");
-              if (exampleValues.length > 3) {
-                values = String.prototype.concat(values, "...");
-              }
+              values = this.arrayToExampleValues(exampleValues);
             }
             break;
           case Sources.File:
@@ -258,9 +263,10 @@ export default class NewDataset extends Vue {
   getDefaultAssignmentItem(assignment: string) {
     return this.dimensionToAssignmentItem(
       this.dimensions.find(
-        ({ id, source }) => source === Sources.File && id === assignment
+        ({ id, source, size }) =>
+          size > 0 && source === Sources.File && id === assignment
       ) ||
-        this.dimensions.find(({ id }) => id === assignment) ||
+        this.dimensions.find(({ id, size }) => size > 0 && id === assignment) ||
         null
     );
   }
@@ -300,7 +306,7 @@ export default class NewDataset extends Vue {
         Object.keys(this.dimensionNames).forEach((dimension: string) => {
           const stride = tile.IndexStride[`Index${dimension}`];
           if (stride && stride > 0) {
-            this.strides[dimension] = stride;
+            this.strides[dimension.toLowerCase()] = stride;
             this.areStridesSetFromFile = true;
           }
         });
@@ -311,6 +317,16 @@ export default class NewDataset extends Vue {
         this.addSizeToDimension("XY", tile.IndexRange.IndexXY, Sources.File);
       } else if (!this.dimensions.some(dimension => dimension.size > 0)) {
         this.addSizeToDimension("Single Image", 1, Sources.Filename);
+      } else {
+        this.dimensions = [
+          ...this.dimensions,
+          {
+            id: "Z",
+            size: this.maxFramesPerItem,
+            name: "Frames per image variable",
+            source: Sources.Images
+          }
+        ];
       }
       if (tile.channels) {
         tile.channels
@@ -320,9 +336,10 @@ export default class NewDataset extends Vue {
     });
 
     if (channels.length > 0) {
-      this.addSizeToDimension("C", channels.length, Sources.File);
-      const channelName = `Metadata (Channel): ${channels.join(", ")}`;
-      this.setDimensionName("C", Sources.File, channelName);
+      const channelName = `Metadata (Channel): ${this.arrayToExampleValues(
+        channels
+      )}`;
+      this.addSizeToDimension("C", channels.length, Sources.File, channelName);
     }
 
     this.channels = channels.length > 0 ? channels : metadata.chan;
@@ -330,16 +347,6 @@ export default class NewDataset extends Vue {
     if (!this.channels.length) {
       this.channels = ["Default"];
     }
-
-    this.dimensions = [
-      ...this.dimensions,
-      {
-        id: "Z",
-        size: this.maxFramesPerItem,
-        name: "Frames per image variable",
-        source: Sources.Images
-      }
-    ];
 
     this.resetDimensionsToDefault();
   }
@@ -358,12 +365,11 @@ export default class NewDataset extends Vue {
     );
   }
 
-  areAllVariablesAssigned() {
-    return (
-      Object.entries(this.assignments).filter(
-        ([_, assignment]) => assignment !== null
-      ).length !== this.dimensions.length
-    );
+  canSubmit() {
+    const filledAssignments = Object.entries(this.assignments).filter(
+      ([_, assignment]) => assignment !== null
+    ).length;
+    return filledAssignments >= this.items.length || filledAssignments >= 4;
   }
 
   async generateJson() {
