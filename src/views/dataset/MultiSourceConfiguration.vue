@@ -317,16 +317,6 @@ export default class NewDataset extends Vue {
         this.addSizeToDimension("XY", tile.IndexRange.IndexXY, Sources.File);
       } else if (!this.dimensions.some(dimension => dimension.size > 0)) {
         this.addSizeToDimension("Single Image", 1, Sources.Filename);
-      } else {
-        this.dimensions = [
-          ...this.dimensions,
-          {
-            id: "Z",
-            size: this.maxFramesPerItem,
-            name: "Frames per image variable",
-            source: Sources.Images
-          }
-        ];
       }
       if (tile.channels) {
         tile.channels
@@ -346,6 +336,15 @@ export default class NewDataset extends Vue {
 
     if (!this.channels.length) {
       this.channels = ["Default"];
+    }
+
+    if (!this.areStridesSetFromFile && this.maxFramesPerItem > 1) {
+      this.addSizeToDimension(
+        "Z",
+        this.maxFramesPerItem,
+        Sources.Images,
+        "Frames per image variable"
+      );
     }
 
     this.resetDimensionsToDefault();
