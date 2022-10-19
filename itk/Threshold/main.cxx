@@ -87,8 +87,12 @@ int main(int argc, char **argv)
     contourFilter->Update();
 
     auto contour = contourFilter->GetOutput(0);
-    ContourFilterType::VertexListType::ConstIterator vertexIterator = contour->GetVertexList()->Begin();
-    ContourFilterType::VertexListType::ConstIterator outputContourEnd = contour->GetVertexList()->End();
+    ContourFilterType::VertexListType::ConstIterator vertexIterator;
+    ContourFilterType::VertexListType::ConstIterator outputContourEnd = vertexIterator;
+    if (contour) {
+        vertexIterator = contour->GetVertexList()->Begin();
+        outputContourEnd = contour->GetVertexList()->End();
+    }
 
     std::fstream outFile;
     outFile.open(outputPath, std::fstream::out);
