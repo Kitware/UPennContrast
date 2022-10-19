@@ -187,7 +187,7 @@ export default class DisplayLayer extends Vue {
     if (this.isZMaxMerge === value) {
       return;
     }
-    let newVal = {};
+    let newVal;
     if (value) {
       newVal = {
         type: "max-merge",

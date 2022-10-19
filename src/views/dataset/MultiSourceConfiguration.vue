@@ -382,9 +382,10 @@ export default class NewDataset extends Vue {
   }
 
   canSubmit() {
-    const filledAssignments = Object.entries(this.assignments).filter(
-      ([_, assignment]) => assignment !== null
-    ).length;
+    const filledAssignments = Object.values(this.assignments).reduce(
+      (count, assignment) => (assignment ? ++count : count),
+      0
+    );
     return filledAssignments >= this.items.length || filledAssignments >= 4;
   }
 
