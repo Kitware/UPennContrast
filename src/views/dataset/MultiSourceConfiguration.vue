@@ -88,14 +88,33 @@ export default class NewDataset extends Vue {
     return this.$route.params.id;
   }
 
-  // Create a short string describing the array with some elements from the array
+  // Call join on the array, cutting out elements or the first word if too long and adding hyphens
+  // Output is always shorter than maxChars
   // For example: ["foo", "bar", "foobar", "barfoo"] => "foo, bar, foobar..."
-  arrayToExampleValues(arr: string[]) {
-    let values = arr.slice(0, 3).join(", ");
-    if (arr.length > 3) {
-      values = String.prototype.concat(values, "...");
+  sliceAndJoin(arr: string[], maxChars: number = 16, sep: string = ", ") {
+    if (arr.length <= 0) {
+      return "";
     }
-    return values;
+    // First element is too long
+    if (
+      arr[0].length > maxChars ||
+      (arr[0].length === maxChars && arr.length > 1)
+    ) {
+      return arr[0].slice(0, maxChars - 1) + "…";
+    }
+    // Add words until the limit of characters is reached or exceeded
+    let nWords = 1;
+    let nChars = arr[0].length;
+    while (nChars < maxChars && nWords < arr.length) {
+      nChars += sep.length + arr[nWords].length;
+      ++nWords;
+    }
+    // The whole string fits
+    if (nChars <= maxChars && nWords === arr.length) {
+      return arr.join(sep);
+    }
+    // Remove the last word and add hyphens
+    return arr.slice(0, nWords - 1).join(sep) + "…";
   }
 
   get items() {
@@ -108,7 +127,7 @@ export default class NewDataset extends Vue {
             if (this.collectedMetadata) {
               const metadataID = this.dimensionTometadataId(dim.id);
               const exampleValues = this.collectedMetadata.metadata[metadataID];
-              values = this.arrayToExampleValues(exampleValues);
+              values = this.sliceAndJoin(exampleValues);
             }
             break;
           case Sources.File:
@@ -326,9 +345,7 @@ export default class NewDataset extends Vue {
     });
 
     if (channels.length > 0) {
-      const channelName = `Metadata (Channel): ${this.arrayToExampleValues(
-        channels
-      )}`;
+      const channelName = `Metadata (Channel): ${this.sliceAndJoin(channels)}`;
       this.addSizeToDimension("C", channels.length, Sources.File, channelName);
     }
 
