@@ -3,33 +3,41 @@
     <v-expansion-panel-header class="displayLayerHeader">
       <v-icon :color="value.color" left>mdi-circle</v-icon>
       <span class="header">{{ value.name }}</span>
-      <v-switch
-        @click.native.stop
-        @mousedown.native.stop
-        @mouseup.native.stop
-        v-mousetrap="[
-          {
-            bind: zMaxMergeBinding(index),
-            handler: () => (isZMaxMerge = !isZMaxMerge)
-          }
-        ]"
-        class="toggleButton"
-        v-model="isZMaxMerge"
-        :title="`Toggle Z Max Merge (Hotkey ${zMaxMergeBinding(index)})`"
-        :displayed="displayZ"
-        dense
-        hide-details
-      />
-      <v-switch
-        @click.native.stop
-        @mousedown.native.stop
-        @mouseup.native.stop
-        class="toggleButton"
-        v-model="visible"
-        :title="`Toggle Visibility (Hotkey ${index + 1})`"
-        dense
-        hide-details
-      />
+      <v-container class="layerToggles">
+        <v-container class="layerToggleWrapper">
+          <v-switch
+            @click.native.stop
+            @mousedown.native.stop
+            @mouseup.native.stop
+            v-mousetrap="[
+              {
+                bind: zMaxMergeBinding(index),
+                handler: () => (isZMaxMerge = !isZMaxMerge)
+              }
+            ]"
+            class="toggleButton"
+            v-model="isZMaxMerge"
+            :title="`Toggle Z Max Merge (Hotkey ${zMaxMergeBinding(index)})`"
+            :displayed="displayZ"
+            dense
+            hide-details
+          />
+          <div class="text-caption">Z max-merge</div>
+        </v-container>
+        <v-container class="layerToggleWrapper">
+          <v-switch
+            @click.native.stop
+            @mousedown.native.stop
+            @mouseup.native.stop
+            class="toggleButton"
+            v-model="visible"
+            :title="`Toggle Visibility (Hotkey ${index + 1})`"
+            dense
+            hide-details
+          />
+          <div class="text-caption">Channel on/off</div>
+        </v-container>
+      </v-container>
     </v-expansion-panel-header>
     <v-expansion-panel-content :class="{ notVisible: !value.visible }">
       <v-text-field
@@ -299,6 +307,21 @@ export default class DisplayLayer extends Vue {
 .toggleButton {
   margin: 0;
   flex: 0 0 auto;
+}
+
+.layerToggles {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+}
+
+.layerToggleWrapper {
+  width: min-content;
+  margin: 0;
+  padding: 0;
+  margin-right: 10pt;
 }
 
 .buttons {
