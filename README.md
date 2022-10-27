@@ -19,6 +19,8 @@ docker-compose up -d
 npm run serve
 ```
 
+To setup an environment for C++ development for ITK, see `itk/README.md`.
+
 ### Girder Defaults
 
 By default, a admin user will be created with the name `admin` and the password `password`.  To use a different admin user, register a new user, log in as the `admin` user and make the new user an admin, then delete the original `admin` user.

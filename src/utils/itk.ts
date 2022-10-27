@@ -29,25 +29,24 @@ function geoJSCoordinatesTo2DITKMesh(coordinates: IGeoJSPoint[], map: any) {
   };
 }
 
-async function getThresholdBlobInContour(
+function runItkPipelineWrapper(
+  pipelineName: string,
   image: Uint8Array,
-  contour: IGeoJSPoint[] = [],
-  geoJSMap: any
-): Promise<IGeoJSPoint[]> {
-  const mesh = geoJSCoordinatesTo2DITKMesh(contour, geoJSMap);
-  return await new Promise((resolve, reject) => {
-    const args: string[] = ["/inimage.png", "/inpoints.json", "/out.json"];
+  otherArgs: { path: string; data: any; type: any }[]
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const args: string[] = [
+      "/inimage.png",
+      ...otherArgs.map(arg => arg.path),
+      "/out.json"
+    ];
     const pipelineInputs = [
       {
         path: "/inimage.png",
         data: image,
         type: IOTypes.Binary
       },
-      {
-        path: "/inpoints.json",
-        data: mesh,
-        type: IOTypes.Mesh
-      }
+      ...otherArgs
     ];
     const pipelineOutputs = [
       {
@@ -57,84 +56,117 @@ async function getThresholdBlobInContour(
     ];
     return runPipelineBrowser(
       null,
-      "Threshold",
+      pipelineName,
       args,
       pipelineOutputs,
       pipelineInputs
     )
       .then(({ outputs, webWorker }: { outputs: any; webWorker: Worker }) => {
-        if (!outputs || !outputs.length) {
+        if (!outputs || outputs.length !== 1 || outputs[0].data === "") {
+          webWorker.terminate();
+          logError(`Pipeline didn't return a value`);
           reject();
+        } else {
+          const result = JSON.parse(outputs[0].data);
+          webWorker.terminate();
+          resolve(result);
         }
-        const result = JSON.parse(outputs[0].data);
-        webWorker.terminate();
-        if (!result?.contour) {
-          logError(
-            "Error getting data back from the pipeline. Could not find max"
-          );
-          reject();
-        }
-        const converted = geoJSMap.displayToGcs(result.contour);
-        resolve(converted);
       })
       .catch((error: any) => {
-        logError(`Failed to run ITK pipeline ${error}`);
+        logError(`Failed to run ITK pipeline:
+${error.message}
+${error.stack}`);
         reject();
       });
   });
 }
 
-async function getMaximumPointInContour(
+function getThresholdBlobInContour(
+  image: Uint8Array,
+  contour: IGeoJSPoint[] = [],
+  geoJSMap: any
+): Promise<IGeoJSPoint[]> {
+  return new Promise((resolve, reject) => {
+    runItkPipelineWrapper("BlobToBlobThreshold", image, [
+      {
+        path: "/inpoints.json",
+        data: geoJSCoordinatesTo2DITKMesh(contour, geoJSMap),
+        type: IOTypes.Mesh
+      }
+    ])
+      .then(result => {
+        if (!result?.contour) {
+          logError(
+            "Error getting data back from the pipeline. Could not find contour"
+          );
+          reject();
+        } else {
+          const converted = geoJSMap.displayToGcs(result.contour);
+          resolve(converted);
+        }
+      })
+      .catch(error => {
+        reject(error);
+      });
+  });
+}
+
+function getMaximumPointInContour(
   image: Uint8Array,
   contour: IGeoJSPoint[] = [],
   geoJSMap: any
 ): Promise<IGeoJSPoint> {
-  const mesh = geoJSCoordinatesTo2DITKMesh(contour, geoJSMap);
-  return await new Promise((resolve, reject) => {
-    const args: string[] = ["/inimage.png", "/inpoints.json", "/out.json"];
-    const pipelineInputs = [
-      {
-        path: "/inimage.png",
-        data: image,
-        type: IOTypes.Binary
-      },
+  return new Promise((resolve, reject) => {
+    runItkPipelineWrapper("BlobToDotMax", image, [
       {
         path: "/inpoints.json",
-        data: mesh,
+        data: geoJSCoordinatesTo2DITKMesh(contour, geoJSMap),
         type: IOTypes.Mesh
       }
-    ];
-    const pipelineOutputs = [
-      {
-        path: "out.json",
-        type: IOTypes.Text
-      }
-    ];
-    return runPipelineBrowser(
-      null,
-      "Max",
-      args,
-      pipelineOutputs,
-      pipelineInputs
-    )
-      .then(({ outputs, webWorker }: { outputs: any; webWorker: Worker }) => {
-        if (!outputs || !outputs.length) {
-          reject();
-        }
-        const result = JSON.parse(outputs[0].data);
-        webWorker.terminate();
+    ])
+      .then(result => {
         if (!result?.point) {
-          logError(
+          reject(
             "Error getting data back from the pipeline. Could not find max"
           );
-          reject();
+        } else {
+          const converted = geoJSMap.displayToGcs(result.point);
+          resolve(converted);
         }
-        const converted = geoJSMap.displayToGcs(result.point);
-        resolve(converted);
       })
-      .catch((error: any) => {
-        logError(`Failed to run ITK pipeline ${error}`);
-        reject();
+      .catch(error => {
+        reject(error);
+      });
+  });
+}
+
+function getMaximumPointInEllipse(
+  image: Uint8Array,
+  gcsCenter: IGeoJSPoint,
+  radius: number,
+  geoJSMap: any
+): Promise<IGeoJSPoint> {
+  const displayCenter = geoJSMap.gcsToDisplay(gcsCenter);
+  return new Promise((resolve, reject) => {
+    runItkPipelineWrapper("EllipseToDotMax", image, [
+      {
+        path: "/ellipse",
+        data: `${displayCenter.x} ${displayCenter.y} ${radius}`,
+        type: IOTypes.Text
+      }
+    ])
+      .then(result => {
+        if (!result?.point) {
+          reject(
+            "Error getting data back from the pipeline. Could not find max"
+          );
+        } else {
+          const converted = geoJSMap.displayToGcs(result.point);
+          resolve(converted);
+        }
+      })
+      .catch(error => {
+        reject(error);
       });
   });
 }
@@ -148,6 +180,15 @@ export async function snapCoordinates(
   const snapTo = tool.values.snapTo.value;
   switch (snapTo) {
     case "ellipseToDot":
+      // TODO: radius hardcoded
+      const temp = await getMaximumPointInEllipse(
+        imageArray,
+        coordinates[0],
+        10,
+        geoJSMap
+      );
+      console.log(temp);
+      return [temp];
     case "blobToDot":
       const point = await getMaximumPointInContour(
         imageArray,

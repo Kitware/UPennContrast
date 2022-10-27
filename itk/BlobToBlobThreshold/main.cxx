@@ -13,7 +13,9 @@
 #include <itkOtsuThresholdImageFilter.h>
 #include <itkContourExtractor2DImageFilter.h>
 
-#include <emscripten/bind.h>
+#ifdef __EMSCRIPTEN__
+    #include <emscripten/bind.h>
+#endif
 
 #include <sstream>
 
@@ -49,6 +51,9 @@ int main(int argc, char **argv)
     std::string inputPath(argv[1]);
     std::string pointsPath(argv[2]);
     std::string outputPath(argv[3]);
+    // Create an empty output file to avoid errors if returning without an ouput
+    std::ofstream emptyOutFile(outputPath);
+    emptyOutFile.close();
 
     auto input = ReadImageFile<ImageType>(inputPath);
     auto mesh = ReadMeshFile<MeshType>(pointsPath);
@@ -75,9 +80,22 @@ int main(int argc, char **argv)
     filter->SetInput1(input);
     filter->SetInput2(inputPolyline);
     filter->Update();
+    auto maskedImage = filter->GetOutput();
+
+    // Check if the polyline mask worked
+    if (!maskedImage) {
+        return -1;
+    }
+    ImageCalculatorFilterType::Pointer imageCalculatorFilter = ImageCalculatorFilterType::New();
+    imageCalculatorFilter->SetImage(maskedImage);
+    imageCalculatorFilter->ComputeMaximum();
+    // The masked image is all black: polyline didn't work
+    if (imageCalculatorFilter->GetMaximum() == 0) {
+        return -1;
+    }
 
     ThresholdFilterType::Pointer thresholdFilter = ThresholdFilterType::New();
-    thresholdFilter->SetInput(filter->GetOutput());
+    thresholdFilter->SetInput(maskedImage);
     thresholdFilter->SetInsideValue(0);
     thresholdFilter->SetOutsideValue(255);
     thresholdFilter->Update();

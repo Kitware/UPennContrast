@@ -860,9 +860,7 @@ export default class AnnotationViewer extends Vue {
       return;
     }
     // Capture a screenshot of the layer
-    this.annotationLayer.visible(false);
     const imageUrl: string = await mapentry.map.screenshot(layerImage);
-    this.annotationLayer.visible(true);
     // Convert the screenshot data-uri to an array
     const response: Response = await fetch(imageUrl);
     const blob: Blob = await response.blob();
@@ -918,7 +916,11 @@ export default class AnnotationViewer extends Vue {
         this.annotationLayer.mode(annotation?.shape);
         break;
       case "snap":
-        this.annotationLayer.mode("polygon");
+        this.annotationLayer.mode(
+          this.selectedTool.values.snapTo.value === "ellipseToDot"
+            ? "point"
+            : "polygon"
+        );
         break;
       case "segmentation":
         // TODO: tool asks for ROI, change layer mode and trigger computation afterwards

@@ -23,47 +23,19 @@ module.exports = {
             to: path.join(__dirname, "dist", "itk", "MeshIOs")
           },
           {
-            from: path.join(__dirname, "itk", "web-build", "Max", "Max.js"),
-            to: path.join(__dirname, "dist", "itk", "Pipelines", "Max.js")
-          },
-          {
-            from: path.join(__dirname, "itk", "web-build", "Max", "MaxWasm.js"),
-            to: path.join(__dirname, "dist", "itk", "Pipelines", "MaxWasm.js")
-          },
-          {
             from: path.join(
               __dirname,
               "itk",
               "web-build",
-              "Max",
-              "MaxWasm.wasm"
-            ),
-            to: path.join(__dirname, "dist", "itk", "Pipelines", "MaxWasm.wasm")
-          },
-          {
-            from: path.join(
-              __dirname,
-              "itk",
-              "web-build",
-              "Threshold",
-              "Threshold.js"
-            ),
-            to: path.join(__dirname, "dist", "itk", "Pipelines", "Threshold.js")
-          },
-          {
-            from: path.join(
-              __dirname,
-              "itk",
-              "web-build",
-              "Threshold",
-              "ThresholdWasm.js"
+              "BlobToDotMax",
+              "BlobToDotMax.js"
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "ThresholdWasm.js"
+              "BlobToDotMax.js"
             )
           },
           {
@@ -71,15 +43,127 @@ module.exports = {
               __dirname,
               "itk",
               "web-build",
-              "Threshold",
-              "ThresholdWasm.wasm"
+              "BlobToDotMax",
+              "BlobToDotMaxWasm.js"
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "ThresholdWasm.wasm"
+              "BlobToDotMaxWasm.js"
+            )
+          },
+          {
+            from: path.join(
+              __dirname,
+              "itk",
+              "web-build",
+              "BlobToDotMax",
+              "BlobToDotMaxWasm.wasm"
+            ),
+            to: path.join(
+              __dirname,
+              "dist",
+              "itk",
+              "Pipelines",
+              "BlobToDotMaxWasm.wasm"
+            )
+          },
+          {
+            from: path.join(
+              __dirname,
+              "itk",
+              "web-build",
+              "BlobToBlobThreshold",
+              "BlobToBlobThreshold.js"
+            ),
+            to: path.join(
+              __dirname,
+              "dist",
+              "itk",
+              "Pipelines",
+              "BlobToBlobThreshold.js"
+            )
+          },
+          {
+            from: path.join(
+              __dirname,
+              "itk",
+              "web-build",
+              "BlobToBlobThreshold",
+              "BlobToBlobThresholdWasm.js"
+            ),
+            to: path.join(
+              __dirname,
+              "dist",
+              "itk",
+              "Pipelines",
+              "BlobToBlobThresholdWasm.js"
+            )
+          },
+          {
+            from: path.join(
+              __dirname,
+              "itk",
+              "web-build",
+              "BlobToBlobThreshold",
+              "BlobToBlobThresholdWasm.wasm"
+            ),
+            to: path.join(
+              __dirname,
+              "dist",
+              "itk",
+              "Pipelines",
+              "BlobToBlobThresholdWasm.wasm"
+            )
+          },
+          {
+            from: path.join(
+              __dirname,
+              "itk",
+              "web-build",
+              "EllipseToDotMax",
+              "EllipseToDotMax.js"
+            ),
+            to: path.join(
+              __dirname,
+              "dist",
+              "itk",
+              "Pipelines",
+              "EllipseToDotMax.js"
+            )
+          },
+          {
+            from: path.join(
+              __dirname,
+              "itk",
+              "web-build",
+              "EllipseToDotMax",
+              "EllipseToDotMaxWasm.js"
+            ),
+            to: path.join(
+              __dirname,
+              "dist",
+              "itk",
+              "Pipelines",
+              "EllipseToDotMaxWasm.js"
+            )
+          },
+          {
+            from: path.join(
+              __dirname,
+              "itk",
+              "web-build",
+              "EllipseToDotMax",
+              "EllipseToDotMaxWasm.wasm"
+            ),
+            to: path.join(
+              __dirname,
+              "dist",
+              "itk",
+              "Pipelines",
+              "EllipseToDotMaxWasm.wasm"
             )
           }
         ]
