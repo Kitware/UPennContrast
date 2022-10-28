@@ -195,16 +195,13 @@ export default class DisplayLayer extends Vue {
     if (this.isZMaxMerge === value) {
       return;
     }
-    let newVal;
-    if (value) {
-      newVal = {
-        type: "max-merge",
-        value: null
-      };
-    } else {
-      newVal = this.alternativeZSlice;
-    }
-    this.changeProp("z", newVal);
+    const newZSlice = value
+      ? {
+          type: "max-merge",
+          value: null
+        }
+      : this.alternativeZSlice;
+    this.changeProp("z", newZSlice);
   }
 
   get zSlice() {
