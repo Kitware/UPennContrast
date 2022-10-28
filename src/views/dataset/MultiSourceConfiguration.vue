@@ -125,7 +125,7 @@ export default class NewDataset extends Vue {
         switch (dim.source) {
           case Sources.Filename:
             if (this.collectedMetadata) {
-              const metadataID = this.dimensionTometadataId(dim.id);
+              const metadataID = this.dimensionToMetadataId(dim.id);
               const exampleValues = this.collectedMetadata.metadata[metadataID];
               values = this.sliceAndJoin(exampleValues);
             }
@@ -169,7 +169,7 @@ export default class NewDataset extends Vue {
 
   dimensionNames = { XY: "Positions", Z: "Z", T: "Time", C: "Channels" };
 
-  dimensionTometadataId(id: string) {
+  dimensionToMetadataId(id: string) {
     return id === "C" ? "chan" : id.toLowerCase();
   }
 
@@ -416,7 +416,7 @@ export default class NewDataset extends Vue {
               case Sources.Filename:
                 let id = assignment?.value.id;
                 if (id && filesInfo) {
-                  id = this.dimensionTometadataId(id);
+                  id = this.dimensionToMetadataId(id);
                   value = filesInfo[item.name][id];
                 }
                 break;

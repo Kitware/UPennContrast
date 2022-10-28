@@ -297,7 +297,7 @@ export default class DatasetInfo extends Vue {
       });
 
       if (config === null) {
-        throw new Error("Config not set");
+        throw new Error("Configuration not set");
       }
 
       const channels = dataset.channels.slice(0, 6);
