@@ -140,7 +140,7 @@ function getMaximumPointInContour(
   });
 }
 
-function getMaximumPointInEllipse(
+function getMaximumPointInCircle(
   image: Uint8Array,
   gcsCenter: IGeoJSPoint,
   radius: number,
@@ -148,9 +148,9 @@ function getMaximumPointInEllipse(
 ): Promise<IGeoJSPoint> {
   const displayCenter = geoJSMap.gcsToDisplay(gcsCenter);
   return new Promise((resolve, reject) => {
-    runItkPipelineWrapper("EllipseToDotMax", image, [
+    runItkPipelineWrapper("CircleToDotMax", image, [
       {
-        path: "/ellipse",
+        path: "/circle",
         data: `${displayCenter.x} ${displayCenter.y} ${radius}`,
         type: IOTypes.Text
       }
@@ -179,9 +179,9 @@ export async function snapCoordinates(
 ) {
   const snapTo = tool.values.snapTo.value;
   switch (snapTo) {
-    case "ellipseToDot":
+    case "circleToDot":
       // TODO: radius hardcoded
-      const temp = await getMaximumPointInEllipse(
+      const temp = await getMaximumPointInCircle(
         imageArray,
         coordinates[0],
         10,

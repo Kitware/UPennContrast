@@ -123,15 +123,15 @@ module.exports = {
               __dirname,
               "itk",
               "web-build",
-              "EllipseToDotMax",
-              "EllipseToDotMax.js"
+              "CircleToDotMax",
+              "CircleToDotMax.js"
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "EllipseToDotMax.js"
+              "CircleToDotMax.js"
             )
           },
           {
@@ -139,15 +139,15 @@ module.exports = {
               __dirname,
               "itk",
               "web-build",
-              "EllipseToDotMax",
-              "EllipseToDotMaxWasm.js"
+              "CircleToDotMax",
+              "CircleToDotMaxWasm.js"
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "EllipseToDotMaxWasm.js"
+              "CircleToDotMaxWasm.js"
             )
           },
           {
@@ -155,15 +155,15 @@ module.exports = {
               __dirname,
               "itk",
               "web-build",
-              "EllipseToDotMax",
-              "EllipseToDotMaxWasm.wasm"
+              "CircleToDotMax",
+              "CircleToDotMaxWasm.wasm"
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "EllipseToDotMaxWasm.wasm"
+              "CircleToDotMaxWasm.wasm"
             )
           }
         ]

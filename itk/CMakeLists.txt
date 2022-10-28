@@ -4,4 +4,4 @@ project(UPennFilters)
 
 add_subdirectory(BlobToDotMax)
 add_subdirectory(BlobToBlobThreshold)
-add_subdirectory(EllipseToDotMax)
+add_subdirectory(CircleToDotMax)

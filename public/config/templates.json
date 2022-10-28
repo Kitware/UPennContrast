@@ -43,7 +43,7 @@
         "id": "snapTo",
         "meta": {
           "items": [
-            { "text": "Snap ellipse to dot", "value": "ellipseToDot" },
+            { "text": "Snap circle to dot", "value": "circleToDot" },
             { "text": "Snap blob to dot", "value": "blobToDot" },
             {
               "text": "Snap blob to blob",

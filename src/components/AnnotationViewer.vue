@@ -917,7 +917,7 @@ export default class AnnotationViewer extends Vue {
         break;
       case "snap":
         this.annotationLayer.mode(
-          this.selectedTool.values.snapTo.value === "ellipseToDot"
+          this.selectedTool.values.snapTo.value === "circleToDot"
             ? "point"
             : "polygon"
         );

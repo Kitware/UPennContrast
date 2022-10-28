@@ -39,13 +39,13 @@ int main(int argc, char** argv)
     {
         std::cerr << "Invalid number of arguments. Usage: "
             << argv[0]
-            << " <inputImagePath> <ellipsePath> <outputPath>"
+            << " <inputImagePath> <circlePath> <outputPath>"
             << std::endl;
         return EXIT_FAILURE;
     }
 
     std::string inputPath(argv[1]);
-    std::string ellipsePath(argv[2]);
+    std::string circlePath(argv[2]);
     std::string outputPath(argv[3]);
     // Create an empty output file to avoid errors if returning without an ouput
     std::ofstream emptyOutFile(outputPath);
@@ -55,12 +55,12 @@ int main(int argc, char** argv)
     const auto& size = input->GetLargestPossibleRegion().GetSize();
     const auto& spacing = input->GetSpacing();
 
-    // Read the ellipse file
-    std::vector<float> ellipseVector = ReadVectorFile<float>(ellipsePath);
-    const int xcenter = ellipseVector[0] * spacing[0];
-    const int ycenter = ellipseVector[1] * spacing[1];
-    const int xradius = ellipseVector[2] * spacing[0];
-    const int yradius = ellipseVector[2] * spacing[1];
+    // Read the cricle file
+    std::vector<float> circleVector = ReadVectorFile<float>(circlePath);
+    const int xcenter = circleVector[0] * spacing[0];
+    const int ycenter = circleVector[1] * spacing[1];
+    const int xradius = circleVector[2] * spacing[0];
+    const int yradius = circleVector[2] * spacing[1];
 
     // Configure the ellipse filter
     auto ellipseToImageFilter = EllipseToImageFilterType::New();
