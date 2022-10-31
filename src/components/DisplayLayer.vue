@@ -1,10 +1,17 @@
 <template>
   <v-expansion-panel>
     <v-expansion-panel-header class="displayLayerHeader">
-      <v-icon :color="value.color" left>mdi-circle</v-icon>
-      <span class="header">{{ value.name }}</span>
-      <v-container class="layerToggles">
-        <v-container class="layerToggleWrapper">
+      <v-row dense class="layerHeader">
+        <v-col class="denseCol">
+          <v-icon :color="value.color" left>mdi-circle</v-icon>
+        </v-col>
+        <v-col class="textCol">
+          <div class="header pa-1">{{ value.name }}</div>
+        </v-col>
+        <v-col class="denseCol">
+          <div v-if="index === 0" class="text-caption pb-2">
+            Z max-merge
+          </div>
           <v-switch
             @click.native.stop
             @mousedown.native.stop
@@ -22,9 +29,11 @@
             dense
             hide-details
           />
-          <div class="text-caption">Z max-merge</div>
-        </v-container>
-        <v-container class="layerToggleWrapper">
+        </v-col>
+        <v-col class="denseCol">
+          <div v-if="index === 0" class="text-caption pb-2">
+            Channel on/off
+          </div>
           <v-switch
             @click.native.stop
             @mousedown.native.stop
@@ -35,9 +44,8 @@
             dense
             hide-details
           />
-          <div class="text-caption">Channel on/off</div>
-        </v-container>
-      </v-container>
+        </v-col>
+      </v-row>
     </v-expansion-panel-header>
     <v-expansion-panel-content :class="{ notVisible: !value.visible }">
       <v-text-field
@@ -306,19 +314,16 @@ export default class DisplayLayer extends Vue {
   flex: 0 0 auto;
 }
 
-.layerToggles {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  margin: 0;
-  padding: 0;
+.layerHeader {
+  align-items: flex-end;
 }
 
-.layerToggleWrapper {
-  width: min-content;
-  margin: 0;
-  padding: 0;
-  margin-right: 10pt;
+.denseCol {
+  flex-grow: 0;
+}
+
+.textCol {
+  overflow: hidden;
 }
 
 .buttons {
