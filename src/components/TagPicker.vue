@@ -10,6 +10,7 @@
     small-chips
     dense
     label="Tags"
+    :disabled="disabled"
   >
     <template v-slot:selection="{ attrs, index, item, parent }">
       <v-chip
@@ -28,7 +29,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, VModel } from "vue-property-decorator";
+import { Vue, Component, VModel, Prop } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
 import { IToolConfiguration } from "@/store/model";
@@ -40,6 +41,9 @@ import { IToolConfiguration } from "@/store/model";
 export default class TagPicker extends Vue {
   readonly store = store;
   readonly toolsStore = toolsStore;
+
+  @Prop({ default: false })
+  readonly disabled!: boolean;
 
   @VModel({ type: Array }) tags!: string[];
 

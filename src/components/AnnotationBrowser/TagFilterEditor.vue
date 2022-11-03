@@ -1,7 +1,7 @@
 <template>
   <div v-if="filter">
     <v-container>
-      <v-row>
+      <v-row align-content="start">
         <v-col class="pa-1" v-if="!property">
           <v-checkbox
             dense
@@ -10,17 +10,17 @@
             v-model="enabled"
           ></v-checkbox>
         </v-col>
-        <v-divider></v-divider>
+        <v-col cols="auto" class="pa-1">
+          <tag-picker v-model="tags" :disabled="!enabled"> </tag-picker>
+        </v-col>
         <v-col class="pa-1">
           <v-checkbox
             dense
             hide-details
             label="Exclusive"
             v-model="exclusive"
+            :disabled="!enabled"
           ></v-checkbox>
-        </v-col>
-        <v-col class="pa-1">
-          <tag-picker v-model="tags"> </tag-picker>
         </v-col>
       </v-row>
     </v-container>
