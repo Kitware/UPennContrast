@@ -70,6 +70,16 @@ export class Tools extends VuexModule {
     this.selectedToolId = id;
   }
 
+  get selectedTool(): IToolConfiguration | null {
+    if (!this.selectedToolId) {
+      return null;
+    }
+    const tool = this.tools.find(
+      (tool: IToolConfiguration) => tool.id === this.selectedToolId
+    );
+    return tool || null;
+  }
+
   @Mutation
   setToolTemplateList(templateList: any[]) {
     this.toolTemplateList = templateList;

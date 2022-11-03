@@ -180,15 +180,17 @@ export async function snapCoordinates(
   const snapTo = tool.values.snapTo.value;
   switch (snapTo) {
     case "circleToDot":
-      // TODO: radius hardcoded
-      const temp = await getMaximumPointInCircle(
-        imageArray,
-        coordinates[0],
-        10,
-        geoJSMap
-      );
-      console.log(temp);
-      return [temp];
+      if (typeof tool.values.radius === "number") {
+        return [
+          await getMaximumPointInCircle(
+            imageArray,
+            coordinates[0],
+            tool.values.radius,
+            geoJSMap
+          )
+        ];
+      }
+      return undefined;
     case "blobToDot":
       const point = await getMaximumPointInContour(
         imageArray,

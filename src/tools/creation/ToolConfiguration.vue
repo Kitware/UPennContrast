@@ -149,7 +149,9 @@ export default class ToolConfiguration extends Vue {
           this.toolValues[item.id] = firstValue.value;
         }
       } else if (item.type === "text") {
-        if (item.meta?.type === "number") {
+        if (item.meta?.value) {
+          this.toolValues[item.id] = item.meta?.value;
+        } else if (item.meta?.type === "number") {
           this.toolValues[item.id] = "0.0";
         } else {
           this.toolValues[item.id] = "";

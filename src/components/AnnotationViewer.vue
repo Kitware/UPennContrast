@@ -170,10 +170,6 @@ export default class AnnotationViewer extends Vue {
     return this.store.dataset;
   }
 
-  get selectedToolId() {
-    return this.toolsStore.selectedToolId;
-  }
-
   get workerImage() {
     return this.selectedTool?.values?.image?.image;
   }
@@ -207,13 +203,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   get selectedTool(): IToolConfiguration | null {
-    if (!this.selectedToolId) {
-      return null;
-    }
-    const tool = this.toolsStore.tools.find(
-      (tool: IToolConfiguration) => tool.id === this.selectedToolId
-    );
-    return tool || null;
+    return this.toolsStore.selectedTool;
   }
 
   get hoveredAnnotationId() {
@@ -896,7 +886,87 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.removeAnnotation(geojsAnnotation);
   }
 
+  get selectedToolRadius() {
+    return this.selectedTool?.values?.radius;
+  }
+
+  cursorAnnotation: any = null;
+  lastCursorPosition: { x: number; y: number } = { x: 0, y: 0 };
+
+  @Watch("selectedToolRadius")
+  updateCursorAnnotation(evt?: any) {
+    if (
+      !this.selectedTool ||
+      !this.cursorAnnotation ||
+      !this.selectedToolRadius
+    ) {
+      return false;
+    }
+    const map = this.maps[0].map;
+    const basePositionGCS = evt?.mapgcs ? evt.mapgcs : this.lastCursorPosition;
+    this.lastCursorPosition = basePositionGCS;
+    const basePositionDisplay = map.gcsToDisplay(basePositionGCS);
+    this.cursorAnnotation._coordinates(
+      [
+        {
+          x: basePositionDisplay.x - this.selectedToolRadius,
+          y: basePositionDisplay.y - this.selectedToolRadius
+        },
+        {
+          x: basePositionDisplay.x + this.selectedToolRadius,
+          y: basePositionDisplay.y - this.selectedToolRadius
+        },
+        {
+          x: basePositionDisplay.x + this.selectedToolRadius,
+          y: basePositionDisplay.y + this.selectedToolRadius
+        },
+        {
+          x: basePositionDisplay.x - this.selectedToolRadius,
+          y: basePositionDisplay.y + this.selectedToolRadius
+        }
+      ].map(displayCoordinate => map.displayToGcs(displayCoordinate))
+    );
+    this.cursorAnnotation.draw();
+    return true;
+  }
+
+  addCursorAnnotation() {
+    if (this.cursorAnnotation) {
+      return;
+    }
+    this.cursorAnnotation = geojs.createAnnotation("circle");
+    this.cursorAnnotation.layer(this.annotationLayer);
+    this.annotationLayer.addAnnotation(this.cursorAnnotation);
+    this.annotationLayer.geoOn(
+      geojs.event.mousemove,
+      this.updateCursorAnnotation
+    );
+    this.annotationLayer.geoOn(geojs.event.zoom, this.updateCursorAnnotation);
+    this.cursorAnnotation.style({
+      fill: true,
+      fillColor: "white",
+      fillOpacity: 0.2,
+      strokeWidth: 3,
+      strokeColor: "black"
+    });
+    this.updateCursorAnnotation();
+  }
+
+  removeCursorAnnotation() {
+    if (!this.cursorAnnotation) {
+      return;
+    }
+    this.annotationLayer.removeAnnotation(this.cursorAnnotation);
+    this.annotationLayer.geoOff(
+      geojs.event.mousemove,
+      this.updateCursorAnnotation
+    );
+    this.annotationLayer.geoOff(geojs.event.zoom, this.updateCursorAnnotation);
+    this.cursorAnnotation = null;
+  }
+
   refreshAnnotationMode() {
+    this.removeCursorAnnotation();
     if (this.unrolling) {
       this.annotationLayer.mode(null);
       return;
@@ -916,11 +986,12 @@ export default class AnnotationViewer extends Vue {
         this.annotationLayer.mode(annotation?.shape);
         break;
       case "snap":
-        this.annotationLayer.mode(
-          this.selectedTool.values.snapTo.value === "circleToDot"
-            ? "point"
-            : "polygon"
-        );
+        if (this.selectedTool.values.snapTo.value === "circleToDot") {
+          this.addCursorAnnotation();
+          this.annotationLayer.mode("point");
+        } else {
+          this.annotationLayer.mode("polygon");
+        }
         break;
       case "segmentation":
         // TODO: tool asks for ROI, change layer mode and trigger computation afterwards
@@ -946,7 +1017,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   handleModeChange(evt: any) {
-    if (evt.mode === null) {
+    if (evt.mode === null && this.annotationLayer.mode() !== null) {
       this.refreshAnnotationMode();
     }
   }

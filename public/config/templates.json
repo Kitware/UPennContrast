@@ -43,7 +43,19 @@
         "id": "snapTo",
         "meta": {
           "items": [
-            { "text": "Snap circle to dot", "value": "circleToDot" },
+            { "text": "Snap circle to dot", "value": "circleToDot", "meta": {
+              "interface": [
+                {
+                  "name": "Default Radius",
+                  "type": "text",
+                  "id": "radius",
+                  "meta": {
+                    "value": "25",
+                    "type": "number"
+                  }
+                }
+              ]
+            } },
             { "text": "Snap blob to dot", "value": "blobToDot" },
             {
               "text": "Snap blob to blob",
