@@ -10,10 +10,6 @@
             <v-container>
               <v-row>
                 <v-col>
-                  <v-text-field label="Tool Name" v-model="toolName" dense>
-                  </v-text-field>
-                </v-col>
-                <v-col>
                   <!-- Pick which template should be used for the tool configuration -->
                   <tool-type-selection v-model="selectedItemTemplate">
                   </tool-type-selection>
@@ -42,12 +38,24 @@
           @reset="reset"
           ref="toolConfiguration"
         />
+        <v-card>
+          <v-card-text class="pa-1">
+            <v-container>
+              <v-row>
+                <v-col>
+                  <v-text-field label="Tool Name" v-model="toolName" dense>
+                  </v-text-field>
+                </v-col>
+              </v-row>
+            </v-container>
+          </v-card-text>
+        </v-card>
       </v-card-text>
       <v-card-actions>
         <div class="button-bar">
           <v-spacer></v-spacer>
           <v-btn class="mr-4" color="primary" @click="createTool">
-            ADD TOOL TO THE CURRENT TOOLSET
+            ADD TOOL TO THE CURRENT TOOLSET
           </v-btn>
           <v-btn class="mr-4" color="warning" @click="close">CANCEL</v-btn>
         </div>
@@ -137,6 +145,7 @@ export default class ToolCreation extends Vue {
   reset() {
     this.toolName = "New Tool";
     this.toolDescription = "";
+    this.selectedItemTemplate = null;
 
     if (!this.$refs.toolConfiguration) {
       return;
