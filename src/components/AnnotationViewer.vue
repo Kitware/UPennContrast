@@ -835,11 +835,10 @@ export default class AnnotationViewer extends Vue {
     const mapentry = this.maps[0];
     const coordinates = annotation.coordinates();
     this.annotationLayer.removeAnnotation(annotation);
-    const tool = this.selectedTool;
-    if (!tool) {
+    if (!this.selectedTool) {
       return;
     }
-    const location = tool.values.annotation.coordinateAssignments;
+    const location = this.selectedTool.values.annotation.coordinateAssignments;
     if (!location) {
       logError("Invalid snapping tool, annotation was not configured properly");
       return;
@@ -859,7 +858,7 @@ export default class AnnotationViewer extends Vue {
     const snappedCoordinates = await snapCoordinates(
       coordinates,
       array,
-      tool,
+      this.selectedTool,
       mapentry.map
     );
     if (!snappedCoordinates || !snappedCoordinates.length) {
@@ -869,7 +868,7 @@ export default class AnnotationViewer extends Vue {
     // Create the new annotation
     const newAnnotation: IAnnotation | null = await this.createAnnotationFromTool(
       snappedCoordinates,
-      tool
+      this.selectedTool
     );
     if (!newAnnotation) {
       return;
@@ -898,7 +897,8 @@ export default class AnnotationViewer extends Vue {
     if (
       !this.selectedTool ||
       !this.cursorAnnotation ||
-      !this.selectedToolRadius
+      !this.selectedToolRadius ||
+      !this.maps
     ) {
       return false;
     }
