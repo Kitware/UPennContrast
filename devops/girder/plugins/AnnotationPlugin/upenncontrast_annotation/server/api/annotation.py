@@ -85,7 +85,7 @@ class Annotation(Resource):
 
     @access.user
     @describeRoute(Description("Compute annotations from a worker tool")
-                   .param('datasetId', 'The dataset Id', paramType='path')
+                   .param('datasetId', 'The dataset Id', required=False)
                    .param('body', 'A JSON object containing the worker tool', paramType='body'))
     def compute(self, params):
         datasetId = params.get('datasetId', None)
