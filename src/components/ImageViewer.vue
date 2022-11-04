@@ -679,7 +679,7 @@ export default class ImageViewer extends Vue {
 
   beforeDestroy() {
     if (this.maps) {
-      this.maps.forEach(mapentry => mapentry.exit());
+      this.maps.forEach(mapentry => mapentry.map.exit());
       this.maps = null;
     }
   }

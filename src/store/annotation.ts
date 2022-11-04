@@ -283,6 +283,41 @@ export class Annotations extends VuexModule {
   }
 
   @Action
+  public async tagAnnotationIds({annotationIds, tags}: {annotationIds: string[], tags: string[]}) {
+    sync.setSaving(true);
+    await Promise.all(
+      annotationIds
+        .map(annotationId => this.annotations.findIndex((annotation: IAnnotation) => annotation.id === annotationId))
+        .filter((annotationIndex: number) => annotationIndex !== -1)
+        .map((annotationIndex: number) => {
+          const annotation = this.annotations[annotationIndex];
+          // Add a tag only if it doesn't exist
+          const newTags = tags.reduce(
+            (newTags: string[], tag: string) => {
+              if (!newTags.includes(tag)) {
+                newTags.push(tag)
+              }
+              return newTags;
+            },
+            annotation.tags
+          );
+          const newAnnotation = {...annotation, tags: newTags};
+          this.setAnnotation({
+            annotation: newAnnotation,
+            index: annotationIndex
+          });
+          return this.annotationsAPI.updateAnnotation(newAnnotation);
+        })
+    );
+    sync.setSaving(false);
+  }
+
+  @Action
+  public tagSelectedAnnotations(tags: string[]) {
+    this.tagAnnotationIds({ annotationIds: this.selectedAnnotationIds, tags });
+  }
+
+  @Action
   public deleteInactiveAnnotations() {
     this.deleteAnnotations(this.inactiveAnnotationIds);
   }

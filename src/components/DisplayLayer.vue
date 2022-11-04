@@ -1,18 +1,51 @@
 <template>
   <v-expansion-panel>
     <v-expansion-panel-header class="displayLayerHeader">
-      <v-icon :color="value.color" left>mdi-circle</v-icon>
-      <span class="header">{{ value.name }}</span>
-      <v-switch
-        @click.native.stop
-        @mousedown.native.stop
-        @mouseup.native.stop
-        class="toggleButton"
-        v-model="visible"
-        :title="`Toggle Visibility (Hotkey ${index + 1})`"
-        dense
-        hide-details
-      />
+      <v-row dense class="layerHeader">
+        <v-col class="denseCol">
+          <v-icon :color="value.color" left>mdi-circle</v-icon>
+        </v-col>
+        <v-col class="textCol">
+          <div class="header pa-1">{{ value.name }}</div>
+        </v-col>
+        <v-col class="denseCol">
+          <div v-if="index === 0" class="text-caption pb-2">
+            Z max-merge
+          </div>
+          <v-switch
+            @click.native.stop
+            @mousedown.native.stop
+            @mouseup.native.stop
+            v-mousetrap="[
+              {
+                bind: zMaxMergeBinding(index),
+                handler: () => (isZMaxMerge = !isZMaxMerge)
+              }
+            ]"
+            class="toggleButton"
+            v-model="isZMaxMerge"
+            :title="`Toggle Z Max Merge (Hotkey ${zMaxMergeBinding(index)})`"
+            :displayed="displayZ"
+            dense
+            hide-details
+          />
+        </v-col>
+        <v-col class="denseCol">
+          <div v-if="index === 0" class="text-caption pb-2">
+            Channel on/off
+          </div>
+          <v-switch
+            @click.native.stop
+            @mousedown.native.stop
+            @mouseup.native.stop
+            class="toggleButton"
+            v-model="visible"
+            :title="`Toggle Visibility (Hotkey ${index + 1})`"
+            dense
+            hide-details
+          />
+        </v-col>
+      </v-row>
     </v-expansion-panel-header>
     <v-expansion-panel-content :class="{ notVisible: !value.visible }">
       <v-text-field
@@ -111,8 +144,8 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop, Emit } from "vue-property-decorator";
-import { IDisplayLayer, IContrast } from "../store/model";
+import { Vue, Component, Prop, Emit, Watch } from "vue-property-decorator";
+import { IDisplayLayer, IContrast, IDisplaySlice } from "../store/model";
 import DisplaySlice from "./DisplaySlice.vue";
 import ContrastHistogram from "./ContrastHistogram.vue";
 import store from "../store";
@@ -151,6 +184,43 @@ export default class DisplayLayer extends Vue {
 
   get visible() {
     return this.value.visible;
+  }
+
+  alternativeZSlice: IDisplaySlice =
+    this.value.z.type === "max-merge"
+      ? { type: "current", value: null }
+      : { ...this.value.z };
+
+  zMaxMergeBinding(index: number) {
+    return `shift+${index + 1}`;
+  }
+
+  get isZMaxMerge() {
+    return this.zSlice.type === "max-merge";
+  }
+
+  set isZMaxMerge(value: boolean) {
+    if (this.isZMaxMerge === value) {
+      return;
+    }
+    const newZSlice = value
+      ? {
+          type: "max-merge",
+          value: null
+        }
+      : this.alternativeZSlice;
+    this.changeProp("z", newZSlice);
+  }
+
+  get zSlice() {
+    return this.value.z;
+  }
+
+  @Watch("zSlice")
+  zSliceChanged() {
+    if (!this.isZMaxMerge) {
+      this.alternativeZSlice = { ...this.zSlice };
+    }
   }
 
   set visible(value: boolean) {
@@ -242,6 +312,18 @@ export default class DisplayLayer extends Vue {
 .toggleButton {
   margin: 0;
   flex: 0 0 auto;
+}
+
+.layerHeader {
+  align-items: flex-end;
+}
+
+.denseCol {
+  flex-grow: 0;
+}
+
+.textCol {
+  overflow: hidden;
 }
 
 .buttons {

@@ -98,10 +98,10 @@ export default class AnnotationsAPI {
     return this.client.delete(`upenn_annotation/${id}`);
   }
 
-  async updateAnnotation(annotation: IAnnotation) {
+  updateAnnotation(annotation: IAnnotation) {
     const newAnnotation = { ...annotation };
     delete newAnnotation.id;
-    this.client.put(`upenn_annotation/${annotation.id}`, newAnnotation);
+    return this.client.put(`upenn_annotation/${annotation.id}`, newAnnotation);
   }
 
   toAnnotation = (item: any): IAnnotation => {

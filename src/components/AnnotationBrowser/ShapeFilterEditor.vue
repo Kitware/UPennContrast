@@ -2,7 +2,7 @@
   <div v-if="filter">
     <v-container>
       <v-row>
-        <v-col class="pa-1" v-if="!property">
+        <v-col cols="auto" class="pa-1" v-if="!property">
           <v-checkbox
             dense
             hide-details
@@ -10,7 +10,6 @@
             v-model="enabled"
           ></v-checkbox>
         </v-col>
-        <v-divider></v-divider>
         <v-col v-if="!property" class="py-0">
           <v-select
             dense
@@ -19,6 +18,7 @@
             :items="shapeItems"
             item-text="text"
             item-value="value"
+            :disabled="!enabled"
           ></v-select>
         </v-col>
       </v-row>

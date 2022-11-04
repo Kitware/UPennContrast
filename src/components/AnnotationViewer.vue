@@ -328,12 +328,19 @@ export default class AnnotationViewer extends Vue {
   }
 
   drawTooltips() {
-    const oldFeatures = this.textLayer.features();
+    this.textLayer.features().forEach((feature: any) => {
+      this.textLayer.deleteFeature(feature);
+    });
 
     if (this.showTooltips) {
-      const annotationsToTooltip = this.annotationLayer
+      const displayedAnnotations: IAnnotation[] = this.annotationLayer
         .annotations()
-        .map((annotation: any) => annotation.options("storedAnnotation"))
+        .map((geojsAnnotation: any) => {
+          return this.annotations.find(
+            iAnnotation =>
+              iAnnotation.id === geojsAnnotation.options("girderId")
+          );
+        })
         .filter((annotation: IAnnotation | undefined) => {
           return (
             annotation &&
@@ -358,7 +365,7 @@ export default class AnnotationViewer extends Vue {
       };
       this.textLayer
         .createFeature("text")
-        .data(annotationsToTooltip)
+        .data(displayedAnnotations)
         .position((annotation: IAnnotation) => {
           return simpleCentroid(annotation.coordinates);
         })
@@ -378,7 +385,7 @@ export default class AnnotationViewer extends Vue {
         });
       this.textLayer
         .createFeature("text")
-        .data(annotationsToTooltip)
+        .data(displayedAnnotations)
         .position((annotation: IAnnotation) => {
           return simpleCentroid(annotation.coordinates);
         })
@@ -391,10 +398,6 @@ export default class AnnotationViewer extends Vue {
         });
     }
 
-    // Delete the old feature after displaying the new one to avoid flickering
-    oldFeatures.forEach((feature: any) => {
-      this.textLayer.deleteFeature(feature);
-    });
     this.textLayer.draw();
   }
 
@@ -561,7 +564,6 @@ export default class AnnotationViewer extends Vue {
     }
     const options = {
       girderId: annotation.id,
-      storedAnnotation: annotation,
       isHovered: annotation.id === this.hoveredAnnotationId,
       location: annotation.location,
       channel: annotation.channel,
