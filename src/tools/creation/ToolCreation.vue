@@ -15,18 +15,6 @@
                   </tool-type-selection>
                 </v-col>
               </v-row>
-              <v-row>
-                <v-col>
-                  <v-textarea
-                    label="Tool Description"
-                    v-model="toolDescription"
-                    auto-grow
-                    rows="2"
-                    dense
-                  >
-                  </v-textarea>
-                </v-col>
-              </v-row>
             </v-container>
           </v-card-text>
         </v-card>
@@ -41,10 +29,18 @@
         <v-card>
           <v-card-text class="pa-1">
             <v-container>
+              <v-text-field label="Tool Name" v-model="toolName" dense>
+              </v-text-field>
               <v-row>
                 <v-col>
-                  <v-text-field label="Tool Name" v-model="toolName" dense>
-                  </v-text-field>
+                  <v-textarea
+                    label="Tool Description"
+                    v-model="toolDescription"
+                    auto-grow
+                    rows="2"
+                    dense
+                  >
+                  </v-textarea>
                 </v-col>
               </v-row>
             </v-container>
