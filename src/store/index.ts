@@ -955,7 +955,11 @@ export class Main extends VuexModule {
         }
         return null;
       };
-      if (images !== layer._histogram.images) {
+      if (
+        !layer._histogram.images ||
+        images.length !== layer._histogram.images.length ||
+        images.some((img, idx) => img !== layer._histogram.images[idx])
+      ) {
         layer._histogram.next = images;
         if (layer._histogram.last) {
           nextHistogram();
