@@ -1019,7 +1019,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   handleModeChange(evt: any) {
-    if (evt.mode === null && this.annotationLayer.mode() !== null) {
+    if (evt.mode === null) {
       this.refreshAnnotationMode();
     }
   }
