@@ -43,21 +43,23 @@
         "id": "snapTo",
         "meta": {
           "items": [
-            { "text": "Snap ellipse to dot", "value": "ellipseToDot" },
+            { "text": "Snap circle to dot", "value": "circleToDot", "meta": {
+              "interface": [
+                {
+                  "name": "Default Radius",
+                  "type": "text",
+                  "id": "radius",
+                  "meta": {
+                    "value": "25",
+                    "type": "number"
+                  }
+                }
+              ]
+            } },
             { "text": "Snap blob to dot", "value": "blobToDot" },
             {
               "text": "Snap blob to blob",
-              "value": "blobToBlob",
-              "meta": {
-                "interface": [
-                  {
-                    "name": "Threshold",
-                    "id": "threshold",
-                    "type": "text",
-                    "meta": { "type": "number" }
-                  }
-                ]
-              }
+              "value": "blobToBlob"
             },
             { "text": "Snap freehand line to edge", "value": "edge" }
           ]

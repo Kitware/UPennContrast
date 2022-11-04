@@ -7,8 +7,10 @@ multi_data
 # local env files
 *.local
 
-#
+# Itk build folders
 /itk/web-build
+/itk/out
+/itk/build
 
 # Log files
 npm-debug.log*
@@ -22,6 +24,8 @@ yarn-error.log*
 *.ntvs*
 *.njsproj
 *.sln
+*.vs
+*CMakeSettings.json
 *.sw?
 src/**/*.map
 src/**/*.js

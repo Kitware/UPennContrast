@@ -100,6 +100,14 @@
             :tool="selectedTool"
             v-if="selectedTool && selectedTool.type === 'segmentation'"
           ></annotation-worker-menu>
+          <circle-to-dot-menu
+            :tool="selectedTool"
+            v-if="
+              selectedTool &&
+                selectedTool.type === 'snap' &&
+                selectedTool.values.snapTo.value === 'circleToDot'
+            "
+          />
         </v-list>
         <v-subheader
           v-if="!toolset || !toolset.toolIds || !toolsetTools.length"
@@ -125,6 +133,7 @@ import ToolIcon from "@/tools/ToolIcon.vue";
 import ToolsetPicker from "@/tools/toolsets/ToolsetPicker.vue";
 import ToolCreation from "@/tools/creation/ToolCreation.vue";
 import AnnotationWorkerMenu from "@/components/AnnotationWorkerMenu.vue";
+import CircleToDotMenu from "@/components/CircleToDotMenu.vue";
 
 // Lists tools from a toolset, allows selecting a tool from the list, and adding new tools
 @Component({
@@ -133,6 +142,7 @@ import AnnotationWorkerMenu from "@/components/AnnotationWorkerMenu.vue";
     ToolIcon,
     ToolsetPicker,
     AnnotationWorkerMenu,
+    CircleToDotMenu,
     draggable
   }
 })
@@ -169,13 +179,7 @@ export default class Toolset extends Vue {
   }
 
   get selectedTool(): IToolConfiguration | null {
-    if (!this.selectedToolId) {
-      return null;
-    }
-    const tool = this.toolsStore.tools.find(
-      (tool: IToolConfiguration) => tool.id === this.selectedToolId
-    );
-    return tool || null;
+    return this.toolsStore.selectedTool;
   }
 
   toolCreationDialogOpen: boolean = false;
@@ -251,5 +255,6 @@ export default class Toolset extends Vue {
   width: 100%;
   /* height: 40vh; */
   overflow-y: auto;
+  overflow-x: hidden;
 }
 </style>

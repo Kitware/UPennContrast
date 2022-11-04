@@ -10,13 +10,26 @@ npm install
 
 ## Development environment
 
+Clone the repo and install node modules:
 ```sh
 git clone https://github.com/Kitware/UPennContrast.git
 cd UPennContrast
 npm install
+```
+
+Depending on your operating system, run one of the following to compile C++ to wasm:
+```sh
+npm run build-workers-unix
+npm run build-workers-windows
+```
+
+Start docker images and run the server:
+```sh
 docker-compose up -d
 npm run serve
 ```
+
+To setup an environment for native C++ development for ITK, see `itk/README.md`.
 
 ### Girder Defaults
 
