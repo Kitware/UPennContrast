@@ -43,18 +43,15 @@
                       @input="userToolName = true"
                       dense
                     />
-                    <v-row>
-                      <v-col>
-                        <v-textarea
-                          label="Tool Description"
-                          v-model="toolDescription"
-                          auto-grow
-                          rows="2"
-                          dense
-                        >
-                        </v-textarea>
-                      </v-col>
-                    </v-row>
+                    <v-textarea
+                      v-if="advancedEnable"
+                      label="Tool Description"
+                      v-model="toolDescription"
+                      auto-grow
+                      rows="2"
+                      dense
+                    >
+                    </v-textarea>
                   </v-container>
                 </v-card-text>
               </v-card>
@@ -122,11 +119,6 @@ export default class ToolCreation extends Vue {
 
   createTool() {
     if (this.selectedItemTemplate) {
-      const tool = {
-        type: this.selectedItemTemplate.type,
-        template: this.selectedItemTemplate,
-        values: this.toolValues
-      };
       const name = this.toolName || "Unnamed Tool";
       const description = this.toolDescription || "";
       // Create an empty tool to get the id
