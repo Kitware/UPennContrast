@@ -4,55 +4,63 @@
       <v-card-title>
         Add a new tool
       </v-card-title>
-      <v-card-text class="pa-1">
-        <v-card>
-          <v-card-text class="pa-1">
-            <v-container>
-              <v-row>
-                <v-col>
-                  <!-- Pick which template should be used for the tool configuration -->
-                  <tool-type-selection v-model="selectedItemTemplate">
-                  </tool-type-selection>
-                </v-col>
-              </v-row>
-            </v-container>
-          </v-card-text>
-        </v-card>
-        <!-- Form elements generated from the template -->
-        <tool-configuration
-          :template="selectedItemTemplate"
-          v-model="toolValues"
-          @submit="createTool"
-          @reset="reset"
-          ref="toolConfiguration"
-        />
-        <v-card>
-          <v-card-text class="pa-1">
-            <v-container>
-              <v-text-field
-                label="Tool Name"
-                v-model="toolName"
-                :append-icon="userToolName ? 'mdi-refresh' : ''"
-                @click:append="userToolName = false"
-                @input="userToolName = true"
-                dense
-              >
-              </v-text-field>
-              <v-row>
-                <v-col>
-                  <v-textarea
-                    label="Tool Description"
-                    v-model="toolDescription"
-                    auto-grow
-                    rows="2"
-                    dense
-                  >
-                  </v-textarea>
-                </v-col>
-              </v-row>
-            </v-container>
-          </v-card-text>
-        </v-card>
+      <v-card-text>
+        <v-expansion-panels mandatory v-model="toolCreationStep" class="pa-1">
+          <v-expansion-panel>
+            <!-- Pick which template should be used for the tool configuration -->
+            <v-expansion-panel-header>{{
+              selectedItemTemplate
+                ? selectedItemTemplate.name
+                : "Select a tool template"
+            }}</v-expansion-panel-header>
+            <v-expansion-panel-content>
+              <tool-type-selection v-model="selectedItemTemplate">
+              </tool-type-selection>
+            </v-expansion-panel-content>
+          </v-expansion-panel>
+          <v-expansion-panel :disabled="!selectedItemTemplate">
+            <v-expansion-panel-header
+              >Tool configuration</v-expansion-panel-header
+            >
+            <v-expansion-panel-content>
+              <!-- Form elements generated from the template -->
+              <tool-configuration
+                :template="selectedItemTemplate"
+                v-model="toolValues"
+                @submit="createTool"
+                @reset="reset"
+                ref="toolConfiguration"
+              />
+              <!-- Tool name with autofill -->
+              <v-card>
+                <v-card-text class="pa-1">
+                  <v-container>
+                    <v-text-field
+                      label="Tool Name"
+                      v-model="toolName"
+                      :append-icon="userToolName ? 'mdi-refresh' : ''"
+                      @click:append="userToolName = false"
+                      @input="userToolName = true"
+                      dense
+                    />
+                    <v-row>
+                      <v-col>
+                        <v-textarea
+                          label="Tool Description"
+                          v-model="toolDescription"
+                          auto-grow
+                          rows="2"
+                          dense
+                        >
+                        </v-textarea>
+                      </v-col>
+                    </v-row>
+                  </v-container>
+                </v-card-text>
+              </v-card>
+            </v-expansion-panel-content>
+          </v-expansion-panel>
+        </v-expansion-panels>
       </v-card-text>
       <v-card-actions>
         <div class="button-bar">
@@ -93,6 +101,8 @@ export default class ToolCreation extends Vue {
   readonly store = store;
   readonly toolsStore = toolsStore;
   readonly propertyStore = propertiesStore;
+
+  toolCreationStep: number = 0;
 
   toolValues: any = { ...defaultValues };
 
@@ -147,6 +157,20 @@ export default class ToolCreation extends Vue {
   }
 
   @Watch("selectedItemTemplate")
+  selectTemplate() {
+    if (this.selectedItemTemplate) {
+      this.toolCreationStep = 1;
+    }
+  }
+
+  @Watch("toolCreationStep")
+  stepChanged() {
+    if (this.toolCreationStep === 0) {
+      this.selectedItemTemplate = null;
+    }
+  }
+
+  @Watch("selectedItemTemplate")
   @Watch("toolValues")
   @Watch("userToolName")
   updateAutoToolName() {
@@ -177,6 +201,7 @@ export default class ToolCreation extends Vue {
 
   @Watch("open")
   reset() {
+    this.toolCreationStep = 0;
     this.userToolName = false;
     this.toolName = "New Tool";
     this.toolDescription = "";

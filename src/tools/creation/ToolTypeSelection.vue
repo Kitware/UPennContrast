@@ -1,14 +1,15 @@
 <template>
-  <v-select
-    v-model="content"
-    :items="templates"
-    item-text="name"
-    item-value="type"
-    label="Select a tool type to add"
-    return-object
-    dense
-  >
-  </v-select>
+  <v-list dense>
+    <v-list-item-group v-model="contentType">
+      <v-list-item
+        v-for="template in templates"
+        :key="template.type"
+        :value="template.type"
+      >
+        {{ template.name }}
+      </v-list-item>
+    </v-list-item-group>
+  </v-list>
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
@@ -27,6 +28,14 @@ export default class ToolTypeSelection extends Vue {
   private value: any;
 
   content: any = null;
+
+  get contentType() {
+    return this.content?.type;
+  }
+
+  set contentType(type) {
+    this.content = this.templates.find(template => template.type === type);
+  }
 
   @Watch("content")
   handleChange() {

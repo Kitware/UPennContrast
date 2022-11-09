@@ -5,7 +5,7 @@
         <v-toolbar-title> Annotation Tools </v-toolbar-title>
         <v-spacer></v-spacer>
         <!-- Tool creation -->
-        <v-dialog v-model="toolCreationDialogOpen" width="unset">
+        <v-dialog v-model="toolCreationDialogOpen" width="60%">
           <template v-slot:activator="{ on: dialog }">
             <v-tooltip top>
               <template v-slot:activator="{ on: tooltip }">
