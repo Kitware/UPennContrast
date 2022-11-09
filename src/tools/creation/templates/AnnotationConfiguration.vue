@@ -183,6 +183,7 @@ export default class AnnotationConfiguration extends Vue {
     this.changed();
   }
 
+  @Watch("coordinateAssignments.layer")
   @Watch("coordinateAssignments")
   @Watch("tags")
   changed() {

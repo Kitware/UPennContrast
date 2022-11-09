@@ -88,6 +88,7 @@ export default class TagAndLayerRestriction extends Vue {
   }
 
   @Watch("newTags")
+  @Watch("selectedLayer")
   changed() {
     this.tagSearchInput = "";
     this.$emit("input", { tags: this.newTags, layer: this.selectedLayer });

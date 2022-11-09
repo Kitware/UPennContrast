@@ -29,7 +29,14 @@
         <v-card>
           <v-card-text class="pa-1">
             <v-container>
-              <v-text-field label="Tool Name" v-model="toolName" dense>
+              <v-text-field
+                label="Tool Name"
+                v-model="toolName"
+                :append-icon="userToolName ? 'mdi-refresh' : ''"
+                @click:append="userToolName = false"
+                @input="userToolName = true"
+                dense
+              >
               </v-text-field>
               <v-row>
                 <v-col>
@@ -64,6 +71,7 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
 import propertiesStore from "@/store/properties";
+import { AnnotationNames, AnnotationShape } from "@/store/model";
 
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";
@@ -92,6 +100,7 @@ export default class ToolCreation extends Vue {
   errorMessages: string[] = [];
   successMessages: string[] = [];
 
+  userToolName = false;
   toolName = "New Tool";
   toolDescription = "";
 
@@ -137,8 +146,38 @@ export default class ToolCreation extends Vue {
     }
   }
 
+  @Watch("selectedItemTemplate")
+  @Watch("toolValues")
+  @Watch("userToolName")
+  updateAutoToolName() {
+    if (this.userToolName) {
+      return;
+    }
+    if (this.toolValues?.annotation) {
+      const toolNameStrings: string[] = [];
+      toolNameStrings.push(this.toolValues?.annotation.tags.join(", "));
+      const layerIdx = this.toolValues?.annotation.coordinateAssignments.layer;
+      if (typeof layerIdx === "number") {
+        const layerName = this.store.configuration?.view.layers[layerIdx].name;
+        if (layerName) {
+          toolNameStrings.push(layerName);
+        }
+      }
+      const toolShape: AnnotationShape = this.toolValues?.annotation.shape;
+      toolNameStrings.push(AnnotationNames[toolShape]);
+      this.toolName = toolNameStrings.join(" ");
+      return;
+    }
+    if (this.selectedItemTemplate) {
+      this.toolName = this.selectedItemTemplate.name;
+      return;
+    }
+    this.toolName = "New Tool";
+  }
+
   @Watch("open")
   reset() {
+    this.userToolName = false;
     this.toolName = "New Tool";
     this.toolDescription = "";
     this.selectedItemTemplate = null;
