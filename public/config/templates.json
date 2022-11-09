@@ -25,21 +25,6 @@
     "type": "snap",
     "interface": [
       {
-        "name": "Annotation Configuration",
-        "id": "annotation",
-        "type": "annotation"
-      },
-      {
-        "name": "Connect to Nearest Tag",
-        "id": "connectTo",
-        "type": "restrictTagsAndLayer",
-        "advanced": "true",
-        "meta": {
-          "tagsLabel": "Connect to nearest tags...",
-          "layerLabel": "Restrict to Layer"
-        }
-      },
-      {
         "name": "Snap To",
         "type": "select",
         "id": "snapTo",
@@ -69,6 +54,21 @@
             },
             { "text": "Snap freehand line to edge", "value": "edge" }
           ]
+        }
+      },
+      {
+        "name": "Annotation Configuration",
+        "id": "annotation",
+        "type": "annotation"
+      },
+      {
+        "name": "Connect to Nearest Tag",
+        "id": "connectTo",
+        "type": "restrictTagsAndLayer",
+        "advanced": "true",
+        "meta": {
+          "tagsLabel": "Connect to nearest tags...",
+          "layerLabel": "Restrict to Layer"
         }
       }
     ]
