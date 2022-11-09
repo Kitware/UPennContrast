@@ -79,10 +79,6 @@ export default class TagAndLayerRestriction extends Vue {
   @Prop()
   readonly layerLabel!: string;
 
-  get tagsLabelWithDefault() {
-    return this.tagsLabel || "Restrict to Tags";
-  }
-
   get layerLabelWithDefault() {
     return this.layerLabel || "Restrict to layer";
   }
