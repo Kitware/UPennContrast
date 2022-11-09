@@ -12,10 +12,7 @@
         "name": "Connect to nearest annotation with Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
-        "advanced": "true",
-        "meta": {
-          "layerLabel": "Restrict to Layer"
-        }
+        "advanced": "true"
       }
     ]
   },
@@ -64,10 +61,7 @@
         "name": "Connect to nearest annotation with Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
-        "advanced": "true",
-        "meta": {
-          "layerLabel": "Restrict to Layer"
-        }
+        "advanced": "true"
       }
     ]
   },
@@ -185,10 +179,7 @@
         "name": "Connect to nearest annotation with Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
-        "advanced": "true",
-        "meta": {
-          "layerLabel": "Restrict to Layer"
-        }
+        "advanced": "true"
       }
     ]
   }

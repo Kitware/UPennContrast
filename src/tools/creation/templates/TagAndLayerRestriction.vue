@@ -80,7 +80,7 @@ export default class TagAndLayerRestriction extends Vue {
   readonly layerLabel!: string;
 
   get layerLabelWithDefault() {
-    return this.layerLabel || "Restrict to layer";
+    return this.layerLabel || "Filter by layer";
   }
 
   @Watch("newTags")
