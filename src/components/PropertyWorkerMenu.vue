@@ -39,7 +39,7 @@ import WorkerInterface from "@/components/WorkerInterface.vue";
     WorkerInterface
   }
 })
-export default class annotationWorkerMenu extends Vue {
+export default class propertyWorkerMenu extends Vue {
   readonly store = store;
   readonly annotationsStore = annotationsStore;
   readonly propertyStore = propertiesStore;
