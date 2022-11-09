@@ -4,7 +4,7 @@
     "type": "create",
     "interface": [
       {
-        "name": "",
+        "name": "Annotation Configuration",
         "id": "annotation",
         "type": "annotation"
       },
@@ -12,6 +12,7 @@
         "name": "Connect to Nearest Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
+        "advanced": "true",
         "meta": {
           "tagsLabel": "Connect to nearest tags...",
           "layerLabel": "Restrict to Layer"
@@ -24,7 +25,7 @@
     "type": "snap",
     "interface": [
       {
-        "name": "",
+        "name": "Annotation Configuration",
         "id": "annotation",
         "type": "annotation"
       },
@@ -32,6 +33,7 @@
         "name": "Connect to Nearest Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
+        "advanced": "true",
         "meta": {
           "tagsLabel": "Connect to nearest tags...",
           "layerLabel": "Restrict to Layer"
@@ -174,7 +176,7 @@
         "type": "dockerImage"
       },
       {
-        "name": "",
+        "name": "Annotation Configuration",
         "id": "annotation",
         "type": "annotation",
         "meta": {
@@ -185,6 +187,7 @@
         "name": "Connect to Nearest Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
+        "advanced": "true",
         "meta": {
           "tagsLabel": "Connect to nearest tags...",
           "layerLabel": "Restrict to Layer"

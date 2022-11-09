@@ -1,13 +1,9 @@
 <template>
   <v-form ref="form">
     <v-container>
+      <!-- shape selection -->
       <v-row>
-        <v-col>
-          <!-- tags -->
-          <tag-picker v-model="tags"></tag-picker>
-        </v-col>
         <v-col v-if="!hideShape">
-          <!-- shape selection -->
           <v-select
             label="Shape"
             :items="availableShapes"
@@ -18,14 +14,21 @@
           </v-select>
         </v-col>
       </v-row>
-      <!-- location -->
+      <!-- tags -->
+      <v-row>
+        <v-col>
+          <tag-picker v-model="tags"></tag-picker>
+        </v-col>
+      </v-row>
+      <!-- layer location -->
       <v-row>
         <v-col class="py-0">
           <v-subheader class="pa-0">Layer</v-subheader>
-          <!-- layer -->
           <layer-select v-model="coordinateAssignments.layer"></layer-select>
         </v-col>
-        <!-- Z and Time assignments -->
+      </v-row>
+      <!-- Z and Time assignments -->
+      <v-row v-if="advancedEnable">
         <v-col
           v-for="(coordinate, index) in coordinates"
           :key="index"
@@ -115,6 +118,9 @@ export default class AnnotationConfiguration extends Vue {
 
   @Prop()
   readonly value!: any;
+
+  @Prop()
+  readonly advancedEnable!: boolean;
 
   availableShapes: { value: string; text: string }[] = [
     {

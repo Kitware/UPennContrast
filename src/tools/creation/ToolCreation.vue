@@ -8,11 +8,9 @@
         <v-expansion-panels mandatory v-model="toolCreationStep" class="pa-1">
           <v-expansion-panel>
             <!-- Pick which template should be used for the tool configuration -->
-            <v-expansion-panel-header>{{
-              selectedItemTemplate
-                ? selectedItemTemplate.name
-                : "Select a tool template"
-            }}</v-expansion-panel-header>
+            <v-expansion-panel-header
+              >Select a tool template</v-expansion-panel-header
+            >
             <v-expansion-panel-content>
               <tool-type-selection v-model="selectedItemTemplate">
               </tool-type-selection>
@@ -27,13 +25,15 @@
               <tool-configuration
                 :template="selectedItemTemplate"
                 v-model="toolValues"
+                :advancedEnable="advancedEnable"
                 @submit="createTool"
                 @reset="reset"
                 ref="toolConfiguration"
               />
               <!-- Tool name with autofill -->
               <v-card>
-                <v-card-text class="pa-1">
+                <v-card-title>Tool Name</v-card-title>
+                <v-card-text class="pa-0">
                   <v-container>
                     <v-text-field
                       label="Tool Name"
@@ -63,13 +63,14 @@
         </v-expansion-panels>
       </v-card-text>
       <v-card-actions>
-        <div class="button-bar">
+        <v-container class="button-bar ma-0 pa-0">
+          <v-checkbox v-model="advancedEnable" label="Advanced" />
           <v-spacer></v-spacer>
           <v-btn class="mr-4" color="primary" @click="createTool">
             ADD TOOL TO THE CURRENT TOOLSET
           </v-btn>
           <v-btn class="mr-4" color="warning" @click="close">CANCEL</v-btn>
-        </div>
+        </v-container>
       </v-card-actions>
     </v-card>
   </div>
@@ -113,6 +114,8 @@ export default class ToolCreation extends Vue {
   userToolName = false;
   toolName = "New Tool";
   toolDescription = "";
+
+  advancedEnable = false;
 
   @Prop()
   readonly open: any;

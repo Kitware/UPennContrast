@@ -1,7 +1,7 @@
 <template>
   <v-form v-if="internalTemplate && toolValues">
     <template v-for="(item, index) in internalTemplate">
-      <v-card :key="index" class="my-1">
+      <v-card :key="index" class="my-1" v-if="advancedEnable || !item.advanced">
         <v-card-title v-if="item.name && item.name.length" class="py-1">
           {{ item.name }}
         </v-card-title>
@@ -13,6 +13,7 @@
                 <component
                   :is="typeToComponentName[item.type]"
                   v-bind="item.meta"
+                  :advancedEnable="advancedEnable"
                   v-model="toolValues[item.id]"
                   :ref="item.id"
                   return-object
@@ -62,6 +63,9 @@ export default class ToolConfiguration extends Vue {
 
   @Prop()
   readonly value!: any;
+
+  @Prop()
+  readonly advancedEnable!: boolean;
 
   toolValues: any = null;
 
