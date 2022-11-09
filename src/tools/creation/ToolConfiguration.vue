@@ -129,6 +129,7 @@ export default class ToolConfiguration extends Vue {
     this.valueTemplates = {};
     this.updateInterface();
     this.setDefaultValues();
+    console.log(this.toolValues);
     this.$emit("input", { ...this.toolValues });
   }
 
@@ -139,47 +140,78 @@ export default class ToolConfiguration extends Vue {
 
   setDefaultValues() {
     this.internalTemplate.forEach(item => {
-      if (this.toolValues[item.id]) {
+      if (this.toolValues[item.id] !== undefined) {
         return;
       }
-      if (item.type === "select") {
-        if (item?.meta?.items.length) {
-          const [firstValue] = item.meta.items;
-          this.toolValues[item.id] = { ...firstValue };
-        }
-      } else if (item.type === "radio") {
-        if (item.values?.length) {
-          const [firstValue] = item.values;
-          this.toolValues[item.id] = firstValue.value;
-        }
-      } else if (item.type === "text") {
-        if (item.meta?.value) {
-          this.toolValues[item.id] = item.meta?.value;
-        } else if (item.meta?.type === "number") {
-          this.toolValues[item.id] = "0.0";
-        } else {
-          this.toolValues[item.id] = "";
-        }
-      } else if (this.$refs[item.id]) {
-        if (item.type === "annotation") {
-          const [annotation] = this.$refs[item.id] as [AnnotationConfiguration];
-          if (annotation) {
-            this.toolValues[item.id] = {};
-            annotation.reset();
+      switch (item.type) {
+        case "select":
+          if (item?.meta?.items.length) {
+            const [firstValue] = item.meta.items;
+            this.toolValues[item.id] = { ...firstValue };
           }
-        } else if (item.type === "restrictTagsAndLayer") {
-          const [restrict] = this.$refs[item.id] as [TagAndLayerRestriction];
-          if (restrict) {
-            this.toolValues[item.id] = {};
-            restrict.reset();
+          break;
+
+        case "radio":
+          if (item.values?.length) {
+            const [firstValue] = item.values;
+            this.toolValues[item.id] = firstValue.value;
           }
-        } else if (item.type === "dockerImage") {
-          const [dockerImage] = this.$refs[item.id] as [DockerImage];
-          if (dockerImage) {
-            this.toolValues[item.id] = null;
-            dockerImage.reset();
+          break;
+
+        case "text":
+          if (item.meta?.value) {
+            this.toolValues[item.id] = item.meta?.value;
+          } else if (item.meta?.type === "number") {
+            this.toolValues[item.id] = "0.0";
+          } else {
+            this.toolValues[item.id] = "";
           }
-        }
+          break;
+
+        case "checkbox":
+          if (item.meta?.value) {
+            this.toolValues[item.id] = !!item.meta?.value;
+          } else {
+            this.toolValues[item.id] = false;
+          }
+          break;
+
+        default:
+          if (this.$refs[item.id]) {
+            switch (item.type) {
+              case "annotation":
+                const [annotation] = this.$refs[item.id] as [
+                  AnnotationConfiguration
+                ];
+                if (annotation) {
+                  this.toolValues[item.id] = {};
+                  annotation.reset();
+                }
+                break;
+
+              case "restrictTagsAndLayer":
+                const [restrict] = this.$refs[item.id] as [
+                  TagAndLayerRestriction
+                ];
+                if (restrict) {
+                  this.toolValues[item.id] = {};
+                  restrict.reset();
+                }
+                break;
+
+              case "dockerImage":
+                const [dockerImage] = this.$refs[item.id] as [DockerImage];
+                if (dockerImage) {
+                  this.toolValues[item.id] = null;
+                  dockerImage.reset();
+                }
+                break;
+
+              default:
+                break;
+            }
+          }
+          break;
       }
     });
   }
@@ -187,7 +219,7 @@ export default class ToolConfiguration extends Vue {
   updateInterface() {
     // Go through values to see if additional interface elements need to be added
     Object.entries(this.toolValues).forEach(([key, value]: any[]) => {
-      if (value.meta?.interface) {
+      if (value?.meta?.interface) {
         this.valueTemplates = {
           ...this.valueTemplates,
           [key]: value.meta.interface

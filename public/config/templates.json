@@ -168,6 +168,15 @@
         "type": "dockerImage"
       },
       {
+        "name": "",
+        "id": "jobDateTag",
+        "type": "checkbox",
+        "meta": {
+          "label": "Add job date tag",
+          "value": true
+        }
+      },
+      {
         "name": "Annotation Configuration",
         "id": "annotation",
         "type": "annotation",
