@@ -23,27 +23,6 @@
             :open="toolCreationDialogOpen"
           />
         </v-dialog>
-        <!-- Add tools to the toolset -->
-        <v-dialog v-model="toolPickerDialogOpen" width="unset">
-          <template v-slot:activator="{ on: dialog }">
-            <v-tooltip top>
-              <template v-slot:activator="{ on: tooltip }">
-                <v-btn icon v-on="{ ...tooltip, ...dialog }">
-                  <v-icon rounded medium>{{ "mdi-magnify" }}</v-icon>
-                </v-btn>
-              </template>
-              <span>Add existing tools</span>
-            </v-tooltip>
-          </template>
-          <v-card>
-            <v-card-title>
-              Choose a tool to add to this toolset
-            </v-card-title>
-            <v-card-text>
-              <toolset-picker @done="toolPickerDialogOpen = false" />
-            </v-card-text>
-          </v-card>
-        </v-dialog>
       </v-expansion-panel-header>
       <v-expansion-panel-content>
         <!-- List toolset tools -->
@@ -130,7 +109,6 @@ import {
   IToolConfiguration
 } from "@/store/model";
 import ToolIcon from "@/tools/ToolIcon.vue";
-import ToolsetPicker from "@/tools/toolsets/ToolsetPicker.vue";
 import ToolCreation from "@/tools/creation/ToolCreation.vue";
 import AnnotationWorkerMenu from "@/components/AnnotationWorkerMenu.vue";
 import CircleToDotMenu from "@/components/CircleToDotMenu.vue";
@@ -140,7 +118,6 @@ import CircleToDotMenu from "@/components/CircleToDotMenu.vue";
   components: {
     ToolCreation,
     ToolIcon,
-    ToolsetPicker,
     AnnotationWorkerMenu,
     CircleToDotMenu,
     draggable
