@@ -163,7 +163,7 @@
     "comment": "TODO: ROI selection, auto annotation tags    ",
     "interface": [
       {
-        "name": "Docker image",
+        "name": "Automated annotation engine",
         "id": "image",
         "type": "dockerImage"
       },

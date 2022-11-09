@@ -14,17 +14,17 @@
           </v-select>
         </v-col>
       </v-row>
-      <!-- tags -->
-      <v-row>
-        <v-col>
-          <tag-picker v-model="tags"></tag-picker>
-        </v-col>
-      </v-row>
       <!-- layer location -->
       <v-row>
         <v-col class="py-0">
           <v-subheader class="pa-0">Layer</v-subheader>
           <layer-select v-model="coordinateAssignments.layer"></layer-select>
+        </v-col>
+      </v-row>
+      <!-- tags -->
+      <v-row>
+        <v-col>
+          <tag-picker v-model="tags"></tag-picker>
         </v-col>
       </v-row>
       <!-- Z and Time assignments -->
