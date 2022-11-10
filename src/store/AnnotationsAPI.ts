@@ -224,7 +224,6 @@ export default class AnnotationsAPI {
       const computedTag = image + " job " + dateString;
       tags = [...tags, computedTag];
     }
-    console.log(tags);
     const params = {
       configurationId,
       datasetId,

@@ -129,7 +129,6 @@ export default class ToolConfiguration extends Vue {
     this.valueTemplates = {};
     this.updateInterface();
     this.setDefaultValues();
-    console.log(this.toolValues);
     this.$emit("input", { ...this.toolValues });
   }
 
