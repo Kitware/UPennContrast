@@ -6,7 +6,7 @@
           {{ item.name }}
         </v-card-title>
         <v-card-text class="pa-1">
-          <v-container>
+          <v-container class="pl-6">
             <v-row class="pa-0">
               <v-col :cols="item.type === 'select' ? 6 : 12" class="py-0">
                 <!-- Tool configuration component. Type depends on item type. -->

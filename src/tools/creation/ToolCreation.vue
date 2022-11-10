@@ -32,9 +32,9 @@
               />
               <!-- Tool name with autofill -->
               <v-card>
-                <v-card-title>Tool Name</v-card-title>
+                <v-card-title class="py-1">Tool Name</v-card-title>
                 <v-card-text class="pa-0">
-                  <v-container>
+                  <v-container class="pl-6">
                     <v-text-field
                       label="Tool Name"
                       v-model="toolName"

@@ -1,9 +1,9 @@
 <template>
-  <v-form ref="form">
-    <v-container>
+  <v-form ref="form" class="pb-4">
+    <v-container class="px-0">
       <!-- shape selection -->
-      <v-row>
-        <v-col v-if="!hideShape">
+      <v-row class="my-0" v-if="!hideShape">
+        <v-col class="py-0">
           <v-select
             label="Shape"
             :items="availableShapes"
@@ -15,15 +15,14 @@
         </v-col>
       </v-row>
       <!-- layer location -->
-      <v-row>
+      <v-row class="my-0">
         <v-col class="py-0">
-          <v-subheader class="pa-0">Layer</v-subheader>
-          <layer-select v-model="coordinateAssignments.layer"></layer-select>
+          <layer-select v-model="coordinateAssignments.layer" label="Layer" />
         </v-col>
       </v-row>
       <!-- tags -->
-      <v-row>
-        <v-col>
+      <v-row class="my-0">
+        <v-col class="py-0">
           <tag-picker v-model="tags"></tag-picker>
         </v-col>
       </v-row>
