@@ -5,7 +5,12 @@
         Add a new tool
       </v-card-title>
       <v-card-text>
-        <v-expansion-panels mandatory v-model="toolCreationStep" class="pa-1">
+        <v-expansion-panels
+          accordion
+          mandatory
+          v-model="toolCreationStep"
+          class="pa-1"
+        >
           <v-expansion-panel>
             <!-- Pick which template should be used for the tool configuration -->
             <v-expansion-panel-header
@@ -25,7 +30,6 @@
               <tool-configuration
                 :template="selectedItemTemplate"
                 v-model="toolValues"
-                :advancedEnable="advancedEnable"
                 @submit="createTool"
                 @reset="reset"
                 ref="toolConfiguration"
@@ -43,15 +47,6 @@
                       @input="userToolName = true"
                       dense
                     />
-                    <v-textarea
-                      v-if="advancedEnable"
-                      label="Tool Description"
-                      v-model="toolDescription"
-                      auto-grow
-                      rows="2"
-                      dense
-                    >
-                    </v-textarea>
                   </v-container>
                 </v-card-text>
               </v-card>
@@ -61,7 +56,6 @@
       </v-card-text>
       <v-card-actions>
         <v-container class="button-bar ma-0 pa-0">
-          <v-checkbox v-model="advancedEnable" label="Advanced" />
           <v-spacer></v-spacer>
           <v-btn class="mr-4" color="primary" @click="createTool">
             ADD TOOL TO THE CURRENT TOOLSET
@@ -110,9 +104,6 @@ export default class ToolCreation extends Vue {
 
   userToolName = false;
   toolName = "New Tool";
-  toolDescription = "";
-
-  advancedEnable = false;
 
   @Prop()
   readonly open: any;
@@ -120,9 +111,8 @@ export default class ToolCreation extends Vue {
   createTool() {
     if (this.selectedItemTemplate) {
       const name = this.toolName || "Unnamed Tool";
-      const description = this.toolDescription || "";
       // Create an empty tool to get the id
-      this.toolsStore.createTool({ name, description }).then(tool => {
+      this.toolsStore.createTool({ name, description: "" }).then(tool => {
         if (tool === null) {
           logError("Failed to create a new tool on the server");
           return;
@@ -199,7 +189,6 @@ export default class ToolCreation extends Vue {
     this.toolCreationStep = 0;
     this.userToolName = false;
     this.toolName = "New Tool";
-    this.toolDescription = "";
     this.selectedItemTemplate = null;
 
     if (!this.$refs.toolConfiguration) {

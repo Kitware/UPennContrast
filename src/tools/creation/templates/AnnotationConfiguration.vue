@@ -27,47 +27,62 @@
         </v-col>
       </v-row>
       <!-- Z and Time assignments -->
-      <v-row v-if="advancedEnable">
-        <v-col
-          v-for="(coordinate, index) in coordinates"
-          :key="index"
-          class="py-0"
-        >
-          <v-radio-group
-            @change="changed"
-            :label="coordinate"
-            v-model="coordinateAssignments[coordinate].type"
-            :key="`${index}Radio`"
-            mandatory
-            dense
-          >
-            <v-radio
-              value="layer"
-              label="From Layer"
-              v-if="!isMaxMerge(coordinate, coordinateAssignments.layer)"
-            ></v-radio>
-            <v-radio value="assign">
-              <template v-slot:label>
-                <span>Assign</span>
-                <v-text-field
-                  dense
-                  type="number"
-                  :min="0"
-                  class="pl-4"
-                  v-model="coordinateAssignments[coordinate].value"
-                  @change="changed"
-                  :disabled="coordinateAssignments[coordinate].type === 'layer'"
-                  :style="{ width: 'min-content' }"
-                  :rules="[
-                    val =>
-                      Number.parseInt(val) <
-                      coordinateAssignments[coordinate].max
-                  ]"
-                />
-              </template>
-            </v-radio>
-          </v-radio-group>
-        </v-col>
+      <v-row>
+        <v-expansion-panels>
+          <v-expansion-panel>
+            <v-expansion-panel-header>
+              Z and Time assignments
+            </v-expansion-panel-header>
+            <v-expansion-panel-content>
+              <v-row>
+                <v-col
+                  v-for="(coordinate, index) in coordinates"
+                  :key="index"
+                  class="py-0"
+                >
+                  <v-radio-group
+                    @change="changed"
+                    :label="coordinate"
+                    v-model="coordinateAssignments[coordinate].type"
+                    :key="`${index}Radio`"
+                    mandatory
+                    dense
+                  >
+                    <v-radio
+                      value="layer"
+                      label="From Layer"
+                      v-if="
+                        !isMaxMerge(coordinate, coordinateAssignments.layer)
+                      "
+                    ></v-radio>
+                    <v-radio value="assign">
+                      <template v-slot:label>
+                        <span>Assign</span>
+                        <v-text-field
+                          dense
+                          type="number"
+                          :min="0"
+                          class="pl-4"
+                          v-model="coordinateAssignments[coordinate].value"
+                          @change="changed"
+                          :disabled="
+                            coordinateAssignments[coordinate].type === 'layer'
+                          "
+                          :style="{ width: 'min-content' }"
+                          :rules="[
+                            val =>
+                              Number.parseInt(val) <
+                              coordinateAssignments[coordinate].max
+                          ]"
+                        />
+                      </template>
+                    </v-radio>
+                  </v-radio-group>
+                </v-col>
+              </v-row>
+            </v-expansion-panel-content>
+          </v-expansion-panel>
+        </v-expansion-panels>
       </v-row>
     </v-container>
   </v-form>
@@ -117,9 +132,6 @@ export default class AnnotationConfiguration extends Vue {
 
   @Prop()
   readonly value!: any;
-
-  @Prop()
-  readonly advancedEnable!: boolean;
 
   availableShapes: { value: string; text: string }[] = [
     {

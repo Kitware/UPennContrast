@@ -1,11 +1,11 @@
 <template>
   <v-container>
-    <v-row>
-      <v-col>
+    <v-row class="pa-0">
+      <v-col class="pa-0 pr-2">
         <!-- tags -->
         <tag-picker v-model="newTags"></tag-picker>
       </v-col>
-      <v-col>
+      <v-col class="pa-0 pr-2">
         <!-- layers -->
         <layer-select
           any

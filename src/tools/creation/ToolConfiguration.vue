@@ -1,60 +1,32 @@
 <template>
-  <v-form v-if="internalTemplate && toolValues">
+  <v-expansion-panels
+    flat
+    v-model="panelsIndices"
+    multiple
+    v-if="internalTemplate && toolValues"
+  >
     <template v-for="(item, index) in internalTemplate">
-      <v-card :key="index" class="my-1" v-if="advancedEnable || !item.advanced">
-        <v-card-title v-if="item.name && item.name.length" class="py-1">
-          {{ item.name }}
-        </v-card-title>
-        <v-card-text class="pa-1">
-          <v-container class="pl-6">
-            <v-row class="pa-0">
-              <v-col :cols="item.type === 'select' ? 6 : 12" class="py-0">
-                <!-- Tool configuration component. Type depends on item type. -->
-                <component
-                  :is="typeToComponentName[item.type]"
-                  v-bind="item.meta"
-                  :advancedEnable="advancedEnable"
-                  v-model="toolValues[item.id]"
-                  :ref="item.id"
-                  return-object
-                  @change="changed"
-                  dense
-                  small
-                >
-                  <v-radio
-                    v-for="(value, index) in item.values"
-                    :key="index"
-                    v-bind="value"
-                  >
-                  </v-radio>
-                </component>
-              </v-col>
-            </v-row>
-          </v-container>
-        </v-card-text>
-      </v-card>
+      <tool-configuration-item
+        :key="index"
+        :item="item"
+        @change="changed"
+        v-model="toolValues[item.id]"
+      />
     </template>
-  </v-form>
+  </v-expansion-panels>
 </template>
 
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
-// Manually import those vuetify components that might be used procedurally
-import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
+import ToolConfigurationItem from "@/tools/creation/ToolConfigurationItem.vue";
 import AnnotationConfiguration from "@/tools/creation/templates/AnnotationConfiguration.vue";
 import TagAndLayerRestriction from "@/tools/creation/templates/TagAndLayerRestriction.vue";
 import DockerImage from "@/tools/creation/templates/DockerImage.vue";
 
 @Component({
   components: {
-    AnnotationConfiguration,
-    TagAndLayerRestriction,
-    VSelect,
-    VCheckbox,
-    VTextField,
-    VRadioGroup,
-    DockerImage
+    ToolConfigurationItem
   }
 })
 // Creates a tool configuration interface based on the current selected template.
@@ -64,21 +36,9 @@ export default class ToolConfiguration extends Vue {
   @Prop()
   readonly value!: any;
 
-  @Prop()
-  readonly advancedEnable!: boolean;
-
   toolValues: any = null;
 
-  // Used to determine :is="" value from template interface type
-  typeToComponentName = {
-    select: "v-select",
-    annotation: "annotation-configuration",
-    restrictTagsAndLayer: "tag-and-layer-restriction",
-    checkbox: "v-checkbox",
-    radio: "v-radio-group",
-    text: "v-text-field",
-    dockerImage: "docker-image"
-  };
+  panelsIndices: number[] = [];
 
   // Dynamic interface elements that depend on various values being selected
   valueTemplates: any = {};
@@ -122,6 +82,10 @@ export default class ToolConfiguration extends Vue {
   reset() {
     this.toolValues = { name: "New Tool", description: "" };
     this.initialize();
+    this.panelsIndices = this.internalTemplate.reduce(
+      (indices, item, index) => (item.advanced ? indices : [...indices, index]),
+      []
+    );
     this.changed();
   }
 
@@ -176,6 +140,7 @@ export default class ToolConfiguration extends Vue {
           break;
 
         default:
+          // The $refs are referencing child refs
           if (this.$refs[item.id]) {
             switch (item.type) {
               case "annotation":
