@@ -3,7 +3,7 @@
   <v-expansion-panel class="pa-0 ma-0" :readonly="!item.advanced">
     <v-expansion-panel-header
       v-if="item.name && item.name.length"
-      class="pa-0 ma-0 pl-4 subtitle-1"
+      class="px-4 py-2 ma-0 subtitle-1 item-header"
     >
       {{ item.name }}
       <!-- Remove icon if not advanced -->
@@ -99,5 +99,9 @@ export default class ToolConfigurationItem extends Vue {
 <style lang="scss" scoped>
 .item-content::v-deep .v-expansion-panel-content__wrap {
   padding: 0 !important;
+}
+
+.item-header {
+  min-height: 0;
 }
 </style>

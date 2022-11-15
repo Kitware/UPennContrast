@@ -38,10 +38,10 @@ export default class ToolConfiguration extends Vue {
 
   toolValues: any = null;
 
-  panelsIndices: number[] = [];
-
   // Dynamic interface elements that depend on various values being selected
   valueTemplates: any = {};
+
+  panelsIndices: number[] = this.defaultPanelsIndices;
 
   // All interface elements that should be displayed
   get internalTemplate() {
@@ -53,6 +53,13 @@ export default class ToolConfiguration extends Vue {
           return [...arr, ...interfaceList];
         }, [])
     ];
+  }
+
+  get defaultPanelsIndices() {
+    return this.internalTemplate.reduce(
+      (indices, item, index) => (item.advanced ? indices : [...indices, index]),
+      []
+    );
   }
 
   @Prop()
@@ -81,12 +88,18 @@ export default class ToolConfiguration extends Vue {
 
   reset() {
     this.toolValues = { name: "New Tool", description: "" };
+    this.panelsIndices = this.defaultPanelsIndices;
     this.initialize();
-    this.panelsIndices = this.internalTemplate.reduce(
-      (indices, item, index) => (item.advanced ? indices : [...indices, index]),
-      []
-    );
     this.changed();
+  }
+
+  @Watch("defaultPanelsIndices")
+  panelsIndicesChanged() {
+    this.defaultPanelsIndices.forEach((index: number) => {
+      if (!this.panelsIndices.includes(index)) {
+        this.panelsIndices.push(index);
+      }
+    });
   }
 
   changed() {

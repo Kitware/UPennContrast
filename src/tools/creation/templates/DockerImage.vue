@@ -1,7 +1,7 @@
 <template>
   <v-container>
     <v-row>
-      <v-col>
+      <v-col class="pa-0">
         <docker-image-select v-model="image"></docker-image-select>
       </v-col>
     </v-row>
