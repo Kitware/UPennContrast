@@ -285,8 +285,7 @@ export default class AnnotationViewer extends Vue {
 
       return annotation.coordinates.map((point: IGeoJSPoint) => ({
         x: tileW * tileX + point.x,
-        y: tileH * tileY + point.y,
-        z: point.z
+        y: tileH * tileY + point.y
       }));
     }
     return annotation.coordinates;
@@ -354,6 +353,10 @@ export default class AnnotationViewer extends Vue {
       // One text feature per line as in https://opengeoscience.github.io/geojs/tutorials/text/
       // Centroid is computed once per new line (optimization needed?)
       // TODO: More performance with renderThreshold https://opengeoscience.github.io/geojs/apidocs/geo.textFeature.html#.styleSpec
+      const anyImage = this.store.dataset?.anyImage();
+      if (!anyImage) {
+        return;
+      }
       const baseStyle = {
         fontSize: "12px",
         fontFamily: "sans-serif",
@@ -367,7 +370,7 @@ export default class AnnotationViewer extends Vue {
         .createFeature("text")
         .data(displayedAnnotations)
         .position((annotation: IAnnotation) => {
-          return simpleCentroid(annotation.coordinates);
+          return simpleCentroid(this.unrolledCoordinates(annotation, anyImage));
         })
         .style({
           text: (annotation: IAnnotation) => {
@@ -387,7 +390,7 @@ export default class AnnotationViewer extends Vue {
         .createFeature("text")
         .data(displayedAnnotations)
         .position((annotation: IAnnotation) => {
-          return simpleCentroid(annotation.coordinates);
+          return simpleCentroid(this.unrolledCoordinates(annotation, anyImage));
         })
         .style({
           text: (annotation: IAnnotation) => {

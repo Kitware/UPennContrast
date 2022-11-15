@@ -13,7 +13,7 @@ def pointToPointDistance(coord1, coord2):
         Number: Squared distance between point1 and point2
     """
     return math.sqrt(
-      math.pow(coord1["x"] - coord2["x"], 2) + math.pow(coord1["y"] - coord2["y"], 2) + math.pow(coord1["z"] - coord2["z"], 2)
+      math.pow(coord1["x"] - coord2["x"], 2) + math.pow(coord1["y"] - coord2["y"], 2)
     )
   
 
@@ -31,12 +31,10 @@ def simpleCentroid(listCoordinates):
     nbCoordinates = len(listCoordinates)
     x = np.sum([coord["x"] for coord in listCoordinates]) / nbCoordinates
     y = np.sum([coord["y"] for coord in listCoordinates]) / nbCoordinates
-    z = np.sum([coord["z"] for coord in listCoordinates]) / nbCoordinates
 
     return {
       "x": x,
-      "y": y,
-      "z": z
+      "y": y
     }
 
 def isAPoint(annotation):

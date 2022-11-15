@@ -373,18 +373,15 @@ class TestConnectToNearest:
         triangleCoordinates = [
             {
                 "x": 6,
-                "y": 2,
-                "z": 0,
+                "y": 2
             },
             {
                 "x": 5,
-                "y": -9,
-                "z": 0,
+                "y": -9
             },
             {
                 "x": 2,
-                "y": -7,
-                "z": 0,
+                "y": -7
             },
         ]
         centroid = simpleCentroid(triangleCoordinates)
@@ -395,14 +392,12 @@ class TestConnectToNearest:
         # TODO: Improve test
         coordPoint1 = {
             "x": 0,
-            "y": 0,
-            "z": 0
+            "y": 0
         }
         
         coordPoint2 = {
             "x": 2,
-            "y": 0,
-            "z": 0
+            "y": 0
         }
         
         assert pointToPointDistance(coordPoint1, coordPoint2) == 2
