@@ -1,5 +1,5 @@
 <template>
-  <v-form ref="form" class="pb-4">
+  <v-form ref="form" class="pa-0">
     <v-container class="px-0">
       <!-- shape selection -->
       <v-row class="my-0" v-if="!hideShape">
@@ -28,7 +28,7 @@
       </v-row>
       <!-- Z and Time assignments -->
       <v-row>
-        <v-expansion-panels>
+        <v-expansion-panels flat>
           <v-expansion-panel>
             <v-expansion-panel-header>
               Z and Time assignments

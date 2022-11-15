@@ -3,23 +3,23 @@
   <v-expansion-panel class="pa-0 ma-0" :readonly="!item.advanced">
     <v-expansion-panel-header
       v-if="item.name && item.name.length"
-      class="pa-0 ma-0"
+      class="pa-0 ma-0 pl-4 subtitle-1"
     >
-      <v-card-title class="py-1 ma-0">{{ item.name }}</v-card-title>
+      {{ item.name }}
       <!-- Remove icon if not advanced -->
       <template v-if="!item.advanced" v-slot:actions>
         <v-icon />
       </template>
     </v-expansion-panel-header>
-    <v-expansion-panel-content class="pa-2 ma-0">
+    <v-expansion-panel-content class="pa-2 ma-0 item-content">
       <v-container class="pa-2 pl-6">
         <v-row>
           <v-col :cols="item.type === 'select' ? 6 : 12" class="py-0">
             <!-- Tool configuration component. Type depends on item type. -->
             <component
-              :is="innerComponentName[item.type]"
+              :is="typeToComponentName[item.type]"
               v-bind="item.meta"
-              :value="value"
+              v-model="componentValue"
               :ref="item.id"
               return-object
               @change="changed"
@@ -71,8 +71,16 @@ export default class ToolConfigurationItem extends Vue {
   @Prop()
   readonly value!: any;
 
+  get componentValue() {
+    return this.value;
+  }
+
+  set componentValue(newValue) {
+    this.$emit("input", newValue);
+  }
+
   // Used to determine :is="" value from template interface type
-  innerComponentName: any = {
+  typeToComponentName: any = {
     select: "v-select",
     annotation: "annotation-configuration",
     restrictTagsAndLayer: "tag-and-layer-restriction",
@@ -82,28 +90,14 @@ export default class ToolConfigurationItem extends Vue {
     dockerImage: "docker-image"
   };
 
-  cardComponentNames = {
-    body: "div",
-    main: "v-card",
-    header: "div",
-    content: "v-card-text"
-  };
-
-  expansionPanelComponentNames = {
-    body: "v-expansion-panels",
-    main: "v-expansion-panel",
-    header: "v-expansion-panel-header",
-    content: "v-expansion-panel-content"
-  };
-
-  get wrapperComponentNames() {
-    return this.item.advanced
-      ? this.expansionPanelComponentNames
-      : this.cardComponentNames;
-  }
-
   changed() {
     this.$emit("change");
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.item-content::v-deep .v-expansion-panel-content__wrap {
+  padding: 0 !important;
+}
+</style>

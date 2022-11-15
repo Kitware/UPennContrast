@@ -13,20 +13,20 @@
         >
           <v-expansion-panel>
             <!-- Pick which template should be used for the tool configuration -->
-            <v-expansion-panel-header
-              >Select a tool template</v-expansion-panel-header
-            >
+            <v-expansion-panel-header class="pa-0 ma-0 pl-4 title">
+              Select a tool template
+            </v-expansion-panel-header>
             <v-expansion-panel-content>
               <tool-type-selection v-model="selectedItemTemplate">
               </tool-type-selection>
             </v-expansion-panel-content>
           </v-expansion-panel>
           <v-expansion-panel :disabled="!selectedItemTemplate">
-            <v-expansion-panel-header
-              >Tool configuration</v-expansion-panel-header
-            >
+            <!-- Form elements generated from the template -->
+            <v-expansion-panel-header class="pa-0 ma-0 pl-4 title">
+              Tool configuration
+            </v-expansion-panel-header>
             <v-expansion-panel-content>
-              <!-- Form elements generated from the template -->
               <tool-configuration
                 :template="selectedItemTemplate"
                 v-model="toolValues"
@@ -35,20 +35,19 @@
                 ref="toolConfiguration"
               />
               <!-- Tool name with autofill -->
-              <v-card>
-                <v-card-title class="py-1">Tool Name</v-card-title>
-                <v-card-text class="pa-0">
-                  <v-container class="pl-6">
-                    <v-text-field
-                      label="Tool Name"
-                      v-model="toolName"
-                      :append-icon="userToolName ? 'mdi-refresh' : ''"
-                      @click:append="userToolName = false"
-                      @input="userToolName = true"
-                      dense
-                    />
-                  </v-container>
-                </v-card-text>
+              <v-divider />
+              <v-card flat class="pa-4 ma-0">
+                <v-card-title class="pa-0 ma-0">
+                  Tool Name
+                </v-card-title>
+                <v-text-field
+                  v-model="toolName"
+                  :append-icon="userToolName ? 'mdi-refresh' : ''"
+                  @click:append="userToolName = false"
+                  @input="userToolName = true"
+                  dense
+                  class="px-4 py-0 ma-0"
+                />
               </v-card>
             </v-expansion-panel-content>
           </v-expansion-panel>
@@ -57,7 +56,12 @@
       <v-card-actions>
         <v-container class="button-bar ma-0 pa-0">
           <v-spacer></v-spacer>
-          <v-btn class="mr-4" color="primary" @click="createTool">
+          <v-btn
+            class="mr-4"
+            color="primary"
+            @click="createTool"
+            :disabled="!selectedItemTemplate"
+          >
             ADD TOOL TO THE CURRENT TOOLSET
           </v-btn>
           <v-btn class="mr-4" color="warning" @click="close">CANCEL</v-btn>
