@@ -70,7 +70,7 @@ export class Main extends VuexModule {
   annotationSelectionType: AnnotationSelectionTypes =
     AnnotationSelectionTypes.TOGGLE;
 
-  showTooltips: boolean = true;
+  showTooltips: boolean = false;
   filteredAnnotationTooltips: boolean = false;
 
   restrictAnnotationsToFilters: boolean = true;
