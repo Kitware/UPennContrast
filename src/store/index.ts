@@ -932,34 +932,50 @@ export class Main extends VuexModule {
       );
       if (!layer._histogram) {
         layer._histogram = {
-          promise: Promise.resolve(),
-          last: true,
-          next: null,
-          images: null
+          promise: Promise.resolve(null),
+          lastHistogram: null,
+          lastImages: null,
+          nextImages: null,
+          lock: false
         };
       }
 
       // debounce histogram calls
       let nextHistogram = () => {
-        if (layer._histogram.next) {
-          const images = layer._histogram.next;
-          layer._histogram.last = null;
-          layer._histogram.promise = this.api.getLayerHistogram(images);
-          layer._histogram.next = null;
-          layer._histogram.images = images;
-          layer._histogram.promise.then((value: any) => {
-            layer._histogram.last = value;
-            return null;
+        if (
+          layer._histogram &&
+          !layer._histogram.lock &&
+          layer._histogram.nextImages !== null
+        ) {
+          const histogramObj = layer._histogram;
+          const images = layer._histogram.nextImages;
+          histogramObj.lock = true;
+          histogramObj.promise = this.api.getLayerHistogram(images);
+          histogramObj.promise.then(value => {
+            histogramObj.lastHistogram = value;
           });
-          layer._histogram.promise.finally(nextHistogram);
+          histogramObj.promise.catch(() => {
+            histogramObj.lastHistogram = null;
+          });
+          histogramObj.promise.finally(() => {
+            histogramObj.lastImages = images;
+            histogramObj.nextImages = null;
+            histogramObj.lock = false;
+            nextHistogram();
+          });
         }
         return null;
       };
-      if (images !== layer._histogram.images) {
-        layer._histogram.next = images;
-        if (layer._histogram.last) {
-          nextHistogram();
-        }
+
+      const imagesToId = (images: IImage[] | null) => {
+        return (
+          images?.map(i => `${i.item._id}#${i.frameIndex}`).join(",") || "null"
+        );
+      };
+
+      if (imagesToId(images) !== imagesToId(layer._histogram.lastImages)) {
+        layer._histogram.nextImages = images;
+        nextHistogram();
       }
       return layer._histogram.promise;
     };
