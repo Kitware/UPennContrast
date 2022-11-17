@@ -70,7 +70,7 @@ export class Main extends VuexModule {
   annotationSelectionType: AnnotationSelectionTypes =
     AnnotationSelectionTypes.TOGGLE;
 
-  showTooltips: boolean = true;
+  showTooltips: boolean = false;
   filteredAnnotationTooltips: boolean = false;
 
   restrictAnnotationsToFilters: boolean = true;
@@ -923,13 +923,7 @@ export class Main extends VuexModule {
       if (!this.dataset || !this.configuration) {
         return Promise.resolve(null);
       }
-      const images = getLayerImages(
-        layer,
-        this.dataset,
-        this.time,
-        this.xy,
-        this.z
-      );
+
       if (!layer._histogram) {
         layer._histogram = {
           promise: Promise.resolve(null),
@@ -967,11 +961,21 @@ export class Main extends VuexModule {
         return null;
       };
 
-      const imagesToId = (images: IImage[] | null) =>
-        images?.map(i => `${i.item._id}#${i.frameIndex}`).join(",");
+      const lastImages = layer._histogram.lastImages;
+      const nextImages = getLayerImages(
+        layer,
+        this.dataset,
+        this.time,
+        this.xy,
+        this.z
+      );
 
-      if (imagesToId(images) !== imagesToId(layer._histogram.lastImages)) {
-        layer._histogram.nextImages = images;
+      if (
+        lastImages === null ||
+        nextImages.length !== lastImages.length ||
+        nextImages.some((image, idx) => image !== lastImages[idx])
+      ) {
+        layer._histogram.nextImages = nextImages;
         nextHistogram();
       }
       return layer._histogram.promise;

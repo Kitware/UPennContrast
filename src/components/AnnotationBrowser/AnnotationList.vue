@@ -206,10 +206,6 @@ export default class AnnotationList extends Vue {
         value: "tags"
       },
       {
-        text: "Channel",
-        value: "channel"
-      },
-      {
         text: "Name",
         value: "name"
       },
