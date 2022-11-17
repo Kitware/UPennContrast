@@ -967,11 +967,8 @@ export class Main extends VuexModule {
         return null;
       };
 
-      const imagesToId = (images: IImage[] | null) => {
-        return (
-          images?.map(i => `${i.item._id}#${i.frameIndex}`).join(",") || "null"
-        );
-      };
+      const imagesToId = (images: IImage[] | null) =>
+        images?.map(i => `${i.item._id}#${i.frameIndex}`).join(",") || "null";
 
       if (imagesToId(images) !== imagesToId(layer._histogram.lastImages)) {
         layer._histogram.nextImages = images;
