@@ -923,47 +923,60 @@ export class Main extends VuexModule {
       if (!this.dataset || !this.configuration) {
         return Promise.resolve(null);
       }
-      const images = getLayerImages(
+
+      if (!layer._histogram) {
+        layer._histogram = {
+          promise: Promise.resolve(null),
+          lastHistogram: null,
+          lastImages: null,
+          nextImages: null,
+          lock: false
+        };
+      }
+
+      // debounce histogram calls
+      let nextHistogram = () => {
+        if (
+          layer._histogram &&
+          !layer._histogram.lock &&
+          layer._histogram.nextImages !== null
+        ) {
+          const histogramObj = layer._histogram;
+          const images = layer._histogram.nextImages;
+          histogramObj.lock = true;
+          histogramObj.promise = this.api.getLayerHistogram(images);
+          histogramObj.promise.then(value => {
+            histogramObj.lastHistogram = value;
+          });
+          histogramObj.promise.catch(() => {
+            histogramObj.lastHistogram = null;
+          });
+          histogramObj.promise.finally(() => {
+            histogramObj.lastImages = images;
+            histogramObj.nextImages = null;
+            histogramObj.lock = false;
+            nextHistogram();
+          });
+        }
+        return null;
+      };
+
+      const lastImages = layer._histogram.lastImages;
+      const nextImages = getLayerImages(
         layer,
         this.dataset,
         this.time,
         this.xy,
         this.z
       );
-      if (!layer._histogram) {
-        layer._histogram = {
-          promise: Promise.resolve(),
-          last: true,
-          next: null,
-          images: null
-        };
-      }
 
-      // debounce histogram calls
-      let nextHistogram = () => {
-        if (layer._histogram.next) {
-          const images = layer._histogram.next;
-          layer._histogram.last = null;
-          layer._histogram.promise = this.api.getLayerHistogram(images);
-          layer._histogram.next = null;
-          layer._histogram.images = images;
-          layer._histogram.promise.then((value: any) => {
-            layer._histogram.last = value;
-            return null;
-          });
-          layer._histogram.promise.finally(nextHistogram);
-        }
-        return null;
-      };
       if (
-        !layer._histogram.images ||
-        images.length !== layer._histogram.images.length ||
-        images.some((img, idx) => img !== layer._histogram.images[idx])
+        lastImages === null ||
+        nextImages.length !== lastImages.length ||
+        nextImages.some((image, idx) => image !== lastImages[idx])
       ) {
-        layer._histogram.next = images;
-        if (layer._histogram.last) {
-          nextHistogram();
-        }
+        layer._histogram.nextImages = nextImages;
+        nextHistogram();
       }
       return layer._histogram.promise;
     };

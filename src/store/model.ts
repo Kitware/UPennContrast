@@ -1,4 +1,5 @@
 import { IGirderItem, IGirderFolder } from "@/girder";
+import { ITileHistogram } from "./images";
 
 export interface IDatasetConfigurationMeta {
   id: string;
@@ -150,7 +151,13 @@ export interface IDisplayLayer {
 
   contrast: IContrast;
 
-  _histogram?: any | undefined;
+  _histogram?: {
+    promise: Promise<null | ITileHistogram>;
+    lastHistogram: null | ITileHistogram;
+    lastImages: IImage[] | null;
+    nextImages: IImage[] | null;
+    lock: boolean;
+  };
 }
 
 export interface IGeoJSPoint {
