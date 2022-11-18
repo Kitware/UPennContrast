@@ -130,23 +130,13 @@ export default class AnnotationConfiguration extends Vue {
   @Prop()
   readonly hideShape!: string;
 
+  @Prop({ default: AnnotationShape.Point })
+  readonly defaultShape!: AnnotationShape;
+
   @Prop()
   readonly value!: any;
 
-  availableShapes: { value: string; text: string }[] = [
-    {
-      text: AnnotationNames[AnnotationShape.Point],
-      value: AnnotationShape.Point
-    },
-    {
-      text: AnnotationNames[AnnotationShape.Polygon],
-      value: AnnotationShape.Polygon
-    },
-    {
-      text: AnnotationNames[AnnotationShape.Line],
-      value: AnnotationShape.Line
-    }
-  ];
+  availableShapes = toolsStore.availableShapes;
 
   label: string = "";
   shape: AnnotationShape | null = null;
@@ -187,6 +177,7 @@ export default class AnnotationConfiguration extends Vue {
     }
   }
 
+  @Watch("defaultShape")
   reset() {
     // Set internal values to the current input, or defaults
     this.coordinateAssignments = {
@@ -195,7 +186,7 @@ export default class AnnotationConfiguration extends Vue {
       Time: { type: "layer", value: 1, max: this.maxTime }
     };
     this.tags = [];
-    this.shape = AnnotationShape.Point;
+    this.shape = this.defaultShape || AnnotationShape.Point;
 
     this.changed();
   }

@@ -6,17 +6,18 @@
       </v-card-title>
       <v-card-text>
         <!-- Pick which template should be used for the tool configuration -->
-        <tool-type-selection v-model="selectedItemTemplate" />
+        <tool-type-selection v-model="selectedTool" />
         <!-- Form elements generated from the template -->
         <tool-configuration
-          :template="selectedItemTemplate"
+          :template="selectedTemplate"
+          :defaultValues="selectedDefaultValues"
           v-model="toolValues"
           @submit="createTool"
           @reset="reset"
           ref="toolConfiguration"
         />
         <!-- Tool name with autofill -->
-        <v-card flat class="pa-4 ma-0">
+        <v-card v-if="selectedTemplate" flat class="pa-4 ma-0">
           <v-card-title class="pa-0 ma-0">
             Tool Name
           </v-card-title>
@@ -37,7 +38,7 @@
             class="mr-4"
             color="primary"
             @click="createTool"
-            :disabled="!selectedItemTemplate"
+            :disabled="!selectedTemplate"
           >
             ADD TOOL TO THE CURRENT TOOLSET
           </v-btn>
@@ -77,7 +78,9 @@ export default class ToolCreation extends Vue {
 
   toolValues: any = { ...defaultValues };
 
-  selectedItemTemplate: any = null;
+  selectedTemplate: any = null;
+  selectedDefaultValues: any = null;
+
   errorMessages: string[] = [];
   successMessages: string[] = [];
 
@@ -88,39 +91,49 @@ export default class ToolCreation extends Vue {
   readonly open: any;
 
   createTool() {
-    if (this.selectedItemTemplate) {
-      const name = this.toolName || "Unnamed Tool";
-      // Create an empty tool to get the id
-      this.toolsStore.createTool({ name, description: "" }).then(tool => {
-        if (tool === null) {
-          logError("Failed to create a new tool on the server");
-          return;
-        }
-        tool.template = this.selectedItemTemplate;
-        tool.values = this.toolValues;
-        tool.type = this.selectedItemTemplate.type;
-        if (tool.type === "segmentation") {
-          const { image } = tool.values.image;
-          this.propertyStore.requestWorkerInterface(image);
-        }
+    const name = this.toolName || "Unnamed Tool";
+    // Create an empty tool to get the id
+    this.toolsStore.createTool({ name, description: "" }).then(tool => {
+      if (tool === null) {
+        logError("Failed to create a new tool on the server");
+        return;
+      }
+      tool.template = this.selectedTemplate;
+      tool.values = this.toolValues;
+      tool.type = this.selectedTemplate.type;
+      if (tool.type === "segmentation") {
+        const { image } = tool.values.image;
+        this.propertyStore.requestWorkerInterface(image);
+      }
 
-        // Update this tool with actual values
-        this.toolsStore.updateTool(tool).then(() => {
-          this.store.syncConfiguration();
-        });
-
-        // Add this tool to the current toolset
-        this.toolsStore.addToolIdsToCurrentToolset({ ids: [tool.id] });
-
-        // Save
+      // Update this tool with actual values
+      this.toolsStore.updateTool(tool).then(() => {
         this.store.syncConfiguration();
-
-        this.close();
       });
-    }
+
+      // Add this tool to the current toolset
+      this.toolsStore.addToolIdsToCurrentToolset({ ids: [tool.id] });
+
+      // Save
+      this.store.syncConfiguration();
+
+      this.close();
+    });
   }
 
-  @Watch("selectedItemTemplate")
+  private _selectedTool: any = null;
+
+  set selectedTool(value: any) {
+    this._selectedTool = value;
+    this.selectedTemplate = value.template;
+    this.selectedDefaultValues = value.defaultValues;
+  }
+
+  get selectedTool() {
+    return this.selectedTemplate ? this._selectedTool : null;
+  }
+
+  @Watch("selectedTemplate")
   @Watch("toolValues")
   @Watch("userToolName")
   updateAutoToolName() {
@@ -142,8 +155,8 @@ export default class ToolCreation extends Vue {
       this.toolName = toolNameStrings.join(" ");
       return;
     }
-    if (this.selectedItemTemplate) {
-      this.toolName = this.selectedItemTemplate.name;
+    if (this.selectedTemplate) {
+      this.toolName = this.selectedTemplate.name;
       return;
     }
     this.toolName = "New Tool";
@@ -153,7 +166,8 @@ export default class ToolCreation extends Vue {
   reset() {
     this.userToolName = false;
     this.toolName = "New Tool";
-    this.selectedItemTemplate = null;
+    this.selectedTemplate = null;
+    this.selectedDefaultValues = null;
 
     if (!this.$refs.toolConfiguration) {
       return;

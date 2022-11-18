@@ -65,10 +65,8 @@ export default class ToolConfiguration extends Vue {
   @Prop()
   readonly template!: any;
 
-  @Watch("template")
-  watchTemplate() {
-    this.reset();
-  }
+  @Prop()
+  readonly defaultValues!: any;
 
   mounted() {
     this.reset();
@@ -86,8 +84,12 @@ export default class ToolConfiguration extends Vue {
     this.setDefaultValues();
   }
 
+  @Watch("template")
+  @Watch("defaultValues")
   reset() {
-    this.toolValues = { name: "New Tool", description: "" };
+    this.toolValues = this.defaultValues
+      ? { ...this.defaultValues }
+      : { name: "New Tool", description: "" };
     this.panelsIndices = this.defaultPanelsIndices;
     this.initialize();
     this.changed();

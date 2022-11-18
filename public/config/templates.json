@@ -6,13 +6,14 @@
       {
         "name": "Annotation Configuration",
         "id": "annotation",
-        "type": "annotation"
+        "type": "annotation",
+        "isSubmenu": true
       },
       {
         "name": "Connect to nearest annotation with Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
-        "advanced": "true"
+        "advanced": true
       }
     ]
   },
@@ -24,6 +25,7 @@
         "name": "Snap To",
         "type": "select",
         "id": "snapTo",
+        "isSubmenu": true,
         "meta": {
           "items": [
             {
@@ -31,6 +33,15 @@
               "value": "circleToDot",
               "meta": {
                 "interface": [
+                  {
+                    "name": "Annotation Configuration",
+                    "id": "annotation",
+                    "type": "annotation",
+                    "meta": {
+                      "hideShape": true,
+                      "defaultShape": "point"
+                    }
+                  },
                   {
                     "name": "Default Radius",
                     "type": "text",
@@ -43,25 +54,65 @@
                 ]
               }
             },
-            { "text": "Snap blob to dot", "value": "blobToDot" },
+            {
+              "text": "Snap blob to dot",
+              "value": "blobToDot",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Annotation Configuration",
+                    "id": "annotation",
+                    "type": "annotation",
+                    "meta": {
+                      "hideShape": true,
+                      "defaultShape": "point"
+                    }
+                  }
+                ]
+              }
+            },
             {
               "text": "Snap blob to blob",
-              "value": "blobToBlob"
+              "value": "blobToBlob",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Annotation Configuration",
+                    "id": "annotation",
+                    "type": "annotation",
+                    "meta": {
+                      "hideShape": true,
+                      "defaultShape": "polygon"
+                    }
+                  }
+                ]
+              }
             },
-            { "text": "Snap freehand line to edge", "value": "edge" }
+            {
+              "text": "Snap freehand line to edge",
+              "value": "edge",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Annotation Configuration",
+                    "id": "annotation",
+                    "type": "annotation",
+                    "meta": {
+                      "hideShape": true,
+                      "defaultShape": "line"
+                    }
+                  }
+                ]
+              }
+            }
           ]
         }
-      },
-      {
-        "name": "Annotation Configuration",
-        "id": "annotation",
-        "type": "annotation"
       },
       {
         "name": "Connect to nearest annotation with Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
-        "advanced": "true"
+        "advanced": true
       }
     ]
   },
@@ -73,6 +124,7 @@
         "name": "Selection shape",
         "type": "select",
         "id": "selectionType",
+        "isSubmenu": true,
         "meta": {
           "items": [
             {
@@ -96,6 +148,7 @@
         "name": "Edition Type",
         "type": "select",
         "id": "editionType",
+        "isSubmenu": true,
         "meta": {
           "items": [
             {
@@ -165,7 +218,8 @@
       {
         "name": "Automated annotation engine",
         "id": "image",
-        "type": "dockerImage"
+        "type": "dockerImage",
+        "isSubmenu": true
       },
       {
         "name": "",
@@ -188,7 +242,7 @@
         "name": "Connect to nearest annotation with Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
-        "advanced": "true"
+        "advanced": true
       }
     ]
   }
