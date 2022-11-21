@@ -285,7 +285,8 @@ export default class AnnotationViewer extends Vue {
 
       return annotation.coordinates.map((point: IGeoJSPoint) => ({
         x: tileW * tileX + point.x,
-        y: tileH * tileY + point.y
+        y: tileH * tileY + point.y,
+        z: point.z
       }));
     }
     return annotation.coordinates;

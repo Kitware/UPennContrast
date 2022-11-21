@@ -91,15 +91,27 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
   if (coordinates.length === 1) {
     return coordinates[0];
   }
-  const sums: IGeoJSPoint = { x: 0, y: 0 };
-  coordinates.forEach(({ x, y }) => {
+  const sums = { x: 0, y: 0, z: 0 };
+  const allZ = !coordinates.some(coord => coord.z === undefined);
+  coordinates.forEach(({ x, y, z }) => {
     sums.x += x;
     sums.y += y;
+    if (z !== undefined) {
+      sums.z += z;
+    }
   });
-  return {
-    x: sums.x / coordinates.length,
-    y: sums.y / coordinates.length
-  };
+  if (allZ) {
+    return {
+      x: sums.x / coordinates.length,
+      y: sums.y / coordinates.length,
+      z: sums.z / coordinates.length
+    };
+  } else {
+    return {
+      x: sums.x / coordinates.length,
+      y: sums.y / coordinates.length
+    };
+  }
 }
 
 export function pointDistance(a: IGeoJSPoint, b: IGeoJSPoint) {

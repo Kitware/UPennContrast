@@ -373,34 +373,126 @@ class TestConnectToNearest:
         triangleCoordinates = [
             {
                 "x": 6,
-                "y": 2
+                "y": 2,
+                "z": 0,
             },
             {
                 "x": 5,
-                "y": -9
+                "y": -9,
+                "z": 0,
             },
             {
                 "x": 2,
-                "y": -7
+                "y": -7,
+                "z": 0,
             },
         ]
         centroid = simpleCentroid(triangleCoordinates)
         assert centroid["x"] == 4.333333333333333
         assert centroid["y"] == -4.666666666666667
+        assert centroid["z"] == 0.0
+
+        triangleCoordinates = [
+            {
+                "x": 6,
+                "y": 2,
+            },
+            {
+                "x": 5,
+                "y": -9,
+                "z": 0,
+            },
+            {
+                "x": 2,
+                "y": -7,
+                "z": 0,
+            },
+        ]
+        centroid = simpleCentroid(triangleCoordinates)
+        assert centroid["x"] == 4.333333333333333
+        assert centroid["y"] == -4.666666666666667
+        assert not "z" in centroid
+
+        triangleCoordinates = [
+            {
+                "x": 6,
+                "y": 2,
+                "z": 1,
+            },
+            {
+                "x": 5,
+                "y": -9,
+                "z": 7,
+            },
+            {
+                "x": 2,
+                "y": -7,
+                "z": 4,
+            },
+        ]
+        centroid = simpleCentroid(triangleCoordinates)
+        assert centroid["x"] == 4.333333333333333
+        assert centroid["y"] == -4.666666666666667
+        assert centroid["z"] == 4.0
         
     def testPointToPointDistance(self):
-        # TODO: Improve test
         coordPoint1 = {
             "x": 0,
-            "y": 0
+            "y": 0,
+            "z": 0,
         }
-        
+        coordPoint2 = {
+            "x": 0,
+            "y": 0,
+            "z": 2,
+        }
+        assert pointToPointDistance(coordPoint1, coordPoint2) == 2
+
+        coordPoint1 = {
+            "x": 0,
+            "y": 0,
+        }
+        coordPoint2 = {
+            "x": 4,
+            "y": 0,
+            "z": 10,
+        }
+        assert pointToPointDistance(coordPoint1, coordPoint2) == 4
+
+        coordPoint1 = {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+        }
+        coordPoint2 = {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+        }
+        assert pointToPointDistance(coordPoint1, coordPoint2) == 0
+
+        coordPoint1 = {
+            "x": 3,
+            "y": 0,
+            "z": 5,
+        }
+        coordPoint2 = {
+            "x": 0,
+            "y": -5,
+        }
+        assert abs(pointToPointDistance(coordPoint1, coordPoint2) - math.sqrt(34)) < 0.000000000000001
+
+        coordPoint1 = {
+            "x": 1,
+            "y": 4,
+            "z": -6,
+        }
         coordPoint2 = {
             "x": 2,
-            "y": 0
+            "y": 10,
+            "z": -10,
         }
-        
-        assert pointToPointDistance(coordPoint1, coordPoint2) == 2
+        assert abs(pointToPointDistance(coordPoint1, coordPoint2) - math.sqrt(53)) < 0.000000000000001
        
     def testAnnotationToAnnotationDistance(self):
         distance = annotationToAnnotationDistance(self.pointAnnotations[0], self.pointAnnotations[1])

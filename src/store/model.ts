@@ -156,6 +156,7 @@ export interface IDisplayLayer {
 export interface IGeoJSPoint {
   x: number;
   y: number;
+  z?: number; // Optional z coordinate
 }
 
 export interface IWorkerInterface {
