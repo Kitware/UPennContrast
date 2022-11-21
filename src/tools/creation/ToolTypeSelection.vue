@@ -1,7 +1,7 @@
 <template>
   <v-container>
     <v-menu
-      offset-y
+      offset-x
       v-model="isMainMenuVisible"
       :close-on-content-click="false"
     >
@@ -12,15 +12,17 @@
           v-bind="attrs"
           v-on="on"
           :value="selectionLabel"
+          style="width: 60%; min-width: fit-content;"
         />
       </template>
-      <v-list dense class="floating-list pa-0 overflow-y-auto">
+      <v-list class="floating-list pa-2 overflow-y-auto" style="min-width: 0;">
         <div
           v-for="(template, templateIdx) in templates"
           :key="template.type"
-          class="px-4 py-2"
+          class="px-4 py-0"
+          style="min-width: auto;"
         >
-          <div class="pa-2 d-flex">
+          <div class="pa-2 d-flex subtitle-2">
             <div>
               {{ template.name }}
             </div>
@@ -37,7 +39,8 @@
             v-for="item in submenus[templateIdx].items"
             :key="item.key"
             @click="() => selectSubmenuItem(submenus[templateIdx], item)"
-            class="pa-0 pl-8"
+            class="pa-1 pl-8 body-2"
+            style="min-height: auto"
           >
             {{ item.text }}
           </v-list-item>
@@ -226,8 +229,6 @@ export default class ToolTypeSelection extends Vue {
 .floating-list {
   display: flex;
   flex-direction: column;
-  flex-shrink: 1;
   max-height: 90vh;
-  min-width: 0;
 }
 </style>
