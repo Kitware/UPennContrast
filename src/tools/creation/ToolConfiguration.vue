@@ -1,19 +1,40 @@
 <template>
-  <v-expansion-panels
-    flat
-    v-model="panelsIndices"
-    multiple
-    v-if="internalTemplate && toolValues"
-  >
-    <template v-for="(item, index) in internalTemplate">
-      <tool-configuration-item
-        :key="index"
-        :item="item"
-        @change="changed"
-        v-model="toolValues[item.id]"
-      />
-    </template>
-  </v-expansion-panels>
+  <div v-if="toolValues">
+    <v-container v-if="basicInternalTemplate.length > 0">
+      <template v-for="(item, index) in basicInternalTemplate">
+        <tool-configuration-item
+          :key="index"
+          :item="item"
+          :advanced="false"
+          @change="changed"
+          v-model="toolValues[item.id]"
+        />
+      </template>
+    </v-container>
+    <v-expansion-panels
+      v-if="advancedInternalTemplate.length > 0"
+      v-model="advancedPanel"
+    >
+      <v-expansion-panel>
+        <v-expansion-panel-header class="title">
+          Advanced options
+        </v-expansion-panel-header>
+        <v-expansion-panel-content eager>
+          <v-container>
+            <template v-for="(item, index) in advancedInternalTemplate">
+              <tool-configuration-item
+                :key="index"
+                :item="item"
+                :advanced="true"
+                @change="changed"
+                v-model="toolValues[item.id]"
+              />
+            </template>
+          </v-container>
+        </v-expansion-panel-content>
+      </v-expansion-panel>
+    </v-expansion-panels>
+  </div>
 </template>
 
 <script lang="ts">
@@ -36,12 +57,12 @@ export default class ToolConfiguration extends Vue {
   @Prop()
   readonly value!: any;
 
+  advancedPanel: any;
+
   toolValues: any = null;
 
   // Dynamic interface elements that depend on various values being selected
   valueTemplates: any = {};
-
-  panelsIndices: number[] = this.defaultPanelsIndices;
 
   // All interface elements that should be displayed
   get internalTemplate() {
@@ -55,10 +76,15 @@ export default class ToolConfiguration extends Vue {
     ];
   }
 
-  get defaultPanelsIndices() {
-    return this.internalTemplate.reduce(
-      (indices, item, index) => (item.advanced ? indices : [...indices, index]),
-      []
+  get advancedInternalTemplate() {
+    return this.internalTemplate.filter(
+      item => item.advanced || item.type === "annotation"
+    );
+  }
+
+  get basicInternalTemplate() {
+    return this.internalTemplate.filter(
+      item => !item.advanced || item.type === "annotation"
     );
   }
 
@@ -74,8 +100,6 @@ export default class ToolConfiguration extends Vue {
 
   initialize() {
     this.valueTemplates = {};
-    // Remove values from outdated template
-    this.clearUnusedValues();
     // Add default values
     this.setDefaultValues();
     // Add interface elements from current values
@@ -87,21 +111,12 @@ export default class ToolConfiguration extends Vue {
   @Watch("template")
   @Watch("defaultValues")
   reset() {
+    this.advancedPanel = undefined;
     this.toolValues = this.defaultValues
       ? { ...this.defaultValues }
       : { name: "New Tool", description: "" };
-    this.panelsIndices = this.defaultPanelsIndices;
     this.initialize();
     this.changed();
-  }
-
-  @Watch("defaultPanelsIndices")
-  panelsIndicesChanged() {
-    this.defaultPanelsIndices.forEach((index: number) => {
-      if (!this.panelsIndices.includes(index)) {
-        this.panelsIndices.push(index);
-      }
-    });
   }
 
   changed() {
@@ -203,18 +218,6 @@ export default class ToolConfiguration extends Vue {
           ...this.valueTemplates,
           [key]: value.meta.interface
         };
-      }
-    });
-  }
-
-  clearUnusedValues() {
-    // Clear values we can't find the interface for
-    Object.keys(this.toolValues).forEach((key: string) => {
-      if (
-        !this.internalTemplate.find(template => template.id === key) &&
-        !["name", "description"].includes(key)
-      ) {
-        delete this.toolValues[key];
       }
     });
   }

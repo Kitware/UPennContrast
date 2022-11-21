@@ -1,23 +1,16 @@
 <template>
-  <!-- Read only if not advanced because always open -->
-  <v-expansion-panel class="pa-0 ma-0" :readonly="!item.advanced">
-    <v-expansion-panel-header
-      v-if="item.name && item.name.length"
-      class="px-4 py-2 ma-0 subtitle-1 item-header"
-    >
+  <v-card flat class="pa-0 ma-0">
+    <v-card-title v-if="item.name && item.name.length" class="px-4 py-2 ma-0">
       {{ item.name }}
-      <!-- Remove icon if not advanced -->
-      <template v-if="!item.advanced" v-slot:actions>
-        <v-icon />
-      </template>
-    </v-expansion-panel-header>
-    <v-expansion-panel-content class="pa-2 ma-0 item-content">
+    </v-card-title>
+    <v-card-text class="pa-2 ma-0">
       <v-container class="pa-2 pl-6">
         <v-row>
           <v-col :cols="item.type === 'select' ? 6 : 12" class="py-0">
             <!-- Tool configuration component. Type depends on item type. -->
             <component
               :is="typeToComponentName[item.type]"
+              :advanced="advanced"
               v-bind="item.meta"
               v-model="componentValue"
               :ref="item.id"
@@ -36,8 +29,8 @@
           </v-col>
         </v-row>
       </v-container>
-    </v-expansion-panel-content>
-  </v-expansion-panel>
+    </v-card-text>
+  </v-card>
 </template>
 
 <script lang="ts">
@@ -71,6 +64,9 @@ export default class ToolConfigurationItem extends Vue {
   @Prop()
   readonly value!: any;
 
+  @Prop()
+  readonly advanced!: boolean;
+
   get componentValue() {
     return this.value;
   }
@@ -95,13 +91,3 @@ export default class ToolConfigurationItem extends Vue {
   }
 }
 </script>
-
-<style lang="scss" scoped>
-.item-content::v-deep .v-expansion-panel-content__wrap {
-  padding: 0 !important;
-}
-
-.item-header {
-  min-height: 0;
-}
-</style>

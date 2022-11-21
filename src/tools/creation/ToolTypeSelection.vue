@@ -1,10 +1,9 @@
 <template>
   <v-container>
     <v-menu
-      offset-x
+      offset-y
       v-model="isMainMenuVisible"
       :close-on-content-click="false"
-      :min-width="'min-content'"
     >
       <template v-slot:activator="{ on, attrs }">
         <v-text-field
@@ -21,8 +20,18 @@
           :key="template.type"
           class="px-4 py-2"
         >
-          <div class="pa-2">
-            {{ template.name }}
+          <div class="pa-2 d-flex">
+            <div>
+              {{ template.name }}
+            </div>
+            <v-icon
+              class="ma-0 ml-4 px-1 py-0"
+              v-if="template.type === 'segmentation'"
+              small
+              @click="refreshWorkers"
+            >
+              mdi-refresh
+            </v-icon>
           </div>
           <v-list-item
             v-for="item in submenus[templateIdx].items"
@@ -175,6 +184,10 @@ export default class ToolTypeSelection extends Vue {
     this.defaultToolValues = defaultToolValues;
   }
 
+  refreshWorkers() {
+    this.propertyStore.fetchWorkerImageList();
+  }
+
   @Watch("computedTemplate")
   @Watch("defaultToolValues")
   handleChange() {
@@ -203,6 +216,7 @@ export default class ToolTypeSelection extends Vue {
       this.computedTemplate = null;
       this.defaultToolValues = { ...defaultValues };
       this.handleChange();
+      this.refreshWorkers();
     }
   }
 }

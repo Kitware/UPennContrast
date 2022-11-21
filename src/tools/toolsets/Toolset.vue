@@ -3,13 +3,16 @@
     <v-expansion-panel expand v-model="panels">
       <v-expansion-panel-header class="pa-4">
         <v-toolbar-title> Annotation Tools </v-toolbar-title>
-        <v-spacer></v-spacer>
         <!-- Tool creation -->
         <v-dialog v-model="toolCreationDialogOpen" width="60%">
           <template v-slot:activator="{ on: dialog }">
             <v-tooltip top>
               <template v-slot:activator="{ on: tooltip }">
-                <v-btn icon v-on="{ ...dialog, ...tooltip }">
+                <v-btn
+                  class="rounded-pill"
+                  icon
+                  v-on="{ ...dialog, ...tooltip }"
+                >
                   <v-icon>
                     {{ "mdi-plus" }}
                   </v-icon>

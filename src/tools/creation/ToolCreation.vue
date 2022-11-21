@@ -17,19 +17,21 @@
           ref="toolConfiguration"
         />
         <!-- Tool name with autofill -->
-        <v-card v-if="selectedTemplate" flat class="pa-4 ma-0">
-          <v-card-title class="pa-0 ma-0">
-            Tool Name
-          </v-card-title>
-          <v-text-field
-            v-model="toolName"
-            :append-icon="userToolName ? 'mdi-refresh' : ''"
-            @click:append="userToolName = false"
-            @input="userToolName = true"
-            dense
-            class="px-4 py-0 ma-0"
-          />
-        </v-card>
+        <v-container>
+          <v-card v-if="selectedTemplate" flat class="pa-4 ma-0">
+            <v-card-title class="pa-0 ma-0">
+              Tool Name
+            </v-card-title>
+            <v-text-field
+              v-model="toolName"
+              :append-icon="userToolName ? 'mdi-refresh' : ''"
+              @click:append="userToolName = false"
+              @input="userToolName = true"
+              dense
+              class="px-4 py-0 ma-0"
+            />
+          </v-card>
+        </v-container>
       </v-card-text>
       <v-card-actions>
         <v-container class="button-bar ma-0 pa-0">
