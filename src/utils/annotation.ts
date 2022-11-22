@@ -92,7 +92,7 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
     return coordinates[0];
   }
   const sums = { x: 0, y: 0, z: 0 };
-  const allZ = !coordinates.some(coord => coord.z === undefined);
+  const hasZ = coordinates.every(coord => coord.z !== undefined);
   coordinates.forEach(({ x, y, z }) => {
     sums.x += x;
     sums.y += y;
@@ -100,7 +100,7 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
       sums.z += z;
     }
   });
-  if (allZ) {
+  if (hasZ) {
     return {
       x: sums.x / coordinates.length,
       y: sums.y / coordinates.length,
