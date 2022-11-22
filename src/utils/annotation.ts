@@ -96,7 +96,8 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
   coordinates.forEach(({ x, y, z }) => {
     sums.x += x;
     sums.y += y;
-    if (z !== undefined) {
+    if (hasZ) {
+      // @ts-ignore
       sums.z += z;
     }
   });
