@@ -92,7 +92,10 @@ export default class ToolTypeSelection extends Vue {
       }[] = [];
       switch (submenuInterface?.type) {
         case "select":
-          items = submenuInterface.meta.items;
+          items = submenuInterface.meta.items.map((item: any) => ({
+            ...item,
+            value: item
+          }));
           break;
         case "annotation":
           items = this.toolStore.availableShapes;
@@ -112,9 +115,9 @@ export default class ToolTypeSelection extends Vue {
         key: string;
         value: any;
         [key: string]: any;
-      }[] = items.map(item => ({
+      }[] = items.map((item, itemIdx) => ({
         ...item,
-        key: template.type + "#" + item.value
+        key: template.type + "#" + itemIdx
       }));
       return {
         template,
@@ -155,7 +158,6 @@ export default class ToolTypeSelection extends Vue {
           ...template,
           interface: [
             ...template.interface.slice(0, submenuInterfaceIdx),
-            ...(item.meta?.interface ? item.meta.interface : []),
             ...template.interface.slice(submenuInterfaceIdx + 1)
           ]
         };
