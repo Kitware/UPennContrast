@@ -13,7 +13,7 @@
               :advanced="advanced"
               v-bind="item.meta"
               v-model="componentValue"
-              :ref="item.id"
+              ref="innerComponent"
               return-object
               @change="changed"
               dense

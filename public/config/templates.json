@@ -2,6 +2,7 @@
   {
     "name": "Manual annotation tool",
     "type": "create",
+    "shortName": "Manual",
     "interface": [
       {
         "name": "Annotation Configuration",
@@ -20,6 +21,7 @@
   {
     "name": "\"Snap to\" manual annotation tools",
     "type": "snap",
+    "shortName": "Snap-to",
     "interface": [
       {
         "name": "Snap To",
@@ -213,6 +215,7 @@
   {
     "name": "Automated annotation tools",
     "type": "segmentation",
+    "shortName": "Automated",
     "comment": "TODO: ROI selection, auto annotation tags    ",
     "interface": [
       {

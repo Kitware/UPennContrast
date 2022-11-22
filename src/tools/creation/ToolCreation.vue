@@ -142,23 +142,36 @@ export default class ToolCreation extends Vue {
     if (this.userToolName) {
       return;
     }
+    const toolNameStrings: string[] = [];
     if (this.toolValues?.annotation) {
-      const toolNameStrings: string[] = [];
-      toolNameStrings.push(this.toolValues?.annotation.tags.join(", "));
-      const layerIdx = this.toolValues?.annotation.coordinateAssignments.layer;
+      toolNameStrings.push(this.toolValues.annotation.tags.join(", "));
+      const layerIdx = this.toolValues.annotation.coordinateAssignments.layer;
       if (typeof layerIdx === "number") {
         const layerName = this.store.configuration?.view.layers[layerIdx].name;
         if (layerName) {
           toolNameStrings.push(layerName);
         }
       }
-      const toolShape: AnnotationShape = this.toolValues?.annotation.shape;
+    }
+    if (this.selectedTemplate?.shortName) {
+      toolNameStrings.push(this.selectedTemplate.shortName);
+    }
+    if (this.toolValues?.annotation) {
+      const toolShape: AnnotationShape = this.toolValues.annotation.shape;
       toolNameStrings.push(AnnotationNames[toolShape]);
+    }
+    if (toolNameStrings.length > 0) {
       this.toolName = toolNameStrings.join(" ");
       return;
     }
+    if (this._selectedTool?.selectedItem?.text) {
+      toolNameStrings.push(this._selectedTool?.selectedItem?.text);
+    }
     if (this.selectedTemplate) {
-      this.toolName = this.selectedTemplate.name;
+      toolNameStrings.push(this.selectedTemplate.name);
+    }
+    if (toolNameStrings.length > 0) {
+      this.toolName = toolNameStrings.join(" ");
       return;
     }
     this.toolName = "New Tool";

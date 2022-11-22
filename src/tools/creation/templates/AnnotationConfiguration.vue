@@ -96,6 +96,9 @@ import { AnnotationNames, AnnotationShape } from "@/store/model";
 
 type VForm = Vue & { validate: () => boolean };
 
+// Properties of AnnotationConfiguration that are emitted as input
+const standardValueKeys = ["tags", "coordinateAssignments", "shape"];
+
 // Interface element for configuring an annotation creation tool
 @Component({
   components: {
@@ -155,6 +158,17 @@ export default class AnnotationConfiguration extends Vue {
     return this.store.dataset?.time.length || 0;
   }
 
+  get standardValue() {
+    if (
+      typeof this.value === "object" &&
+      standardValueKeys.every(key => this.value.hasOwnProperty(key))
+    ) {
+      return this.value;
+    } else {
+      return null;
+    }
+  }
+
   isMaxMerge(axis: string, layerIndex: number) {
     const layer = this.layers[layerIndex];
     if (!layer) {
@@ -181,18 +195,14 @@ export default class AnnotationConfiguration extends Vue {
   @Watch("defaultShape")
   reset() {
     // Set internal values to the current input, or defaults
-    if (this.value) {
-      this.valueChanged();
-    } else {
-      this.coordinateAssignments = {
-        layer: 0,
-        Z: { type: "layer", value: 1, max: this.maxZ },
-        Time: { type: "layer", value: 1, max: this.maxTime }
-      };
-      this.tags = [];
-      this.shape = this.defaultShape;
-      this.changed();
-    }
+    this.coordinateAssignments = {
+      layer: 0,
+      Z: { type: "layer", value: 1, max: this.maxZ },
+      Time: { type: "layer", value: 1, max: this.maxTime }
+    };
+    this.tags = [];
+    this.shape = this.defaultShape;
+    this.changed();
   }
 
   @Watch("coordinateAssignments.layer")
@@ -218,16 +228,21 @@ export default class AnnotationConfiguration extends Vue {
   }
 
   // Synchronise advanced and basic attributes
-  @Watch("value")
-  valueChanged() {
-    if (!this.value) {
+  @Watch("standardValue")
+  standardValueChanged() {
+    if (!this.standardValue) {
       return;
     }
-    ["tags", "coordinateAssignments", "shape"].forEach(key => {
-      if (key in this.value) {
-        (this as any)[key] = this.value[key];
+    let changed = false;
+    standardValueKeys.forEach(key => {
+      if ((this as any)[key] !== this.standardValue[key]) {
+        (this as any)[key] = this.standardValue[key];
+        changed = true;
       }
     });
+    if (changed) {
+      this.changed();
+    }
   }
 }
 </script>

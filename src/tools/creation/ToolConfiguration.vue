@@ -8,6 +8,7 @@
           :advanced="false"
           @change="changed"
           v-model="toolValues[item.id]"
+          :ref="item.id"
         />
       </template>
     </v-container>
@@ -28,6 +29,7 @@
                 :advanced="true"
                 @change="changed"
                 v-model="toolValues[item.id]"
+                :ref="item.id"
               />
             </template>
           </v-container>
@@ -171,33 +173,36 @@ export default class ToolConfiguration extends Vue {
 
         default:
           // The $refs are referencing child refs
-          if (this.$refs[item.id]) {
+          if (Array.isArray(this.$refs[item.id])) {
+            const innerComponents = (this.$refs[item.id] as Vue[]).reduce(
+              (innerComponents, configItem) => [
+                ...innerComponents,
+                configItem.$refs["innerComponent"] as Vue
+              ],
+              [] as Vue[]
+            );
             switch (item.type) {
               case "annotation":
-                const [annotation] = this.$refs[item.id] as [
-                  AnnotationConfiguration
-                ];
-                if (annotation) {
+                const annotations = innerComponents as AnnotationConfiguration[];
+                if (annotations.length) {
                   this.toolValues[item.id] = {};
-                  annotation.reset();
+                  annotations.forEach(annotation => annotation.reset());
                 }
                 break;
 
               case "restrictTagsAndLayer":
-                const [restrict] = this.$refs[item.id] as [
-                  TagAndLayerRestriction
-                ];
-                if (restrict) {
+                const restricts = innerComponents as TagAndLayerRestriction[];
+                if (restricts.length) {
                   this.toolValues[item.id] = {};
-                  restrict.reset();
+                  restricts.forEach(restrict => restrict.reset());
                 }
                 break;
 
               case "dockerImage":
-                const [dockerImage] = this.$refs[item.id] as [DockerImage];
-                if (dockerImage) {
+                const dockerImages = innerComponents as DockerImage[];
+                if (dockerImages.length) {
                   this.toolValues[item.id] = null;
-                  dockerImage.reset();
+                  dockerImages.forEach(dockerImage => dockerImage.reset());
                 }
                 break;
 

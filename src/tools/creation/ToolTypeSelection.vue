@@ -53,7 +53,6 @@ export default class ToolTypeSelection extends Vue {
   defaultToolValues: any = { ...defaultValues };
 
   isMainMenuVisible = false;
-  selectionLabel: string | null = null;
   selectedItem: AugmentedItem | null = null;
 
   // Returns a list of dividers, headers and items
@@ -127,7 +126,6 @@ export default class ToolTypeSelection extends Vue {
     let computedTemplate = template;
     let defaultToolValues: any = { ...defaultValues };
 
-    this.selectionLabel = template.name + " / " + item.text;
     // template references to the store template
     // Shallow copy some parts of it to avoid overwriting
     switch (submenuInterface.type) {
@@ -178,11 +176,9 @@ export default class ToolTypeSelection extends Vue {
   handleChange() {
     this.$emit("input", {
       template: this.computedTemplate,
-      defaultValues: this.defaultToolValues
+      defaultValues: this.defaultToolValues,
+      selectedItem: this.selectedItem
     });
-    if (!this.computedTemplate) {
-      this.selectionLabel = null;
-    }
   }
 
   mounted() {
@@ -203,6 +199,7 @@ export default class ToolTypeSelection extends Vue {
   }
 
   reset() {
+    this.selectedItem = null;
     this.computedTemplate = null;
     this.defaultToolValues = { ...defaultValues };
     this.handleChange();
