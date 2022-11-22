@@ -34,19 +34,16 @@ def simpleCentroid(listCoordinates):
     nbCoordinates = len(listCoordinates)
     x = np.sum([coord["x"] for coord in listCoordinates]) / nbCoordinates
     y = np.sum([coord["y"] for coord in listCoordinates]) / nbCoordinates
+    centroid = {
+      "x": x,
+      "y": y,
+    }
 
     if all(["z" in coord for coord in listCoordinates]):
       z = np.sum([coord["z"] for coord in listCoordinates]) / nbCoordinates
-      return {
-        "x": x,
-        "y": y,
-        "z": z
-      }
-    else:
-      return {
-        "x": x,
-        "y": y
-      }
+      centroid["z"] = z
+
+    return centroid
 
 def isAPoint(annotation):
   return annotation["shape"] == 'point'
