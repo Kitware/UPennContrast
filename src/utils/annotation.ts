@@ -101,18 +101,14 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
       sums.z += z;
     }
   });
+  const centroid: IGeoJSPoint = {
+    x: sums.x / coordinates.length,
+    y: sums.y / coordinates.length
+  };
   if (hasZ) {
-    return {
-      x: sums.x / coordinates.length,
-      y: sums.y / coordinates.length,
-      z: sums.z / coordinates.length
-    };
-  } else {
-    return {
-      x: sums.x / coordinates.length,
-      y: sums.y / coordinates.length
-    };
+    centroid.z = sums.z / coordinates.length;
   }
+  return centroid;
 }
 
 export function pointDistance(a: IGeoJSPoint, b: IGeoJSPoint) {
