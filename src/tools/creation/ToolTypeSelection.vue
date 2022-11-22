@@ -1,52 +1,11 @@
 <template>
   <v-container>
-    <v-menu
-      offset-x
-      v-model="isMainMenuVisible"
-      :close-on-content-click="false"
-    >
-      <template v-slot:activator="{ on, attrs }">
-        <v-text-field
-          readonly
-          label="Tool type"
-          v-bind="attrs"
-          v-on="on"
-          :value="selectionLabel"
-          style="width: 60%; min-width: fit-content;"
-        />
-      </template>
-      <v-list class="floating-list pa-2 overflow-y-auto" style="min-width: 0;">
-        <div
-          v-for="(template, templateIdx) in templates"
-          :key="template.type"
-          class="px-4 py-0"
-          style="min-width: auto;"
-        >
-          <div class="pa-2 d-flex subtitle-2">
-            <div>
-              {{ template.name }}
-            </div>
-            <v-icon
-              class="ma-0 ml-4 px-1 py-0"
-              v-if="template.type === 'segmentation'"
-              small
-              @click="refreshWorkers"
-            >
-              mdi-refresh
-            </v-icon>
-          </div>
-          <v-list-item
-            v-for="item in submenus[templateIdx].items"
-            :key="item.key"
-            @click="() => selectSubmenuItem(submenus[templateIdx], item)"
-            class="pa-1 pl-8 body-2"
-            style="min-height: auto"
-          >
-            {{ item.text }}
-          </v-list-item>
-        </div>
-      </v-list>
-    </v-menu>
+    <v-select
+      return-object
+      label="Tool type"
+      :items="submenuItems"
+      v-model="selectedItem"
+    />
   </v-container>
 </template>
 <script lang="ts">
@@ -59,6 +18,24 @@ const defaultValues = {
   name: "New Tool",
   description: ""
 };
+
+interface Item {
+  text: string;
+  value: any;
+  key: string;
+  [key: string]: any;
+}
+
+interface Submenu {
+  template: any;
+  submenuInterface: any;
+  submenuInterfaceIdx: any;
+  items: Item[];
+}
+
+interface AugmentedItem extends Item {
+  submenu: Submenu;
+}
 
 @Component({
   components: {
@@ -77,19 +54,30 @@ export default class ToolTypeSelection extends Vue {
 
   isMainMenuVisible = false;
   selectionLabel: string | null = null;
+  selectedItem: AugmentedItem | null = null;
 
-  get submenus() {
+  // Returns a list of dividers, headers and items
+  // The items are submenu items augmented with a reference to their submenus
+  get submenuItems() {
+    return this.submenus.reduce(
+      (items, submenu) => [
+        ...items,
+        { divider: true },
+        { header: submenu.template.name },
+        ...submenu.items.map(item => ({ ...item, submenu } as AugmentedItem))
+      ],
+      [] as (AugmentedItem | { divider: boolean } | { header: string })[]
+    );
+  }
+
+  get submenus(): Submenu[] {
     return this.templates.map(template => {
       // For each template, an interface element is used as submenu
       const submenuInterfaceIdx = template.interface.findIndex(
         (elem: any) => elem.isSubmenu
       );
       const submenuInterface = template.interface[submenuInterfaceIdx];
-      let items: {
-        text: string;
-        value: any;
-        [key: string]: any;
-      }[] = [];
+      let items: any[] = [];
       switch (submenuInterface?.type) {
         case "select":
           items = submenuInterface.meta.items.map((item: any) => ({
@@ -110,12 +98,7 @@ export default class ToolTypeSelection extends Vue {
           items.push({ text: "No Submenu", value: "defaultSubmenu" });
           break;
       }
-      const keydItems: {
-        text: string;
-        key: string;
-        value: any;
-        [key: string]: any;
-      }[] = items.map((item, itemIdx) => ({
+      const keydItems: Item[] = items.map((item, itemIdx) => ({
         ...item,
         key: template.type + "#" + itemIdx
       }));
@@ -130,19 +113,16 @@ export default class ToolTypeSelection extends Vue {
 
   // The new template and the default tool values are computed
   // depending on the type of the interface element used as submenu
-  selectSubmenuItem(
-    submenu: typeof this.submenus[0],
-    item?: typeof submenu.items[0]
-  ) {
-    const { template, submenuInterface, submenuInterfaceIdx } = submenu;
-    this.isMainMenuVisible = false;
-
-    if (!item) {
-      this.selectionLabel = template.name;
-      this.computedTemplate = template;
-      this.defaultToolValues = { ...defaultValues };
+  @Watch("selectedItem")
+  selectSubmenuItem() {
+    if (!this.selectedItem) {
+      this.reset();
       return;
     }
+    const submenu = this.selectedItem.submenu;
+    const item = this.selectedItem;
+    const { template, submenuInterface, submenuInterfaceIdx } = submenu;
+    this.isMainMenuVisible = false;
 
     let computedTemplate = template;
     let defaultToolValues: any = { ...defaultValues };
@@ -218,11 +198,15 @@ export default class ToolTypeSelection extends Vue {
   initialize() {
     // Set initial value
     if (!this.value && this.templates.length) {
-      this.computedTemplate = null;
-      this.defaultToolValues = { ...defaultValues };
-      this.handleChange();
-      this.refreshWorkers();
+      this.reset();
     }
+  }
+
+  reset() {
+    this.computedTemplate = null;
+    this.defaultToolValues = { ...defaultValues };
+    this.handleChange();
+    this.refreshWorkers();
   }
 }
 </script>
