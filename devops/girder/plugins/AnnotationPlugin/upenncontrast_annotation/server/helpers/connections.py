@@ -3,7 +3,8 @@ import numpy as np
 
 def pointToPointDistance(coord1, coord2):
     """Get the distance between two points using points coordinates.
-    Points coordinates are represented by {x: x_coord, y: y_coord, z: z_coord}.
+    If both points have z coordinate, get the XYZ distance, else get the XY distance
+    Points coordinates are represented by {x: x_coord, y: y_coord, z?: z_coord}.
 
     Args:
         coord1 (dict): Coordinates of point 1
@@ -12,18 +13,20 @@ def pointToPointDistance(coord1, coord2):
     Returns:
         Number: Squared distance between point1 and point2
     """
-    return math.sqrt(
-      math.pow(coord1["x"] - coord2["x"], 2) + math.pow(coord1["y"] - coord2["y"], 2) + math.pow(coord1["z"] - coord2["z"], 2)
-    )
+    squareDist = math.pow(coord1["x"] - coord2["x"], 2) + math.pow(coord1["y"] - coord2["y"], 2)
+    if ("z" in coord1 and "z" in coord2):
+      squareDist += math.pow(coord1["z"] - coord2["z"], 2)
+    return math.sqrt(squareDist)
   
 
 def simpleCentroid(listCoordinates):
     """Compute the simple centroid of a polygon using its list of coordinates.
     The centroid corresponds to the barycenter of the polygon.
+    Compute centroid for z coordinate iff all points have z
 
     Args:
         listCoordinates (dict[]): List of point coordinates.
-          Point coordinates are represented by {x: x_coord, y: y_coord, z: z_coord}
+          Point coordinates are represented by {x: x_coord, y: y_coord, z?: z_coord}
 
     Returns:
         dict: Coordinates of the centroid
@@ -31,13 +34,16 @@ def simpleCentroid(listCoordinates):
     nbCoordinates = len(listCoordinates)
     x = np.sum([coord["x"] for coord in listCoordinates]) / nbCoordinates
     y = np.sum([coord["y"] for coord in listCoordinates]) / nbCoordinates
-    z = np.sum([coord["z"] for coord in listCoordinates]) / nbCoordinates
-
-    return {
+    centroid = {
       "x": x,
       "y": y,
-      "z": z
     }
+
+    if all(["z" in coord for coord in listCoordinates]):
+      z = np.sum([coord["z"] for coord in listCoordinates]) / nbCoordinates
+      centroid["z"] = z
+
+    return centroid
 
 def isAPoint(annotation):
   return annotation["shape"] == 'point'
