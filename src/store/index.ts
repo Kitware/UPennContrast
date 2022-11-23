@@ -66,7 +66,6 @@ export class Main extends VuexModule {
 
   drawAnnotations: boolean = true;
   filteredDraw: boolean = false;
-  drawActive: boolean = false;
   annotationSelectionType: AnnotationSelectionTypes =
     AnnotationSelectionTypes.TOGGLE;
 
@@ -128,11 +127,6 @@ export class Main extends VuexModule {
   @Mutation
   public setFilteredDraw(value: boolean) {
     this.filteredDraw = value;
-  }
-
-  @Mutation
-  public setDrawActive(value: boolean) {
-    this.drawActive = value;
   }
 
   @Mutation

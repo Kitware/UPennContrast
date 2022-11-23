@@ -32,7 +32,6 @@ import {
   getAnnotationStyleFromLayer,
   unrollIndexFromImages,
   geojsAnnotationFactory,
-  annotationDistance,
   simpleCentroid
 } from "@/utils/annotation";
 
@@ -124,12 +123,6 @@ export default class AnnotationViewer extends Vue {
   }
 
   get annotations() {
-    if (this.store.drawActive) {
-      return this.annotationStore.annotations.filter(
-        (annotation: IAnnotation) =>
-          this.annotationStore.activeAnnotationIds.includes(annotation.id)
-      );
-    }
     return this.store.filteredDraw
       ? this.filteredAnnotations
       : this.annotationStore.annotations;
