@@ -8,7 +8,7 @@ sampleAnnotation = {
     "tags": ["tag"],
     "shape": "point",
     "name": sampleAnnotationName,
-    "channel": 0,
+    "layerId": "Brightfield",
     "location": {
         "XY": 0,
         "Z": 0,

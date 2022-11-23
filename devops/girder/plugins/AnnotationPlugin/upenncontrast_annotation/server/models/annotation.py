@@ -63,12 +63,12 @@ class AnnotationSchema:
             },
             'coordinates': coordsSchema,
             'tags': tagsSchema,
-            'channel': {'type': 'integer'},
+            'layerId': {'type': 'string'},
             'location': locationSchema,
             'shape': shapeSchema,
             'datasetId': {'type': 'string', 'minLength': 1},
         },
-        'required': ['coordinates', 'tags', 'channel', 'location', 'shape', 'datasetId']
+        'required': ['coordinates', 'tags', 'layerId', 'location', 'shape', 'datasetId']
     }
 
 class Annotation(AccessControlledModel):

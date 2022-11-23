@@ -982,6 +982,11 @@ export class Main extends VuexModule {
     };
   }
 
+  get getLayerFromId() {
+    return (layerId: string) =>
+      this.configuration?.view.layers.find(layer => layer.id === layerId);
+  }
+
   @Mutation
   public setSnapshotImpl(value?: string) {
     // check if snapshot is available.  If not, set to undefined

@@ -147,14 +147,14 @@ export class Annotations extends VuexModule {
   public async createAnnotation({
     tags,
     shape,
-    channel,
+    layerId,
     location,
     coordinates,
     datasetId
   }: {
     tags: string[];
     shape: string;
-    channel: number;
+    layerId: string;
     location: { XY: number; Z: number; Time: number };
     coordinates: IGeoJSPoint[];
     datasetId: string;
@@ -163,7 +163,7 @@ export class Annotations extends VuexModule {
     const newAnnotation: IAnnotation | null = await this.annotationsAPI.createAnnotation(
       tags,
       shape,
-      channel,
+      layerId,
       location,
       coordinates,
       datasetId
@@ -373,9 +373,13 @@ export class Annotations extends VuexModule {
       return;
     }
     const datasetId = main.dataset.id;
-    const { location, channel } = await this.getAnnotationLocationFromTool(
+    const { location, layerId } = await this.getAnnotationLocationFromTool(
       tool
     );
+    const channel = main.getLayerFromId(layerId)?.channel;
+    if (channel === undefined) {
+      return;
+    }
     const tile = { XY: main.xy, Z: main.z, Time: main.time };
     this.annotationsAPI
       .computeAnnotationWithWorker(
@@ -416,11 +420,10 @@ export class Annotations extends VuexModule {
     };
     const layers = main.configuration?.view.layers;
     if (!layers) {
-      return { location, channel: 0 };
+      return { layerId: "", location };
     }
 
     const layer = layers[toolAnnotation.coordinateAssignments.layer];
-    const channel = layer.channel;
     const assign = toolAnnotation.coordinateAssignments;
     if (layer) {
       const indexes = main.layerSliceIndexes(layer);
@@ -435,7 +438,7 @@ export class Annotations extends VuexModule {
             : Number.parseInt(assign.Time.value);
       }
     }
-    return { channel, location };
+    return { layerId: layer.id, location };
   }
 }
 

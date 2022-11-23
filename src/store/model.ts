@@ -197,7 +197,7 @@ export interface IAnnotation {
   id: string;
   tags: string[];
   name: string | null;
-  channel: number;
+  layerId: string;
   location: IAnnotationLocation;
   shape: AnnotationShape;
   coordinates: IGeoJSPoint[];

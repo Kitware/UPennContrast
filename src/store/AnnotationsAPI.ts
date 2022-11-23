@@ -21,7 +21,7 @@ export default class AnnotationsAPI {
   createAnnotation(
     tags: string[],
     shape: string,
-    channel: number,
+    layerId: string,
     location: { XY: number; Z: number; Time: number },
     coordinates: IGeoJSPoint[],
     datasetId: string
@@ -30,7 +30,7 @@ export default class AnnotationsAPI {
       .post("upenn_annotation", {
         tags,
         shape,
-        channel,
+        layerId,
         location,
         coordinates,
         datasetId
@@ -109,7 +109,7 @@ export default class AnnotationsAPI {
       name,
       tags,
       shape,
-      channel,
+      layerId,
       location,
       coordinates,
       _id,
@@ -119,7 +119,7 @@ export default class AnnotationsAPI {
       name,
       tags,
       shape,
-      channel,
+      layerId,
       location,
       coordinates,
       id: _id,

@@ -101,22 +101,8 @@ export default class AnnotationViewer extends Vue {
     return this.configuration?.view.layers || [];
   }
 
-  get visibleChannels() {
-    return this.layers.reduce(
-      (channels: number[], layer: IDisplayLayer, idx: number) => {
-        if (
-          idx < this.lowestLayer ||
-          idx >= this.lowestLayer + this.layerCount
-        ) {
-          return [...channels];
-        }
-        if (layer.visible && !channels.includes(layer.channel)) {
-          return [...channels, layer.channel];
-        }
-        return [...channels];
-      },
-      []
-    );
+  get getLayerFromId() {
+    return this.store.getLayerFromId;
   }
 
   get filteredAnnotations() {
@@ -145,9 +131,10 @@ export default class AnnotationViewer extends Vue {
 
   // All annotations available for the currently enabled layers
   get layerAnnotations() {
-    return this.annotations.filter(annotation =>
-      this.visibleChannels.includes(annotation.channel)
-    );
+    return this.annotations.filter(annotation => {
+      const layer = this.getLayerFromId(annotation.layerId);
+      return layer ? layer.visible : false;
+    });
   }
 
   get unrolling() {
@@ -214,12 +201,6 @@ export default class AnnotationViewer extends Vue {
     return this.annotationStore.selectedAnnotations;
   }
 
-  getAnyLayerForChannel(channel: number) {
-    return this.layers.find(
-      (layer: IDisplayLayer) => channel === layer.channel
-    );
-  }
-
   get shouldDrawAnnotations(): boolean {
     return this.store.drawAnnotations;
   }
@@ -237,9 +218,8 @@ export default class AnnotationViewer extends Vue {
   }
 
   getAnnotationStyle(annotation: IAnnotation) {
-    const layer = this.getAnyLayerForChannel(annotation.channel);
     return getAnnotationStyleFromLayer(
-      layer,
+      this.getLayerFromId(annotation.layerId),
       annotation.id === this.hoveredAnnotationId,
       this.isAnnotationSelected(annotation.id)
     );
@@ -401,18 +381,35 @@ export default class AnnotationViewer extends Vue {
     this.textLayer.draw();
   }
 
-  shouldDisplayAnnotationWithChannel(channelId: number): boolean {
-    return this.visibleChannels.includes(channelId);
+  shouldDisplayAnnotationWithLayer(layer: IDisplayLayer | undefined): boolean {
+    return layer ? layer.visible : false;
   }
 
-  shouldDisplayAnnotationWithLocation(location: IAnnotationLocation): boolean {
+  // The optional layer is useful when the layer where the annotation lies has an offset
+  shouldDisplayAnnotationWithLocation(
+    location: IAnnotationLocation | undefined,
+    layer?: IDisplayLayer
+  ): boolean {
+    if (!location) {
+      return true;
+    }
+    if (layer !== undefined) {
+      return (
+        (layer.xy.value === null ||
+          location.XY === layer.xy.value ||
+          this.store.unrollXY) &&
+        (layer.z.value === null ||
+          location.Z === layer.z.value ||
+          this.store.unrollZ) &&
+        (layer.time.value === null ||
+          location.Time === layer.time.value ||
+          this.store.unrollT)
+      );
+    }
     return (
-      !location ||
-      !(
-        (location.XY !== this.store.xy && !this.store.unrollXY) ||
-        (location.Z !== this.store.z && !this.store.unrollZ) ||
-        (location.Time !== this.store.time && !this.store.unrollT)
-      )
+      (location.XY === this.store.xy || this.store.unrollXY) &&
+      (location.Z === this.store.z || this.store.unrollZ) &&
+      (location.Time === this.store.time || this.store.unrollT)
     );
   }
 
@@ -423,7 +420,11 @@ export default class AnnotationViewer extends Vue {
     if (annotation.id === this.hoveredAnnotationId) {
       return true;
     }
-    return this.shouldDisplayAnnotationWithLocation(annotation.location);
+    const layer = this.getLayerFromId(annotation.layerId);
+    return (
+      this.shouldDisplayAnnotationWithLocation(annotation.location, layer) &&
+      this.shouldDisplayAnnotationWithLayer(layer)
+    );
   }
 
   // Remove from the layer annotations that should no longer be renderered (index change, layer change...)
@@ -439,7 +440,7 @@ export default class AnnotationViewer extends Vue {
         isHovered,
         isConnection,
         location,
-        channel,
+        layerId,
         isSelected
       } = annotation.options();
 
@@ -489,9 +490,10 @@ export default class AnnotationViewer extends Vue {
         return;
       }
 
+      const layer = this.getLayerFromId(layerId);
       if (
-        this.shouldDisplayAnnotationWithLocation(location) &&
-        this.shouldDisplayAnnotationWithChannel(channel) &&
+        this.shouldDisplayAnnotationWithLocation(location, layer) &&
+        this.shouldDisplayAnnotationWithLayer(layer) &&
         (!this.store.filteredDraw || this.annotationIds.includes(girderId))
       ) {
         return;
@@ -566,7 +568,7 @@ export default class AnnotationViewer extends Vue {
       girderId: annotation.id,
       isHovered: annotation.id === this.hoveredAnnotationId,
       location: annotation.location,
-      channel: annotation.channel,
+      layerId: annotation.layerId,
       isSelected: false
     };
 
@@ -631,7 +633,7 @@ export default class AnnotationViewer extends Vue {
       return null;
     }
 
-    const { location, channel } = await this.getAnnotationLocationFromTool(
+    const { location, layerId } = await this.getAnnotationLocationFromTool(
       tool
     );
 
@@ -641,7 +643,7 @@ export default class AnnotationViewer extends Vue {
       {
         tags: toolAnnotation.tags,
         shape: toolAnnotation.shape,
-        channel,
+        layerId,
         location,
         coordinates,
         datasetId: this.dataset.id
@@ -733,12 +735,16 @@ export default class AnnotationViewer extends Vue {
     const unitsPerPixel = this.getMapUnitsPerPixel();
 
     // Get selected annotations.
-    // Only select annotations that are located at the same XY, Z and Time frames and with a visible channel
+    // Only select annotations that are located at the same XY, Z and Time frames and with a visible layer
     const selectedAnnotations = this.annotations.filter(
       (annotation: IAnnotation) => {
+        const annotationLayer = this.getLayerFromId(annotation.layerId);
         return (
-          this.shouldDisplayAnnotationWithLocation(annotation.location) &&
-          this.shouldDisplayAnnotationWithChannel(annotation.channel) &&
+          this.shouldDisplayAnnotationWithLocation(
+            annotation.location,
+            annotationLayer
+          ) &&
+          this.shouldDisplayAnnotationWithLayer(annotationLayer) &&
           this.shouldSelectAnnotation(
             type,
             coordinates,

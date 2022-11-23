@@ -97,13 +97,13 @@ export default class AnnotationCsvDialog extends Vue {
   }
 
   async generateCSVStringForAnnotations() {
-    let text = "Id, Channel, XY, Z, Time, Tags, Shape";
+    let text = "Id, Layer Id, XY, Z, Time, Tags, Shape";
     this.propertyIds?.forEach((id: string) => {
       text += `, ${id}`;
     });
 
     (this.annotations as IAnnotation[]).forEach((annotation: IAnnotation) => {
-      text += `\n${annotation.id}, ${annotation.channel}, ${
+      text += `\n${annotation.id}, ${annotation.layerId}, ${
         annotation.location.XY
       }, ${annotation.location.Z}, ${
         annotation.location.Time
