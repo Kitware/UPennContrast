@@ -15,7 +15,6 @@ import { snapCoordinates } from "@/utils/itk";
 import {
   IAnnotation,
   IAnnotationConnection,
-  IAnnotationLocation,
   IDisplayLayer,
   IGeoJSPoint,
   IImage,
@@ -100,46 +99,24 @@ export default class AnnotationViewer extends Vue {
     return this.configuration?.view.layers || [];
   }
 
-  get visibleChannels() {
-    return this.layers.reduce(
-      (channels: number[], layer: IDisplayLayer, idx: number) => {
-        if (
-          idx < this.lowestLayer ||
-          idx >= this.lowestLayer + this.layerCount
-        ) {
-          return [...channels];
-        }
-        if (layer.visible && !channels.includes(layer.channel)) {
-          return [...channels, layer.channel];
-        }
-        return [...channels];
-      },
-      []
-    );
-  }
-
   get filteredAnnotations() {
     return this.filterStore.filteredAnnotations;
   }
 
-  get annotations() {
+  get displayableAnnotations() {
     return this.store.filteredDraw
       ? this.filteredAnnotations
       : this.annotationStore.annotations;
   }
 
-  get annotationsConnections() {
+  get annotationConnections() {
     return this.annotationStore.annotationConnections;
   }
 
-  get annotationIds() {
-    return this.annotations.map((annotation: IAnnotation) => annotation.id);
-  }
-
   // All annotations available for the currently enabled layers
-  get layerAnnotations() {
-    return this.annotations.filter(annotation =>
-      this.visibleChannels.includes(annotation.channel)
+  get annotationsToBeDisplayed() {
+    return this.displayableAnnotations.filter(annotation =>
+      this.shouldDisplayAnnotation(annotation)
     );
   }
 
@@ -229,13 +206,20 @@ export default class AnnotationViewer extends Vue {
     return this.store.filteredAnnotationTooltips;
   }
 
-  getAnnotationStyle(annotation: IAnnotation) {
-    const layer = this.getAnyLayerForChannel(annotation.channel);
-    return getAnnotationStyleFromLayer(
-      layer,
-      annotation.id === this.hoveredAnnotationId,
-      this.isAnnotationSelected(annotation.id)
-    );
+  get getAnnotationFromId() {
+    return (annotationId: string) =>
+      this.annotationStore.annotations.find(
+        annotation => annotation.id === annotationId
+      );
+  }
+
+  getAnnotationStyle(
+    annotation: IAnnotation,
+    layer: IDisplayLayer | undefined
+  ) {
+    const hovered = annotation.id === this.hoveredAnnotationId;
+    const selected = this.isAnnotationSelected(annotation.id);
+    return getAnnotationStyleFromLayer(layer, hovered, selected);
   }
 
   // Get the index of the tile an annotation should be drawn in.
@@ -304,18 +288,20 @@ export default class AnnotationViewer extends Vue {
     this.clearOldAnnotations();
 
     // We want to ignore these already displayed annotations
-    const displayedIds = this.annotationLayer
+    const noRedrawGeoJSAnnotations = this.annotationLayer
       .annotations()
-      .map((a: any) => a.options("girderId"))
-      .filter(
-        (id: string) =>
-          id !== this.hoveredAnnotationId || !this.isAnnotationSelected(id)
-      );
+      .filter((geoJSAnnotation: any) => {
+        const id = geoJSAnnotation.options("girderId");
+        return !(
+          // Force redraw of annotations which are selected or hovered
+          (id === this.hoveredAnnotationId || this.isAnnotationSelected(id))
+        );
+      });
 
     // Then draw the new annotations
-    this.drawNewAnnotations(displayedIds);
+    this.drawNewAnnotations(noRedrawGeoJSAnnotations);
     if (this.shouldDrawConnections) {
-      this.drawNewConnections(displayedIds);
+      this.drawNewConnections(noRedrawGeoJSAnnotations);
     }
     this.annotationLayer.draw();
   }
@@ -326,24 +312,6 @@ export default class AnnotationViewer extends Vue {
     });
 
     if (this.showTooltips) {
-      const displayedAnnotations: IAnnotation[] = this.annotationLayer
-        .annotations()
-        .map((geojsAnnotation: any) => {
-          return this.annotations.find(
-            iAnnotation =>
-              iAnnotation.id === geojsAnnotation.options("girderId")
-          );
-        })
-        .filter((annotation: IAnnotation | undefined) => {
-          return (
-            annotation &&
-            (!this.filteredAnnotationTooltips ||
-              this.filteredAnnotations.find(({ id }) => {
-                return id === annotation.id;
-              }))
-          );
-        });
-
       // One text feature per line as in https://opengeoscience.github.io/geojs/tutorials/text/
       // Centroid is computed once per new line (optimization needed?)
       // TODO: More performance with renderThreshold https://opengeoscience.github.io/geojs/apidocs/geo.textFeature.html#.styleSpec
@@ -362,7 +330,7 @@ export default class AnnotationViewer extends Vue {
       };
       this.textLayer
         .createFeature("text")
-        .data(displayedAnnotations)
+        .data(this.annotationsToBeDisplayed)
         .position((annotation: IAnnotation) => {
           return simpleCentroid(this.unrolledCoordinates(annotation, anyImage));
         })
@@ -382,7 +350,7 @@ export default class AnnotationViewer extends Vue {
         });
       this.textLayer
         .createFeature("text")
-        .data(displayedAnnotations)
+        .data(this.annotationsToBeDisplayed)
         .position((annotation: IAnnotation) => {
           return simpleCentroid(this.unrolledCoordinates(annotation, anyImage));
         })
@@ -398,29 +366,54 @@ export default class AnnotationViewer extends Vue {
     this.textLayer.draw();
   }
 
-  shouldDisplayAnnotationWithChannel(channelId: number): boolean {
-    return this.visibleChannels.includes(channelId);
-  }
-
-  shouldDisplayAnnotationWithLocation(location: IAnnotationLocation): boolean {
-    return (
-      !location ||
-      !(
-        (location.XY !== this.store.xy && !this.store.unrollXY) ||
-        (location.Z !== this.store.z && !this.store.unrollZ) ||
-        (location.Time !== this.store.time && !this.store.unrollT)
-      )
+  get validLayers() {
+    return this.layers.slice(
+      this.lowestLayer,
+      this.lowestLayer + this.layerCount
     );
   }
 
-  shouldDisplayAnnotation(annotation: IAnnotation): boolean {
-    if (!annotation.location) {
-      return false;
+  // Should the annotation be displayed in the layer
+  // The precheck checks if the annotation is displayable and the layer valid
+  layerShouldDisplayAnnotation(
+    layer: IDisplayLayer,
+    annotation: IAnnotation,
+    precheck: boolean = true
+  ) {
+    if (precheck) {
+      if (
+        !this.validLayers.some(validLayer => validLayer.id === layer.id) ||
+        !this.displayableAnnotations.some(
+          displayableAnnotation => displayableAnnotation.id === annotation.id
+        )
+      ) {
+        return false;
+      }
     }
-    if (annotation.id === this.hoveredAnnotationId) {
-      return true;
-    }
-    return this.shouldDisplayAnnotationWithLocation(annotation.location);
+
+    const xy = layer.xy.value !== null ? layer.xy.value : this.store.xy;
+    const z = layer.z.value !== null ? layer.z.value : this.store.z;
+    const time = layer.time.value !== null ? layer.time.value : this.store.time;
+    const channel = layer.channel;
+    return (
+      layer.visible &&
+      annotation.location.XY === xy &&
+      annotation.location.Z === z &&
+      annotation.location.Time === time &&
+      annotation.channel === channel
+    );
+  }
+
+  // Check if any of the layers should display this annotation
+  shouldDisplayAnnotation(annotation: IAnnotation) {
+    return (
+      this.displayableAnnotations.some(
+        displayableAnnotation => displayableAnnotation.id === annotation.id
+      ) &&
+      this.validLayers.some(layer =>
+        this.layerShouldDisplayAnnotation(layer, annotation, false)
+      )
+    );
   }
 
   // Remove from the layer annotations that should no longer be renderered (index change, layer change...)
@@ -433,11 +426,10 @@ export default class AnnotationViewer extends Vue {
 
       const {
         girderId,
+        layerId,
         isHovered,
-        isConnection,
-        location,
-        channel,
-        isSelected
+        isSelected,
+        isConnection
       } = annotation.options();
 
       if (!girderId) {
@@ -445,18 +437,12 @@ export default class AnnotationViewer extends Vue {
       }
 
       // Remove (not)hovered annotation
-      if (girderId === this.hoveredAnnotationId && !isHovered) {
-        this.annotationLayer.removeAnnotation(annotation, false);
-      } else if (girderId !== this.hoveredAnnotationId && isHovered) {
+      if (isHovered !== (girderId === this.hoveredAnnotationId)) {
         this.annotationLayer.removeAnnotation(annotation, false);
       }
 
       // Remove (un)selected annotation
-      const isSelectedOnStore = this.isAnnotationSelected(girderId);
-      if (
-        (!isSelected && isSelectedOnStore) ||
-        (isSelected && !isSelectedOnStore)
-      ) {
+      if (isSelected !== this.isAnnotationSelected(girderId)) {
         this.annotationLayer.removeAnnotation(annotation, false);
       }
 
@@ -464,12 +450,8 @@ export default class AnnotationViewer extends Vue {
       if (isConnection) {
         const childId = annotation.options("childId");
         const parentId = annotation.options("parentId");
-        const parent = this.annotationStore.annotations.find(
-          ({ id }) => id === parentId
-        );
-        const child = this.annotationStore.annotations.find(
-          ({ id }) => id === childId
-        );
+        const parent = this.getAnnotationFromId(parentId);
+        const child = this.getAnnotationFromId(childId);
         if (
           !this.shouldDrawConnections ||
           !parent ||
@@ -486,11 +468,8 @@ export default class AnnotationViewer extends Vue {
         return;
       }
 
-      if (
-        this.shouldDisplayAnnotationWithLocation(location) &&
-        this.shouldDisplayAnnotationWithChannel(channel) &&
-        (!this.store.filteredDraw || this.annotationIds.includes(girderId))
-      ) {
+      const layer = this.store.getLayerFromId(layerId);
+      if (layer && this.layerShouldDisplayAnnotation(layer, annotation)) {
         return;
       }
 
@@ -501,37 +480,50 @@ export default class AnnotationViewer extends Vue {
   }
 
   // Add to the layer annotations that should be rendered and have not already been added.
-  drawNewAnnotations(existingIds: string[]) {
-    this.layerAnnotations
-      // Check for annotation that have not been displayed yet
-      .filter(annotation => !existingIds.includes(annotation.id))
-      // Check for valid coordinates
-      .filter(this.shouldDisplayAnnotation)
-      .map(this.createGeoJSAnnotation)
-      .forEach(geoJSAnnotation => {
-        this.annotationLayer.addAnnotation(geoJSAnnotation, undefined, false);
-      });
+  drawNewAnnotations(noRedrawGeoJSAnnotations: any[]) {
+    this.validLayers.forEach(layer => {
+      // Optimize out invisible layers (performance)
+      if (!layer.visible) {
+        return;
+      }
+      this.displayableAnnotations
+        .filter(
+          annotation =>
+            this.layerShouldDisplayAnnotation(layer, annotation, false) &&
+            noRedrawGeoJSAnnotations.every(
+              geoJSAnnotation =>
+                !(
+                  geoJSAnnotation.options("girderId") === annotation.id &&
+                  geoJSAnnotation.options("layerId") === layer.id
+                )
+            )
+        )
+        .map(annotation => this.createGeoJSAnnotation(annotation, layer.id))
+        .forEach(geoJSAnnotation => {
+          this.annotationLayer.addAnnotation(geoJSAnnotation, undefined, false);
+        });
+    });
   }
 
-  drawNewConnections(existingIds: string[]) {
-    const layerAnnotationIds = this.layerAnnotations.map(
-      (annotation: IAnnotation) => annotation.id
+  drawNewConnections(noRedrawGeoJSAnnotations: any[]) {
+    const displayedAnnotationIds = this.annotationsToBeDisplayed.map(
+      annotation => annotation.id
     );
-
-    this.annotationsConnections
+    this.annotationConnections
       .filter(
         (connection: IAnnotationConnection) =>
-          !existingIds.includes(connection.id) &&
-          (layerAnnotationIds.includes(connection.parentId) ||
-            layerAnnotationIds.includes(connection.childId))
+          noRedrawGeoJSAnnotations.every(
+            geoJSAnnotation =>
+              geoJSAnnotation.options("girderId") !== connection.id
+          ) &&
+          (displayedAnnotationIds.includes(connection.parentId) ||
+            displayedAnnotationIds.includes(connection.childId))
       )
       .forEach((connection: IAnnotationConnection) => {
         {
-          const childAnnotation = this.annotationStore.annotations.find(
-            (child: IAnnotation) => child.id === connection.childId
-          );
-          const parentAnnotation = this.annotationStore.annotations.find(
-            (parent: IAnnotation) => parent.id === connection.parentId
+          const childAnnotation = this.getAnnotationFromId(connection.childId);
+          const parentAnnotation = this.getAnnotationFromId(
+            connection.parentId
           );
           if (
             !childAnnotation ||
@@ -550,7 +542,7 @@ export default class AnnotationViewer extends Vue {
       });
   }
 
-  createGeoJSAnnotation(annotation: IAnnotation) {
+  createGeoJSAnnotation(annotation: IAnnotation, layerId: string | undefined) {
     if (!this.store.dataset) {
       return;
     }
@@ -559,12 +551,13 @@ export default class AnnotationViewer extends Vue {
     if (!anyImage) {
       return;
     }
-    const options = {
+    const girderOptions = {
       girderId: annotation.id,
       isHovered: annotation.id === this.hoveredAnnotationId,
       location: annotation.location,
       channel: annotation.channel,
-      isSelected: false
+      isSelected: false,
+      layerId
     };
 
     const coordinates = this.unrolledCoordinates(annotation, anyImage);
@@ -572,7 +565,7 @@ export default class AnnotationViewer extends Vue {
     const newGeoJSAnnotation = geojsAnnotationFactory(
       annotation.shape,
       coordinates,
-      options
+      girderOptions
     );
     newGeoJSAnnotation.options("girderId", annotation.id);
 
@@ -585,7 +578,8 @@ export default class AnnotationViewer extends Vue {
     }
 
     const style = newGeoJSAnnotation.options("style");
-    const newStyle = this.getAnnotationStyle(annotation);
+    const layer = this.store.getLayerFromId(layerId);
+    const newStyle = this.getAnnotationStyle(annotation, layer);
     newGeoJSAnnotation.options("style", Object.assign({}, style, newStyle));
 
     return newGeoJSAnnotation;
@@ -651,6 +645,7 @@ export default class AnnotationViewer extends Vue {
     selectionAnnotationType: AnnotationShape,
     selectionAnnotationCoordinates: any[],
     annotation: IAnnotation,
+    annotationStyle: any,
     unitsPerPixel: number
   ) {
     const annotationCoordinates = annotation.coordinates;
@@ -665,7 +660,7 @@ export default class AnnotationViewer extends Vue {
       // Check if the selection point is positioned into the Polygon.
 
       const selectionPosition = selectionAnnotationCoordinates[0];
-      const { radius, strokeWidth } = this.getAnnotationStyle(annotation);
+      const { radius, strokeWidth } = annotationStyle;
 
       if (annotation.shape === AnnotationShape.Point) {
         const annotationRadius = (radius + strokeWidth) * unitsPerPixel;
@@ -716,11 +711,6 @@ export default class AnnotationViewer extends Vue {
       return;
     }
 
-    const selectLocation = {
-      XY: this.xy,
-      Z: this.z,
-      Time: this.time
-    };
     const coordinates = selectAnnotation.coordinates();
     const type = selectAnnotation.type();
 
@@ -730,21 +720,34 @@ export default class AnnotationViewer extends Vue {
     const unitsPerPixel = this.getMapUnitsPerPixel();
 
     // Get selected annotations.
-    // Only select annotations that are located at the same XY, Z and Time frames and with a visible channel
-    const selectedAnnotations = this.annotations.filter(
-      (annotation: IAnnotation) => {
-        return (
-          this.shouldDisplayAnnotationWithLocation(annotation.location) &&
-          this.shouldDisplayAnnotationWithChannel(annotation.channel) &&
-          this.shouldSelectAnnotation(
+    const selectedAnnotations: IAnnotation[] = this.annotationLayer
+      .annotations()
+      .reduce((selectedAnnotations: IAnnotation[], geoJSannotation: any) => {
+        const { girderId, isConnection } = geoJSannotation.options();
+        if (
+          !girderId ||
+          isConnection ||
+          selectedAnnotations.some(
+            selectedAnnotation => selectedAnnotation.id === girderId
+          )
+        ) {
+          return selectedAnnotations;
+        }
+        const annotation = this.getAnnotationFromId(girderId);
+        if (
+          !annotation ||
+          !this.shouldSelectAnnotation(
             type,
             coordinates,
             annotation,
+            geoJSannotation.style(),
             unitsPerPixel
           )
-        );
-      }
-    );
+        ) {
+          return selectedAnnotations;
+        }
+        return [...selectedAnnotations, annotation];
+      }, []);
 
     // Update annotation store
     switch (this.annotationSelectionType) {
@@ -776,8 +779,12 @@ export default class AnnotationViewer extends Vue {
     if (!newAnnotation) {
       return;
     }
+    const layerNumber = this.selectedTool?.values?.annotation
+      ?.coordinateAssignments?.layer;
+    const layerId =
+      typeof layerNumber !== "number" ? this.layers[layerNumber].id : undefined;
 
-    this.addAnnotation(newAnnotation);
+    this.addAnnotation(newAnnotation, layerId);
     this.annotationLayer.removeAnnotation(annotation);
   }
 
@@ -809,7 +816,7 @@ export default class AnnotationViewer extends Vue {
     return [];
   }
 
-  addAnnotation(newAnnotation: IAnnotation) {
+  addAnnotation(newAnnotation: IAnnotation, layerId: string | undefined) {
     // Save the new annotation
     this.annotationStore.addAnnotation(newAnnotation);
 
@@ -823,7 +830,10 @@ export default class AnnotationViewer extends Vue {
     );
 
     // Display the new annotation
-    const newGeoJSAnnotation = this.createGeoJSAnnotation(newAnnotation);
+    const newGeoJSAnnotation = this.createGeoJSAnnotation(
+      newAnnotation,
+      layerId
+    );
     this.annotationLayer.addAnnotation(newGeoJSAnnotation);
   }
 
@@ -872,7 +882,7 @@ export default class AnnotationViewer extends Vue {
     if (!newAnnotation) {
       return;
     }
-    this.addAnnotation(newAnnotation);
+    this.addAnnotation(newAnnotation, location.layer);
   }
 
   handleNewROIFilter(geojsAnnotation: any) {
@@ -1093,8 +1103,9 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-  @Watch("annotations")
-  @Watch("annotationsConnections")
+  @Watch("displayableAnnotations")
+  @Watch("annotationsToBeDisplayed")
+  @Watch("annotationConnections")
   onAnnotationsChanged() {
     this.drawAnnotationsAndTooltips();
   }
@@ -1113,13 +1124,13 @@ export default class AnnotationViewer extends Vue {
   @Watch("xy")
   @Watch("z")
   @Watch("time")
-  @Watch("layerAnnotations")
-  onLayerAnnotationsChanged() {
+  onSliceChanged() {
     this.drawAnnotationsAndTooltips();
   }
 
   @Watch("shouldDrawAnnotations")
   @Watch("shouldDrawConnections")
+  @Watch("validLayers")
   onSettingsChanged() {
     this.drawAnnotationsAndTooltips();
   }
@@ -1127,7 +1138,6 @@ export default class AnnotationViewer extends Vue {
   @Watch("showTooltips")
   @Watch("filteredAnnotationTooltips")
   @Watch("filteredAnnotations")
-  @Watch("todo")
   onDrawTooltipsChanged() {
     this.drawTooltips();
   }
