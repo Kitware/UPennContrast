@@ -1,11 +1,11 @@
 <template>
   <v-container>
-    <v-row>
-      <v-col>
+    <v-row class="pa-0">
+      <v-col class="pa-0 pr-2">
         <!-- tags -->
         <tag-picker v-model="newTags"></tag-picker>
       </v-col>
-      <v-col>
+      <v-col class="pa-0 pr-2">
         <!-- layers -->
         <layer-select
           any
@@ -79,15 +79,12 @@ export default class TagAndLayerRestriction extends Vue {
   @Prop()
   readonly layerLabel!: string;
 
-  get tagsLabelWithDefault() {
-    return this.tagsLabel || "Restrict to Tags";
-  }
-
   get layerLabelWithDefault() {
-    return this.layerLabel || "Restrict to layer";
+    return this.layerLabel || "Filter by layer";
   }
 
   @Watch("newTags")
+  @Watch("selectedLayer")
   changed() {
     this.tagSearchInput = "";
     this.$emit("input", { tags: this.newTags, layer: this.selectedLayer });

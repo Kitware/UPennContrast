@@ -3,13 +3,16 @@
     <v-expansion-panel expand v-model="panels">
       <v-expansion-panel-header class="pa-4">
         <v-toolbar-title> Annotation Tools </v-toolbar-title>
-        <v-spacer></v-spacer>
         <!-- Tool creation -->
-        <v-dialog v-model="toolCreationDialogOpen" width="unset">
+        <v-dialog v-model="toolCreationDialogOpen" width="60%">
           <template v-slot:activator="{ on: dialog }">
             <v-tooltip top>
               <template v-slot:activator="{ on: tooltip }">
-                <v-btn icon v-on="{ ...dialog, ...tooltip }">
+                <v-btn
+                  class="rounded-pill"
+                  icon
+                  v-on="{ ...dialog, ...tooltip }"
+                >
                   <v-icon>
                     {{ "mdi-plus" }}
                   </v-icon>
@@ -22,27 +25,6 @@
             @done="toolCreationDialogOpen = false"
             :open="toolCreationDialogOpen"
           />
-        </v-dialog>
-        <!-- Add tools to the toolset -->
-        <v-dialog v-model="toolPickerDialogOpen" width="unset">
-          <template v-slot:activator="{ on: dialog }">
-            <v-tooltip top>
-              <template v-slot:activator="{ on: tooltip }">
-                <v-btn icon v-on="{ ...tooltip, ...dialog }">
-                  <v-icon rounded medium>{{ "mdi-magnify" }}</v-icon>
-                </v-btn>
-              </template>
-              <span>Add existing tools</span>
-            </v-tooltip>
-          </template>
-          <v-card>
-            <v-card-title>
-              Choose a tool to add to this toolset
-            </v-card-title>
-            <v-card-text>
-              <toolset-picker @done="toolPickerDialogOpen = false" />
-            </v-card-text>
-          </v-card>
         </v-dialog>
       </v-expansion-panel-header>
       <v-expansion-panel-content>
@@ -130,7 +112,6 @@ import {
   IToolConfiguration
 } from "@/store/model";
 import ToolIcon from "@/tools/ToolIcon.vue";
-import ToolsetPicker from "@/tools/toolsets/ToolsetPicker.vue";
 import ToolCreation from "@/tools/creation/ToolCreation.vue";
 import AnnotationWorkerMenu from "@/components/AnnotationWorkerMenu.vue";
 import CircleToDotMenu from "@/components/CircleToDotMenu.vue";
@@ -140,7 +121,6 @@ import CircleToDotMenu from "@/components/CircleToDotMenu.vue";
   components: {
     ToolCreation,
     ToolIcon,
-    ToolsetPicker,
     AnnotationWorkerMenu,
     CircleToDotMenu,
     draggable
@@ -219,12 +199,11 @@ export default class Toolset extends Vue {
         values.connectTo.tags &&
         values.connectTo.tags.length
       ) {
-        propDesc.push(["Connect to", values.connectTo.tags.join(", ")]);
-        if (values.connectTo.layer && values.connectTo.layer.length) {
-          propDesc.push([
-            "Restrict to layers",
-            values.connectTo.layer.join(", ")
-          ]);
+        propDesc.push(["Connect to tags", values.connectTo.tags.join(", ")]);
+        const layerIdx = values.connectTo.layer;
+        const layers = this.store.configuration?.view.layers;
+        if (layers && typeof values.connectTo.layer === "number") {
+          propDesc.push(["Connect only on layer", layers[layerIdx].name]);
         }
       }
     }

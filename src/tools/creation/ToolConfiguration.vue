@@ -1,59 +1,55 @@
 <template>
-  <v-form v-if="internalTemplate && toolValues">
-    <template v-for="(item, index) in internalTemplate">
-      <v-card :key="index" class="my-1">
-        <v-card-title v-if="item.name && item.name.length" class="py-1">
-          {{ item.name }}
-        </v-card-title>
-        <v-card-text class="pa-1">
+  <div v-if="toolValues">
+    <v-container v-if="basicInternalTemplate.length > 0">
+      <template v-for="(item, index) in basicInternalTemplate">
+        <tool-configuration-item
+          :key="index"
+          :item="item"
+          :advanced="false"
+          @change="changed"
+          v-model="toolValues[item.id]"
+          :ref="item.id"
+        />
+      </template>
+    </v-container>
+    <v-expansion-panels
+      v-if="advancedInternalTemplate.length > 0"
+      v-model="advancedPanel"
+    >
+      <v-expansion-panel>
+        <v-expansion-panel-header class="title">
+          Advanced options
+        </v-expansion-panel-header>
+        <v-expansion-panel-content eager>
           <v-container>
-            <v-row class="pa-0">
-              <v-col :cols="item.type === 'select' ? 6 : 12" class="py-0">
-                <!-- Tool configuration component. Type depends on item type. -->
-                <component
-                  :is="typeToComponentName[item.type]"
-                  v-bind="item.meta"
-                  v-model="toolValues[item.id]"
-                  :ref="item.id"
-                  return-object
-                  @change="changed"
-                  dense
-                  small
-                >
-                  <v-radio
-                    v-for="(value, index) in item.values"
-                    :key="index"
-                    v-bind="value"
-                  >
-                  </v-radio>
-                </component>
-              </v-col>
-            </v-row>
+            <template v-for="(item, index) in advancedInternalTemplate">
+              <tool-configuration-item
+                :key="index"
+                :item="item"
+                :advanced="true"
+                @change="changed"
+                v-model="toolValues[item.id]"
+                :ref="item.id"
+              />
+            </template>
           </v-container>
-        </v-card-text>
-      </v-card>
-    </template>
-  </v-form>
+        </v-expansion-panel-content>
+      </v-expansion-panel>
+    </v-expansion-panels>
+  </div>
 </template>
 
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
-// Manually import those vuetify components that might be used procedurally
-import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
+import ToolConfigurationItem from "@/tools/creation/ToolConfigurationItem.vue";
 import AnnotationConfiguration from "@/tools/creation/templates/AnnotationConfiguration.vue";
 import TagAndLayerRestriction from "@/tools/creation/templates/TagAndLayerRestriction.vue";
 import DockerImage from "@/tools/creation/templates/DockerImage.vue";
 
 @Component({
   components: {
-    AnnotationConfiguration,
-    TagAndLayerRestriction,
-    VSelect,
-    VCheckbox,
-    VTextField,
-    VRadioGroup,
-    DockerImage
+    ToolConfigurationItem
   }
 })
 // Creates a tool configuration interface based on the current selected template.
@@ -63,18 +59,9 @@ export default class ToolConfiguration extends Vue {
   @Prop()
   readonly value!: any;
 
-  toolValues: any = null;
+  advancedPanel: any;
 
-  // Used to determine :is="" value from template interface type
-  typeToComponentName = {
-    select: "v-select",
-    annotation: "annotation-configuration",
-    restrictTagsAndLayer: "tag-and-layer-restriction",
-    checkbox: "v-checkbox",
-    radio: "v-radio-group",
-    text: "v-text-field",
-    dockerImage: "docker-image"
-  };
+  toolValues: any = null;
 
   // Dynamic interface elements that depend on various values being selected
   valueTemplates: any = {};
@@ -91,13 +78,23 @@ export default class ToolConfiguration extends Vue {
     ];
   }
 
+  get advancedInternalTemplate() {
+    return this.internalTemplate.filter(
+      item => item.advanced || item.type === "annotation"
+    );
+  }
+
+  get basicInternalTemplate() {
+    return this.internalTemplate.filter(
+      item => !item.advanced || item.type === "annotation"
+    );
+  }
+
   @Prop()
   readonly template!: any;
 
-  @Watch("template")
-  watchTemplate() {
-    this.reset();
-  }
+  @Prop()
+  readonly defaultValues!: any;
 
   mounted() {
     this.reset();
@@ -105,8 +102,6 @@ export default class ToolConfiguration extends Vue {
 
   initialize() {
     this.valueTemplates = {};
-    // Remove values from outdated template
-    this.clearUnusedValues();
     // Add default values
     this.setDefaultValues();
     // Add interface elements from current values
@@ -115,8 +110,13 @@ export default class ToolConfiguration extends Vue {
     this.setDefaultValues();
   }
 
+  @Watch("template")
+  @Watch("defaultValues")
   reset() {
-    this.toolValues = { name: "New Tool", description: "" };
+    this.advancedPanel = undefined;
+    this.toolValues = this.defaultValues
+      ? { ...this.defaultValues }
+      : { name: "New Tool", description: "" };
     this.initialize();
     this.changed();
   }
@@ -135,47 +135,82 @@ export default class ToolConfiguration extends Vue {
 
   setDefaultValues() {
     this.internalTemplate.forEach(item => {
-      if (this.toolValues[item.id]) {
+      if (this.toolValues[item.id] !== undefined) {
         return;
       }
-      if (item.type === "select") {
-        if (item?.meta?.items.length) {
-          const [firstValue] = item.meta.items;
-          this.toolValues[item.id] = { ...firstValue };
-        }
-      } else if (item.type === "radio") {
-        if (item.values?.length) {
-          const [firstValue] = item.values;
-          this.toolValues[item.id] = firstValue.value;
-        }
-      } else if (item.type === "text") {
-        if (item.meta?.value) {
-          this.toolValues[item.id] = item.meta?.value;
-        } else if (item.meta?.type === "number") {
-          this.toolValues[item.id] = "0.0";
-        } else {
-          this.toolValues[item.id] = "";
-        }
-      } else if (this.$refs[item.id]) {
-        if (item.type === "annotation") {
-          const [annotation] = this.$refs[item.id] as [AnnotationConfiguration];
-          if (annotation) {
-            this.toolValues[item.id] = {};
-            annotation.reset();
+      switch (item.type) {
+        case "select":
+          if (item?.meta?.items.length) {
+            const [firstValue] = item.meta.items;
+            this.toolValues[item.id] = { ...firstValue };
           }
-        } else if (item.type === "restrictTagsAndLayer") {
-          const [restrict] = this.$refs[item.id] as [TagAndLayerRestriction];
-          if (restrict) {
-            this.toolValues[item.id] = {};
-            restrict.reset();
+          break;
+
+        case "radio":
+          if (item.values?.length) {
+            const [firstValue] = item.values;
+            this.toolValues[item.id] = firstValue.value;
           }
-        } else if (item.type === "dockerImage") {
-          const [dockerImage] = this.$refs[item.id] as [DockerImage];
-          if (dockerImage) {
-            this.toolValues[item.id] = null;
-            dockerImage.reset();
+          break;
+
+        case "text":
+          if (item.meta?.value) {
+            this.toolValues[item.id] = item.meta?.value;
+          } else if (item.meta?.type === "number") {
+            this.toolValues[item.id] = "0.0";
+          } else {
+            this.toolValues[item.id] = "";
           }
-        }
+          break;
+
+        case "checkbox":
+          if (item.meta?.value) {
+            this.toolValues[item.id] = !!item.meta?.value;
+          } else {
+            this.toolValues[item.id] = false;
+          }
+          break;
+
+        default:
+          // The $refs are referencing child refs
+          if (Array.isArray(this.$refs[item.id])) {
+            const innerComponents = (this.$refs[item.id] as Vue[]).reduce(
+              (innerComponents, configItem) => [
+                ...innerComponents,
+                configItem.$refs["innerComponent"] as Vue
+              ],
+              [] as Vue[]
+            );
+            switch (item.type) {
+              case "annotation":
+                const annotations = innerComponents as AnnotationConfiguration[];
+                if (annotations.length) {
+                  this.toolValues[item.id] = {};
+                  annotations.forEach(annotation => annotation.reset());
+                }
+                break;
+
+              case "restrictTagsAndLayer":
+                const restricts = innerComponents as TagAndLayerRestriction[];
+                if (restricts.length) {
+                  this.toolValues[item.id] = {};
+                  restricts.forEach(restrict => restrict.reset());
+                }
+                break;
+
+              case "dockerImage":
+                const dockerImages = innerComponents as DockerImage[];
+                if (dockerImages.length) {
+                  this.toolValues[item.id] = null;
+                  dockerImages.forEach(dockerImage => dockerImage.reset());
+                }
+                break;
+
+              default:
+                break;
+            }
+          }
+          break;
       }
     });
   }
@@ -183,23 +218,11 @@ export default class ToolConfiguration extends Vue {
   updateInterface() {
     // Go through values to see if additional interface elements need to be added
     Object.entries(this.toolValues).forEach(([key, value]: any[]) => {
-      if (value.meta?.interface) {
+      if (value?.meta?.interface) {
         this.valueTemplates = {
           ...this.valueTemplates,
           [key]: value.meta.interface
         };
-      }
-    });
-  }
-
-  clearUnusedValues() {
-    // Clear values we can't find the interface for
-    Object.keys(this.toolValues).forEach((key: string) => {
-      if (
-        !this.internalTemplate.find(template => template.id === key) &&
-        !["name", "description"].includes(key)
-      ) {
-        delete this.toolValues[key];
       }
     });
   }

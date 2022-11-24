@@ -10,7 +10,7 @@ import store from "./root";
 import main from "./index";
 import sync from "./sync";
 
-import { IToolConfiguration } from "./model";
+import { AnnotationNames, AnnotationShape, IToolConfiguration } from "./model";
 
 import { logWarning } from "@/utils/log";
 
@@ -22,6 +22,21 @@ export class Tools extends VuexModule {
   toolTemplateList: any[] = [];
   // All tools created by the current user
   userTools: IToolConfiguration[] = [];
+
+  availableShapes: { value: string; text: string }[] = [
+    {
+      text: AnnotationNames[AnnotationShape.Point],
+      value: AnnotationShape.Point
+    },
+    {
+      text: AnnotationNames[AnnotationShape.Polygon],
+      value: AnnotationShape.Polygon
+    },
+    {
+      text: AnnotationNames[AnnotationShape.Line],
+      value: AnnotationShape.Line
+    }
+  ];
 
   get tools(): IToolConfiguration[] {
     return this.userTools.filter(

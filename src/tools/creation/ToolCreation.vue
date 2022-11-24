@@ -4,53 +4,48 @@
       <v-card-title>
         Add a new tool
       </v-card-title>
-      <v-card-text class="pa-1">
-        <v-card>
-          <v-card-text class="pa-1">
-            <v-container>
-              <v-row>
-                <v-col>
-                  <v-text-field label="Tool Name" v-model="toolName" dense>
-                  </v-text-field>
-                </v-col>
-                <v-col>
-                  <!-- Pick which template should be used for the tool configuration -->
-                  <tool-type-selection v-model="selectedItemTemplate">
-                  </tool-type-selection>
-                </v-col>
-              </v-row>
-              <v-row>
-                <v-col>
-                  <v-textarea
-                    label="Tool Description"
-                    v-model="toolDescription"
-                    auto-grow
-                    rows="2"
-                    dense
-                  >
-                  </v-textarea>
-                </v-col>
-              </v-row>
-            </v-container>
-          </v-card-text>
-        </v-card>
+      <v-card-text>
+        <!-- Pick which template should be used for the tool configuration -->
+        <tool-type-selection v-model="selectedTool" />
         <!-- Form elements generated from the template -->
         <tool-configuration
-          :template="selectedItemTemplate"
+          :template="selectedTemplate"
+          :defaultValues="selectedDefaultValues"
           v-model="toolValues"
           @submit="createTool"
           @reset="reset"
           ref="toolConfiguration"
         />
+        <!-- Tool name with autofill -->
+        <v-container>
+          <v-card v-if="selectedTemplate" flat class="pa-4 ma-0">
+            <v-card-title class="pa-0 ma-0">
+              Tool Name
+            </v-card-title>
+            <v-text-field
+              v-model="toolName"
+              :append-icon="userToolName ? 'mdi-refresh' : ''"
+              @click:append="userToolName = false"
+              @input="userToolName = true"
+              dense
+              class="px-4 py-0 ma-0"
+            />
+          </v-card>
+        </v-container>
       </v-card-text>
       <v-card-actions>
-        <div class="button-bar">
+        <v-container class="button-bar ma-0 pa-0">
           <v-spacer></v-spacer>
-          <v-btn class="mr-4" color="primary" @click="createTool">
-            ADD TOOL TO THE CURRENT TOOLSET
+          <v-btn
+            class="mr-4"
+            color="primary"
+            @click="createTool"
+            :disabled="!selectedTemplate"
+          >
+            ADD TOOL TO THE CURRENT TOOLSET
           </v-btn>
           <v-btn class="mr-4" color="warning" @click="close">CANCEL</v-btn>
-        </div>
+        </v-container>
       </v-card-actions>
     </v-card>
   </div>
@@ -60,6 +55,7 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
 import propertiesStore from "@/store/properties";
+import { AnnotationNames, AnnotationShape } from "@/store/model";
 
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";
@@ -84,59 +80,109 @@ export default class ToolCreation extends Vue {
 
   toolValues: any = { ...defaultValues };
 
-  selectedItemTemplate: any = null;
+  selectedTemplate: any = null;
+  selectedDefaultValues: any = null;
+
   errorMessages: string[] = [];
   successMessages: string[] = [];
 
+  userToolName = false;
   toolName = "New Tool";
-  toolDescription = "";
 
   @Prop()
   readonly open: any;
 
   createTool() {
-    if (this.selectedItemTemplate) {
-      const tool = {
-        type: this.selectedItemTemplate.type,
-        template: this.selectedItemTemplate,
-        values: this.toolValues
-      };
-      const name = this.toolName || "Unnamed Tool";
-      const description = this.toolDescription || "";
-      // Create an empty tool to get the id
-      this.toolsStore.createTool({ name, description }).then(tool => {
-        if (tool === null) {
-          logError("Failed to create a new tool on the server");
-          return;
-        }
-        tool.template = this.selectedItemTemplate;
-        tool.values = this.toolValues;
-        tool.type = this.selectedItemTemplate.type;
-        if (tool.type === "segmentation") {
-          const { image } = tool.values.image;
-          this.propertyStore.requestWorkerInterface(image);
-        }
+    const name = this.toolName || "Unnamed Tool";
+    // Create an empty tool to get the id
+    this.toolsStore.createTool({ name, description: "" }).then(tool => {
+      if (tool === null) {
+        logError("Failed to create a new tool on the server");
+        return;
+      }
+      tool.template = this.selectedTemplate;
+      tool.values = this.toolValues;
+      tool.type = this.selectedTemplate.type;
+      if (tool.type === "segmentation") {
+        const { image } = tool.values.image;
+        this.propertyStore.requestWorkerInterface(image);
+      }
 
-        // Update this tool with actual values
-        this.toolsStore.updateTool(tool).then(() => {
-          this.store.syncConfiguration();
-        });
-
-        // Add this tool to the current toolset
-        this.toolsStore.addToolIdsToCurrentToolset({ ids: [tool.id] });
-
-        // Save
+      // Update this tool with actual values
+      this.toolsStore.updateTool(tool).then(() => {
         this.store.syncConfiguration();
-
-        this.close();
       });
+
+      // Add this tool to the current toolset
+      this.toolsStore.addToolIdsToCurrentToolset({ ids: [tool.id] });
+
+      // Save
+      this.store.syncConfiguration();
+
+      this.close();
+    });
+  }
+
+  private _selectedTool: any = null;
+
+  set selectedTool(value: any) {
+    this._selectedTool = value;
+    this.selectedTemplate = value.template;
+    this.selectedDefaultValues = value.defaultValues;
+  }
+
+  get selectedTool() {
+    return this.selectedTemplate ? this._selectedTool : null;
+  }
+
+  @Watch("selectedTemplate")
+  @Watch("toolValues")
+  @Watch("userToolName")
+  updateAutoToolName() {
+    if (this.userToolName) {
+      return;
     }
+    const toolNameStrings: string[] = [];
+    if (this.toolValues?.annotation) {
+      toolNameStrings.push(this.toolValues.annotation.tags.join(", "));
+      const layerIdx = this.toolValues.annotation.coordinateAssignments.layer;
+      if (typeof layerIdx === "number") {
+        const layerName = this.store.configuration?.view.layers[layerIdx].name;
+        if (layerName) {
+          toolNameStrings.push(layerName);
+        }
+      }
+    }
+    if (this.selectedTemplate?.shortName) {
+      toolNameStrings.push(this.selectedTemplate.shortName);
+    }
+    if (this.toolValues?.annotation) {
+      const toolShape: AnnotationShape = this.toolValues.annotation.shape;
+      toolNameStrings.push(AnnotationNames[toolShape]);
+    }
+    if (toolNameStrings.length > 0) {
+      this.toolName = toolNameStrings.join(" ");
+      return;
+    }
+    if (this._selectedTool?.selectedItem?.text) {
+      toolNameStrings.push(this._selectedTool?.selectedItem?.text);
+    }
+    if (this.selectedTemplate) {
+      toolNameStrings.push(this.selectedTemplate.name);
+    }
+    if (toolNameStrings.length > 0) {
+      this.toolName = toolNameStrings.join(" ");
+      return;
+    }
+    this.toolName = "New Tool";
   }
 
   @Watch("open")
   reset() {
+    this.userToolName = false;
     this.toolName = "New Tool";
-    this.toolDescription = "";
+    this.selectedTemplate = null;
+    this.selectedDefaultValues = null;
 
     if (!this.$refs.toolConfiguration) {
       return;

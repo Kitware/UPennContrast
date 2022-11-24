@@ -2,68 +2,119 @@
   {
     "name": "Manual annotation tool",
     "type": "create",
+    "shortName": "Manual",
     "interface": [
       {
-        "name": "",
+        "name": "Annotation Configuration",
         "id": "annotation",
-        "type": "annotation"
+        "type": "annotation",
+        "isSubmenu": true
       },
       {
-        "name": "Connect to Nearest Tag",
+        "name": "Connect to nearest annotation with Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
-        "meta": {
-          "tagsLabel": "Connect to nearest tags...",
-          "layerLabel": "Restrict to Layer"
-        }
+        "advanced": true
       }
     ]
   },
   {
     "name": "\"Snap to\" manual annotation tools",
     "type": "snap",
+    "shortName": "Snap-to",
     "interface": [
-      {
-        "name": "",
-        "id": "annotation",
-        "type": "annotation"
-      },
-      {
-        "name": "Connect to Nearest Tag",
-        "id": "connectTo",
-        "type": "restrictTagsAndLayer",
-        "meta": {
-          "tagsLabel": "Connect to nearest tags...",
-          "layerLabel": "Restrict to Layer"
-        }
-      },
       {
         "name": "Snap To",
         "type": "select",
         "id": "snapTo",
+        "isSubmenu": true,
         "meta": {
           "items": [
-            { "text": "Snap circle to dot", "value": "circleToDot", "meta": {
-              "interface": [
-                {
-                  "name": "Default Radius",
-                  "type": "text",
-                  "id": "radius",
-                  "meta": {
-                    "value": "25",
-                    "type": "number"
+            {
+              "text": "Snap circle to dot",
+              "value": "circleToDot",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Annotation Configuration",
+                    "id": "annotation",
+                    "type": "annotation",
+                    "meta": {
+                      "hideShape": true,
+                      "defaultShape": "point"
+                    }
+                  },
+                  {
+                    "name": "Default Radius",
+                    "type": "text",
+                    "id": "radius",
+                    "meta": {
+                      "value": "25",
+                      "type": "number"
+                    }
                   }
-                }
-              ]
-            } },
-            { "text": "Snap blob to dot", "value": "blobToDot" },
+                ]
+              }
+            },
+            {
+              "text": "Snap blob to dot",
+              "value": "blobToDot",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Annotation Configuration",
+                    "id": "annotation",
+                    "type": "annotation",
+                    "meta": {
+                      "hideShape": true,
+                      "defaultShape": "point"
+                    }
+                  }
+                ]
+              }
+            },
             {
               "text": "Snap blob to blob",
-              "value": "blobToBlob"
+              "value": "blobToBlob",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Annotation Configuration",
+                    "id": "annotation",
+                    "type": "annotation",
+                    "meta": {
+                      "hideShape": true,
+                      "defaultShape": "polygon"
+                    }
+                  }
+                ]
+              }
             },
-            { "text": "Snap freehand line to edge", "value": "edge" }
+            {
+              "text": "Snap freehand line to edge",
+              "value": "edge",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Annotation Configuration",
+                    "id": "annotation",
+                    "type": "annotation",
+                    "meta": {
+                      "hideShape": true,
+                      "defaultShape": "line"
+                    }
+                  }
+                ]
+              }
+            }
           ]
         }
+      },
+      {
+        "name": "Connect to nearest annotation with Tag",
+        "id": "connectTo",
+        "type": "restrictTagsAndLayer",
+        "advanced": true
       }
     ]
   },
@@ -75,6 +126,7 @@
         "name": "Selection shape",
         "type": "select",
         "id": "selectionType",
+        "isSubmenu": true,
         "meta": {
           "items": [
             {
@@ -98,6 +150,7 @@
         "name": "Edition Type",
         "type": "select",
         "id": "editionType",
+        "isSubmenu": true,
         "meta": {
           "items": [
             {
@@ -162,15 +215,26 @@
   {
     "name": "Automated annotation tools",
     "type": "segmentation",
+    "shortName": "Automated",
     "comment": "TODO: ROI selection, auto annotation tags    ",
     "interface": [
       {
-        "name": "Docker image",
+        "name": "Automated annotation engine",
         "id": "image",
-        "type": "dockerImage"
+        "type": "dockerImage",
+        "isSubmenu": true
       },
       {
         "name": "",
+        "id": "jobDateTag",
+        "type": "checkbox",
+        "meta": {
+          "label": "Add job date tag (e.g. \"my-image job 1985-10-26 21:00:00 UTC-5\")",
+          "value": true
+        }
+      },
+      {
+        "name": "Annotation Configuration",
         "id": "annotation",
         "type": "annotation",
         "meta": {
@@ -178,13 +242,10 @@
         }
       },
       {
-        "name": "Connect to Nearest Tag",
+        "name": "Connect to nearest annotation with Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
-        "meta": {
-          "tagsLabel": "Connect to nearest tags...",
-          "layerLabel": "Restrict to Layer"
-        }
+        "advanced": true
       }
     ]
   }

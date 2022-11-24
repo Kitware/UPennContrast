@@ -209,7 +209,21 @@ export default class AnnotationsAPI {
   ) {
     const { configurationId, description, id, name, type, values } = tool;
     const image = values.image.image;
-    const { annotation, connectTo } = values;
+    const { annotation, connectTo, jobDateTag } = values;
+    let tags = annotation.tags;
+    if (jobDateTag) {
+      const date = new Date(Date.now());
+      const timeZone = date.getTimezoneOffset() / 60;
+      const dateString =
+        [date.getFullYear(), date.getMonth() + 1, date.getDate()].join("-") +
+        " " +
+        [date.getHours(), date.getMinutes(), date.getSeconds()].join(":") +
+        " UTC" +
+        (timeZone >= 0 ? "+" : "") +
+        timeZone;
+      const computedTag = image + " job " + dateString;
+      tags = [...tags, computedTag];
+    }
     const params = {
       configurationId,
       datasetId,
@@ -220,7 +234,7 @@ export default class AnnotationsAPI {
       image,
       channel: metadata.channel,
       assignment: metadata.location,
-      tags: annotation.tags,
+      tags,
       tile: metadata.tile,
       connectTo,
       workerInterface
