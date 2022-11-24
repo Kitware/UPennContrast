@@ -28,17 +28,16 @@ export function getAnnotationStyleFromLayer(
     return style;
   }
 
-  // "Hovered" style should be 1st priority
-  if (isHovered) {
-    style.fillColor = "gray";
-    style.strokeColor = "gray";
-    style.strokeWidth = 4;
-  } else if (isSelected) {
-    style.strokeColor = layer.color;
-    style.strokeWidth = 5;
-  } else if (layer) {
+  if (layer) {
     style.fillColor = layer.color;
     style.strokeColor = layer.color;
+  }
+  if (isHovered) {
+    style.radius = 13;
+  }
+  if (isSelected) {
+    style.fillOpacity = 0.3;
+    style.strokeWidth = 5;
   }
   return style;
 }
