@@ -113,14 +113,6 @@ export default class AnnotationConfiguration extends Vue {
   get dataset() {
     return this.store.dataset;
   }
-  get channels() {
-    return (
-      this.dataset?.channels.map(channelId => ({
-        value: channelId,
-        text: this.dataset?.channelNames.get(channelId)
-      })) || []
-    );
-  }
 
   tagSearchInput: string = "";
 

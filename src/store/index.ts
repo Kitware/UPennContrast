@@ -66,7 +66,6 @@ export class Main extends VuexModule {
 
   drawAnnotations: boolean = true;
   filteredDraw: boolean = false;
-  drawActive: boolean = false;
   annotationSelectionType: AnnotationSelectionTypes =
     AnnotationSelectionTypes.TOGGLE;
 
@@ -128,11 +127,6 @@ export class Main extends VuexModule {
   @Mutation
   public setFilteredDraw(value: boolean) {
     this.filteredDraw = value;
-  }
-
-  @Mutation
-  public setDrawActive(value: boolean) {
-    this.drawActive = value;
   }
 
   @Mutation
@@ -980,6 +974,13 @@ export class Main extends VuexModule {
       }
       return layer._histogram.promise;
     };
+  }
+
+  get getLayerFromId() {
+    return (layerId: string | undefined) =>
+      layerId === undefined
+        ? undefined
+        : this.configuration?.view.layers.find(layer => layer.id === layerId);
   }
 
   @Mutation

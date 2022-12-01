@@ -141,14 +141,6 @@ export default class AnnotationToggles extends Vue {
     this.store.setFilteredDraw(value);
   }
 
-  get drawActive() {
-    return this.store.drawActive;
-  }
-
-  set drawActive(value: boolean) {
-    this.store.setDrawActive(value);
-  }
-
   get drawConnections() {
     return this.store.drawAnnotationConnections;
   }
