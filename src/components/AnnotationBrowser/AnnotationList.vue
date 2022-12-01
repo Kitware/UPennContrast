@@ -3,10 +3,10 @@
     <v-expansion-panel-header class="py-1">
       Annotation List
       <v-spacer></v-spacer>
-      <v-btn v-if="selectionFilterEnabled" @click="clearSelection">
+      <v-btn v-if="selectionFilterEnabled" @click.native.stop="clearSelection">
         Clear selection filter
       </v-btn>
-      <v-btn v-else @click="filterBySelection">
+      <v-btn v-else @click.native.stop="filterBySelection">
         Use selection as filter
       </v-btn>
       <v-spacer></v-spacer>
@@ -22,7 +22,7 @@
         v-model="selected"
         item-key="id"
         show-select
-        :options="tableOptions"
+        :options.sync="tableOptions"
       >
         <template v-slot:body="{ items }">
           <tbody>
@@ -32,6 +32,7 @@
               @mouseover="hover(item.id)"
               @mouseleave="hover(null)"
               :class="item.id === hoveredId ? 'is-hovered' : ''"
+              :ref="item.id"
             >
               <td :class="tableItemClass">
                 <v-checkbox
@@ -87,7 +88,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Emit } from "vue-property-decorator";
+import { Vue, Component, Emit, Watch } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
@@ -114,9 +115,7 @@ export default class AnnotationList extends Vue {
 
   tableItemClass = "px-1"; // To enable dividers, use v-data-table__divider
 
-  tableOptions = {
-    itemsPerPage: 50
-  };
+  tableOptions: any = {};
 
   // TODO: clean up selected after filter changes
   get selected() {
@@ -222,6 +221,39 @@ export default class AnnotationList extends Vue {
 
   get hoveredId() {
     return this.annotationStore.hoveredAnnotationId;
+  }
+
+  @Watch("hoveredId")
+  hoveredAnnotationChanged() {
+    if (this.hoveredId === null) {
+      return;
+    }
+    // Change page
+    const entryIndex = this.filtered.findIndex(
+      annotation => annotation.id === this.hoveredId
+    );
+    if (entryIndex < 0) {
+      return;
+    }
+    this.tableOptions.page =
+      Math.floor(entryIndex / this.tableOptions.itemsPerPage) + 1;
+    console.log(this.tableOptions);
+    // Get the tr element from the refs if it exists
+    let annotationRef = this.$refs[this.hoveredId];
+    if (annotationRef === undefined) {
+      return;
+    }
+    if (Array.isArray(annotationRef)) {
+      if (annotationRef.length <= 0) {
+        return;
+      }
+      annotationRef = annotationRef[0];
+    }
+    // Scroll to the element
+    (annotationRef as Element).scrollIntoView({
+      behavior: "smooth",
+      block: "nearest"
+    });
   }
 
   @Emit("clickedTag")
