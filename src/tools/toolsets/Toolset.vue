@@ -46,6 +46,16 @@
                       :value="tool.id"
                       v-bind="attrs"
                       v-on="on"
+                      v-mousetrap="
+                        tool.hotkey
+                          ? {
+                              bind: tool.hotkey,
+                              handler: () =>
+                                (selectedToolId =
+                                  selectedToolId === tool.id ? '' : tool.id)
+                            }
+                          : []
+                      "
                     >
                       <v-list-item-avatar>
                         <tool-icon :tool="tool" />

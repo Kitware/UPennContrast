@@ -72,6 +72,8 @@ export interface IToolConfiguration {
   name: string;
   description: string;
 
+  hotkey: string | null;
+
   type: string;
 
   values: any;

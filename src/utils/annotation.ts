@@ -96,6 +96,7 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
     sums.x += x;
     sums.y += y;
     if (hasZ) {
+      // We know that z is not undefined
       // @ts-ignore
       sums.z += z;
     }
