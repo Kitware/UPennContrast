@@ -9,22 +9,20 @@
           <div class="header pa-1">{{ value.name }}</div>
         </v-col>
         <v-col class="denseCol">
-          <div v-if="index === 0" class="text-caption pb-2">
+          <div v-if="index === 0" class="text-caption pb-2" title="hotkey Z">
             Z max-merge
           </div>
           <v-switch
             @click.native.stop
             @mousedown.native.stop
             @mouseup.native.stop
-            v-mousetrap="[
-              {
-                bind: zMaxMergeBinding(index),
-                handler: () => (isZMaxMerge = !isZMaxMerge)
-              }
-            ]"
+            v-mousetrap="{
+              bind: zMaxMergeBinding(index),
+              handler: () => (isZMaxMerge = !isZMaxMerge)
+            }"
             class="toggleButton"
             v-model="isZMaxMerge"
-            :title="`Toggle Z Max Merge (Hotkey ${zMaxMergeBinding(index)})`"
+            :title="`Toggle Z Max Merge (hotkey ${zMaxMergeBinding(index)})`"
             :displayed="displayZ"
             dense
             hide-details
@@ -40,7 +38,7 @@
             @mouseup.native.stop
             class="toggleButton"
             v-model="visible"
-            :title="`Toggle Visibility (Hotkey ${index + 1})`"
+            :title="`Toggle Visibility (hotkey ${index + 1})`"
             dense
             hide-details
           />
@@ -164,6 +162,12 @@ export default class DisplayLayer extends Vue {
   @Prop()
   readonly index!: number;
 
+  @Prop()
+  readonly globalZMaxMerge!: boolean;
+
+  @Prop()
+  readonly zMaxMergeUpdate!: number;
+
   showColorPicker = false;
 
   get histogram() {
@@ -221,6 +225,11 @@ export default class DisplayLayer extends Vue {
     if (!this.isZMaxMerge) {
       this.alternativeZSlice = { ...this.zSlice };
     }
+  }
+
+  @Watch("zMaxMergeUpdate")
+  globalZMaxMergeChanged() {
+    this.isZMaxMerge = this.globalZMaxMerge;
   }
 
   set visible(value: boolean) {

@@ -10,7 +10,7 @@
             hide-details
             v-model="drawAnnotations"
             dense
-            label="Show Annotations"
+            label="Show Annotations (hotkey A)"
           ></v-checkbox>
         </v-list-item>
         <v-list-item v-if="drawAnnotations">

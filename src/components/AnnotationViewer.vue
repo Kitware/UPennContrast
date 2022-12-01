@@ -1,5 +1,5 @@
 <template>
-  <div></div>
+  <div v-mousetrap="mousetrapAnnotations"></div>
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
@@ -1227,6 +1227,22 @@ export default class AnnotationViewer extends Vue {
     this.propertiesStore.fetchPropertyValues();
     this.filterStore.updateHistograms();
   }
+
+  // Mousetrap bindings
+  mousetrapAnnotations = [
+    {
+      bind: "a",
+      handler: () => {
+        this.store.setDrawAnnotations(!this.store.drawAnnotations);
+      }
+    },
+    {
+      bind: "t",
+      handler: () => {
+        this.store.setShowTooltips(!this.store.showTooltips);
+      }
+    }
+  ];
 }
 </script>
 

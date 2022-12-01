@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div>
+    <div v-mousetrap="mousetrapSliders">
       <toolset></toolset>
       <v-layout>
         <value-slider
@@ -8,7 +8,7 @@
           label="XY"
           :min="0"
           :max="maxXY"
-          :title="maxXY > 0 ? maxXY + 1 + ' XY Values' : ''"
+          :title="maxXY > 0 ? maxXY + 1 + ' XY Values (hotkeys w/r)' : ''"
           :offset="1"
         />
         <v-checkbox
@@ -24,7 +24,7 @@
           label="Z"
           :min="0"
           :max="maxZ"
-          :title="maxZ > 0 ? maxZ + 1 + ' Z Values' : ''"
+          :title="maxZ > 0 ? maxZ + 1 + ' Z Values (hotkeys d/e)' : ''"
           :offset="1"
         />
         <v-checkbox
@@ -40,7 +40,7 @@
           label="Time"
           :min="0"
           :max="maxTime"
-          :title="maxTime > 0 ? maxTime + 1 + ' Time Values' : ''"
+          :title="maxTime > 0 ? maxTime + 1 + ' Time Values (hotkeys s/f)' : ''"
           :offset="1"
         />
         <v-checkbox
@@ -213,5 +213,51 @@ export default class ViewerToolbar extends Vue {
   get layerMode() {
     return this.store.layerMode;
   }
+
+  // Mousetrap bindings
+  mousetrapSliders = [
+    {
+      // XY left
+      bind: "w",
+      handler: () => {
+        this.xy = Math.max(this.xy - 1, 0);
+      }
+    },
+    {
+      // XY right
+      bind: "r",
+      handler: () => {
+        this.xy = Math.min(this.xy + 1, this.maxXY);
+      }
+    },
+    {
+      // Z down
+      bind: "d",
+      handler: () => {
+        this.z = Math.max(this.z - 1, 0);
+      }
+    },
+    {
+      // Z up
+      bind: "e",
+      handler: () => {
+        this.z = Math.min(this.z + 1, this.maxZ);
+      }
+    },
+    {
+      // previous T
+      bind: "s",
+      handler: () => {
+        this.time = Math.max(this.time - 1, 0);
+      }
+    },
+    {
+      // next T
+      bind: "f",
+      handler: () => {
+        this.time = Math.min(this.time + 1, this.maxTime);
+      }
+    }
+  ];
 }
 </script>
