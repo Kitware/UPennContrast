@@ -664,27 +664,6 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async handleHotkey(hotKey: number) {
-    if (
-      !this.dataset ||
-      !this.configuration ||
-      hotKey < 1 ||
-      hotKey > this.configuration.view.layers.length
-    ) {
-      return;
-    }
-    if (
-      /^(input|textarea|select)$/.test(
-        (document!.activeElement!.tagName || "").toLowerCase()
-      )
-    ) {
-      return;
-    }
-    this.toggleLayer(hotKey - 1);
-    await this.syncConfiguration();
-  }
-
-  @Action
   async toggleLayerVisibility(layerIndex: number) {
     if (
       !this.dataset ||

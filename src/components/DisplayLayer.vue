@@ -36,6 +36,10 @@
             @click.native.stop
             @mousedown.native.stop
             @mouseup.native.stop
+            v-mousetrap="{
+              bind: `${index + 1}`,
+              handler: () => store.toggleLayerVisibility(index)
+            }"
             class="toggleButton"
             v-model="visible"
             :title="`Toggle Visibility (hotkey ${index + 1})`"
