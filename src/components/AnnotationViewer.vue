@@ -104,6 +104,9 @@ export default class AnnotationViewer extends Vue {
   }
 
   get displayableAnnotations() {
+    if (!this.annotationLayer || !this.shouldDrawAnnotations) {
+      return [];
+    }
     return this.store.filteredDraw
       ? this.filteredAnnotations
       : this.annotationStore.annotations;
