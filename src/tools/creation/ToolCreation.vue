@@ -17,25 +17,60 @@
           ref="toolConfiguration"
         />
         <!-- Tool name with autofill -->
-        <v-container>
-          <v-card v-if="selectedTemplate" flat class="pa-4 ma-0">
-            <v-card-title class="pa-0 ma-0">
-              Tool Name
-            </v-card-title>
-            <v-text-field
-              v-model="toolName"
-              :append-icon="userToolName ? 'mdi-refresh' : ''"
-              @click:append="userToolName = false"
-              @input="userToolName = true"
-              dense
-              class="px-4 py-0 ma-0"
-            />
-          </v-card>
+        <v-container v-if="selectedTemplate" class="pa-4">
+          <v-row dense>
+            <v-col>
+              <div class="title white--text">
+                Tool Name
+              </div>
+            </v-col>
+          </v-row>
+          <v-row dense class="px-4">
+            <v-col>
+              <v-text-field
+                v-model="toolName"
+                :append-icon="userToolName ? 'mdi-refresh' : ''"
+                @click:append="userToolName = false"
+                @input="userToolName = true"
+                dense
+              />
+            </v-col>
+          </v-row>
+          <v-row dense>
+            <v-col>
+              <div class="title white--text">
+                Tool Hotkey
+              </div>
+            </v-col>
+          </v-row>
+          <v-row dense class="px-4">
+            <v-col class="d-inline-flex">
+              <div>
+                {{
+                  hotkey === null
+                    ? "No hotkey yet"
+                    : `Current hotkey: ${hotkey}`
+                }}
+              </div>
+              <v-spacer />
+              <v-progress-circular indeterminate v-if="isRecordingHotkey" />
+              <v-btn
+                class="mx-2"
+                @click="editHotkey()"
+                :disabled="isRecordingHotkey"
+              >
+                {{ isRecordingHotkey ? "Recording..." : "Record hotkey" }}
+              </v-btn>
+              <v-btn class="mx-2" @click="hotkey = null">
+                Clear hotkey
+              </v-btn>
+            </v-col>
+          </v-row>
         </v-container>
       </v-card-text>
       <v-card-actions>
         <v-container class="button-bar ma-0 pa-0">
-          <v-spacer></v-spacer>
+          <v-spacer />
           <v-btn
             class="mr-4"
             color="primary"
@@ -60,6 +95,7 @@ import { AnnotationNames, AnnotationShape } from "@/store/model";
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";
 import { logError } from "@/utils/log";
+import Mousetrap from "mousetrap";
 
 const defaultValues = {
   name: "New Tool",
@@ -89,6 +125,9 @@ export default class ToolCreation extends Vue {
   userToolName = false;
   toolName = "New Tool";
 
+  isRecordingHotkey: boolean = false;
+  hotkey: string | null = null;
+
   @Prop()
   readonly open: any;
 
@@ -103,6 +142,7 @@ export default class ToolCreation extends Vue {
       tool.template = this.selectedTemplate;
       tool.values = this.toolValues;
       tool.type = this.selectedTemplate.type;
+      tool.hotkey = this.hotkey;
       if (tool.type === "segmentation") {
         const { image } = tool.values.image;
         this.propertyStore.requestWorkerInterface(image);
@@ -175,6 +215,17 @@ export default class ToolCreation extends Vue {
       return;
     }
     this.toolName = "New Tool";
+  }
+
+  editHotkey() {
+    // The extensions of Mousetrap are loaded in main.ts
+    // but they don't update the types, hence the ts-ignore
+    this.isRecordingHotkey = true;
+    // @ts-ignore
+    Mousetrap.record((sequence: string[]) => {
+      this.hotkey = sequence.join(" ");
+      this.isRecordingHotkey = false;
+    });
   }
 
   @Watch("open")

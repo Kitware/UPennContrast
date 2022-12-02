@@ -26,21 +26,6 @@ import store from "@/store";
 })
 export default class Viewer extends Vue {
   readonly store = store;
-
-  created() {
-    document.addEventListener("keydown", this.onKeyDown);
-  }
-
-  beforeDestroy() {
-    document.removeEventListener("keydown", this.onKeyDown);
-  }
-
-  private onKeyDown(evt: KeyboardEvent) {
-    // handle hot keys
-    if (/^\d$/g.test(evt.key)) {
-      this.store.handleHotkey(parseInt(evt.key, 10));
-    }
-  }
 }
 </script>
 

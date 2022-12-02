@@ -1,5 +1,5 @@
 <template>
-  <div></div>
+  <div v-mousetrap="mousetrapAnnotations"></div>
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
@@ -104,6 +104,9 @@ export default class AnnotationViewer extends Vue {
   }
 
   get displayableAnnotations() {
+    if (!this.annotationLayer || !this.shouldDrawAnnotations) {
+      return [];
+    }
     return this.store.filteredDraw
       ? this.filteredAnnotations
       : this.annotationStore.annotations;
@@ -1231,6 +1234,22 @@ export default class AnnotationViewer extends Vue {
       }
     });
   }
+
+  // Mousetrap bindings
+  mousetrapAnnotations = [
+    {
+      bind: "a",
+      handler: () => {
+        this.store.setDrawAnnotations(!this.store.drawAnnotations);
+      }
+    },
+    {
+      bind: "t",
+      handler: () => {
+        this.store.setShowTooltips(!this.store.showTooltips);
+      }
+    }
+  ];
 }
 </script>
 

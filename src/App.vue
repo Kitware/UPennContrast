@@ -1,5 +1,5 @@
 <template>
-  <v-app v-mousetrap="mousetrapBindings" id="inspire">
+  <v-app id="inspire">
     <v-app-bar class="elevation-1" app clipped-right>
       <v-toolbar-title @click="goHome" class="logo"
         >NimbusImage</v-toolbar-title
@@ -76,13 +76,10 @@ import ServerStatus from "./components/ServerStatus.vue";
 import Snapshots from "./components/Snapshots.vue";
 import AnnotationBrowser from "@/components/AnnotationBrowser/AnnotationBrowser.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
-import vMousetrap from "./utils/v-mousetrap";
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
 import Persister from "@/store/Persister";
-
-Vue.use(vMousetrap);
 
 @Component({
   components: {
@@ -103,15 +100,6 @@ export default class App extends Vue {
   annotationPanel = false;
 
   lastModifiedRightPanel: string | null = null;
-
-  mousetrapBindings = [
-    {
-      bind: "t",
-      handler: () => {
-        this.store.setShowTooltips(!this.store.showTooltips);
-      }
-    }
-  ];
 
   fetchConfig() {
     // Fetch the list of available tool templates

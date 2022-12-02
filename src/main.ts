@@ -18,9 +18,15 @@ import App from "./App.vue";
 import "./style.scss";
 import VueRouter from "vue-router";
 
+// Mousetrap is configured for further imports (no need to import record plugin again)
+import _Mousetrap from "mousetrap";
+import "mousetrap/plugins/record/mousetrap-record.min.js";
+import vMousetrap from "./utils/v-mousetrap";
+
 Vue.config.productionTip = false;
 
 Vue.use(VueAsyncComputed);
+Vue.use(vMousetrap);
 
 main.initialize();
 

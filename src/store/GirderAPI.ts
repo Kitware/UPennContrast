@@ -572,12 +572,20 @@ function asDataset(folder: IGirderFolder): IDataset {
 }
 
 function asToolConfiguration(item: IGirderItem): IToolConfiguration {
-  const { values, template, type, datasetId, configurationId } = item.meta;
+  const {
+    values,
+    template,
+    type,
+    hotkey,
+    datasetId,
+    configurationId
+  } = item.meta;
   const tool = {
     id: item._id,
     _girder: item,
     name: item.name,
     description: item.description,
+    hotkey: hotkey,
     type,
     values,
     template,

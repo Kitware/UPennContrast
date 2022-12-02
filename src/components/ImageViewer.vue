@@ -2,7 +2,7 @@
   <div class="image">
     <annotation-viewer
       v-for="(mapentry, index) in maps.filter(
-        (mapentry, index) =>
+        mapentry =>
           mapentry.annotationLayer &&
           mapentry.lowestLayer !== undefined &&
           mapentry.imageLayers &&
@@ -85,16 +85,17 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import geojs from "geojs";
 
-import { IImage } from "../store/model";
+import { IImage, ILayerStackImage, IMapEntry } from "../store/model";
 import setFrameQuad from "../utils/setFrameQuad.js";
 
 import AnnotationViewer from "@/components/AnnotationViewer.vue";
+import { ITileHistogram } from "@/store/images";
 
 function generateFilterURL(
   index: number,
   contrast: { whitePoint: number; blackPoint: number; mode: string },
   color: string,
-  hist: { min: number; max: number }
+  hist: ITileHistogram | null
 ) {
   if (hist === null) {
     return;
@@ -151,16 +152,14 @@ export default class ImageViewer extends Vue {
 
   private ready = { layers: [] };
 
-  private imageLayers: any[] = [];
-
-  private maps: any[] = [];
+  maps: IMapEntry[] = [];
   tileWidth: number = 0;
   tileHeight: number = 0;
 
-  private unrollW: number = 1;
-  private unrollH: number = 1;
+  unrollW: number = 1;
+  unrollH: number = 1;
 
-  private textLayer: any;
+  private _inPan: number | undefined = undefined;
 
   cacheProgress = 0; // 0 to cacheProgressTotal
   cacheProgressTotal = 0;
@@ -196,11 +195,11 @@ export default class ImageViewer extends Vue {
     this.draw(this.$refs.geojsmap);
   }
 
-  private get layerStackImages() {
+  get layerStackImages() {
     return this.store.configuration ? this.store.layerStackImages : [];
   }
 
-  private get mapLayerList() {
+  get mapLayerList(): ILayerStackImage[][] {
     let llist = [this.layerStackImages];
     if (this.store.layerMode === "unroll") {
       llist = [[]];
@@ -221,7 +220,7 @@ export default class ImageViewer extends Vue {
   /**
    * Synchronize all maps on any pan event.
    */
-  private _handlePan(evt, mapidx) {
+  private _handlePan(mapidx: number) {
     if (this._inPan !== undefined) {
       return;
     }
@@ -256,7 +255,7 @@ export default class ImageViewer extends Vue {
   private blankUrl =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQIHWNgYAAAAAMAAU9ICq8AAAAASUVORK5CYII=";
 
-  private _setupMap(mll, mllidx, parentElement, someImage) {
+  private _setupMap(mllidx: number, parentElement: Element, someImage: IImage) {
     const mapElement = parentElement.querySelector(`#map-${mllidx}`);
     if (!mapElement) {
       return;
@@ -284,16 +283,17 @@ export default class ImageViewer extends Vue {
     params.layer.url = this.blankUrl;
     params.map.max += 5;
 
+    let needReset = false;
     if (this.maps.length > mllidx && !mapElement.firstChild) {
-      const mapentry = this.maps[mllidx];
-      mapentry.map.exit();
-      this.maps[mllidx] = undefined;
+      this.maps[mllidx].map.exit();
+      needReset = true;
     }
 
-    let map, mapentry;
-    if (this.maps.length <= mllidx || this.maps[mllidx] === undefined) {
+    let map: any;
+    let mapentry: IMapEntry | undefined;
+    if (this.maps.length <= mllidx || needReset) {
       map = geojs.map(params.map);
-      map.geoOn(geojs.event.pan, evt => this._handlePan(evt, mllidx));
+      map.geoOn(geojs.event.pan, () => this._handlePan(mllidx));
       mapentry = {
         map: map,
         imageLayers: [],
@@ -376,7 +376,12 @@ export default class ImageViewer extends Vue {
   /**
    * Make sure a map has the appropriate tile layers.
    */
-  private _setupTileLayers(mll, mllidx, someImage, baseLayerIndex) {
+  private _setupTileLayers(
+    mll: ILayerStackImage[],
+    mllidx: number,
+    someImage: IImage,
+    baseLayerIndex: number
+  ) {
     const mapentry = this.maps[mllidx];
     const map = mapentry.map;
     // adjust number of tile layers
@@ -441,7 +446,6 @@ export default class ImageViewer extends Vue {
           .replace("{y}", ty);
         return result;
       });
-      const o = layer._tileBounds;
       layer._tileBounds = (tile: any) => {
         const s = Math.pow(2, someImage.levels - 1 - tile.index.level);
         const w = Math.ceil(someImage.sizeX / s),
@@ -503,26 +507,16 @@ export default class ImageViewer extends Vue {
   /**
    * Set tile urls for all tile layers/
    */
-  private _setTileUrls(mll, mllidx, someImage, baseLayerIndex) {
+  private _setTileUrls(
+    mll: ILayerStackImage[],
+    mllidx: number,
+    someImage: IImage,
+    baseLayerIndex: number
+  ) {
     const mapentry = this.maps[mllidx];
-    const map = mapentry.map;
     mll.forEach(
       (
-        {
-          layer,
-          urls,
-          fullUrls,
-          hist,
-          singleFrame,
-          baseQuadOptions
-        }: {
-          layer: any;
-          urls: string[];
-          fullUrls: string[];
-          hist: any;
-          singleFrame: number | null;
-          baseQuadOptions: any;
-        },
+        { layer, urls, fullUrls, hist, singleFrame, baseQuadOptions },
         layerIndex: number
       ) => {
         let fullLayer = mapentry.imageLayers[layerIndex * 2];
@@ -618,7 +612,7 @@ export default class ImageViewer extends Vue {
     if (!this.layerStackImages.length) {
       return;
     }
-    const someImages = this.layerStackImages.find((lsi: any) => lsi.images[0]);
+    const someImages = this.layerStackImages.find(lsi => lsi.images[0]);
     if (!someImages) {
       return;
     }
@@ -640,11 +634,13 @@ export default class ImageViewer extends Vue {
     const mapLayerList = this.mapLayerList;
     while (this.maps.length > mapLayerList.length) {
       const mapentry = this.maps.pop();
-      mapentry.map.exit();
+      if (mapentry) {
+        mapentry.map.exit();
+      }
     }
     let baseLayerIndex = 0;
     mapLayerList.forEach((mll, mllidx) => {
-      this._setupMap(mll, mllidx, parentElement, someImage);
+      this._setupMap(mllidx, parentElement, someImage);
       const mapentry = this.maps[mllidx];
       if (!mapentry) {
         return;
@@ -680,7 +676,7 @@ export default class ImageViewer extends Vue {
   beforeDestroy() {
     if (this.maps) {
       this.maps.forEach(mapentry => mapentry.map.exit());
-      this.maps = null;
+      this.maps = [];
     }
   }
 }

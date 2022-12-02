@@ -1,10 +1,12 @@
 <template>
-  <v-expansion-panels multiple accordion>
+  <v-expansion-panels multiple accordion v-mousetrap="mousetrapMaxMerge">
     <display-layer
       v-for="(l, index) in layers"
       :key="l.id"
       :value="l"
       :index="index"
+      :globalZMaxMerge="globalZMaxMerge"
+      :zMaxMergeUpdate="zMaxMergeUpdate"
     />
     <v-expansion-panel readonly class="add-layer">
       <v-btn @click="addLayer" icon>
@@ -26,6 +28,9 @@ import store from "@/store";
 export default class DisplayLayers extends Vue {
   readonly store = store;
 
+  globalZMaxMerge: boolean = false;
+  zMaxMergeUpdate: number = 0;
+
   get layers() {
     return this.store.configuration ? this.store.configuration.view.layers : [];
   }
@@ -33,6 +38,20 @@ export default class DisplayLayers extends Vue {
   addLayer() {
     this.store.addLayer();
   }
+
+  globalZMaxMergeUpdate() {
+    const currentMaxMerge = this.layers.every(
+      layer => layer.z.type === "max-merge"
+    );
+    this.globalZMaxMerge = !currentMaxMerge;
+    this.zMaxMergeUpdate++;
+  }
+
+  // Mousetrap bindings
+  mousetrapMaxMerge = {
+    bind: "z",
+    handler: this.globalZMaxMergeUpdate
+  };
 }
 </script>
 
