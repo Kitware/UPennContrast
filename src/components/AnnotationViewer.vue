@@ -1057,7 +1057,11 @@ export default class AnnotationViewer extends Vue {
             unitsPerPixel
           )
         ) {
-          this.annotationStore.setHoveredAnnotationId(id);
+          if (this.annotationStore.hoveredAnnotationId === id) {
+            this.annotationStore.setHoveredAnnotationId(null);
+          } else {
+            this.annotationStore.setHoveredAnnotationId(id);
+          }
           return true;
         } else {
           return false;
@@ -1222,7 +1226,7 @@ export default class AnnotationViewer extends Vue {
     this.filterStore.updateHistograms();
 
     this.annotationLayer.geoOn(geojs.event.mouseclick, (evt: any) => {
-      if (evt?.geo) {
+      if (this.selectedTool === null && evt?.geo) {
         this.setHoveredAnnotationFromCoordinates(evt.geo);
       }
     });
