@@ -398,16 +398,19 @@ export default class AnnotationViewer extends Vue {
       }
     }
 
-    const xy = layer.xy.value !== null ? layer.xy.value : this.store.xy;
-    const z = layer.z.value !== null ? layer.z.value : this.store.z;
-    const time = layer.time.value !== null ? layer.time.value : this.store.time;
-    const channel = layer.channel;
+    if (!layer.visible || layer.channel !== annotation.channel) {
+      return false;
+    }
+
+    const sliceIndexes = this.store.layerSliceIndexes(layer);
+    if (!sliceIndexes) {
+      return false;
+    }
     return (
-      layer.visible &&
-      annotation.location.XY === xy &&
-      annotation.location.Z === z &&
-      annotation.location.Time === time &&
-      annotation.channel === channel
+      (this.store.unrollXY ||
+        annotation.location.XY === sliceIndexes.xyIndex) &&
+      (this.store.unrollZ || annotation.location.Z === sliceIndexes.zIndex) &&
+      (this.store.unrollT || annotation.location.Time === sliceIndexes.tIndex)
     );
   }
 
@@ -940,7 +943,7 @@ export default class AnnotationViewer extends Vue {
           x: basePositionDisplay.x - this.selectedToolRadius,
           y: basePositionDisplay.y + this.selectedToolRadius
         }
-      ].map(displayCoordinate => map.displayToGcs(displayCoordinate))
+      ].map(map.displayToGcs)
     );
     this.cursorAnnotation.draw();
     return true;
