@@ -103,7 +103,7 @@
             </v-btn>
           </v-col>
         </v-row>
-        <v-row>
+        <v-row v-if="store.dataset">
           <v-col class="pa-2">
             <v-text-field
               label="Left"
@@ -178,7 +178,7 @@
           :items-per-page="5"
           item-key="key"
           class="accent-1"
-          @click:row="(item, unused) => loadSnapshot(item.name)"
+          @click:row="item => loadSnapshot(item.name)"
         >
           <!-- Search bar -->
           <template v-slot:top>
@@ -218,7 +218,9 @@
               :max="
                 Math.min(
                   format === 'tiled' ? 1e8 : 10000,
-                  Math.max(store.dataset.width, store.dataset.height)
+                  store.dataset
+                    ? Math.max(store.dataset.width, store.dataset.height)
+                    : Infinity
                 )
               "
               dense
@@ -269,6 +271,13 @@ import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
 import geojs from "geojs";
 import { formatDate } from "@/utils/date";
+
+interface ISnapshotItem {
+  name: string;
+  key: string;
+  record: any;
+  modified: string;
+}
 
 @Component
 export default class Snapshots extends Vue {
@@ -415,7 +424,7 @@ export default class Snapshots extends Vue {
   }
 
   getDownload() {
-    let url = store.layerStackImages[0].urls[0].split("/zxy/")[0] + "/region";
+    let url = store.layerStackImages[0].urls[0]?.split("/zxy/")[0] + "/region";
     let params = this.getBasicDownloadParams();
     let bands: any = [];
     store.configuration!.view.layers.forEach((layer, idx) => {
@@ -423,9 +432,9 @@ export default class Snapshots extends Vue {
         layer.visible &&
         (this.exportLayer === "all" || parseInt(this.exportLayer) === idx)
       ) {
-        let suburl = store.layerStackImages[idx].urls[0].split("?")[1];
+        let suburl = store.layerStackImages[idx].urls[0]?.split("?")[1];
         let q: any = {};
-        suburl.split("&").forEach((e: string) => {
+        suburl?.split("&").forEach((e: string) => {
           let pair = e.split("=");
           q[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
         });
@@ -607,9 +616,9 @@ export default class Snapshots extends Vue {
     }
   }
 
-  snapshotList(sortMode?: string): { [key: string]: any }[] {
+  snapshotList(sortMode?: string) {
     let sre = new RegExp(this.snapshotSearch || "", "i");
-    let results: { [key: string]: any }[] = [];
+    let results: ISnapshotItem[] = [];
     if (store.configuration && store.configuration.snapshots) {
       let snapshots = store.configuration.snapshots.slice();
       if (!sortMode) {

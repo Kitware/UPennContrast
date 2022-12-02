@@ -293,6 +293,41 @@ export interface IUISetting {
   activeLayer: IDisplayLayer;
 }
 
+export interface IMapEntry {
+  map: any;
+  imageLayers: any[];
+  params: any;
+  baseLayerIndex: number | undefined;
+  annotationLayer?: any;
+  workerPreviewLayer?: any;
+  workerPreviewFeature?: any;
+  textLayer?: any;
+  uiLayer?: any;
+  scaleWidget?: any;
+  lowestLayer?: number;
+}
+
+export interface ILayerStackImage {
+  layer: IDisplayLayer;
+  images: IImage[];
+  urls: (string | undefined)[];
+  fullUrls: (string | undefined)[];
+  hist: ITileHistogram | null;
+  singleFrame: number | null;
+  baseQuadOptions?: {
+    baseUrl: string;
+    restRequest: (params: any) => Promise<any>;
+    restUrl: string;
+    maxTextures: number;
+    maxTextureSize: number;
+    query: string;
+    frameBase?: number;
+    frameStride?: number;
+    frameGroup?: number;
+    frameGroupStride?: number;
+  };
+}
+
 export function isConfigurationItem(item: IGirderItem) {
   return item.meta.subtype === "contrastConfiguration";
 }

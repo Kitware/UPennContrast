@@ -85,17 +85,17 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import geojs from "geojs";
 
-import { IImage } from "../store/model";
+import { IImage, ILayerStackImage, IMapEntry } from "../store/model";
 import setFrameQuad from "../utils/setFrameQuad.js";
 
 import AnnotationViewer from "@/components/AnnotationViewer.vue";
-import { ITileMeta } from "@/store/GirderAPI";
+import { ITileHistogram } from "@/store/images";
 
 function generateFilterURL(
   index: number,
   contrast: { whitePoint: number; blackPoint: number; mode: string },
   color: string,
-  hist: { min: number; max: number }
+  hist: ITileHistogram | null
 ) {
   if (hist === null) {
     return;
@@ -152,16 +152,12 @@ export default class ImageViewer extends Vue {
 
   private ready = { layers: [] };
 
-  private imageLayers: any[] = [];
-
-  maps: any[] = [];
+  maps: IMapEntry[] = [];
   tileWidth: number = 0;
   tileHeight: number = 0;
 
   unrollW: number = 1;
   unrollH: number = 1;
-
-  private textLayer: any;
 
   private _inPan: number | undefined = undefined;
 
@@ -203,12 +199,12 @@ export default class ImageViewer extends Vue {
     return this.store.configuration ? this.store.layerStackImages : [];
   }
 
-  get mapLayerList(): any[][] {
+  get mapLayerList(): ILayerStackImage[][] {
     let llist = [this.layerStackImages];
     if (this.store.layerMode === "unroll") {
       llist = [[]];
       let visible = 0;
-      this.layerStackImages.forEach((lsi: any) => {
+      this.layerStackImages.forEach(lsi => {
         if (visible && lsi.layer.visible) {
           llist.push([]);
         }
@@ -224,7 +220,7 @@ export default class ImageViewer extends Vue {
   /**
    * Synchronize all maps on any pan event.
    */
-  private _handlePan(_: any, mapidx: number) {
+  private _handlePan(mapidx: number) {
     if (this._inPan !== undefined) {
       return;
     }
@@ -259,12 +255,7 @@ export default class ImageViewer extends Vue {
   private blankUrl =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQIHWNgYAAAAAMAAU9ICq8AAAAASUVORK5CYII=";
 
-  private _setupMap(
-    _: any,
-    mllidx: number,
-    parentElement: Element,
-    someImage: ITileMeta
-  ) {
+  private _setupMap(mllidx: number, parentElement: Element, someImage: IImage) {
     const mapElement = parentElement.querySelector(`#map-${mllidx}`);
     if (!mapElement) {
       return;
@@ -292,16 +283,17 @@ export default class ImageViewer extends Vue {
     params.layer.url = this.blankUrl;
     params.map.max += 5;
 
+    let needReset = false;
     if (this.maps.length > mllidx && !mapElement.firstChild) {
-      const mapentry = this.maps[mllidx];
-      mapentry.map.exit();
-      this.maps[mllidx] = undefined;
+      this.maps[mllidx].map.exit();
+      needReset = true;
     }
 
-    let map, mapentry: any;
-    if (this.maps.length <= mllidx || this.maps[mllidx] === undefined) {
+    let map: any;
+    let mapentry: IMapEntry | undefined;
+    if (this.maps.length <= mllidx || needReset) {
       map = geojs.map(params.map);
-      map.geoOn(geojs.event.pan, (evt: any) => this._handlePan(evt, mllidx));
+      map.geoOn(geojs.event.pan, () => this._handlePan(mllidx));
       mapentry = {
         map: map,
         imageLayers: [],
@@ -385,9 +377,9 @@ export default class ImageViewer extends Vue {
    * Make sure a map has the appropriate tile layers.
    */
   private _setupTileLayers(
-    mll: any[],
+    mll: ILayerStackImage[],
     mllidx: number,
-    someImage: ITileMeta,
+    someImage: IImage,
     baseLayerIndex: number
   ) {
     const mapentry = this.maps[mllidx];
@@ -454,7 +446,6 @@ export default class ImageViewer extends Vue {
           .replace("{y}", ty);
         return result;
       });
-      const o = layer._tileBounds;
       layer._tileBounds = (tile: any) => {
         const s = Math.pow(2, someImage.levels - 1 - tile.index.level);
         const w = Math.ceil(someImage.sizeX / s),
@@ -517,29 +508,15 @@ export default class ImageViewer extends Vue {
    * Set tile urls for all tile layers/
    */
   private _setTileUrls(
-    mll: any[],
+    mll: ILayerStackImage[],
     mllidx: number,
-    someImage: ITileMeta,
+    someImage: IImage,
     baseLayerIndex: number
   ) {
     const mapentry = this.maps[mllidx];
     mll.forEach(
       (
-        {
-          layer,
-          urls,
-          fullUrls,
-          hist,
-          singleFrame,
-          baseQuadOptions
-        }: {
-          layer: any;
-          urls: string[];
-          fullUrls: string[];
-          hist: any;
-          singleFrame: number | null;
-          baseQuadOptions: any;
-        },
+        { layer, urls, fullUrls, hist, singleFrame, baseQuadOptions },
         layerIndex: number
       ) => {
         let fullLayer = mapentry.imageLayers[layerIndex * 2];
@@ -635,7 +612,7 @@ export default class ImageViewer extends Vue {
     if (!this.layerStackImages.length) {
       return;
     }
-    const someImages = this.layerStackImages.find((lsi: any) => lsi.images[0]);
+    const someImages = this.layerStackImages.find(lsi => lsi.images[0]);
     if (!someImages) {
       return;
     }
@@ -657,11 +634,13 @@ export default class ImageViewer extends Vue {
     const mapLayerList = this.mapLayerList;
     while (this.maps.length > mapLayerList.length) {
       const mapentry = this.maps.pop();
-      mapentry.map.exit();
+      if (mapentry) {
+        mapentry.map.exit();
+      }
     }
     let baseLayerIndex = 0;
     mapLayerList.forEach((mll, mllidx) => {
-      this._setupMap(mll, mllidx, parentElement, someImage);
+      this._setupMap(mllidx, parentElement, someImage);
       const mapentry = this.maps[mllidx];
       if (!mapentry) {
         return;

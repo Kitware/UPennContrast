@@ -24,7 +24,8 @@ import {
   IDisplayLayer,
   IImage,
   newLayer,
-  AnnotationSelectionTypes
+  AnnotationSelectionTypes,
+  ILayerStackImage
 } from "./model";
 
 import persister from "./Persister";
@@ -784,7 +785,7 @@ export class Main extends VuexModule {
     };
   }
 
-  get layerStackImages(): any {
+  get layerStackImages() {
     if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
       return [];
     }
@@ -804,7 +805,7 @@ export class Main extends VuexModule {
         layer.time.type !== "max-merge" &&
         layer.z.type !== "max-merge" &&
         images.length === 1;
-      const results: { [key: string]: any } = {
+      const results: ILayerStackImage = {
         layer,
         images,
         urls: images.map(image =>
