@@ -16,6 +16,17 @@
       ></annotation-csv-dialog>
     </v-expansion-panel-header>
     <v-expansion-panel-content>
+      <v-dialog v-model="annotationFilteredDialog">
+        <v-card>
+          <v-card-title>
+            Annotation does not pass current filtering criteria
+          </v-card-title>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn @click.native="annotationFilteredDialog = false">OK</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
       <v-data-table
         :items="filtered"
         :headers="headers"
@@ -116,6 +127,8 @@ export default class AnnotationList extends Vue {
   tableItemClass = "px-1"; // To enable dividers, use v-data-table__divider
 
   tableOptions: any = {};
+
+  annotationFilteredDialog: boolean = false;
 
   // TODO: clean up selected after filter changes
   get selected() {
@@ -233,11 +246,11 @@ export default class AnnotationList extends Vue {
       annotation => annotation.id === this.hoveredId
     );
     if (entryIndex < 0) {
+      this.annotationFilteredDialog = true;
       return;
     }
     this.tableOptions.page =
       Math.floor(entryIndex / this.tableOptions.itemsPerPage) + 1;
-    console.log(this.tableOptions);
     // Get the tr element from the refs if it exists
     let annotationRef = this.$refs[this.hoveredId];
     if (annotationRef === undefined) {
@@ -287,6 +300,10 @@ tbody tr.is-hovered:hover {
   min-height: 0 !important;
   display: flex !important;
   align-items: center !important;
+}
+
+.v-dialog {
+  width: 50%;
 }
 
 .v-input--selection-controls {
