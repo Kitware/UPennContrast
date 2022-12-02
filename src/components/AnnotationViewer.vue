@@ -1035,31 +1035,39 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-  handleMouseOver(evt: any) {
-    if (!evt || this.selectedTool) {
-      return;
-    }
-    let annotation = evt?.data?.annotation;
-    if (!annotation && evt?.data?.length) {
-      annotation = evt.data[0][2].annotation;
-    }
-    if (annotation && annotation.options("girderId")) {
-      this.annotationStore.setHoveredAnnotationId(
-        annotation.options("girderId")
-      );
-    }
-  }
-
-  handleMouseOff(evt: any) {
-    let annotation = evt?.data?.annotation;
-    if (!annotation && evt?.data?.length) {
-      annotation = evt.data[0][2].annotation;
-    }
-    if (
-      annotation &&
-      annotation.options("girderId") &&
-      this.hoveredAnnotationId === annotation.options("girderId")
-    ) {
+  setHoveredAnnotationFromCoordinates(gcsCoordinates: IGeoJSPoint) {
+    const hasSet = this.annotationLayer
+      .annotations()
+      .some((geoJSAnnotation: any) => {
+        const id = geoJSAnnotation.options("girderId");
+        if (!id) {
+          return false;
+        }
+        const annotation = this.getAnnotationFromId(id);
+        if (!annotation) {
+          return false;
+        }
+        const unitsPerPixel = this.getMapUnitsPerPixel();
+        if (
+          this.shouldSelectAnnotation(
+            AnnotationShape.Point,
+            [gcsCoordinates],
+            annotation,
+            geoJSAnnotation.style(),
+            unitsPerPixel
+          )
+        ) {
+          if (this.annotationStore.hoveredAnnotationId === id) {
+            this.annotationStore.setHoveredAnnotationId(null);
+          } else {
+            this.annotationStore.setHoveredAnnotationId(id);
+          }
+          return true;
+        } else {
+          return false;
+        }
+      });
+    if (!hasSet) {
       this.annotationStore.setHoveredAnnotationId(null);
     }
   }
@@ -1070,16 +1078,6 @@ export default class AnnotationViewer extends Vue {
   }
 
   handleAnnotationChange(evt: any) {
-    this.annotationLayer
-      .features()
-      .filter((feature: any) => !feature.selectionAPI())
-      .forEach((feature: any) => {
-        feature.selectionAPI(true);
-        feature.geoOff(geojs.event.feature.mouseon, this.handleMouseOver);
-        feature.geoOff(geojs.event.feature.mouseoff, this.handleMouseOff);
-        feature.geoOn(geojs.event.feature.mouseon, this.handleMouseOver);
-        feature.geoOn(geojs.event.feature.mouseoff, this.handleMouseOff);
-      });
     if (!this.selectedTool && !this.roiFilter) {
       return;
     }
@@ -1226,6 +1224,12 @@ export default class AnnotationViewer extends Vue {
     this.propertiesStore.fetchProperties();
     this.propertiesStore.fetchPropertyValues();
     this.filterStore.updateHistograms();
+
+    this.annotationLayer.geoOn(geojs.event.mouseclick, (evt: any) => {
+      if (this.selectedTool === null && evt?.geo) {
+        this.setHoveredAnnotationFromCoordinates(evt.geo);
+      }
+    });
   }
 }
 </script>

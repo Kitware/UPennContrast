@@ -19,25 +19,21 @@ export function getAnnotationStyleFromLayer(
     strokeColor: "black",
     strokeOpacity: 1,
     strokeWidth: 2,
-    fillColor: "#white",
+    fillColor: "white",
     fillOpacity: 0.5,
     fill: true,
     radius: 10
   };
-  if (!layer) {
-    return style;
-  }
 
   if (layer) {
     style.fillColor = layer.color;
     style.strokeColor = layer.color;
   }
-  if (isHovered) {
-    style.radius = 13;
-  }
   if (isSelected) {
-    style.fillOpacity = 0.3;
     style.strokeWidth = 5;
+  }
+  if (isHovered) {
+    style.fillOpacity = 0;
   }
   return style;
 }
