@@ -59,6 +59,8 @@ import store from "@/store";
 
 import { collectFilenameMetadata2 } from "@/utils/parsing";
 import { IGirderItem } from "@/girder";
+import { ITileMeta } from "@/store/GirderAPI";
+import { IGeoJSPoint } from "@/store/model";
 
 enum Sources {
   File = "file",
@@ -83,6 +85,9 @@ interface IAssignment {
 })
 export default class NewDataset extends Vue {
   readonly store = store;
+
+  tilesInternalMetadata: { [key: string]: any }[] | undefined;
+  tilesMetadata: ITileMeta[] | undefined;
 
   get datasetId() {
     return this.$route.params.id;
@@ -309,16 +314,20 @@ export default class NewDataset extends Vue {
     this.addSizeToDimension("XY", metadata.xy.length, Sources.Filename);
 
     // Get info from file
-    const tiles = await Promise.all(
+    this.tilesMetadata = await Promise.all(
       items.map(item => this.store.api.getTiles(item))
     );
-    this.numberOfFrames = tiles[0]?.frames?.length || tiles.length;
+    this.tilesInternalMetadata = await Promise.all(
+      items.map(item => this.store.api.getTilesInternalMetadata(item))
+    );
+    this.numberOfFrames =
+      this.tilesMetadata[0]?.frames?.length || this.tilesMetadata.length;
 
     const channels: string[] = [];
 
     this.maxFramesPerItem = 1;
     this.areStridesSetFromFile = false;
-    tiles.forEach(tile => {
+    this.tilesMetadata.forEach(tile => {
       const frames: number = tile.frames?.length || 1;
       this.maxFramesPerItem = Math.max(this.maxFramesPerItem, frames);
       if (tile.IndexStride) {
@@ -434,7 +443,38 @@ export default class NewDataset extends Vue {
       })
     };
 
-    const newItemId = await this.store.addMultiSourceMetadata({
+    if (
+      this.tilesInternalMetadata &&
+      this.tilesInternalMetadata.length === 0 &&
+      this.tilesInternalMetadata[0].nd2_frame_metadata &&
+      this.tilesMetadata &&
+      this.tilesMetadata.length === 1
+    ) {
+      const { mm_x, mm_y } = this.tilesMetadata[0];
+      const framesMetadata = this.tilesInternalMetadata[0].nd2_frame_metadata;
+      const coordinates: IGeoJSPoint[] = framesMetadata.map((f: any) => {
+        const framePos = f.position.stagePositionUm;
+        return {
+          x: (1000 * framePos[0]) / mm_x,
+          y: (1000 * framePos[1]) / mm_y
+        };
+      });
+      const minCoordinate = {
+        x: Math.min(...coordinates.map(coordinate => coordinate.x)),
+        y: Math.min(...coordinates.map(coordinate => coordinate.y))
+      };
+      const intCoordinates = coordinates.map(coordinate => ({
+        x: Math.round(coordinate.x - minCoordinate.x),
+        y: Math.round(coordinate.y - minCoordinate.y)
+      }));
+
+      description.sources.forEach((source, itemIdx) => {
+        source.xySet = 0;
+        source.position = intCoordinates[itemIdx];
+      });
+    }
+
+    await this.store.addMultiSourceMetadata({
       parentId: this.datasetId,
       metadata: JSON.stringify(description)
     });

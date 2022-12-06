@@ -239,6 +239,12 @@ export default class GirderAPI {
     return this.client.get(`item/${toId(item)}/tiles`).then(r => r.data);
   }
 
+  getTilesInternalMetadata(item: string | IGirderItem): Promise<ITileMeta> {
+    return this.client
+      .get(`item/${toId(item)}/tiles/internal_metadata`)
+      .then(r => r.data);
+  }
+
   private getHistogram(
     item: string | IGirderItem,
     options: Partial<IHistogramOptions> = {}
