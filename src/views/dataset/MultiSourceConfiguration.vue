@@ -1,55 +1,83 @@
 <template>
   <v-container>
-    <v-subheader>Variables</v-subheader>
-    <v-data-table :headers="headers" :items="items" item-key="key">
-    </v-data-table>
-    <v-subheader>Assignments</v-subheader>
-    <v-container>
-      <v-row
-        v-for="[dimension, dimensionName] in Object.entries(dimensionNames)"
-        :key="dimension"
-      >
-        <v-col>{{ dimensionName }} ({{ dimension }})</v-col>
-        <v-col>
-          <v-combobox
-            v-model="assignments[dimension]"
-            :items="assignmentItems"
-            :search-input.sync="searchInput"
-            item-text="text"
-            item-value="value"
-            hide-selected
-            hide-details
-            dense
-            :disabled="
-              assignments[dimension] &&
-                assignments[dimension].value.source === 'file'
-            "
-          >
-            <template v-slot:selection="{ item }">
-              {{ item.text }}
-            </template>
-          </v-combobox>
-        </v-col>
-        <v-col>
-          <v-btn
-            :disabled="
-              !assignments[dimension] ||
+    <v-card class="pa-4 my-4">
+      <v-subheader class="headline">Variables</v-subheader>
+      <v-divider class="my-2" />
+      <v-data-table :headers="headers" :items="items" item-key="key" />
+    </v-card>
+    <v-card class="pa-4 my-4">
+      <v-subheader class="headline">Assignments</v-subheader>
+      <v-divider class="my-2" />
+      <v-container>
+        <v-row
+          v-for="[dimension, dimensionName] in Object.entries(dimensionNames)"
+          :key="dimension"
+        >
+          <v-col cols="2" class="body-1">
+            {{ dimensionName }} ({{ dimension }})
+          </v-col>
+          <v-col>
+            <v-combobox
+              v-model="assignments[dimension]"
+              :items="assignmentItems"
+              :search-input.sync="searchInput"
+              item-text="text"
+              item-value="value"
+              hide-selected
+              hide-details
+              dense
+              :disabled="
                 (assignments[dimension] &&
-                  assignments[dimension].value.source === 'file')
-            "
-            @click="assignments[dimension] = null"
-            >Clear</v-btn
-          >
-        </v-col>
-      </v-row>
-    </v-container>
-    <v-btn @click="generateJson" :disabled="!canSubmit()">SUBMIT</v-btn>
-    <v-btn
-      @click="resetDimensionsToDefault"
-      class="ml-4"
-      :disabled="areDimensionsSetToDefault()"
-      >Reset to defaults</v-btn
-    >
+                  assignments[dimension].value.source === 'file') ||
+                  assignmentItems.length === 0
+              "
+            >
+              <template v-slot:selection="{ item }">
+                {{ item.text }}
+                <template v-if="shouldDoCompositing && dimension === 'XY'">
+                  (will be composited)
+                </template>
+              </template>
+            </v-combobox>
+          </v-col>
+          <v-col v-if="canDoCompositing && dimension === 'XY'">
+            <v-checkbox
+              dense
+              label="Composite positions into single image"
+              class="d-inline-flex"
+              v-model="enableCompositing"
+            />
+          </v-col>
+          <v-col cols="2" class="d-flex">
+            <v-spacer />
+            <v-btn
+              :disabled="
+                !assignments[dimension] ||
+                  (assignments[dimension] &&
+                    assignments[dimension].value.source === 'file')
+              "
+              @click="assignments[dimension] = null"
+            >
+              Clear
+            </v-btn>
+          </v-col>
+        </v-row>
+      </v-container>
+    </v-card>
+    <v-row>
+      <v-col class="d-flex justify-end">
+        <v-btn @click="generateJson" :disabled="!canSubmit()">
+          Submit
+        </v-btn>
+        <v-btn
+          @click="resetDimensionsToDefault"
+          :disabled="areDimensionsSetToDefault()"
+          class="ml-4"
+        >
+          Reset to defaults
+        </v-btn>
+      </v-col>
+    </v-row>
   </v-container>
 </template>
 
@@ -57,27 +85,44 @@
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 
-import { collectFilenameMetadata2 } from "@/utils/parsing";
+import {
+  collectFilenameMetadata2,
+  IVariableGuess,
+  TDimensions
+} from "@/utils/parsing";
 import { IGirderItem } from "@/girder";
 import { ITileMeta } from "@/store/GirderAPI";
 import { IGeoJSPoint } from "@/store/model";
 
+// Possible sources for variables
 enum Sources {
-  File = "file",
-  Filename = "filename",
-  Images = "images"
+  File = "file", // File metadata
+  Filename = "filename", // Filenames parsing
+  Images = "images" // All images from the items
 }
 
-interface IDimension {
-  id: string; // Guessed dimension
+interface IFileSourceData {
+  [itemIdx: number]: {
+    stride: number;
+    range: number;
+    values: string[] | null;
+  };
+}
+
+interface IFilenameSourceData extends IVariableGuess {}
+
+interface IAssignmentOption {
+  id: number;
+  guess: TDimensions; // Guessed dimension
   size: number; // Number of elements on this dimension
+  data: IFileSourceData | IFilenameSourceData | null; // To compute which image should be taken from the tiles
   name: string; // Displayed name
   source: Sources; // Source of the dimension
 }
 
 interface IAssignment {
   text: string;
-  value: IDimension;
+  value: IAssignmentOption;
 }
 
 @Component({
@@ -86,8 +131,10 @@ interface IAssignment {
 export default class NewDataset extends Vue {
   readonly store = store;
 
-  tilesInternalMetadata: { [key: string]: any }[] | undefined;
-  tilesMetadata: ITileMeta[] | undefined;
+  tilesInternalMetadata: { [key: string]: any }[] | null = null;
+  tilesMetadata: ITileMeta[] | null = null;
+
+  enableCompositing: boolean = false;
 
   get datasetId() {
     return this.$route.params.id;
@@ -122,32 +169,44 @@ export default class NewDataset extends Vue {
     return arr.slice(0, nWords - 1).join(sep) + "…";
   }
 
+  get canDoCompositing() {
+    return (
+      this.tilesInternalMetadata !== null &&
+      this.tilesInternalMetadata.length === 1 &&
+      this.tilesInternalMetadata[0].nd2_frame_metadata &&
+      this.tilesMetadata !== null &&
+      this.tilesMetadata.length === 1
+    );
+  }
+
+  get shouldDoCompositing() {
+    return this.canDoCompositing && this.enableCompositing;
+  }
+
   get items() {
     return this.dimensions
       .filter(dim => dim.size > 0)
-      .map((dim: IDimension) => {
+      .map((dim: IAssignmentOption) => {
         let values = "";
         switch (dim.source) {
           case Sources.Filename:
-            if (this.collectedMetadata) {
-              const metadataID = this.dimensionToMetadataId(dim.id);
-              const exampleValues = this.collectedMetadata.metadata[metadataID];
-              values = this.sliceAndJoin(exampleValues);
-            }
+            values = this.sliceAndJoin(
+              (dim.data as IFilenameSourceData).values
+            );
             break;
           case Sources.File:
-            values = "Metadata";
+            values = "From metadata";
             break;
         }
         return {
           ...dim,
           values,
-          key: `${dim.id}_${dim.source}`
+          key: `${dim.id}_${dim.guess}_${dim.source}`
         };
       });
   }
 
-  dimensions: IDimension[] = [];
+  dimensions: IAssignmentOption[] = [];
 
   headers = [
     {
@@ -160,7 +219,7 @@ export default class NewDataset extends Vue {
     },
     {
       text: "Guess",
-      value: "id"
+      value: "guess"
     },
     {
       text: "Source",
@@ -172,16 +231,14 @@ export default class NewDataset extends Vue {
     }
   ];
 
-  dimensionNames = { XY: "Positions", Z: "Z", T: "Time", C: "Channels" };
+  readonly dimensionNames: { [dim in TDimensions]: string } = {
+    XY: "Positions",
+    Z: "Z",
+    T: "Time",
+    C: "Channels"
+  };
 
-  dimensionToMetadataId(id: string) {
-    return id === "C" ? "chan" : id.toLowerCase();
-  }
-
-  dimensionToAssignmentItem(dimension: IDimension | null): IAssignment | null {
-    if (!dimension) {
-      return null;
-    }
+  assignmentOptionToAssignmentItem(dimension: IAssignmentOption): IAssignment {
     return {
       text: dimension.name,
       value: dimension
@@ -189,18 +246,19 @@ export default class NewDataset extends Vue {
   }
 
   get assignmentItems() {
-    const assignedDimensions = Object.entries(this.assignments)
-      .map(([_, assignment]: [any, any]) => assignment?.value || null)
-      .filter(assignment => !!assignment);
+    const assignedDimensions = Object.entries(this.assignments).reduce(
+      (assignedDimensions, [_, assignment]) =>
+        assignment
+          ? [...assignedDimensions, assignment.value.id]
+          : assignedDimensions,
+      [] as number[]
+    );
 
-    const isNotAssigned = (dimension: IDimension) => {
-      return !assignedDimensions.find(
-        assignedDimension =>
-          assignedDimension.id === dimension.id &&
-          assignedDimension.source === dimension.source
-      );
-    };
-    return this.items.filter(isNotAssigned).map(this.dimensionToAssignmentItem);
+    const isNotAssigned = (dimension: IAssignmentOption) =>
+      !assignedDimensions.includes(dimension.id);
+    return this.items
+      .filter(isNotAssigned)
+      .map(this.assignmentOptionToAssignmentItem);
   }
 
   assignments: { [dimension: string]: IAssignment | null } = {
@@ -209,42 +267,37 @@ export default class NewDataset extends Vue {
     T: null,
     C: null
   };
-  strides: { [dimension: string]: number } = {};
-  areStridesSetFromFile: boolean = false;
-
-  collectedMetadata: {
-    metadata: {
-      [key: string]: string[];
-      t: string[];
-      xy: string[];
-      z: string[];
-      chan: string[];
-    };
-    filesInfo: {
-      [key: string]: { [key: string]: number[] };
-    };
-  } | null = null;
 
   searchInput: string = "";
   filenameVariableCount = 0;
   fileVariableCount = 0;
   imageVariableCount = 0;
+  assignmentIdCount = 0;
 
   addSizeToDimension(
-    id: string,
+    guess: TDimensions,
     size: number,
     source: Sources,
+    data: IFileSourceData | IFilenameSourceData | null,
     name: string | null = null
   ) {
     if (size === 0) {
       return;
     }
-    const dim = this.dimensions.find(
-      dimension => dimension.id === id && dimension.source === source
-    );
+    // Merge the dimension when the source is file and source and guess match
+    const dim =
+      source === Sources.File &&
+      this.dimensions.find(
+        dimension => dimension.source === source && dimension.guess === guess
+      );
     if (dim) {
-      dim.size = dim.size + size;
+      dim.data = {
+        ...(dim.data as IFileSourceData),
+        ...(data as IFileSourceData)
+      };
+      dim.size += size;
     } else {
+      // If no merge, compute the name if needed and add to this.dimensions
       let computedName = name;
       if (!computedName) {
         computedName = "";
@@ -254,7 +307,7 @@ export default class NewDataset extends Vue {
             break;
           case Sources.File:
             computedName = `Metadata ${++this.fileVariableCount} (${
-              this.dimensionNames[id]
+              this.dimensionNames[guess]
             }) `;
             break;
           case Sources.Images:
@@ -264,38 +317,36 @@ export default class NewDataset extends Vue {
       }
       this.dimensions = [
         ...this.dimensions,
-        { id, size, name: computedName, source }
+        {
+          id: this.assignmentIdCount++,
+          guess,
+          size,
+          name: computedName,
+          source,
+          data
+        }
       ];
     }
   }
 
-  setDimensionName(id: string, source: string, name: string) {
-    const dim = this.dimensions.find(
-      dimension => dimension.id === id && dimension.source === source
-    );
-    if (dim) {
-      dim.name = name;
-      this.dimensions = [...this.dimensions];
-    }
-  }
-
-  numberOfFrames = 0; // TODO: assume constant
-  maxFramesPerItem: number = 1;
-
   girderItems: IGirderItem[] = [];
 
   getDefaultAssignmentItem(assignment: string) {
-    return this.dimensionToAssignmentItem(
+    const assignmentOption =
       this.dimensions.find(
-        ({ id, source, size }) =>
-          size > 0 && source === Sources.File && id === assignment
+        ({ guess, source, size }) =>
+          source === Sources.File && size > 0 && guess === assignment
       ) ||
-        this.dimensions.find(({ id, size }) => size > 0 && id === assignment) ||
-        null
-    );
+      this.dimensions.find(
+        ({ guess, size }) => size > 0 && guess === assignment
+      ) ||
+      null;
+    if (assignmentOption) {
+      return this.assignmentOptionToAssignmentItem(assignmentOption);
+    } else {
+      return null;
+    }
   }
-
-  channels: string[] = [];
 
   @Watch("datasetId")
   async mounted() {
@@ -306,12 +357,14 @@ export default class NewDataset extends Vue {
     //  Get info from filename
     const names = items.map(item => item.name);
 
-    this.collectedMetadata = collectFilenameMetadata2(names);
-    const { metadata } = this.collectedMetadata;
-    this.addSizeToDimension("Z", metadata.z.length, Sources.Filename);
-    this.addSizeToDimension("C", metadata.chan.length, Sources.Filename);
-    this.addSizeToDimension("T", metadata.t.length, Sources.Filename);
-    this.addSizeToDimension("XY", metadata.xy.length, Sources.Filename);
+    collectFilenameMetadata2(names).forEach(filenameData =>
+      this.addSizeToDimension(
+        filenameData.guess,
+        filenameData.values.length,
+        Sources.Filename,
+        filenameData
+      )
+    );
 
     // Get info from file
     this.tilesMetadata = await Promise.all(
@@ -320,56 +373,40 @@ export default class NewDataset extends Vue {
     this.tilesInternalMetadata = await Promise.all(
       items.map(item => this.store.api.getTilesInternalMetadata(item))
     );
-    this.numberOfFrames =
-      this.tilesMetadata[0]?.frames?.length || this.tilesMetadata.length;
 
-    const channels: string[] = [];
-
-    this.maxFramesPerItem = 1;
-    this.areStridesSetFromFile = false;
-    this.tilesMetadata.forEach(tile => {
+    let maxFramesPerItem = 0;
+    let hasFileVariable = false;
+    this.tilesMetadata.forEach((tile, tileIdx) => {
       const frames: number = tile.frames?.length || 1;
-      this.maxFramesPerItem = Math.max(this.maxFramesPerItem, frames);
-      if (tile.IndexStride) {
-        Object.keys(this.dimensionNames).forEach((dimension: string) => {
-          const stride = tile.IndexStride[`Index${dimension}`];
-          if (stride && stride > 0) {
-            this.strides[dimension.toLowerCase()] = stride;
-            this.areStridesSetFromFile = true;
-          }
-        });
-      }
-      if (tile.IndexRange) {
-        this.addSizeToDimension("Z", tile.IndexRange.IndexZ, Sources.File);
-        this.addSizeToDimension("T", tile.IndexRange.IndexT, Sources.File);
-        this.addSizeToDimension("XY", tile.IndexRange.IndexXY, Sources.File);
-      } else if (!this.dimensions.some(dimension => dimension.size > 0)) {
-        this.addSizeToDimension("Single Image", 1, Sources.Filename);
-      }
-      if (tile.channels) {
-        tile.channels
-          .filter((channel: string) => !channels.includes(channel))
-          .forEach((channel: string) => channels.push(channel));
+      maxFramesPerItem = Math.max(maxFramesPerItem, frames);
+      if (tile.IndexRange && tile.IndexStride) {
+        hasFileVariable = true;
+        for (const dim in this.dimensionNames) {
+          const indexDim = `Index${dim}`;
+          this.addSizeToDimension(
+            // We know that the keys of this.dimensionNames are of type TDimensions
+            dim as TDimensions,
+            tile.IndexRange[indexDim],
+            Sources.File,
+            {
+              [tileIdx]: {
+                range: tile.IndexRange[indexDim],
+                stride: tile.IndexStride[indexDim],
+                values: dim === "C" ? tile.channels : null
+              }
+            }
+          );
+        }
       }
     });
 
-    if (channels.length > 0) {
-      const channelName = `Metadata (Channel): ${this.sliceAndJoin(channels)}`;
-      this.addSizeToDimension("C", channels.length, Sources.File, channelName);
-    }
-
-    this.channels = channels.length > 0 ? channels : metadata.chan;
-
-    if (!this.channels.length) {
-      this.channels = ["Default"];
-    }
-
-    if (!this.areStridesSetFromFile && this.maxFramesPerItem > 1) {
+    if (!hasFileVariable) {
       this.addSizeToDimension(
         "Z",
-        this.maxFramesPerItem,
+        maxFramesPerItem,
         Sources.Images,
-        "Frames per image variable"
+        null,
+        "All frames per item"
       );
     }
 
@@ -377,9 +414,9 @@ export default class NewDataset extends Vue {
   }
 
   resetDimensionsToDefault() {
-    Object.keys(this.dimensionNames).forEach(
-      dim => (this.assignments[dim] = this.getDefaultAssignmentItem(dim))
-    );
+    for (const dim in this.dimensionNames) {
+      this.assignments[dim] = this.getDefaultAssignmentItem(dim);
+    }
   }
 
   areDimensionsSetToDefault() {
@@ -398,65 +435,113 @@ export default class NewDataset extends Vue {
     return filledAssignments >= this.items.length || filledAssignments >= 4;
   }
 
+  getValueFromAssignments(
+    dim: TDimensions,
+    itemIdx: number,
+    frameIdx: number
+  ): number {
+    const assignmentValue = this.assignments[dim]?.value;
+    if (!assignmentValue) {
+      return 0;
+    }
+    switch (assignmentValue.source) {
+      case Sources.File:
+        const fileData = assignmentValue.data as IFileSourceData;
+        return fileData[itemIdx]
+          ? Math.floor(frameIdx / fileData[itemIdx].stride) %
+              fileData[itemIdx].range
+          : 0;
+      case Sources.Filename:
+        const filenameData = assignmentValue.data as IFilenameSourceData;
+        const filename = this.girderItems[itemIdx].name;
+        return filenameData.valueIdxPerFilename[filename];
+      case Sources.Images:
+        return frameIdx;
+      case undefined:
+        return 0;
+    }
+  }
+
   async generateJson() {
-    const dimCount: any = {
-      C: 0,
-      Z: 0,
-      XY: 0,
-      T: 0
-    };
-
-    const filesInfo = this.collectedMetadata
-      ? this.collectedMetadata.filesInfo
-      : null;
-
-    const framesAsAxes: { [dim: string]: number } = this.strides;
-
-    const description = {
-      channels: this.channels,
-      sources: this.girderItems.map((item: IGirderItem) => {
-        const source: any = { path: item.name };
-        Object.entries(this.assignments)
-          .filter(([_, assignment]) => !!assignment)
-          .forEach(([assignmentId, assignment]) => {
-            let value = [dimCount[assignmentId]];
-
-            switch (assignment?.value.source) {
-              case Sources.Filename:
-                let id = assignment?.value.id;
-                if (id && filesInfo) {
-                  id = this.dimensionToMetadataId(id);
-                  value = filesInfo[item.name][id];
+    // Find the channel names
+    let channels: string[] | null = null;
+    const channelAssignment = this.assignments.C?.value;
+    if (channelAssignment) {
+      switch (channelAssignment.source) {
+        case Sources.File:
+          // For each channel index, find the possible different channel names
+          const fileData = channelAssignment.data as IFileSourceData;
+          const channelsPerIdx = [] as string[][];
+          for (const itemIdx in fileData) {
+            const values = fileData[itemIdx].values;
+            if (values) {
+              for (let chanIdx = 0; chanIdx < values.length; ++chanIdx) {
+                if (!channelsPerIdx[chanIdx]) {
+                  channelsPerIdx[chanIdx] = [];
                 }
-                break;
-              case Sources.File:
-                dimCount[assignmentId] += assignment?.value.size || 0;
-                break;
-              case Sources.Images:
-                framesAsAxes[assignmentId.toLowerCase()] = 1;
-                break;
+                if (!channelsPerIdx[chanIdx].includes(values[chanIdx])) {
+                  channelsPerIdx[chanIdx].push(values[chanIdx]);
+                }
+              }
             }
-            source[`${assignmentId.toLowerCase()}Values`] = value;
-          });
-        source.framesAsAxes = framesAsAxes;
-        return source;
-      })
-    };
+          }
+          channels = [];
+          for (const channelsAtIdx of channelsPerIdx) {
+            channels.push(channelsAtIdx.join("/"));
+          }
+          break;
+        case Sources.Filename:
+          const filenameData = channelAssignment.data as IFilenameSourceData;
+          channels = filenameData.values;
+          break;
+        case Sources.Images:
+          channels = [...Array(channelAssignment.size).keys()].map(
+            id => `Default ${id}`
+          );
+          break;
+      }
+    }
+    if (channels === null || channels.length === 0) {
+      channels = ["Default"];
+    }
 
-    if (
-      this.tilesInternalMetadata &&
-      this.tilesInternalMetadata.length === 0 &&
-      this.tilesInternalMetadata[0].nd2_frame_metadata &&
-      this.tilesMetadata &&
-      this.tilesMetadata.length === 1
-    ) {
-      const { mm_x, mm_y } = this.tilesMetadata[0];
-      const framesMetadata = this.tilesInternalMetadata[0].nd2_frame_metadata;
+    // Find all possible (XY, Z, T, C)
+    const sources: {
+      path: string;
+      xySet: number;
+      zSet: number;
+      tSet: number;
+      cSet: number;
+      frames: number[];
+      position?: { x: number; y: number };
+    }[] = [];
+    if (!this.tilesMetadata) {
+      return;
+    }
+    for (let itemIdx = 0; itemIdx < this.girderItems.length; ++itemIdx) {
+      const item = this.girderItems[itemIdx];
+      const nFrames = this.tilesMetadata[itemIdx].frames.length;
+      for (let frameIdx = 0; frameIdx < nFrames; ++frameIdx) {
+        sources.push({
+          path: item.name,
+          xySet: this.getValueFromAssignments("XY", itemIdx, frameIdx),
+          zSet: this.getValueFromAssignments("Z", itemIdx, frameIdx),
+          tSet: this.getValueFromAssignments("T", itemIdx, frameIdx),
+          cSet: this.getValueFromAssignments("C", itemIdx, frameIdx),
+          frames: [frameIdx]
+        });
+      }
+    }
+
+    // Compositing
+    if (this.shouldDoCompositing) {
+      const { mm_x, mm_y } = this.tilesMetadata![0];
+      const framesMetadata = this.tilesInternalMetadata![0].nd2_frame_metadata;
       const coordinates: IGeoJSPoint[] = framesMetadata.map((f: any) => {
         const framePos = f.position.stagePositionUm;
         return {
-          x: (1000 * framePos[0]) / mm_x,
-          y: (1000 * framePos[1]) / mm_y
+          x: framePos[0] / (mm_x * 1000),
+          y: framePos[1] / (mm_y * 1000)
         };
       });
       const minCoordinate = {
@@ -468,15 +553,16 @@ export default class NewDataset extends Vue {
         y: Math.round(coordinate.y - minCoordinate.y)
       }));
 
-      description.sources.forEach((source, itemIdx) => {
+      sources.forEach((source, sourceIdx) => {
+        source.position =
+          intCoordinates[Math.floor(sourceIdx / channels!.length)];
         source.xySet = 0;
-        source.position = intCoordinates[itemIdx];
       });
     }
 
     await this.store.addMultiSourceMetadata({
       parentId: this.datasetId,
-      metadata: JSON.stringify(description)
+      metadata: JSON.stringify({ channels, sources })
     });
     this.$router.push({
       name: "dataset",
@@ -485,7 +571,5 @@ export default class NewDataset extends Vue {
       }
     });
   }
-
-  // TODO: composite
 }
 </script>
