@@ -1,105 +1,86 @@
 <template>
-  <div>
-    <v-card class="pa-1">
-      <v-card-title>
-        Create a new property
-      </v-card-title>
-      <v-card-text class="pa-1">
-        <v-card>
-          <v-card-text class="pa-1">
-            <v-container>
-              <v-row>
-                <v-col>
-                  <v-text-field
-                    label="Property Name"
-                    v-model="deduplicatedName"
-                    dense
-                  >
-                  </v-text-field>
-                </v-col>
-              </v-row>
-              <v-row>
-                <v-col>
-                  <docker-image-select
-                    dense
-                    v-model="dockerImage"
-                  ></docker-image-select>
-                </v-col>
-              </v-row>
-              <v-row>
-                <v-col>
-                  <v-select
-                    :items="propertyTypeItems"
-                    v-model="propertyType"
-                    item-text="label"
-                    dense
-                  ></v-select>
-                </v-col>
-              </v-row>
-              <v-row>
-                <v-col>
-                  <layer-select
-                    v-if="propertyType === 'layer'"
-                    v-model="propertyLayer"
-                    label=""
-                    :any="false"
-                  ></layer-select>
-                  <tag-filter-editor
-                    v-if="propertyType === 'relational'"
-                    v-model="propertyTags"
-                    :property="true"
-                  ></tag-filter-editor>
-                  <v-select
-                    v-if="propertyType === 'morphology'"
-                    :items="shapeItems"
-                    label="Shape restriction"
-                    v-model="propertyShape"
-                    item-text="label"
-                  >
-                  </v-select>
-                </v-col>
-              </v-row>
-            </v-container>
-          </v-card-text>
-        </v-card>
-      </v-card-text>
-      <v-card-actions>
-        <div class="button-bar">
-          <v-spacer></v-spacer>
-          <v-btn class="mr-4" color="primary" @click="createProperty">
-            SUBMIT
-          </v-btn>
-          <v-btn class="mr-4" color="warning" @click="close">CANCEL</v-btn>
-        </div>
-      </v-card-actions>
-    </v-card>
-  </div>
+  <v-expansion-panel>
+    <v-expansion-panel-header>
+      Create Property
+    </v-expansion-panel-header>
+    <v-expansion-panel-content>
+      <v-container>
+        <v-row>
+          <v-col>
+            <tag-picker v-model="filteringTags" />
+          </v-col>
+          <v-col cols="auto">
+            <v-checkbox
+              hide-details
+              dense
+              label="Exclusive"
+              v-model="areTagsExclusive"
+            />
+          </v-col>
+        </v-row>
+        <template v-if="filteringTags.length">
+          <v-row>
+            <v-col>
+              <v-select
+                multiple
+                v-model="filteringShapes"
+                label="Shape(s)"
+                :items="availableShapes"
+                dense
+              />
+            </v-col>
+          </v-row>
+          <template v-if="filteringShapes.length">
+            <v-row>
+              <v-col>
+                <docker-image-select dense v-model="dockerImage" />
+              </v-col>
+            </v-row>
+          </template>
+        </template>
+      </v-container>
+      <div class="button-bar">
+        <v-spacer></v-spacer>
+        <v-btn class="mr-4" color="primary" @click="createProperty">
+          SUBMIT
+        </v-btn>
+        <v-btn class="mr-4" color="warning" @click="reset">CANCEL</v-btn>
+      </div>
+    </v-expansion-panel-content>
+  </v-expansion-panel>
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import propertiesStore from "@/store/properties";
+import toolsStore from "@/store/tool";
+import annotationStore from "@/store/annotation";
 import {
   IAnnotationProperty,
   ITagAnnotationFilter,
   AnnotationShape,
-  AnnotationNames
+  IWorkerInterface
 } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
 import DockerImageSelect from "@/components/DockerImageSelect.vue";
+import TagPicker from "@/components/TagPicker.vue";
 
 // Popup for new tool configuration
-@Component({ components: { LayerSelect, TagFilterEditor, DockerImageSelect } })
+@Component({
+  components: { LayerSelect, TagFilterEditor, DockerImageSelect, TagPicker }
+})
 export default class PropertyCreation extends Vue {
   readonly store = store;
   readonly propertiesStore = propertiesStore;
+  readonly toolsStore = toolsStore;
+  readonly annotationStore = annotationStore;
 
-  propertyTypeItems = [
-    { value: "layer", label: "Intensity property (layer dependant)" },
-    { value: "morphology", label: "Morphology property (shape dependant)" },
-    { value: "relational", label: "Relational Property (neighbor dependant)" }
-  ];
+  availableShapes = toolsStore.availableShapes;
+
+  areTagsExclusive: boolean = true;
+  filteringTags: string[] = [];
+  filteringShapes: AnnotationShape[] = [];
 
   originalName = "New Property";
 
@@ -130,10 +111,7 @@ export default class PropertyCreation extends Vue {
   }
 
   propertyType: "layer" | "morphology" | "relational" = "layer";
-  dockerImage = "repo/image:tag";
-
-  @Prop()
-  readonly open: any;
+  dockerImage: string | null = null;
 
   propertyLayer: number | null = null;
   propertyTags: ITagAnnotationFilter = {
@@ -142,54 +120,89 @@ export default class PropertyCreation extends Vue {
     enabled: false,
     id: "Relational property tags"
   };
-  propertyShape: AnnotationShape | null = null;
-  shapeItems: { label: string; value: string | null }[] = [
-    {
-      label: AnnotationNames[AnnotationShape.Point],
-      value: AnnotationShape.Point
-    },
-    {
-      label: AnnotationNames[AnnotationShape.Polygon],
-      value: AnnotationShape.Polygon
-    },
-    {
-      label: AnnotationNames[AnnotationShape.Line],
-      value: AnnotationShape.Line
-    },
-    { label: "No restrictions", value: null }
-  ];
+
+  @Watch("filteringTags")
+  filteringTagsChanged() {
+    // The keys of counts are in AnnotationShape
+    // Find the best matching shape for these tags
+    const counts: { [key: string]: number } = {};
+    for (const annotation of this.annotationStore.annotations) {
+      if (
+        (this.areTagsExclusive &&
+          this.filteringTags.every(tag => annotation.tags.includes(tag))) ||
+        (!this.areTagsExclusive &&
+          this.filteringTags.some(tag => annotation.tags.includes(tag)))
+      ) {
+        if (counts[annotation.shape] === undefined) {
+          counts[annotation.shape] = 0;
+        }
+        ++counts[annotation.shape];
+      }
+    }
+    this.filteringShapes = [];
+    let bestCount = 0;
+    for (const shape in counts) {
+      if (counts[shape] !== undefined && counts[shape] > bestCount) {
+        bestCount = counts[shape];
+        this.filteringShapes = [shape as AnnotationShape];
+      }
+    }
+  }
+
+  @Watch("dockerImage")
+  dockerImageChanged() {
+    if (
+      this.dockerImage &&
+      !this.propertiesStore.workerInterfaces[this.dockerImage]
+    ) {
+      this.propertiesStore.fetchWorkerInterface(this.dockerImage);
+    }
+  }
+
+  get workerInterface() {
+    if (!this.dockerImage) {
+      return null;
+    }
+    const workerInterface = this.propertiesStore.workerInterfaces[
+      this.dockerImage
+    ];
+    return workerInterface ? workerInterface : null;
+  }
+
+  @Watch("workerInterface")
+  workerInterfaceChanged() {
+    // TODO: fill the interface and edit DockerImageSelect.vue
+  }
 
   createProperty() {
-    this.propertiesStore.createProperty({
-      id: this.deduplicatedName,
-      name: this.deduplicatedName,
-      image: this.dockerImage,
-      propertyType: this.propertyType,
-      layer: this.propertyLayer,
-      tags: {
-        tags: this.propertyTags.tags,
-        exclusive: this.propertyTags.exclusive
-      },
-      independant: false,
-      shape: this.propertyShape,
-      customName: null,
-      enabled: false,
-      computed: false
-    });
-    this.propertiesStore.requestWorkerInterface(this.dockerImage);
-    this.close();
+    if (!this.dockerImage) {
+      return;
+    }
+    for (const shape of this.filteringShapes) {
+      this.propertiesStore.createProperty({
+        id: this.deduplicatedName,
+        name: this.deduplicatedName,
+        image: this.dockerImage,
+        propertyType: this.propertyType,
+        layer: this.propertyLayer,
+        tags: {
+          tags: this.propertyTags.tags,
+          exclusive: this.propertyTags.exclusive
+        },
+        independant: false,
+        shape,
+        customName: null,
+        enabled: false,
+        computed: false
+      });
+    }
+    this.reset();
   }
 
-  @Watch("open")
   reset() {
     this.originalName = "New Property";
-    this.dockerImage = "repo/image:tag";
+    this.dockerImage = null;
     this.propertyType = "layer";
-  }
-
-  close() {
-    this.reset();
-    this.$emit("done");
   }
 }
 </script>

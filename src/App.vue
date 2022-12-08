@@ -20,21 +20,18 @@
       </v-btn>
       <v-divider class="ml-4" vertical />
       <template v-if="store.dataset && routeName === 'view'">
-        <v-btn
-          class="ml-4"
-          :to="{
-            name: 'newconfiguration',
-            params: { id: store.selectedDatasetId }
-          }"
-        >
-          New Configuration
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('analyzePanel')">
+          Analyze
         </v-btn>
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('snapshotPanel')"
-          >Snapshots</v-btn
-        >
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('annotationPanel')"
-          >Browse Annotations</v-btn
-        >
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('settingsPanel')">
+          Settings
+        </v-btn>
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('snapshotPanel')">
+          Snapshots
+        </v-btn>
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('annotationPanel')">
+          Annotations
+        </v-btn>
       </template>
       <server-status />
     </v-app-bar>
@@ -42,6 +39,31 @@
     <v-main>
       <router-view />
     </v-main>
+
+    <v-navigation-drawer
+      v-model="analyzePanel"
+      app
+      right
+      disable-resize-watcher
+      clipped
+      hide-overlay
+      :width="480"
+    >
+      <analyze-annotations />
+    </v-navigation-drawer>
+
+    <v-navigation-drawer
+      v-model="settingsPanel"
+      app
+      right
+      disable-resize-watcher
+      clipped
+      hide-overlay
+      :width="480"
+    >
+      <annotations-settings />
+    </v-navigation-drawer>
+
     <v-navigation-drawer
       v-model="snapshotPanel"
       app
@@ -49,7 +71,7 @@
       disable-resize-watcher
       clipped
       hide-overlay
-      :width="320"
+      :width="480"
       @transitionend="snapshotPanelFull = snapshotPanel"
     >
       <snapshots :snapshotVisible="snapshotPanel && snapshotPanelFull" />
@@ -73,6 +95,8 @@
 import axios from "axios";
 import UserMenu from "./layout/UserMenu.vue";
 import ServerStatus from "./components/ServerStatus.vue";
+import AnalyzeAnnotations from "./components/AnalyzePanel.vue";
+import AnnotationsSettings from "./components/SettingsPanel.vue";
 import Snapshots from "./components/Snapshots.vue";
 import AnnotationBrowser from "@/components/AnnotationBrowser/AnnotationBrowser.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
@@ -87,17 +111,23 @@ import Persister from "@/store/Persister";
     UserMenu,
     BreadCrumbs,
     ServerStatus,
+    AnalyzeAnnotations,
+    AnnotationsSettings,
     Snapshots
   }
 })
 export default class App extends Vue {
   readonly store = store;
   readonly toolsStore = toolsStore;
-  drawer = false;
+
   snapshotPanel = false;
   snapshotPanelFull = false;
 
   annotationPanel = false;
+
+  settingsPanel = false;
+
+  analyzePanel = false;
 
   lastModifiedRightPanel: string | null = null;
 
@@ -174,6 +204,6 @@ body > div {
 }
 
 .v-navigation-drawer {
-  z-index: 100;
+  z-index: 8;
 }
 </style>

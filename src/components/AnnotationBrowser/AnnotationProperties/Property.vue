@@ -1,27 +1,47 @@
 <template>
-  <v-row>
-    <!-- In list (???) -->
-    <v-col class="pa-0">
-      <v-checkbox
-        dense
-        hide-details
-        :value="list"
-        @click.stop="toggleList"
-      ></v-checkbox>
-    </v-col>
-    <!-- As filter -->
-    <v-col class="pa-0">
-      <v-checkbox
-        dense
-        hide-details
-        :value="filter"
-        @click.stop="toggleFilter"
-      ></v-checkbox>
-    </v-col>
-    <v-col class="pa-1" cols="7">
-      {{ property.name }}
-    </v-col>
-  </v-row>
+  <v-container class="ma-0 pa-0">
+    <v-row>
+      <!-- In list (???) -->
+      <v-col class="pa-0">
+        <div v-if="enableLabels" class="py-4 subtitle-2 label">
+          In list
+        </div>
+        <div>
+          <v-checkbox
+            dense
+            hide-details
+            :value="list"
+            @click.stop="toggleList"
+            class="ma-0"
+          />
+        </div>
+      </v-col>
+      <!-- As filter -->
+      <v-col class="pa-0">
+        <div v-if="enableLabels" class="py-4 subtitle-2 label">
+          As filter
+        </div>
+        <div>
+          <v-checkbox
+            dense
+            hide-details
+            :value="filter"
+            @click.stop="toggleFilter"
+            class="ma-0"
+          />
+        </div>
+      </v-col>
+      <!-- Property name -->
+      <v-col class="pa-0" cols="7">
+        <div v-if="enableLabels" class="py-4 subtitle-2 label">
+          Property
+        </div>
+        <div class="d-flex align-center justify-center">
+          {{ property.name }}
+        </div>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 
 <script lang="ts">
@@ -44,7 +64,9 @@ export default class AnnotationProperty extends Vue {
   readonly filterStore = filterStore;
   readonly store = store;
   @Prop()
-  private readonly property!: any;
+  readonly property!: any;
+  @Prop()
+  readonly enableLabels!: boolean;
 
   get filter() {
     return this.filterStore.filterIds.includes(this.property.id);
@@ -75,3 +97,11 @@ export default class AnnotationProperty extends Vue {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>
