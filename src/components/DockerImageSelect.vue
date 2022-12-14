@@ -1,12 +1,13 @@
 <template>
   <!-- image -->
-  <v-select :items="previewItems" dense v-model="image" label="Docker image" />
+  <v-select :items="items" dense v-model="image" label="Algorithm" />
 </template>
 
 <script lang="ts">
-import { Vue, Component, VModel, Watch } from "vue-property-decorator";
+import { Vue, Component, VModel, Prop } from "vue-property-decorator";
 import store from "@/store";
 import propertiesStore from "@/store/properties";
+import { IWorkerLabels } from "@/store/model";
 
 // Interface element selecting an image
 @Component({
@@ -18,36 +19,40 @@ export default class DockerImageSelect extends Vue {
 
   @VModel({ type: String }) image!: String;
 
+  @Prop()
+  readonly imageFilter!: { (labels: IWorkerLabels): boolean };
+
   get images() {
     return this.propertyStore.workerImageList;
   }
 
-  get previewItems() {
-    const previewItems = [];
-    for (const image in this.propertyStore.workerPreviews) {
-      const preview = this.propertyStore.workerPreviews[image];
-      const text =
-        typeof preview.text === "string" && preview.text.length
-          ? preview.text
-          : image;
-      previewItems.push({ text, value: image });
+  get items() {
+    const imagesPerCategory: { [category: string]: string[] } = {};
+    for (const image in this.images) {
+      const labels = this.images[image];
+      if (this.imageFilter(labels)) {
+        const category = labels.interfaceCategory || "No category";
+        if (!imagesPerCategory[category]) {
+          imagesPerCategory[category] = [];
+        }
+        imagesPerCategory[category].push(image);
+      }
     }
-    return previewItems;
+    const items = [];
+    for (const category in imagesPerCategory) {
+      items.push({ divider: true }, { header: category });
+      for (const image of imagesPerCategory[category]) {
+        items.push({
+          text: this.images[image].interfaceName || image,
+          value: image
+        });
+      }
+    }
+    return items;
   }
 
   mounted() {
-    if (!this.images.length) {
-      this.propertyStore.fetchWorkerImageList();
-    }
-  }
-
-  @Watch("images")
-  imagesChanged() {
-    for (const image of this.images) {
-      if (!this.propertyStore.workerPreviews[image]) {
-        this.propertyStore.fetchWorkerPreview(image);
-      }
-    }
+    this.propertyStore.fetchWorkerImageList();
   }
 }
 </script>

@@ -177,6 +177,18 @@ export interface IWorkerInterface {
   };
 }
 
+export interface IWorkerLabels {
+  isAnnotationWorker?: string;
+  isPropertyWorker?: string;
+  interfaceName?: string;
+  interfaceCategory?: string;
+  annotationShape?: AnnotationShape;
+}
+
+export interface IWorkerImageList {
+  [image: string]: IWorkerLabels;
+}
+
 export enum AnnotationShape {
   Point = "point",
   Line = "line",

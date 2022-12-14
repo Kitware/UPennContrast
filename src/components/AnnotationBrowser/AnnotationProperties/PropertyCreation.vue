@@ -1,10 +1,10 @@
 <template>
-  <v-expansion-panel>
-    <v-expansion-panel-header>
-      Create Property
-    </v-expansion-panel-header>
-    <v-expansion-panel-content>
-      <v-container>
+  <v-card>
+    <v-card-text class="pt-0">
+      <v-container class="elevation-3 mt-4">
+        <div class="pb-4 subtitle-1">
+          Create property for annotations matching...
+        </div>
         <v-row>
           <v-col>
             <tag-picker v-model="filteringTags" />
@@ -18,25 +18,48 @@
             />
           </v-col>
         </v-row>
-        <template v-if="filteringTags.length">
+        <v-row>
+          <v-col>
+            <v-select
+              v-model="filteringShape"
+              label="Shape"
+              :items="availableShapes"
+            />
+          </v-col>
+        </v-row>
+      </v-container>
+      <v-container
+        class="elevation-3 mt-4"
+        v-if="filteringShape !== null && filteringTags.length > 0"
+      >
+        <div class="pb-4 subtitle-1">
+          Using these parameters...
+        </div>
+        <v-row>
+          <v-col>
+            <docker-image-select
+              dense
+              v-model="dockerImage"
+              :imageFilter="propertyImageFilter"
+            />
+          </v-col>
+        </v-row>
+        <template v-if="dockerImage !== null">
           <v-row>
             <v-col>
-              <v-select
-                multiple
-                v-model="filteringShapes"
-                label="Shape(s)"
-                :items="availableShapes"
-                dense
+              <v-textarea
+                v-model="originalName"
+                label="Property name"
+                rows="1"
+                :append-icon="isNameGenerated ? '' : 'mdi-refresh'"
+                @click:append="isNameGenerated = true"
+                @input="isNameGenerated = false"
               />
             </v-col>
           </v-row>
-          <template v-if="filteringShapes.length">
-            <v-row>
-              <v-col>
-                <docker-image-select dense v-model="dockerImage" />
-              </v-col>
-            </v-row>
-          </template>
+        </template>
+        <template v-if="workerInterface">
+          {{ workerInterface }}
         </template>
       </v-container>
       <div class="button-bar">
@@ -46,20 +69,20 @@
         </v-btn>
         <v-btn class="mr-4" color="warning" @click="reset">CANCEL</v-btn>
       </div>
-    </v-expansion-panel-content>
-  </v-expansion-panel>
+    </v-card-text>
+  </v-card>
 </template>
 <script lang="ts">
-import { Vue, Component, Watch, Prop } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import propertiesStore from "@/store/properties";
 import toolsStore from "@/store/tool";
 import annotationStore from "@/store/annotation";
 import {
   IAnnotationProperty,
-  ITagAnnotationFilter,
   AnnotationShape,
-  IWorkerInterface
+  IWorkerLabels,
+  AnnotationNames
 } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
@@ -72,17 +95,18 @@ import TagPicker from "@/components/TagPicker.vue";
 })
 export default class PropertyCreation extends Vue {
   readonly store = store;
-  readonly propertiesStore = propertiesStore;
+  readonly propertyStore = propertiesStore;
   readonly toolsStore = toolsStore;
   readonly annotationStore = annotationStore;
 
   availableShapes = toolsStore.availableShapes;
 
-  areTagsExclusive: boolean = true;
+  areTagsExclusive: boolean = false;
   filteringTags: string[] = [];
-  filteringShapes: AnnotationShape[] = [];
+  filteringShape: AnnotationShape | null = null;
 
   originalName = "New Property";
+  isNameGenerated = true;
 
   get deduplicatedName() {
     const escapedName = this.originalName.replace(
@@ -90,7 +114,7 @@ export default class PropertyCreation extends Vue {
       "\\$&"
     );
     const re = new RegExp(`^${escapedName}( \([0-9]*\))?$`);
-    const count = this.propertiesStore.properties
+    const count = this.propertyStore.properties
       .map((property: IAnnotationProperty) => property.name)
       .map((id: string) => re.test(id))
       .filter((value: boolean) => value).length;
@@ -100,26 +124,59 @@ export default class PropertyCreation extends Vue {
     return this.originalName;
   }
 
-  set deduplicatedName(value) {
-    if (
-      this.originalName !== this.deduplicatedName &&
-      value === this.deduplicatedName
-    ) {
-      return;
+  get generatedName() {
+    let nameList = [];
+    if (this.filteringTags.length) {
+      if (this.areTagsExclusive) {
+        nameList.push("Exclusive ");
+      } else {
+        nameList.push("Inclusive ");
+      }
+      nameList.push("[", this.filteringTags.join(", "), "]");
+    } else {
+      nameList.push("No tag");
     }
-    this.originalName = value;
+    nameList.push(
+      this.filteringShape ? AnnotationNames[this.filteringShape] : "No shape"
+    );
+    if (this.dockerImage) {
+      const imageInterfaceName = this.propertyStore.workerImageList[
+        this.dockerImage
+      ]?.interfaceName;
+      if (imageInterfaceName) {
+        nameList.push(imageInterfaceName);
+      } else {
+        nameList.push(this.dockerImage);
+      }
+    } else {
+      nameList.push("No image");
+    }
+    return nameList.join(" ");
   }
 
-  propertyType: "layer" | "morphology" | "relational" = "layer";
+  @Watch("isNameGenerated")
+  @Watch("generatedName")
+  generatedNameChanged() {
+    if (this.isNameGenerated) {
+      this.originalName = this.generatedName;
+    }
+  }
+
   dockerImage: string | null = null;
 
-  propertyLayer: number | null = null;
-  propertyTags: ITagAnnotationFilter = {
-    tags: [],
-    exclusive: false,
-    enabled: false,
-    id: "Relational property tags"
-  };
+  get propertyImageFilter() {
+    return (labels: IWorkerLabels) => {
+      return (
+        labels.isPropertyWorker !== undefined &&
+        (labels.annotationShape || null) === this.filteringShape
+      );
+    };
+  }
+
+  @Watch("filteringShape")
+  filteringShapeChanged() {
+    this.dockerImage = null;
+  }
 
   @Watch("filteringTags")
   filteringTagsChanged() {
@@ -139,23 +196,23 @@ export default class PropertyCreation extends Vue {
         ++counts[annotation.shape];
       }
     }
-    this.filteringShapes = [];
     let bestCount = 0;
     for (const shape in counts) {
       if (counts[shape] !== undefined && counts[shape] > bestCount) {
         bestCount = counts[shape];
-        this.filteringShapes = [shape as AnnotationShape];
+        this.filteringShape = shape as AnnotationShape;
       }
     }
   }
 
   @Watch("dockerImage")
   dockerImageChanged() {
+    this.isNameGenerated = true;
     if (
       this.dockerImage &&
-      !this.propertiesStore.workerInterfaces[this.dockerImage]
+      !this.propertyStore.workerInterfaces[this.dockerImage]
     ) {
-      this.propertiesStore.fetchWorkerInterface(this.dockerImage);
+      this.propertyStore.fetchWorkerInterface(this.dockerImage);
     }
   }
 
@@ -163,7 +220,7 @@ export default class PropertyCreation extends Vue {
     if (!this.dockerImage) {
       return null;
     }
-    const workerInterface = this.propertiesStore.workerInterfaces[
+    const workerInterface = this.propertyStore.workerInterfaces[
       this.dockerImage
     ];
     return workerInterface ? workerInterface : null;
@@ -178,31 +235,38 @@ export default class PropertyCreation extends Vue {
     if (!this.dockerImage) {
       return;
     }
-    for (const shape of this.filteringShapes) {
-      this.propertiesStore.createProperty({
+    const capturedId = this.deduplicatedName;
+    this.propertyStore
+      .createProperty({
         id: this.deduplicatedName,
         name: this.deduplicatedName,
         image: this.dockerImage,
-        propertyType: this.propertyType,
-        layer: this.propertyLayer,
         tags: {
-          tags: this.propertyTags.tags,
-          exclusive: this.propertyTags.exclusive
+          tags: this.filteringTags,
+          exclusive: this.areTagsExclusive
         },
+        shape: this.filteringShape,
+
+        propertyType: "layer",
+        layer: null,
         independant: false,
-        shape,
         customName: null,
         enabled: false,
         computed: false
+      })
+      .then(() => {
+        this.propertyStore.addAnnotationListId(capturedId);
       });
-    }
     this.reset();
   }
 
   reset() {
-    this.originalName = "New Property";
+    this.filteringTags = [];
+    this.areTagsExclusive = false;
+    this.filteringShape = null;
     this.dockerImage = null;
-    this.propertyType = "layer";
+    this.originalName = "New Property";
+    this.isNameGenerated = true;
   }
 }
 </script>

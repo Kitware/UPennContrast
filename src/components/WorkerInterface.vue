@@ -71,16 +71,15 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Watch, Prop, VModel } from "vue-property-decorator";
+import { Vue, Component, Prop, VModel } from "vue-property-decorator";
 import store from "@/store";
 import annotationsStore from "@/store/annotation";
 import propertiesStore from "@/store/properties";
 import { IWorkerInterface } from "@/store/model";
 import LayerSelect from "@/components/LayerSelect.vue";
-import DockerImageSelect from "@/components/DockerImageSelect.vue";
 import TagPicker from "@/components/TagPicker.vue";
 // Popup for new tool configuration
-@Component({ components: { LayerSelect, TagPicker, DockerImageSelect } })
+@Component({ components: { LayerSelect, TagPicker } })
 export default class WorkerInterface extends Vue {
   readonly store = store;
   readonly annotationsStore = annotationsStore;

@@ -1,6 +1,6 @@
 <template>
   <v-container class="ma-0 pa-0">
-    <v-row>
+    <v-row class="mr-4">
       <!-- In list (???) -->
       <v-col class="pa-0">
         <div v-if="enableLabels" class="py-4 subtitle-2 label">
@@ -36,7 +36,7 @@
         <div v-if="enableLabels" class="py-4 subtitle-2 label">
           Property
         </div>
-        <div class="d-flex align-center justify-center">
+        <div class="d-flex align-center">
           {{ property.name }}
         </div>
       </v-col>

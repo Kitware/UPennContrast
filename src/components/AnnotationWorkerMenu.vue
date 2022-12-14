@@ -31,13 +31,12 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Watch, Prop, VModel } from "vue-property-decorator";
+import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationsStore from "@/store/annotation";
 import { IToolConfiguration } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
-import DockerImageSelect from "@/components/DockerImageSelect.vue";
 import propertiesStore from "@/store/properties";
 import WorkerInterface from "@/components/WorkerInterface.vue";
 // Popup for new tool configuration
@@ -45,7 +44,6 @@ import WorkerInterface from "@/components/WorkerInterface.vue";
   components: {
     LayerSelect,
     TagFilterEditor,
-    DockerImageSelect,
     WorkerInterface
   }
 })

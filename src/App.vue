@@ -204,6 +204,6 @@ body > div {
 }
 
 .v-navigation-drawer {
-  z-index: 8;
+  z-index: 100;
 }
 </style>

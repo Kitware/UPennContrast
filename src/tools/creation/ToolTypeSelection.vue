@@ -88,10 +88,15 @@ export default class ToolTypeSelection extends Vue {
           items = this.toolStore.availableShapes;
           break;
         case "dockerImage":
-          items = this.propertyStore.workerImageList.map(image => ({
-            text: image,
-            value: { image }
-          }));
+          for (const image in this.propertyStore.workerImageList) {
+            const labels = this.propertyStore.workerImageList[image];
+            if (labels.isAnnotationWorker !== undefined) {
+              items.push({
+                text: labels.interfaceName || image,
+                value: { image }
+              });
+            }
+          }
           break;
         default:
           items.push({ text: "No Submenu", value: "defaultSubmenu" });

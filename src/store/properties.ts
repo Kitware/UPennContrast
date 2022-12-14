@@ -13,7 +13,8 @@ import {
   IAnnotationProperty,
   IPropertyComputeJob,
   IWorkerInterface,
-  IToolConfiguration
+  IToolConfiguration,
+  IWorkerImageList
 } from "./model";
 
 import Vue from "vue";
@@ -47,7 +48,7 @@ export class Properties extends VuexModule {
     [annotationId: string]: { [propertyId: string]: number };
   } = {};
 
-  workerImageList: string[] = [];
+  workerImageList: IWorkerImageList = {};
   workerInterfaces: { [image: string]: IWorkerInterface } = {};
   workerPreviews: { [image: string]: { text: string; image: string } } = {};
   displayWorkerPreview = true;
@@ -240,7 +241,7 @@ export class Properties extends VuexModule {
   }
 
   @Mutation
-  setWorkerImageList(list: string[]) {
+  setWorkerImageList(list: IWorkerImageList) {
     this.workerImageList = list;
   }
 

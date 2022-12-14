@@ -1,9 +1,9 @@
 <template>
-  <v-expansion-panel>
-    <v-expansion-panel-header>
+  <v-card>
+    <v-card-title>
       Annotation Properties
-    </v-expansion-panel-header>
-    <v-expansion-panel-content>
+    </v-card-title>
+    <v-card-text>
       <v-container class="pa-0">
         <v-expansion-panels>
           <v-expansion-panel
@@ -22,8 +22,8 @@
           </v-expansion-panel>
         </v-expansion-panels>
       </v-container>
-    </v-expansion-panel-content>
-  </v-expansion-panel>
+    </v-card-text>
+  </v-card>
 </template>
 
 <script lang="ts">

@@ -40,7 +40,7 @@ export default class AnnotationViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
   readonly toolsStore = toolsStore;
-  readonly propertiesStore = propertiesStore;
+  readonly propertyStore = propertiesStore;
   readonly filterStore = filterStore;
 
   get annotationSelectionType() {
@@ -88,7 +88,7 @@ export default class AnnotationViewer extends Vue {
   readonly layerCount: any;
 
   get displayWorkerPreview() {
-    return this.propertiesStore.displayWorkerPreview;
+    return this.propertyStore.displayWorkerPreview;
   }
 
   get configuration() {
@@ -150,7 +150,7 @@ export default class AnnotationViewer extends Vue {
 
   get workerPreview() {
     return this.workerImage
-      ? this.propertiesStore.getWorkerPreview(this.workerImage)
+      ? this.propertyStore.getWorkerPreview(this.workerImage)
       : { text: null, image: "" };
   }
 
@@ -832,7 +832,7 @@ export default class AnnotationViewer extends Vue {
 
     this.addAnnotationConnections(newAnnotation).then(
       (connections: IAnnotationConnection[]) => {
-        this.propertiesStore.handleNewAnnotation({
+        this.propertyStore.handleNewAnnotation({
           newAnnotation,
           newConnections: connections
         });
@@ -1227,8 +1227,8 @@ export default class AnnotationViewer extends Vue {
     this.fetchAnnotations();
     this.bind();
 
-    this.propertiesStore.fetchProperties();
-    this.propertiesStore.fetchPropertyValues();
+    this.propertyStore.fetchProperties();
+    this.propertyStore.fetchPropertyValues();
     this.filterStore.updateHistograms();
 
     this.annotationLayer.geoOn(geojs.event.mouseclick, (evt: any) => {

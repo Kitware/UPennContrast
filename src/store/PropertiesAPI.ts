@@ -2,10 +2,9 @@ import { RestClientInstance } from "@/girder";
 import {
   IAnnotationProperty,
   IWorkerInterface,
-  IToolConfiguration
+  IToolConfiguration,
+  IWorkerImageList
 } from "./model";
-
-import { Promise } from "bluebird";
 
 export default class AnnotationsAPI {
   private readonly client: RestClientInstance;
@@ -95,7 +94,7 @@ export default class AnnotationsAPI {
     };
   }
 
-  async getWorkerImages(): Promise<string[]> {
+  async getWorkerImages(): Promise<IWorkerImageList> {
     return this.client.get("worker_interface/available").then(res => {
       return res.data;
     });

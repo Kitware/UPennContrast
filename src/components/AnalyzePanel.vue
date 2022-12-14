@@ -1,13 +1,11 @@
 <template>
   <v-card class="ma-1">
     <v-card-title>
-      Analyze annotations
+      Analyze
     </v-card-title>
-    <v-card-text class="pa-1">
-      <v-expansion-panels hover multiple>
-        <property-creation />
-        <property-list />
-      </v-expansion-panels>
+    <v-card-text>
+      <property-creation />
+      <property-list />
     </v-card-text>
   </v-card>
 </template>
