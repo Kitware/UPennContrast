@@ -56,9 +56,7 @@ class UPennContrastWorkerClient:
         self.token = token
         self.params = params
 
-        self.propertyName = params.get('customName', None)
-        if not self.propertyName:
-            self.propertyName = params.get('name', 'unknown_property')
+        self.propertyName = params.get('name', 'unknown_property')
 
         # Setup helper classes with url and credentials
         self.annotationClient = annotations.UPennContrastAnnotationClient(

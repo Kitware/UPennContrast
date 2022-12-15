@@ -58,9 +58,6 @@
             </v-col>
           </v-row>
         </template>
-        <template v-if="workerInterface">
-          {{ workerInterface }}
-        </template>
       </v-container>
       <div class="button-bar">
         <v-spacer></v-spacer>
@@ -232,7 +229,11 @@ export default class PropertyCreation extends Vue {
   }
 
   createProperty() {
-    if (!this.dockerImage) {
+    if (
+      !this.dockerImage ||
+      !this.filteringShape ||
+      !this.filteringTags.length
+    ) {
       return;
     }
     const capturedId = this.deduplicatedName;
@@ -245,14 +246,7 @@ export default class PropertyCreation extends Vue {
           tags: this.filteringTags,
           exclusive: this.areTagsExclusive
         },
-        shape: this.filteringShape,
-
-        propertyType: "layer",
-        layer: null,
-        independant: false,
-        customName: null,
-        enabled: false,
-        computed: false
+        shape: this.filteringShape
       })
       .then(() => {
         this.propertyStore.addAnnotationListId(capturedId);

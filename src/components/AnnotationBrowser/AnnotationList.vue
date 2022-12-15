@@ -226,7 +226,7 @@ export default class AnnotationList extends Vue {
           a.id.localeCompare(b.id)
         )
         .map((property: IAnnotationProperty) => ({
-          text: property.customName || property.name,
+          text: property.name,
           value: property.id
         }))
     ];

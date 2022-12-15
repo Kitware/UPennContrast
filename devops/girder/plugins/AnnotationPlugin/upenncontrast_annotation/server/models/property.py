@@ -13,44 +13,34 @@ class PropertySchema:
         'id': '/girder/plugins/upenncontrast_annotation/models/annotation',
         'type': 'object',
         'properties': {
+            'id': {
+                'type': 'string'
+            },
             'name': {
                 'type': 'string'
             },
             'image': {
                 'type': 'string'
             },
-            'propertyType': {
-                'type': 'string',
-                'enum': ['layer', 'morphology', 'relational']
-            },
-            'parameters': {
+            'tags': {
                 'type': 'object',
                 'properties': {
-                    'layer': {
-                        'type': 'integer'
-                    },
-                    'tags': { # TODO:
-                        'type': 'object',
-                        'properties': {
-                            'tags': {
-                                'type': 'array'
-                            },
-                            'exclusive': {
-                                'type': 'boolean'
-                            }
+                    'tags': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'string'
                         }
                     },
-                    'independant': {
+                    'exclusive': {
                         'type': 'boolean'
-                    },
-                    'shape': {
-                        'type': 'string',
-                        'enum': ['point', 'line', 'polygon']
-                    },
+                    }
                 }
-            }
-        },
-        # 'additionalProperties': False
+            },
+            'shape': {
+                'type': 'string',
+                'enum': ['point', 'line', 'polygon']
+            },
+        }
     }
 
 

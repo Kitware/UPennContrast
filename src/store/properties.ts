@@ -8,13 +8,11 @@ import {
 import store from "./root";
 
 import {
-  IAnnotation,
-  IAnnotationConnection,
   IAnnotationProperty,
-  IPropertyComputeJob,
   IWorkerInterface,
   IToolConfiguration,
-  IWorkerImageList
+  IWorkerImageList,
+  IAnnotationPropertyConfiguration
 } from "./model";
 
 import Vue from "vue";
@@ -129,34 +127,6 @@ export class Properties extends VuexModule {
     };
   }
 
-  @Action
-  disableProperty(property: IAnnotationProperty) {
-    this.replaceProperty({ ...property, enabled: false });
-  }
-
-  @Action
-  enableProperty({
-    property,
-    workerInterface,
-    callback
-  }: {
-    property: IAnnotationProperty;
-    workerInterface: any;
-    callback: (success: boolean) => void;
-  }) {
-    this.replaceProperty({ ...property, enabled: true, computed: false });
-
-    const newProp = this.getPropertyById(property.id);
-    if (newProp) {
-      this.computeProperty({
-        property: newProp,
-        annotationIds: [],
-        workerInterface,
-        callback
-      });
-    }
-  }
-
   @Mutation
   addAnnotationListId(id: string) {
     if (!this.annotationListIds.includes(id)) {
@@ -176,42 +146,27 @@ export class Properties extends VuexModule {
   @Action
   async computeProperty({
     property,
-    annotationIds = [],
-    workerInterface = {},
+    params = {},
     callback = () => {}
   }: {
     property: IAnnotationProperty;
-    annotationIds: string[];
-    workerInterface: any;
+    params: object;
     callback: (success: boolean) => void;
   }) {
     if (!jobs.isSubscribedToNotifications) {
       jobs.initializeNotificationSubscription();
     }
 
-    if (
-      !property.enabled ||
-      !main.dataset?.id ||
-      !main.configuration?.view?.layers
-    ) {
+    if (!main.dataset?.id || !main.configuration?.view?.layers) {
       return;
     }
 
     // Get channel from layer
-    const layers = main.configuration.view.layers;
-    let channel = null;
-    if (property.layer || property.layer === 0) {
-      const layer = layers[property.layer];
-      if (layer) {
-        channel = layer.channel;
-      }
-    }
+    this.replaceProperty({ ...property, computed: false });
     this.propertiesAPI
       .computeProperty(property.name, main.dataset.id, {
         ...property,
-        annotationIds: annotationIds.length ? annotationIds : undefined,
-        channel,
-        workerInterface: workerInterface
+        ...params
       })
       .then((response: any) => {
         // Keep track of running jobs
@@ -222,15 +177,13 @@ export class Properties extends VuexModule {
         if (job && job._id) {
           jobs.addJob({
             jobId: job._id,
-            propertyId: property.id,
-            annotationIds,
             datasetId: main.dataset!.id,
             callback: (success: boolean) => {
               this.fetchPropertyValues();
               filters.updateHistograms();
               callback(success);
             }
-          } as IPropertyComputeJob);
+          });
         }
       });
   }
@@ -254,36 +207,6 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  async handleNewAnnotation({}: // newAnnotation,
-  // newConnections
-  {
-    newAnnotation: IAnnotation;
-    newConnections: IAnnotationConnection[];
-  }) {
-    // TODO: can't be done without the interface values
-    // We also want to recompute properties for connected annotations
-    // const relatedIds: string[] = [newAnnotation.id];
-    // newConnections.forEach((connection: IAnnotationConnection) => {
-    //   if (!relatedIds.includes(connection.childId)) {
-    //     relatedIds.push(connection.childId);
-    //   }
-    //   if (!relatedIds.includes(connection.parentId)) {
-    //     relatedIds.push(connection.parentId);
-    //   }
-    // });
-    // // For all enabled and valid properties, send a compute request with these annotations
-    // this.properties
-    //   .filter((property: IAnnotationProperty) => property.enabled)
-    //   .filter(
-    //     (property: IAnnotationProperty) =>
-    //       !property.shape || property.shape === newAnnotation.shape
-    //   )
-    //   .forEach((property: IAnnotationProperty) =>
-    //     this.computeProperty({ property, annotationIds: relatedIds })
-    //   );
-  }
-
-  @Action
   async fetchPropertyValues() {
     if (!main.dataset?.id) {
       return;
@@ -293,7 +216,7 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  async createProperty(property: IAnnotationProperty) {
+  async createProperty(property: IAnnotationPropertyConfiguration) {
     const newProperty = await this.propertiesAPI.createProperty(property);
     if (newProperty) {
       this.setProperties([...this.properties, newProperty]);

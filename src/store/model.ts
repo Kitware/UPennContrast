@@ -257,29 +257,26 @@ export interface IROIAnnotationFilter extends IAnnotationFilter {
   roi: IGeoJSPoint[];
 }
 
-export interface IAnnotationProperty {
+export interface IAnnotationPropertyConfiguration {
   id: string;
   name: string;
   image: string;
-  propertyType: "layer" | "morphology" | "relational";
 
-  layer: number | null;
   tags: {
     tags: string[];
     exclusive: boolean;
   };
-  independant: boolean;
-  shape: AnnotationShape | null;
-  customName: string | null;
+  shape: AnnotationShape;
+}
 
-  enabled: boolean;
+export interface IAnnotationProperty extends IAnnotationPropertyConfiguration {
   computed: boolean;
 }
 
 export interface IComputeJob {
   jobId: string;
   callback: (success: boolean) => void;
-  datasetId: string;
+  datasetId: string | null;
 }
 export interface IAnnotationComputeJob extends IComputeJob {
   tool: IToolConfiguration;

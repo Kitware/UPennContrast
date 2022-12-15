@@ -830,14 +830,7 @@ export default class AnnotationViewer extends Vue {
     // Save the new annotation
     this.annotationStore.addAnnotation(newAnnotation);
 
-    this.addAnnotationConnections(newAnnotation).then(
-      (connections: IAnnotationConnection[]) => {
-        this.propertyStore.handleNewAnnotation({
-          newAnnotation,
-          newConnections: connections
-        });
-      }
-    );
+    this.addAnnotationConnections(newAnnotation);
 
     // Display the new annotation
     const newGeoJSAnnotation = this.createGeoJSAnnotation(

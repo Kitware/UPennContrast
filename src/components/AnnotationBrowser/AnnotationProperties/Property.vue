@@ -52,6 +52,7 @@ import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
+import { IAnnotationProperty } from "@/store/model";
 
 @Component({
   components: {
@@ -64,7 +65,7 @@ export default class AnnotationProperty extends Vue {
   readonly filterStore = filterStore;
   readonly store = store;
   @Prop()
-  readonly property!: any;
+  readonly property!: IAnnotationProperty;
   @Prop()
   readonly enableLabels!: boolean;
 
@@ -74,10 +75,6 @@ export default class AnnotationProperty extends Vue {
 
   get list() {
     return this.propertyStore.annotationListIds.includes(this.property.id);
-  }
-
-  get enabled() {
-    return this.property.enabled;
   }
 
   toggleFilter() {

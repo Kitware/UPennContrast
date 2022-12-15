@@ -3,7 +3,8 @@ import {
   IAnnotationProperty,
   IWorkerInterface,
   IToolConfiguration,
-  IWorkerImageList
+  IWorkerImageList,
+  IAnnotationPropertyConfiguration
 } from "./model";
 
 export default class AnnotationsAPI {
@@ -16,7 +17,7 @@ export default class AnnotationsAPI {
   histogramsLoaded = 0;
 
   async createProperty(
-    property: IAnnotationProperty
+    property: IAnnotationPropertyConfiguration
   ): Promise<IAnnotationProperty> {
     return this.client.post("annotation_property", property).then(res => {
       return this.toProperty(res.data);
@@ -78,19 +79,14 @@ export default class AnnotationsAPI {
   }
 
   toProperty(item: any): IAnnotationProperty {
-    const { _id, name, image, propertyType, layer, shape, tags } = item;
+    const { name, image, shape, tags } = item;
     return {
       id: name,
       name,
       image,
-      propertyType,
-      layer,
       tags,
-      independant: false,
       shape,
-      enabled: false,
-      computed: false,
-      customName: null
+      computed: false
     };
   }
 

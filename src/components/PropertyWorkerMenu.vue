@@ -74,9 +74,9 @@ export default class propertyWorkerMenu extends Vue {
     this.running = true;
     this.previousRunStatus = null;
 
-    this.propertyStore.enableProperty({
+    this.propertyStore.computeProperty({
       property: this.property,
-      workerInterface: interfaceValues,
+      params: interfaceValues,
       callback: success => {
         this.running = false;
         this.previousRunStatus = success;
