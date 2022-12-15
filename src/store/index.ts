@@ -266,14 +266,16 @@ export class Main extends VuexModule {
     const confs = await this.api.getRecentConfigurations();
     let curlen = this.recentConfigurations.length;
     for (let i = 0; i < 5 - curlen; i += 1) {
-      const folder = await this.api.getFolder(confs[i].folderId);
-      this.recentConfigurations.unshift({
-        id: confs[i]._id,
-        name: confs[i].name,
-        description: confs[i].description,
-        datasetId: confs[i].folderId!,
-        datasetName: folder.name || "Unknown"
-      });
+      if (confs[i]) {
+        const folder = await this.api.getFolder(confs[i].folderId);
+        this.recentConfigurations.unshift({
+          id: confs[i]._id,
+          name: confs[i].name,
+          description: confs[i].description,
+          datasetId: confs[i].folderId!,
+          datasetName: folder.name || "Unknown"
+        });
+      }
     }
   }
 
