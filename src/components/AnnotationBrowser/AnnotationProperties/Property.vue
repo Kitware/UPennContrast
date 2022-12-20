@@ -2,10 +2,7 @@
   <v-container class="ma-0 pa-0">
     <v-row class="mr-4">
       <!-- In list (???) -->
-      <v-col class="pa-0">
-        <div v-if="enableLabels" class="py-4 subtitle-2 label">
-          In list
-        </div>
+      <v-col class="px-0" cols="1">
         <div>
           <v-checkbox
             dense
@@ -17,10 +14,7 @@
         </div>
       </v-col>
       <!-- As filter -->
-      <v-col class="pa-0">
-        <div v-if="enableLabels" class="py-4 subtitle-2 label">
-          As filter
-        </div>
+      <v-col class="px-0" cols="1">
         <div>
           <v-checkbox
             dense
@@ -32,13 +26,29 @@
         </div>
       </v-col>
       <!-- Property name -->
-      <v-col class="pa-0" cols="7">
-        <div v-if="enableLabels" class="py-4 subtitle-2 label">
-          Property
-        </div>
+      <v-col class="px-2">
         <div class="d-flex align-center">
           {{ property.name }}
         </div>
+      </v-col>
+      <!-- Compute button -->
+      <v-col class="px-0" cols="1">
+        <v-btn small fab @click.native.stop :disabled="false" @click="compute">
+          <v-badge
+            color="red"
+            :value="uncomputed[property.id].length > 0 && !running"
+            :content="uncomputed[property.id].length"
+          >
+            <template v-if="running">
+              <v-progress-circular indeterminate />
+            </template>
+            <template v-else>
+              <v-icon color="primary">
+                mdi-reload
+              </v-icon>
+            </template>
+          </v-badge>
+        </v-btn>
       </v-col>
     </v-row>
   </v-container>
@@ -50,9 +60,11 @@ import LayerSelect from "@/components/LayerSelect.vue";
 
 import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
+import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 import { IAnnotationProperty } from "@/store/model";
+import { property } from "lodash";
 
 @Component({
   components: {
@@ -62,12 +74,14 @@ import { IAnnotationProperty } from "@/store/model";
 })
 export default class AnnotationProperty extends Vue {
   readonly propertyStore = propertyStore;
+  readonly annotationStore = annotationStore;
   readonly filterStore = filterStore;
   readonly store = store;
   @Prop()
   readonly property!: IAnnotationProperty;
-  @Prop()
-  readonly enableLabels!: boolean;
+
+  running: boolean = false;
+  previousRunStatus: boolean | null = null;
 
   get filter() {
     return this.filterStore.filterIds.includes(this.property.id);
@@ -75,6 +89,10 @@ export default class AnnotationProperty extends Vue {
 
   get list() {
     return this.propertyStore.annotationListIds.includes(this.property.id);
+  }
+
+  get uncomputed() {
+    return this.propertyStore.uncomputedAnnotationsPerProperty;
   }
 
   toggleFilter() {
@@ -92,13 +110,22 @@ export default class AnnotationProperty extends Vue {
       this.propertyStore.addAnnotationListId(this.property.id);
     }
   }
+
+  compute() {
+    if (this.running) {
+      return;
+    }
+    this.running = true;
+    this.previousRunStatus = null;
+
+    this.propertyStore.computeProperty({
+      property: this.property,
+      params: this.property.workerInterface,
+      callback: success => {
+        this.running = false;
+        this.previousRunStatus = success;
+      }
+    });
+  }
 }
 </script>
-
-<style lang="scss" scoped>
-.label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-</style>

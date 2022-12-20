@@ -47,6 +47,14 @@
         <template v-if="dockerImage !== null">
           <v-row>
             <v-col>
+              <property-worker-menu
+                v-model="interfaceValues"
+                :image="dockerImage"
+              />
+            </v-col>
+          </v-row>
+          <v-row>
+            <v-col>
               <v-textarea
                 v-model="originalName"
                 label="Property name"
@@ -79,16 +87,24 @@ import {
   IAnnotationProperty,
   AnnotationShape,
   IWorkerLabels,
-  AnnotationNames
+  AnnotationNames,
+  IWorkerInterfaceValues
 } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
 import DockerImageSelect from "@/components/DockerImageSelect.vue";
 import TagPicker from "@/components/TagPicker.vue";
+import PropertyWorkerMenu from "@/components/PropertyWorkerMenu.vue";
 
 // Popup for new tool configuration
 @Component({
-  components: { LayerSelect, TagFilterEditor, DockerImageSelect, TagPicker }
+  components: {
+    LayerSelect,
+    TagFilterEditor,
+    DockerImageSelect,
+    TagPicker,
+    PropertyWorkerMenu
+  }
 })
 export default class PropertyCreation extends Vue {
   readonly store = store;
@@ -104,6 +120,8 @@ export default class PropertyCreation extends Vue {
 
   originalName = "New Property";
   isNameGenerated = true;
+
+  interfaceValues: IWorkerInterfaceValues = {};
 
   get deduplicatedName() {
     const escapedName = this.originalName.replace(
@@ -124,11 +142,6 @@ export default class PropertyCreation extends Vue {
   get generatedName() {
     let nameList = [];
     if (this.filteringTags.length) {
-      if (this.areTagsExclusive) {
-        nameList.push("Exclusive ");
-      } else {
-        nameList.push("Inclusive ");
-      }
       nameList.push("[", this.filteringTags.join(", "), "]");
     } else {
       nameList.push("No tag");
@@ -213,21 +226,6 @@ export default class PropertyCreation extends Vue {
     }
   }
 
-  get workerInterface() {
-    if (!this.dockerImage) {
-      return null;
-    }
-    const workerInterface = this.propertyStore.workerInterfaces[
-      this.dockerImage
-    ];
-    return workerInterface ? workerInterface : null;
-  }
-
-  @Watch("workerInterface")
-  workerInterfaceChanged() {
-    // TODO: fill the interface and edit DockerImageSelect.vue
-  }
-
   createProperty() {
     if (
       !this.dockerImage ||
@@ -246,7 +244,8 @@ export default class PropertyCreation extends Vue {
           tags: this.filteringTags,
           exclusive: this.areTagsExclusive
         },
-        shape: this.filteringShape
+        shape: this.filteringShape,
+        workerInterface: this.interfaceValues
       })
       .then(() => {
         this.propertyStore.addAnnotationListId(capturedId);

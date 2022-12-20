@@ -19,9 +19,11 @@ export default class AnnotationsAPI {
   async createProperty(
     property: IAnnotationPropertyConfiguration
   ): Promise<IAnnotationProperty> {
-    return this.client.post("annotation_property", property).then(res => {
-      return this.toProperty(res.data);
-    });
+    return this.client
+      .post("annotation_property", this.fromPropertyConfiguration(property))
+      .then(res => {
+        return this.toProperty(res.data);
+      });
   }
 
   async getProperties(): Promise<IAnnotationProperty[]> {
@@ -78,15 +80,29 @@ export default class AnnotationsAPI {
     );
   }
 
+  fromPropertyConfiguration(item: IAnnotationPropertyConfiguration) {
+    const { id, name, image, shape, tags, workerInterface } = item;
+    return {
+      id,
+      name,
+      image,
+      tags,
+      shape,
+      workerInterface,
+      computed: false
+    };
+  }
+
   toProperty(item: any): IAnnotationProperty {
-    const { name, image, shape, tags } = item;
+    const { name, image, shape, tags, workerInterface, computed } = item;
     return {
       id: name,
       name,
       image,
       tags,
       shape,
-      computed: false
+      workerInterface: workerInterface || {},
+      computed: typeof computed === "boolean" ? computed : false
     };
   }
 

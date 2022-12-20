@@ -168,12 +168,30 @@ export interface IGeoJSPoint {
   z?: number; // Optional z coordinate
 }
 
+export declare type WorkerInterfaceType =
+  | "number"
+  | "text"
+  | "tags"
+  | "layer"
+  | "select"
+  | "channel";
+
+export interface IWorkerInterfaceElement {
+  type: WorkerInterfaceType;
+  min?: number;
+  max?: number;
+  default?: number;
+  items?: any[];
+}
+
 export interface IWorkerInterface {
+  [id: string]: IWorkerInterfaceElement;
+}
+
+export interface IWorkerInterfaceValues {
   [id: string]: {
-    type: "number" | "text" | "tags" | "layer";
-    min?: number;
-    max?: number;
-    default?: number;
+    type: WorkerInterfaceType;
+    value: any;
   };
 }
 
@@ -267,6 +285,7 @@ export interface IAnnotationPropertyConfiguration {
     exclusive: boolean;
   };
   shape: AnnotationShape;
+  workerInterface: IWorkerInterfaceValues;
 }
 
 export interface IAnnotationProperty extends IAnnotationPropertyConfiguration {

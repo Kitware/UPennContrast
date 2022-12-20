@@ -12,16 +12,18 @@ import {
   IWorkerInterface,
   IToolConfiguration,
   IWorkerImageList,
-  IAnnotationPropertyConfiguration
+  IAnnotationPropertyConfiguration,
+  IWorkerInterfaceValues,
+  IAnnotation
 } from "./model";
 
 import Vue from "vue";
 
 import main from "./index";
 
-import { logError } from "@/utils/log";
+import { canCompute } from "@/utils/annotation";
 import filters from "./filters";
-import annotation from "./annotation";
+import annotations from "./annotation";
 import jobs from "./jobs";
 
 const jobStates = {
@@ -143,6 +145,25 @@ export class Properties extends VuexModule {
     }
   }
 
+  get uncomputedAnnotationsPerProperty() {
+    const uncomputed: { [propertyId: string]: IAnnotation[] } = {};
+    for (const property of this.properties) {
+      uncomputed[property.id] = [];
+    }
+    for (const annotation of annotations.annotations) {
+      const values = this.propertyValues[annotation.id];
+      for (const property of this.properties) {
+        if (
+          (!values || !values[property.id]) &&
+          canCompute(property, annotation)
+        ) {
+          uncomputed[property.id].push(annotation);
+        }
+      }
+    }
+    return uncomputed;
+  }
+
   @Action
   async computeProperty({
     property,
@@ -150,7 +171,7 @@ export class Properties extends VuexModule {
     callback = () => {}
   }: {
     property: IAnnotationProperty;
-    params: object;
+    params: IWorkerInterfaceValues;
     callback: (success: boolean) => void;
   }) {
     if (!jobs.isSubscribedToNotifications) {
@@ -251,7 +272,7 @@ export class Properties extends VuexModule {
       return;
     }
     const datasetId = main.dataset.id;
-    const { location, channel } = await annotation.context.dispatch(
+    const { location, channel } = await annotations.context.dispatch(
       "getAnnotationLocationFromTool",
       tool
     );

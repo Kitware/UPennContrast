@@ -21,7 +21,9 @@
       <v-divider class="ml-4" vertical />
       <template v-if="store.dataset && routeName === 'view'">
         <v-btn class="ml-4" @click.stop="toggleRightPanel('analyzePanel')">
-          Analyze
+          <v-badge dot color="red" :value="hasUncomputedProperties">
+            Analyze
+          </v-badge>
         </v-btn>
         <v-btn class="ml-4" @click.stop="toggleRightPanel('settingsPanel')">
           Settings
@@ -104,6 +106,7 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
 import Persister from "@/store/Persister";
+import propertyStore from "@/store/properties";
 
 @Component({
   components: {
@@ -119,6 +122,7 @@ import Persister from "@/store/Persister";
 export default class App extends Vue {
   readonly store = store;
   readonly toolsStore = toolsStore;
+  readonly propertyStore = propertyStore;
 
   snapshotPanel = false;
   snapshotPanelFull = false;
@@ -174,6 +178,16 @@ export default class App extends Vue {
 
   get routeName() {
     return this.$route.name;
+  }
+
+  get hasUncomputedProperties() {
+    const uncomputed = this.propertyStore.uncomputedAnnotationsPerProperty;
+    for (const id in uncomputed) {
+      if (uncomputed[id].length > 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Watch("routeName")
