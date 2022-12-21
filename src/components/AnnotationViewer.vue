@@ -112,6 +112,14 @@ export default class AnnotationViewer extends Vue {
       : this.annotationStore.annotations;
   }
 
+  get annotationIdToDisplayable() {
+    const ret: { [annotationId: string]: boolean } = {};
+    for (const annotation of this.displayableAnnotations) {
+      ret[annotation.id] = true;
+    }
+    return ret;
+  }
+
   get annotationConnections() {
     return this.annotationStore.annotationConnections;
   }
@@ -211,10 +219,11 @@ export default class AnnotationViewer extends Vue {
   }
 
   get getAnnotationFromId() {
-    return (annotationId: string) =>
-      this.annotationStore.annotations.find(
-        annotation => annotation.id === annotationId
-      );
+    const idToAnnotation: { [annotationId: string]: IAnnotation } = {};
+    for (const annotation of this.annotationStore.annotations) {
+      idToAnnotation[annotation.id] = annotation;
+    }
+    return (annotationId: string) => idToAnnotation[annotationId];
   }
 
   getAnnotationStyle(
@@ -390,9 +399,7 @@ export default class AnnotationViewer extends Vue {
     if (precheck) {
       if (
         !this.validLayers.some(validLayer => validLayer.id === layer.id) ||
-        !this.displayableAnnotations.some(
-          displayableAnnotation => displayableAnnotation.id === annotation.id
-        )
+        !this.annotationIdToDisplayable[annotation.id]
       ) {
         return false;
       }
@@ -417,9 +424,7 @@ export default class AnnotationViewer extends Vue {
   // Check if any of the layers should display this annotation
   shouldDisplayAnnotation(annotation: IAnnotation) {
     return (
-      this.displayableAnnotations.some(
-        displayableAnnotation => displayableAnnotation.id === annotation.id
-      ) &&
+      this.annotationIdToDisplayable[annotation.id] &&
       this.validLayers.some(layer =>
         this.layerShouldDisplayAnnotation(layer, annotation, false)
       )
