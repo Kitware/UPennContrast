@@ -26,16 +26,6 @@ import filters from "./filters";
 import annotations from "./annotation";
 import jobs from "./jobs";
 
-const jobStates = {
-  inactive: 0,
-  queued: 1,
-  running: 2,
-  success: 3,
-  error: 4,
-  cancelled: 5,
-  cancelling: 824
-};
-
 @Module({ dynamic: true, store, name: "properties" })
 export class Properties extends VuexModule {
   propertiesAPI = main.propertiesAPI;
@@ -154,7 +144,7 @@ export class Properties extends VuexModule {
       const values = this.propertyValues[annotation.id];
       for (const property of this.properties) {
         if (
-          (!values || !values[property.id]) &&
+          (!values || values[property.id] === undefined) &&
           canCompute(property, annotation)
         ) {
           uncomputed[property.id].push(annotation);
@@ -165,19 +155,13 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  async computeProperty({
+  computeProperty({
     property,
-    params = {},
     callback = () => {}
   }: {
     property: IAnnotationProperty;
-    params: IWorkerInterfaceValues;
     callback: (success: boolean) => void;
   }) {
-    if (!jobs.isSubscribedToNotifications) {
-      jobs.initializeNotificationSubscription();
-    }
-
     if (!main.dataset?.id || !main.configuration?.view?.layers) {
       return;
     }
@@ -187,7 +171,7 @@ export class Properties extends VuexModule {
     this.propertiesAPI
       .computeProperty(property.name, main.dataset.id, {
         ...property,
-        ...params
+        ...property.workerInterface
       })
       .then((response: any) => {
         // Keep track of running jobs
@@ -265,9 +249,6 @@ export class Properties extends VuexModule {
     tool: IToolConfiguration;
     workerInterface: { [id: string]: { type: string; value: any } };
   }) {
-    if (!jobs.isSubscribedToNotifications) {
-      jobs.initializeNotificationSubscription();
-    }
     if (!main.dataset || !main.configuration) {
       return;
     }

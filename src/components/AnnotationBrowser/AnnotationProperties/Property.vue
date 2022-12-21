@@ -44,7 +44,7 @@
             </template>
             <template v-else>
               <v-icon color="primary">
-                mdi-reload
+                mdi-play
               </v-icon>
             </template>
           </v-badge>
@@ -120,7 +120,6 @@ export default class AnnotationProperty extends Vue {
 
     this.propertyStore.computeProperty({
       property: this.property,
-      params: this.property.workerInterface,
       callback: success => {
         this.running = false;
         this.previousRunStatus = success;

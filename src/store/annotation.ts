@@ -366,9 +366,6 @@ export class Annotations extends VuexModule {
     workerInterface: any;
     callback: (success: boolean) => void;
   }) {
-    if (!jobs.isSubscribedToNotifications) {
-      jobs.initializeNotificationSubscription();
-    }
     if (!main.dataset || !main.configuration) {
       return;
     }

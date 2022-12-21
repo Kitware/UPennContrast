@@ -8,15 +8,17 @@
         outlined
         class="ma-2"
         @click="computeUncomputed"
-        :disabled="uncomputedRunning"
+        :disabled="uncomputedRunning > 0 || uncomputedProperties.length <= 0"
       >
-        {{ uncomputedRunning ? "Computing uncomputed" : "Compute uncomputed" }}
-        <template v-if="uncomputedRunning">
+        {{
+          uncomputedRunning > 0 ? "Computing uncomputed" : "Compute uncomputed"
+        }}
+        <template v-if="uncomputedRunning > 0">
           <v-progress-circular indeterminate />
         </template>
         <template v-else>
           <v-icon right color="primary">
-            mdi-reload
+            mdi-play
           </v-icon>
         </template>
       </v-btn>
@@ -113,30 +115,34 @@ export default class PropertyList extends Vue {
 
   annotationNames = AnnotationNames;
 
-  uncomputedRunning: boolean = false;
+  uncomputedRunning: number = 0;
 
   get properties() {
     return propertyStore.properties;
   }
 
-  computeUncomputed() {
-    this.uncomputedRunning = true;
-    const count = { val: 0, target: this.propertyStore.properties.length };
+  get uncomputedProperties() {
+    const res = [];
     for (const property of this.propertyStore.properties) {
       if (
         this.propertyStore.uncomputedAnnotationsPerProperty[property.id]
           .length > 0
       ) {
-        this.propertyStore.computeProperty({
-          property,
-          params: property.workerInterface,
-          callback: () => {
-            if (++count.val >= count.target) {
-              this.uncomputedRunning = false;
-            }
-          }
-        });
+        res.push(property);
       }
+    }
+    return res;
+  }
+
+  computeUncomputed() {
+    for (const property of this.uncomputedProperties) {
+      ++this.uncomputedRunning;
+      this.propertyStore.computeProperty({
+        property,
+        callback: () => {
+          --this.uncomputedRunning;
+        }
+      });
     }
   }
 }

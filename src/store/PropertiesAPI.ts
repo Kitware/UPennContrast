@@ -7,7 +7,7 @@ import {
   IAnnotationPropertyConfiguration
 } from "./model";
 
-export default class AnnotationsAPI {
+export default class PropertiesAPI {
   private readonly client: RestClientInstance;
 
   constructor(client: RestClientInstance) {
@@ -52,32 +52,26 @@ export default class AnnotationsAPI {
   }
 
   async getPropertyValues(datasetId: string) {
-    return this.client
-      .get(`annotation_property_values?datasetId=${datasetId}&limit=1000`)
-      .then(res => {
-        // map values by annotation id
-        const annotationMapping: {
-          [annotationId: string]: { [propertyId: string]: number };
-        } = {};
-        res.data.forEach(
-          (value: {
-            annotationId: string;
-            values: { [propertyId: string]: number };
-          }) => {
-            annotationMapping[value.annotationId] = {
-              ...annotationMapping[value.annotationId],
-              ...value.values
-            };
-          }
-        );
-        return annotationMapping;
-      });
-  }
-
-  subscribeToNotifications(): EventSource | null {
-    return new EventSource(
-      `${this.client.apiRoot}/notification/stream?token=${this.client.token}`
-    );
+    const annotationMapping: {
+      [annotationId: string]: { [propertyId: string]: number };
+    } = {};
+    const limit = 1000;
+    let offset = 0;
+    let data;
+    do {
+      const res = await this.client.get(
+        `annotation_property_values?datasetId=${datasetId}&limit=${limit}&offset=${offset}&sort=_id`
+      );
+      data = res.data;
+      for (const { annotationId, values } of data) {
+        annotationMapping[annotationId] = {
+          ...annotationMapping[annotationId],
+          ...values
+        };
+      }
+      offset += data.length;
+    } while (data.length === limit);
+    return annotationMapping;
   }
 
   fromPropertyConfiguration(item: IAnnotationPropertyConfiguration) {
