@@ -124,19 +124,17 @@ export default class PropertyCreation extends Vue {
   interfaceValues: IWorkerInterfaceValues = {};
 
   get deduplicatedName() {
-    const escapedName = this.originalName.replace(
-      /[-\/\\^$*+?.()|[\]{}]/g,
-      "\\$&"
-    );
-    const re = new RegExp(`^${escapedName}( \([0-9]*\))?$`);
-    const count = this.propertyStore.properties
-      .map((property: IAnnotationProperty) => property.name)
-      .map((id: string) => re.test(id))
-      .filter((value: boolean) => value).length;
-    if (count) {
-      return `${this.originalName} (${count})`;
+    // Find a name which is not already taken
+    let count = 0;
+    let candidateName = this.originalName;
+    while (
+      this.propertyStore.properties.some(
+        property => property.name === candidateName
+      )
+    ) {
+      candidateName = `${this.originalName} (${++count})`;
     }
-    return this.originalName;
+    return candidateName;
   }
 
   get generatedName() {

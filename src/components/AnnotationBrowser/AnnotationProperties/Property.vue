@@ -1,7 +1,7 @@
 <template>
   <v-container class="ma-0 pa-0">
     <v-row class="mr-4">
-      <!-- In list (???) -->
+      <!-- In list checkbox -->
       <v-col class="px-0" cols="1">
         <div>
           <v-checkbox
@@ -13,7 +13,7 @@
           />
         </div>
       </v-col>
-      <!-- As filter -->
+      <!-- As filter checkbox -->
       <v-col class="px-0" cols="1">
         <div>
           <v-checkbox
@@ -26,7 +26,7 @@
         </div>
       </v-col>
       <!-- Property name -->
-      <v-col class="px-2">
+      <v-col class="d-flex px-2">
         <div class="d-flex align-center">
           {{ property.name }}
         </div>
@@ -64,7 +64,6 @@ import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 import { IAnnotationProperty } from "@/store/model";
-import { property } from "lodash";
 
 @Component({
   components: {

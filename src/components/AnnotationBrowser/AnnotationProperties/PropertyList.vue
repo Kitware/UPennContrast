@@ -7,7 +7,7 @@
       <v-btn
         outlined
         class="ma-2"
-        @click="computeUncomputed"
+        @click="computeUncomputedProperties"
         :disabled="uncomputedRunning > 0 || uncomputedProperties.length <= 0"
       >
         {{
@@ -24,37 +24,16 @@
       </v-btn>
       <v-container class="pa-0">
         <v-expansion-panels>
+          <!-- Header for property -->
           <v-expansion-panel readonly v-if="properties.length > 0">
             <v-expansion-panel-header>
-              <v-container class="ma-0 pa-0">
-                <v-row class="mr-4">
-                  <v-col class="px-0 d-flex justify-center" cols="1">
-                    <div class="py-4 subtitle-2 d-flex">
-                      In list
-                    </div>
-                  </v-col>
-                  <v-col class="px-0 d-flex justify-center" cols="1">
-                    <div class="py-4 subtitle-2 d-flex">
-                      As filter
-                    </div>
-                  </v-col>
-                  <v-col class="px-0 d-flex justify-center">
-                    <div class="py-4 subtitle-2 d-flex">
-                      Property
-                    </div>
-                  </v-col>
-                  <v-col class="px-0 d-flex justify-center" cols="1">
-                    <div class="py-4 subtitle-2 d-flex">
-                      Compute
-                    </div>
-                  </v-col>
-                </v-row>
-              </v-container>
+              <annotation-property-header />
               <template v-slot:actions>
                 <v-icon color="transparent">$expand</v-icon>
               </template>
             </v-expansion-panel-header>
           </v-expansion-panel>
+          <!-- List of all the properties -->
           <v-expansion-panel
             v-for="(property, index) in properties"
             :key="`${property.id} ${index}`"
@@ -63,26 +42,7 @@
               <annotation-property :property="property" />
             </v-expansion-panel-header>
             <v-expansion-panel-content>
-              <v-container>
-                <v-row>Image: {{ property.image }}</v-row>
-                <v-row>
-                  Tags ({{
-                    property.tags.exclusive ? "exclusive" : "inclusive"
-                  }}): {{ property.tags.tags.join(", ") }}
-                </v-row>
-                <v-row>Shape: {{ annotationNames[property.shape] }}</v-row>
-                <v-row>
-                  Worker interface:
-                  <v-row
-                    v-for="[name, { value }] in Object.entries(
-                      property.workerInterface
-                    )"
-                    :key="name"
-                  >
-                    {{ name }}: {{ value }}
-                  </v-row>
-                </v-row>
-              </v-container>
+              <annotation-property-body :property="property" />
             </v-expansion-panel-content>
           </v-expansion-panel>
         </v-expansion-panels>
@@ -99,21 +59,21 @@ import filterStore from "@/store/filters";
 
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import AnnotationProperty from "@/components/AnnotationBrowser/AnnotationProperties/Property.vue";
-
-import { AnnotationNames } from "@/store/model";
+import AnnotationPropertyHeader from "@/components/AnnotationBrowser/AnnotationProperties/PropertyHeader.vue";
+import AnnotationPropertyBody from "@/components/AnnotationBrowser/AnnotationProperties/PropertyBody.vue";
 
 @Component({
   components: {
     TagFilterEditor,
-    AnnotationProperty
+    AnnotationProperty,
+    AnnotationPropertyHeader,
+    AnnotationPropertyBody
   }
 })
 export default class PropertyList extends Vue {
   readonly store = store;
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
-
-  annotationNames = AnnotationNames;
 
   uncomputedRunning: number = 0;
 
@@ -134,7 +94,7 @@ export default class PropertyList extends Vue {
     return res;
   }
 
-  computeUncomputed() {
+  computeUncomputedProperties() {
     for (const property of this.uncomputedProperties) {
       ++this.uncomputedRunning;
       this.propertyStore.computeProperty({

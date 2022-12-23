@@ -155,7 +155,7 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
   return Number.POSITIVE_INFINITY;
 }
 
-export function canCompute(
+export function canComputeAnnotationProperty(
   property: IAnnotationProperty,
   annotation: IAnnotation
 ) {

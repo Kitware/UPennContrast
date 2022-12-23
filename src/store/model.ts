@@ -196,6 +196,7 @@ export interface IWorkerInterfaceValues {
 }
 
 export interface IWorkerLabels {
+  isUPennContrastWorker: string;
   isAnnotationWorker?: string;
   isPropertyWorker?: string;
   interfaceName?: string;

@@ -13,7 +13,6 @@ import {
   IToolConfiguration,
   IWorkerImageList,
   IAnnotationPropertyConfiguration,
-  IWorkerInterfaceValues,
   IAnnotation
 } from "./model";
 
@@ -21,7 +20,7 @@ import Vue from "vue";
 
 import main from "./index";
 
-import { canCompute } from "@/utils/annotation";
+import { canComputeAnnotationProperty } from "@/utils/annotation";
 import filters from "./filters";
 import annotations from "./annotation";
 import jobs from "./jobs";
@@ -145,7 +144,7 @@ export class Properties extends VuexModule {
       for (const property of this.properties) {
         if (
           (!values || values[property.id] === undefined) &&
-          canCompute(property, annotation)
+          canComputeAnnotationProperty(property, annotation)
         ) {
           uncomputed[property.id].push(annotation);
         }

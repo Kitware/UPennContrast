@@ -25,8 +25,6 @@ const jobStates = {
 
 @Module({ dynamic: true, store, name: "jobs" })
 export class Jobs extends VuexModule {
-  propertiesAPI = main.propertiesAPI;
-
   notificationSource: EventSource | null = null;
   latestNotificationTime: number = 0;
 
