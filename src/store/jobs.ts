@@ -42,7 +42,7 @@ export class Jobs extends VuexModule {
     if (!this.notificationSource) {
       await this.initializeNotificationSubscription();
     }
-    this.context.commit("rawAddJob", job);
+    this.rawAddJob(job);
   }
 
   @Mutation
@@ -54,9 +54,13 @@ export class Jobs extends VuexModule {
 
   @Action
   async removeJob(jobId: string) {
-    this.context.commit("rawRemoveJob", jobId);
+    this.rawRemoveJob(jobId);
     if (this.runningJobs.length <= 0) {
       await this.closeNotificationSubscription();
+    }
+    // A job is done, add badge to annotation panel if it is closed
+    if (!main.isAnnotationPanelOpen) {
+      main.setAnnotationPanelBadge(true);
     }
   }
 

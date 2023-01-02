@@ -31,8 +31,16 @@
         <v-btn class="ml-4" @click.stop="toggleRightPanel('snapshotPanel')">
           Snapshots
         </v-btn>
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('annotationPanel')">
-          Annotations
+        <v-btn
+          class="ml-4"
+          @click.stop="
+            toggleRightPanel('annotationPanel');
+            annotationPanelBadge = false;
+          "
+        >
+          <v-badge dot color="green" :value="annotationPanelBadge">
+            Annotations
+          </v-badge>
         </v-btn>
       </template>
       <server-status />
@@ -174,6 +182,19 @@ export default class App extends Vue {
       this.$data[this.lastModifiedRightPanel] = false;
     }
     this.lastModifiedRightPanel = panel;
+  }
+
+  @Watch("annotationPanel")
+  annotationPanelChanged() {
+    this.store.setIsAnnotationPanelOpen(this.annotationPanel);
+  }
+
+  get annotationPanelBadge() {
+    return this.store.annotationPanelBadge;
+  }
+
+  set annotationPanelBadge(value) {
+    this.store.setAnnotationPanelBadge(value);
   }
 
   get routeName() {

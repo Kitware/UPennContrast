@@ -82,6 +82,9 @@ export class Main extends VuexModule {
   unrollT: boolean = false;
   snapshot?: string;
 
+  isAnnotationPanelOpen: boolean = false;
+  annotationPanelBadge: boolean = false;
+
   get userName() {
     return this.girderUser ? this.girderUser.login : "anonymous";
   }
@@ -247,6 +250,16 @@ export class Main extends VuexModule {
   @Mutation
   public setUnrollTImpl(value: boolean) {
     this.unrollT = value;
+  }
+
+  @Mutation
+  public setAnnotationPanelBadge(value: boolean) {
+    this.annotationPanelBadge = value;
+  }
+
+  @Mutation
+  public setIsAnnotationPanelOpen(value: boolean) {
+    this.isAnnotationPanelOpen = value;
   }
 
   @Action

@@ -8,7 +8,7 @@ Workers
 Labels are used to define properties for the worker.
 The typescript interface describing the different possible labels is ``IWorkerLabels`` and can be found in ``src/store/models.ts``.
 
-The following informations may change in the future, but for now:
+The following information may change in the future, but for now:
 - Workers for property or annotation computation need to have the label ``isUPennContrastWorker`` defined (no need to give it a value).
 - Defining ``isAnnotationWorker`` or ``isPropertyWorker`` defines the role of the worker (may have both roles).
 - Any worker can have an ``interfaceName`` which will be used to designate the worker and an ``interfaceCategory`` which may be used to group workers together.
