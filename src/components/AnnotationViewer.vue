@@ -343,16 +343,13 @@ export default class AnnotationViewer extends Vue {
         })
         .style({
           text: (annotation: IAnnotation) => {
-            return (
-              "XY, Z, T = " +
-              annotation.location.XY +
-              ", " +
-              annotation.location.Z +
-              ", " +
-              annotation.location.Time
+            const index = this.annotationStore.annotations.findIndex(
+              (annotationCandidate: IAnnotation) =>
+                annotationCandidate.id === annotation.id
             );
+            return "In-List ID: " + index;
           },
-          offset: { x: 0, y: -6 },
+          offset: { x: 0, y: -12 },
           ...baseStyle
         });
       this.textLayer
@@ -363,14 +360,54 @@ export default class AnnotationViewer extends Vue {
         })
         .style({
           text: (annotation: IAnnotation) => {
-            return "[ " + annotation.tags.join(", ") + " ]";
+            return "Tags: [ " + annotation.tags.join(", ") + " ]";
           },
-          offset: { x: 0, y: 6 },
+          offset: { x: 0, y: 0 },
           ...baseStyle
         });
+      if (this.toggledPropertiesId.length > 0) {
+        this.textLayer
+          .createFeature("text")
+          .data(this.displayedAnnotations)
+          .position((annotation: IAnnotation) => {
+            return simpleCentroid(
+              this.unrolledCoordinates(annotation, anyImage)
+            );
+          })
+          .style({
+            text: (annotation: IAnnotation) => {
+              const propertiesStringArray: string[] = [];
+              for (const propertyId of this.toggledPropertiesId) {
+                const property = this.properties.find(
+                  property => property.id === propertyId
+                );
+                let value =
+                  this.propertyValues[annotation.id]?.[propertyId] || "unknown";
+                if (property) {
+                  propertiesStringArray.push(`${property.name}=${value}`);
+                }
+              }
+              return "Properties: " + propertiesStringArray.join(", ");
+            },
+            offset: { x: 0, y: 12 },
+            ...baseStyle
+          });
+      }
     }
 
     this.textLayer.draw();
+  }
+
+  get toggledPropertiesId() {
+    return this.propertiesStore.annotationListIds;
+  }
+
+  get properties() {
+    return this.propertiesStore.properties;
+  }
+
+  get propertyValues() {
+    return this.propertiesStore.propertyValues;
   }
 
   get validLayers() {
@@ -1152,6 +1189,9 @@ export default class AnnotationViewer extends Vue {
   @Watch("showTooltips")
   @Watch("filteredAnnotationTooltips")
   @Watch("filteredAnnotations")
+  @Watch("properties")
+  @Watch("propertyValues")
+  @Watch("toggledPropertiesId")
   onDrawTooltipsChanged() {
     this.drawTooltips();
   }
