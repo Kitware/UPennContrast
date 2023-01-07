@@ -80,11 +80,11 @@ class UPennContrastWorkerClient:
 
         return annotationList
 
-    def get_annotation_list_by_shape(self, shape):
+    def get_annotation_list_by_shape(self, shape, limit=50, offset=0):
 
         # Get all point annotations from the dataset
         annotationList = self.annotationClient.getAnnotationsByDatasetId(
-            self.datasetId, shape=shape)
+            self.datasetId, shape=shape, limit=limit, offset=offset)
 
         return annotationList
 
