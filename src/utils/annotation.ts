@@ -47,9 +47,9 @@ export function unrollIndexFromImages(
 ) {
   const matchingImage = images.find(image => {
     return (
-      image.frame.IndexZ === Z &&
-      image.frame.IndexT === Time &&
-      image.frame.IndexXY === XY
+      (image.frame.IndexZ === undefined || image.frame.IndexZ === Z) &&
+      (image.frame.IndexT === undefined || image.frame.IndexT === Time) &&
+      (image.frame.IndexXY === undefined || image.frame.IndexXY === XY)
     );
   });
 

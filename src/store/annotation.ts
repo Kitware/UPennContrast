@@ -21,6 +21,7 @@ import {
 } from "./model";
 
 import Vue from "vue";
+import { simpleCentroid } from "@/utils/annotation";
 
 @Module({ dynamic: true, store, name: "annotation" })
 export class Annotations extends VuexModule {
@@ -33,6 +34,14 @@ export class Annotations extends VuexModule {
 
   selectedAnnotations: IAnnotation[] = [];
   activeAnnotationIds: string[] = [];
+
+  get annotationCentroids() {
+    const centroids: { [annotationId: string]: IGeoJSPoint } = {};
+    for (const annotation of this.annotations) {
+      centroids[annotation.id] = simpleCentroid(annotation.coordinates);
+    }
+    return centroids;
+  }
 
   get selectedAnnotationIds() {
     return this.selectedAnnotations.map(
