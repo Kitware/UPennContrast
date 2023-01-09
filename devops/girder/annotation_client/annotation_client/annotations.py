@@ -7,6 +7,7 @@ PATHS = {
 
     'connection': '/annotation_connection/',
     'connection_by_id': '/annotation_connection/{connectionId}',
+    'connect_to_nearest': '/annotation_connection/connectTo/',
 
     'add_property_values': '/annotation_property_values?datasetId={datasetId}&annotationId={annotationId}',
     'get_dataset_properties': '/annotation_property_values?datasetId={datasetId}',
@@ -94,7 +95,7 @@ class UPennContrastAnnotationClient:
         return self.client.delete(PATHS['annotation_by_id'].format(annotationId=annotationId))
 
     # Connections
-    def getAnnotationConnections(self, datasetId=None, childId=None, parentId=None, nodeId=None):
+    def getAnnotationConnections(self, datasetId=None, childId=None, parentId=None, nodeId=None, limit=50, offset=0):
         """
         Search for annotation connections with various parameters
 
@@ -117,6 +118,12 @@ class UPennContrastAnnotationClient:
 
         if nodeId:
             query += 'nodeId=' + str(nodeId) + '&'
+            
+        if limit:
+            query += 'limit=' + str(limit) + '&'
+        
+        if offset:
+            query += 'offset=' + str(offset) + '&'
 
         return self.client.get(PATHS['connection'] + query, )
 
@@ -160,6 +167,20 @@ class UPennContrastAnnotationClient:
         :param str connectionId: The connection id
         """
         return self.client.delete(PATHS['connection_by_id'].format(connectionId=connectionId))
+    
+    def connectToNearest(self, connectTo, annotationsIds):
+        """
+        Automatically create connections between a list of annotations and the nearest annotation of a specified tag.
+        :param dict connectTo: A dict of connect to nearest specifications for tags and layer.
+        :param list annotationsIds: Annotation ids to be connected.
+        """
+        body = {
+            "annotationsIds": annotationsIds,
+            "tags": connectTo['tags'],
+            "channelId": connectTo['layer']
+        }
+        
+        return self.client.post(PATHS['connect_to_nearest'], json=body)
 
     # Property values
 
