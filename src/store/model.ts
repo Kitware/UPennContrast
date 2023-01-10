@@ -14,10 +14,10 @@ export interface IFrameInfo {
   PositionX: number;
   PositionY: number;
   PositionZ: number;
-  IndexXY: number;
-  IndexZ: number;
-  IndexC: number;
-  IndexT: number;
+  IndexXY?: number;
+  IndexZ?: number;
+  IndexC?: number;
+  IndexT?: number;
 }
 
 export interface IImage {

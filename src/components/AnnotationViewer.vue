@@ -21,7 +21,8 @@ import {
   IToolConfiguration,
   IROIAnnotationFilter,
   AnnotationShape,
-  AnnotationSelectionTypes
+  AnnotationSelectionTypes,
+  IAnnotationLocation
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -42,6 +43,28 @@ export default class AnnotationViewer extends Vue {
   readonly toolsStore = toolsStore;
   readonly propertiesStore = propertiesStore;
   readonly filterStore = filterStore;
+
+  // Compute the centroid of each annotation, taking unrolling into account
+  get unrolledCentroidCoordinates() {
+    const centroids: { [annotationId: string]: IGeoJSPoint } = {};
+
+    const anyImage = this.store.dataset?.anyImage();
+    if (anyImage) {
+      for (const annotation of this.annotationStore.annotations) {
+        const centroid = this.annotationStore.annotationCentroids[
+          annotation.id
+        ];
+        const unrolledCentroid = this.unrolledCoordinates(
+          [centroid],
+          annotation.location,
+          anyImage
+        )[0];
+        centroids[annotation.id] = unrolledCentroid;
+      }
+    }
+
+    return centroids;
+  }
 
   get annotationSelectionType() {
     return this.store.annotationSelectionType;
@@ -247,30 +270,34 @@ export default class AnnotationViewer extends Vue {
     return unrollIndexFromImages(XY, Z, Time, images);
   }
 
-  // Transform an annotation's coordiantes, taking unrolling into account.
-  unrolledCoordinates(annotation: IAnnotation, image: IImage) {
+  // Transform a list of coordinates, taking unrolling into account.
+  unrolledCoordinates(
+    coordinates: IGeoJSPoint[],
+    location: IAnnotationLocation,
+    image: IImage
+  ) {
     const tileW = image.sizeX;
     const tileH = image.sizeY;
     if (this.unrolling) {
-      const location = this.unrollIndex(
-        annotation.location.XY,
-        annotation.location.Z,
-        annotation.location.Time,
+      const locationIdx = this.unrollIndex(
+        location.XY,
+        location.Z,
+        location.Time,
         this.store.unrollXY,
         this.store.unrollZ,
         this.store.unrollT
       );
 
-      const tileX = Math.floor(location % this.unrollW);
-      const tileY = Math.floor(location / this.unrollW);
+      const tileX = Math.floor(locationIdx % this.unrollW);
+      const tileY = Math.floor(locationIdx / this.unrollW);
 
-      return annotation.coordinates.map((point: IGeoJSPoint) => ({
+      return coordinates.map((point: IGeoJSPoint) => ({
         x: tileW * tileX + point.x,
         y: tileH * tileY + point.y,
         z: point.z
       }));
     }
-    return annotation.coordinates;
+    return coordinates;
   }
 
   drawAnnotationsAndTooltips() {
@@ -335,11 +362,12 @@ export default class AnnotationViewer extends Vue {
         textStrokeColor: "black",
         textStrokeWidth: 3
       };
+      let yOffset = 0;
       this.textLayer
         .createFeature("text")
         .data(this.displayedAnnotations)
         .position((annotation: IAnnotation) => {
-          return simpleCentroid(this.unrolledCoordinates(annotation, anyImage));
+          return this.unrolledCentroidCoordinates[annotation.id];
         })
         .style({
           text: (annotation: IAnnotation) => {
@@ -347,51 +375,36 @@ export default class AnnotationViewer extends Vue {
               (annotationCandidate: IAnnotation) =>
                 annotationCandidate.id === annotation.id
             );
-            return "In-List ID: " + index;
-          },
-          offset: { x: 0, y: -12 },
-          ...baseStyle
-        });
-      this.textLayer
-        .createFeature("text")
-        .data(this.displayedAnnotations)
-        .position((annotation: IAnnotation) => {
-          return simpleCentroid(this.unrolledCoordinates(annotation, anyImage));
-        })
-        .style({
-          text: (annotation: IAnnotation) => {
-            return "Tags: [ " + annotation.tags.join(", ") + " ]";
-          },
-          offset: { x: 0, y: 0 },
-          ...baseStyle
-        });
-      if (this.toggledPropertiesId.length > 0) {
-        this.textLayer
-          .createFeature("text")
-          .data(this.displayedAnnotations)
-          .position((annotation: IAnnotation) => {
-            return simpleCentroid(
-              this.unrolledCoordinates(annotation, anyImage)
+            return (
+              "ID=" + index + " Tags:[ " + annotation.tags.join(", ") + " ]"
             );
-          })
-          .style({
-            text: (annotation: IAnnotation) => {
-              const propertiesStringArray: string[] = [];
-              for (const propertyId of this.toggledPropertiesId) {
-                const property = this.properties.find(
-                  property => property.id === propertyId
-                );
+          },
+          offset: { x: 0, y: yOffset },
+          ...baseStyle
+        });
+      yOffset += 12;
+      for (const propertyId of this.toggledPropertiesId) {
+        const property = this.properties.find(
+          property => property.id === propertyId
+        );
+        if (property) {
+          this.textLayer
+            .createFeature("text")
+            .data(this.displayedAnnotations)
+            .position((annotation: IAnnotation) => {
+              return this.unrolledCentroidCoordinates[annotation.id];
+            })
+            .style({
+              text: (annotation: IAnnotation) => {
                 let value =
                   this.propertyValues[annotation.id]?.[propertyId] || "unknown";
-                if (property) {
-                  propertiesStringArray.push(`${property.name}=${value}`);
-                }
-              }
-              return "Properties: " + propertiesStringArray.join(", ");
-            },
-            offset: { x: 0, y: 12 },
-            ...baseStyle
-          });
+                return `${property.name}=${value}`;
+              },
+              offset: { x: 0, y: yOffset },
+              ...baseStyle
+            });
+          yOffset += 12;
+        }
       }
     }
 
@@ -607,7 +620,11 @@ export default class AnnotationViewer extends Vue {
       layerId
     };
 
-    const coordinates = this.unrolledCoordinates(annotation, anyImage);
+    const coordinates = this.unrolledCoordinates(
+      annotation.coordinates,
+      annotation.location,
+      anyImage
+    );
 
     const newGeoJSAnnotation = geojsAnnotationFactory(
       annotation.shape,
@@ -646,8 +663,8 @@ export default class AnnotationViewer extends Vue {
     if (!anyImage) {
       return;
     }
-    const pA = simpleCentroid(this.unrolledCoordinates(child, anyImage));
-    const pB = simpleCentroid(this.unrolledCoordinates(parent, anyImage));
+    const pA = this.unrolledCentroidCoordinates[child.id];
+    const pB = this.unrolledCentroidCoordinates[parent.id];
     const line = geojs.annotation.lineAnnotation();
     line.options("vertices", [pA, pB]);
     line.options("isConnection", true);

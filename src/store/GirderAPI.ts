@@ -685,14 +685,14 @@ function parseTiles(
   }
 
   tile.frames.forEach((frame, j) => {
-    let t = metadata.t !== null ? metadata.t : frame.IndexT;
+    let t = metadata.t !== null ? metadata.t : frame.IndexT || 0;
     let xy = metadata.xy !== null ? metadata.xy : frame.IndexXY || 0;
     let z =
       metadata.z !== null
         ? metadata.z
         : frame.IndexZ !== undefined
         ? frame.IndexZ
-        : frame.PositionZ;
+        : frame.PositionZ || 0;
     if (unrollT) {
       unrollCount.t = Math.max(unrollCount.t, t + 1);
       t = -1;
@@ -719,9 +719,9 @@ function parseTiles(
     const c =
       metadataChannel !== undefined
         ? metadataChannel
-        : frame.IndexC === undefined
-        ? 0
-        : frame.IndexC;
+        : frame.IndexC !== undefined
+        ? frame.IndexC
+        : 0;
     if (zs.has(z)) {
       zs.get(z)!.add(t);
     } else {
