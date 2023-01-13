@@ -140,10 +140,9 @@ export class Properties extends VuexModule {
       uncomputed[property.id] = [];
     }
     for (const annotation of annotations.annotations) {
-      const values = this.propertyValues[annotation.id];
       for (const property of this.properties) {
         if (
-          (!values || values[property.id] === undefined) &&
+          this.propertyValues[annotation.id]?.[property.id] === undefined &&
           canComputeAnnotationProperty(property, annotation)
         ) {
           uncomputed[property.id].push(annotation);
@@ -165,10 +164,8 @@ export class Properties extends VuexModule {
       return;
     }
 
-    // Get channel from layer
-    this.replaceProperty({ ...property, computed: false });
     this.propertiesAPI
-      .computeProperty(property.name, main.dataset.id, {
+      .computeProperty(property.id, main.dataset.id, {
         ...property,
         ...property.workerInterface
       })
@@ -205,7 +202,7 @@ export class Properties extends VuexModule {
   @Action
   async fetchProperties() {
     const properties = await this.propertiesAPI.getProperties();
-    if (properties && properties.length) {
+    if (properties) {
       this.setProperties(properties);
     }
   }
@@ -225,6 +222,22 @@ export class Properties extends VuexModule {
     if (newProperty) {
       this.setProperties([...this.properties, newProperty]);
     }
+    return newProperty;
+  }
+
+  @Action
+  async deleteProperty(propertyId: string) {
+    await this.propertiesAPI.deleteProperty(propertyId);
+    await this.fetchProperties();
+  }
+
+  @Action
+  async deletePropertyValues(propertyId: string) {
+    if (!main.dataset?.id) {
+      return;
+    }
+    await this.propertiesAPI.deletePropertyValues(propertyId, main.dataset.id);
+    await this.fetchPropertyValues();
   }
 
   @Action

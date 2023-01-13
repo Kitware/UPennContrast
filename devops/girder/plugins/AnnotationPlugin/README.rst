@@ -15,9 +15,9 @@ The following information may change in the future, but for now:
 - Property workers should have an ``annotationShape`` label which defines which type of annotation they work on.
 
 To build a property worker called ``Intensity Mean`` working on blobs, with category ``Intensity``, one can use this command:
-``docker build . -t annotations/blob_intensity_mean_worker:latest --label isUPennContrastWorker --label isPropertyWorker --label "annotationShape=polygon" --label "interfaceName=Intensity Mean" --label "interfaceCategory=Intensity"``
+``docker build . -t properties/blob_intensity_mean_worker:latest --label isUPennContrastWorker --label isPropertyWorker --label "annotationShape=polygon" --label "interfaceName=Intensity Mean" --label "interfaceCategory=Intensity"``
 
 If a worker is already built and you want to edit a label ``foo`` and give it the value ``bar``, one can use this command (doesn't work for label deletion):
-``echo "FROM annotations/blob_intensity_mean_worker:latest" | docker build --label "foo=bar" -t "annotations/blob_intensity_mean_worker:latest"``
+``echo "FROM properties/blob_intensity_mean_worker:latest" | docker build --label "foo=bar" -t "properties/blob_intensity_mean_worker:latest"``
 
 **TODO:** Add more documentation on Annotation Plugin

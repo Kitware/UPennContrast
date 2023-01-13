@@ -74,29 +74,36 @@ export default class PropertiesAPI {
     return annotationMapping;
   }
 
+  async deleteProperty(propertyId: string) {
+    return this.client.delete(`annotation_property/${propertyId}`);
+  }
+
+  async deletePropertyValues(propertyId: string, datasetId: string) {
+    return this.client.delete(
+      `annotation_property_values?datasetId=${datasetId}&propertyId=${propertyId}`
+    );
+  }
+
   fromPropertyConfiguration(item: IAnnotationPropertyConfiguration) {
-    const { id, name, image, shape, tags, workerInterface } = item;
+    const { name, image, shape, tags, workerInterface } = item;
     return {
-      id,
       name,
       image,
       tags,
       shape,
-      workerInterface,
-      computed: false
+      workerInterface
     };
   }
 
   toProperty(item: any): IAnnotationProperty {
-    const { name, image, shape, tags, workerInterface, computed } = item;
+    const { _id, name, image, shape, tags, workerInterface } = item;
     return {
-      id: name,
+      id: _id,
       name,
       image,
       tags,
       shape,
-      workerInterface: workerInterface || {},
-      computed: typeof computed === "boolean" ? computed : false
+      workerInterface: workerInterface || {}
     };
   }
 

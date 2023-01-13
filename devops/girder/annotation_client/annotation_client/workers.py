@@ -56,7 +56,7 @@ class UPennContrastWorkerClient:
         self.token = token
         self.params = params
 
-        self.propertyName = params.get('name', 'unknown_property')
+        self.propertyId = params.get('id', 'unknown_property')
 
         # Setup helper classes with url and credentials
         self.annotationClient = annotations.UPennContrastAnnotationClient(
@@ -114,6 +114,6 @@ class UPennContrastWorkerClient:
 
     def add_annotation_property_values(self, annotation, values):
 
-        property_values = {self.propertyName: values}
+        property_values = {self.propertyId: values}
 
         self.annotationClient.addAnnotationPropertyValues(self.datasetId, annotation['_id'], property_values)

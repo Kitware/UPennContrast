@@ -14,6 +14,7 @@ class PropertyValues(Resource):
         self._annotationModel = AnnotationModel()
         self._annotationPropertyValuesModel = PropertyValuesModel()
 
+        self.route('DELETE', (), self.delete)
         self.route('POST', (), self.add)
         self.route('GET', (), self.find)
         self.route('GET', ('histogram',), self.histogram)
@@ -32,6 +33,20 @@ class PropertyValues(Resource):
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
         return self._annotationPropertyValuesModel.appendValues(currentUser, self.getBodyJson(), params['annotationId'], params['datasetId'])
+
+    @describeRoute(Description("Delete all the values for annotations in this dataset with this property's id")
+        .param('propertyId', 'The property\'s Id', paramType='path')
+        .param('datasetId', 'The dataset\'s Id', paramType='path')
+        .errorResponse('Property ID was invalid.')
+        .errorResponse('Dataset ID was invalid.')
+        .errorResponse('Write access was denied for the property values.', 403))
+    @access.user
+    def delete(self, params):
+        if 'propertyId' not in params:
+            raise RestException(code=400, message="Property ID was invalid")
+        if 'datasetId' not in params:
+            raise RestException(code=400, message="Dataset ID was invalid")
+        self._annotationPropertyValuesModel.delete(params['propertyId'], params['datasetId'])
 
     @access.user
     @describeRoute(Description("Search for property values")

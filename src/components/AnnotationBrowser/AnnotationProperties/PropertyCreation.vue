@@ -232,10 +232,8 @@ export default class PropertyCreation extends Vue {
     ) {
       return;
     }
-    const capturedId = this.deduplicatedName;
     this.propertyStore
       .createProperty({
-        id: this.deduplicatedName,
         name: this.deduplicatedName,
         image: this.dockerImage,
         tags: {
@@ -245,8 +243,8 @@ export default class PropertyCreation extends Vue {
         shape: this.filteringShape,
         workerInterface: this.interfaceValues
       })
-      .then(() => {
-        this.propertyStore.addAnnotationListId(capturedId);
+      .then(property => {
+        this.propertyStore.addAnnotationListId(property.id);
       });
     this.reset();
   }

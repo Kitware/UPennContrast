@@ -27,10 +27,11 @@ class AnnotationProperty(Resource):
         .param('datasetId', 'The dataset for whose annotations the property should be computed', required=False)
         .param('body', 'A JSON object containing parameters for the computation', paramType='body')
     )
-    def compute(self, id, params):
+    @loadmodel(model='annotation_property', plugin='upenncontrast_annotation', level=AccessType.READ)
+    def compute(self, annotation_property, params):
         datasetId = params.get('datasetId', None)
         if datasetId and id:
-            return self._propertyModel.compute(id, datasetId, self.getBodyJson())
+            return self._propertyModel.compute(annotation_property, datasetId, self.getBodyJson())
         return {}
 
     @access.user
@@ -45,8 +46,8 @@ class AnnotationProperty(Resource):
         .errorResponse('Write access was denied for the property.', 403))
     @access.user
     @loadmodel(model='annotation_property', plugin='upenncontrast_annotation', level=AccessType.WRITE)
-    def delete(self, property, params):
-        self._propertyModel.remove(property)
+    def delete(self, annotation_property, params):
+        self._propertyModel.delete(annotation_property)
 
     @describeRoute(Description("Update an existing property")
     .param('id', 'The ID of the property.', paramType='path')
@@ -77,6 +78,6 @@ class AnnotationProperty(Resource):
     @access.user
     @describeRoute(Description("Get a property by its id.")
         .param('id', 'The annotation\'s id', paramType='path'))
-    @loadmodel(model='annotation_property', plugin='upenncontrast_annotation', level=AccessType.WRITE)
-    def get(self, property):
-        return property
+    @loadmodel(model='annotation_property', plugin='upenncontrast_annotation', level=AccessType.READ)
+    def get(self, annotation_property, params):
+        return annotation_property

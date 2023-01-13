@@ -13,9 +13,6 @@ class PropertySchema:
         'id': '/girder/plugins/upenncontrast_annotation/models/annotation',
         'type': 'object',
         'properties': {
-            'id': {
-                'type': 'string'
-            },
             'name': {
                 'type': 'string'
             },
@@ -40,6 +37,19 @@ class PropertySchema:
                 'type': 'string',
                 'enum': ['point', 'line', 'polygon']
             },
+            'workerInterface': {
+                'type': 'object',
+                'additionalProperties': {
+                    'type': 'object',
+                    'properties': {
+                        'type': { 'type': 'string' },
+                        'min': { 'type': 'number' },
+                        'max': { 'type': 'number' },
+                        'default': { 'type': 'number' },
+                        'items': { 'type': 'array' },
+                    }
+                }
+            }
         }
     }
 
@@ -68,7 +78,7 @@ class AnnotationProperty(AccessControlledModel):
       return self.save(property)
 
     def delete(self, property):
-      self.remove(self.find(property))
+      self.remove(property)
     
     def update(self, property):
       return self.save(property)
@@ -76,9 +86,7 @@ class AnnotationProperty(AccessControlledModel):
     def getPropertyById(self, id, user=None):
       return self.load(id, user=user)
 
-    def compute(self, propertyId, datasetId, params):
-        query = { 'name': propertyId }
-        property = self.findOne(query)
+    def compute(self, property, datasetId, params):
         image = property.get('image', None)
         if not image:
             raise RestException(code=500, message="Invalid property: no image")

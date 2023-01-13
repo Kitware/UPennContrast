@@ -19,19 +19,42 @@
       <v-spacer />
       <v-dialog v-model="deleteDialog">
         <template v-slot:activator="{ on, attrs }">
-          <v-btn v-bind="attrs" v-on="on" color="red">Delete property</v-btn>
+          <v-btn
+            v-bind="attrs"
+            v-on="on"
+            @click.stop="deleteComputedValues = true"
+            color="red"
+          >
+            Delete property
+          </v-btn>
         </template>
         <v-card>
           <v-card-title>
             Delete property
           </v-card-title>
           <v-card-text>
-            <div class="body-2">
-              You are about to delete this property:
-            </div>
-            <div class="body-1">
-              {{ property.name }}
-            </div>
+            <v-container>
+              <v-row>
+                <v-col class="body-2">
+                  You are about to delete this property:
+                </v-col>
+              </v-row>
+              <v-row>
+                <v-col class="body-1 d-flex justify-center">
+                  {{ property.name }}
+                </v-col>
+              </v-row>
+              <v-row>
+                <v-col>
+                  <v-checkbox
+                    hide-details
+                    dense
+                    label="Also delete the computed values for this property"
+                    v-model="deleteComputedValues"
+                  />
+                </v-col>
+              </v-row>
+            </v-container>
           </v-card-text>
           <v-card-actions>
             <v-spacer />
@@ -68,9 +91,13 @@ export default class AnnotationPropertyBody extends Vue {
   annotationNames = AnnotationNames;
 
   deleteDialog: boolean = false;
+  deleteComputedValues: boolean = false;
 
   deleteProperty() {
-    // TODO
+    this.propertyStore.deleteProperty(this.property.id);
+    if (this.deleteComputedValues) {
+      this.propertyStore.deletePropertyValues(this.property.id);
+    }
   }
 }
 </script>

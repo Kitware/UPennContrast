@@ -277,7 +277,6 @@ export interface IROIAnnotationFilter extends IAnnotationFilter {
 }
 
 export interface IAnnotationPropertyConfiguration {
-  id: string;
   name: string;
   image: string;
 
@@ -290,7 +289,7 @@ export interface IAnnotationPropertyConfiguration {
 }
 
 export interface IAnnotationProperty extends IAnnotationPropertyConfiguration {
-  computed: boolean;
+  id: string;
 }
 
 export interface IComputeJob {
