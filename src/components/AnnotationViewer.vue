@@ -479,6 +479,10 @@ export default class AnnotationViewer extends Vue {
   // Remove from the layer annotations that should no longer be renderered (index change, layer change...)
   clearOldAnnotations(clearAll = false) {
     this.annotationLayer.annotations().forEach((annotation: any) => {
+      if (annotation === this.annotationLayer.currentAnnotation) {
+        // Don't do anything with currentAnnotation as it is used internally by geoJS
+        return;
+      }
       if (clearAll) {
         this.annotationLayer.removeAnnotation(annotation, false);
         return;
