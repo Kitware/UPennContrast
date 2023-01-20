@@ -42,6 +42,8 @@
               :key="item.id"
               @mouseover="hover(item.id)"
               @mouseleave="hover(null)"
+              @click="goToAnnotationIdLocation(item.id)"
+              title="Go to annotation location"
               :class="item.id === hoveredId ? 'is-hovered' : ''"
               :ref="item.id"
             >
@@ -51,6 +53,8 @@
                   multiple
                   :value="item"
                   v-model="selected"
+                  @click.capture.stop
+                  title
                 ></v-checkbox>
               </td>
               <td :class="tableItemClass">
@@ -72,6 +76,15 @@
                   >
                 </span>
               </td>
+              <td>
+                {{ item.location.XY + 1 }}
+              </td>
+              <td>
+                {{ item.location.Z + 1 }}
+              </td>
+              <td>
+                {{ item.location.Time + 1 }}
+              </td>
               <td :class="tableItemClass">
                 <v-text-field
                   hide-details
@@ -80,6 +93,8 @@
                   flat
                   outlined
                   @change="updateAnnotationName($event, item.id)"
+                  @click.capture.stop
+                  title
                 >
                 </v-text-field>
               </td>
@@ -218,6 +233,18 @@ export default class AnnotationList extends Vue {
         value: "tags"
       },
       {
+        text: "XY",
+        value: "xy"
+      },
+      {
+        text: "Z",
+        value: "z"
+      },
+      {
+        text: "Time",
+        value: "time"
+      },
+      {
         text: "Name",
         value: "name"
       },
@@ -230,6 +257,16 @@ export default class AnnotationList extends Vue {
           value: property.id
         }))
     ];
+  }
+
+  goToAnnotationIdLocation(annotationId: string) {
+    const annotation = this.annotationStore.getAnnotationFromId(annotationId);
+    if (!annotation) {
+      return;
+    }
+    this.store.setXY(annotation.location.XY);
+    this.store.setZ(annotation.location.Z);
+    this.store.setTime(annotation.location.Time);
   }
 
   get hoveredId() {
@@ -299,6 +336,7 @@ tbody tr:hover,
 tbody tr.is-hovered,
 tbody tr.is-hovered:hover {
   background-color: #616161;
+  cursor: pointer;
 }
 
 .v-text-field .v-input__control .v-input__slot {
