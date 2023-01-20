@@ -29,7 +29,7 @@
           />
         </v-col>
         <v-col class="denseCol">
-          <div v-if="index === 0" class="text-caption pb-2">
+          <div v-if="index === 0" class="text-caption pb-2" title="hotkey 0">
             Channel on/off
           </div>
           <v-switch
@@ -166,12 +166,6 @@ export default class DisplayLayer extends Vue {
   @Prop()
   readonly index!: number;
 
-  @Prop()
-  readonly globalZMaxMerge!: boolean;
-
-  @Prop()
-  readonly zMaxMergeUpdate!: number;
-
   showColorPicker = false;
 
   get histogram() {
@@ -229,11 +223,6 @@ export default class DisplayLayer extends Vue {
     if (!this.isZMaxMerge) {
       this.alternativeZSlice = { ...this.zSlice };
     }
-  }
-
-  @Watch("zMaxMergeUpdate")
-  globalZMaxMergeChanged() {
-    this.isZMaxMerge = this.globalZMaxMerge;
   }
 
   set visible(value: boolean) {

@@ -25,7 +25,8 @@ import {
   IImage,
   newLayer,
   AnnotationSelectionTypes,
-  ILayerStackImage
+  ILayerStackImage,
+  IDisplaySlice
 } from "./model";
 
 import persister from "./Persister";
@@ -678,6 +679,35 @@ export class Main extends VuexModule {
     }
     this.toggleLayer(layerIndex);
     await this.syncConfiguration();
+  }
+
+  @Action
+  async toggleGlobalZMaxMerge() {
+    const layers = this.configuration?.view?.layers;
+    if (!layers || !this.dataset) {
+      return;
+    }
+    const currentZMaxMerge = layers.every(
+      layer => layer.z.type === "max-merge"
+    );
+    const newLayerZ: IDisplaySlice = currentZMaxMerge
+      ? { type: "current", value: null }
+      : { type: "max-merge", value: null };
+    layers.forEach(layer => (layer.z = newLayerZ));
+  }
+
+  @Action
+  async toggleGlobalLayerVisibility() {
+    const layers = this.configuration?.view?.layers;
+    if (!layers || !this.dataset) {
+      return;
+    }
+    const currentVisibility = layers.every(layer => layer.visible);
+    layers.forEach((layer, layerIdx) => {
+      if (layer.visible === currentVisibility) {
+        this.toggleLayerVisibility(layerIdx);
+      }
+    });
   }
 
   @Mutation
