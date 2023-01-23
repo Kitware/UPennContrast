@@ -379,8 +379,11 @@ export default class ContrastHistogram extends Vue {
       return "";
     }
     const bins = this.histData.hist;
+    let maxValue = bins.reduce((acc, v) => Math.max(acc, v), 0);
+    const secondMax = bins.reduce((acc, v) => Math.max(acc, v !== maxValue ? v : 0), 0);
+    maxValue = Math.min(maxValue, secondMax * 1.5);
     const scaleY = scaleLinear()
-      .domain([0, bins.reduce((acc, v) => Math.max(acc, v), 0)])
+      .domain([0, maxValue])
       .range([this.height, 0]);
     const scaleX = scalePoint<number>()
       .domain(bins.map((_, i) => i))
