@@ -548,9 +548,13 @@ export default class NewDataset extends Vue {
         x: Math.min(...coordinates.map(coordinate => coordinate.x)),
         y: Math.min(...coordinates.map(coordinate => coordinate.y))
       };
+      const maxCoordinate = {
+        x: Math.max(...coordinates.map(coordinate => coordinate.x)),
+        y: Math.max(...coordinates.map(coordinate => coordinate.y))
+      };
       const intCoordinates = coordinates.map(coordinate => ({
         x: Math.round(coordinate.x - minCoordinate.x),
-        y: Math.round(coordinate.y - minCoordinate.y)
+        y: Math.round(maxCoordinate.y - coordinate.y)
       }));
 
       sources.forEach((source, sourceIdx) => {
