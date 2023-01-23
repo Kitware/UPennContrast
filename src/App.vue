@@ -166,6 +166,8 @@ export default class App extends Vue {
 <style lang="scss" scoped>
 .logo {
   cursor: pointer;
+  text-overflow: unset;
+  overflow: unset;
 }
 </style>
 <style lang="scss">

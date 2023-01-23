@@ -12,6 +12,12 @@
     </template>
   </v-breadcrumbs>
 </template>
+<style lang="scss" scoped>
+.v-breadcrumbs {
+  overflow: hidden;
+  white-space: nowrap;
+}
+</style>
 
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
