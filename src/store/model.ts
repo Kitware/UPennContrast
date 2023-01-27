@@ -231,23 +231,30 @@ export interface IAnnotationLocation {
   Time: number;
 }
 
-export interface IAnnotation {
-  id: string;
+export interface IAnnotationBase {
   tags: string[];
-  name: string | null;
+  shape: AnnotationShape;
   channel: number;
   location: IAnnotationLocation;
-  shape: AnnotationShape;
   coordinates: IGeoJSPoint[];
   datasetId: string;
 }
 
-export interface IAnnotationConnection {
+export interface IAnnotation extends IAnnotationBase {
   id: string;
+  name: string | null;
+}
+
+export interface IAnnotationConnectionBase {
   label: string;
   tags: string[];
   parentId: string;
   childId: string;
+  datasetId: string;
+}
+
+export interface IAnnotationConnection extends IAnnotationConnectionBase {
+  id: string;
 }
 
 export interface IAnnotationFilter {
@@ -295,6 +302,19 @@ export interface IAnnotationPropertyConfiguration {
 
 export interface IAnnotationProperty extends IAnnotationPropertyConfiguration {
   id: string;
+}
+
+export interface IAnnotationPropertyValues {
+  [annotationId: string]: {
+    [propertyId: string]: number;
+  };
+}
+
+export interface ISerializedData {
+  annotations: IAnnotation[];
+  annotationConnections: IAnnotationConnection[];
+  annotationProperties: IAnnotationProperty[];
+  annotationPropertyValues: IAnnotationPropertyValues;
 }
 
 export interface IComputeJob {

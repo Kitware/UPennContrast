@@ -83,9 +83,22 @@ class Annotation(AccessControlledModel):
         AnnotationSchema.annotationSchema
     )
 
+  def annotationRemovedEvent(self, event):
+    if event.info and event.info['_id']:
+      annotationStringId = str(event.info['_id'])
+      events.trigger('model.upenn_annotation.removeStringIds', [annotationStringId])
+
+  def multipleAnnotationsRemovedEvent(self, event):
+    if event.info and len(event.info) > 0:
+      annotationStringIds = event.info
+      events.trigger('model.upenn_annotation.removeStringIds', annotationStringIds)
+
   def initialize(self):
     self.name="upenn_annotation"
     events.bind('model.folder.remove', 'upenn.annotations.clean.orphaned', self.cleanOrphaned)
+    # Cleaning the database when annotations are removed is done by a custom event: model.upenn_annotation.removeStringIds
+    events.bind('model.upenn_annotation.remove', 'upenn.connections.annotationRemovedEvent', self.annotationRemovedEvent)
+    events.bind('model.upenn_annotation.removeMultiple', 'upenn.connections.multipleAnnotationsRemovedEvent', self.multipleAnnotationsRemovedEvent)
 
   def cleanOrphaned(self, event):
     if event.info and event.info['_id']:
@@ -131,7 +144,14 @@ class Annotation(AccessControlledModel):
     return self.save(annotation)
 
   def delete(self, annotation):
-    self.remove(self.find(annotation))
+    self.remove(annotation)
+
+  def deleteMultiple(self, annotationStringIds):
+    events.trigger('model.upenn_annotation.removeMultiple', annotationStringIds)
+    query = {
+      '_id': { '$in': [ObjectId(stringId) for stringId in annotationStringIds] },
+    }
+    self.removeWithQuery(query)
 
   def getAnnotationById(self, id, user=None):
     return self.load(id, user=user, level=AccessType.READ)

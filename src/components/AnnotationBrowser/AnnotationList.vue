@@ -3,17 +3,37 @@
     <v-expansion-panel-header class="py-1">
       Annotation List
       <v-spacer></v-spacer>
-      <v-btn v-if="selectionFilterEnabled" @click.native.stop="clearSelection">
-        Clear selection filter
-      </v-btn>
-      <v-btn v-else @click.native.stop="filterBySelection">
-        Use selection as filter
-      </v-btn>
-      <v-spacer></v-spacer>
-      <annotation-csv-dialog
-        :annotations="filtered"
-        :propertyIds="propertyIds"
-      ></annotation-csv-dialog>
+      <v-container style="width: auto;">
+        <v-row>
+          <v-col class="pa-1">
+            <v-btn
+              v-if="selectionFilterEnabled"
+              @click.native.stop="clearSelection"
+              block
+            >
+              Clear selection filter
+            </v-btn>
+            <v-btn v-else @click.native.stop="filterBySelection" block>
+              Use selection as filter
+            </v-btn>
+          </v-col>
+          <v-col class="pa-1">
+            <annotation-csv-dialog
+              block
+              :annotations="filteredAnnotations"
+              :propertyIds="propertyIds"
+            ></annotation-csv-dialog>
+          </v-col>
+        </v-row>
+        <v-row>
+          <v-col class="pa-1">
+            <annotation-import block />
+          </v-col>
+          <v-col class="pa-1">
+            <annotation-export block />
+          </v-col>
+        </v-row>
+      </v-container>
     </v-expansion-panel-header>
     <v-expansion-panel-content>
       <v-dialog v-model="annotationFilteredDialog">
@@ -28,7 +48,7 @@
         </v-card>
       </v-dialog>
       <v-data-table
-        :items="filtered"
+        :items="filteredItems"
         :headers="headers"
         v-model="selected"
         item-key="id"
@@ -58,11 +78,11 @@
                 ></v-checkbox>
               </td>
               <td :class="tableItemClass">
-                <span>{{ getAnnotationIndex(item.id) }}</span>
+                <span>{{ annotationIdToIndex.get(item.id) }}</span>
               </td>
               <td :class="tableItemClass">
                 <span>
-                  {{ item.shape }}
+                  {{ item.shapeName }}
                 </span>
               </td>
               <td :class="tableItemClass">
@@ -127,10 +147,19 @@ import {
 } from "@/store/model";
 
 import AnnotationCsvDialog from "@/components/AnnotationBrowser/AnnotationCSVDialog.vue";
+import AnnotationExport from "@/components/AnnotationBrowser/AnnotationExport.vue";
+import AnnotationImport from "@/components/AnnotationBrowser/AnnotationImport.vue";
+
+interface IAnnotationListItem extends IAnnotation {
+  shapeName: string;
+  [propertyId: string]: any;
+}
 
 @Component({
   components: {
-    AnnotationCsvDialog
+    AnnotationCsvDialog,
+    AnnotationExport,
+    AnnotationImport
   }
 })
 export default class AnnotationList extends Vue {
@@ -145,16 +174,9 @@ export default class AnnotationList extends Vue {
 
   annotationFilteredDialog: boolean = false;
 
-  // TODO: clean up selected after filter changes
   get selected() {
-    if (!this.filtered) {
-      return [];
-    }
-    const selectedAnnotationsIds = this.annotationStore.selectedAnnotations.map(
-      annotation => annotation.id
-    );
-    return this.filtered.filter(annotation =>
-      selectedAnnotationsIds.includes(annotation.id)
+    return this.annotationStore.selectedAnnotations.filter(annotation =>
+      this.filteredAnnotationIdToIdx.has(annotation.id)
     );
   }
 
@@ -162,26 +184,30 @@ export default class AnnotationList extends Vue {
     this.annotationStore.setSelected(selected);
   }
 
-  get annotations() {
-    return this.annotationStore.annotations;
+  get filteredAnnotationIdToIdx() {
+    return this.filterStore.filteredAnnotationIdToIdx;
   }
 
-  get filtered() {
-    return this.filterStore.filteredAnnotations.map(
-      (annotation: IAnnotation) => {
-        const item: any = {
-          ...annotation,
-          shape: AnnotationNames[annotation.shape]
-        };
-        this.properties.forEach((property: IAnnotationProperty) => {
-          item[property.id] = this.getPropertyValueForAnnotation(
-            annotation,
-            property.id
-          );
-        });
-        return item;
-      }
-    );
+  get filteredAnnotations() {
+    return this.filterStore.filteredAnnotations;
+  }
+
+  get filteredItems() {
+    return this.filterStore.filteredAnnotations.map(this.annotationToItem);
+  }
+
+  annotationToItem(annotation: IAnnotation) {
+    const item: IAnnotationListItem = {
+      ...annotation,
+      shapeName: AnnotationNames[annotation.shape]
+    };
+    this.properties.forEach((property: IAnnotationProperty) => {
+      item[property.id] = this.getPropertyValueForAnnotationId(
+        annotation.id,
+        property.id
+      );
+    });
+    return item;
   }
 
   get propertyIds() {
@@ -190,18 +216,16 @@ export default class AnnotationList extends Vue {
     );
   }
 
-  getAnnotationIndex(id: string) {
-    return this.annotationStore.annotations.findIndex(
-      (annotation: IAnnotation) => annotation.id === id
-    );
+  get annotationIdToIndex() {
+    return this.annotationStore.annotationIdToIdx;
   }
 
   updateAnnotationName(name: string, id: string) {
     this.annotationStore.updateAnnotationName({ name, id });
   }
 
-  getPropertyValueForAnnotation(annotation: IAnnotation, propertyId: string) {
-    const values = this.propertyStore.propertyValues[annotation.id];
+  getPropertyValueForAnnotationId(annotationId: string, propertyId: string) {
+    const values = this.propertyStore.propertyValues[annotationId];
     if (!values) {
       return "-";
     }
@@ -284,10 +308,8 @@ export default class AnnotationList extends Vue {
       return;
     }
     // Change page
-    const entryIndex = this.filtered.findIndex(
-      annotation => annotation.id === this.hoveredId
-    );
-    if (entryIndex < 0) {
+    const entryIndex = this.filteredAnnotationIdToIdx.get(this.hoveredId);
+    if (entryIndex === undefined) {
       this.annotationFilteredDialog = true;
       return;
     }

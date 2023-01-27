@@ -12,7 +12,7 @@ import { logError } from "@/utils/log";
 
 // Which style an annotation should have, depending on its layer (color change)
 export function getAnnotationStyleFromLayer(
-  layer: IDisplayLayer | undefined,
+  layerColor: string | undefined,
   isHovered: boolean = false,
   isSelected: boolean = false
 ) {
@@ -27,9 +27,9 @@ export function getAnnotationStyleFromLayer(
     radius: 10
   };
 
-  if (layer) {
-    style.fillColor = layer.color;
-    style.strokeColor = layer.color;
+  if (layerColor) {
+    style.fillColor = layerColor;
+    style.strokeColor = layerColor;
   }
   if (isSelected) {
     style.strokeWidth = 5;

@@ -232,6 +232,15 @@ export class Filters extends VuexModule {
     });
   }
 
+  get filteredAnnotationIdToIdx() {
+    const idToIdx: Map<string, number> = new Map();
+    const annotations = this.filteredAnnotations;
+    for (let i = 0; i < annotations.length; ++i) {
+      idToIdx.set(annotations[i].id, i);
+    }
+    return idToIdx;
+  }
+
   @Mutation
   public updatePropertyFilter(value: IPropertyAnnotationFilter) {
     this.propertyFilters = [
