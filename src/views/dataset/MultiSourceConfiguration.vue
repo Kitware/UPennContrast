@@ -125,6 +125,33 @@ interface IAssignment {
   value: IAssignmentOption;
 }
 
+type TUpDim = "XY" | "Z" | "T" | "C";
+
+type TLowDim = "xy" | "z" | "t" | "c";
+
+type TFramesAsAxes = {
+  [dim in TLowDim]?: number;
+};
+
+interface IBasicSource {
+  path: string;
+  xyValues?: number[];
+  zValues?: number[];
+  tValues?: number[];
+  cValues?: number[];
+  framesAsAxes: TFramesAsAxes;
+}
+
+interface ICompositingSource {
+  path: string;
+  xySet: number;
+  zSet: number;
+  tSet: number;
+  cSet: number;
+  frames: number[];
+  position?: { x: number; y: number };
+}
+
 @Component({
   components: {}
 })
@@ -231,7 +258,7 @@ export default class NewDataset extends Vue {
     }
   ];
 
-  readonly dimensionNames: { [dim in TDimensions]: string } = {
+  readonly dimensionNames: { [dim in TUpDim]: string } = {
     XY: "Positions",
     Z: "Z",
     T: "Time",
@@ -261,7 +288,7 @@ export default class NewDataset extends Vue {
       .map(this.assignmentOptionToAssignmentItem);
   }
 
-  assignments: { [dimension: string]: IAssignment | null } = {
+  assignments: { [dimension in TUpDim]: IAssignment | null } = {
     XY: null,
     Z: null,
     T: null,
@@ -415,7 +442,7 @@ export default class NewDataset extends Vue {
 
   resetDimensionsToDefault() {
     for (const dim in this.dimensionNames) {
-      this.assignments[dim] = this.getDefaultAssignmentItem(dim);
+      this.assignments[dim as TUpDim] = this.getDefaultAssignmentItem(dim);
     }
   }
 
@@ -423,7 +450,7 @@ export default class NewDataset extends Vue {
     return Object.keys(this.dimensionNames).every(
       dim =>
         this.getDefaultAssignmentItem(dim)?.value ===
-        this.assignments[dim]?.value
+        this.assignments[dim as TUpDim]?.value
     );
   }
 
@@ -435,7 +462,7 @@ export default class NewDataset extends Vue {
     return filledAssignments >= this.items.length || filledAssignments >= 4;
   }
 
-  getValueFromAssignments(
+  getCompositingValueFromAssignments(
     dim: TDimensions,
     itemIdx: number,
     frameIdx: number
@@ -457,8 +484,6 @@ export default class NewDataset extends Vue {
         return filenameData.valueIdxPerFilename[filename];
       case Sources.Images:
         return frameIdx;
-      case undefined:
-        return 0;
     }
   }
 
@@ -505,36 +530,48 @@ export default class NewDataset extends Vue {
       channels = ["Default"];
     }
 
-    // Find all possible (XY, Z, T, C)
-    const sources: {
-      path: string;
-      xySet: number;
-      zSet: number;
-      tSet: number;
-      cSet: number;
-      frames: number[];
-      position?: { x: number; y: number };
-    }[] = [];
-    if (!this.tilesMetadata) {
-      return;
-    }
-    for (let itemIdx = 0; itemIdx < this.girderItems.length; ++itemIdx) {
-      const item = this.girderItems[itemIdx];
-      const nFrames = this.tilesMetadata[itemIdx].frames.length;
-      for (let frameIdx = 0; frameIdx < nFrames; ++frameIdx) {
-        sources.push({
-          path: item.name,
-          xySet: this.getValueFromAssignments("XY", itemIdx, frameIdx),
-          zSet: this.getValueFromAssignments("Z", itemIdx, frameIdx),
-          tSet: this.getValueFromAssignments("T", itemIdx, frameIdx),
-          cSet: this.getValueFromAssignments("C", itemIdx, frameIdx),
-          frames: [frameIdx]
-        });
-      }
-    }
+    // See specifications of multi source here:
+    // https://girder.github.io/large_image/multi_source_specification.html
+    // The sources have two possible interfaces depending on compositing
+    const sources: ICompositingSource[] | IBasicSource[] = [];
 
-    // Compositing
     if (this.shouldDoCompositing) {
+      // Compositing
+      const compositingSources: ICompositingSource[] = sources as ICompositingSource[];
+      if (!this.tilesMetadata) {
+        return;
+      }
+      // For each frame, find (XY, Z, T, C)
+      for (let itemIdx = 0; itemIdx < this.girderItems.length; ++itemIdx) {
+        const item = this.girderItems[itemIdx];
+        const nFrames = this.tilesMetadata[itemIdx].frames.length;
+        for (let frameIdx = 0; frameIdx < nFrames; ++frameIdx) {
+          compositingSources.push({
+            path: item.name,
+            xySet: this.getCompositingValueFromAssignments(
+              "XY",
+              itemIdx,
+              frameIdx
+            ),
+            zSet: this.getCompositingValueFromAssignments(
+              "Z",
+              itemIdx,
+              frameIdx
+            ),
+            tSet: this.getCompositingValueFromAssignments(
+              "T",
+              itemIdx,
+              frameIdx
+            ),
+            cSet: this.getCompositingValueFromAssignments(
+              "C",
+              itemIdx,
+              frameIdx
+            ),
+            frames: [frameIdx]
+          });
+        }
+      }
       const { mm_x, mm_y } = this.tilesMetadata![0];
       const framesMetadata = this.tilesInternalMetadata![0].nd2_frame_metadata;
       const coordinates: IGeoJSPoint[] = framesMetadata.map((f: any) => {
@@ -557,11 +594,63 @@ export default class NewDataset extends Vue {
         y: Math.round(maxCoordinate.y - coordinate.y)
       }));
 
-      sources.forEach((source, sourceIdx) => {
+      compositingSources.forEach((source, sourceIdx) => {
         source.position =
           intCoordinates[Math.floor(sourceIdx / channels!.length)];
         source.xySet = 0;
       });
+    } else {
+      // No compositing
+      const basicSources: IBasicSource[] = sources as IBasicSource[];
+      const dimOffset: { XY: number; Z: number; C: number; T: number } = {
+        XY: 0,
+        Z: 0,
+        C: 0,
+        T: 0
+      };
+      for (let itemIdx = 0; itemIdx < this.girderItems.length; ++itemIdx) {
+        const item = this.girderItems[itemIdx];
+        const framesAsAxes: TFramesAsAxes = {};
+        const dimValues: { [dim in TLowDim]?: number } = {};
+
+        for (const dim in this.assignments) {
+          const upDim = dim as TUpDim;
+          const lowDim = dim.toLocaleLowerCase() as TLowDim;
+          const assignment = this.assignments[upDim];
+          // Add file strides
+          if (!assignment) {
+            continue;
+          }
+          let dimValue = dimOffset[upDim];
+          switch (assignment.value.source) {
+            case Sources.File:
+              const fileSource = assignment.value.data as IFileSourceData;
+              framesAsAxes[lowDim] = fileSource[itemIdx].stride;
+              dimOffset[upDim] += fileSource[itemIdx].range;
+              break;
+
+            case Sources.Filename:
+              const filenameSource = assignment.value
+                .data as IFilenameSourceData;
+              dimValue = filenameSource.valueIdxPerFilename[item.name];
+              break;
+
+            case Sources.Images:
+              framesAsAxes[lowDim] = 1;
+              break;
+          }
+          dimValues[lowDim] = dimValue;
+        }
+        const newSource: IBasicSource = {
+          path: item.name,
+          framesAsAxes
+        };
+        for (const dim in dimValues) {
+          const lowDim = dim as TLowDim;
+          newSource[`${lowDim}Values`] = [dimValues[lowDim]!];
+        }
+        basicSources.push(newSource);
+      }
     }
 
     await this.store.addMultiSourceMetadata({
