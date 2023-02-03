@@ -41,12 +41,12 @@ class WorkerInterfaces(Resource):
         return self._interfaceModel.getImageInterface(image) or {}
 
     @access.user
-    @describeRoute(Description("List available images"))
+    @describeRoute(Description("List available worker images and their corresponding labels"))
     def getAvailableImages(self, params):
         images = self.dockerClient.images.list()
-        labelFilter = lambda image : image.labels.get('isUPennContrastWorker', False) and len(image.tags)
-        mapTag = lambda image: image.tags[0]
-        return list (map(mapTag, filter(labelFilter, images)))
+        labelFilter = lambda image : 'isUPennContrastWorker' in image.labels and image.tags
+        mapTagAndLabels = lambda image: (image.tags[0], image.labels)
+        return dict(map(mapTagAndLabels, filter(labelFilter, images)))
 
     @access.user
     @describeRoute(Description("Ask the worker to update its interface data")

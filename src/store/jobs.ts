@@ -9,8 +9,6 @@ import store from "./root";
 
 import { IComputeJob } from "./model";
 
-import Vue from "vue";
-
 import main from "./index";
 
 import { logError } from "@/utils/log";
@@ -27,27 +25,43 @@ const jobStates = {
 
 @Module({ dynamic: true, store, name: "jobs" })
 export class Jobs extends VuexModule {
-  propertiesAPI = main.propertiesAPI;
-
   notificationSource: EventSource | null = null;
   latestNotificationTime: number = 0;
 
   runningJobs: IComputeJob[] = [];
 
+  connectionErrors: number = 0;
+
   @Mutation
-  addJob(job: IComputeJob) {
+  rawAddJob(job: IComputeJob) {
     this.runningJobs = [...this.runningJobs, job];
   }
 
+  @Action
+  async addJob(job: IComputeJob) {
+    if (!this.notificationSource) {
+      await this.initializeNotificationSubscription();
+    }
+    this.rawAddJob(job);
+  }
+
   @Mutation
-  removeJob(jobId: string) {
+  rawRemoveJob(jobId: string) {
     this.runningJobs = this.runningJobs.filter(
       (job: IComputeJob) => job.jobId !== jobId
     );
   }
 
-  get isSubscribedToNotifications() {
-    return !!this.notificationSource;
+  @Action
+  async removeJob(jobId: string) {
+    this.rawRemoveJob(jobId);
+    if (this.runningJobs.length <= 0) {
+      await this.closeNotificationSubscription();
+    }
+    // A job is done, add badge to annotation panel if it is closed
+    if (!main.isAnnotationPanelOpen) {
+      main.setAnnotationPanelBadge(true);
+    }
   }
 
   @Mutation
@@ -58,6 +72,11 @@ export class Jobs extends VuexModule {
   @Mutation
   setLatestNotificationTime(time: number) {
     this.latestNotificationTime = time;
+  }
+
+  @Mutation
+  setConnectionErrors(value: number) {
+    this.connectionErrors = value;
   }
 
   @Action
@@ -95,28 +114,49 @@ export class Jobs extends VuexModule {
       } else {
         jobTask.callback(false);
         logError(
-          `Compute job with id ${jobTask.jobId} failed or was cancelled`
+          `Compute job with id ${jobTask.jobId} ${
+            status === jobStates.cancelled ? "cancelled" : "failed"
+          }`
         );
       }
       this.removeJob(jobTask.jobId);
     }
   }
+
+  @Action
+  async handleError() {
+    this.setConnectionErrors(this.connectionErrors + 1);
+    if (this.connectionErrors <= 3) {
+      await this.initializeNotificationSubscription();
+    } else {
+      // Can't connect after 3 attempts
+      logError("Can't connect to girder notification stream");
+      await this.closeNotificationSubscription();
+    }
+  }
+
+  @Action
+  async handleOpen() {
+    this.setConnectionErrors(0);
+  }
+
   @Action
   async initializeNotificationSubscription() {
-    if (this.notificationSource) {
-      this.closeNotificationSubscription();
-    }
-    const notificationSource: EventSource | null = this.propertiesAPI.subscribeToNotifications();
-    if (notificationSource) {
-      notificationSource.onmessage = this.handleJobEvent;
-    }
+    await this.closeNotificationSubscription();
+    const notificationSource = new EventSource(
+      `${main.girderRest.apiRoot}/notification/stream?token=${main.girderRest.token}`
+    );
+    notificationSource.onmessage = this.handleJobEvent;
+    notificationSource.onerror = this.handleError;
+    notificationSource.onopen = this.handleOpen;
+    this.setNotificationSource(notificationSource);
   }
 
   @Action
   async closeNotificationSubscription() {
     if (this.notificationSource) {
       this.notificationSource.close();
-      this.notificationSource = null;
+      this.setNotificationSource(null);
     }
   }
 }

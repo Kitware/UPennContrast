@@ -72,6 +72,15 @@ class AnnotationPropertyValues(AccessControlledModel):
         self.save({'annotationId': annotationId,
                   'values': values, 'datasetId': datasetId})
 
+    def delete(self, propertyId, datasetId):
+        # Could use self.collection.updateMany but girder doesn't expose this method
+        for document in self.find({'datasetId': datasetId}):
+            document['values'].pop(propertyId, None)
+            if len(document['values']) == 0:
+                self.remove(document)
+            else:
+                self.save(document, False)
+
     def histogram(self, propertyId, datasetId, buckets=255):
         valueKey = 'values.' + propertyId
         match = {

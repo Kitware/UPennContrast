@@ -1,54 +1,54 @@
 <template>
-  <v-expansion-panel>
-    <v-expansion-panel-header>
+  <v-card>
+    <v-card-title>
       Annotation Properties
-      <v-spacer></v-spacer>
-      <v-dialog v-model="propertyCreationDialogOpen" width="unset">
-        <template v-slot:activator="{ on: dialog }">
-          <v-tooltip top>
-            <template v-slot:activator="{ on: tooltip }">
-              <v-btn icon v-on="{ ...dialog, ...tooltip }">
-                <v-icon>
-                  {{ "mdi-plus" }}
-                </v-icon>
-              </v-btn>
-            </template>
-            <span>Create new property</span>
-          </v-tooltip>
+    </v-card-title>
+    <v-card-text>
+      <v-btn
+        outlined
+        class="ma-2"
+        @click="computeUncomputedProperties"
+        :disabled="uncomputedRunning > 0 || uncomputedProperties.length <= 0"
+      >
+        {{
+          uncomputedRunning > 0 ? "Computing uncomputed" : "Compute uncomputed"
+        }}
+        <template v-if="uncomputedRunning > 0">
+          <v-progress-circular indeterminate />
         </template>
-        <property-creation
-          @done="propertyCreationDialogOpen = false"
-          :open="propertyCreationDialogOpen"
-        />
-      </v-dialog>
-    </v-expansion-panel-header>
-    <v-expansion-panel-content>
-      <v-container>
-        <v-row class="py-4">
-          <v-col v-for="header in headers" :key="header" class="pa-0">
-            {{ header }}
-          </v-col>
-          <v-col class="pa-0" cols="7">
-            Property
-          </v-col>
-        </v-row>
+        <template v-else>
+          <v-icon right color="primary">
+            mdi-play
+          </v-icon>
+        </template>
+      </v-btn>
+      <v-container class="pa-0">
         <v-expansion-panels>
+          <!-- Header for property -->
+          <v-expansion-panel readonly v-if="properties.length > 0">
+            <v-expansion-panel-header>
+              <annotation-property-header />
+              <template v-slot:actions>
+                <v-icon color="transparent">$expand</v-icon>
+              </template>
+            </v-expansion-panel-header>
+          </v-expansion-panel>
+          <!-- List of all the properties -->
           <v-expansion-panel
             v-for="(property, index) in properties"
             :key="`${property.id} ${index}`"
           >
             <v-expansion-panel-header>
-              <annotation-property :property="property"></annotation-property>
+              <annotation-property :property="property" />
             </v-expansion-panel-header>
             <v-expansion-panel-content>
-              <property-worker-menu :property="property">
-              </property-worker-menu>
+              <annotation-property-body :property="property" />
             </v-expansion-panel-content>
           </v-expansion-panel>
         </v-expansion-panels>
       </v-container>
-    </v-expansion-panel-content>
-  </v-expansion-panel>
+    </v-card-text>
+  </v-card>
 </template>
 
 <script lang="ts">
@@ -59,17 +59,15 @@ import filterStore from "@/store/filters";
 
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import AnnotationProperty from "@/components/AnnotationBrowser/AnnotationProperties/Property.vue";
-import PropertyCreation from "@/components/AnnotationBrowser/AnnotationProperties/PropertyCreation.vue";
-import PropertyWorkerMenu from "@/components/PropertyWorkerMenu.vue";
-
-import { IAnnotationProperty } from "@/store/model";
+import AnnotationPropertyHeader from "@/components/AnnotationBrowser/AnnotationProperties/PropertyHeader.vue";
+import AnnotationPropertyBody from "@/components/AnnotationBrowser/AnnotationProperties/PropertyBody.vue";
 
 @Component({
   components: {
     TagFilterEditor,
     AnnotationProperty,
-    PropertyCreation,
-    PropertyWorkerMenu
+    AnnotationPropertyHeader,
+    AnnotationPropertyBody
   }
 })
 export default class PropertyList extends Vue {
@@ -77,22 +75,35 @@ export default class PropertyList extends Vue {
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
 
-  propertyCreationDialogOpen = false;
-  private headers = ["List", "As filter"];
+  uncomputedRunning: number = 0;
 
   get properties() {
     return propertyStore.properties;
   }
 
-  get layers() {
-    return this.store.configuration?.view.layers || [];
+  get uncomputedProperties() {
+    const res = [];
+    for (const property of this.propertyStore.properties) {
+      if (
+        this.propertyStore.uncomputedAnnotationsPerProperty[property.id]
+          .length > 0
+      ) {
+        res.push(property);
+      }
+    }
+    return res;
   }
 
-  get layerItems() {
-    return this.layers.map((layer, index) => ({
-      label: layer.name,
-      value: index
-    }));
+  computeUncomputedProperties() {
+    for (const property of this.uncomputedProperties) {
+      ++this.uncomputedRunning;
+      this.propertyStore.computeProperty({
+        property,
+        callback: () => {
+          --this.uncomputedRunning;
+        }
+      });
+    }
   }
 }
 </script>

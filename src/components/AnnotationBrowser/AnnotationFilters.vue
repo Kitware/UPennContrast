@@ -48,7 +48,7 @@ import RoiFilters from "@/components/AnnotationBrowser/ROIFilters.vue";
     TagFilterEditor
   }
 })
-export default class AnnotationFilter extends Vue {
+export default class AnnotationFilters extends Vue {
   readonly filterStore = filterStore;
   @Prop()
   readonly additionalTags!: string[];

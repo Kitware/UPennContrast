@@ -3,7 +3,8 @@ import {
   IDisplayLayer,
   IImage,
   IGeoJSPoint,
-  AnnotationShape
+  AnnotationShape,
+  IAnnotationProperty
 } from "@/store/model";
 import geojs from "geojs";
 import { logError } from "@/utils/log";
@@ -152,4 +153,17 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
   // Should not happen
   logError("Unsupported annotation shapes for distance calculations");
   return Number.POSITIVE_INFINITY;
+}
+
+export function canComputeAnnotationProperty(
+  property: IAnnotationProperty,
+  annotation: IAnnotation
+) {
+  return (
+    property.shape === annotation.shape &&
+    ((property.tags.exclusive &&
+      property.tags.tags.every(tag => annotation.tags.includes(tag))) ||
+      (!property.tags.exclusive &&
+        property.tags.tags.some(tag => annotation.tags.includes(tag))))
+  );
 }

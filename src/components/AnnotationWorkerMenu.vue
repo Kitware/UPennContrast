@@ -4,25 +4,38 @@
       <v-expansion-panel-header>
         {{ tool.name }} worker menu
       </v-expansion-panel-header>
-      <v-expansion-panel-content class="pa-0 ma-0">
-        <v-container class="pa-0 ma-0">
-          <v-row class="pa-0 ma-0">
-            <v-col class="pa-0 ma-0">
+      <v-expansion-panel-content>
+        <v-container>
+          <v-row>
+            <v-col>
               <v-subheader>Image: {{ tool.values.image.image }}</v-subheader>
             </v-col>
           </v-row>
-          <v-row class="pa-0 ma-0">
-            <v-col cols="12">
-              <worker-interface
-                :workerInterface="workerInterface"
-                @preview="preview"
-                @compute="compute"
-                :canPreview="true"
-                :running="running"
-                :status="previousRunStatus"
-              >
-              </worker-interface>
-            </v-col>
+          <v-row>
+            <worker-interface-values
+              :workerInterface="workerInterface"
+              v-model="interfaceValues"
+            />
+          </v-row>
+          <v-row>
+            <v-btn @click="preview">preview</v-btn>
+            <v-spacer></v-spacer>
+            <v-btn @click="compute" :disabled="running"
+              ><v-progress-circular
+                size="16"
+                v-if="running"
+                indeterminate
+              ></v-progress-circular>
+              <v-icon v-if="previousRunStatus === false">mdi-close</v-icon>
+              <v-icon v-if="previousRunStatus === true">mdi-check</v-icon>
+              <span>Compute</span></v-btn
+            >
+          </v-row>
+          <v-row>
+            <v-checkbox
+              v-model="displayWorkerPreview"
+              label="Display Previews"
+            ></v-checkbox>
           </v-row>
         </v-container>
       </v-expansion-panel-content>
@@ -31,22 +44,20 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Watch, Prop, VModel } from "vue-property-decorator";
+import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationsStore from "@/store/annotation";
-import { IToolConfiguration } from "@/store/model";
+import { IToolConfiguration, IWorkerInterfaceValues } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
-import DockerImageSelect from "@/components/DockerImageSelect.vue";
 import propertiesStore from "@/store/properties";
-import WorkerInterface from "@/components/WorkerInterface.vue";
+import WorkerInterfaceValues from "@/components/WorkerInterfaceValues.vue";
 // Popup for new tool configuration
 @Component({
   components: {
     LayerSelect,
     TagFilterEditor,
-    DockerImageSelect,
-    WorkerInterface
+    WorkerInterfaceValues
   }
 })
 export default class annotationWorkerMenu extends Vue {
@@ -57,6 +68,8 @@ export default class annotationWorkerMenu extends Vue {
   show: boolean = true;
   running: boolean = false;
   previousRunStatus: boolean | null = null;
+
+  interfaceValues: IWorkerInterfaceValues = {};
 
   @Prop()
   readonly tool!: IToolConfiguration;
@@ -78,7 +91,15 @@ export default class annotationWorkerMenu extends Vue {
     );
   }
 
-  compute(interfaceValues: any) {
+  get displayWorkerPreview() {
+    return this.propertyStore.displayWorkerPreview;
+  }
+
+  set displayWorkerPreview(value: boolean) {
+    this.propertyStore.setDisplayWorkerPreview(value);
+  }
+
+  compute() {
     if (this.running) {
       return;
     }
@@ -86,7 +107,7 @@ export default class annotationWorkerMenu extends Vue {
     this.previousRunStatus = null;
     this.annotationsStore.computeAnnotationsWithWorker({
       tool: this.tool,
-      workerInterface: interfaceValues,
+      workerInterface: this.interfaceValues,
       callback: success => {
         this.running = false;
         this.previousRunStatus = success;
@@ -95,11 +116,11 @@ export default class annotationWorkerMenu extends Vue {
     this.show = false;
   }
 
-  preview(result: any) {
+  preview() {
     this.propertyStore.requestWorkerPreview({
       image: this.image,
       tool: this.tool,
-      workerInterface: result
+      workerInterface: this.interfaceValues
     });
   }
 

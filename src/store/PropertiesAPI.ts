@@ -2,12 +2,12 @@ import { RestClientInstance } from "@/girder";
 import {
   IAnnotationProperty,
   IWorkerInterface,
-  IToolConfiguration
+  IToolConfiguration,
+  IWorkerImageList,
+  IAnnotationPropertyConfiguration
 } from "./model";
 
-import { Promise } from "bluebird";
-
-export default class AnnotationsAPI {
+export default class PropertiesAPI {
   private readonly client: RestClientInstance;
 
   constructor(client: RestClientInstance) {
@@ -17,11 +17,13 @@ export default class AnnotationsAPI {
   histogramsLoaded = 0;
 
   async createProperty(
-    property: IAnnotationProperty
+    property: IAnnotationPropertyConfiguration
   ): Promise<IAnnotationProperty> {
-    return this.client.post("annotation_property", property).then(res => {
-      return this.toProperty(res.data);
-    });
+    return this.client
+      .post("annotation_property", this.fromPropertyConfiguration(property))
+      .then(res => {
+        return this.toProperty(res.data);
+      });
   }
 
   async getProperties(): Promise<IAnnotationProperty[]> {
@@ -50,52 +52,62 @@ export default class AnnotationsAPI {
   }
 
   async getPropertyValues(datasetId: string) {
-    return this.client
-      .get(`annotation_property_values?datasetId=${datasetId}&limit=1000`)
-      .then(res => {
-        // map values by annotation id
-        const annotationMapping: {
-          [annotationId: string]: { [propertyId: string]: number };
-        } = {};
-        res.data.forEach(
-          (value: {
-            annotationId: string;
-            values: { [propertyId: string]: number };
-          }) => {
-            annotationMapping[value.annotationId] = {
-              ...annotationMapping[value.annotationId],
-              ...value.values
-            };
-          }
-        );
-        return annotationMapping;
-      });
+    const annotationMapping: {
+      [annotationId: string]: { [propertyId: string]: number };
+    } = {};
+    const limit = 1000;
+    let offset = 0;
+    let data;
+    do {
+      const res = await this.client.get(
+        `annotation_property_values?datasetId=${datasetId}&limit=${limit}&offset=${offset}&sort=_id`
+      );
+      data = res.data;
+      for (const { annotationId, values } of data) {
+        annotationMapping[annotationId] = {
+          ...annotationMapping[annotationId],
+          ...values
+        };
+      }
+      offset += data.length;
+    } while (data.length === limit);
+    return annotationMapping;
   }
 
-  subscribeToNotifications(): EventSource | null {
-    return new EventSource(
-      `${this.client.apiRoot}/notification/stream?token=${this.client.token}`
+  async deleteProperty(propertyId: string) {
+    return this.client.delete(`annotation_property/${propertyId}`);
+  }
+
+  async deletePropertyValues(propertyId: string, datasetId: string) {
+    return this.client.delete(
+      `annotation_property_values?datasetId=${datasetId}&propertyId=${propertyId}`
     );
   }
 
-  toProperty(item: any): IAnnotationProperty {
-    const { _id, name, image, propertyType, layer, shape, tags } = item;
+  fromPropertyConfiguration(item: IAnnotationPropertyConfiguration) {
+    const { name, image, shape, tags, workerInterface } = item;
     return {
-      id: name,
       name,
       image,
-      propertyType,
-      layer,
       tags,
-      independant: false,
       shape,
-      enabled: false,
-      computed: false,
-      customName: null
+      workerInterface
     };
   }
 
-  async getWorkerImages(): Promise<string[]> {
+  toProperty(item: any): IAnnotationProperty {
+    const { _id, name, image, shape, tags, workerInterface } = item;
+    return {
+      id: _id,
+      name,
+      image,
+      tags,
+      shape,
+      workerInterface: workerInterface || {}
+    };
+  }
+
+  async getWorkerImages(): Promise<IWorkerImageList> {
     return this.client.get("worker_interface/available").then(res => {
       return res.data;
     });

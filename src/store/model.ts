@@ -168,13 +168,44 @@ export interface IGeoJSPoint {
   z?: number; // Optional z coordinate
 }
 
+export declare type WorkerInterfaceType =
+  | "number"
+  | "text"
+  | "tags"
+  | "layer"
+  | "select"
+  | "channel";
+
+export interface IWorkerInterfaceElement {
+  type: WorkerInterfaceType;
+  min?: number;
+  max?: number;
+  default?: number;
+  items?: any[];
+}
+
 export interface IWorkerInterface {
+  [id: string]: IWorkerInterfaceElement;
+}
+
+export interface IWorkerInterfaceValues {
   [id: string]: {
-    type: "number" | "text" | "tags" | "layer";
-    min?: number;
-    max?: number;
-    default?: number;
+    type: WorkerInterfaceType;
+    value: any;
   };
+}
+
+export interface IWorkerLabels {
+  isUPennContrastWorker: string;
+  isAnnotationWorker?: string;
+  isPropertyWorker?: string;
+  interfaceName?: string;
+  interfaceCategory?: string;
+  annotationShape?: AnnotationShape;
+}
+
+export interface IWorkerImageList {
+  [image: string]: IWorkerLabels;
 }
 
 export enum AnnotationShape {
@@ -245,29 +276,26 @@ export interface IROIAnnotationFilter extends IAnnotationFilter {
   roi: IGeoJSPoint[];
 }
 
-export interface IAnnotationProperty {
-  id: string;
+export interface IAnnotationPropertyConfiguration {
   name: string;
   image: string;
-  propertyType: "layer" | "morphology" | "relational";
 
-  layer: number | null;
   tags: {
     tags: string[];
     exclusive: boolean;
   };
-  independant: boolean;
-  shape: AnnotationShape | null;
-  customName: string | null;
+  shape: AnnotationShape;
+  workerInterface: IWorkerInterfaceValues;
+}
 
-  enabled: boolean;
-  computed: boolean;
+export interface IAnnotationProperty extends IAnnotationPropertyConfiguration {
+  id: string;
 }
 
 export interface IComputeJob {
   jobId: string;
   callback: (success: boolean) => void;
-  datasetId: string;
+  datasetId: string | null;
 }
 export interface IAnnotationComputeJob extends IComputeJob {
   tool: IToolConfiguration;

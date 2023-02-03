@@ -226,7 +226,7 @@ export default class AnnotationList extends Vue {
           a.id.localeCompare(b.id)
         )
         .map((property: IAnnotationProperty) => ({
-          text: property.customName || property.name,
+          text: property.name,
           value: property.id
         }))
     ];
@@ -236,7 +236,12 @@ export default class AnnotationList extends Vue {
     return this.annotationStore.hoveredAnnotationId;
   }
 
+  get itemsPerPage() {
+    return this.tableOptions.itemsPerPage;
+  }
+
   @Watch("hoveredId")
+  @Watch("itemsPerPage")
   hoveredAnnotationChanged() {
     if (this.hoveredId === null) {
       return;
@@ -250,7 +255,7 @@ export default class AnnotationList extends Vue {
       return;
     }
     this.tableOptions.page =
-      Math.floor(entryIndex / this.tableOptions.itemsPerPage) + 1;
+      Math.floor(entryIndex / this.itemsPerPage) + 1 || 1;
     // Get the tr element from the refs if it exists
     let annotationRef = this.$refs[this.hoveredId];
     if (annotationRef === undefined) {

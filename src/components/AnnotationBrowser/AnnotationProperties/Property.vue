@@ -1,27 +1,57 @@
 <template>
-  <v-row>
-    <!-- In list (???) -->
-    <v-col class="pa-0">
-      <v-checkbox
-        dense
-        hide-details
-        :value="list"
-        @click.stop="toggleList"
-      ></v-checkbox>
-    </v-col>
-    <!-- As filter -->
-    <v-col class="pa-0">
-      <v-checkbox
-        dense
-        hide-details
-        :value="filter"
-        @click.stop="toggleFilter"
-      ></v-checkbox>
-    </v-col>
-    <v-col class="pa-1" cols="7">
-      {{ property.name }}
-    </v-col>
-  </v-row>
+  <v-container class="ma-0 pa-0">
+    <v-row class="mr-4">
+      <!-- In list checkbox -->
+      <v-col class="px-0" cols="1">
+        <div>
+          <v-checkbox
+            dense
+            hide-details
+            :value="list"
+            @click.stop="toggleList"
+            class="ma-0"
+          />
+        </div>
+      </v-col>
+      <!-- As filter checkbox -->
+      <v-col class="px-0" cols="1">
+        <div>
+          <v-checkbox
+            dense
+            hide-details
+            :value="filter"
+            @click.stop="toggleFilter"
+            class="ma-0"
+          />
+        </div>
+      </v-col>
+      <!-- Property name -->
+      <v-col class="d-flex px-2">
+        <div class="d-flex align-center">
+          {{ property.name }}
+        </div>
+      </v-col>
+      <!-- Compute button -->
+      <v-col class="px-0" cols="1">
+        <v-btn small fab @click.native.stop :disabled="false" @click="compute">
+          <v-badge
+            color="red"
+            :value="uncomputed[property.id].length > 0 && !running"
+            :content="uncomputed[property.id].length"
+          >
+            <template v-if="running">
+              <v-progress-circular indeterminate />
+            </template>
+            <template v-else>
+              <v-icon color="primary">
+                mdi-play
+              </v-icon>
+            </template>
+          </v-badge>
+        </v-btn>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 
 <script lang="ts">
@@ -30,8 +60,10 @@ import LayerSelect from "@/components/LayerSelect.vue";
 
 import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
+import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
+import { IAnnotationProperty } from "@/store/model";
 
 @Component({
   components: {
@@ -41,10 +73,14 @@ import filterStore from "@/store/filters";
 })
 export default class AnnotationProperty extends Vue {
   readonly propertyStore = propertyStore;
+  readonly annotationStore = annotationStore;
   readonly filterStore = filterStore;
   readonly store = store;
   @Prop()
-  private readonly property!: any;
+  readonly property!: IAnnotationProperty;
+
+  running: boolean = false;
+  previousRunStatus: boolean | null = null;
 
   get filter() {
     return this.filterStore.filterIds.includes(this.property.id);
@@ -54,8 +90,8 @@ export default class AnnotationProperty extends Vue {
     return this.propertyStore.annotationListIds.includes(this.property.id);
   }
 
-  get enabled() {
-    return this.property.enabled;
+  get uncomputed() {
+    return this.propertyStore.uncomputedAnnotationsPerProperty;
   }
 
   toggleFilter() {
@@ -72,6 +108,22 @@ export default class AnnotationProperty extends Vue {
     } else {
       this.propertyStore.addAnnotationListId(this.property.id);
     }
+  }
+
+  compute() {
+    if (this.running) {
+      return;
+    }
+    this.running = true;
+    this.previousRunStatus = null;
+
+    this.propertyStore.computeProperty({
+      property: this.property,
+      callback: success => {
+        this.running = false;
+        this.previousRunStatus = success;
+      }
+    });
   }
 }
 </script>

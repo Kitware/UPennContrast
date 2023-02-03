@@ -41,7 +41,7 @@ export default class AnnotationViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
   readonly toolsStore = toolsStore;
-  readonly propertiesStore = propertiesStore;
+  readonly propertyStore = propertiesStore;
   readonly filterStore = filterStore;
 
   // Compute the centroid of each annotation, taking unrolling into account
@@ -111,7 +111,7 @@ export default class AnnotationViewer extends Vue {
   readonly layerCount: any;
 
   get displayWorkerPreview() {
-    return this.propertiesStore.displayWorkerPreview;
+    return this.propertyStore.displayWorkerPreview;
   }
 
   get configuration() {
@@ -133,6 +133,14 @@ export default class AnnotationViewer extends Vue {
     return this.store.filteredDraw
       ? this.filteredAnnotations
       : this.annotationStore.annotations;
+  }
+
+  get annotationIdToDisplayable() {
+    const ret: { [annotationId: string]: boolean } = {};
+    for (const annotation of this.displayableAnnotations) {
+      ret[annotation.id] = true;
+    }
+    return ret;
   }
 
   get annotationConnections() {
@@ -173,7 +181,7 @@ export default class AnnotationViewer extends Vue {
 
   get workerPreview() {
     return this.workerImage
-      ? this.propertiesStore.getWorkerPreview(this.workerImage)
+      ? this.propertyStore.getWorkerPreview(this.workerImage)
       : { text: null, image: "" };
   }
 
@@ -234,10 +242,11 @@ export default class AnnotationViewer extends Vue {
   }
 
   get getAnnotationFromId() {
-    return (annotationId: string) =>
-      this.annotationStore.annotations.find(
-        annotation => annotation.id === annotationId
-      );
+    const idToAnnotation: { [annotationId: string]: IAnnotation } = {};
+    for (const annotation of this.annotationStore.annotations) {
+      idToAnnotation[annotation.id] = annotation;
+    }
+    return (annotationId: string) => idToAnnotation[annotationId];
   }
 
   getAnnotationStyle(
@@ -440,9 +449,7 @@ export default class AnnotationViewer extends Vue {
     if (precheck) {
       if (
         !this.validLayers.some(validLayer => validLayer.id === layer.id) ||
-        !this.displayableAnnotations.some(
-          displayableAnnotation => displayableAnnotation.id === annotation.id
-        )
+        !this.annotationIdToDisplayable[annotation.id]
       ) {
         return false;
       }
@@ -467,9 +474,7 @@ export default class AnnotationViewer extends Vue {
   // Check if any of the layers should display this annotation
   shouldDisplayAnnotation(annotation: IAnnotation) {
     return (
-      this.displayableAnnotations.some(
-        displayableAnnotation => displayableAnnotation.id === annotation.id
-      ) &&
+      this.annotationIdToDisplayable[annotation.id] &&
       this.validLayers.some(layer =>
         this.layerShouldDisplayAnnotation(layer, annotation, false)
       )
@@ -888,14 +893,7 @@ export default class AnnotationViewer extends Vue {
     // Save the new annotation
     this.annotationStore.addAnnotation(newAnnotation);
 
-    this.addAnnotationConnections(newAnnotation).then(
-      (connections: IAnnotationConnection[]) => {
-        this.propertiesStore.handleNewAnnotation({
-          newAnnotation,
-          newConnections: connections
-        });
-      }
-    );
+    this.addAnnotationConnections(newAnnotation);
 
     // Display the new annotation
     const newGeoJSAnnotation = this.createGeoJSAnnotation(
@@ -1288,8 +1286,8 @@ export default class AnnotationViewer extends Vue {
     this.fetchAnnotations();
     this.bind();
 
-    this.propertiesStore.fetchProperties();
-    this.propertiesStore.fetchPropertyValues();
+    this.propertyStore.fetchProperties();
+    this.propertyStore.fetchPropertyValues();
     this.filterStore.updateHistograms();
 
     this.annotationLayer.geoOn(geojs.event.mouseclick, (evt: any) => {

@@ -375,9 +375,6 @@ export class Annotations extends VuexModule {
     workerInterface: any;
     callback: (success: boolean) => void;
   }) {
-    if (!jobs.isSubscribedToNotifications) {
-      jobs.initializeNotificationSubscription();
-    }
     if (!main.dataset || !main.configuration) {
       return;
     }
@@ -404,13 +401,12 @@ export class Annotations extends VuexModule {
         }
         jobs.addJob({
           jobId: job._id,
-          datasetId: main.dataset?.id,
-          tool,
+          datasetId: main.dataset?.id ? main.dataset.id : null,
           callback: (success: boolean) => {
             this.fetchAnnotations();
             callback(success);
           }
-        } as IAnnotationComputeJob);
+        });
       });
   }
 

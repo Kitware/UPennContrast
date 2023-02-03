@@ -8,32 +8,22 @@ import {
 import store from "./root";
 
 import {
-  IAnnotation,
-  IAnnotationConnection,
   IAnnotationProperty,
-  IPropertyComputeJob,
   IWorkerInterface,
-  IToolConfiguration
+  IToolConfiguration,
+  IWorkerImageList,
+  IAnnotationPropertyConfiguration,
+  IAnnotation
 } from "./model";
 
 import Vue from "vue";
 
 import main from "./index";
 
-import { logError } from "@/utils/log";
+import { canComputeAnnotationProperty } from "@/utils/annotation";
 import filters from "./filters";
-import annotation from "./annotation";
+import annotations from "./annotation";
 import jobs from "./jobs";
-
-const jobStates = {
-  inactive: 0,
-  queued: 1,
-  running: 2,
-  success: 3,
-  error: 4,
-  cancelled: 5,
-  cancelling: 824
-};
 
 @Module({ dynamic: true, store, name: "properties" })
 export class Properties extends VuexModule {
@@ -47,7 +37,7 @@ export class Properties extends VuexModule {
     [annotationId: string]: { [propertyId: string]: number };
   } = {};
 
-  workerImageList: string[] = [];
+  workerImageList: IWorkerImageList = {};
   workerInterfaces: { [image: string]: IWorkerInterface } = {};
   workerPreviews: { [image: string]: { text: string; image: string } } = {};
   displayWorkerPreview = true;
@@ -128,34 +118,6 @@ export class Properties extends VuexModule {
     };
   }
 
-  @Action
-  disableProperty(property: IAnnotationProperty) {
-    this.replaceProperty({ ...property, enabled: false });
-  }
-
-  @Action
-  enableProperty({
-    property,
-    workerInterface,
-    callback
-  }: {
-    property: IAnnotationProperty;
-    workerInterface: any;
-    callback: (success: boolean) => void;
-  }) {
-    this.replaceProperty({ ...property, enabled: true, computed: false });
-
-    const newProp = this.getPropertyById(property.id);
-    if (newProp) {
-      this.computeProperty({
-        property: newProp,
-        annotationIds: [],
-        workerInterface,
-        callback
-      });
-    }
-  }
-
   @Mutation
   addAnnotationListId(id: string) {
     if (!this.annotationListIds.includes(id)) {
@@ -172,45 +134,40 @@ export class Properties extends VuexModule {
     }
   }
 
+  get uncomputedAnnotationsPerProperty() {
+    const uncomputed: { [propertyId: string]: IAnnotation[] } = {};
+    for (const property of this.properties) {
+      uncomputed[property.id] = [];
+    }
+    for (const annotation of annotations.annotations) {
+      for (const property of this.properties) {
+        if (
+          this.propertyValues[annotation.id]?.[property.id] === undefined &&
+          canComputeAnnotationProperty(property, annotation)
+        ) {
+          uncomputed[property.id].push(annotation);
+        }
+      }
+    }
+    return uncomputed;
+  }
+
   @Action
-  async computeProperty({
+  computeProperty({
     property,
-    annotationIds = [],
-    workerInterface = {},
     callback = () => {}
   }: {
     property: IAnnotationProperty;
-    annotationIds: string[];
-    workerInterface: any;
     callback: (success: boolean) => void;
   }) {
-    if (!jobs.isSubscribedToNotifications) {
-      jobs.initializeNotificationSubscription();
-    }
-
-    if (
-      !property.enabled ||
-      !main.dataset?.id ||
-      !main.configuration?.view?.layers
-    ) {
+    if (!main.dataset?.id || !main.configuration?.view?.layers) {
       return;
     }
 
-    // Get channel from layer
-    const layers = main.configuration.view.layers;
-    let channel = null;
-    if (property.layer || property.layer === 0) {
-      const layer = layers[property.layer];
-      if (layer) {
-        channel = layer.channel;
-      }
-    }
     this.propertiesAPI
-      .computeProperty(property.name, main.dataset.id, {
+      .computeProperty(property.id, main.dataset.id, {
         ...property,
-        annotationIds: annotationIds.length ? annotationIds : undefined,
-        channel,
-        workerInterface: workerInterface
+        ...property.workerInterface
       })
       .then((response: any) => {
         // Keep track of running jobs
@@ -221,15 +178,13 @@ export class Properties extends VuexModule {
         if (job && job._id) {
           jobs.addJob({
             jobId: job._id,
-            propertyId: property.id,
-            annotationIds,
             datasetId: main.dataset!.id,
             callback: (success: boolean) => {
               this.fetchPropertyValues();
               filters.updateHistograms();
               callback(success);
             }
-          } as IPropertyComputeJob);
+          });
         }
       });
   }
@@ -240,46 +195,16 @@ export class Properties extends VuexModule {
   }
 
   @Mutation
-  setWorkerImageList(list: string[]) {
+  setWorkerImageList(list: IWorkerImageList) {
     this.workerImageList = list;
   }
 
   @Action
   async fetchProperties() {
     const properties = await this.propertiesAPI.getProperties();
-    if (properties && properties.length) {
+    if (properties) {
       this.setProperties(properties);
     }
-  }
-
-  @Action
-  async handleNewAnnotation({}: // newAnnotation,
-  // newConnections
-  {
-    newAnnotation: IAnnotation;
-    newConnections: IAnnotationConnection[];
-  }) {
-    // TODO: can't be done without the interface values
-    // We also want to recompute properties for connected annotations
-    // const relatedIds: string[] = [newAnnotation.id];
-    // newConnections.forEach((connection: IAnnotationConnection) => {
-    //   if (!relatedIds.includes(connection.childId)) {
-    //     relatedIds.push(connection.childId);
-    //   }
-    //   if (!relatedIds.includes(connection.parentId)) {
-    //     relatedIds.push(connection.parentId);
-    //   }
-    // });
-    // // For all enabled and valid properties, send a compute request with these annotations
-    // this.properties
-    //   .filter((property: IAnnotationProperty) => property.enabled)
-    //   .filter(
-    //     (property: IAnnotationProperty) =>
-    //       !property.shape || property.shape === newAnnotation.shape
-    //   )
-    //   .forEach((property: IAnnotationProperty) =>
-    //     this.computeProperty({ property, annotationIds: relatedIds })
-    //   );
   }
 
   @Action
@@ -292,11 +217,27 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  async createProperty(property: IAnnotationProperty) {
+  async createProperty(property: IAnnotationPropertyConfiguration) {
     const newProperty = await this.propertiesAPI.createProperty(property);
     if (newProperty) {
       this.setProperties([...this.properties, newProperty]);
     }
+    return newProperty;
+  }
+
+  @Action
+  async deleteProperty(propertyId: string) {
+    await this.propertiesAPI.deleteProperty(propertyId);
+    await this.fetchProperties();
+  }
+
+  @Action
+  async deletePropertyValues(propertyId: string) {
+    if (!main.dataset?.id) {
+      return;
+    }
+    await this.propertiesAPI.deletePropertyValues(propertyId, main.dataset.id);
+    await this.fetchPropertyValues();
   }
 
   @Action
@@ -320,14 +261,11 @@ export class Properties extends VuexModule {
     tool: IToolConfiguration;
     workerInterface: { [id: string]: { type: string; value: any } };
   }) {
-    if (!jobs.isSubscribedToNotifications) {
-      jobs.initializeNotificationSubscription();
-    }
     if (!main.dataset || !main.configuration) {
       return;
     }
     const datasetId = main.dataset.id;
-    const { location, channel } = await annotation.context.dispatch(
+    const { location, channel } = await annotations.context.dispatch(
       "getAnnotationLocationFromTool",
       tool
     );

@@ -19,38 +19,38 @@ class PropertySchema:
             'image': {
                 'type': 'string'
             },
-            'propertyType': {
-                'type': 'string',
-                'enum': ['layer', 'morphology', 'relational']
-            },
-            'parameters': {
+            'tags': {
                 'type': 'object',
                 'properties': {
-                    'layer': {
-                        'type': 'integer'
-                    },
-                    'tags': { # TODO:
-                        'type': 'object',
-                        'properties': {
-                            'tags': {
-                                'type': 'array'
-                            },
-                            'exclusive': {
-                                'type': 'boolean'
-                            }
+                    'tags': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'string'
                         }
                     },
-                    'independant': {
+                    'exclusive': {
                         'type': 'boolean'
-                    },
-                    'shape': {
-                        'type': 'string',
-                        'enum': ['point', 'line', 'polygon']
-                    },
+                    }
+                }
+            },
+            'shape': {
+                'type': 'string',
+                'enum': ['point', 'line', 'polygon']
+            },
+            'workerInterface': {
+                'type': 'object',
+                'additionalProperties': {
+                    'type': 'object',
+                    'properties': {
+                        'type': { 'type': 'string' },
+                        'min': { 'type': 'number' },
+                        'max': { 'type': 'number' },
+                        'default': { 'type': 'number' },
+                        'items': { 'type': 'array' },
+                    }
                 }
             }
-        },
-        # 'additionalProperties': False
+        }
     }
 
 
@@ -78,7 +78,7 @@ class AnnotationProperty(AccessControlledModel):
       return self.save(property)
 
     def delete(self, property):
-      self.remove(self.find(property))
+      self.remove(property)
     
     def update(self, property):
       return self.save(property)
@@ -86,9 +86,7 @@ class AnnotationProperty(AccessControlledModel):
     def getPropertyById(self, id, user=None):
       return self.load(id, user=user)
 
-    def compute(self, propertyId, datasetId, params):
-        query = { 'name': propertyId }
-        property = self.findOne(query)
+    def compute(self, property, datasetId, params):
         image = property.get('image', None)
         if not image:
             raise RestException(code=500, message="Invalid property: no image")

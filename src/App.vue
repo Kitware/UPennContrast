@@ -20,21 +20,28 @@
       </v-btn>
       <v-divider class="ml-4" vertical />
       <template v-if="store.dataset && routeName === 'view'">
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('analyzePanel')">
+          <v-badge dot color="red" :value="hasUncomputedProperties">
+            Analyze
+          </v-badge>
+        </v-btn>
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('settingsPanel')">
+          Settings
+        </v-btn>
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('snapshotPanel')">
+          Snapshots
+        </v-btn>
         <v-btn
           class="ml-4"
-          :to="{
-            name: 'newconfiguration',
-            params: { id: store.selectedDatasetId }
-          }"
+          @click.stop="
+            toggleRightPanel('annotationPanel');
+            annotationPanelBadge = false;
+          "
         >
-          New Configuration
+          <v-badge dot color="green" :value="annotationPanelBadge">
+            Annotations
+          </v-badge>
         </v-btn>
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('snapshotPanel')"
-          >Snapshots</v-btn
-        >
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('annotationPanel')"
-          >Browse Annotations</v-btn
-        >
       </template>
       <server-status />
     </v-app-bar>
@@ -42,6 +49,31 @@
     <v-main>
       <router-view />
     </v-main>
+
+    <v-navigation-drawer
+      v-model="analyzePanel"
+      app
+      right
+      disable-resize-watcher
+      clipped
+      hide-overlay
+      :width="480"
+    >
+      <analyze-annotations />
+    </v-navigation-drawer>
+
+    <v-navigation-drawer
+      v-model="settingsPanel"
+      app
+      right
+      disable-resize-watcher
+      clipped
+      hide-overlay
+      :width="480"
+    >
+      <annotations-settings />
+    </v-navigation-drawer>
+
     <v-navigation-drawer
       v-model="snapshotPanel"
       app
@@ -49,7 +81,7 @@
       disable-resize-watcher
       clipped
       hide-overlay
-      :width="320"
+      :width="480"
       @transitionend="snapshotPanelFull = snapshotPanel"
     >
       <snapshots :snapshotVisible="snapshotPanel && snapshotPanelFull" />
@@ -73,6 +105,8 @@
 import axios from "axios";
 import UserMenu from "./layout/UserMenu.vue";
 import ServerStatus from "./components/ServerStatus.vue";
+import AnalyzeAnnotations from "./components/AnalyzePanel.vue";
+import AnnotationsSettings from "./components/SettingsPanel.vue";
 import Snapshots from "./components/Snapshots.vue";
 import AnnotationBrowser from "@/components/AnnotationBrowser/AnnotationBrowser.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
@@ -80,6 +114,7 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import toolsStore from "@/store/tool";
 import Persister from "@/store/Persister";
+import propertyStore from "@/store/properties";
 
 @Component({
   components: {
@@ -87,17 +122,24 @@ import Persister from "@/store/Persister";
     UserMenu,
     BreadCrumbs,
     ServerStatus,
+    AnalyzeAnnotations,
+    AnnotationsSettings,
     Snapshots
   }
 })
 export default class App extends Vue {
   readonly store = store;
   readonly toolsStore = toolsStore;
-  drawer = false;
+  readonly propertyStore = propertyStore;
+
   snapshotPanel = false;
   snapshotPanelFull = false;
 
   annotationPanel = false;
+
+  settingsPanel = false;
+
+  analyzePanel = false;
 
   lastModifiedRightPanel: string | null = null;
 
@@ -142,8 +184,31 @@ export default class App extends Vue {
     this.lastModifiedRightPanel = panel;
   }
 
+  @Watch("annotationPanel")
+  annotationPanelChanged() {
+    this.store.setIsAnnotationPanelOpen(this.annotationPanel);
+  }
+
+  get annotationPanelBadge() {
+    return this.store.annotationPanelBadge;
+  }
+
+  set annotationPanelBadge(value) {
+    this.store.setAnnotationPanelBadge(value);
+  }
+
   get routeName() {
     return this.$route.name;
+  }
+
+  get hasUncomputedProperties() {
+    const uncomputed = this.propertyStore.uncomputedAnnotationsPerProperty;
+    for (const id in uncomputed) {
+      if (uncomputed[id].length > 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Watch("routeName")
