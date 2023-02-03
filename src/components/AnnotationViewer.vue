@@ -242,11 +242,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   get getAnnotationFromId() {
-    const idToAnnotation: { [annotationId: string]: IAnnotation } = {};
-    for (const annotation of this.annotationStore.annotations) {
-      idToAnnotation[annotation.id] = annotation;
-    }
-    return (annotationId: string) => idToAnnotation[annotationId];
+    return this.annotationStore.getAnnotationFromId;
   }
 
   getAnnotationStyle(
