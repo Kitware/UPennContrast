@@ -134,23 +134,23 @@ export function splitFilenames(filenames: string[]): string[][] {
     });
 }
 
-const enumType: { [index: string]: string } = {
-  t: "t",
-  time: "t",
-  timepoint: "t",
-  s: "xy",
-  stage: "xy",
-  position: "xy",
-  xy: "xy",
-  XY: "xy",
-  z: "z",
-  Z: "z",
-  slice: "z",
-  chann: "chan",
-  channel: "chan"
+const enumType: { [index: string]: TDimensions } = {
+  t: "T",
+  time: "T",
+  timepoint: "T",
+  s: "XY",
+  stage: "XY",
+  position: "XY",
+  xy: "XY",
+  XY: "XY",
+  z: "Z",
+  Z: "Z",
+  slice: "Z",
+  chann: "C",
+  channel: "C"
 };
 
-export function getStringType(inputString: string): string | undefined {
+export function getStringType(inputString: string): TDimensions | undefined {
   return enumType[inputString];
 }
 
@@ -173,85 +173,70 @@ export function getFields(filenames: string[][]) {
   });
 }
 
+export type TDimensions = "XY" | "Z" | "T" | "C";
+
+export interface IVariableGuess {
+  guess: TDimensions; // Guessed dimension
+  values: string[]; // All the values for this dimension (a list of unique strings)
+  valueIdxPerFilename: {
+    [key: string]: number; // Index of the value for each filename
+  };
+}
+
 export function collectFilenameMetadata2(
   filenames: string[]
-): {
-  metadata: {
-    [key: string]: string[];
-    t: string[];
-    xy: string[];
-    z: string[];
-    chan: string[];
-  };
-  filesInfo: {
-    [key: string]: { [key: string]: number[] };
-  };
-} {
+): IVariableGuess[] {
   // Convert annoying date format to time
   const convertedFilenames = filenames.map(filename =>
     convertDateToTime(filename)
   );
 
   // Split up the filenames with delimiters
+  // Get a matrix of values: filenamesSplit[fileIdx][variableIdx]
   const filenamesSplit: string[][] = splitFilenames(convertedFilenames);
 
-  const output: {
-    [key: string]: string[];
-    t: string[];
-    xy: string[];
-    z: string[];
-    chan: string[];
-  } = {
-    t: [],
-    xy: [],
-    z: [],
-    chan: []
-  };
-  const filesInfo: {
-    [key: string]: { [key: string]: number[] };
-  } = {};
+  const guesses: IVariableGuess[] = [];
 
+  // A list of variables
   const fieldsElements = getFields(filenamesSplit);
-  fieldsElements.forEach((fieldElement, index) => {
-    const { values, numberOfElement, isNumeric } = fieldElement;
-    let typename: string | undefined = undefined;
-    if (numberOfElement > 1) {
-      if (isNumeric) {
-        typename =
-          index > 0 && fieldsElements[index - 1].numberOfElement === 1
-            ? getStringType(fieldsElements[index - 1].values[0])
-            : "xy";
-      } else {
-        // If we just have a bunch of names, then assume it's a channel
-        typename = "chan";
-      }
-      if (typename) {
-        output[typename].push(...values);
 
-        filenamesSplit.forEach((split, j) => {
-          const filename = filenames[j];
-          if (!filesInfo[filename]) {
-            filesInfo[filename] = {
-              t: [],
-              xy: [],
-              z: [],
-              chan: []
-            };
-          }
-          if (typename) {
-            const val: string = split[index];
-            const foundIndex = output[typename].indexOf(val);
-            if (foundIndex > -1) {
-              filesInfo[filename][typename].push(foundIndex);
-            }
-          }
-        });
-      }
+  fieldsElements.forEach((fieldElement, variableIdx) => {
+    const { values, numberOfElement, isNumeric } = fieldElement;
+    values.sort((a, b) => a.localeCompare(b));
+
+    // Guess an ID (XY, Z, T, C) for this variable
+    let typename: TDimensions | undefined = undefined;
+    if (numberOfElement <= 1) {
+      return;
+    }
+    if (isNumeric) {
+      typename =
+        variableIdx > 0 && fieldsElements[variableIdx - 1].numberOfElement === 1
+          ? getStringType(fieldsElements[variableIdx - 1].values[0])
+          : "XY";
+    } else {
+      // If we just have a bunch of names, then assume it's a channel
+      typename = "C";
+    }
+
+    // If an ID was guessed, add the guess to the list
+    if (typename) {
+      const valueIdxPerFilename: { [key: string]: number } = {};
+      filenames.forEach((filename, filenameIdx) => {
+        const filenameValue = filenamesSplit[filenameIdx][variableIdx];
+        // We know that filenameValue is in values thanks to the implementation of getFields
+        valueIdxPerFilename[filename] = values.findIndex(
+          value => value === filenameValue
+        );
+      });
+      const guess: IVariableGuess = {
+        guess: typename,
+        values: [...values],
+        valueIdxPerFilename
+      };
+      guesses.push(guess);
     }
   });
 
-  return {
-    metadata: output,
-    filesInfo
-  };
+  return guesses;
 }

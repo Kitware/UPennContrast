@@ -239,6 +239,12 @@ export default class GirderAPI {
     return this.client.get(`item/${toId(item)}/tiles`).then(r => r.data);
   }
 
+  getTilesInternalMetadata(item: string | IGirderItem): Promise<any> {
+    return this.client
+      .get(`item/${toId(item)}/tiles/internal_metadata`)
+      .then(r => r.data);
+  }
+
   private getHistogram(
     item: string | IGirderItem,
     options: Partial<IHistogramOptions> = {}
@@ -298,20 +304,21 @@ export default class GirderAPI {
   ): Promise<IDataset> {
     return Promise.all([this.getFolder(id), this.getItems(id)]).then(
       ([folder, items]) => {
-        // just use the first image
-        const images = items.filter(d => (d as any).largeImage).slice(0, 1);
-        return Promise.all(images.map(item => this.getTiles(item))).then(
-          tiles => {
-            const configurations = items
-              .filter(isConfigurationItem)
-              .map(asConfigurationItem);
-            return {
-              ...asDataset(folder),
-              configurations,
-              ...parseTiles(images[0], tiles[0], unrollXY, unrollZ, unrollT)
-            };
-          }
-        );
+        // just use the first image if it exists
+        const folderDataset = asDataset(folder);
+        const imageItem = items.find(d => (d as any).largeImage);
+        const configurations = items
+          .filter(isConfigurationItem)
+          .map(asConfigurationItem);
+        const baseDataset = { ...folderDataset, configurations };
+        if (imageItem === undefined) {
+          return baseDataset;
+        } else {
+          return this.getTiles(imageItem).then(tiles => ({
+            ...baseDataset,
+            ...parseTiles(imageItem, tiles, unrollXY, unrollZ, unrollT)
+          }));
+        }
       }
     );
   }
