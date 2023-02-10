@@ -22,7 +22,8 @@ import {
   IROIAnnotationFilter,
   AnnotationShape,
   AnnotationSelectionTypes,
-  IAnnotationLocation
+  IAnnotationLocation,
+  IGeoJSAnnotation
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -321,26 +322,25 @@ export default class AnnotationViewer extends Vue {
     }
 
     // First remove undesired annotations (layer was disabled, uneligible coordinates...)
-    this.clearOldAnnotations();
+    this.clearOldAnnotations(false, true);
 
     // We want to ignore these already displayed annotations
-    const excludedGeoJSAnnotations = this.annotationLayer
-      .annotations()
-      .filter((geoJSAnnotation: any) => {
-        const id = geoJSAnnotation.options("girderId");
-        return (
-          id !== undefined ||
-          !(
-            // Force redraw of annotations which are selected or hovered
-            (id === this.hoveredAnnotationId || this.isAnnotationSelected(id))
-          )
-        );
-      });
+    // Use a map with id as key for performance and layer id as key
+    const drawnGeoJSAnnotations: Map<string, IGeoJSAnnotation[]> = new Map();
+    for (const geoJSAnnotation of this.annotationLayer.annotations()) {
+      const id = geoJSAnnotation.options("girderId");
+      if (id) {
+        if (!drawnGeoJSAnnotations.has(id)) {
+          drawnGeoJSAnnotations.set(id, []);
+        }
+        drawnGeoJSAnnotations.get(id)!.push(geoJSAnnotation);
+      }
+    }
 
     // Then draw the new annotations
-    this.drawNewAnnotations(excludedGeoJSAnnotations);
+    this.drawNewAnnotations(drawnGeoJSAnnotations);
     if (this.shouldDrawConnections) {
-      this.drawNewConnections(excludedGeoJSAnnotations);
+      this.drawNewConnections(drawnGeoJSAnnotations);
     }
     this.annotationLayer.draw();
   }
@@ -417,15 +417,15 @@ export default class AnnotationViewer extends Vue {
   }
 
   get toggledPropertiesId() {
-    return this.propertiesStore.annotationListIds;
+    return this.propertyStore.annotationListIds;
   }
 
   get properties() {
-    return this.propertiesStore.properties;
+    return this.propertyStore.properties;
   }
 
   get propertyValues() {
-    return this.propertiesStore.propertyValues;
+    return this.propertyStore.propertyValues;
   }
 
   get validLayers() {
@@ -437,152 +437,162 @@ export default class AnnotationViewer extends Vue {
 
   // Should the annotation be displayed in the layer
   // The precheck checks if the annotation is displayable and the layer valid
-  layerShouldDisplayAnnotation(
-    layer: IDisplayLayer,
-    annotation: IAnnotation,
-    precheck: boolean = true
-  ) {
-    if (precheck) {
-      if (
-        !this.validLayers.some(validLayer => validLayer.id === layer.id) ||
-        !this.annotationIdToDisplayable[annotation.id]
-      ) {
+  get layerShouldDisplayAnnotation() {
+    return (
+      layer: IDisplayLayer,
+      annotation: IAnnotation,
+      precheck: boolean = true
+    ) => {
+      if (precheck) {
+        if (
+          !this.validLayers.some(validLayer => validLayer.id === layer.id) ||
+          !this.annotationIdToDisplayable[annotation.id]
+        ) {
+          return false;
+        }
+      }
+
+      if (!layer.visible || layer.channel !== annotation.channel) {
         return false;
       }
-    }
 
-    if (!layer.visible || layer.channel !== annotation.channel) {
-      return false;
-    }
-
-    const sliceIndexes = this.store.layerSliceIndexes(layer);
-    if (!sliceIndexes) {
-      return false;
-    }
-    return (
-      (this.store.unrollXY ||
-        annotation.location.XY === sliceIndexes.xyIndex) &&
-      (this.store.unrollZ || annotation.location.Z === sliceIndexes.zIndex) &&
-      (this.store.unrollT || annotation.location.Time === sliceIndexes.tIndex)
-    );
+      const sliceIndexes = this.store.layerSliceIndexes(layer);
+      if (!sliceIndexes) {
+        return false;
+      }
+      return (
+        (this.store.unrollXY ||
+          annotation.location.XY === sliceIndexes.xyIndex) &&
+        (this.store.unrollZ || annotation.location.Z === sliceIndexes.zIndex) &&
+        (this.store.unrollT || annotation.location.Time === sliceIndexes.tIndex)
+      );
+    };
   }
 
   // Check if any of the layers should display this annotation
-  shouldDisplayAnnotation(annotation: IAnnotation) {
-    return (
-      this.annotationIdToDisplayable[annotation.id] &&
-      this.validLayers.some(layer =>
-        this.layerShouldDisplayAnnotation(layer, annotation, false)
-      )
-    );
+  get shouldDisplayAnnotation() {
+    return (annotation: IAnnotation) => {
+      return (
+        this.annotationIdToDisplayable[annotation.id] &&
+        this.validLayers.some(layer =>
+          this.layerShouldDisplayAnnotation(layer, annotation, false)
+        )
+      );
+    };
   }
 
   // Remove from the layer annotations that should no longer be renderered (index change, layer change...)
-  clearOldAnnotations(clearAll = false) {
-    this.annotationLayer.annotations().forEach((annotation: any) => {
-      if (annotation === this.annotationLayer.currentAnnotation) {
-        // Don't do anything with currentAnnotation as it is used internally by geoJS
-        return;
-      }
-      if (clearAll) {
-        this.annotationLayer.removeAnnotation(annotation, false);
-        return;
-      }
-
-      const {
-        girderId,
-        layerId,
-        isHovered,
-        isSelected,
-        isConnection
-      } = annotation.options();
-
-      if (!girderId) {
-        return;
-      }
-
-      // Remove (not)hovered annotation
-      if (isHovered !== (girderId === this.hoveredAnnotationId)) {
-        this.annotationLayer.removeAnnotation(annotation, false);
-      }
-
-      // Remove (un)selected annotation
-      if (isSelected !== this.isAnnotationSelected(girderId)) {
-        this.annotationLayer.removeAnnotation(annotation, false);
-      }
-
-      // Check for connections
-      if (isConnection) {
-        const childId = annotation.options("childId");
-        const parentId = annotation.options("parentId");
-        const parent = this.getAnnotationFromId(parentId);
-        const child = this.getAnnotationFromId(childId);
-        if (
-          !this.shouldDrawConnections ||
-          !parent ||
-          !child ||
-          !this.shouldDisplayAnnotation(parent) ||
-          !this.shouldDisplayAnnotation(child)
-        ) {
-          this.annotationLayer.removeAnnotation(annotation, false);
+  clearOldAnnotations(clearAll = false, redraw = true) {
+    this.annotationLayer
+      .annotations()
+      .forEach((geoJsAnnotation: IGeoJSAnnotation) => {
+        if (geoJsAnnotation === this.annotationLayer.currentAnnotation) {
+          // Don't do anything with currentAnnotation as it is used internally by geoJS
+          return;
         }
-        return;
-      }
+        if (clearAll) {
+          this.annotationLayer.removeAnnotation(geoJsAnnotation, false);
+          return;
+        }
 
-      if (girderId === this.hoveredAnnotationId) {
-        return;
-      }
+        const {
+          girderId,
+          layerId,
+          isHovered,
+          isSelected,
+          isConnection,
+          childId,
+          parentId
+        } = geoJsAnnotation.options();
 
-      const layer = this.store.getLayerFromId(layerId);
-      if (layer && this.layerShouldDisplayAnnotation(layer, annotation)) {
-        return;
-      }
+        if (!girderId) {
+          return;
+        }
 
-      this.annotationLayer.removeAnnotation(annotation, false);
-    });
-    this.annotationLayer.modified();
-    this.annotationLayer.draw();
+        // Remove (not)hovered annotation
+        if (isHovered != (girderId === this.hoveredAnnotationId)) {
+          this.annotationLayer.removeAnnotation(geoJsAnnotation, false);
+          return;
+        }
+
+        // Remove (un)selected annotation
+        if (isSelected != this.isAnnotationSelected(girderId)) {
+          this.annotationLayer.removeAnnotation(geoJsAnnotation, false);
+          return;
+        }
+
+        // Check for connections
+        if (isConnection) {
+          const parent = this.getAnnotationFromId(parentId);
+          const child = this.getAnnotationFromId(childId);
+          if (
+            !this.shouldDrawConnections ||
+            !parent ||
+            !child ||
+            !this.shouldDisplayAnnotation(parent) ||
+            !this.shouldDisplayAnnotation(child)
+          ) {
+            this.annotationLayer.removeAnnotation(geoJsAnnotation, false);
+          }
+          return;
+        }
+
+        const annotation = this.getAnnotationFromId(girderId);
+        const layer = this.store.getLayerFromId(layerId);
+        if (
+          layer &&
+          annotation &&
+          this.layerShouldDisplayAnnotation(layer, annotation)
+        ) {
+          return;
+        }
+
+        this.annotationLayer.removeAnnotation(geoJsAnnotation, false);
+      });
+    if (redraw) {
+      this.annotationLayer.modified();
+      this.annotationLayer.draw();
+    }
   }
 
   // Add to the layer annotations that should be rendered and have not already been added.
-  drawNewAnnotations(excludedGeoJSAnnotations: any[]) {
+  drawNewAnnotations(drawnGeoJSAnnotations: Map<string, IGeoJSAnnotation[]>) {
     this.validLayers.forEach(layer => {
       // Optimize out invisible layers (performance)
       if (!layer.visible) {
         return;
       }
       this.displayableAnnotations
-        .filter(
-          annotation =>
-            this.layerShouldDisplayAnnotation(layer, annotation, false) &&
-            excludedGeoJSAnnotations.every(
-              geoJSAnnotation =>
-                !(
-                  geoJSAnnotation.options("girderId") === annotation.id &&
-                  geoJSAnnotation.options("layerId") === layer.id
-                )
-            )
-        )
+        .filter(annotation => {
+          const excluded = drawnGeoJSAnnotations
+            .get(annotation.id)
+            ?.some(
+              geoJSAnnotation => geoJSAnnotation.options("layerId") === layer.id
+            );
+          return (
+            !excluded &&
+            this.layerShouldDisplayAnnotation(layer, annotation, false)
+          );
+        })
         .map(annotation => this.createGeoJSAnnotation(annotation, layer.id))
+        .filter(geoJSAnnotation => !!geoJSAnnotation)
         .forEach(geoJSAnnotation => {
           this.annotationLayer.addAnnotation(geoJSAnnotation, undefined, false);
         });
     });
   }
 
-  drawNewConnections(excludedGeoJSAnnotations: any[]) {
-    const displayedAnnotationIds = this.displayedAnnotations.map(
-      annotation => annotation.id
-    );
+  drawNewConnections(drawnGeoJSAnnotations: Map<string, IGeoJSAnnotation[]>) {
+    const displayedAnnotationIds: Set<string> = new Set();
+    for (const { id } of this.displayedAnnotations) {
+      displayedAnnotationIds.add(id);
+    }
     this.annotationConnections
       .filter(
         (connection: IAnnotationConnection) =>
-          excludedGeoJSAnnotations.every(
-            geoJSAnnotation =>
-              geoJSAnnotation.options("girderId") !== connection.id
-          ) &&
-          (displayedAnnotationIds.includes(connection.parentId) ||
-            displayedAnnotationIds.includes(connection.childId))
+          !drawnGeoJSAnnotations.has(connection.id) &&
+          (displayedAnnotationIds.has(connection.parentId) ||
+            displayedAnnotationIds.has(connection.childId))
       )
       .forEach((connection: IAnnotationConnection) => {
         {
@@ -609,12 +619,12 @@ export default class AnnotationViewer extends Vue {
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId: string | undefined) {
     if (!this.store.dataset) {
-      return;
+      return null;
     }
 
     const anyImage = this.store.dataset?.anyImage();
     if (!anyImage) {
-      return;
+      return null;
     }
     const girderOptions = {
       girderId: annotation.id,
@@ -636,6 +646,10 @@ export default class AnnotationViewer extends Vue {
       coordinates,
       girderOptions
     );
+    if (!newGeoJSAnnotation) {
+      return null;
+    }
+
     newGeoJSAnnotation.options("girderId", annotation.id);
 
     if (annotation.id === this.hoveredAnnotationId) {
@@ -791,32 +805,38 @@ export default class AnnotationViewer extends Vue {
     // Get selected annotations.
     const selectedAnnotations: IAnnotation[] = this.annotationLayer
       .annotations()
-      .reduce((selectedAnnotations: IAnnotation[], geoJSannotation: any) => {
-        const { girderId, isConnection } = geoJSannotation.options();
-        if (
-          !girderId ||
-          isConnection ||
-          selectedAnnotations.some(
-            selectedAnnotation => selectedAnnotation.id === girderId
-          )
-        ) {
-          return selectedAnnotations;
-        }
-        const annotation = this.getAnnotationFromId(girderId);
-        if (
-          !annotation ||
-          !this.shouldSelectAnnotation(
-            type,
-            coordinates,
-            annotation,
-            geoJSannotation.style(),
-            unitsPerPixel
-          )
-        ) {
-          return selectedAnnotations;
-        }
-        return [...selectedAnnotations, annotation];
-      }, []);
+      .reduce(
+        (
+          selectedAnnotations: IAnnotation[],
+          geoJSannotation: IGeoJSAnnotation
+        ) => {
+          const { girderId, isConnection } = geoJSannotation.options();
+          if (
+            !girderId ||
+            isConnection ||
+            selectedAnnotations.some(
+              selectedAnnotation => selectedAnnotation.id === girderId
+            )
+          ) {
+            return selectedAnnotations;
+          }
+          const annotation = this.getAnnotationFromId(girderId);
+          if (
+            !annotation ||
+            !this.shouldSelectAnnotation(
+              type,
+              coordinates,
+              annotation,
+              geoJSannotation.style(),
+              unitsPerPixel
+            )
+          ) {
+            return selectedAnnotations;
+          }
+          return [...selectedAnnotations, annotation];
+        },
+        []
+      );
 
     // Update annotation store
     switch (this.annotationSelectionType) {
@@ -1166,7 +1186,14 @@ export default class AnnotationViewer extends Vue {
   @Watch("displayableAnnotations")
   @Watch("displayedAnnotations")
   @Watch("annotationConnections")
-  onAnnotationsChanged() {
+  @Watch("xy")
+  @Watch("z")
+  @Watch("time")
+  @Watch("hoveredAnnotationId")
+  @Watch("selectedAnnotations")
+  @Watch("shouldDrawAnnotations")
+  @Watch("shouldDrawConnections")
+  onRedrawNeeded() {
     this.drawAnnotationsAndTooltips();
   }
 
@@ -1179,26 +1206,6 @@ export default class AnnotationViewer extends Vue {
   @Watch("configuration")
   fetchAnnotations() {
     this.annotationStore.fetchAnnotations();
-  }
-
-  @Watch("xy")
-  @Watch("z")
-  @Watch("time")
-  onSliceChanged() {
-    this.drawAnnotationsAndTooltips();
-  }
-
-  @Watch("hoveredAnnotationId")
-  @Watch("selectedAnnotations")
-  onHoverOrSelectionChange() {
-    this.drawAnnotationsAndTooltips();
-  }
-
-  @Watch("shouldDrawAnnotations")
-  @Watch("shouldDrawConnections")
-  @Watch("validLayers")
-  onSettingsChanged() {
-    this.drawAnnotationsAndTooltips();
   }
 
   @Watch("showTooltips")
@@ -1234,8 +1241,10 @@ export default class AnnotationViewer extends Vue {
   drawRoiFilters() {
     this.annotationLayer
       .annotations()
-      .filter((annotation: any) => annotation.options("isRoiFilter"))
-      .forEach((annotation: any) => {
+      .filter((annotation: IGeoJSAnnotation) =>
+        annotation.options("isRoiFilter")
+      )
+      .forEach((annotation: IGeoJSAnnotation) => {
         this.annotationLayer.removeAnnotation(annotation);
       });
     this.enabledRoiFilters.forEach((filter: IROIAnnotationFilter) => {
@@ -1243,6 +1252,10 @@ export default class AnnotationViewer extends Vue {
         id: filter.id,
         isRoiFilter: true
       });
+
+      if (!newGeoJSAnnotation) {
+        return;
+      }
 
       newGeoJSAnnotation.style({
         fill: false,

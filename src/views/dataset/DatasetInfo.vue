@@ -302,7 +302,9 @@ export default class DatasetInfo extends Vue {
 
       const channels = dataset.channels.slice(0, 6);
       const layers: IDisplayLayer[] = [];
-      channels.forEach(() => layers.push(newLayer(dataset, layers)));
+      channels.forEach((_, idx) =>
+        Vue.set(layers, idx, newLayer(dataset, layers))
+      );
 
       const view: IViewConfiguration = { layers };
       config.view = view;

@@ -4,7 +4,8 @@ import {
   IImage,
   IGeoJSPoint,
   AnnotationShape,
-  IAnnotationProperty
+  IAnnotationProperty,
+  IGeoJSAnnotation
 } from "@/store/model";
 import geojs from "geojs";
 import { logError } from "@/utils/log";
@@ -63,19 +64,19 @@ export function geojsAnnotationFactory(
   coordinates: IGeoJSPoint[],
   options: any
 ) {
-  let newGeoJSAnnotation = null;
+  let newGeoJSAnnotation: IGeoJSAnnotation | null = null;
   switch (shape) {
     case AnnotationShape.Point:
       newGeoJSAnnotation = geojs.annotation.pointAnnotation(options);
-      newGeoJSAnnotation.options("position", coordinates[0]);
+      newGeoJSAnnotation!.options("position", coordinates[0]);
       break;
     case AnnotationShape.Polygon:
       newGeoJSAnnotation = geojs.annotation.polygonAnnotation(options);
-      newGeoJSAnnotation.options("vertices", coordinates);
+      newGeoJSAnnotation!.options("vertices", coordinates);
       break;
     case AnnotationShape.Line:
       newGeoJSAnnotation = geojs.annotation.lineAnnotation(options);
-      newGeoJSAnnotation.options("vertices", coordinates);
+      newGeoJSAnnotation!.options("vertices", coordinates);
       break;
     default:
       logError(`Unsupported annotation shape: ${shape}`);

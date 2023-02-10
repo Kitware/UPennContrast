@@ -43,7 +43,7 @@ export default class LayerSelect extends Vue {
       })
     );
     if (this.any !== undefined) {
-      layers.push({
+      Vue.set(layers, layers.length, {
         label: "Any",
         value: null
       });

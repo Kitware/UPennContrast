@@ -5,9 +5,9 @@ import {
   IGeoJSPoint,
   IToolConfiguration
 } from "./model";
-import { Promise } from "bluebird";
 
 import { logError } from "@/utils/log";
+import { fetchAllPages } from "@/utils/fetch";
 
 export default class AnnotationsAPI {
   private readonly client: RestClientInstance;
@@ -60,36 +60,10 @@ export default class AnnotationsAPI {
 
   async getAnnotationsForDatasetId(id: string): Promise<IAnnotation[]> {
     const annotations: IAnnotation[] = [];
-    const limit = 250;
-    let totalCount = -1;
-
-    const fetchPage = (offset: number) =>
-      this.client
-        .get(
-          `upenn_annotation?datasetId=${id}&limit=${limit}&offset=${offset}&sort=_id`
-        )
-        .then(res => {
-          totalCount = Number(res.headers["girder-total-count"]);
-          const newAnnotations = res.data.map(this.toAnnotation);
-          annotations.push(...newAnnotations);
-        })
-        .catch(err => {
-          throw err;
-        });
-
-    // Fetch first page
-    await fetchPage(0);
-
-    // Fetch remaining pages if needed
-    const promises = [];
-    for (let offset = limit; offset < totalCount; offset += limit) {
-      promises.push(fetchPage(offset));
-    }
-    try {
-      await Promise.all(promises);
-    } catch (err) {
-      logError(`Could not get annotations for dataset ${id}: ${err}`);
-      return [];
+    const pages = await fetchAllPages(this.client, "upenn_annotation", id);
+    for (const page of pages) {
+      const newAnnotations = page.map(this.toAnnotation);
+      annotations.push(...newAnnotations);
     }
     return annotations;
   }
@@ -99,7 +73,7 @@ export default class AnnotationsAPI {
   }
 
   updateAnnotation(annotation: IAnnotation) {
-    const newAnnotation = { ...annotation };
+    const newAnnotation: Partial<IAnnotation> = { ...annotation };
     delete newAnnotation.id;
     return this.client.put(`upenn_annotation/${annotation.id}`, newAnnotation);
   }
@@ -153,36 +127,10 @@ export default class AnnotationsAPI {
     id: string
   ): Promise<IAnnotationConnection[]> {
     const connections: IAnnotationConnection[] = [];
-    const limit = 1;
-    let totalCount = -1;
-
-    const fetchPage = (offset: number) =>
-      this.client
-        .get(
-          `annotation_connection?datasetId=${id}&limit=${limit}&offset=${offset}&sort=_id`
-        )
-        .then(res => {
-          totalCount = Number(res.headers["girder-total-count"]);
-          const newConnections = res.data.map(this.toConnection);
-          connections.push(...newConnections);
-        })
-        .catch(err => {
-          throw err;
-        });
-
-    // Fetch first page
-    await fetchPage(0);
-
-    // Fetch remaining pages if needed
-    const promises = [];
-    for (let offset = limit; offset < totalCount; offset += limit) {
-      promises.push(fetchPage(offset));
-    }
-    try {
-      await Promise.all(promises);
-    } catch (err) {
-      logError(`Could not get connections for dataset ${id}: ${err}`);
-      return [];
+    const pages = await fetchAllPages(this.client, "annotation_connection", id);
+    for (const page of pages) {
+      const newConnections = page.map(this.toConnection);
+      connections.push(...newConnections);
     }
     return connections;
   }
@@ -192,7 +140,7 @@ export default class AnnotationsAPI {
   }
 
   async updateConnection(connection: IAnnotationConnection) {
-    const newConnection = { ...connection };
+    const newConnection: Partial<IAnnotationConnection> = { ...connection };
     delete newConnection.id;
     this.client.put(`annotation_connection/${connection.id}`, newConnection);
   }
