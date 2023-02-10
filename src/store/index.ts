@@ -601,7 +601,8 @@ export class Main extends VuexModule {
 
   @Mutation
   private pushLayer(layer: IDisplayLayer) {
-    this.configuration!.view.layers.push(layer);
+    const layers = this.configuration!.view.layers;
+    Vue.set(layers, layers.length, Object.assign({}, layer));
   }
 
   @Mutation
@@ -615,10 +616,9 @@ export class Main extends VuexModule {
         layers.forEach((l, i) => (l.visible = i === index));
         break;
       case "multiple":
-        layers[index].visible = !layers[index].visible;
-        break;
       case "unroll":
         layers[index].visible = !layers[index].visible;
+        Vue.set(layers, index, layers[index]);
         break;
     }
   }

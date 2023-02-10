@@ -162,6 +162,11 @@ export interface IDisplayLayer {
   };
 }
 
+export interface IGeoJSAnnotation {
+  options: (key?: string, value?: any) => any;
+  style: (value?: { [key: string]: any }) => any;
+}
+
 export interface IGeoJSPoint {
   x: number;
   y: number;

@@ -31,6 +31,7 @@
 <script lang="ts">
 import { Vue, Component, VModel, Prop } from "vue-property-decorator";
 import store from "@/store";
+import annotationStore from "@/store/annotation";
 import toolsStore from "@/store/tool";
 import { IToolConfiguration } from "@/store/model";
 
@@ -40,6 +41,7 @@ import { IToolConfiguration } from "@/store/model";
 })
 export default class TagPicker extends Vue {
   readonly store = store;
+  readonly annotationStore = annotationStore;
   readonly toolsStore = toolsStore;
 
   @Prop({ default: false })
@@ -48,14 +50,23 @@ export default class TagPicker extends Vue {
   @VModel({ type: Array }) tags!: string[];
 
   get tagList(): string[] {
-    return this.toolsStore.tools
-      .filter(
-        (tool: IToolConfiguration) =>
-          (tool.type === "create" || tool.type === "snap") &&
-          tool.values.annotation
-      )
-      .map((tool: IToolConfiguration) => tool.values.annotation.tags)
-      .flat();
+    const tagSet: Set<string> = new Set();
+    // Tags from annotations
+    for (const { tags } of this.annotationStore.annotations) {
+      for (const tag of tags) {
+        tagSet.add(tag);
+      }
+    }
+    // Tags from tools
+    for (const tool of this.toolsStore.tools) {
+      if (tool.values?.annotation?.tags) {
+        const tags = tool.values.annotation.tags;
+        for (const tag of tags) {
+          tagSet.add(tag);
+        }
+      }
+    }
+    return Array.from(tagSet);
   }
 
   tagSearchInput: string = "";

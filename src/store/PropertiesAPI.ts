@@ -7,6 +7,8 @@ import {
   IAnnotationPropertyConfiguration
 } from "./model";
 
+import { fetchAllPages } from "@/utils/fetch";
+
 export default class PropertiesAPI {
   private readonly client: RestClientInstance;
 
@@ -55,22 +57,20 @@ export default class PropertiesAPI {
     const annotationMapping: {
       [annotationId: string]: { [propertyId: string]: number };
     } = {};
-    const limit = 1000;
-    let offset = 0;
-    let data;
-    do {
-      const res = await this.client.get(
-        `annotation_property_values?datasetId=${datasetId}&limit=${limit}&offset=${offset}&sort=_id`
-      );
-      data = res.data;
-      for (const { annotationId, values } of data) {
+
+    const pages = await fetchAllPages(
+      this.client,
+      "annotation_property_values",
+      datasetId
+    );
+    for (const page of pages) {
+      for (const { annotationId, values } of page) {
         annotationMapping[annotationId] = {
           ...annotationMapping[annotationId],
           ...values
         };
       }
-      offset += data.length;
-    } while (data.length === limit);
+    }
     return annotationMapping;
   }
 

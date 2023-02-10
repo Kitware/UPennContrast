@@ -29,7 +29,7 @@ import {
 } from "./images";
 import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
-import { VTreeviewNode } from "vuetify/lib";
+import Vue from "vue";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
 // using HTML 2 might improve that slightly).  For a single layer, if we set
@@ -427,7 +427,9 @@ export default class GirderAPI {
     data.set("reuseExisting", "false");
     const channels = dataset.channels.slice(0, 6);
     const layers: IDisplayLayer[] = [];
-    channels.forEach(() => layers.push(newLayer(dataset, layers)));
+    channels.forEach((_, idx) =>
+      Vue.set(layers, idx, newLayer(dataset, layers))
+    );
     const view: IViewConfiguration = { layers };
     const toolset: IToolSet = { name: "Default Toolset", toolIds: [] };
     data.set(
