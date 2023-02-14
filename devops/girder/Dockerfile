@@ -8,7 +8,7 @@ WORKDIR /src
 
 RUN git clone https://github.com/girder/large_image.git
 WORKDIR /src/large_image
-RUN pip install -e . -rrequirements-dev.txt girder[mount] --find-links https://girder.github.io/large_image_wheels
+RUN pip install .[all] girder[mount] --find-links https://girder.github.io/large_image_wheels
 RUN girder build
 
 COPY plugins/AnnotationPlugin /src/AnnotationPlugin
