@@ -43,22 +43,22 @@ class AnnotationConnection(AccessControlledModel):
         ConnectionSchema.connectionSchema
     )
 
-  def cleanOrphanedAnnotation(self, event):
-    if event.info and event.info['_id']:
-      annotationId = str(event.info['_id'])
-      query = {
-        '$or': [
-          {
-            'childId': annotationId
-          },
-          {
-            'parentId': annotationId
-          }
-        ]
-      }
-      self.removeWithQuery(query)
+  def annotationsRemovedEvent(self, event):
+    # Clean connections orphaned by the deletion of the annotations
+    annotationStringIds = event.info
+    query = {
+      '$or': [
+        {
+          'childId': { '$in': annotationStringIds }
+        },
+        {
+          'parentId': { '$in': annotationStringIds }
+        }
+      ]
+    }
+    self.removeWithQuery(query)
 
-  def cleanOrphanedDataset(self, event):
+  def folderRemovedEvent(self, event):
     if event.info and event.info['_id']:
       folderId = str(event.info['_id'])
       query = {
@@ -68,8 +68,8 @@ class AnnotationConnection(AccessControlledModel):
 
   def initialize(self):
     self.name="annotation_connection"
-    events.bind('model.upenn_annotation.remove', 'upenn.connections.clean.orphans.annotation', self.cleanOrphanedAnnotation)
-    events.bind('model.folder.remove', 'upenn.connections.clean.orphans.dataset', self.cleanOrphanedDataset)
+    events.bind('model.upenn_annotation.removeStringIds', 'upenn.connections.annotationsRemovedEvent', self.annotationsRemovedEvent)
+    events.bind('model.folder.remove', 'upenn.connections.folderRemovedEvent', self.folderRemovedEvent)
 
   def validate(self, document):
     try:
@@ -155,8 +155,15 @@ class AnnotationConnection(AccessControlledModel):
       tileQuery = {
         "location": location
       }
-
       query.update(tileQuery)
+
+      # Only work on annotations that are placed in the same dataset
+      datasetId = annotation["datasetId"]
+      datasetQuery = {
+        "datasetId": datasetId
+      }
+      query.update(datasetQuery)
+
       annotations = list(Annotation().find(query))
 
       # Find the closest annotation

@@ -33,18 +33,17 @@ class AnnotationPropertyValues(AccessControlledModel):
         PropertySchema.annotationPropertySchema
     )
 
+    def annotationsRemovedEvent(self, event):
+        # Clean property values orphaned by the deletion of the annotations
+        annotationStringIds = event.info
+        query = {
+            'annotationId': { '$in': annotationStringIds }
+        }
+        self.removeWithQuery(query)
+
     def initialize(self):
         self.name = "annotation_property_values"
-        events.bind('model.upenn_annotation.remove',
-                    'upenn.annotation_values.clean', self.cleanOrphaned)
-
-    def cleanOrphaned(self, event):
-        if event.info and event.info['_id']:
-            annotationId = str(event.info['_id'])
-            query = {
-                'annotationId': annotationId
-            }
-            self.removeWithQuery(query)
+        events.bind('model.upenn_annotation.removeStringIds', 'upenn.annotation_values.annotationsRemovedEvent', self.annotationsRemovedEvent)
 
     def validate(self, document):
         try:

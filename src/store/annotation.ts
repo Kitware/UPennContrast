@@ -17,7 +17,8 @@ import {
   IAnnotationConnection,
   IGeoJSPoint,
   IToolConfiguration,
-  IAnnotationComputeJob
+  IAnnotationBase,
+  IAnnotationConnectionBase
 } from "./model";
 
 import Vue from "vue";
@@ -55,12 +56,22 @@ export class Annotations extends VuexModule {
       .filter((id: string) => !this.activeAnnotationIds.includes(id));
   }
 
-  get getAnnotationFromId() {
-    const idToAnnotation: { [annotationId: string]: IAnnotation } = {};
-    for (const annotation of this.annotations) {
-      idToAnnotation[annotation.id] = annotation;
+  get annotationIdToIdx() {
+    // Cache the annotations to avoid the getter overhead in the for loop
+    const annotations = this.annotations;
+    const idToIdx: Map<string, number> = new Map();
+    for (let idx = 0; idx < annotations.length; ++idx) {
+      idToIdx.set(annotations[idx].id, idx);
     }
-    return (annotationId: string): undefined | IAnnotation => idToAnnotation[annotationId];
+    return idToIdx;
+  }
+
+  get getAnnotationFromId() {
+    const getAnnotationFromId = (annotationId: string) => {
+      const idx = this.annotationIdToIdx.get(annotationId);
+      return idx === undefined ? undefined : this.annotations[idx];
+    };
+    return getAnnotationFromId;
   }
 
   hoveredAnnotationId: string | null = null;
@@ -161,30 +172,9 @@ export class Annotations extends VuexModule {
   }
 
   @Action
-  public async createAnnotation({
-    tags,
-    shape,
-    channel,
-    location,
-    coordinates,
-    datasetId
-  }: {
-    tags: string[];
-    shape: string;
-    channel: number;
-    location: { XY: number; Z: number; Time: number };
-    coordinates: IGeoJSPoint[];
-    datasetId: string;
-  }): Promise<IAnnotation | null> {
+  public async createAnnotation(annotationBase: IAnnotationBase): Promise<IAnnotation | null> {
     sync.setSaving(true);
-    const newAnnotation: IAnnotation | null = await this.annotationsAPI.createAnnotation(
-      tags,
-      shape,
-      channel,
-      location,
-      coordinates,
-      datasetId
-    );
+    const newAnnotation: IAnnotation | null = await this.annotationsAPI.createAnnotation(annotationBase);
     sync.setSaving(false);
     return newAnnotation;
   }
@@ -245,27 +235,9 @@ export class Annotations extends VuexModule {
   }
 
   @Action
-  public async createConnection({
-    parentId,
-    childId,
-    label,
-    tags,
-    datasetId
-  }: {
-    parentId: string;
-    childId: string;
-    label: string;
-    tags: string[];
-    datasetId: string;
-  }): Promise<IAnnotationConnection | null> {
+  public async createConnection(annotationConnectionBase: IAnnotationConnectionBase): Promise<IAnnotationConnection | null> {
     sync.setSaving(true);
-    const newConnection: IAnnotationConnection | null = await this.annotationsAPI.createConnection(
-      parentId,
-      childId,
-      label,
-      tags,
-      datasetId
-    );
+    const newConnection: IAnnotationConnection | null = await this.annotationsAPI.createConnection(annotationConnectionBase);
     sync.setSaving(false);
     return newConnection;
   }

@@ -1,7 +1,7 @@
 <template>
   <v-dialog v-model="dialog">
     <template v-slot:activator="{ on, attrs }">
-      <v-btn v-bind="attrs" v-on="on">
+      <v-btn v-bind="{ ...attrs, ...$attrs }" v-on="on">
         <v-icon>mdi-application-export</v-icon>
         EXPORT CSV
       </v-btn>
@@ -47,6 +47,7 @@ import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 
 import { IAnnotation } from "@/store/model";
+import { downloadToClient } from "@/utils/download";
 
 @Component({
   components: {}
@@ -130,19 +131,11 @@ export default class AnnotationCsvDialog extends Vue {
   }
 
   download() {
-    const element = document.createElement("a");
-    element.setAttribute(
-      "href",
-      "data:text/plain;charset=utf-8," + encodeURIComponent(this.text)
-    );
-    element.setAttribute("download", "upenn_annotation_export.csv");
-
-    element.style.display = "none";
-    document.body.appendChild(element);
-
-    element.click();
-
-    document.body.removeChild(element);
+    const params = {
+      href: "data:text/plain;charset=utf-8," + encodeURIComponent(this.text),
+      download: "upenn_annotation_export.csv"
+    };
+    downloadToClient(params);
   }
 }
 </script>

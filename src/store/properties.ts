@@ -11,6 +11,7 @@ import {
   IAnnotationProperty,
   IWorkerInterface,
   IToolConfiguration,
+  IAnnotationPropertyValues,
   IWorkerImageList,
   IAnnotationPropertyConfiguration,
   IAnnotation
@@ -33,9 +34,7 @@ export class Properties extends VuexModule {
 
   annotationListIds: string[] = [];
 
-  propertyValues: {
-    [annotationId: string]: { [propertyId: string]: number };
-  } = {};
+  propertyValues: IAnnotationPropertyValues = {};
 
   workerImageList: IWorkerImageList = {};
   workerInterfaces: { [image: string]: IWorkerInterface } = {};
@@ -94,9 +93,7 @@ export class Properties extends VuexModule {
   }
 
   @Mutation
-  updatePropertyValues(values: {
-    [annotationId: string]: { [propertyId: string]: number };
-  }) {
+  updatePropertyValues(values: IAnnotationPropertyValues) {
     // TODO(performance): merge instead
     this.propertyValues = values;
   }

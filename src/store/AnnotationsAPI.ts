@@ -2,8 +2,11 @@ import { RestClientInstance } from "@/girder";
 import {
   IAnnotation,
   IAnnotationConnection,
+  IAnnotationBase,
+  AnnotationShape,
   IGeoJSPoint,
-  IToolConfiguration
+  IToolConfiguration,
+  IAnnotationConnectionBase
 } from "./model";
 
 import { logError } from "@/utils/log";
@@ -19,25 +22,31 @@ export default class AnnotationsAPI {
   histogramsLoaded = 0;
 
   createAnnotation(
-    tags: string[],
-    shape: string,
-    channel: number,
-    location: { XY: number; Z: number; Time: number },
-    coordinates: IGeoJSPoint[],
-    datasetId: string
+    annotationBase: IAnnotationBase
   ): Promise<IAnnotation | null> {
     return this.client
-      .post("upenn_annotation", {
-        tags,
-        shape,
-        channel,
-        location,
-        coordinates,
-        datasetId
-      })
+      .post("upenn_annotation", annotationBase)
       .then(r => this.toAnnotation(r.data))
       .catch(err => {
-        logError(`Unable to send new annotation data to server ${err}`);
+        logError(`Unable to send new annotation to server ${err}`);
+        return null;
+      });
+  }
+
+  createMultipleAnnotations(
+    annotationList: IAnnotationBase[]
+  ): Promise<IAnnotation[] | null> {
+    return this.client
+      .post("upenn_annotation/multiple", annotationList)
+      .then(response => {
+        const annotations: IAnnotation[] = [];
+        for (const item of response.data) {
+          annotations.push(this.toAnnotation(item));
+        }
+        return annotations;
+      })
+      .catch(err => {
+        logError(`Unable to send multiple new annotations to server ${err}`);
         return null;
       });
   }
@@ -72,6 +81,12 @@ export default class AnnotationsAPI {
     return this.client.delete(`upenn_annotation/${id}`);
   }
 
+  async deleteMultipleAnnotations(annotationIds: string[]) {
+    return this.client.delete("upenn_annotation/multiple", {
+      data: annotationIds
+    });
+  }
+
   updateAnnotation(annotation: IAnnotation) {
     const newAnnotation: Partial<IAnnotation> = { ...annotation };
     delete newAnnotation.id;
@@ -102,23 +117,33 @@ export default class AnnotationsAPI {
   };
 
   createConnection(
-    parentId: string,
-    childId: string,
-    label: string,
-    tags: string[],
-    datasetId: string
+    annotationConnectionBase: IAnnotationConnectionBase
   ): Promise<IAnnotationConnection | null> {
     return this.client
-      .post("annotation_connection", {
-        label,
-        tags,
-        childId,
-        parentId,
-        datasetId
-      })
+      .post("annotation_connection", annotationConnectionBase)
       .then(r => this.toConnection(r.data))
       .catch(err => {
-        logError(`Unable to send new annotation data to server ${err}`);
+        logError(`Unable to send new annotation connection to server ${err}`);
+        return null;
+      });
+  }
+
+  createMultipleConnections(
+    annotationConnectionBases: IAnnotationConnectionBase[]
+  ): Promise<IAnnotationConnection[] | null> {
+    return this.client
+      .post("annotation_connection/multiple", annotationConnectionBases)
+      .then(response => {
+        const connections: IAnnotationConnection[] = [];
+        for (const item of response.data) {
+          connections.push(this.toConnection(item));
+        }
+        return connections;
+      })
+      .catch(err => {
+        logError(
+          `Unable to send multiple new annotation connections to server ${err}`
+        );
         return null;
       });
   }
@@ -194,13 +219,14 @@ export default class AnnotationsAPI {
   }
 
   toConnection = (item: any): IAnnotationConnection => {
-    const { label, tags, _id, parentId, childId } = item;
+    const { label, tags, _id, parentId, childId, datasetId } = item;
     return {
       label,
       tags,
       id: _id,
       parentId,
-      childId
+      childId,
+      datasetId
     };
   };
 }

@@ -3,6 +3,7 @@ import {
   IAnnotationProperty,
   IWorkerInterface,
   IToolConfiguration,
+  IAnnotationPropertyValues,
   IWorkerImageList,
   IAnnotationPropertyConfiguration
 } from "./model";
@@ -53,10 +54,10 @@ export default class PropertiesAPI {
     );
   }
 
-  async getPropertyValues(datasetId: string) {
-    const annotationMapping: {
-      [annotationId: string]: { [propertyId: string]: number };
-    } = {};
+  async getPropertyValues(
+    datasetId: string
+  ): Promise<IAnnotationPropertyValues> {
+    const annotationMapping: IAnnotationPropertyValues = {};
 
     const pages = await fetchAllPages(
       this.client,

@@ -20,6 +20,7 @@ class AnnotationConnection(Resource):
         self.route('POST', (), self.create)
         self.route('PUT', (':id',), self.update)
         self.route('POST',('connectTo',) , self.connectToNearest)
+        self.route('POST', ('multiple',), self.multipleCreate)
 
     # TODO: anytime a dataset is mentioned, load the dataset and check for existence and that the user has access to it
     # TODO: load both childe and parent annotations, and check that they share existence, access and location
@@ -33,6 +34,14 @@ class AnnotationConnection(Resource):
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
         return self._connectionModel.create(currentUser, self.getBodyJson())
+
+    @access.user
+    @describeRoute(Description("Create multiple new connections").param('body', 'Connection Object List', paramType='body'))
+    def multipleCreate(self, params):
+        currentUser = self.getCurrentUser()
+        if not currentUser:
+            raise AccessException('User not found', 'currentUser')
+        return [self._connectionModel.create(currentUser, connection) for connection in self.getBodyJson()]
 
     @describeRoute(Description("Delete an existing connection").param('id', 'The connection\'s Id', paramType='path').errorResponse('ID was invalid.')
                    .errorResponse('Write access was denied for the connection.', 403))

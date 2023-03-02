@@ -271,6 +271,7 @@ import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
 import geojs from "geojs";
 import { formatDate } from "@/utils/date";
+import { downloadToClient } from "@/utils/download";
 
 interface ISnapshotItem {
   name: string;
@@ -448,10 +449,10 @@ export default class Snapshots extends Vue {
       e => encodeURIComponent(e[0]) + "=" + encodeURIComponent("" + e[1])
     );
     url += "?" + queryParts.join("&");
-    const link = document.createElement("a");
-    link.download = "screenshot." + (this.format === "png" ? "png" : "jpg");
-    link.href = url;
-    link.click();
+    downloadToClient({
+      href: url,
+      download: "screenshot." + (this.format === "png" ? "png" : "jpg")
+    });
   }
 
   setBoundingBox(left: number, top: number, right: number, bottom: number) {

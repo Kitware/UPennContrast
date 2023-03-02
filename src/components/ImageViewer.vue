@@ -316,7 +316,8 @@ export default class ImageViewer extends Vue {
       mapentry.annotationLayer = map.createLayer("annotation", {
         annotations: geojs.listAnnotations(),
         autoshareRenderer: false,
-        continuousCloseProximity: true
+        continuousCloseProximity: true,
+        showLabels: false
       });
       mapentry.workerPreviewLayer = map.createLayer("feature", {
         renderer: mllidx ? "canvas" : undefined,
