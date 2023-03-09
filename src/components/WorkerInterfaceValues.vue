@@ -15,13 +15,13 @@
           v-if="item.type === 'number'"
           :max="item.max"
           :min="item.min"
-          v-model="values[id].value"
+          v-model="values[id]"
           :step="((item.max || 0) - (item.min || 0)) / 100.0"
           class="align-center"
         >
           <template v-slot:append>
             <v-text-field
-              v-model="values[id].value"
+              v-model="values[id]"
               type="number"
               style="width: 60px"
               class="mt-0 pt-0"
@@ -31,25 +31,25 @@
         </v-slider>
         <v-text-field
           v-if="item.type === 'text'"
-          v-model="values[id].value"
+          v-model="values[id]"
           dense
         ></v-text-field>
         <tag-picker
           v-if="item.type === 'tags'"
-          v-model="values[id].value"
+          v-model="values[id]"
         ></tag-picker>
         <layer-select
           v-if="item.type === 'layer'"
-          v-model="values[id].value"
+          v-model="values[id]"
         ></layer-select>
         <v-select
           v-if="item.type === 'select'"
-          v-model="values[id].value"
+          v-model="values[id]"
           :items="item.items"
         ></v-select>
         <channel-select
           v-if="item.type === 'channel'"
-          v-model="values[id].value"
+          v-model="values[id]"
         ></channel-select>
       </v-col>
     </v-row>
@@ -58,7 +58,12 @@
 
 <script lang="ts">
 import { Vue, Component, Prop } from "vue-property-decorator";
-import { IWorkerInterface, WorkerInterfaceType } from "@/store/model";
+import {
+  IWorkerInterface,
+  IWorkerInterfaceValues,
+  TWorkerInterfaceType,
+  TWorkerInterfaceValue
+} from "@/store/model";
 import LayerSelect from "@/components/LayerSelect.vue";
 import ChannelSelect from "@/components/ChannelSelect.vue";
 import TagPicker from "@/components/TagPicker.vue";
@@ -68,7 +73,10 @@ export default class WorkerInterfaceValues extends Vue {
   @Prop()
   readonly workerInterface!: IWorkerInterface;
 
-  getDefault(type: string, defaultValue: any = null) {
+  getDefault(
+    type: TWorkerInterfaceType,
+    defaultValue: TWorkerInterfaceValue = undefined
+  ) {
     if (defaultValue) {
       return defaultValue;
     }
@@ -82,24 +90,25 @@ export default class WorkerInterfaceValues extends Vue {
       case "tags":
         return [];
 
-      case "layers":
+      case "layer":
+        return 0;
+
+      case "select":
+        return "";
+
+      case "channel":
         return 0;
     }
   }
 
   get values() {
-    const interfaceValues: {
-      [id: string]: { type: WorkerInterfaceType; value: any };
-    } = {};
+    const interfaceValues: IWorkerInterfaceValues = {};
     for (const id in this.workerInterface) {
       const interfaceTemplate = this.workerInterface[id];
-      interfaceValues[id] = {
-        type: interfaceTemplate.type,
-        value: this.getDefault(
-          interfaceTemplate.type,
-          interfaceTemplate.default
-        )
-      };
+      interfaceValues[id] = this.getDefault(
+        interfaceTemplate.type,
+        interfaceTemplate.default
+      );
     }
     // emit a reactive object
     // only triggered when workerInterface changes

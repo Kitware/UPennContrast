@@ -14,7 +14,8 @@ import {
   IAnnotationPropertyValues,
   IWorkerImageList,
   IAnnotationPropertyConfiguration,
-  IAnnotation
+  IAnnotation,
+  IWorkerInterfaceValues
 } from "./model";
 
 import Vue from "vue";
@@ -88,6 +89,15 @@ export class Properties extends VuexModule {
 
   @Action
   async fetchWorkerInterface(image: string) {
+    if (!this.workerInterfaces[image]) {
+      const requestPromise = this.requestWorkerInterface(image);
+      // Wait for the promise for 2s maximum
+      await new Promise(resolve => {
+        setTimeout(resolve, 2000);
+        requestPromise.then(resolve);
+      });
+    }
+    // Fetch the interface
     const workerInterface = await this.propertiesAPI.getWorkerInterface(image);
     this.setWorkerInterface({ image, workerInterface });
   }
@@ -242,7 +252,18 @@ export class Properties extends VuexModule {
 
   @Action
   async requestWorkerInterface(image: string) {
-    this.propertiesAPI.requestWorkerInterface(image);
+    const response = await this.propertiesAPI.requestWorkerInterface(image);
+    const jobId = response.data[0]?._id;
+    if (!jobId) {
+      return;
+    }
+    return new Promise(resolve => {
+      jobs.addJob({
+        jobId: jobId,
+        datasetId: main.dataset?.id || null,
+        callback: resolve
+      });
+    });
   }
 
   @Action
@@ -253,7 +274,7 @@ export class Properties extends VuexModule {
   }: {
     image: string;
     tool: IToolConfiguration;
-    workerInterface: { [id: string]: { type: string; value: any } };
+    workerInterface: IWorkerInterfaceValues;
   }) {
     if (!main.dataset || !main.configuration) {
       return;

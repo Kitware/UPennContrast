@@ -5,7 +5,9 @@ import {
   IToolConfiguration,
   IAnnotationPropertyValues,
   IWorkerImageList,
-  IAnnotationPropertyConfiguration
+  IAnnotationPropertyConfiguration,
+  IWorkerInterfaceValues,
+  IAnnotationLocation
 } from "./model";
 
 import { fetchAllPages } from "@/utils/fetch";
@@ -47,7 +49,11 @@ export default class PropertiesAPI {
       .then(res => res.data);
   }
 
-  async computeProperty(propertyId: string, datasetId: string, params: any) {
+  async computeProperty(
+    propertyId: string,
+    datasetId: string,
+    params: IAnnotationProperty
+  ) {
     return this.client.post(
       `annotation_property/${propertyId}/compute?datasetId=${datasetId}`,
       params
@@ -115,7 +121,7 @@ export default class PropertiesAPI {
   }
 
   async requestWorkerInterface(image: string) {
-    this.client.post(
+    return this.client.post(
       `worker_interface/request?image=${encodeURIComponent(image)}`
     );
   }
@@ -132,11 +138,11 @@ export default class PropertiesAPI {
     image: string,
     tool: IToolConfiguration,
     datasetId: string,
-    workerInterface: { [id: string]: { type: string; value: any } },
+    workerInterface: IWorkerInterfaceValues,
     metadata: {
       channel: Number;
-      location: { XY: Number; Z: Number; Time: Number };
-      tile: { XY: Number; Z: Number; Time: Number };
+      location: IAnnotationLocation;
+      tile: IAnnotationLocation;
     }
   ) {
     const { configurationId, description, id, name, type, values } = tool;

@@ -6,7 +6,9 @@ import {
   AnnotationShape,
   IGeoJSPoint,
   IToolConfiguration,
-  IAnnotationConnectionBase
+  IAnnotationConnectionBase,
+  IWorkerInterfaceValues,
+  IAnnotationLocation
 } from "./model";
 
 import { logError } from "@/utils/log";
@@ -175,10 +177,10 @@ export default class AnnotationsAPI {
     datasetId: string,
     metadata: {
       channel: Number;
-      location: { XY: Number; Z: Number; Time: Number };
-      tile: { XY: Number; Z: Number; Time: Number };
+      location: IAnnotationLocation;
+      tile: IAnnotationLocation;
     },
-    workerInterface: any
+    workerInterface: IWorkerInterfaceValues
   ) {
     const { configurationId, description, id, name, type, values } = tool;
     const image = values.image.image;

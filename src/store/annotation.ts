@@ -18,7 +18,8 @@ import {
   IGeoJSPoint,
   IToolConfiguration,
   IAnnotationBase,
-  IAnnotationConnectionBase
+  IAnnotationConnectionBase,
+  IWorkerInterfaceValues
 } from "./model";
 
 import Vue from "vue";
@@ -352,7 +353,7 @@ export class Annotations extends VuexModule {
     callback
   }: {
     tool: IToolConfiguration;
-    workerInterface: any;
+    workerInterface: IWorkerInterfaceValues;
     callback: (success: boolean) => void;
   }) {
     if (!main.dataset || !main.configuration) {

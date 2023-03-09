@@ -1,7 +1,7 @@
 from girder.models.model_base import AccessControlledModel
 from girder.exceptions import AccessException, ValidationException, RestException
 from girder.constants import AccessType
-from ..helpers.tasks import runComputeJob
+from ..helpers.tasks import runJobRequest
 
 from bson.objectid import ObjectId
 import jsonschema
@@ -38,17 +38,7 @@ class PropertySchema:
                 'enum': ['point', 'line', 'polygon']
             },
             'workerInterface': {
-                'type': 'object',
-                'additionalProperties': {
-                    'type': 'object',
-                    'properties': {
-                        'type': { 'type': 'string' },
-                        'min': { 'type': 'number' },
-                        'max': { 'type': 'number' },
-                        'default': { 'type': 'number' },
-                        'items': { 'type': 'array' },
-                    }
-                }
+                'type': 'object'
             }
         }
     }
@@ -92,5 +82,5 @@ class AnnotationProperty(AccessControlledModel):
             raise RestException(code=500, message="Invalid property: no image")
 
         if property:
-            return runComputeJob(image, datasetId, params)
+            return runJobRequest(image, datasetId, params, 'compute')
         return {}

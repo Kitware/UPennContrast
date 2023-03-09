@@ -8,12 +8,14 @@
     <v-row>Shape: {{ annotationNames[property.shape] }}</v-row>
     <v-row>
       Worker interface:
-      <div
-        v-for="[name, { value }] in Object.entries(property.workerInterface)"
-        :key="name"
-      >
-        {{ name }}: {{ value }}
-      </div>
+      <v-container class="pl-8">
+        <v-row
+          v-for="[name, value] in Object.entries(property.workerInterface)"
+          :key="name"
+        >
+          {{ name }}: {{ value }}
+        </v-row>
+      </v-container>
     </v-row>
     <v-row>
       <v-spacer />

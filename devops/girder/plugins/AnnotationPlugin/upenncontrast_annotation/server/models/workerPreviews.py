@@ -1,7 +1,7 @@
 from girder.models.model_base import AccessControlledModel
 from girder.exceptions import AccessException, ValidationException, RestException
 from girder.constants import AccessType
-from ..helpers.tasks import runComputeJob
+from ..helpers.tasks import runJobRequest
 
 from bson.objectid import ObjectId
 import jsonschema
@@ -80,5 +80,4 @@ class WorkerPreviewModel(AccessControlledModel):
             raise RestException(
                 code=500, message="Invalid dataset id in annotation")
 
-        parameters['request'] = 'preview'
-        return runComputeJob(image, datasetId, parameters)
+        return runJobRequest(image, datasetId, parameters, 'preview')

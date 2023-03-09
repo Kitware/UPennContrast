@@ -126,14 +126,10 @@ export interface IDatasetConfiguration {
   snapshots?: any[];
 }
 
-export declare type DisplaySliceType =
-  | "current"
-  | "max-merge"
-  | "constant"
-  | "offset";
+export type TDisplaySliceType = "current" | "max-merge" | "constant" | "offset";
 
 export interface IDisplaySlice {
-  type: DisplaySliceType;
+  type: TDisplaySliceType;
   value: number | null;
 }
 
@@ -173,31 +169,57 @@ export interface IGeoJSPoint {
   z?: number; // Optional z coordinate
 }
 
-export declare type WorkerInterfaceType =
-  | "number"
-  | "text"
-  | "tags"
-  | "layer"
-  | "select"
-  | "channel";
-
-export interface IWorkerInterfaceElement {
-  type: WorkerInterfaceType;
+export interface INumberWorkerInterfaceElement {
+  type: "number";
   min?: number;
   max?: number;
   default?: number;
-  items?: any[];
 }
 
+export interface ITextWorkerInterfaceElement {
+  type: "text";
+  default?: string;
+}
+
+export interface ITagsWorkerInterfaceElement {
+  type: "tags";
+  default?: string[];
+}
+
+export interface ILayerWorkerInterfaceElement {
+  type: "layer";
+  default?: number;
+}
+
+export interface ISelectWorkerInterfaceElement {
+  type: "select";
+  items: string[];
+  default?: string;
+}
+
+export interface IChannelWorkerInterfaceElement {
+  type: "channel";
+  default?: number;
+}
+
+export type TWorkerInterfaceElement =
+  | INumberWorkerInterfaceElement
+  | ITextWorkerInterfaceElement
+  | ITagsWorkerInterfaceElement
+  | ILayerWorkerInterfaceElement
+  | ISelectWorkerInterfaceElement
+  | IChannelWorkerInterfaceElement;
+
+export type TWorkerInterfaceType = TWorkerInterfaceElement["type"];
+
+export type TWorkerInterfaceValue = TWorkerInterfaceElement["default"];
+
 export interface IWorkerInterface {
-  [id: string]: IWorkerInterfaceElement;
+  [id: string]: TWorkerInterfaceElement;
 }
 
 export interface IWorkerInterfaceValues {
-  [id: string]: {
-    type: WorkerInterfaceType;
-    value: any;
-  };
+  [id: string]: TWorkerInterfaceValue;
 }
 
 export interface IWorkerLabels {

@@ -1,4 +1,4 @@
-from ..helpers.tasks import runComputeJob
+from ..helpers.tasks import runJobRequest
 from girder.models.model_base import AccessControlledModel
 from girder.exceptions import AccessException, ValidationException, RestException
 from girder.constants import AccessType
@@ -166,4 +166,4 @@ class Annotation(AccessControlledModel):
     image = tool.get('image', None)
     if not image:
         raise RestException(code=500, message="Invalid segmentation tool: no image")
-    return runComputeJob(image, datasetId, tool)
+    return runJobRequest(image, datasetId, tool, 'compute')

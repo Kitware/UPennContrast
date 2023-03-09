@@ -16,7 +16,7 @@ import re
 # )
 
 
-def runComputeJob(image, datasetId, params):
+def runJobRequest(image, datasetId, params, request):
     name = params.get('name', 'unknown')
     # Make sure name is a valid name for a docker container
     name = ''.join(re.findall('[a-zA-Z0-9_.-]', name))
@@ -25,6 +25,7 @@ def runComputeJob(image, datasetId, params):
     containerArgs = [
         '--apiUrl', Setting().get('worker.api_url') or 'http://localhost:8080/api/v1',
         '--token', getCurrentToken()['_id'],
+        '--request', request,
         '--parameters', params
     ]
     if (datasetId):
