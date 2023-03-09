@@ -162,10 +162,7 @@ export class Properties extends VuexModule {
     }
 
     this.propertiesAPI
-      .computeProperty(property.id, main.dataset.id, {
-        ...property,
-        ...property.workerInterface
-      })
+      .computeProperty(property.id, main.dataset.id, property)
       .then((response: any) => {
         // Keep track of running jobs
         const job = response.data[0];
