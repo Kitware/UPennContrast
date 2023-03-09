@@ -89,7 +89,9 @@ class UPennContrastWorkerClient:
     def get_image_for_annotation(self, annotation):
 
         # Get image location
-        channel = self.params.get('channel', None)
+        channel = self.params['workerInterface']['Channel'].get('value', None)
+        if channel is None:
+            channel = self.params.get('channel', None)
         if channel is None:  # Default to the annotation's channel, null means Any was selected
             channel = annotation.get('channel', None)
         if channel is None:
