@@ -1,6 +1,7 @@
 import annotation_client.annotations as annotations
 import annotation_client.tiles as tiles
 import girder_client
+import numpy as np
 import urllib
 
 PATHS = {
@@ -116,6 +117,6 @@ class UPennContrastWorkerClient:
 
     def add_annotation_property_values(self, annotation, values):
 
-        property_values = {self.propertyId: values}
-
-        self.annotationClient.addAnnotationPropertyValues(self.datasetId, annotation['_id'], property_values)
+        if not np.isnan(values):
+            property_values = {self.propertyId: values}
+            self.annotationClient.addAnnotationPropertyValues(self.datasetId, annotation['_id'], property_values)
