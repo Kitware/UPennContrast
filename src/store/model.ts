@@ -189,17 +189,20 @@ export interface ITagsWorkerInterfaceElement {
 export interface ILayerWorkerInterfaceElement {
   type: "layer";
   default?: number;
+  required?: boolean;
 }
 
 export interface ISelectWorkerInterfaceElement {
   type: "select";
   items: string[];
   default?: string;
+  required?: boolean;
 }
 
 export interface IChannelWorkerInterfaceElement {
   type: "channel";
   default?: number;
+  required?: boolean;
 }
 
 export type TWorkerInterfaceElement =
@@ -212,7 +215,12 @@ export type TWorkerInterfaceElement =
 
 export type TWorkerInterfaceType = TWorkerInterfaceElement["type"];
 
-export type TWorkerInterfaceValue = TWorkerInterfaceElement["default"];
+// A value can't be undefined (it comes from "default" field being optionall),
+// but it can be null when "required" field is false
+export type TWorkerInterfaceValue = Exclude<
+  TWorkerInterfaceElement["default"],
+  undefined
+> | null;
 
 export interface IWorkerInterface {
   [id: string]: TWorkerInterfaceElement;

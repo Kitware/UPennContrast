@@ -15,13 +15,13 @@
           v-if="item.type === 'number'"
           :max="item.max"
           :min="item.min"
-          v-model="values[id]"
+          v-model="interfaceValues[id]"
           :step="((item.max || 0) - (item.min || 0)) / 100.0"
           class="align-center"
         >
           <template v-slot:append>
             <v-text-field
-              v-model="values[id]"
+              v-model="interfaceValues[id]"
               type="number"
               style="width: 60px"
               class="mt-0 pt-0"
@@ -31,25 +31,28 @@
         </v-slider>
         <v-text-field
           v-if="item.type === 'text'"
-          v-model="values[id]"
+          v-model="interfaceValues[id]"
           dense
         ></v-text-field>
         <tag-picker
           v-if="item.type === 'tags'"
-          v-model="values[id]"
+          v-model="interfaceValues[id]"
         ></tag-picker>
         <layer-select
+          :clearable="!item.required"
           v-if="item.type === 'layer'"
-          v-model="values[id]"
+          v-model="interfaceValues[id]"
         ></layer-select>
         <v-select
+          :clearable="!item.required"
           v-if="item.type === 'select'"
-          v-model="values[id]"
+          v-model="interfaceValues[id]"
           :items="item.items"
         ></v-select>
         <channel-select
+          :clearable="!item.required"
           v-if="item.type === 'channel'"
-          v-model="values[id]"
+          v-model="interfaceValues[id]"
         ></channel-select>
       </v-col>
     </v-row>
@@ -57,7 +60,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop } from "vue-property-decorator";
+import { Vue, Component, Prop, Watch, VModel } from "vue-property-decorator";
 import {
   IWorkerInterface,
   IWorkerInterfaceValues,
@@ -73,10 +76,9 @@ export default class WorkerInterfaceValues extends Vue {
   @Prop()
   readonly workerInterface!: IWorkerInterface;
 
-  getDefault(
-    type: TWorkerInterfaceType,
-    defaultValue: TWorkerInterfaceValue = undefined
-  ) {
+  @VModel({ type: Object }) interfaceValues!: IWorkerInterfaceValues;
+
+  getDefault(type: TWorkerInterfaceType, defaultValue?: TWorkerInterfaceValue) {
     if (defaultValue) {
       return defaultValue;
     }
@@ -101,7 +103,8 @@ export default class WorkerInterfaceValues extends Vue {
     }
   }
 
-  get values() {
+  @Watch("workerInterface")
+  resetValues() {
     const interfaceValues: IWorkerInterfaceValues = {};
     for (const id in this.workerInterface) {
       const interfaceTemplate = this.workerInterface[id];
@@ -110,10 +113,7 @@ export default class WorkerInterfaceValues extends Vue {
         interfaceTemplate.default
       );
     }
-    // emit a reactive object
-    // only triggered when workerInterface changes
-    this.$emit("input", interfaceValues);
-    return interfaceValues;
+    this.interfaceValues = interfaceValues;
   }
 }
 </script>

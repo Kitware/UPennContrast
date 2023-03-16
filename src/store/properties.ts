@@ -89,17 +89,29 @@ export class Properties extends VuexModule {
 
   @Action
   async fetchWorkerInterface(image: string) {
-    if (!this.workerInterfaces[image]) {
-      const requestPromise = this.requestWorkerInterface(image);
-      // Wait for the promise for 2s maximum
-      await new Promise(resolve => {
-        setTimeout(resolve, 2000);
-        requestPromise.then(resolve);
+    // This function fetches the interface
+    const fetchInterface = () => {
+      this.propertiesAPI.getWorkerInterface(image).then(workerInterface => {
+        this.setWorkerInterface({ image, workerInterface });
       });
-    }
-    // Fetch the interface
-    const workerInterface = await this.propertiesAPI.getWorkerInterface(image);
-    this.setWorkerInterface({ image, workerInterface });
+    };
+
+    // First, requestWorkerInterface (girder will ask the worker to send it the interface)
+    // Then, getWorkerInterface (girder will send the interface it has received)
+    // If we don't call requestWorkerInterface first, girder will have no interface to send
+    const requestPromise = this.requestWorkerInterface(image);
+    let isPromisePending = true;
+    // Fetch interface when requestWorkerInterface resolves
+    requestPromise.finally(() => {
+      fetchInterface();
+      isPromisePending = false;
+    });
+    // Also fetch after 5s if it is still pending
+    setTimeout(() => {
+      if (isPromisePending) {
+        fetchInterface();
+      }
+    }, 5000);
   }
 
   @Mutation
