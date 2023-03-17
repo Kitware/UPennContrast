@@ -1,277 +1,273 @@
 <template>
-  <div class="snapshots mx-0">
-    <div v-if="store.configuration">
-      <v-card-title class="headline">
-        Snapshot
-      </v-card-title>
-      <v-card-text
-        class="pb-0"
-        title="Add a name, description, or tags to filter the list of snapshots or to create a new snapshot."
-      >
-        <v-row>
-          <v-col cols="8" class="py-0">
-            <!-- add :rules="validationFunc" -->
-            <v-text-field
-              label="Snapshot name"
-              v-model="newName"
-              dense
-              hide-details
-            ></v-text-field>
-          </v-col>
-          <v-col cols="4" class="py-0">
-            <v-btn
-              color="primary"
-              text
-              :disabled="!newName.trim()"
-              @click="saveSnapshot"
-            >
-              Save
-            </v-btn>
-          </v-col>
-        </v-row>
-        <v-row>
-          <v-col cols="8" class="py-0">
-            <span v-if="modifiedDate" id="modified-date">
-              Last change: {{ new Date(modifiedDate).toLocaleString() }}
-            </span>
-          </v-col>
-          <v-col cols="4" class="py-0">
-            <v-btn
-              color="primary"
-              text
-              @click="removeSnapshot"
-              :disabled="!currentSnapshot"
-            >
-              Delete
-            </v-btn>
-          </v-col>
-        </v-row>
-        <v-row>
-          <v-col class="py-0">
-            <v-combobox
-              v-model="newTags"
-              :items="tagList()"
-              :search-input.sync="tagSearchInput"
-              @change="tagSearchInput = ''"
-              label="Tags"
-              multiple
-              hide-selected
-              small-chips
-              dense
-            >
-              <template v-slot:selection="{ attrs, index, item, parent }">
-                <v-chip
-                  class="pa-2"
-                  v-bind="attrs"
-                  close
-                  small
-                  @click:close="parent.selectItem(item)"
-                >
-                  {{ item }}
-                </v-chip>
-              </template>
-            </v-combobox>
-          </v-col>
-        </v-row>
-        <v-row>
-          <v-col class="py-0">
-            <v-text-field
-              label="Snapshot description"
-              v-model="newDescription"
-              dense
-              hide-details
-            ></v-text-field>
-          </v-col>
-        </v-row>
-        <div class="group-label" :currentArea="markCurrentArea()">
-          Resolution and Area:
+  <v-card v-if="store.configuration">
+    <v-card-title class="headline">
+      Snapshot
+    </v-card-title>
+
+    <v-dialog v-model="imageTooBigDialog">
+      <v-alert class="ma-0" type="error">
+        <div class="title">
+          Image can't be downloaded
         </div>
-        <v-row>
-          <v-col class="py-0">
-            <v-btn
-              color="primary"
-              text
-              @click="setArea('viewport')"
-              :disabled="isRotated()"
-            >
-              Viewport
+        <div class="ma-2">
+          Image size can't exceed {{ maxPixels }} pixels.<br />
+          When downloading raw channels, subsampling is not allowed.<br />
+          Downloading layers allows subsampling image to {{ maxPixels }} pixels
+          if the image is too big.
+        </div>
+        <div class="d-flex">
+          <v-spacer />
+          <v-btn @click="imageTooBigDialog = false">OK</v-btn>
+        </div>
+      </v-alert>
+    </v-dialog>
+
+    <v-card-text>
+      <v-row justify="center">
+        <v-dialog v-model="createDialog">
+          <template v-slot:activator="{ on, attrs }">
+            <v-btn color="primary" v-on="on" v-bind="attrs">
+              Save as Snapshot...
             </v-btn>
-          </v-col>
-          <v-col class="py-0">
-            <v-btn color="primary" text @click="setArea('full')">
-              Full
-            </v-btn>
-          </v-col>
-        </v-row>
-        <v-row v-if="store.dataset">
-          <v-col class="pa-2">
-            <v-text-field
-              label="Left"
-              v-model="bboxLeft"
-              type="number"
-              :max="store.dataset.width"
-              dense
-              hide-details
-            ></v-text-field>
-          </v-col>
-          <v-col class="pa-2">
-            <v-text-field
-              label="Top"
-              v-model="bboxTop"
-              type="number"
-              :max="store.dataset.height"
-              dense
-              hide-details
-            ></v-text-field>
-          </v-col>
-          <!--
-          <v-col class="pa-2">
-            <v-text-field
-              label="Right"
-              v-model="bboxRight"
-              type="number"
-              :max="store.dataset.width"
-              dense
-              hide-details
-            ></v-text-field>
-          </v-col>
-          <v-col class="pa-2">
-            <v-text-field
-              label="Bottom"
-              v-model="bboxBottom"
-              type="number"
-              :max="store.dataset.height"
-              dense
-              hide-details
-            ></v-text-field>
-          </v-col>
-          -->
-          <v-col class="pa-2">
-            <v-text-field
-              label="Width"
-              v-model="bboxWidth"
-              type="number"
-              :max="store.dataset.width"
-              dense
-              hide-details
-            ></v-text-field>
-          </v-col>
-          <v-col class="pa-2">
-            <v-text-field
-              label="Height"
-              v-model="bboxHeight"
-              type="number"
-              :max="store.dataset.height"
-              dense
-              hide-details
-            ></v-text-field>
-          </v-col>
-        </v-row>
-      </v-card-text>
-
-      <v-divider></v-divider>
-
-      <v-card-text class="pa-0">
-        <v-data-table
-          :items="snapshotList()"
-          :headers="tableHeaders"
-          :items-per-page="5"
-          item-key="key"
-          class="accent-1"
-          @click:row="item => loadSnapshot(item.name)"
-        >
-          <!-- Search bar -->
-          <template v-slot:top>
-            <v-text-field
-              label="Search Snapshots"
-              v-model="snapshotSearch"
-              clearable
-              hide-details
-              class="ma-2"
-            />
           </template>
-          <!-- Tags -->
-          <template v-slot:item.tags="{ item }">
-            <v-chip
-              v-for="t in item.record.tags"
-              :key="'tag_' + item.name + '_' + t"
-              @click.stop="snapshotSearch = t"
-              x-small
-              >{{ t }}</v-chip
+          <v-card>
+            <v-card-title>
+              Create New Snapshot
+            </v-card-title>
+            <v-card-text
+              title="Add a name, description, or tags to create a new snapshot."
             >
-          </template>
-        </v-data-table>
-      </v-card-text>
-
-      <v-divider></v-divider>
-
-      <v-card-title class="headline">
-        Download
-      </v-card-title>
-      <v-card-text class="pb-0">
-        <v-row>
-          <v-col class="pa-2">
-            <v-text-field
-              label="Maximum resolution"
-              v-model="maxResolution"
-              type="number"
-              :max="
-                Math.min(
-                  format === 'tiled' ? 1e8 : 10000,
-                  store.dataset
-                    ? Math.max(store.dataset.width, store.dataset.height)
-                    : Infinity
-                )
-              "
-              dense
-              hide-details
-            ></v-text-field>
-          </v-col>
-          <v-col class="pa-2">
-            <v-select
-              v-model="exportLayer"
-              :items="layerList"
-              label="Layer"
-              item-text="name"
-              item-value="key"
-              dense
-              hide-details
-            ></v-select>
-          </v-col>
-          <v-col class="pa-2">
-            <v-select
-              v-model="format"
-              :items="formatList"
-              label="Format"
-              item-text="name"
-              item-value="key"
-              dense
-              hide-details
-            ></v-select>
-          </v-col>
-        </v-row>
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer></v-spacer>
+              <v-row>
+                <v-col>
+                  <v-text-field
+                    label="Snapshot name"
+                    v-model="newName"
+                    dense
+                    hide-details
+                  />
+                </v-col>
+              </v-row>
+              <v-row>
+                <v-col>
+                  <tag-picker v-model="newTags" />
+                </v-col>
+              </v-row>
+              <v-row>
+                <v-col>
+                  <v-text-field
+                    label="Snapshot description"
+                    v-model="newDescription"
+                    dense
+                    hide-details
+                  />
+                </v-col>
+              </v-row>
+            </v-card-text>
+            <v-card-actions>
+              <v-spacer />
+              <v-btn
+                color="primary"
+                :disabled="!newName.trim()"
+                @click="saveSnapshot"
+              >
+                Create
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+      </v-row>
+      <v-row :currentArea="markCurrentArea()">
+        <v-col class="title">
+          Resolution and Area:
+        </v-col>
+      </v-row>
+      <v-row v-if="store.dataset">
+        <v-col>
+          <v-text-field
+            label="Left"
+            v-model="bboxLeft"
+            type="number"
+            :max="store.dataset.width"
+            dense
+            hide-details
+          />
+        </v-col>
+        <v-col>
+          <v-text-field
+            label="Top"
+            v-model="bboxTop"
+            type="number"
+            :max="store.dataset.height"
+            dense
+            hide-details
+          />
+        </v-col>
+        <v-col>
+          <v-text-field
+            label="Width"
+            v-model="bboxWidth"
+            type="number"
+            :max="store.dataset.width"
+            dense
+            hide-details
+          />
+        </v-col>
+        <v-col>
+          <v-text-field
+            label="Height"
+            v-model="bboxHeight"
+            type="number"
+            :max="store.dataset.height"
+            dense
+            hide-details
+          />
+        </v-col>
+      </v-row>
+      <v-row justify="center">
         <v-btn
-          color="primary"
-          text
-          @click="getDownload()"
-          :disabled="isUnrolled"
+          class="my-2"
+          @click="setArea('viewport')"
+          :disabled="isRotated()"
         >
-          Download
+          Set frame to current viewport
         </v-btn>
-      </v-card-actions>
-    </div>
-  </div>
+        <v-btn class="my-2" @click="setArea('full')">
+          Set frame to maximum
+        </v-btn>
+      </v-row>
+    </v-card-text>
+
+    <v-divider />
+
+    <v-card-text>
+      <v-data-table
+        :items="snapshotList()"
+        :headers="tableHeaders"
+        :items-per-page="5"
+        item-key="key"
+        class="accent-1"
+        @click:row="item => loadSnapshot(item.name)"
+      >
+        <!-- Search bar -->
+        <template v-slot:top>
+          <v-text-field
+            label="Filter by name..."
+            v-model="snapshotSearch"
+            clearable
+            hide-details
+            class="ma-2"
+          />
+        </template>
+        <!-- Tags -->
+        <template v-slot:item.tags="{ item }">
+          <v-chip
+            v-for="t in item.record.tags"
+            :key="'tag_' + item.name + '_' + t"
+            @click.stop="snapshotSearch = t"
+            x-small
+            >{{ t }}</v-chip
+          >
+        </template>
+        <!-- Delete icon -->
+        <template v-slot:item.delete="{ item }">
+          <v-btn fab small color="red" @click.stop="removeSnapshot(item.name)">
+            <v-icon>mdi-trash-can</v-icon>
+          </v-btn>
+        </template>
+      </v-data-table>
+    </v-card-text>
+
+    <v-divider />
+
+    <v-card-title class="headline">
+      Download
+    </v-card-title>
+    <v-card-text>
+      <v-row>
+        <v-col cols="5">
+          <v-radio-group v-model="downloadMode">
+            <v-radio label="Scaled Layers" value="layers" />
+            <v-radio label="Raw channels" value="channels" />
+          </v-radio-group>
+        </v-col>
+        <v-col>
+          <v-select
+            v-if="downloadMode === 'layers'"
+            v-model="exportLayer"
+            :items="layerItems"
+            label="Layer"
+            dense
+            hide-details
+          />
+          <v-select
+            v-if="downloadMode === 'channels'"
+            v-model="exportChannel"
+            :items="channelItems"
+            label="Channel"
+            dense
+            hide-details
+          />
+        </v-col>
+      </v-row>
+      <v-row>
+        <v-col>
+          <v-select
+            v-model="format"
+            :items="formatList"
+            label="Format"
+            dense
+            hide-details
+          />
+        </v-col>
+      </v-row>
+      <v-row>
+        <v-col>
+          <v-slider
+            v-if="format === 'jpeg'"
+            label="JPEG Quality"
+            v-model="jpegQuality"
+            min="80"
+            max="95"
+            step="5"
+          >
+            <template v-slot:append>
+              <v-text-field
+                v-model="jpegQuality"
+                class="mt-0 pt-0"
+                type="number"
+                step="5"
+                style="width: 3em"
+              />
+            </template>
+          </v-slider>
+        </v-col>
+      </v-row>
+    </v-card-text>
+    <v-card-actions>
+      <v-spacer />
+      <v-btn
+        color="primary"
+        @click="getDownload()"
+        :disabled="unroll || downloading"
+      >
+        <v-progress-circular v-if="downloading" indeterminate />
+        Download Snapshot images...
+      </v-btn>
+    </v-card-actions>
+  </v-card>
 </template>
 
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
+import TagPicker from "@/components/TagPicker.vue";
 import store from "@/store";
 import geojs from "geojs";
 import { formatDate } from "@/utils/date";
 import { downloadToClient } from "@/utils/download";
+import { IDisplayLayer, IImage, ISnapshot } from "@/store/model";
+import { ITileHistogram, ITileOptionsBands, toStyle } from "@/store/images";
+import axios from "axios";
+import { DeflateOptions, Zip, ZipDeflate } from "fflate";
 
 interface ISnapshotItem {
   name: string;
@@ -280,7 +276,34 @@ interface ISnapshotItem {
   modified: string;
 }
 
-@Component
+interface IDownloadParameters {
+  encoding: string;
+  contentDisposition: string;
+  contentDispositionFilename: string;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+  jpeqQuality?: number;
+  style?: string;
+  tiffCompression?: string;
+}
+
+function copyObjectWithoutPrivateAttributes<T extends object>(
+  obj: T
+): Partial<T> {
+  const newObj: Partial<T> = { ...obj };
+  for (const key of Object.keys(newObj)) {
+    if (key.startsWith("_")) {
+      delete newObj[key as keyof T];
+    }
+  }
+  return newObj;
+}
+
+@Component({ components: { TagPicker } })
 export default class Snapshots extends Vue {
   readonly store = store;
 
@@ -305,31 +328,63 @@ export default class Snapshots extends Vue {
   }[] = [
     { text: "Name", value: "name", sortable: true, class: "text-no-wrap" },
     {
-      text: "Modified",
+      text: "Timestamp",
       value: "modified",
       sortable: true,
       sort: (a: any, b: any) => Date.parse(a) - Date.parse(b),
       class: "text-no-wrap"
     },
-    { text: "Tags", value: "tags", sortable: false, class: "text-no-wrap" }
+    { text: "Tags", value: "tags", sortable: false, class: "text-no-wrap" },
+    { text: "Delete", value: "delete", sortable: false }
   ];
 
+  jpegQuality: number | string = 95;
+
+  readonly maxPixels = 4_000_000;
+
+  downloading: boolean = false;
+
+  imageTooBigDialog: boolean = false;
+  createDialog: boolean = false;
   newName: string = "";
   newDescription: string = "";
   newTags: string[] = [];
-  tagSearchInput: string = "";
 
   snapshotSearch: string = "";
 
-  maxResolution: number | null = null;
-  bboxLeft: number | null = null;
-  bboxTop: number | null = null;
-  bboxRight: number | null = null;
-  bboxBottom: number | null = null;
+  bboxLeft: number = 0;
+  bboxTop: number = 0;
+  bboxRight: number = 0;
+  bboxBottom: number = 0;
   bboxLayer: any;
   bboxAnnotation: any;
-  exportLayer: string = "all";
+  downloadMode: "layers" | "channels" = "layers";
+  exportLayer: "all" | "composite" | number = "all";
+  exportChannel: "all" | number = "all";
   format: string = "png";
+
+  get formatList() {
+    if (this.downloadMode === "layers") {
+      return [
+        { text: "PNG", value: "png" },
+        { text: "JPEG", value: "jpeg" },
+        { text: "TIFF", value: "tiff" },
+        { text: "TIFF - Tiled (for huge images)", value: "tiled" }
+      ];
+    }
+    if (this.downloadMode === "channels") {
+      return [
+        { text: "TIFF", value: "tiff" },
+        { text: "TIFF - Tiled (for huge images)", value: "tiled" }
+      ];
+    }
+    return [{ text: "Unknown download mode", value: "" }];
+  }
+
+  @Watch("downloadMode")
+  downloadModeChanged() {
+    this.format = this.formatList[0].value;
+  }
 
   get bboxWidth(): number {
     return (this.bboxRight || 0) - (this.bboxLeft || 0);
@@ -347,20 +402,8 @@ export default class Snapshots extends Vue {
     this.bboxBottom = (this.bboxTop || 0) + parseInt("" + value, 0);
   }
 
-  get formatList(): object[] {
-    let fullList = [
-      { name: "PNG", key: "png" },
-      { name: "JPEG - Quality 95", key: "jpeg-95" },
-      { name: "JPEG - Quality 90", key: "jpeg-90" },
-      { name: "JPEG - Quality 80", key: "jpeg-80" },
-      { name: "TIFF", key: "tiff" },
-      { name: "TIFF - Tiled (for huge images)", key: "tiled" }
-    ];
-    return fullList;
-  }
-
-  get isUnrolled(): boolean {
-    return store.unrollZ || store.unrollXY || store.unrollT;
+  get unroll(): boolean {
+    return store.unroll;
   }
 
   isRotated(): boolean {
@@ -368,91 +411,290 @@ export default class Snapshots extends Vue {
     return map && !!map.rotation();
   }
 
-  get layerList(): object[] {
-    let results = [{ name: "All", key: "all" }];
+  get layerItems() {
+    const results: {
+      text: string;
+      value: string | number;
+    }[] = [
+      { text: "All layers", value: "all" },
+      { text: "Composite layers", value: "composite" }
+    ];
     if (store.configuration && store.configuration.view.layers) {
       store.configuration.view.layers.forEach((layer, idx) => {
         if (layer.visible) {
-          results.push({ name: layer.name, key: "" + idx });
+          results.push({ text: layer.name, value: idx });
         }
       });
     }
     return results;
   }
 
-  getBasicDownloadParams() {
-    let w = store.dataset!.width;
-    let h = store.dataset!.height;
+  get channelItems() {
+    const results: {
+      text: string;
+      value: string | number;
+    }[] = [{ text: "All channels", value: "all" }];
+    if (this.store.dataset) {
+      this.store.dataset.channels.forEach(channel => {
+        results.push({
+          text:
+            this.store.dataset!.channelNames.get(channel) ||
+            "Channel " + channel,
+          value: channel
+        });
+      });
+    }
+    return results;
+  }
 
+  getBasicDownloadParams() {
     // Determine fileName
     const datasetName = store.dataset?.name || "unknown";
     const configurationName = store.configuration?.name || "unknown";
     const snapshotName = this.newName ? `-${this.newName}` : "";
     const dateStr = formatDate(new Date());
-    const extension = this.format === "png" ? "png" : "jpg";
+    const extension = this.format === "tiled" ? "tiff" : this.format;
     // Should be dataset-configuration-snapshot-date
     const fileName = `${datasetName}-${configurationName}${snapshotName}-${dateStr}.${extension}`;
 
-    let params: any = {
-      encoding:
-        this.format === "png"
-          ? "PNG"
-          : this.format === "tiff"
-          ? "TIFF"
-          : this.format === "tiled"
-          ? "TILED"
-          : "JPEG",
+    let params: IDownloadParameters = {
+      encoding: this.format.toUpperCase(),
       contentDisposition: "attachment",
-      contentDispositionFilename: fileName
+      contentDispositionFilename: fileName,
+      left: this.bboxLeft,
+      top: this.bboxTop,
+      right: this.bboxRight,
+      bottom: this.bboxBottom,
+      width: 0,
+      height: 0
     };
-    if (this.format !== "png") {
-      params.jpeqQuality = parseInt(this.format.substr(5), 10);
+    if (this.format === "jpeg") {
+      if (typeof this.jpegQuality === "string") {
+        this.jpegQuality = parseInt(this.jpegQuality);
+      }
+      params.jpeqQuality = this.jpegQuality;
     }
-    params.left = this.bboxLeft;
-    params.top = this.bboxTop;
-    params.right = this.bboxRight;
-    params.bottom = this.bboxBottom;
+    if (this.format === "tiff") {
+      params.tiffCompression = "raw";
+    }
 
-    w = params.right - params.left;
-    h = params.bottom - params.top;
-    let max = Math.max(w, h);
-    if (this.format !== "tiled") {
-      Math.min(max, Math.min(this.maxResolution || 1e8, 10000));
+    params.width = params.right - params.left;
+    params.height = params.bottom - params.top;
+
+    // Maximum 4M pixels per image
+    const nPixels = params.width * params.height;
+    if (nPixels > this.maxPixels) {
+      if (this.downloadMode === "layers") {
+        // Scale the image
+        const scale = Math.sqrt(this.maxPixels / nPixels);
+        params.width = Math.floor(scale * params.width);
+        params.height = Math.floor(scale * params.height);
+      }
+      if (this.downloadMode === "channels") {
+        this.imageTooBigDialog = true;
+        return null;
+      }
     }
-    params.width = max;
-    params.height = max;
     return params;
   }
 
-  getDownload() {
-    let url = store.layerStackImages[0].urls[0]?.split("/zxy/")[0] + "/region";
-    let params = this.getBasicDownloadParams();
-    let bands: any = [];
-    store.configuration!.view.layers.forEach((layer, idx) => {
-      if (
-        layer.visible &&
-        (this.exportLayer === "all" || parseInt(this.exportLayer) === idx)
-      ) {
-        let suburl = store.layerStackImages[idx].urls[0]?.split("?")[1];
-        let q: any = {};
-        suburl?.split("&").forEach((e: string) => {
-          let pair = e.split("=");
-          q[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
-        });
-        let bandstyle = JSON.parse(q.style);
-        bandstyle.frame = parseInt(q.frame, 10);
-        bands.push(bandstyle);
+  async getDownload() {
+    this.downloading = true;
+    let urls: URL[] = [];
+    if (this.downloadMode === "layers") {
+      urls = await this.getLayerDownloadURLs();
+    }
+    if (this.downloadMode === "channels") {
+      urls = this.getChannelDownloadURLs();
+    }
+    if (urls.length <= 0) {
+      this.downloading = false;
+      throw "No urls to download";
+    } else if (urls.length === 1) {
+      downloadToClient({ href: urls[0].href });
+      this.downloading = false;
+    } else {
+      // Create and setup a zip object
+      const zip: Zip = new Zip();
+      const zipChunks: Uint8Array[] = [];
+      const zipDone: Promise<Blob> = new Promise((resolve, reject) => {
+        zip.ondata = (err, data, final) => {
+          if (!err) {
+            zipChunks.push(data);
+            if (final) {
+              resolve(new Blob(zipChunks));
+            }
+          } else {
+            reject(err);
+          }
+        };
+      });
+      // Get all the files and add them to the zip
+      const deflateOptions: DeflateOptions = {
+        level: ["jpeg", "png"].includes(this.format) ? 0 : 9
+      };
+      const filenames = new Set();
+      const filesPushed: Promise<void>[] = [];
+      for (const url of urls) {
+        // Fetch file
+        const getPromise = axios.get(url.href, { responseType: "arraybuffer" });
+        // Create a unique file name
+        const baseFullFilename =
+          url.searchParams.get("contentDispositionFilename") || "snapshot";
+        const lastPointIdx = baseFullFilename.lastIndexOf(".");
+        let baseFileName = baseFullFilename;
+        let baseExtension = "";
+        if (lastPointIdx > 0) {
+          baseFileName = baseFullFilename.slice(0, lastPointIdx);
+          baseExtension = baseFullFilename.slice(lastPointIdx);
+        }
+        let fileName = baseFileName + baseExtension;
+        let counter = 1;
+        while (filenames.has(fileName)) {
+          fileName = baseFileName + " (" + counter + ")" + baseExtension;
+          counter++;
+        }
+        filenames.add(fileName);
+        // Add file to zip
+        const zipFile = new ZipDeflate(fileName, deflateOptions);
+        zip.add(zipFile);
+        filesPushed.push(
+          getPromise.then(({ data }) =>
+            zipFile.push(new Uint8Array(data), true)
+          )
+        );
       }
+      // Wait for all files to be pushed to end the zip
+      Promise.all(filesPushed).then(zip.end.bind(zip));
+      zipDone
+        .then(blob => {
+          const dataURL = URL.createObjectURL(blob);
+          const params = {
+            href: dataURL,
+            download: "snapshot.zip"
+          };
+          downloadToClient(params);
+        })
+        .finally(() => (this.downloading = false));
+    }
+  }
+
+  getChannelDownloadURLs() {
+    const allChannels = this.store.dataset?.channels;
+    const baseUrl = this.getBaseURL();
+    if (!allChannels || !baseUrl) {
+      return [];
+    }
+    let channelsToDownload = [];
+    if (this.exportChannel === "all") {
+      channelsToDownload = allChannels;
+    } else {
+      channelsToDownload = [this.exportChannel];
+    }
+    const urls: URL[] = [];
+    for (const channel of channelsToDownload) {
+      const url = this.getChannelDownloadURL(baseUrl, channel);
+      if (url) {
+        urls.push(url);
+      }
+    }
+    return urls;
+  }
+
+  getChannelDownloadURL(baseUrl: URL, channel: number) {
+    const image = this.store.getImagesFromChannel(channel)[0];
+    if (!image) {
+      return null;
+    }
+    const url = new URL(baseUrl);
+    url.searchParams.set("frame", image.frameIndex.toString());
+    return url;
+  }
+
+  async getLayerDownloadURLs() {
+    const layers = this.store.configuration?.view.layers;
+    const baseUrl = this.getBaseURL();
+    if (!layers || !baseUrl) {
+      return [];
+    }
+
+    // Get layer bands: style and frame idx
+    const bands: ITileOptionsBands["bands"] = [];
+    const promises: Promise<any>[] = [];
+    const pushBand = bands.push.bind(bands);
+    if (this.exportLayer === "composite" || this.exportLayer === "all") {
+      layers.forEach((layer, layerIdx) => {
+        if (layer.visible || this.exportLayer === "all") {
+          promises.push(this.getBandOption(layer, layerIdx).then(pushBand));
+        }
+      });
+    } else {
+      const layerIdx = this.exportLayer;
+      const layer = layers[layerIdx];
+      if (!layer) {
+        return [];
+      }
+      promises.push(this.getBandOption(layer, layerIdx).then(pushBand));
+    }
+    await Promise.all(promises);
+
+    // Return one URL per band or a single URL with all bands
+    if (this.exportLayer === "all") {
+      const urls = [];
+      for (const band of bands) {
+        const url = new URL(baseUrl);
+        const style = JSON.stringify({ bands: [band] });
+        url.searchParams.set("style", style);
+        urls.push(url);
+      }
+      return urls;
+    } else {
+      const url = new URL(baseUrl);
+      const style = JSON.stringify({ bands });
+      url.searchParams.set("style", style);
+      return [url];
+    }
+  }
+
+  // Returns the style of the layer combined with the frame idx
+  getBandOption(layer: IDisplayLayer, layerIdx: number) {
+    const image = this.store.getImagesFromLayer(layerIdx)[0];
+    const histogramPromise = this.store.getLayerHistogram(layer);
+    const bandPromise = histogramPromise.then(histogram => {
+      const style = this.getLayerStyle(layer, histogram, image);
+      return { ...style, frame: image.frameIndex };
     });
-    params.style = JSON.stringify({ bands: bands });
-    let queryParts: string[] = Object.entries(params).map(
-      e => encodeURIComponent(e[0]) + "=" + encodeURIComponent("" + e[1])
+    return bandPromise;
+  }
+
+  getBaseURL() {
+    const anyImage: IImage | undefined = this.store.getImagesFromChannel(0)[0];
+    const params = this.getBasicDownloadParams();
+    if (!anyImage || !params) {
+      return null;
+    }
+    const itemId = anyImage.item._id;
+    const apiRoot = this.store.api.client.apiRoot;
+    const baseUrl = new URL(`${apiRoot}/item/${itemId}/tiles/region`);
+    for (const [key, value] of Object.entries(params)) {
+      baseUrl.searchParams.set(key, value);
+    }
+    return baseUrl;
+  }
+
+  getLayerStyle(
+    layer: IDisplayLayer,
+    histogram: ITileHistogram | null,
+    image: IImage | null
+  ) {
+    return toStyle(
+      layer.color,
+      layer.contrast,
+      histogram,
+      layer,
+      this.store.dataset,
+      image
     );
-    url += "?" + queryParts.join("&");
-    downloadToClient({
-      href: url,
-      download: "screenshot." + (this.format === "png" ? "png" : "jpg")
-    });
   }
 
   setBoundingBox(left: number, top: number, right: number, bottom: number) {
@@ -472,6 +714,12 @@ export default class Snapshots extends Vue {
 
   showSnapshot(show: boolean) {
     const map = Vue.prototype.$currentMap;
+    if (this.bboxHeight <= 0 && this.bboxWidth <= 0) {
+      this.bboxLeft = 0;
+      this.bboxTop = 0;
+      this.bboxRight = store.dataset?.width || 0;
+      this.bboxBottom = store.dataset?.height || 0;
+    }
     if (show && map) {
       const bounds = map.bounds();
       if (this.bboxLeft === null) {
@@ -534,23 +782,20 @@ export default class Snapshots extends Vue {
 
   markCurrentArea() {
     // this updates the shown screenshot area
-    let w = store.dataset!.width;
-    let h = store.dataset!.height;
-    let params = this.getBasicDownloadParams();
+    const w = store.dataset!.width;
+    const h = store.dataset!.height;
     let coordinates = [
       { x: 0, y: 0 },
       { x: w, y: 0 },
       { x: w, y: h },
       { x: 0, y: h }
     ];
-    if (params.left !== undefined) {
-      coordinates = [
-        { x: params.left, y: params.top },
-        { x: params.right, y: params.top },
-        { x: params.right, y: params.bottom },
-        { x: params.left, y: params.bottom }
-      ];
-    }
+    coordinates = [
+      { x: this.bboxLeft, y: this.bboxTop },
+      { x: this.bboxRight, y: this.bboxTop },
+      { x: this.bboxRight, y: this.bboxBottom },
+      { x: this.bboxLeft, y: this.bboxBottom }
+    ];
     if (this.bboxLayer && this.bboxAnnotation) {
       this.bboxLayer.visible(true);
       const map = Vue.prototype.$currentMap;
@@ -618,10 +863,10 @@ export default class Snapshots extends Vue {
   }
 
   snapshotList(sortMode?: string) {
-    let sre = new RegExp(this.snapshotSearch || "", "i");
-    let results: ISnapshotItem[] = [];
+    const sre = new RegExp(this.snapshotSearch || "", "i");
+    const results: ISnapshotItem[] = [];
     if (store.configuration && store.configuration.snapshots) {
-      let snapshots = store.configuration.snapshots.slice();
+      const snapshots = store.configuration.snapshots.slice();
       if (!sortMode) {
         snapshots.sort(
           (a, b) => (b.modified || b.created) - (a.modified || a.created)
@@ -646,21 +891,11 @@ export default class Snapshots extends Vue {
     return results;
   }
 
-  tagList(): string[] {
-    const tagSet: { [key: string]: any } = {};
-    if (store.configuration && store.configuration.snapshots) {
-      store.configuration.snapshots.forEach(s => {
-        (s.tags || []).forEach((tag: string) => {
-          tagSet[tag] = true;
-        });
-      });
-    }
-    let tags = Object.keys(tagSet).sort();
-    return tags;
-  }
-
   async loadSnapshot(name: string) {
-    var snapshot = await this.store.loadSnapshot(name);
+    const snapshot = await this.store.loadSnapshot(name);
+    if (!snapshot) {
+      return;
+    }
     this.newName = snapshot.name || "";
     this.newDescription = snapshot.description || "";
     this.newTags = (snapshot.tags || []).slice();
@@ -669,18 +904,17 @@ export default class Snapshots extends Vue {
     this.bboxTop = snapshot.screenshot!.bbox!.top;
     this.bboxRight = snapshot.screenshot!.bbox!.right;
     this.bboxBottom = snapshot.screenshot!.bbox!.bottom;
-    this.maxResolution = snapshot.screenshot!.maxResolution;
 
     this.$router
       .replace({
         query: {
           ...this.$route.query,
-          unrollXY: snapshot.unrollXY,
-          unrollZ: snapshot.unrollZ,
-          unrollT: snapshot.unrollT,
-          xy: snapshot.xy,
-          z: snapshot.z,
-          time: snapshot.time,
+          unrollXY: snapshot.unrollXY.toString(),
+          unrollZ: snapshot.unrollZ.toString(),
+          unrollT: snapshot.unrollT.toString(),
+          xy: snapshot.xy.toString(),
+          z: snapshot.z.toString(),
+          time: snapshot.time.toString(),
           layer: snapshot.layerMode
         }
       })
@@ -722,8 +956,7 @@ export default class Snapshots extends Vue {
       return;
     }
     const map = Vue.prototype.$currentMap;
-    let params = this.getBasicDownloadParams();
-    let snapshot = {
+    const snapshot: ISnapshot = {
       name: this.newName.trim(),
       description: this.newDescription.trim(),
       tags: this.newTags.slice(),
@@ -743,11 +976,9 @@ export default class Snapshots extends Vue {
       z: store.z,
       time: store.time,
       layerMode: store.layerMode,
-      layers: store.configuration!.view.layers.map(l =>
-        Object.fromEntries(
-          Object.entries(l).filter(([k]) => !k.startsWith("_"))
-        )
-      ),
+      layers: store.configuration!.view.layers.map(
+        copyObjectWithoutPrivateAttributes
+      ) as IDisplayLayer[],
       screenshot: {
         format: this.format,
         bbox: {
@@ -755,15 +986,22 @@ export default class Snapshots extends Vue {
           top: this.bboxTop,
           right: this.bboxRight,
           bottom: this.bboxBottom
-        },
-        maxResolution: this.maxResolution
+        }
       }
     };
+    this.reset();
     this.store.addSnapshot(snapshot);
   }
 
-  removeSnapshot(): void {
-    this.store.removeSnapshot(this.newName);
+  reset() {
+    this.createDialog = false;
+    this.newName = "";
+    this.newDescription = "";
+    this.newTags = [];
+  }
+
+  removeSnapshot(name: string): void {
+    this.store.removeSnapshot(name);
   }
 
   get currentSnapshot(): { [key: string]: any } | undefined {
@@ -774,30 +1012,5 @@ export default class Snapshots extends Vue {
     }
     return;
   }
-
-  get modifiedDate(): number {
-    const snapshot = this.currentSnapshot;
-    if (snapshot) {
-      return snapshot.modified || snapshot.created;
-    }
-    return 0;
-  }
 }
 </script>
-
-<style lang="scss" scoped>
-.snapshots {
-  margin-right: 1em;
-
-  &.dark {
-    color: white;
-  }
-
-  .group_label {
-    margin-right: 1em;
-  }
-}
-#modified-date {
-  font-size: 10px;
-}
-</style>

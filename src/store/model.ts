@@ -113,6 +113,40 @@ export interface IToolSet {
   toolIds: string[];
 }
 
+export type TLayerMode = "single" | "multiple" | "unroll";
+
+export interface ISnapshot {
+  name: string;
+  description: string;
+  tags: string[];
+  created: any;
+  modified: number;
+  viewport: {
+    tl: any;
+    tr: any;
+    bl: any;
+    br: any;
+  };
+  rotation: any;
+  unrollXY: boolean;
+  unrollZ: boolean;
+  unrollT: boolean;
+  xy: number;
+  z: number;
+  time: number;
+  layerMode: TLayerMode;
+  layers: IDisplayLayer[];
+  screenshot: {
+    format: string;
+    bbox: {
+      left: number;
+      top: number;
+      right: number;
+      bottom: number;
+    };
+  };
+}
+
 export interface IDatasetConfiguration {
   readonly id: string;
   readonly _girder: IGirderItem;
@@ -123,7 +157,7 @@ export interface IDatasetConfiguration {
   view: IViewConfiguration;
   toolset: IToolSet;
 
-  snapshots?: any[];
+  snapshots?: ISnapshot[];
 }
 
 export declare type DisplaySliceType =

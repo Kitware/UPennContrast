@@ -130,7 +130,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   get unrolling() {
-    return this.store.unrollXY || this.store.unrollZ || this.store.unrollT;
+    return this.store.unroll;
   }
 
   get xy() {

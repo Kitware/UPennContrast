@@ -3,6 +3,7 @@
 </template>
 <script lang="ts">
 import store from "@/store";
+import { TLayerMode } from "@/store/model";
 import routeMapper from "@/utils/routeMapper";
 
 export default routeMapper(
@@ -47,7 +48,7 @@ export default routeMapper(
     layer: {
       parse: v => v,
       get: () => store.layerMode,
-      set: (value: string) =>
+      set: (value: TLayerMode) =>
         store.setLayerMode(
           ["single", "multiple", "unroll"].indexOf(value) >= 0
             ? value
