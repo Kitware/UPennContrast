@@ -1,6 +1,12 @@
 <template>
   <!-- channel -->
-  <v-select :items="channelItems" dense v-model="channel" :label="label" />
+  <v-select
+    v-bind="$attrs"
+    :items="channelItems"
+    dense
+    v-model="channel"
+    :label="label"
+  />
 </template>
 
 <script lang="ts">

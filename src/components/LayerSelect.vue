@@ -1,6 +1,7 @@
 <template>
   <!-- layer -->
   <v-select
+    v-bind="$attrs"
     :items="layerItems"
     item-text="label"
     dense

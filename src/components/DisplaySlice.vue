@@ -55,7 +55,7 @@
 
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
-import { IDisplaySlice, DisplaySliceType } from "../store/model";
+import { IDisplaySlice, TDisplaySliceType } from "../store/model";
 import store from "@/store";
 
 @Component
@@ -87,7 +87,7 @@ export default class DisplaySlice extends Vue {
     return this.label;
   }
 
-  changeSlice(type: DisplaySliceType, value: string | number | null) {
+  changeSlice(type: TDisplaySliceType, value: string | number | null) {
     const inputValue =
       typeof value === "string" ? parseInt(value, 10) : value || 0;
 

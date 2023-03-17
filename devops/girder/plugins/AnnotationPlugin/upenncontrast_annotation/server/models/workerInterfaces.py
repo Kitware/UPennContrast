@@ -1,7 +1,7 @@
 from girder.models.model_base import AccessControlledModel
 from girder.exceptions import ValidationException
 from girder.constants import AccessType
-from ..helpers.tasks import runComputeJob
+from ..helpers.tasks import runJobRequest
 
 import jsonschema
 
@@ -71,4 +71,4 @@ class WorkerInterfaceModel(AccessControlledModel):
         return self.findOne(query)
 
     def requestWorkerUpdate(self, image):
-        return runComputeJob(image, None, {'request': 'interface', 'image': image})
+        return runJobRequest(image, None, { 'image': image }, 'interface')

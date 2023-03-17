@@ -143,8 +143,8 @@ export default class ToolCreation extends Vue {
       tool.values = this.toolValues;
       tool.type = this.selectedTemplate.type;
       tool.hotkey = this.hotkey;
-      if (tool.type === "segmentation") {
-        const { image } = tool.values.image;
+      const image = tool.values?.image?.image;
+      if (image) {
         this.propertyStore.requestWorkerInterface(image);
       }
 

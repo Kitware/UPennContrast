@@ -52,16 +52,5 @@ export default class PropertyWorkerMenu extends Vue {
       ? this.propertyStore.getWorkerInterface(this.image) || {}
       : {};
   }
-
-  mounted() {
-    this.updateInterface();
-  }
-
-  @Watch("image")
-  updateInterface() {
-    if (this.image !== null) {
-      this.propertyStore.fetchWorkerInterface(this.image);
-    }
-  }
 }
 </script>
