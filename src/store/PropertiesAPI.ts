@@ -68,7 +68,8 @@ export default class PropertiesAPI {
     const pages = await fetchAllPages(
       this.client,
       "annotation_property_values",
-      datasetId
+      datasetId,
+      100000
     );
     for (const page of pages) {
       for (const { annotationId, values } of page) {

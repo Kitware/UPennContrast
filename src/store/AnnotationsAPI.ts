@@ -71,7 +71,12 @@ export default class AnnotationsAPI {
 
   async getAnnotationsForDatasetId(id: string): Promise<IAnnotation[]> {
     const annotations: IAnnotation[] = [];
-    const pages = await fetchAllPages(this.client, "upenn_annotation", id);
+    const pages = await fetchAllPages(
+      this.client,
+      "upenn_annotation",
+      id,
+      100000
+    );
     for (const page of pages) {
       const newAnnotations = page.map(this.toAnnotation);
       annotations.push(...newAnnotations);
@@ -154,7 +159,12 @@ export default class AnnotationsAPI {
     id: string
   ): Promise<IAnnotationConnection[]> {
     const connections: IAnnotationConnection[] = [];
-    const pages = await fetchAllPages(this.client, "annotation_connection", id);
+    const pages = await fetchAllPages(
+      this.client,
+      "annotation_connection",
+      id,
+      100000
+    );
     for (const page of pages) {
       const newConnections = page.map(this.toConnection);
       connections.push(...newConnections);
