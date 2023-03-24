@@ -28,8 +28,12 @@ export function getAnnotationStyleFromLayer(
   };
 
   if (layerColor) {
+    const geoColor = { ...geojs.util.convertColor(layerColor) };
+    geoColor.r *= 0.75;
+    geoColor.g *= 0.75;
+    geoColor.b *= 0.75;
     style.fillColor = layerColor;
-    style.strokeColor = layerColor;
+    style.strokeColor = geoColor;
   }
   if (isSelected) {
     style.strokeWidth = 5;
