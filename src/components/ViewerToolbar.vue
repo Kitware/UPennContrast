@@ -93,6 +93,7 @@ import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
 import Toolset from "@/tools/toolsets/Toolset.vue";
 import store from "@/store";
+import { TLayerMode } from "@/store/model";
 
 @Component({
   components: {
@@ -204,7 +205,7 @@ export default class ViewerToolbar extends Vue {
     return this.store.dataset ? this.store.dataset.time.length - 1 : this.time;
   }
 
-  set layerMode(value: "multiple" | "single" | "unroll") {
+  set layerMode(value: TLayerMode) {
     if (value !== this.layerMode) {
       this.changeQuery("layer", value);
     }

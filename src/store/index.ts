@@ -26,7 +26,9 @@ import {
   newLayer,
   AnnotationSelectionTypes,
   ILayerStackImage,
-  IDisplaySlice
+  IDisplaySlice,
+  TLayerMode,
+  ISnapshot
 } from "./model";
 
 import persister from "./Persister";
@@ -64,7 +66,7 @@ export class Main extends VuexModule {
   xy: number = 0;
   z: number = 0;
   time: number = 0;
-  layerMode: "single" | "multiple" | "unroll" = "multiple";
+  layerMode: TLayerMode = "multiple";
 
   drawAnnotations: boolean = true;
   filteredDraw: boolean = false;
@@ -85,6 +87,10 @@ export class Main extends VuexModule {
 
   isAnnotationPanelOpen: boolean = false;
   annotationPanelBadge: boolean = false;
+
+  get unroll() {
+    return this.unrollXY || this.unrollZ || this.unrollT;
+  }
 
   get userName() {
     return this.girderUser ? this.girderUser.login : "anonymous";
@@ -647,7 +653,7 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  private setLayerModeImpl(mode: "multiple" | "single" | "unroll") {
+  private setLayerModeImpl(mode: TLayerMode) {
     this.layerMode = mode;
   }
 
@@ -671,7 +677,7 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async setLayerMode(mode: "multiple" | "single" | "unroll") {
+  async setLayerMode(mode: TLayerMode) {
     this.setLayerModeImpl(mode);
 
     if (mode === "single") {
@@ -773,6 +779,39 @@ export class Main extends VuexModule {
   async removeLayer(index: number) {
     this.removeLayerImpl(index);
     await this.syncConfiguration();
+  }
+
+  get getImagesFromChannel() {
+    return (channel: number) => {
+      if (!this.dataset) {
+        return [];
+      }
+      return this.dataset.images(this.z, this.time, this.xy, channel);
+    };
+  }
+
+  get getImagesFromLayer() {
+    return (layerIdx: number) => {
+      if (!this.dataset) {
+        return [];
+      }
+      const layer = this.configuration?.view.layers[layerIdx];
+      if (!layer) {
+        return [];
+      }
+      const indexes = this.layerSliceIndexes(layer);
+      if (!indexes) {
+        return [];
+      }
+      return (
+        this.dataset.images(
+          indexes.zIndex,
+          indexes.tIndex,
+          indexes.xyIndex,
+          layer.channel
+        ) || []
+      );
+    };
   }
 
   get getFullLayerImages() {
@@ -1029,7 +1068,7 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async addSnapshot(snapshot: { [key: string]: any }) {
+  async addSnapshot(snapshot: ISnapshot) {
     if (!this.configuration) {
       return;
     }
@@ -1065,25 +1104,16 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async loadSnapshot(name: string) {
+  async loadSnapshot(name: string): Promise<ISnapshot | undefined> {
     if (!this.configuration || !this.dataset) {
-      return {};
+      return;
     }
-    let snapshots = (this.configuration.snapshots || []).filter(
-      d => d.name == name
-    );
-    if (!snapshots.length) {
-      return {};
+    const snapshot = this.configuration.snapshots?.find(d => d.name == name);
+    if (!snapshot) {
+      return;
     }
-    let snapshot = snapshots[0];
-    while (this.configuration.view.layers.length) {
-      this.removeLayerImpl(0);
-    }
-    snapshot.layers.forEach((sslayer: { [key: string]: any }) => {
-      var layer = newLayer(this.dataset!, this.configuration!.view.layers!);
-      Object.assign(layer, sslayer);
-      this.pushLayer(layer);
-    });
+    this.configuration.view.layers = [];
+    snapshot.layers.forEach(this.pushLayer);
     this.loadSnapshotImpl(snapshot);
     await this.syncConfiguration();
     // note that this doesn't set viewport, snapshot name, description, tags,
