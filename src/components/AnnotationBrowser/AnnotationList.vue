@@ -54,6 +54,7 @@
         item-key="id"
         show-select
         :options.sync="tableOptions"
+        ref="dataTable"
       >
         <template v-slot:body="{ items }">
           <tbody>
@@ -301,6 +302,46 @@ export default class AnnotationList extends Vue {
     return this.tableOptions.itemsPerPage;
   }
 
+  get vDataTable() {
+    const vDataTableParent = this.$refs.dataTable as any;
+    if (!vDataTableParent) {
+      return null;
+    }
+    return vDataTableParent.$children?.[0] || null;
+  }
+
+  get dataTableItems() {
+    const vDataTable = this.vDataTable;
+    if (!vDataTable) {
+      return [];
+    }
+    let tableItems = vDataTable.filteredItems.slice();
+    if (
+      (!vDataTable.disableSort || this.tableOptions.groupBy?.length) &&
+      vDataTable.serverItemsLength <= 0
+    ) {
+      tableItems = vDataTable.sortItems(tableItems);
+    }
+    return tableItems;
+  }
+
+  get getPageFromItemId() {
+    return (itemId: string) => {
+      const entryIndex = this.dataTableItems.findIndex(
+        ({ id }: any) => id === itemId
+      );
+      if (entryIndex <= 0) {
+        return 0;
+      }
+      const itemsPerPage = this.itemsPerPage;
+      if (itemsPerPage <= 0) {
+        return 0;
+      } else {
+        return (Math.floor(entryIndex / itemsPerPage) || 0) + 1;
+      }
+    };
+  }
+
   @Watch("hoveredId")
   @Watch("itemsPerPage")
   hoveredAnnotationChanged() {
@@ -308,13 +349,7 @@ export default class AnnotationList extends Vue {
       return;
     }
     // Change page
-    const entryIndex = this.filteredAnnotationIdToIdx.get(this.hoveredId);
-    if (entryIndex === undefined) {
-      this.annotationFilteredDialog = true;
-      return;
-    }
-    this.tableOptions.page =
-      Math.floor(entryIndex / this.itemsPerPage) + 1 || 1;
+    this.tableOptions.page = this.getPageFromItemId(this.hoveredId);
     // Get the tr element from the refs if it exists
     let annotationRef = this.$refs[this.hoveredId];
     if (annotationRef === undefined) {

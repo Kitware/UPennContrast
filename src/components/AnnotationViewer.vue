@@ -1203,7 +1203,6 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-  @Watch("displayableAnnotations")
   @Watch("displayedAnnotations")
   @Watch("annotationConnections")
   @Watch("xy")
