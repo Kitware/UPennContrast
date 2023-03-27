@@ -254,6 +254,14 @@
         Download Snapshot images...
       </v-btn>
     </v-card-actions>
+
+    <v-divider />
+
+    <div class="d-flex pa-4 justify-center">
+      <v-btn color="primary" @click="screenshotViewport()">
+        Download Screenshot of Current Viewport
+      </v-btn>
+    </div>
   </v-card>
 </template>
 
@@ -264,7 +272,13 @@ import store from "@/store";
 import geojs from "geojs";
 import { formatDate } from "@/utils/date";
 import { downloadToClient } from "@/utils/download";
-import { IDisplayLayer, IImage, ISnapshot } from "@/store/model";
+import {
+  IDisplayLayer,
+  IGeoJSAnnotation,
+  IGeoJSLayer,
+  IImage,
+  ISnapshot
+} from "@/store/model";
 import { ITileHistogram, ITileOptionsBands, toStyle } from "@/store/images";
 import axios from "axios";
 import { DeflateOptions, Zip, ZipDeflate } from "fflate";
@@ -356,8 +370,8 @@ export default class Snapshots extends Vue {
   bboxTop: number = 0;
   bboxRight: number = 0;
   bboxBottom: number = 0;
-  bboxLayer: any;
-  bboxAnnotation: any;
+  bboxLayer: IGeoJSLayer | null = null;
+  bboxAnnotation: IGeoJSAnnotation | null = null;
   downloadMode: "layers" | "channels" = "layers";
   exportLayer: "all" | "composite" | number = "all";
   exportChannel: "all" | number = "all";
@@ -496,6 +510,24 @@ export default class Snapshots extends Vue {
       }
     }
     return params;
+  }
+
+  async screenshotViewport() {
+    const map = Vue.prototype.$currentMap;
+    const layers = map
+      .layers()
+      .filter(
+        (layer: any) =>
+          layer !== this.bboxLayer &&
+          layer.node().css("visibility") !== "hidden"
+      );
+    map.screenshot(layers).then((image: string) => {
+      const params = {
+        href: image,
+        download: "viewport_screenshot.png"
+      };
+      downloadToClient(params);
+    });
   }
 
   async getDownload() {
@@ -742,7 +774,7 @@ export default class Snapshots extends Vue {
       if (!this.bboxLayer) {
         this.bboxLayer = map.createLayer("annotation", {
           autoshareRenderer: false
-        });
+        }) as IGeoJSLayer;
         this.bboxAnnotation = geojs.annotation.rectangleAnnotation({
           layer: this.bboxLayer,
           corners: [
@@ -765,7 +797,7 @@ export default class Snapshots extends Vue {
             strokeColor: { r: 1, g: 0, b: 0 },
             strokeWidth: 2
           }
-        });
+        }) as IGeoJSAnnotation;
         this.bboxLayer.addAnnotation(this.bboxAnnotation);
         map.draw();
       }
@@ -825,8 +857,11 @@ export default class Snapshots extends Vue {
   }
 
   drawBoundingBox() {
-    this.bboxLayer.mode(null);
-    this.bboxLayer.mode(this.bboxLayer.modes.edit, this.bboxAnnotation).draw();
+    if (this.bboxLayer && this.bboxAnnotation) {
+      this.bboxLayer.mode(null);
+      this.bboxLayer.mode(this.bboxLayer.modes.edit, this.bboxAnnotation);
+      this.bboxLayer.draw();
+    }
     const map = Vue.prototype.$currentMap;
     map.geoOff(geojs.event.annotation.mode, this.doneBoundingBox);
     map.geoOff(geojs.event.annotation.coordinates, this.boundingBoxCoordinates);
@@ -837,26 +872,33 @@ export default class Snapshots extends Vue {
 
   boundingBoxCoordinates(event: { [key: string]: any }) {
     const coord = event.annotation!.coordinates();
-    this.setBoundingBox(
-      Math.min(coord[0].x, coord[2].x),
-      Math.min(coord[0].y, coord[2].y),
-      Math.max(coord[0].x, coord[2].x),
-      Math.max(coord[0].y, coord[2].y)
-    );
+    if (event.annotation === this.bboxAnnotation && coord.length === 4) {
+      this.setBoundingBox(
+        Math.min(coord[0].x, coord[2].x),
+        Math.min(coord[0].y, coord[2].y),
+        Math.max(coord[0].x, coord[2].x),
+        Math.max(coord[0].y, coord[2].y)
+      );
+    }
   }
 
   doneBoundingBox(allDone: boolean) {
     const map = Vue.prototype.$currentMap;
     map.geoOff(geojs.event.annotation.mode, this.doneBoundingBox);
     map.geoOff(geojs.event.annotation.coordinates, this.boundingBoxCoordinates);
-    const coord = this.bboxAnnotation.coordinates();
-    this.setBoundingBox(
-      Math.min(coord[0].x, coord[2].x),
-      Math.min(coord[0].y, coord[2].y),
-      Math.max(coord[0].x, coord[2].x),
-      Math.max(coord[0].y, coord[2].y)
-    );
-    this.bboxLayer.mode(null).draw();
+    const coord = this.bboxAnnotation?.coordinates();
+    if (coord && coord.length === 4) {
+      this.setBoundingBox(
+        Math.min(coord[0].x, coord[2].x),
+        Math.min(coord[0].y, coord[2].y),
+        Math.max(coord[0].x, coord[2].x),
+        Math.max(coord[0].y, coord[2].y)
+      );
+    }
+    if (this.bboxLayer) {
+      this.bboxLayer.mode(null);
+      this.bboxLayer.draw();
+    }
     if (allDone !== true) {
       this.drawBoundingBox();
     }

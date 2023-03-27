@@ -192,9 +192,25 @@ export interface IDisplayLayer {
   };
 }
 
+export interface IGeoJSLayer {
+  addAnnotation: (annotation: IGeoJSAnnotation) => IGeoJSLayer;
+  visible: (value?: boolean) => boolean | IGeoJSLayer;
+  draw: () => IGeoJSLayer;
+  mode: (
+    arg?: string | null,
+    editAnnotation?: IGeoJSAnnotation
+  ) => string | null | IGeoJSLayer;
+  modes: {
+    edit: "edit";
+    cursor: "cursor";
+  };
+  currentAnnotation: null | IGeoJSAnnotation;
+}
+
 export interface IGeoJSAnnotation {
   options: (key?: string, value?: any) => any;
   style: (value?: { [key: string]: any }) => any;
+  coordinates: () => IGeoJSPoint[];
 }
 
 export interface IGeoJSPoint {
