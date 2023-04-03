@@ -433,8 +433,8 @@ export default class Snapshots extends Vue {
       { text: "All layers", value: "all" },
       { text: "Composite layers", value: "composite" }
     ];
-    if (store.configuration && store.configuration.view.layers) {
-      store.configuration.view.layers.forEach((layer, idx) => {
+    if (store.configuration && store.configuration.layers) {
+      store.configuration.layers.forEach((layer, idx) => {
         if (layer.visible) {
           results.push({ text: layer.name, value: idx });
         }
@@ -644,7 +644,7 @@ export default class Snapshots extends Vue {
   }
 
   async getLayerDownloadURLs() {
-    const layers = this.store.configuration?.view.layers;
+    const layers = this.store.configuration?.layers;
     const baseUrl = this.getBaseURL();
     if (!layers || !baseUrl) {
       return [];
@@ -1018,7 +1018,7 @@ export default class Snapshots extends Vue {
       z: store.z,
       time: store.time,
       layerMode: store.layerMode,
-      layers: store.configuration!.view.layers.map(
+      layers: store.configuration!.layers.map(
         copyObjectWithoutPrivateAttributes
       ) as IDisplayLayer[],
       screenshot: {

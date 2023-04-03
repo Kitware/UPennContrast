@@ -48,7 +48,7 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
-import { IDisplayLayer, IDisplaySlice } from "@/store/model";
+import { IDisplaySlice } from "@/store/model";
 
 @Component
 export default class ConfigurationInfo extends Vue {
@@ -65,10 +65,7 @@ export default class ConfigurationInfo extends Vue {
   }
 
   get layers() {
-    if (!this.store.configuration) {
-      return [];
-    }
-    return this.store.configuration.view.layers;
+    return this.store.configuration?.layers || [];
   }
 
   get view() {

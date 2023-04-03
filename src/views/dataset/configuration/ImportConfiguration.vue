@@ -112,8 +112,7 @@ export default class ImportConfiguration extends Vue {
       return;
     }
 
-    const view: IViewConfiguration = { layers: configToCopy.view.layers };
-    config.view = view;
+    config.layers = configToCopy.layers;
 
     await store.api.updateConfiguration(config);
 

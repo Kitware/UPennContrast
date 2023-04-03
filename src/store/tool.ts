@@ -62,20 +62,17 @@ export class Tools extends VuexModule {
   }
 
   @Mutation
-  public addToolIdsToCurrentToolset({ ids }: { ids: string[] }) {
-    if (main.configuration?.toolset) {
-      main.configuration.toolset.toolIds = [
-        ...main.configuration?.toolset.toolIds,
-        ...ids
-      ];
+  public addToolsToCurrentToolset({ tools }: { tools: IToolConfiguration[] }) {
+    if (main.configuration?.tools) {
+      main.configuration.tools = [...main.configuration?.tools, ...tools];
     }
   }
 
   @Mutation
   public removeToolIdFromCurrentToolset({ id }: { id: string }) {
-    if (main.configuration?.toolset) {
-      main.configuration.toolset.toolIds = main.configuration.toolset.toolIds.filter(
-        idToFilter => id !== idToFilter
+    if (main.configuration?.tools) {
+      main.configuration.tools = main.configuration.tools.filter(
+        tools => id !== tools.id
       );
     }
   }
@@ -149,30 +146,6 @@ export class Tools extends VuexModule {
       sync.setSaving(error);
     }
     return null;
-  }
-
-  // We don't need to fetch all tools unless the user wants to add new ones
-  // This only fetches the tools in the current toolset
-  @Action
-  async refreshToolsInCurrentToolset() {
-    if (main.configuration?.toolset) {
-      main.configuration.toolset.toolIds.forEach(toolId => {
-        main.api
-          .getTool(toolId)
-          .then(tool => {
-            this.addTools({ tools: [tool] });
-          })
-          .catch(e => {
-            if (main.configuration?.toolset.toolIds) {
-              main.configuration.toolset.toolIds = main.configuration.toolset.toolIds.filter(
-                id => id !== toolId
-              );
-
-              logWarning(`Could not fetch tool: ${e.message}`);
-            }
-          });
-      });
-    }
   }
 }
 

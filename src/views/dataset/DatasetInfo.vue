@@ -126,8 +126,6 @@ import store from "@/store";
 import {
   IDatasetConfiguration,
   IDisplayLayer,
-  IToolSet,
-  IViewConfiguration,
   newLayer
 } from "../../store/model";
 import { formatDate } from "@/utils/date";
@@ -266,8 +264,7 @@ export default class DatasetInfo extends Vue {
       return;
     }
 
-    const view: IViewConfiguration = { layers: c.view.layers };
-    config.view = view;
+    config.layers = c.layers;
 
     await store.api.updateConfiguration(config);
 
@@ -306,11 +303,8 @@ export default class DatasetInfo extends Vue {
         Vue.set(layers, idx, newLayer(dataset, layers))
       );
 
-      const view: IViewConfiguration = { layers };
-      config.view = view;
-
-      const toolset: IToolSet = { name: "Default toolset", toolIds: [] };
-      config.toolset = toolset;
+      config.layers = layers;
+      config.tools = [];
       await store.api.updateConfiguration(config);
 
       this.configuration = [config!];

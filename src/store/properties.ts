@@ -179,7 +179,7 @@ export class Properties extends VuexModule {
     property: IAnnotationProperty;
     callback: (success: boolean) => void;
   }) {
-    if (!main.dataset?.id || !main.configuration?.view?.layers) {
+    if (!main.dataset?.id || !main.configuration?.layers) {
       return;
     }
 

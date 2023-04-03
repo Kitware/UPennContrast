@@ -29,7 +29,7 @@
       </v-expansion-panel-header>
       <v-expansion-panel-content>
         <!-- List toolset tools -->
-        <v-list v-if="toolset && toolset.toolIds && toolsetTools.length" dense>
+        <v-list v-if="toolsetTools.length" dense>
           <v-list-item-group v-model="selectedToolId">
             <draggable>
               <template v-for="(tool, index) in toolsetTools">
@@ -101,9 +101,7 @@
             "
           />
         </v-list>
-        <v-subheader
-          v-if="!toolset || !toolset.toolIds || !toolsetTools.length"
-        >
+        <v-subheader v-if="!toolsetTools.length">
           No tools in the current toolset.
         </v-subheader>
       </v-expansion-panel-content>
@@ -150,18 +148,12 @@ export default class Toolset extends Vue {
     this.toolsStore.setSelectedToolId(id);
   }
 
-  get toolset() {
-    return this.store.configuration?.toolset;
-  }
-
   get tools() {
     return this.toolsStore.tools;
   }
 
   get toolsetTools() {
-    return (
-      this.toolset?.toolIds.map(this.getToolById).filter(tool => !!tool) || []
-    );
+    return this.configuration?.tools || [];
   }
 
   get configuration() {
@@ -211,7 +203,7 @@ export default class Toolset extends Vue {
       ) {
         propDesc.push(["Connect to tags", values.connectTo.tags.join(", ")]);
         const layerIdx = values.connectTo.layer;
-        const layers = this.store.configuration?.view.layers;
+        const layers = this.store.configuration?.layers;
         if (layers && typeof values.connectTo.layer === "number") {
           propDesc.push(["Connect only on layer", layers[layerIdx].name]);
         }
@@ -227,15 +219,6 @@ export default class Toolset extends Vue {
     }
     this.toolsStore.removeToolIdFromCurrentToolset({ id: toolId });
     this.store.syncConfiguration();
-  }
-
-  mounted() {
-    this.toolsStore.refreshToolsInCurrentToolset();
-  }
-
-  @Watch("configuration")
-  toolsetChanged() {
-    this.toolsStore.refreshToolsInCurrentToolset();
   }
 }
 </script>

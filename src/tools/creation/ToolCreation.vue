@@ -154,7 +154,7 @@ export default class ToolCreation extends Vue {
       });
 
       // Add this tool to the current toolset
-      this.toolsStore.addToolIdsToCurrentToolset({ ids: [tool.id] });
+      this.toolsStore.addToolsToCurrentToolset({ tools: [tool] });
 
       // Save
       this.store.syncConfiguration();
@@ -187,7 +187,7 @@ export default class ToolCreation extends Vue {
       toolNameStrings.push(this.toolValues.annotation.tags.join(", "));
       const layerIdx = this.toolValues.annotation.coordinateAssignments.layer;
       if (typeof layerIdx === "number") {
-        const layerName = this.store.configuration?.view.layers[layerIdx].name;
+        const layerName = this.store.configuration?.layers[layerIdx].name;
         if (layerName) {
           toolNameStrings.push(layerName);
         }

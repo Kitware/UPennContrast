@@ -108,11 +108,6 @@ export interface IViewConfiguration {
   layers: IDisplayLayer[];
 }
 
-export interface IToolSet {
-  name: string;
-  toolIds: string[];
-}
-
 export type TLayerMode = "single" | "multiple" | "unroll";
 
 export interface ISnapshot {
@@ -154,10 +149,10 @@ export interface IDatasetConfiguration {
   name: string;
   description: string;
 
-  view: IViewConfiguration;
-  toolset: IToolSet;
-
-  snapshots?: ISnapshot[];
+  layers: IDisplayLayer[];
+  tools: IToolConfiguration[];
+  snapshots: ISnapshot[];
+  properties: IAnnotationProperty[];
 }
 
 export type TDisplaySliceType = "current" | "max-merge" | "constant" | "offset";

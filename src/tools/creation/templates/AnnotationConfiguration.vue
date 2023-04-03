@@ -139,7 +139,7 @@ export default class AnnotationConfiguration extends Vue {
   tags: string[] = [];
 
   get layers() {
-    return this.store.configuration?.view.layers || [];
+    return this.store.configuration?.layers || [];
   }
 
   get maxZ() {

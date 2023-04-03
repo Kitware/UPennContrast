@@ -33,7 +33,7 @@ export default class LayerSelect extends Vue {
   @VModel({ type: Number }) layer!: Number;
 
   get layers() {
-    return this.store.configuration?.view.layers || [];
+    return this.store.configuration?.layers || [];
   }
 
   get layerItems() {

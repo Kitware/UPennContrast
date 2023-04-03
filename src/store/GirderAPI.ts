@@ -14,11 +14,11 @@ import {
   IFrameInfo,
   IImage,
   IContrast,
-  IImageTile,
-  IToolSet,
   newLayer,
   IViewConfiguration,
-  IToolConfiguration
+  IToolConfiguration,
+  ISnapshot,
+  IAnnotationProperty
 } from "./model";
 import {
   toStyle,
@@ -430,14 +430,17 @@ export default class GirderAPI {
     channels.forEach((_, idx) =>
       Vue.set(layers, idx, newLayer(dataset, layers))
     );
-    const view: IViewConfiguration = { layers };
-    const toolset: IToolSet = { name: "Default Toolset", toolIds: [] };
+    const tools: IToolConfiguration[] = [];
+    const snapshots: ISnapshot[] = [];
+    const properties: IAnnotationProperty[] = [];
     data.set(
       "metadata",
       JSON.stringify({
         subtype: "contrastConfiguration",
-        view,
-        toolset
+        layers,
+        tools,
+        snapshots,
+        properties
       })
     );
     return this.client
@@ -451,13 +454,13 @@ export default class GirderAPI {
     return this.client
       .put(`/item/${config.id}/metadata`, {
         view: {
-          layers: config.view.layers.map(l =>
+          layers: config.layers.map(l =>
             Object.fromEntries(
               Object.entries(l).filter(([k]) => !k.startsWith("_"))
             )
           )
         },
-        toolset: config.toolset
+        tools: config.tools
       })
       .then(() => config);
   }
@@ -610,9 +613,10 @@ function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
     _girder: item,
     name: item.name,
     description: item.description,
-    view: item.meta.view || { layers: item.meta.layers || [] },
-    toolset: item.meta.toolset || { name: "Default toolset", toolIds: [] },
-    snapshots: item.meta.snapshots || []
+    layers: item.meta.layers || [],
+    tools: item.meta.tools || [],
+    snapshots: item.meta.snapshots || [],
+    properties: item.meta.properties || []
   };
   return configuration;
 }

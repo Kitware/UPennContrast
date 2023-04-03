@@ -400,7 +400,7 @@ export class Annotations extends VuexModule {
       Z: main.z,
       Time: main.time
     };
-    const layers = main.configuration?.view.layers;
+    const layers = main.configuration?.layers;
     if (!layers) {
       return { location, channel: 0 };
     }

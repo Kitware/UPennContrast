@@ -607,7 +607,7 @@ export class Main extends VuexModule {
 
   @Mutation
   private pushLayer(layer: IDisplayLayer) {
-    const layers = this.configuration!.view.layers;
+    const layers = this.configuration!.layers;
     Vue.set(layers, layers.length, Object.assign({}, layer));
   }
 
@@ -616,7 +616,7 @@ export class Main extends VuexModule {
     if (!this.configuration) {
       return;
     }
-    const layers = this.configuration.view.layers;
+    const layers = this.configuration.layers;
     switch (this.layerMode) {
       case "single":
         layers.forEach((l, i) => (l.visible = i === index));
@@ -648,7 +648,7 @@ export class Main extends VuexModule {
     if (!this.configuration || !this.dataset) {
       return;
     }
-    this.pushLayer(newLayer(this.dataset, this.configuration.view.layers));
+    this.pushLayer(newLayer(this.dataset, this.configuration.layers));
     await this.syncConfiguration();
   }
 
@@ -663,7 +663,7 @@ export class Main extends VuexModule {
       return;
     }
     let first = true;
-    this.configuration.view.layers.forEach(l => {
+    this.configuration.layers.forEach(l => {
       if (l.visible) {
         if (!first) {
           l.visible = false;
@@ -671,8 +671,8 @@ export class Main extends VuexModule {
         first = false;
       }
     });
-    if (first && this.configuration.view.layers.length) {
-      this.configuration.view.layers[0].visible = true;
+    if (first && this.configuration.layers.length) {
+      this.configuration.layers[0].visible = true;
     }
   }
 
@@ -692,7 +692,7 @@ export class Main extends VuexModule {
       !this.dataset ||
       !this.configuration ||
       layerIndex < 0 ||
-      layerIndex >= this.configuration.view.layers.length
+      layerIndex >= this.configuration.layers.length
     ) {
       return;
     }
@@ -702,7 +702,7 @@ export class Main extends VuexModule {
 
   @Action
   async toggleGlobalZMaxMerge() {
-    const layers = this.configuration?.view?.layers;
+    const layers = this.configuration?.layers;
     if (!layers || !this.dataset) {
       return;
     }
@@ -717,7 +717,7 @@ export class Main extends VuexModule {
 
   @Action
   async toggleGlobalLayerVisibility() {
-    const layers = this.configuration?.view?.layers;
+    const layers = this.configuration?.layers;
     if (!layers || !this.dataset) {
       return;
     }
@@ -740,14 +740,14 @@ export class Main extends VuexModule {
     if (
       !this.configuration ||
       index < 0 ||
-      index >= this.configuration.view.layers.length
+      index >= this.configuration.layers.length
     ) {
       return;
     }
     Vue.set(
-      this.configuration.view.layers,
+      this.configuration.layers,
       index,
-      Object.assign({}, this.configuration.view.layers[index], delta)
+      Object.assign({}, this.configuration.layers[index], delta)
     );
   }
 
@@ -768,11 +768,11 @@ export class Main extends VuexModule {
     if (
       !this.configuration ||
       index < 0 ||
-      index >= this.configuration.view.layers.length
+      index >= this.configuration.layers.length
     ) {
       return;
     }
-    this.configuration.view.layers.splice(index, 1);
+    this.configuration.layers.splice(index, 1);
   }
 
   @Action
@@ -795,7 +795,7 @@ export class Main extends VuexModule {
       if (!this.dataset) {
         return [];
       }
-      const layer = this.configuration?.view.layers[layerIdx];
+      const layer = this.configuration?.layers[layerIdx];
       if (!layer) {
         return [];
       }
@@ -828,7 +828,7 @@ export class Main extends VuexModule {
       if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
         return results;
       }
-      const layers = this.configuration.view.layers;
+      const layers = this.configuration.layers;
       layers.forEach(layer => {
         const images = getLayerImages(layer, this.dataset!, time, xy, z);
         const hist = this.api.getResolvedLayerHistogram(images);
@@ -873,7 +873,7 @@ export class Main extends VuexModule {
     if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
       return [];
     }
-    const layers = this.configuration.view.layers;
+    const layers = this.configuration.layers;
 
     return layers.map(layer => {
       const images = getLayerImages(
@@ -1044,7 +1044,7 @@ export class Main extends VuexModule {
     return (layerId: string | undefined) =>
       layerId === undefined
         ? undefined
-        : this.configuration?.view.layers.find(layer => layer.id === layerId);
+        : this.configuration?.layers.find(layer => layer.id === layerId);
   }
 
   @Mutation
@@ -1112,7 +1112,7 @@ export class Main extends VuexModule {
     if (!snapshot) {
       return;
     }
-    this.configuration.view.layers = [];
+    this.configuration.layers = [];
     snapshot.layers.forEach(this.pushLayer);
     this.loadSnapshotImpl(snapshot);
     await this.syncConfiguration();
