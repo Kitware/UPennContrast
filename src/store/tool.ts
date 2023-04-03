@@ -12,16 +12,12 @@ import sync from "./sync";
 
 import { AnnotationNames, AnnotationShape, IToolConfiguration } from "./model";
 
-import { logWarning } from "@/utils/log";
-
 @Module({ dynamic: true, store, name: "tool" })
 export class Tools extends VuexModule {
   // User selected tool in the toolset list
   selectedToolId: string | null = null;
   // List of available tool templates for tool creation interface
   toolTemplateList: any[] = [];
-  // All tools created by the current user
-  userTools: IToolConfiguration[] = [];
 
   availableShapes: { value: string; text: string }[] = [
     {
@@ -39,26 +35,7 @@ export class Tools extends VuexModule {
   ];
 
   get tools(): IToolConfiguration[] {
-    return this.userTools.filter(
-      (tool: IToolConfiguration) =>
-        main.dataset &&
-        tool.datasetId === main.dataset.id &&
-        main.configuration &&
-        tool.configurationId === main.configuration.id
-    );
-  }
-
-  @Mutation
-  public addTools({ tools }: { tools: IToolConfiguration[] }) {
-    this.userTools = [
-      // If duplicates are found, make sure we only keep the latest ones
-      // Only keep tools for the current dataset configuration
-      ...this.userTools.filter(
-        (existingTool: IToolConfiguration) =>
-          !tools.find(newTool => existingTool.id === newTool.id)
-      ),
-      ...tools
-    ];
+    return main.configuration?.tools || [];
   }
 
   @Mutation
@@ -111,16 +88,6 @@ export class Tools extends VuexModule {
   }
 
   @Action
-  async fetchAvailableTools() {
-    try {
-      const tools = await main.api.getAllTools();
-      this.addTools({ tools });
-    } catch (error) {
-      error(`Unable to fetch a list of available tools: ${error.message}`);
-    }
-  }
-
-  @Action
   async createTool({
     name,
     description
@@ -139,7 +106,6 @@ export class Tools extends VuexModule {
         main.dataset,
         main.configuration
       );
-      this.addTools({ tools: [tool] });
       sync.setSaving(false);
       return tool;
     } catch (error) {

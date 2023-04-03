@@ -101,48 +101,6 @@ export default class GirderAPI {
     }
   }
 
-  async getAllTools(): Promise<IToolConfiguration[]> {
-    const userIds = await this.getAllUserIds();
-    const promises = userIds.map(id => this.getToolsForUser(id));
-    const tools = await Promise.all(promises);
-    return tools.reduce(
-      (array, currentTools) => [...array, ...currentTools],
-      []
-    );
-  }
-
-  async getToolsForUser(userId: string = "me"): Promise<IToolConfiguration[]> {
-    const publicFolder = await this.getUserPublicFolder(userId);
-
-    const toolFolderName = "TOOLS";
-    const toolsFolderResult = await this.client.get(
-      `folder?parentType=folder&parentId=${publicFolder._id}&name=${toolFolderName}`
-    );
-    const toolsFolder: IGirderFolder = toolsFolderResult.data[0];
-    if (toolsFolder?.meta?.subtype !== "toolFolder") {
-      return [];
-    }
-
-    const toolsResult = await this.client.get(
-      `item?folderId=${toolsFolder._id}`
-    );
-    if (toolsResult.status !== 200) {
-      throw new Error(
-        `Could not get a list of tools for folder ${toolsFolder.name}: ${toolsResult.status}: ${toolsResult.statusText}`
-      );
-      return [];
-    }
-
-    if (toolsResult.data?.length) {
-      const items = toolsResult.data;
-      const toolItems = items.filter(
-        (item: IGirderItem) => (item.meta || {}).subtype === "toolConfiguration"
-      );
-      return toolItems.map((item: IGirderItem) => asToolConfiguration(item));
-    }
-    return [];
-  }
-
   async getDatasetsForUser(userId: string = "me"): Promise<IDataset[]> {
     const publicFolder = await this.getUserPublicFolder(userId);
     const result = await this.client.get(

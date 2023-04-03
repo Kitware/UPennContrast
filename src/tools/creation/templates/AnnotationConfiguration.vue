@@ -179,9 +179,6 @@ export default class AnnotationConfiguration extends Vue {
 
   mounted() {
     this.reset();
-    if (!this.toolsStore.tools?.length) {
-      this.toolsStore.fetchAvailableTools();
-    }
   }
 
   @Watch("defaultShape")
