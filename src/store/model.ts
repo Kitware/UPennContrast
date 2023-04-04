@@ -67,7 +67,6 @@ export interface IToolTemplate {
 
 export interface IToolConfiguration {
   readonly id: string;
-  readonly _girder: IGirderItem;
 
   name: string;
   description: string;
@@ -86,7 +85,6 @@ export interface IToolConfiguration {
 
 export interface IDataset {
   readonly id: string;
-  readonly _girder: IGirderFolder;
 
   name: string;
   description: string;
@@ -142,17 +140,17 @@ export interface ISnapshot {
   };
 }
 
-export interface IDatasetConfiguration {
-  readonly id: string;
-  readonly _girder: IGirderItem;
-
-  name: string;
-  description: string;
-
+export interface IDatasetConfigurationBase {
   layers: IDisplayLayer[];
   tools: IToolConfiguration[];
   snapshots: ISnapshot[];
-  properties: IAnnotationProperty[];
+  propertyIds: string[];
+}
+
+export interface IDatasetConfiguration extends IDatasetConfigurationBase {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
 }
 
 export type TDisplaySliceType = "current" | "max-merge" | "constant" | "offset";

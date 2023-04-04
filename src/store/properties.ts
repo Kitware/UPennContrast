@@ -206,8 +206,15 @@ export class Properties extends VuexModule {
   }
 
   @Mutation
-  setProperties(properties: IAnnotationProperty[]) {
+  protected setPropertiesImpl(properties: IAnnotationProperty[]) {
     this.properties = [...properties];
+  }
+
+  @Action
+  protected setProperties(properties: IAnnotationProperty[]) {
+    this.setPropertiesImpl(properties);
+    const propertyIds = this.properties.map(p => p.id);
+    this.context.dispatch("updateConfigurationProperties", propertyIds);
   }
 
   @Mutation
@@ -217,9 +224,13 @@ export class Properties extends VuexModule {
 
   @Action
   async fetchProperties() {
-    const properties = await this.propertiesAPI.getProperties();
-    if (properties) {
+    if (main.configuration) {
+      const properties = await this.propertiesAPI.getProperties(
+        main.configuration.propertyIds
+      );
       this.setProperties(properties);
+    } else {
+      this.setProperties([]);
     }
   }
 

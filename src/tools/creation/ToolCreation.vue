@@ -150,14 +150,14 @@ export default class ToolCreation extends Vue {
 
       // Update this tool with actual values
       this.toolsStore.updateTool(tool).then(() => {
-        this.store.syncConfiguration();
+        this.store.syncConfiguration("tools");
       });
 
       // Add this tool to the current toolset
       this.toolsStore.addToolsToCurrentToolset({ tools: [tool] });
 
       // Save
-      this.store.syncConfiguration();
+      this.store.syncConfiguration("tools");
 
       this.close();
     });

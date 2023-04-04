@@ -256,17 +256,7 @@ export default class DatasetInfo extends Vue {
   }
 
   async duplicateConfiguration(c: IDatasetConfiguration) {
-    const config = await this.store.createConfiguration({
-      name: c.name,
-      description: c.description
-    });
-    if (!config) {
-      return;
-    }
-
-    config.layers = c.layers;
-
-    await store.api.updateConfiguration(config);
+    const config = await store.api.duplicateConfiguration(c);
 
     this.$router.push({
       name: "configuration",
@@ -297,17 +287,7 @@ export default class DatasetInfo extends Vue {
         throw new Error("Configuration not set");
       }
 
-      const channels = dataset.channels.slice(0, 6);
-      const layers: IDisplayLayer[] = [];
-      channels.forEach((_, idx) =>
-        Vue.set(layers, idx, newLayer(dataset, layers))
-      );
-
-      config.layers = layers;
-      config.tools = [];
-      await store.api.updateConfiguration(config);
-
-      this.configuration = [config!];
+      this.configuration = [config];
     } catch (err) {
       throw err;
     }

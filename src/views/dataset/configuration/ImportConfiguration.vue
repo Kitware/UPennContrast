@@ -104,17 +104,7 @@ export default class ImportConfiguration extends Vue {
   async submit() {
     const [active] = this.active;
     const configToCopy = active.meta;
-    const config = await this.store.createConfiguration({
-      name: configToCopy.name,
-      description: configToCopy.description
-    });
-    if (!config) {
-      return;
-    }
-
-    config.layers = configToCopy.layers;
-
-    await store.api.updateConfiguration(config);
+    const config = await this.store.api.duplicateConfiguration(configToCopy);
 
     this.$router.push({
       name: "configuration",

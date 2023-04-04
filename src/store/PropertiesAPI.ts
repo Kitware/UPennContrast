@@ -31,10 +31,15 @@ export default class PropertiesAPI {
       });
   }
 
-  async getProperties(): Promise<IAnnotationProperty[]> {
-    return this.client.get("annotation_property?limit=1000").then(res => {
-      return res.data.map(this.toProperty);
-    });
+  async getProperties(propertyIds: string[]): Promise<IAnnotationProperty[]> {
+    const promises: Promise<IAnnotationProperty>[] = [];
+    for (const id of propertyIds) {
+      const propertyPromise = this.client
+        .get(`annotation_property/${id}`)
+        .then(res => this.toProperty(res.data));
+      promises.push(propertyPromise);
+    }
+    return Promise.all(promises);
   }
 
   async getPropertyHistogram(

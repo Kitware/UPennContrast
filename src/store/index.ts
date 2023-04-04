@@ -28,7 +28,8 @@ import {
   ILayerStackImage,
   IDisplaySlice,
   TLayerMode,
-  ISnapshot
+  ISnapshot,
+  IDatasetConfigurationBase
 } from "./model";
 
 import persister from "./Persister";
@@ -184,8 +185,21 @@ export class Main extends VuexModule {
     this.selectedDatasetId = id;
     this.dataset = data;
   }
-  @Mutation
+
+  @Action
   protected setConfiguration({
+    id,
+    data
+  }: {
+    id: string | null;
+    data: IDatasetConfiguration | null;
+  }) {
+    this.setConfigurationImpl({ id, data });
+    this.context.dispatch("fetchProperties");
+  }
+
+  @Mutation
+  protected setConfigurationImpl({
     id,
     data
   }: {
@@ -630,13 +644,21 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async syncConfiguration() {
+  updateConfigurationProperties(propertyIds: string[]) {
+    if (this.configuration) {
+      this.configuration.propertyIds = propertyIds;
+      this.syncConfiguration("propertyIds");
+    }
+  }
+
+  @Action
+  async syncConfiguration(key: keyof IDatasetConfigurationBase) {
     if (!this.configuration) {
       return;
     }
     sync.setSaving(true);
     try {
-      await this.api.updateConfiguration(this.configuration);
+      await this.api.updateConfigurationKey(this.configuration, key);
       sync.setSaving(false);
     } catch (error) {
       sync.setSaving(error);
@@ -649,7 +671,7 @@ export class Main extends VuexModule {
       return;
     }
     this.pushLayer(newLayer(this.dataset, this.configuration.layers));
-    await this.syncConfiguration();
+    await this.syncConfiguration("layers");
   }
 
   @Mutation
@@ -682,7 +704,7 @@ export class Main extends VuexModule {
 
     if (mode === "single") {
       this.verifySingleLayerMode();
-      await this.syncConfiguration();
+      await this.syncConfiguration("layers");
     }
   }
 
@@ -697,7 +719,7 @@ export class Main extends VuexModule {
       return;
     }
     this.toggleLayer(layerIndex);
-    await this.syncConfiguration();
+    await this.syncConfiguration("layers");
   }
 
   @Action
@@ -759,7 +781,7 @@ export class Main extends VuexModule {
   }) {
     this.changeLayerImpl(args);
     if (args.sync !== false) {
-      await this.syncConfiguration();
+      await this.syncConfiguration("layers");
     }
   }
 
@@ -778,7 +800,7 @@ export class Main extends VuexModule {
   @Action
   async removeLayer(index: number) {
     this.removeLayerImpl(index);
-    await this.syncConfiguration();
+    await this.syncConfiguration("layers");
   }
 
   get getImagesFromChannel() {
@@ -1064,7 +1086,7 @@ export class Main extends VuexModule {
     if (!this.configuration) {
       return;
     }
-    await this.api.updateSnapshots(this.configuration);
+    await this.syncConfiguration("snapshots");
   }
 
   @Action
@@ -1115,7 +1137,7 @@ export class Main extends VuexModule {
     this.configuration.layers = [];
     snapshot.layers.forEach(this.pushLayer);
     this.loadSnapshotImpl(snapshot);
-    await this.syncConfiguration();
+    await this.syncConfiguration("layers");
     // note that this doesn't set viewport, snapshot name, description, tags,
     // map rotation, or screenshot parameters
     return snapshot;

@@ -15,10 +15,9 @@ import {
   IImage,
   IContrast,
   newLayer,
-  IViewConfiguration,
   IToolConfiguration,
   ISnapshot,
-  IAnnotationProperty
+  IDatasetConfigurationBase
 } from "./model";
 import {
   toStyle,
@@ -30,6 +29,7 @@ import {
 import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
 import Vue from "vue";
+import { throws } from "assert";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
 // using HTML 2 might improve that slightly).  For a single layer, if we set
@@ -383,22 +383,21 @@ export default class GirderAPI {
     data.set("name", name);
     data.set("description", description);
     data.set("reuseExisting", "false");
-    const channels = dataset.channels.slice(0, 6);
-    const layers: IDisplayLayer[] = [];
-    channels.forEach((_, idx) =>
-      Vue.set(layers, idx, newLayer(dataset, layers))
-    );
+    const layers: IDisplayLayer[] = defaultLayers(dataset);
     const tools: IToolConfiguration[] = [];
     const snapshots: ISnapshot[] = [];
-    const properties: IAnnotationProperty[] = [];
+    const propertyIds: string[] = [];
+    const config: IDatasetConfigurationBase = {
+      layers,
+      tools,
+      snapshots,
+      propertyIds
+    };
     data.set(
       "metadata",
       JSON.stringify({
         subtype: "contrastConfiguration",
-        layers,
-        tools,
-        snapshots,
-        properties
+        ...config
       })
     );
     return this.client
@@ -406,31 +405,29 @@ export default class GirderAPI {
       .then(r => asConfigurationItem(r.data));
   }
 
-  updateConfiguration(
-    config: IDatasetConfiguration
-  ): Promise<IDatasetConfiguration> {
+  private updateConfigurationImpl(
+    id: string,
+    data: Partial<IDatasetConfigurationBase>
+  ) {
     return this.client
-      .put(`/item/${config.id}/metadata`, {
-        view: {
-          layers: config.layers.map(l =>
-            Object.fromEntries(
-              Object.entries(l).filter(([k]) => !k.startsWith("_"))
-            )
-          )
-        },
-        tools: config.tools
-      })
-      .then(() => config);
+      .put(`/item/${id}/metadata`, data)
+      .then(r => asConfigurationItem(r.data));
   }
 
-  updateSnapshots(
-    config: IDatasetConfiguration
+  duplicateConfiguration(configuration: IDatasetConfiguration) {
+    // TODO: implement function
+    throw Error("unimplemented function");
+    return configuration;
+  }
+
+  updateConfigurationKey(
+    config: IDatasetConfiguration,
+    key: keyof IDatasetConfigurationBase
   ): Promise<IDatasetConfiguration> {
-    return this.client
-      .put(`/item/${config.id}/metadata`, {
-        snapshots: config.snapshots! || []
-      })
-      .then(() => config);
+    const data: Partial<IDatasetConfigurationBase> = {
+      [key]: config[key]
+    };
+    return this.updateConfigurationImpl(config.id, data);
   }
 
   deleteConfiguration(
@@ -522,10 +519,16 @@ export default class GirderAPI {
   }
 }
 
+function defaultLayers(dataset: IDataset) {
+  const channels = dataset.channels.slice(0, 6);
+  const layers: IDisplayLayer[] = [];
+  channels.forEach((_, idx) => Vue.set(layers, idx, newLayer(dataset, layers)));
+  return layers;
+}
+
 function asDataset(folder: IGirderFolder): IDataset {
   return {
     id: folder._id,
-    _girder: folder,
     name: folder.name,
     description: folder.description,
     xy: [],
@@ -552,7 +555,6 @@ function asToolConfiguration(item: IGirderItem): IToolConfiguration {
   } = item.meta;
   const tool = {
     id: item._id,
-    _girder: item,
     name: item.name,
     description: item.description,
     hotkey: hotkey,
@@ -568,13 +570,12 @@ function asToolConfiguration(item: IGirderItem): IToolConfiguration {
 function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
   const configuration = {
     id: item._id,
-    _girder: item,
     name: item.name,
     description: item.description,
     layers: item.meta.layers || [],
     tools: item.meta.tools || [],
     snapshots: item.meta.snapshots || [],
-    properties: item.meta.properties || []
+    propertyIds: item.meta.propertyIds || []
   };
   return configuration;
 }

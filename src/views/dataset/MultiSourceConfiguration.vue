@@ -155,7 +155,7 @@ interface ICompositingSource {
 @Component({
   components: {}
 })
-export default class NewDataset extends Vue {
+export default class MultiSourceConfiguration extends Vue {
   readonly store = store;
 
   tilesInternalMetadata: { [key: string]: any }[] | null = null;

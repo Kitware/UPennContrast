@@ -37,6 +37,7 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
+import propertyStore from "@/store/properties";
 
 import {
   IAnnotation,
@@ -50,6 +51,7 @@ import { downloadToClient } from "@/utils/download";
 @Component({})
 export default class AnnotationImport extends Vue {
   readonly store = store;
+  readonly propertyStore = propertyStore;
 
   dialog = false;
 
@@ -81,7 +83,9 @@ export default class AnnotationImport extends Vue {
 
     let propertiesPromise: Promise<IAnnotationProperty[]> = Promise.resolve([]);
     if (this.exportProperties) {
-      propertiesPromise = store.propertiesAPI.getProperties();
+      propertiesPromise = this.propertyStore
+        .fetchProperties()
+        .then(() => this.propertyStore.properties);
     }
 
     let valuesPromise: Promise<IAnnotationPropertyValues> = Promise.resolve({});

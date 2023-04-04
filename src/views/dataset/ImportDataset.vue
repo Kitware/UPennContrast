@@ -32,14 +32,13 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
-import { IDataset } from "@/store/model";
 
 @Component({
   components: {
     GirderLocationChooser
   }
 })
-export default class NewDataset extends Vue {
+export default class ImportDataset extends Vue {
   readonly store = store;
 
   valid = false;

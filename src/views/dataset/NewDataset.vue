@@ -56,6 +56,8 @@ import {
   triggers,
   makeAlternation
 } from "@/utils/parsing";
+import { IGirderFile } from "@/girder";
+import { IGirderFolder } from "@/girder";
 
 interface FileUpload {
   file: File;
@@ -133,10 +135,6 @@ export default class NewDataset extends Vue {
     return this.dataset != null;
   }
 
-  get pathName() {
-    return this.path ? this.path.name : "";
-  }
-
   get rules() {
     return [(v: string) => v.trim().length > 0 || `value is required`];
   }
@@ -191,8 +189,10 @@ export default class NewDataset extends Vue {
 
     this.failedDataset = "";
 
-    this.path = this.dataset!._girder;
-
+    this.path = {
+      _modelType: "folder",
+      _id: this.dataset.id
+    } as IGirderFolder;
     await Vue.nextTick();
 
     this.uploading = true;
@@ -214,10 +214,6 @@ export default class NewDataset extends Vue {
 
   nextStep() {
     this.hideUploader = true;
-
-    const filenameMetadata = collectFilenameMetadata(
-      this.files.map(f => f.file.name)
-    );
 
     if (this.dataset?.id) {
       this.store.scheduleTileFramesComputation(this.dataset.id);
