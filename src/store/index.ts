@@ -29,7 +29,10 @@ import {
   IDisplaySlice,
   TLayerMode,
   ISnapshot,
-  IDatasetConfigurationBase
+  IDatasetConfigurationBase,
+  IToolConfiguration,
+  AnnotationNames,
+  AnnotationShape
 } from "./model";
 
 import persister from "./Persister";
@@ -89,6 +92,27 @@ export class Main extends VuexModule {
   isAnnotationPanelOpen: boolean = false;
   annotationPanelBadge: boolean = false;
 
+  toolTemplateList: any[] = [];
+  selectedTool: IToolConfiguration | null = null;
+  readonly availableToolShapes: { value: string; text: string }[] = [
+    {
+      text: AnnotationNames[AnnotationShape.Point],
+      value: AnnotationShape.Point
+    },
+    {
+      text: AnnotationNames[AnnotationShape.Polygon],
+      value: AnnotationShape.Polygon
+    },
+    {
+      text: AnnotationNames[AnnotationShape.Line],
+      value: AnnotationShape.Line
+    }
+  ];
+
+  get tools() {
+    return this.configuration?.tools || [];
+  }
+
   get unroll() {
     return this.unrollXY || this.unrollZ || this.unrollT;
   }
@@ -144,6 +168,53 @@ export class Main extends VuexModule {
   @Mutation
   public setDrawAnnotationConnections(value: boolean) {
     this.drawAnnotationConnections = value;
+  }
+
+  @Mutation
+  setToolTemplateList(value: any[]) {
+    this.toolTemplateList = value;
+  }
+
+  @Mutation
+  private setSelectedToolImpl(tool: IToolConfiguration | null) {
+    this.selectedTool = tool;
+  }
+
+  @Action
+  setSelectedToolId(id: string | null) {
+    let tool: IToolConfiguration | null = null;
+    if (id) {
+      tool = this.tools.find(t => t.id === id) || null;
+    }
+    this.setSelectedToolImpl(tool);
+  }
+
+  @Mutation
+  private setConfigurationTools(tools: IToolConfiguration[]) {
+    if (this.configuration) {
+      this.configuration.tools = tools;
+    }
+  }
+
+  @Action
+  addToolToConfiguration(tool: IToolConfiguration) {
+    if (this.configuration) {
+      this.setConfigurationTools([...this.configuration.tools, tool]);
+      // Fetch the worker interface for this new tool if there is one
+      const image = tool.values?.image?.image;
+      if (image) {
+        this.context.dispatch("requestWorkerInterface", image);
+      }
+      this.syncConfiguration("tools");
+    }
+  }
+
+  @Action
+  removeToolFromConfiguration(toolId: string) {
+    if (this.configuration) {
+      this.configuration.tools = this.tools.filter(t => t.id !== toolId);
+      this.syncConfiguration("tools");
+    }
   }
 
   @Mutation

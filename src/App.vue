@@ -112,7 +112,6 @@ import AnnotationBrowser from "@/components/AnnotationBrowser/AnnotationBrowser.
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
-import toolsStore from "@/store/tool";
 import Persister from "@/store/Persister";
 import propertyStore from "@/store/properties";
 
@@ -129,7 +128,6 @@ import propertyStore from "@/store/properties";
 })
 export default class App extends Vue {
   readonly store = store;
-  readonly toolsStore = toolsStore;
   readonly propertyStore = propertyStore;
 
   snapshotPanel = false;
@@ -154,7 +152,7 @@ export default class App extends Vue {
     axios
       .get("config/templates.json")
       .then(resp => {
-        this.toolsStore.setToolTemplateList(resp.data);
+        this.store.setToolTemplateList(resp.data);
       })
       .catch(err => {
         console.log(err); // eslint-disable-line no-console

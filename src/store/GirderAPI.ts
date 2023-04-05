@@ -21,7 +21,6 @@ import {
 } from "./model";
 import {
   toStyle,
-  ITileOptions,
   ITileOptionsBands,
   mergeHistograms,
   ITileHistogram
@@ -29,7 +28,6 @@ import {
 import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
 import Vue from "vue";
-import { throws } from "assert";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
 // using HTML 2 might improve that slightly).  For a single layer, if we set
@@ -37,7 +35,6 @@ import { throws } from "assert";
 // capacity slack.  If it is too great (thousands, for instance), browsers can
 // fail.  9 is a balance that is somewhat low but was measured as fast as
 // higher values in a limited set of tests.
-const ImageConcurrency: number = 9;
 const HistogramConcurrency: number = 9;
 
 interface HTMLImageElementLocal extends HTMLImageElement {
@@ -91,14 +88,6 @@ export default class GirderAPI {
       (array, currentDatasets) => [...array, ...currentDatasets],
       []
     );
-  }
-  async getTool(toolId: string): Promise<IToolConfiguration> {
-    try {
-      const item = await this.getItem(toolId);
-      return asToolConfiguration(item);
-    } catch (e) {
-      throw e;
-    }
   }
 
   async getDatasetsForUser(userId: string = "me"): Promise<IDataset[]> {
@@ -283,62 +272,6 @@ export default class GirderAPI {
 
   getDatasetConfiguration(id: string): Promise<IDatasetConfiguration> {
     return this.getItem(id).then(asConfigurationItem);
-  }
-
-  async createTool(
-    name: string,
-    description: string,
-    dataset: IDataset,
-    configuration: IDatasetConfiguration
-  ): Promise<IToolConfiguration> {
-    const toolFolderName = "TOOLS";
-
-    // Create a tools directory if not created
-    const publicFolder = await this.getUserPublicFolder();
-
-    // Create tools folder
-    const toolsFolderData = new FormData();
-    toolsFolderData.set("parentType", publicFolder._modelType);
-    toolsFolderData.set("parentId", publicFolder._id);
-    toolsFolderData.set("name", toolFolderName);
-    toolsFolderData.set(
-      "description",
-      "A directory for all tools that were created by this user"
-    );
-    toolsFolderData.set("reuseExisting", "true");
-    toolsFolderData.set("metadata", JSON.stringify({ subtype: "toolFolder" }));
-
-    const resp = await this.client.post("folder", toolsFolderData);
-    const toolsFolder: IGirderFolder = resp.data;
-
-    // Use this directory as parent for all items
-    const itemData = new FormData();
-    itemData.set("folderId", toolsFolder._id);
-    itemData.set("name", name);
-    itemData.set("description", description);
-    itemData.set("reuseExisting", "false");
-    itemData.set(
-      "metadata",
-      JSON.stringify({
-        subtype: "toolConfiguration",
-        datasetId: dataset.id,
-        configurationId: configuration.id
-      })
-    );
-
-    return this.client
-      .post("item", itemData)
-      .then(r => asToolConfiguration(r.data));
-  }
-
-  updateTool(tool: IToolConfiguration): Promise<IToolConfiguration> {
-    return this.client
-      .put(`/item/${tool.id}/metadata`, {
-        type: tool.type,
-        template: tool.template,
-        values: tool.values
-      })
-      .then(() => tool);
   }
 
   createDataset(
@@ -542,29 +475,6 @@ function asDataset(folder: IGirderFolder): IDataset {
     anyImage: () => null,
     configurations: []
   };
-}
-
-function asToolConfiguration(item: IGirderItem): IToolConfiguration {
-  const {
-    values,
-    template,
-    type,
-    hotkey,
-    datasetId,
-    configurationId
-  } = item.meta;
-  const tool = {
-    id: item._id,
-    name: item.name,
-    description: item.description,
-    hotkey: hotkey,
-    type,
-    values,
-    template,
-    configurationId,
-    datasetId
-  };
-  return tool;
 }
 
 function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {

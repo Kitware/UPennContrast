@@ -192,7 +192,7 @@ export default class AnnotationsAPI {
     },
     workerInterface: IWorkerInterfaceValues
   ) {
-    const { configurationId, description, id, name, type, values } = tool;
+    const { id, name, type, values } = tool;
     const image = values.image.image;
     const { annotation, connectTo, jobDateTag } = values;
     let tags = annotation.tags;
@@ -210,9 +210,7 @@ export default class AnnotationsAPI {
       tags = [...tags, computedTag];
     }
     const params = {
-      configurationId,
       datasetId,
-      description,
       type,
       id,
       name,

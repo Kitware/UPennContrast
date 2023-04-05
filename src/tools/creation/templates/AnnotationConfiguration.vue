@@ -88,7 +88,6 @@
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
-import toolsStore from "@/store/tool";
 import LayerSelect from "@/components/LayerSelect.vue";
 import TagPicker from "@/components/TagPicker.vue";
 
@@ -108,7 +107,6 @@ const standardValueKeys = ["tags", "coordinateAssignments", "shape"];
 })
 export default class AnnotationConfiguration extends Vue {
   readonly store = store;
-  readonly toolsStore = toolsStore;
 
   get dataset() {
     return this.store.dataset;
@@ -131,7 +129,7 @@ export default class AnnotationConfiguration extends Vue {
   @Prop()
   readonly advanced!: boolean;
 
-  availableShapes = toolsStore.availableShapes;
+  availableShapes = store.availableToolShapes;
   private AnnotationNames = AnnotationNames;
 
   label: string = "";

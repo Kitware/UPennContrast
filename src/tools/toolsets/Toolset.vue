@@ -62,9 +62,6 @@
                       </v-list-item-avatar>
                       <v-list-item-content
                         ><v-list-item-title>{{ tool.name }}</v-list-item-title>
-                        <v-list-item-subtitle>
-                          {{ tool.description }}
-                        </v-list-item-subtitle>
                       </v-list-item-content>
                       <v-list-item-action
                         ><v-btn icon @click="removeToolId(tool.id)"
@@ -110,10 +107,9 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Watch, Prop } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import draggable from "vuedraggable";
 import store from "@/store";
-import toolsStore from "@/store/tool";
 import {
   AnnotationNames,
   AnnotationShape,
@@ -136,20 +132,19 @@ import CircleToDotMenu from "@/components/CircleToDotMenu.vue";
 })
 export default class Toolset extends Vue {
   readonly store = store;
-  readonly toolsStore = toolsStore;
 
   panels: number = 0;
 
   get selectedToolId() {
-    return this.toolsStore.selectedToolId || "";
+    return this.store.selectedTool?.id || "";
   }
 
   set selectedToolId(id: string) {
-    this.toolsStore.setSelectedToolId(id);
+    this.store.setSelectedToolId(id);
   }
 
   get tools() {
-    return this.toolsStore.tools;
+    return this.store.tools;
   }
 
   get toolsetTools() {
@@ -161,24 +156,14 @@ export default class Toolset extends Vue {
   }
 
   get selectedTool(): IToolConfiguration | null {
-    return this.toolsStore.selectedTool;
+    return this.store.selectedTool;
   }
 
   toolCreationDialogOpen: boolean = false;
   toolPickerDialogOpen: boolean = false;
 
-  getToolById(toolId: string) {
-    return this.toolsStore.tools.find(
-      (tool: IToolConfiguration) => tool.id === toolId
-    );
-  }
-
   getToolPropertiesDescription(tool: IToolConfiguration): string[][] {
     const propDesc: string[][] = [["Name", tool.name]];
-
-    if (tool.description) {
-      propDesc.push(["Description", tool.description]);
-    }
 
     if (tool.values) {
       const { values } = tool;
@@ -217,7 +202,7 @@ export default class Toolset extends Vue {
     if (toolId === this.selectedToolId) {
       this.selectedToolId = "";
     }
-    this.toolsStore.removeToolIdFromCurrentToolset({ id: toolId });
+    this.store.removeToolFromConfiguration(toolId);
     this.store.syncConfiguration("tools");
   }
 }

@@ -32,8 +32,6 @@
 import { Vue, Component, VModel, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
-import toolsStore from "@/store/tool";
-import { IToolConfiguration } from "@/store/model";
 
 // Interface element for the input of annotation tags
 @Component({
@@ -42,7 +40,6 @@ import { IToolConfiguration } from "@/store/model";
 export default class TagPicker extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
-  readonly toolsStore = toolsStore;
 
   @Prop({ default: false })
   readonly disabled!: boolean;
@@ -58,7 +55,7 @@ export default class TagPicker extends Vue {
       }
     }
     // Tags from tools
-    for (const tool of this.toolsStore.tools) {
+    for (const tool of this.store.tools) {
       if (tool.values?.annotation?.tags) {
         const tags = tool.values.annotation.tags;
         for (const tag of tags) {

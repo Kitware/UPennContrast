@@ -67,20 +67,11 @@ export interface IToolTemplate {
 
 export interface IToolConfiguration {
   readonly id: string;
-
   name: string;
-  description: string;
-
   hotkey: string | null;
-
   type: string;
-
   values: any;
-
   template: IToolTemplate;
-
-  configurationId: string;
-  datasetId: string;
 }
 
 export interface IDataset {
@@ -539,11 +530,7 @@ const channelColors: { [key: string]: string } = {
   GFP: "#00FF00"
 };
 
-function randomId() {
-  return Math.random()
-    .toString(36)
-    .substr(2, 5);
-}
+import { v4 as uuidv4 } from "uuid";
 
 export function newLayer(
   dataset: IDataset,
@@ -570,7 +557,7 @@ export function newLayer(
 
   // guess a good new layer
   return {
-    id: randomId(),
+    id: uuidv4(),
     name: layerName,
     visible: true,
     channel: nextChannel[0] || 0,

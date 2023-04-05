@@ -88,14 +88,17 @@
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
-import toolsStore from "@/store/tool";
 import propertiesStore from "@/store/properties";
-import { AnnotationNames, AnnotationShape } from "@/store/model";
+import {
+  AnnotationNames,
+  AnnotationShape,
+  IToolConfiguration
+} from "@/store/model";
 
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";
-import { logError } from "@/utils/log";
 import Mousetrap from "mousetrap";
+import { v4 as uuidv4 } from "uuid";
 
 const defaultValues = {
   name: "New Tool",
@@ -111,7 +114,6 @@ const defaultValues = {
 })
 export default class ToolCreation extends Vue {
   readonly store = store;
-  readonly toolsStore = toolsStore;
   readonly propertyStore = propertiesStore;
 
   toolValues: any = { ...defaultValues };
@@ -132,35 +134,19 @@ export default class ToolCreation extends Vue {
   readonly open: any;
 
   createTool() {
-    const name = this.toolName || "Unnamed Tool";
-    // Create an empty tool to get the id
-    this.toolsStore.createTool({ name, description: "" }).then(tool => {
-      if (tool === null) {
-        logError("Failed to create a new tool on the server");
-        return;
-      }
-      tool.template = this.selectedTemplate;
-      tool.values = this.toolValues;
-      tool.type = this.selectedTemplate.type;
-      tool.hotkey = this.hotkey;
-      const image = tool.values?.image?.image;
-      if (image) {
-        this.propertyStore.requestWorkerInterface(image);
-      }
+    const tool: IToolConfiguration = {
+      id: uuidv4(),
+      name: this.toolName || "Unnamed Tool",
+      template: this.selectedTemplate,
+      values: this.toolValues,
+      type: this.selectedTemplate.type,
+      hotkey: this.hotkey
+    };
 
-      // Update this tool with actual values
-      this.toolsStore.updateTool(tool).then(() => {
-        this.store.syncConfiguration("tools");
-      });
+    // Add this tool to the current toolset
+    this.store.addToolToConfiguration(tool);
 
-      // Add this tool to the current toolset
-      this.toolsStore.addToolsToCurrentToolset({ tools: [tool] });
-
-      // Save
-      this.store.syncConfiguration("tools");
-
-      this.close();
-    });
+    this.close();
   }
 
   private _selectedTool: any = null;

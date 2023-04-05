@@ -151,12 +151,10 @@ export default class PropertiesAPI {
       tile: IAnnotationLocation;
     }
   ) {
-    const { configurationId, description, id, name, type, values } = tool;
+    const { id, name, type, values } = tool;
     const { annotation, connectTo } = values;
     const params = {
-      configurationId,
       datasetId,
-      description,
       type,
       id,
       name,

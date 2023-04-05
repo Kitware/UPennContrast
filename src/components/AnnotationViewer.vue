@@ -5,7 +5,6 @@
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
-import toolsStore from "@/store/tool";
 import propertiesStore from "@/store/properties";
 import filterStore from "@/store/filters";
 
@@ -40,7 +39,6 @@ import {
 export default class AnnotationViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
-  readonly toolsStore = toolsStore;
   readonly propertyStore = propertiesStore;
   readonly filterStore = filterStore;
 
@@ -182,7 +180,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   get selectedTool(): IToolConfiguration | null {
-    return this.toolsStore.selectedTool;
+    return this.store.selectedTool;
   }
 
   get hoveredAnnotationId() {
@@ -1085,7 +1083,7 @@ export default class AnnotationViewer extends Vue {
 
     if (this.roiFilter) {
       if (this.selectedTool) {
-        this.toolsStore.setSelectedToolId(null);
+        this.store.setSelectedToolId(null);
       }
       this.annotationLayer.mode("polygon");
       return;
