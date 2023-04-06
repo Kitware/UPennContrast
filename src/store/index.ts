@@ -1001,6 +1001,7 @@ export class Main extends VuexModule {
         ) {
           const histogramObj = layer._histogram;
           const images = layer._histogram.nextImages;
+          histogramObj.nextImages = null;
           histogramObj.lock = true;
           histogramObj.promise = this.api.getLayerHistogram(images);
           histogramObj.promise.then(value => {
@@ -1011,7 +1012,6 @@ export class Main extends VuexModule {
           });
           histogramObj.promise.finally(() => {
             histogramObj.lastImages = images;
-            histogramObj.nextImages = null;
             histogramObj.lock = false;
             nextHistogram();
           });
