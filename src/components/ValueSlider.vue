@@ -62,7 +62,7 @@ export default class ValueSlider extends Vue {
 
   set slider(value: number) {
     const numberValue = typeof value === "number" ? value : parseInt(value);
-    if (numberValue == this.internalValue) {
+    if (numberValue === this.internalValue) {
       return;
     }
     this.internalValue = numberValue;
