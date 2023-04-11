@@ -15,8 +15,8 @@ import {
   IImage,
   IContrast,
   IDatasetConfigurationBase,
-  defaultConfigurationBase,
-  emptyConfigurationBase
+  configurationBaseKeys,
+  newLayer
 } from "./model";
 import {
   toStyle,
@@ -303,21 +303,16 @@ export default class GirderAPI {
     return this.client.delete(`/folder/${dataset.id}`).then(() => dataset);
   }
 
-  async createConfiguration(
+  async createConfigurationFromBase(
     name: string,
     description: string,
     folderId: string,
-    dataset?: IDataset,
-    base?: IDatasetConfigurationBase
+    base: IDatasetConfigurationBase
   ): Promise<IDatasetConfiguration> {
     // Create metadata for the configuration item
-    const configBase: IDatasetConfigurationBase = {
-      ...defaultConfigurationBase(dataset),
-      ...base
-    };
     const metadata: { [key: string]: any } = {
       subtype: "contrastConfiguration",
-      ...toConfiguationMetadata(configBase)
+      ...toConfiguationMetadata(base)
     };
 
     // Create the item
@@ -333,15 +328,28 @@ export default class GirderAPI {
     return asConfigurationItem(item);
   }
 
+  async createConfigurationFromDataset(
+    name: string,
+    description: string,
+    folderId: string,
+    dataset: IDataset
+  ) {
+    return this.createConfigurationFromBase(
+      name,
+      description,
+      folderId,
+      defaultConfigurationBase(dataset)
+    );
+  }
+
   duplicateConfiguration(
     configuration: IDatasetConfiguration,
     folderId: string
   ) {
-    return this.createConfiguration(
+    return this.createConfigurationFromBase(
       configuration.name,
       configuration.description,
       folderId,
-      undefined,
       configuration
     );
   }
@@ -466,11 +474,52 @@ function asDataset(folder: IGirderFolder): IDataset {
   };
 }
 
+function defaultLayers(dataset: IDataset) {
+  const nLayers = Math.min(6, dataset.channels.length);
+  const layers: IDisplayLayer[] = [];
+  for (let i = 0; i < nLayers; ++i) {
+    layers.push(newLayer(dataset, layers));
+  }
+  return layers;
+}
+
+function getDatasetCompatibility(
+  dataset: IDataset
+): IDatasetConfigurationBase["compatibility"] {
+  const channelNames: IDatasetConfigurationBase["compatibility"]["channels"] = {};
+  for (const channel of dataset.channels) {
+    channelNames[channel] =
+      dataset.channelNames.get(channel) || "Unnamed channel";
+  }
+  return {
+    xyDimensions: dataset.xy.length > 1 ? "multiple" : "one",
+    zDimensions: dataset.z.length > 1 ? "multiple" : "one",
+    tDimensions: dataset.time.length > 1 ? "multiple" : "one",
+    channels: channelNames
+  };
+}
+
+export function defaultConfigurationBase(
+  dataset: IDataset
+): IDatasetConfigurationBase {
+  const config: IDatasetConfigurationBase = {
+    compatibility: getDatasetCompatibility(dataset),
+    layers: [],
+    tools: [],
+    propertyIds: [],
+    snapshots: []
+  };
+  if (dataset) {
+    config.layers = defaultLayers(dataset);
+  }
+  return config;
+}
+
 function toConfiguationMetadata(data: Partial<IDatasetConfigurationBase>) {
   let metadata: Partial<IDatasetConfigurationBase> = {};
   for (const key in data) {
     // Keep in metadata only keys that are part of IDatasetConfigurationBase
-    if (key in emptyConfigurationBase) {
+    if ((configurationBaseKeys as Set<string>).has(key)) {
       const typedKey = key as keyof IDatasetConfigurationBase;
       // Strip private attributes from layers (_histogram)
       let values = data[typedKey]!;
@@ -491,19 +540,17 @@ function toConfiguationMetadata(data: Partial<IDatasetConfigurationBase>) {
 }
 
 function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
-  const config = {
+  const config: Partial<IDatasetConfiguration> = {
     id: item._id,
     name: item.name,
-    description: item.description,
-    ...emptyConfigurationBase
+    description: item.description
   };
-  for (const key in emptyConfigurationBase) {
-    const typedKey = key as keyof IDatasetConfigurationBase;
-    if (typedKey in item.meta) {
-      config[typedKey] = item.meta[typedKey];
+  for (const key of configurationBaseKeys) {
+    if (key in item.meta) {
+      config[key] = item.meta[key];
     }
   }
-  return config;
+  return config as IDatasetConfiguration;
 }
 
 export interface IHistogramOptions {

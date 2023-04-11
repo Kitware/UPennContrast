@@ -548,11 +548,11 @@ export class Main extends VuexModule {
   }) {
     try {
       sync.setSaving(true);
-      const config = await this.api.createConfiguration(
+      const config = await this.api.createConfigurationFromDataset(
         name,
         description,
         this.dataset!.id,
-        this.dataset || undefined
+        this.dataset!
       );
       sync.setSaving(false);
       return config;

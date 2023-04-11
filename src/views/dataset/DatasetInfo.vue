@@ -123,12 +123,7 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
-import {
-  IDatasetConfiguration,
-  IDisplayLayer,
-  newLayer
-} from "../../store/model";
-import { formatDate } from "@/utils/date";
+import { IDatasetConfiguration } from "../../store/model";
 
 @Component
 export default class DatasetInfo extends Vue {

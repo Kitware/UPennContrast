@@ -131,7 +131,15 @@ export interface ISnapshot {
   };
 }
 
+export type IDimensionCompatibility = "one" | "multiple";
+
 export interface IDatasetConfigurationBase {
+  compatibility: {
+    xyDimensions: IDimensionCompatibility;
+    zDimensions: IDimensionCompatibility;
+    tDimensions: IDimensionCompatibility;
+    channels: { [key: number]: string };
+  };
   layers: IDisplayLayer[];
   tools: IToolConfiguration[];
   snapshots: ISnapshot[];
@@ -584,31 +592,23 @@ export function newLayer(
   };
 }
 
-function defaultLayers(dataset: IDataset) {
-  const nLayers = Math.min(6, dataset.channels.length);
-  const layers: IDisplayLayer[] = [];
-  for (let i = 0; i < nLayers; ++i) {
-    layers.push(newLayer(dataset, layers));
-  }
-  return layers;
-}
-
-export const emptyConfigurationBase: IDatasetConfigurationBase = {
+// To get all the keys of IDatasetConfigurationBase without missing one
+const exampleConfigurationBase: IDatasetConfigurationBase = {
+  compatibility: {
+    xyDimensions: "multiple",
+    zDimensions: "multiple",
+    tDimensions: "multiple",
+    channels: {}
+  },
   layers: [],
   tools: [],
   snapshots: [],
   propertyIds: []
 };
 
-export function defaultConfigurationBase(
-  dataset?: IDataset
-): IDatasetConfigurationBase {
-  const config = { ...emptyConfigurationBase };
-  if (dataset) {
-    config.layers = defaultLayers(dataset);
-  }
-  return config;
-}
+export const configurationBaseKeys = new Set(
+  Object.keys(exampleConfigurationBase)
+) as Set<keyof IDatasetConfigurationBase>;
 
 export enum AnnotationSelectionTypes {
   ADD = "ADD",
