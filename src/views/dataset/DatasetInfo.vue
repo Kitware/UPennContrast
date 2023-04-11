@@ -256,7 +256,14 @@ export default class DatasetInfo extends Vue {
   }
 
   async duplicateConfiguration(c: IDatasetConfiguration) {
-    const config = await store.api.duplicateConfiguration(c);
+    // TODO: temp choose location of the duplicated config
+    if (!this.store.dataset) {
+      return;
+    }
+    const config = await store.api.duplicateConfiguration(
+      c,
+      this.store.dataset.id
+    );
 
     this.$router.push({
       name: "configuration",

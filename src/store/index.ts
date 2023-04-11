@@ -496,7 +496,7 @@ export class Main extends VuexModule {
     }
     try {
       sync.setLoading(true);
-      const r = await this.api.getDatasetConfiguration(id);
+      const r = await this.api.getConfiguration(id);
       this.setConfiguration({ id, data: r });
       sync.setLoading(false);
     } catch (error) {
@@ -551,7 +551,8 @@ export class Main extends VuexModule {
       const config = await this.api.createConfiguration(
         name,
         description,
-        this.dataset!
+        this.dataset!.id,
+        this.dataset || undefined
       );
       sync.setSaving(false);
       return config;
@@ -596,7 +597,12 @@ export class Main extends VuexModule {
     metadata: string;
   }) {
     const newFile = (
-      await this.api.uploadJSONFile("multi-source2.json", parentId, metadata)
+      await this.api.uploadJSONFile(
+        "multi-source2.json",
+        metadata,
+        parentId,
+        "folder"
+      )
     ).data;
 
     const items = await this.api.getItems(parentId);
@@ -1208,7 +1214,7 @@ export class Main extends VuexModule {
     this.configuration.layers = [];
     snapshot.layers.forEach(this.pushLayer);
     this.loadSnapshotImpl(snapshot);
-    await this.syncConfiguration("layers");
+    await this.syncConfiguration("layers"); // TODO: temp do we want to sync the layers?
     // note that this doesn't set viewport, snapshot name, description, tags,
     // map rotation, or screenshot parameters
     return snapshot;

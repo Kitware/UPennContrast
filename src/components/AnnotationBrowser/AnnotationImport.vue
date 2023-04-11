@@ -348,7 +348,6 @@ export default class AnnotationImport extends Vue {
       })
       .then(() => {
         this.annotationStore.fetchAnnotations();
-        this.propertyStore.fetchProperties();
         this.propertyStore.fetchPropertyValues();
       })
       .finally(() => {

@@ -223,14 +223,14 @@ export class Properties extends VuexModule {
   }
 
   @Action
+  // Fetch properties corresponding of the configuration
+  // This action should be called when changing configuration
   async fetchProperties() {
     if (main.configuration) {
       const properties = await this.propertiesAPI.getProperties(
         main.configuration.propertyIds
       );
-      this.setProperties(properties);
-    } else {
-      this.setProperties([]);
+      this.setPropertiesImpl(properties);
     }
   }
 
@@ -254,8 +254,9 @@ export class Properties extends VuexModule {
 
   @Action
   async deleteProperty(propertyId: string) {
-    await this.propertiesAPI.deleteProperty(propertyId);
-    await this.fetchProperties();
+    // TODO: temp another configuration could be using this property!
+    // await this.propertiesAPI.deleteProperty(propertyId);
+    this.setProperties(this.properties.filter(p => p.id === propertyId));
   }
 
   @Action
