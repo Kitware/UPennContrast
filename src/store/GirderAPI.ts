@@ -17,7 +17,9 @@ import {
   IDatasetConfigurationBase,
   configurationBaseKeys,
   newLayer,
-  copyLayerWithoutPrivateAttributes
+  copyLayerWithoutPrivateAttributes,
+  IDatasetView,
+  IDatasetViewBase
 } from "./model";
 import {
   toStyle,
@@ -27,7 +29,8 @@ import {
 } from "./images";
 import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
-import Vue from "vue";
+import { AxiosRequestConfig, AxiosResponse } from "axios";
+import { fetchAllPages } from "@/utils/fetch";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
 // using HTML 2 might improve that slightly).  For a single layer, if we set
@@ -270,6 +273,62 @@ export default class GirderAPI {
 
   getConfiguration(id: string): Promise<IDatasetConfiguration> {
     return this.getItem(id).then(asConfigurationItem);
+  }
+
+  createDatasetView(datasetViewBase: IDatasetViewBase) {
+    return this.client
+      .post("dataset_view", datasetViewBase)
+      .then(asDatasetView);
+  }
+
+  getDatasetView(id: string) {
+    return this.client
+      .get(`dataset_view/${id}`)
+      .then(r => asDatasetView(r.data));
+  }
+
+  deleteDatasetView(id: string) {
+    return this.client.delete(`dataset_view/${id}`);
+  }
+
+  async findDatasetViews(options?: {
+    datasetId?: string;
+    configurationId?: string;
+  }) {
+    const params: AxiosRequestConfig["params"] = {
+      limit: 100000,
+      sort: "_id",
+      ...options
+    };
+    const pages = await fetchAllPages(this.client, "dataset_view", { params });
+    const datasetViews: IDatasetView[] = [];
+    for (const page of pages) {
+      for (const data of page) {
+        datasetViews.push(asDatasetView(data));
+      }
+    }
+    return datasetViews;
+  }
+
+  async getCompatibleConfigurations(dataset: IDataset) {
+    const compatibility = getDatasetCompatibility(dataset);
+    const pages = await fetchAllPages(this.client, "item/query", {
+      params: {
+        query: JSON.stringify({
+          "meta.subtype": "contrastConfiguration",
+          "meta.compatibility": compatibility
+        }),
+        sort: "updated",
+        sortdir: -1
+      }
+    });
+    const configurations: IDatasetConfiguration[] = [];
+    for (const page of pages) {
+      for (const data of page) {
+        configurations.push(asConfigurationItem(data));
+      }
+    }
+    return configurations;
   }
 
   createDataset(
@@ -543,6 +602,10 @@ function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
     }
   }
   return config as IDatasetConfiguration;
+}
+
+function asDatasetView(data: AxiosResponse["data"]): IDatasetView {
+  return { ...data, id: data._id };
 }
 
 export interface IHistogramOptions {

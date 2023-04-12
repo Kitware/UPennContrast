@@ -801,8 +801,12 @@ export default class Snapshots extends Vue {
 
   markCurrentArea() {
     // this updates the shown screenshot area
-    const w = store.dataset!.width;
-    const h = store.dataset!.height;
+    const dataset = store.dataset;
+    if (!dataset) {
+      return;
+    }
+    const w = dataset.width;
+    const h = dataset.height;
     let coordinates = [
       { x: 0, y: 0 },
       { x: w, y: 0 },

@@ -16,11 +16,13 @@
                 </v-btn>
               </template>
               <v-card>
-                <v-card-title
-                  >Are you sure to remove "{{ name }}"?</v-card-title
-                >
+                <v-card-title>
+                  Are you sure to remove "{{ name }}"?
+                </v-card-title>
                 <v-card-actions class="button-bar">
-                  <v-btn @click="removeDatasetConfirm = false">Cancel</v-btn>
+                  <v-btn @click="removeDatasetConfirm = false">
+                    Cancel
+                  </v-btn>
                   <v-btn @click="removeDataset" color="warning">Remove</v-btn>
                 </v-card-actions>
               </v-card>
@@ -58,8 +60,9 @@
                 name: 'newconfiguration',
                 params: Object.assign({ id: '' }, $route.params)
               }"
-              >Add Configuration</v-btn
             >
+              Create Configuration
+            </v-btn>
           </v-toolbar>
           <v-card-text>
             <v-dialog
@@ -68,18 +71,16 @@
               v-if="configurationToRemove"
             >
               <v-card>
-                <v-card-title
-                  >Are you sure to remove "{{
-                    configurationToRemove.name
-                  }}"?</v-card-title
-                >
+                <v-card-title>
+                  Are you sure to remove "{{ configurationToRemove.name }}"?
+                </v-card-title>
                 <v-card-actions class="button-bar">
-                  <v-btn @click="removeDatasetConfirm = false">Cancel</v-btn>
-                  <v-btn
-                    @click="removeConfiguration(configurationToRemove)"
-                    color="warning"
-                    >Remove</v-btn
-                  >
+                  <v-btn @click="closeRemoveConfigurationDialog()">
+                    Cancel
+                  </v-btn>
+                  <v-btn @click="removeConfiguration()" color="warning">
+                    Remove
+                  </v-btn>
                 </v-card-actions>
               </v-card>
             </v-dialog>
@@ -100,8 +101,9 @@
                     <v-btn
                       color="warning"
                       v-on:click.stop="openRemoveConfigurationDialog(c)"
-                      ><v-icon left>mdi-close</v-icon>remove</v-btn
                     >
+                      <v-icon left>mdi-close</v-icon>remove
+                    </v-btn>
                     <v-btn color="primary" @click="duplicateConfiguration(c)">
                       <v-icon left>mdi-content-duplicate</v-icon>
                       duplicate
@@ -121,7 +123,7 @@
   </v-container>
 </template>
 <script lang="ts">
-import { Vue, Component } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import { IDatasetConfiguration } from "../../store/model";
 
@@ -134,7 +136,7 @@ export default class DatasetInfo extends Vue {
   removeConfigurationConfirm = false;
   configurationToRemove: IDatasetConfiguration | null = null;
 
-  configuration: IDatasetConfiguration[] = [];
+  configurations: IDatasetConfiguration[] = [];
 
   readonly headers = [
     {
@@ -150,28 +152,32 @@ export default class DatasetInfo extends Vue {
     }
   ];
 
+  get dataset() {
+    return this.store.dataset;
+  }
+
   get name() {
-    return this.store.dataset ? this.store.dataset.name : "";
+    return this.dataset?.name || "";
   }
 
   get description() {
-    return this.store.dataset ? this.store.dataset.description : "";
+    return this.dataset?.description || "";
   }
 
   get xy() {
-    return this.store.dataset ? this.store.dataset.xy.length : "?";
+    return this.dataset?.xy.length || "?";
   }
 
   get z() {
-    return this.store.dataset ? this.store.dataset.z.length : "?";
+    return this.dataset?.z.length || "?";
   }
 
   get time() {
-    return this.store.dataset ? this.store.dataset.time.length : "?";
+    return this.dataset?.time.length || "?";
   }
 
   get channels() {
-    return this.store.dataset ? this.store.dataset.channels.length : "?";
+    return this.dataset?.channels.length || "?";
   }
 
   get report() {
@@ -205,17 +211,28 @@ export default class DatasetInfo extends Vue {
     ];
   }
 
-  get configurations() {
-    const existing = this.store.dataset
-      ? this.store.dataset.configurations
-      : [];
-    const my = this.configuration;
-
-    return existing.length === 0 ? existing.concat(my) : existing;
+  mounted() {
+    this.updateConfigurations();
   }
 
-  updated() {
-    this.ensureDefaultConfiguration();
+  @Watch("dataset")
+  async updateConfigurations() {
+    const views = await this.store.getCompatibleDatasetViews();
+    const configurationsSettled = await Promise.allSettled(
+      views.map(view => this.store.api.getConfiguration(view.configurationId))
+    );
+    const configurations = configurationsSettled.reduce(
+      (configurations, promise) => {
+        if (promise.status === "fulfilled") {
+          configurations.push(promise.value);
+        }
+        return configurations;
+      },
+      [] as IDatasetConfiguration[]
+    );
+
+    this.configurations = configurations;
+    return configurations;
   }
 
   toRoute(c: IDatasetConfiguration) {
@@ -226,7 +243,7 @@ export default class DatasetInfo extends Vue {
   }
 
   removeDataset() {
-    this.store.deleteDataset(this.store.dataset!).then(() => {
+    this.store.deleteDataset(this.dataset!).then(() => {
       this.removeDatasetConfirm = false;
       this.$router.push({
         name: "root"
@@ -239,26 +256,27 @@ export default class DatasetInfo extends Vue {
     this.configurationToRemove = configuration;
   }
 
-  removeConfiguration(c: IDatasetConfiguration) {
-    this.store.deleteConfiguration(c).then(() => {
-      this.removeConfigurationConfirm = false;
-      this.configurationToRemove = null;
-    });
+  closeRemoveConfigurationDialog() {
+    this.removeConfigurationConfirm = false;
+    this.configurationToRemove = null;
   }
 
-  mounted() {
-    this.ensureDefaultConfiguration();
+  removeConfiguration() {
+    if (this.configurationToRemove) {
+      this.store.deleteConfiguration(this.configurationToRemove).then(() => {
+        this.removeConfigurationConfirm = false;
+        this.configurationToRemove = null;
+        this.updateConfigurations();
+      });
+    }
   }
 
   async duplicateConfiguration(c: IDatasetConfiguration) {
     // TODO: temp choose location of the duplicated config
-    if (!this.store.dataset) {
+    if (!this.dataset) {
       return;
     }
-    const config = await store.api.duplicateConfiguration(
-      c,
-      this.store.dataset.id
-    );
+    const config = await store.api.duplicateConfiguration(c, this.dataset.id);
 
     this.$router.push({
       name: "configuration",
@@ -266,33 +284,29 @@ export default class DatasetInfo extends Vue {
     });
   }
 
+  @Watch("configurations")
   async ensureDefaultConfiguration() {
-    const { configurations, store } = this;
-
-    const dataset = this.store.dataset;
-    if (dataset === null || configurations.length > 0) {
+    if (this.dataset === null || this.configurations.length > 0) {
       return;
     }
 
-    try {
-      const dataset = this.store.dataset;
-      if (dataset === null) {
-        throw new Error("Dataset not set");
-      }
+    const defaultConfig = await store.createConfiguration({
+      name: `${this.name} default configuration`,
+      description: "Default configuration"
+    });
 
-      const config = await store.createConfiguration({
-        name: `${dataset.name} default configuration`,
-        description: "Default configuration"
-      });
-
-      if (config === null) {
-        throw new Error("Configuration not set");
-      }
-
-      this.configuration = [config];
-    } catch (err) {
-      throw err;
+    if (defaultConfig === null) {
+      throw new Error("Configuration not set");
     }
+
+    await this.store.api.createDatasetView({
+      name: "Default view",
+      datasetId: this.dataset.id,
+      configurationId: defaultConfig.id,
+      layerContrasts: {}
+    });
+
+    this.configurations = [defaultConfig];
   }
 }
 </script>

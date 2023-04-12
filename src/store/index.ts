@@ -120,6 +120,22 @@ export class Main extends VuexModule {
     });
   }
 
+  get getCompatibleDatasetViews() {
+    return () => {
+      const options: {
+        datasetId?: string;
+        configurationId?: string;
+      } = {};
+      if (this.selectedDatasetId) {
+        options.datasetId = this.selectedDatasetId;
+      }
+      if (this.selectedConfigurationId) {
+        options.configurationId = this.selectedConfigurationId;
+      }
+      return this.api.findDatasetViews(options);
+    };
+  }
+
   get unroll() {
     return this.unrollXY || this.unrollZ || this.unrollT;
   }
@@ -624,14 +640,20 @@ export class Main extends VuexModule {
   async deleteConfiguration(configuration: IDatasetConfiguration) {
     try {
       sync.setSaving(true);
-      const config = await this.api.deleteConfiguration(configuration);
+      const promises: Promise<any>[] = [];
+      promises.push(this.api.deleteConfiguration(configuration));
+      const views = await this.api.findDatasetViews({
+        configurationId: configuration.id
+      });
+      for (const { id } of views) {
+        promises.push(this.api.deleteDatasetView(id));
+      }
+      await Promise.all(promises);
       this.deleteConfigurationImpl(configuration);
       sync.setSaving(false);
-      return config;
     } catch (error) {
       sync.setSaving(error);
     }
-    return null;
   }
 
   @Mutation
@@ -663,14 +685,20 @@ export class Main extends VuexModule {
   async deleteDataset(dataset: IDataset) {
     try {
       sync.setSaving(true);
-      const config = await this.api.deleteDataset(dataset);
+      const promises: Promise<any>[] = [];
+      promises.push(this.api.deleteDataset(dataset));
+      const views = await this.api.findDatasetViews({
+        datasetId: dataset.id
+      });
+      for (const { id } of views) {
+        promises.push(this.api.deleteDatasetView(id));
+      }
+      await Promise.all(promises);
       this.deleteDatasetImpl(dataset);
       sync.setSaving(false);
-      return config;
     } catch (error) {
       sync.setSaving(error);
     }
-    return null;
   }
 
   @Action
