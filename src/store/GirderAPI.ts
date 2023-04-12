@@ -474,7 +474,7 @@ function asDataset(folder: IGirderFolder): IDataset {
   };
 }
 
-function defaultLayers(dataset: IDataset) {
+function getDefaultLayers(dataset: IDataset) {
   const nLayers = Math.min(6, dataset.channels.length);
   const layers: IDisplayLayer[] = [];
   for (let i = 0; i < nLayers; ++i) {
@@ -504,14 +504,11 @@ export function defaultConfigurationBase(
 ): IDatasetConfigurationBase {
   const config: IDatasetConfigurationBase = {
     compatibility: getDatasetCompatibility(dataset),
-    layers: [],
+    layers: getDefaultLayers(dataset),
     tools: [],
     propertyIds: [],
     snapshots: []
   };
-  if (dataset) {
-    config.layers = defaultLayers(dataset);
-  }
   return config;
 }
 

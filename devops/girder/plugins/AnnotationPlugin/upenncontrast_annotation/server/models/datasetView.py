@@ -1,5 +1,6 @@
-from girder.models.model_base import AccessControlledModel
+from girder.constants import AccessType
 from girder.exceptions import ValidationException
+from girder.models.model_base import AccessControlledModel
 
 import jsonschema
 
@@ -39,19 +40,13 @@ class DatasetViewSchema:
             'configurationId': {
                 'type': 'string'
             },
+            # Associate a contrast to a layer id
             'layerContrasts': {
-                'type': 'array',
-                'items': {
-                    'type': 'object',
-                    'properties': {
-                        'layerId': {
-                            'type': 'string'
-                        },
-                        'constrast': contrastSchema
-                    }
-                }
+                'type': 'object',
+                'additionalProperties': contrastSchema
             }
-        }
+        },
+        'required': ['name', 'datasetId', 'configurationId', 'layerContrasts']
     }
 
 class DatasetView(AccessControlledModel):
@@ -69,3 +64,14 @@ class DatasetView(AccessControlledModel):
             print('not validated cause objectId')
             raise ValidationException(exp)
         return document
+    
+    def create(self, creator, dataset_view):
+      self.setUserAccess(dataset_view, user=creator, level=AccessType.ADMIN, save=False)
+      return self.save(dataset_view)
+    
+    def delete(self, dataset_view):
+      self.remove(dataset_view)
+
+    def update(self, dataset_view, new_dataset_view):
+      dataset_view.update(new_dataset_view)
+      return self.save(dataset_view)
