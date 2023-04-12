@@ -297,7 +297,7 @@ export default class GirderAPI {
   }) {
     const params: AxiosRequestConfig["params"] = {
       limit: 100000,
-      sort: "_id",
+      sort: "updated",
       ...options
     };
     const pages = await fetchAllPages(this.client, "dataset_view", { params });

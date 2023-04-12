@@ -17,7 +17,7 @@
               </template>
               <v-card>
                 <v-card-title>
-                  Are you sure to remove "{{ name }}"?
+                  Are you sure to remove "{{ datasetName }}"?
                 </v-card-title>
                 <v-card-actions class="button-bar">
                   <v-btn @click="removeDatasetConfirm = false">
@@ -156,83 +156,69 @@ export default class DatasetInfo extends Vue {
     return this.store.dataset;
   }
 
-  get name() {
+  get datasetName() {
     return this.dataset?.name || "";
   }
 
-  get description() {
-    return this.dataset?.description || "";
-  }
-
-  get xy() {
-    return this.dataset?.xy.length || "?";
-  }
-
-  get z() {
-    return this.dataset?.z.length || "?";
-  }
-
-  get time() {
-    return this.dataset?.time.length || "?";
-  }
-
-  get channels() {
-    return this.dataset?.channels.length || "?";
-  }
-
   get report() {
-    const { name, description, time, xy, z, channels } = this;
-
     return [
       {
         name: "Dataset Name",
-        value: name
+        value: this.datasetName
       },
       {
         name: "Dataset Description",
-        value: description
+        value: this.dataset?.description || ""
       },
       {
         name: "Timepoints",
-        value: time
+        value: this.dataset?.time.length || "?"
       },
       {
         name: "XY Slices",
-        value: xy
+        value: this.dataset?.xy.length || "?"
       },
       {
         name: "Z Slices",
-        value: z
+        value: this.dataset?.z.length || "?"
       },
       {
         name: "Channels",
-        value: channels
+        value: this.dataset?.channels.length || "?"
       }
     ];
   }
 
   mounted() {
-    this.updateConfigurations();
+    if (this.dataset) {
+      this.updateConfigurations();
+    }
   }
 
   @Watch("dataset")
   async updateConfigurations() {
-    const views = await this.store.getCompatibleDatasetViews();
-    const configurationsSettled = await Promise.allSettled(
-      views.map(view => this.store.api.getConfiguration(view.configurationId))
-    );
-    const configurations = configurationsSettled.reduce(
-      (configurations, promise) => {
-        if (promise.status === "fulfilled") {
-          configurations.push(promise.value);
-        }
-        return configurations;
-      },
-      [] as IDatasetConfiguration[]
-    );
+    if (!this.dataset) {
+      this.configurations = [];
+    } else {
+      const views = await this.store.api.findDatasetViews({
+        datasetId: this.dataset.id
+      });
+      const configurationsSettled = await Promise.allSettled(
+        views.map(view => this.store.api.getConfiguration(view.configurationId))
+      );
+      const configurations = configurationsSettled.reduce(
+        (configurations, promise) => {
+          if (promise.status === "fulfilled") {
+            configurations.push(promise.value);
+          }
+          return configurations;
+        },
+        [] as IDatasetConfiguration[]
+      );
+      this.configurations = configurations;
+    }
 
-    this.configurations = configurations;
-    return configurations;
+    return this.configurations;
   }
 
   toRoute(c: IDatasetConfiguration) {
@@ -291,7 +277,7 @@ export default class DatasetInfo extends Vue {
     }
 
     const defaultConfig = await store.createConfiguration({
-      name: `${this.name} default configuration`,
+      name: `${this.datasetName} default configuration`,
       description: "Default configuration"
     });
 
@@ -300,7 +286,6 @@ export default class DatasetInfo extends Vue {
     }
 
     await this.store.api.createDatasetView({
-      name: "Default view",
       datasetId: this.dataset.id,
       configurationId: defaultConfig.id,
       layerContrasts: {}

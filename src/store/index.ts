@@ -120,22 +120,6 @@ export class Main extends VuexModule {
     });
   }
 
-  get getCompatibleDatasetViews() {
-    return () => {
-      const options: {
-        datasetId?: string;
-        configurationId?: string;
-      } = {};
-      if (this.selectedDatasetId) {
-        options.datasetId = this.selectedDatasetId;
-      }
-      if (this.selectedConfigurationId) {
-        options.configurationId = this.selectedConfigurationId;
-      }
-      return this.api.findDatasetViews(options);
-    };
-  }
-
   get unroll() {
     return this.unrollXY || this.unrollZ || this.unrollT;
   }

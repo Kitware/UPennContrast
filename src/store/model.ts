@@ -153,7 +153,6 @@ export interface IDatasetConfiguration extends IDatasetConfigurationBase {
 }
 
 export interface IDatasetViewBase {
-  name: string;
   datasetId: string;
   configurationId: string;
   layerContrasts: {

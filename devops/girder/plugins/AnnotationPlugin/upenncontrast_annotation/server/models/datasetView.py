@@ -31,9 +31,6 @@ class DatasetViewSchema:
         'id': '/girder/plugins/upenncontrast_annotation/models/annotation',
         'type': 'object',
         'properties': {
-            'name': {
-                'type': 'string'
-            },
             'datasetId': {
                 'type': 'string'
             },
@@ -46,7 +43,7 @@ class DatasetViewSchema:
                 'additionalProperties': contrastSchema
             }
         },
-        'required': ['name', 'datasetId', 'configurationId', 'layerContrasts']
+        'required': ['datasetId', 'configurationId', 'layerContrasts']
     }
 
 class DatasetView(AccessControlledModel):

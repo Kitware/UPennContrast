@@ -89,14 +89,12 @@ export default class ImportConfiguration extends Vue {
       const configuration = this.compatibleConfigurations[configurationIdx];
       promises.push(
         this.store.api.createDatasetView({
-          name: "Imported configuration",
           configurationId: configuration.id,
           datasetId: this.dataset.id,
           layerContrasts: {}
         })
       );
     }
-    await Promise.all(promises);
 
     this.$router.push({
       name: "dataset",

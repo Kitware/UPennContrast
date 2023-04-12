@@ -5,17 +5,16 @@
       <v-textarea v-model="description" label="Description" />
 
       <div class="button-bar">
-        <v-btn :disabled="!valid" color="success" class="mr-4" @click="submit"
-          >Create
+        <v-btn :disabled="!valid" color="success" class="mr-4" @click="submit">
+          Create
         </v-btn>
       </div>
     </v-form>
   </v-container>
 </template>
 <script lang="ts">
-import { Vue, Component, Inject, Prop } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
-import { IDataset } from "@/store/model";
 
 @Component
 export default class NewConfiguration extends Vue {
@@ -42,6 +41,13 @@ export default class NewConfiguration extends Vue {
       .then(config => {
         if (!config) {
           return;
+        }
+        if (this.store.dataset) {
+          this.store.api.createDatasetView({
+            datasetId: this.store.dataset.id,
+            configurationId: config.id,
+            layerContrasts: {}
+          });
         }
         this.$router.push({
           name: "configuration",
