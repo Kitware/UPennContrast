@@ -16,7 +16,8 @@ import {
   IContrast,
   IDatasetConfigurationBase,
   configurationBaseKeys,
-  newLayer
+  newLayer,
+  copyLayerWithoutPrivateAttributes
 } from "./model";
 import {
   toStyle,
@@ -521,13 +522,7 @@ function toConfiguationMetadata(data: Partial<IDatasetConfigurationBase>) {
       // Strip private attributes from layers (_histogram)
       let values = data[typedKey]!;
       if (typedKey === "layers") {
-        values = data[typedKey]!.map(layer => {
-          const baseEntries = Object.entries(layer);
-          const filteredEntries = baseEntries.filter(
-            ([key]) => !key.startsWith("_")
-          );
-          return Object.fromEntries(filteredEntries);
-        }) as IDisplayLayer[];
+        values = data[typedKey]!.map(copyLayerWithoutPrivateAttributes);
       }
       // metadata[typedKey] = values; doesn't work because of typescript
       metadata = { ...metadata, [typedKey]: values };

@@ -277,7 +277,8 @@ import {
   IGeoJSAnnotation,
   IGeoJSLayer,
   IImage,
-  ISnapshot
+  ISnapshot,
+  copyLayerWithoutPrivateAttributes
 } from "@/store/model";
 import { ITileHistogram, ITileOptionsBands, toStyle } from "@/store/images";
 import axios from "axios";
@@ -303,18 +304,6 @@ interface IDownloadParameters {
   jpeqQuality?: number;
   style?: string;
   tiffCompression?: string;
-}
-
-function copyObjectWithoutPrivateAttributes<T extends object>(
-  obj: T
-): Partial<T> {
-  const newObj: Partial<T> = { ...obj };
-  for (const key of Object.keys(newObj)) {
-    if (key.startsWith("_")) {
-      delete newObj[key as keyof T];
-    }
-  }
-  return newObj;
 }
 
 @Component({ components: { TagPicker } })
@@ -433,13 +422,11 @@ export default class Snapshots extends Vue {
       { text: "All layers", value: "all" },
       { text: "Composite layers", value: "composite" }
     ];
-    if (store.configuration && store.configuration.layers) {
-      store.configuration.layers.forEach((layer, idx) => {
-        if (layer.visible) {
-          results.push({ text: layer.name, value: idx });
-        }
-      });
-    }
+    store.layers.forEach((layer, idx) => {
+      if (layer.visible) {
+        results.push({ text: layer.name, value: idx });
+      }
+    });
     return results;
   }
 
@@ -644,7 +631,7 @@ export default class Snapshots extends Vue {
   }
 
   async getLayerDownloadURLs() {
-    const layers = this.store.configuration?.layers;
+    const layers = this.store.layers;
     const baseUrl = this.getBaseURL();
     if (!layers || !baseUrl) {
       return [];
@@ -1018,9 +1005,7 @@ export default class Snapshots extends Vue {
       z: store.z,
       time: store.time,
       layerMode: store.layerMode,
-      layers: store.configuration!.layers.map(
-        copyObjectWithoutPrivateAttributes
-      ) as IDisplayLayer[],
+      layers: store.layers.map(copyLayerWithoutPrivateAttributes),
       screenshot: {
         format: this.format,
         bbox: {

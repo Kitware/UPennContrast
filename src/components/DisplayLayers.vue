@@ -27,7 +27,7 @@ export default class DisplayLayers extends Vue {
   readonly store = store;
 
   get layers() {
-    return this.store.configuration?.layers || [];
+    return this.store.layers;
   }
 
   addLayer() {

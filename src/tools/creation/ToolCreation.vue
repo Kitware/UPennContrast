@@ -173,7 +173,7 @@ export default class ToolCreation extends Vue {
       toolNameStrings.push(this.toolValues.annotation.tags.join(", "));
       const layerIdx = this.toolValues.annotation.coordinateAssignments.layer;
       if (typeof layerIdx === "number") {
-        const layerName = this.store.configuration?.layers[layerIdx].name;
+        const layerName = this.store.layers[layerIdx].name;
         if (layerName) {
           toolNameStrings.push(layerName);
         }

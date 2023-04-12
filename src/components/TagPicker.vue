@@ -68,7 +68,7 @@ export default class TagPicker extends Vue {
 
   tagSearchInput: string = "";
   get layers() {
-    return this.store.configuration?.layers || [];
+    return this.store.layers;
   }
 }
 </script>

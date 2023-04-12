@@ -1,9 +1,4 @@
-import {
-  RestClient,
-  RestClientInstance,
-  IGirderFolder,
-  IGirderItem
-} from "@/girder";
+import { RestClient, RestClientInstance, IGirderItem } from "@/girder";
 import { IGirderSelectAble, IGirderUser } from "@/girder";
 import {
   Action,
@@ -32,7 +27,8 @@ import {
   IDatasetConfigurationBase,
   IToolConfiguration,
   AnnotationNames,
-  AnnotationShape
+  AnnotationShape,
+  IDatasetView
 } from "./model";
 
 import persister from "./Persister";
@@ -66,6 +62,8 @@ export class Main extends VuexModule {
     "recentConfigurations",
     []
   );
+
+  datasetView: IDatasetView | null = null;
 
   xy: number = 0;
   z: number = 0;
@@ -111,6 +109,15 @@ export class Main extends VuexModule {
 
   get tools() {
     return this.configuration?.tools || [];
+  }
+
+  get layers() {
+    const configurationLayers = this.configuration?.layers || [];
+    // Use contrast from dataset view
+    return configurationLayers.map(layer => {
+      const contrast = this.datasetView?.layerContrasts[layer.id];
+      return contrast ? { ...layer, contrast } : layer;
+    });
   }
 
   get unroll() {
@@ -698,8 +705,10 @@ export class Main extends VuexModule {
 
   @Mutation
   private pushLayer(layer: IDisplayLayer) {
-    const layers = this.configuration!.layers;
-    Vue.set(layers, layers.length, Object.assign({}, layer));
+    if (this.configuration) {
+      const layers = this.configuration.layers;
+      Vue.set(layers, layers.length, Object.assign({}, layer));
+    }
   }
 
   @Mutation
@@ -707,7 +716,7 @@ export class Main extends VuexModule {
     if (!this.configuration) {
       return;
     }
-    const layers = this.configuration.layers;
+    const layers = this.layers;
     switch (this.layerMode) {
       case "single":
         layers.forEach((l, i) => (l.visible = i === index));
@@ -747,7 +756,7 @@ export class Main extends VuexModule {
     if (!this.configuration || !this.dataset) {
       return;
     }
-    this.pushLayer(newLayer(this.dataset, this.configuration.layers));
+    this.pushLayer(newLayer(this.dataset, this.layers));
     await this.syncConfiguration("layers");
   }
 
@@ -762,7 +771,7 @@ export class Main extends VuexModule {
       return;
     }
     let first = true;
-    this.configuration.layers.forEach(l => {
+    this.layers.forEach(l => {
       if (l.visible) {
         if (!first) {
           l.visible = false;
@@ -770,8 +779,8 @@ export class Main extends VuexModule {
         first = false;
       }
     });
-    if (first && this.configuration.layers.length) {
-      this.configuration.layers[0].visible = true;
+    if (first && this.layers.length) {
+      this.layers[0].visible = true;
     }
   }
 
@@ -791,7 +800,7 @@ export class Main extends VuexModule {
       !this.dataset ||
       !this.configuration ||
       layerIndex < 0 ||
-      layerIndex >= this.configuration.layers.length
+      layerIndex >= this.layers.length
     ) {
       return;
     }
@@ -801,7 +810,7 @@ export class Main extends VuexModule {
 
   @Action
   async toggleGlobalZMaxMerge() {
-    const layers = this.configuration?.layers;
+    const layers = this.layers;
     if (!layers || !this.dataset) {
       return;
     }
@@ -816,10 +825,7 @@ export class Main extends VuexModule {
 
   @Action
   async toggleGlobalLayerVisibility() {
-    const layers = this.configuration?.layers;
-    if (!layers || !this.dataset) {
-      return;
-    }
+    const layers = this.layers;
     const currentVisibility = layers.every(layer => layer.visible);
     layers.forEach((layer, layerIdx) => {
       if (layer.visible === currentVisibility) {
@@ -828,6 +834,8 @@ export class Main extends VuexModule {
     });
   }
 
+  // TODO: temp
+  // Change layers? Change contrast?
   @Mutation
   private changeLayerImpl({
     index,
@@ -894,7 +902,7 @@ export class Main extends VuexModule {
       if (!this.dataset) {
         return [];
       }
-      const layer = this.configuration?.layers[layerIdx];
+      const layer = this.layers[layerIdx];
       if (!layer) {
         return [];
       }
@@ -927,8 +935,7 @@ export class Main extends VuexModule {
       if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
         return results;
       }
-      const layers = this.configuration.layers;
-      layers.forEach(layer => {
+      this.layers.forEach(layer => {
         const images = getLayerImages(layer, this.dataset!, time, xy, z);
         const hist = this.api.getResolvedLayerHistogram(images);
         if (!hist) {
@@ -972,9 +979,8 @@ export class Main extends VuexModule {
     if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
       return [];
     }
-    const layers = this.configuration.layers;
 
-    return layers.map(layer => {
+    return this.layers.map(layer => {
       const images = getLayerImages(
         layer,
         this.dataset!,
@@ -1143,7 +1149,7 @@ export class Main extends VuexModule {
     return (layerId: string | undefined) =>
       layerId === undefined
         ? undefined
-        : this.configuration?.layers.find(layer => layer.id === layerId);
+        : this.layers.find(layer => layer.id === layerId);
   }
 
   @Mutation

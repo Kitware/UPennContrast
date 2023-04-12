@@ -116,7 +116,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   get layers() {
-    return this.configuration?.layers || [];
+    return this.store.layers;
   }
 
   get filteredAnnotations() {

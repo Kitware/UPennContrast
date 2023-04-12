@@ -152,6 +152,19 @@ export interface IDatasetConfiguration extends IDatasetConfigurationBase {
   readonly description: string;
 }
 
+export interface IDatasetViewBase {
+  name: string;
+  datasetId: string;
+  configurationId: string;
+  layerContrasts: {
+    [layerId: string]: IContrast;
+  };
+}
+
+export interface IDatasetView extends IDatasetViewBase {
+  readonly id: string;
+}
+
 export type TDisplaySliceType = "current" | "max-merge" | "constant" | "offset";
 
 export interface IDisplaySlice {
@@ -590,6 +603,18 @@ export function newLayer(
       savedWhitePoint: 100
     }
   };
+}
+
+export function copyLayerWithoutPrivateAttributes(
+  layer: IDisplayLayer
+): IDisplayLayer {
+  const newLayer: IDisplayLayer = { ...layer };
+  for (const key of Object.keys(newLayer)) {
+    if (key.startsWith("_")) {
+      delete newLayer[key as keyof IDisplayLayer];
+    }
+  }
+  return newLayer;
 }
 
 // To get all the keys of IDatasetConfigurationBase without missing one
