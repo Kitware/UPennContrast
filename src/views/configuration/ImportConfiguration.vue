@@ -91,17 +91,13 @@ export default class ImportConfiguration extends Vue {
         this.store.api.createDatasetView({
           configurationId: configuration.id,
           datasetId: this.dataset.id,
-          layerContrasts: {}
+          layerContrasts: {},
+          lastViewed: Date.now()
         })
       );
     }
 
-    this.$router.push({
-      name: "dataset",
-      params: {
-        id: this.dataset.id
-      }
-    });
+    this.$router.back();
   }
 
   async cancel() {

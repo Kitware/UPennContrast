@@ -38,10 +38,6 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
-      <v-btn color="primary" :to="view" :disabled="!store.configuration">
-        <v-icon left>mdi-eye</v-icon>
-        View
-      </v-btn>
     </div>
   </v-container>
 </template>
@@ -68,16 +64,6 @@ export default class ConfigurationInfo extends Vue {
     return this.store.layers;
   }
 
-  get view() {
-    return {
-      name: "view",
-      params: Object.assign(
-        { config: this.store.selectedConfigurationId! },
-        this.$route.params
-      )
-    };
-  }
-
   toSlice(slice: IDisplaySlice) {
     switch (slice.type) {
       case "constant":
@@ -94,12 +80,7 @@ export default class ConfigurationInfo extends Vue {
   remove() {
     this.store.deleteConfiguration(this.store.configuration!).then(() => {
       this.removeConfirm = false;
-      this.$router.push({
-        name: "dataset",
-        params: {
-          id: this.$route.params.id
-        }
-      });
+      this.$router.back();
     });
   }
 }

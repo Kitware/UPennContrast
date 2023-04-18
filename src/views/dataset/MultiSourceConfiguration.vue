@@ -164,7 +164,7 @@ export default class MultiSourceConfiguration extends Vue {
   enableCompositing: boolean = false;
 
   get datasetId() {
-    return this.$route.params.id;
+    return this.$route.params.datasetId;
   }
 
   // Call join on the array, cutting out elements or the first word if too long and adding hyphens
@@ -660,7 +660,7 @@ export default class MultiSourceConfiguration extends Vue {
     this.$router.push({
       name: "dataset",
       params: {
-        id: this.datasetId
+        datasetId: this.datasetId
       }
     });
   }

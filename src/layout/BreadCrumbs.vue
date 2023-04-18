@@ -20,37 +20,102 @@
 </style>
 
 <script lang="ts">
-import { Vue, Component } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
+import { Dictionary } from "vue-router/types/router";
 
 @Component
 export default class BreadCrumbs extends Vue {
   readonly store = store;
+  items: {
+    exact: boolean;
+    text: string;
+    to: {
+      name: string;
+      params: Dictionary<string>;
+    };
+    title: string;
+  }[] = [];
 
-  get items() {
-    const titles = ["Dataset:", "Configuration:"];
-    return this.$route.matched
-      .filter(m => !m.meta.hidden)
-      .filter(m => m.name !== "view")
-      .map(record => {
-        const customText = record.meta.text;
-        let text = customText
-          ? typeof customText === "function"
-            ? customText(this.store)
-            : customText
-          : record.name;
-        return {
-          exact: true,
-          text,
-          to: {
-            name: record.name || record.meta.name,
-            params: this.$route.params
-          },
-          title: ""
-        };
-      })
-      .slice(-2)
-      .map((item, i) => Object.assign(item, { title: titles[i] }));
+  get datasetView() {
+    const { datasetViewId } = this.$route.params;
+    if (datasetViewId) {
+      return this.store.api.getDatasetView(datasetViewId);
+    }
+    return null;
+  }
+
+  get datasetId() {
+    const routeId = this.$route.params.datasetId;
+    if (routeId) {
+      return Promise.resolve(routeId);
+    }
+    if (this.datasetView) {
+      return this.datasetView.then(({ datasetId }) => datasetId);
+    }
+    return null;
+  }
+
+  get datasetFolder() {
+    return this.datasetId?.then(id => this.store.api.getFolder(id)) || null;
+  }
+
+  get configurationId() {
+    const routeId = this.$route.params.configurationId;
+    if (routeId) {
+      return Promise.resolve(routeId);
+    }
+    if (this.datasetView) {
+      return this.datasetView.then(({ configurationId }) => configurationId);
+    }
+    return null;
+  }
+
+  get configurationItem() {
+    return this.configurationId?.then(id => this.store.api.getItem(id)) || null;
+  }
+
+  mounted() {
+    this.refreshItems();
+  }
+
+  @Watch("$route")
+  async refreshItems() {
+    let index = 0;
+    for (const { title, to, recordPromise } of [
+      {
+        title: "Dataset:",
+        to: {
+          name: "dataset",
+          params: { ...this.$route.params, datasetId: await this.datasetId }
+        },
+        recordPromise: this.datasetFolder
+      },
+      {
+        title: "Configuration:",
+        to: {
+          name: "configuration",
+          params: {
+            ...this.$route.params,
+            configurationId: await this.configurationId
+          }
+        },
+        recordPromise: this.configurationItem
+      }
+    ]) {
+      if (recordPromise) {
+        const capturedIndex = index;
+        recordPromise.then(record => {
+          Vue.set(this.items, capturedIndex, {
+            exact: true,
+            text: record.name,
+            to,
+            title
+          });
+        });
+        index++;
+      }
+    }
   }
 }
 </script>

@@ -8,10 +8,10 @@ import routeMapper from "@/utils/routeMapper";
 
 export default routeMapper(
   {
-    config: {
+    datasetViewId: {
       parse: String,
-      get: () => store.selectedConfigurationId,
-      set: (value: string) => store.setSelectedConfiguration(value)
+      get: () => store.datasetView?.id || null,
+      set: (value: string) => store.setDatasetViewId(value)
     }
   },
   {

@@ -70,5 +70,7 @@ class DatasetView(AccessControlledModel):
       self.remove(dataset_view)
 
     def update(self, dataset_view, new_dataset_view):
+      id = dataset_view['_id']
       dataset_view.update(new_dataset_view)
+      dataset_view['_id'] = id
       return self.save(dataset_view)

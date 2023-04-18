@@ -48,7 +48,7 @@
               color="primary"
               :to="{
                 name: 'importconfiguration',
-                params: Object.assign({ id: '' }, $route.params)
+                params: Object.assign({ datasetId: '' }, $route.params)
               }"
             >
               Import Configuration
@@ -58,7 +58,7 @@
               color="primary"
               :to="{
                 name: 'newconfiguration',
-                params: Object.assign({ id: '' }, $route.params)
+                params: Object.assign({ datasetId: '' }, $route.params)
               }"
             >
               Create Configuration
@@ -66,19 +66,23 @@
           </v-toolbar>
           <v-card-text>
             <v-dialog
-              v-model="removeConfigurationConfirm"
+              v-model="removeDatasetViewConfirm"
               max-width="33vw"
-              v-if="configurationToRemove"
+              v-if="viewToRemove"
             >
               <v-card>
                 <v-card-title>
-                  Are you sure to remove "{{ configurationToRemove.name }}"?
+                  Are you sure to remove the view for configuration "{{
+                    configInfo[viewToRemove.configurationId]
+                      ? configInfo[viewToRemove.configurationId].name
+                      : "Unnamed configuration"
+                  }}"?
                 </v-card-title>
                 <v-card-actions class="button-bar">
                   <v-btn @click="closeRemoveConfigurationDialog()">
                     Cancel
                   </v-btn>
-                  <v-btn @click="removeConfiguration()" color="warning">
+                  <v-btn @click="removeDatasetView()" color="warning">
                     Remove
                   </v-btn>
                 </v-card-actions>
@@ -86,29 +90,40 @@
             </v-dialog>
             <v-list two-line>
               <v-list-item
-                v-for="c in configurations"
-                :key="c.name"
-                @click="$router.push(toRoute(c))"
+                v-for="d in datasetViewItems"
+                :key="d.datasetView.id"
+                @click="$router.push(toRoute(d.datasetView))"
               >
                 <v-list-item-content>
-                  <v-list-item-title>{{ c.name }}</v-list-item-title>
-                  <v-list-item-subtitle>{{
-                    c.description
-                  }}</v-list-item-subtitle>
+                  <v-list-item-title>
+                    {{
+                      d.configInfo ? d.configInfo.name : "Unnamed configuration"
+                    }}
+                  </v-list-item-title>
+                  <v-list-item-subtitle>
+                    {{
+                      d.configInfo ? d.configInfo.description : "No description"
+                    }}
+                  </v-list-item-subtitle>
                 </v-list-item-content>
                 <v-list-item-action>
                   <span class="button-bar">
                     <v-btn
                       color="warning"
-                      v-on:click.stop="openRemoveConfigurationDialog(c)"
+                      v-on:click.stop="
+                        openRemoveConfigurationDialog(d.datasetView)
+                      "
                     >
                       <v-icon left>mdi-close</v-icon>remove
                     </v-btn>
-                    <v-btn color="primary" @click="duplicateConfiguration(c)">
+                    <v-btn
+                      color="primary"
+                      @click="duplicateView(d.datasetView)"
+                    >
                       <v-icon left>mdi-content-duplicate</v-icon>
                       duplicate
                     </v-btn>
-                    <v-btn color="primary" :to="toRoute(c)">
+                    <v-btn color="primary" :to="toRoute(d.datasetView)">
                       <v-icon left>mdi-eye</v-icon>
                       view
                     </v-btn>
@@ -125,7 +140,8 @@
 <script lang="ts">
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
-import { IDatasetConfiguration } from "../../store/model";
+import { IDatasetConfiguration, IDatasetView } from "../../store/model";
+import { IGirderItem } from "@/girder";
 
 @Component
 export default class DatasetInfo extends Vue {
@@ -133,10 +149,11 @@ export default class DatasetInfo extends Vue {
 
   removeDatasetConfirm = false;
 
-  removeConfigurationConfirm = false;
-  configurationToRemove: IDatasetConfiguration | null = null;
+  removeDatasetViewConfirm = false;
+  viewToRemove: IDatasetView | null = null;
 
-  configurations: IDatasetConfiguration[] = [];
+  datasetViews: IDatasetView[] = [];
+  configInfo: { [configurationId: string]: IGirderItem } = {};
 
   readonly headers = [
     {
@@ -151,6 +168,29 @@ export default class DatasetInfo extends Vue {
       value: "value"
     }
   ];
+
+  get datasetViewItems(): {
+    datasetView: IDatasetView;
+    configInfo: IGirderItem | undefined;
+  }[] {
+    return this.datasetViews.map(datasetView => ({
+      datasetView,
+      configInfo: this.configInfo[datasetView.configurationId]
+    }));
+  }
+
+  @Watch("datasetViews")
+  fetchConfigurationsInfo() {
+    for (const datasetView of this.datasetViews) {
+      if (!(datasetView.configurationId in this.configInfo)) {
+        this.store.api
+          .getItem(datasetView.configurationId)
+          .then(item =>
+            Vue.set(this.configInfo, datasetView.configurationId, item)
+          );
+      }
+    }
+  }
 
   get dataset() {
     return this.store.dataset;
@@ -191,40 +231,28 @@ export default class DatasetInfo extends Vue {
 
   mounted() {
     if (this.dataset) {
-      this.updateConfigurations();
+      this.updateDatasetViews();
     }
   }
 
   @Watch("dataset")
-  async updateConfigurations() {
-    if (!this.dataset) {
-      this.configurations = [];
-    } else {
-      const views = await this.store.api.findDatasetViews({
+  async updateDatasetViews() {
+    if (this.dataset) {
+      this.datasetViews = await this.store.api.findDatasetViews({
         datasetId: this.dataset.id
       });
-      const configurationsSettled = await Promise.allSettled(
-        views.map(view => this.store.api.getConfiguration(view.configurationId))
-      );
-      const configurations = configurationsSettled.reduce(
-        (configurations, promise) => {
-          if (promise.status === "fulfilled") {
-            configurations.push(promise.value);
-          }
-          return configurations;
-        },
-        [] as IDatasetConfiguration[]
-      );
-      this.configurations = configurations;
+    } else {
+      this.datasetViews = [];
     }
-
-    return this.configurations;
+    return this.datasetViews;
   }
 
-  toRoute(c: IDatasetConfiguration) {
+  toRoute(datasetView: IDatasetView) {
     return {
-      name: "view",
-      params: Object.assign({}, this.$route.params, { config: c.id })
+      name: "datasetview",
+      params: Object.assign({}, this.$route.params, {
+        datasetViewId: datasetView.id
+      })
     };
   }
 
@@ -237,42 +265,54 @@ export default class DatasetInfo extends Vue {
     });
   }
 
-  openRemoveConfigurationDialog(configuration: IDatasetConfiguration) {
-    this.removeConfigurationConfirm = true;
-    this.configurationToRemove = configuration;
+  openRemoveConfigurationDialog(datasetView: IDatasetView) {
+    this.removeDatasetViewConfirm = true;
+    this.viewToRemove = datasetView;
   }
 
   closeRemoveConfigurationDialog() {
-    this.removeConfigurationConfirm = false;
-    this.configurationToRemove = null;
+    this.removeDatasetViewConfirm = false;
+    this.viewToRemove = null;
   }
 
-  removeConfiguration() {
-    if (this.configurationToRemove) {
-      this.store.deleteConfiguration(this.configurationToRemove).then(() => {
-        this.removeConfigurationConfirm = false;
-        this.configurationToRemove = null;
-        this.updateConfigurations();
+  removeDatasetView() {
+    if (this.viewToRemove) {
+      this.store.deleteDatasetView(this.viewToRemove).then(() => {
+        this.removeDatasetViewConfirm = false;
+        this.viewToRemove = null;
+        this.updateDatasetViews();
       });
     }
   }
 
-  async duplicateConfiguration(c: IDatasetConfiguration) {
+  async duplicateView(datasetView: IDatasetView) {
     // TODO: temp choose location of the duplicated config
     if (!this.dataset) {
       return;
     }
-    const config = await store.api.duplicateConfiguration(c, this.dataset.id);
+    const baseConfig = await this.store.api.getConfiguration(
+      datasetView.configurationId
+    );
+    const config = await store.api.duplicateConfiguration(
+      baseConfig,
+      this.dataset.id
+    );
+    await this.store.api.createDatasetView({
+      datasetId: this.dataset.id,
+      configurationId: config.id,
+      layerContrasts: {},
+      lastViewed: Date.now()
+    });
 
     this.$router.push({
       name: "configuration",
-      params: Object.assign({ config: config.id }, this.$route.params)
+      params: Object.assign({ configurationId: config.id }, this.$route.params)
     });
   }
 
   @Watch("configurations")
   async ensureDefaultConfiguration() {
-    if (this.dataset === null || this.configurations.length > 0) {
+    if (this.dataset === null || this.datasetViews.length > 0) {
       return;
     }
 
@@ -285,13 +325,14 @@ export default class DatasetInfo extends Vue {
       throw new Error("Configuration not set");
     }
 
-    await this.store.api.createDatasetView({
+    const defaultView = await this.store.api.createDatasetView({
       datasetId: this.dataset.id,
       configurationId: defaultConfig.id,
-      layerContrasts: {}
+      layerContrasts: {},
+      lastViewed: Date.now()
     });
 
-    this.configurations = [defaultConfig];
+    this.datasetViews = [defaultView];
   }
 }
 </script>

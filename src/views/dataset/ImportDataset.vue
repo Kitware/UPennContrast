@@ -90,7 +90,7 @@ export default class ImportDataset extends Vue {
       if (ds) {
         this.$router.push({
           name: "dataset",
-          params: { id: ds.id }
+          params: { datasetId: ds.id }
         });
       }
     });

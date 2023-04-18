@@ -2,8 +2,10 @@ from girder.api import access
 from girder.api.describe import Description, describeRoute
 from girder.api.rest import Resource, loadmodel
 from girder.constants import AccessType
-from girder.exceptions import AccessException
+from girder.exceptions import AccessException, RestException
 from ..models.datasetView import DatasetView as DatasetViewModel
+
+from bson.objectid import ObjectId
 
 
 class DatasetView(Resource):
@@ -20,41 +22,41 @@ class DatasetView(Resource):
         self.route('GET', (), self.find)
 
     @access.user
-    @describeRoute(Description("Get a dataset view by its id.")
+    @describeRoute(Description('Get a dataset view by its id.')
         .param('id', 'The dataset view\'s id', paramType='path'))
     @loadmodel(model='dataset_view', plugin='upenncontrast_dataset_view', level=AccessType.READ)
     def get(self, dataset_view, params):
         return dataset_view
     
     @access.user
-    @describeRoute(Description("Create a new dataset view.").param('body', 'Dataset View Object', paramType='body'))
+    @describeRoute(Description('Create a new dataset view.').param('body', 'Dataset View Object', paramType='body'))
     def create(self, params):
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
         return self._datasetViewModel.create(currentUser, self.getBodyJson())
     
-    @describeRoute(Description("Delete an existing dataset view.").param('id', 'The dataset view\'s Id', paramType='path').errorResponse('ID was invalid.')
+    @describeRoute(Description('Delete an existing dataset view.').param('id', 'The dataset view\'s Id', paramType='path').errorResponse('ID was invalid.')
         .errorResponse('Write access was denied for the dataset view.', 403))
     @access.user
     @loadmodel(model='dataset_view', plugin='upenncontrast_dataset_view', level=AccessType.WRITE)
     def delete(self, dataset_view, params):
         self._datasetViewModel.delete(dataset_view)
 
-    @describeRoute(Description("Update an existing dataset view.")
+    @describeRoute(Description('Update an existing dataset view.')
     .param('id', 'The ID of the dataset view.', paramType='path')
     .param('body', 'A JSON object containing the dataset view.',
                paramType='body')
     .errorResponse('Write access was denied for the item.', 403)
     .errorResponse('Invalid JSON passed in request body.')
-    .errorResponse("Validation Error: JSON doesn't follow schema."))
+    .errorResponse('Validation Error: JSON doesn\'t follow schema.'))
     @access.user
     @loadmodel(model='dataset_view', plugin='upenncontrast_dataset_view', level=AccessType.WRITE)
     def update(self, dataset_view, params):
         self._datasetViewModel.update(dataset_view, self.getBodyJson())
 
     @access.user
-    @describeRoute(Description("Search for dataset views.")
+    @describeRoute(Description('Search for dataset views.')
                    .responseClass('dataset_view')
                    .param('datasetId', 'Get all dataset views on this dataset', required=False)
                    .param('configurationId', 'Get all dataset views using this configuration', required=False)

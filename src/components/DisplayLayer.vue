@@ -58,7 +58,8 @@
         hide-details
       />
       <contrast-histogram
-        :value="value.contrast"
+        :configurationContrast="configurationContrast"
+        :viewContrast="viewContrast"
         @change="changeContrast($event, false)"
         @commit="changeContrast($event, true)"
         :histogram="histogram"
@@ -176,6 +177,14 @@ export default class DisplayLayer extends Vue {
     return this.store.dataset ? this.store.dataset.channels : [];
   }
 
+  get configurationContrast() {
+    return this.value.contrast;
+  }
+
+  get viewContrast() {
+    return this.store.datasetView?.layerContrasts[this.value.id] || null;
+  }
+
   channelName(channel: number): string {
     let result = channel.toString();
     if (this.store.dataset) {
@@ -282,14 +291,15 @@ export default class DisplayLayer extends Vue {
     });
   }
 
-  changeContrast(contrast: IContrast, sync = true) {
-    this.store.changeLayer({
-      index: this.index,
-      sync,
-      delta: {
+  changeContrast(contrast: IContrast, syncConfiguration: boolean) {
+    if (syncConfiguration) {
+      this.store.saveContrastInConfiguration({
+        index: this.index,
         contrast
-      }
-    });
+      });
+    } else {
+      this.store.saveContrastInView({ index: this.index, contrast });
+    }
   }
 
   removeLayer() {

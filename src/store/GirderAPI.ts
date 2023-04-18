@@ -223,19 +223,6 @@ export default class GirderAPI {
       .then(r => r.data);
   }
 
-  getRecentConfigurations(): Promise<IGirderItem[]> {
-    return this.client
-      .get("item/query", {
-        params: {
-          query: '{"meta.subtype":"contrastConfiguration"}',
-          limit: 5,
-          sort: "updated",
-          sortdir: -1
-        }
-      })
-      .then(r => r.data);
-  }
-
   getImages(folderId: string): Promise<IGirderItem[]> {
     return this.getItems(folderId).then(items =>
       items.filter(d => (d as any).largeImage)
@@ -278,7 +265,7 @@ export default class GirderAPI {
   createDatasetView(datasetViewBase: IDatasetViewBase) {
     return this.client
       .post("dataset_view", datasetViewBase)
-      .then(asDatasetView);
+      .then(r => asDatasetView(r.data));
   }
 
   getDatasetView(id: string) {
@@ -291,13 +278,17 @@ export default class GirderAPI {
     return this.client.delete(`dataset_view/${id}`);
   }
 
+  updateDatasetView(datasetView: IDatasetView) {
+    return this.client.put(`dataset_view/${datasetView.id}`, datasetView);
+  }
+
   async findDatasetViews(options?: {
     datasetId?: string;
     configurationId?: string;
   }) {
     const params: AxiosRequestConfig["params"] = {
       limit: 100000,
-      sort: "updated",
+      sort: "lastViewed",
       ...options
     };
     const pages = await fetchAllPages(this.client, "dataset_view", { params });
@@ -308,6 +299,19 @@ export default class GirderAPI {
       }
     }
     return datasetViews;
+  }
+
+  async getRecentDatasetViews(limit: number, offset: number = 0) {
+    const formData: AxiosRequestConfig = {
+      params: {
+        limit,
+        offset,
+        sort: "lastViewed",
+        sortdir: -1
+      }
+    };
+    const response = await this.client.get("dataset_view", formData);
+    return (response.data as any[]).map(asDatasetView);
   }
 
   async getCompatibleConfigurations(dataset: IDataset) {
@@ -605,7 +609,13 @@ function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
 }
 
 function asDatasetView(data: AxiosResponse["data"]): IDatasetView {
-  return { ...data, id: data._id };
+  return {
+    id: data._id,
+    configurationId: data.configurationId,
+    datasetId: data.datasetId,
+    layerContrasts: data.layerContrasts,
+    lastViewed: data.lastViewed
+  };
 }
 
 export interface IHistogramOptions {

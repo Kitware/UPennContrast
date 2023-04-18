@@ -28,13 +28,14 @@ import {
   IToolConfiguration,
   AnnotationNames,
   AnnotationShape,
-  IDatasetView
+  IDatasetView,
+  IContrast
 } from "./model";
 
 import persister from "./Persister";
 import store from "./root";
 import sync from "./sync";
-import { MAX_NUMBER_OF_RECENT_CONFIGURATIONS } from "./constants";
+import { MAX_NUMBER_OF_RECENT_DATASET_VIEWS } from "./constants";
 import Vue from "vue";
 export { default as store } from "./root";
 
@@ -58,10 +59,7 @@ export class Main extends VuexModule {
 
   selectedConfigurationId: string | null = null;
   configuration: IDatasetConfiguration | null = null;
-  readonly recentConfigurations: IDatasetConfigurationMeta[] = persister.get(
-    "recentConfigurations",
-    []
-  );
+  recentDatasetViews: IDatasetView[] = [];
 
   datasetView: IDatasetView | null = null;
 
@@ -224,8 +222,21 @@ export class Main extends VuexModule {
     }
   }
 
+  @Action
+  protected async loggedIn({
+    girderUrl,
+    girderRest
+  }: {
+    girderUrl: string;
+    girderRest: RestClientInstance;
+  }) {
+    await this.loggedInImpl({ girderRest, girderUrl });
+    this.setSelectedConfiguration(this.selectedConfigurationId);
+    this.setSelectedDataset(this.selectedDatasetId);
+  }
+
   @Mutation
-  protected loggedIn({
+  protected loggedInImpl({
     girderUrl,
     girderRest
   }: {
@@ -295,30 +306,6 @@ export class Main extends VuexModule {
         this.dataset.configurations.push(data);
       }
     }
-
-    // persist list
-
-    // remove old
-    const index = this.recentConfigurations.findIndex(d => d.id === data.id);
-    if (index >= 0) {
-      this.recentConfigurations.splice(index, 1);
-    }
-    this.recentConfigurations.unshift({
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      datasetId: this.selectedDatasetId!,
-      datasetName: this.dataset?.name || "Unknown"
-    });
-    if (
-      this.recentConfigurations.length > MAX_NUMBER_OF_RECENT_CONFIGURATIONS
-    ) {
-      this.recentConfigurations.splice(
-        MAX_NUMBER_OF_RECENT_CONFIGURATIONS,
-        this.recentConfigurations.length - MAX_NUMBER_OF_RECENT_CONFIGURATIONS
-      );
-    }
-    persister.set("recentConfigurations", this.recentConfigurations);
   }
 
   @Mutation
@@ -373,22 +360,17 @@ export class Main extends VuexModule {
     this.loggedOut();
   }
 
+  @Mutation
+  private setRecentDatasetViewsImpl(recentDatasetViews: IDatasetView[]) {
+    this.recentDatasetViews = recentDatasetViews;
+  }
+
   @Action
-  private async fetchRecentConfigurations() {
-    const confs = await this.api.getRecentConfigurations();
-    let curlen = this.recentConfigurations.length;
-    for (let i = 0; i < 5 - curlen; i += 1) {
-      if (confs[i]) {
-        const folder = await this.api.getFolder(confs[i].folderId);
-        this.recentConfigurations.unshift({
-          id: confs[i]._id,
-          name: confs[i].name,
-          description: confs[i].description,
-          datasetId: confs[i].folderId!,
-          datasetName: folder.name || "Unknown"
-        });
-      }
-    }
+  async fetchRecentDatasetViews() {
+    const recentDatasetViews = await this.api.getRecentDatasetViews(
+      MAX_NUMBER_OF_RECENT_DATASET_VIEWS
+    );
+    this.setRecentDatasetViewsImpl(recentDatasetViews);
   }
 
   @Action
@@ -400,16 +382,14 @@ export class Main extends VuexModule {
       sync.setLoading(true);
       const user = await this.girderRest.fetchUser();
       if (user) {
-        this.loggedIn({
+        await this.loggedIn({
           girderUrl: this.girderUrl,
           girderRest: this.girderRest
         });
       }
       await this.initFromUrl();
       sync.setLoading(false);
-      if (this.recentConfigurations.length < 5) {
-        await this.fetchRecentConfigurations();
-      }
+      await this.fetchRecentDatasetViews();
     } catch (error) {
       sync.setLoading(error);
     }
@@ -464,7 +444,7 @@ export class Main extends VuexModule {
       }
     }
 
-    this.loggedIn({
+    await this.loggedIn({
       girderUrl: domain,
       girderRest: this.girderRest
     });
@@ -509,6 +489,33 @@ export class Main extends VuexModule {
     } catch (error) {
       sync.setLoading(error);
     }
+  }
+
+  @Action
+  async setDatasetViewId(id: string | null) {
+    if (!id) {
+      this.setDatasetViewImpl(null);
+    } else {
+      const datasetView = await this.api.getDatasetView(id);
+      datasetView.lastViewed = Date.now();
+      this.setDatasetViewImpl(datasetView);
+      const promises: Promise<any>[] = [
+        this.api.updateDatasetView(datasetView),
+        this.setSelectedDataset(datasetView.datasetId),
+        this.setSelectedConfiguration(datasetView.configurationId)
+      ];
+      await Promise.all(promises);
+    }
+  }
+
+  @Mutation
+  setDatasetViewImpl(datasetView: IDatasetView | null) {
+    this.datasetView = datasetView;
+  }
+
+  @Action
+  deleteDatasetView(datasetView: IDatasetView) {
+    return this.api.deleteDatasetView(datasetView.id);
   }
 
   @Action
@@ -585,14 +592,6 @@ export class Main extends VuexModule {
         this.dataset.configurations.splice(index, 1);
       }
     }
-    // remove old
-    const index = this.recentConfigurations.findIndex(
-      d => d.id === configuration.id
-    );
-    if (index >= 0) {
-      this.recentConfigurations.splice(index, 1);
-      persister.set("recentConfigurations", this.recentConfigurations);
-    }
   }
 
   @Action
@@ -649,19 +648,6 @@ export class Main extends VuexModule {
     }
     if (this.selectedDatasetId === dataset.id) {
       this.selectedDatasetId = null;
-    }
-
-    // remove all configurations
-    const toDelete: number[] = [];
-    this.recentConfigurations.forEach((d, i) => {
-      if (d.datasetId === dataset.id) {
-        toDelete.push(i);
-      }
-    });
-    if (toDelete.length > 0) {
-      // splice in reverse order
-      toDelete.reverse().forEach(i => this.recentConfigurations.splice(i, 1));
-      persister.set("recentConfigurations", this.recentConfigurations);
     }
   }
 
@@ -728,7 +714,7 @@ export class Main extends VuexModule {
     if (!this.configuration) {
       return;
     }
-    const layers = this.layers;
+    const layers = this.configuration.layers;
     switch (this.layerMode) {
       case "single":
         layers.forEach((l, i) => (l.visible = i === index));
@@ -783,7 +769,7 @@ export class Main extends VuexModule {
       return;
     }
     let first = true;
-    this.layers.forEach(l => {
+    this.configuration.layers.forEach(l => {
       if (l.visible) {
         if (!first) {
           l.visible = false;
@@ -791,8 +777,8 @@ export class Main extends VuexModule {
         first = false;
       }
     });
-    if (first && this.layers.length) {
-      this.layers[0].visible = true;
+    if (first && this.configuration.layers.length) {
+      this.configuration.layers[0].visible = true;
     }
   }
 
@@ -846,8 +832,35 @@ export class Main extends VuexModule {
     });
   }
 
-  // TODO: temp
-  // Change layers? Change contrast?
+  @Action
+  async saveContrastInConfiguration({
+    index,
+    contrast
+  }: {
+    index: number;
+    contrast: IContrast;
+  }) {
+    this.changeLayer({ index, delta: { contrast }, sync: true });
+    if (this.datasetView) {
+      Vue.delete(this.datasetView.layerContrasts, this.layers[index].id);
+      this.api.updateDatasetView(this.datasetView);
+    }
+  }
+
+  @Action
+  async saveContrastInView({
+    index,
+    contrast
+  }: {
+    index: number;
+    contrast: IContrast;
+  }) {
+    if (this.datasetView) {
+      Vue.set(this.datasetView.layerContrasts, this.layers[index].id, contrast);
+      this.api.updateDatasetView(this.datasetView);
+    }
+  }
+
   @Mutation
   private changeLayerImpl({
     index,
@@ -1232,7 +1245,7 @@ export class Main extends VuexModule {
     this.configuration.layers = [];
     snapshot.layers.forEach(this.pushLayer);
     this.loadSnapshotImpl(snapshot);
-    await this.syncConfiguration("layers"); // TODO: temp do we want to sync the layers?
+    await this.syncConfiguration("layers");
     // note that this doesn't set viewport, snapshot name, description, tags,
     // map rotation, or screenshot parameters
     return snapshot;

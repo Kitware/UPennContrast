@@ -158,6 +158,7 @@ export interface IDatasetViewBase {
   layerContrasts: {
     [layerId: string]: IContrast;
   };
+  lastViewed: number;
 }
 
 export interface IDatasetView extends IDatasetViewBase {

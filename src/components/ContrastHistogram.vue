@@ -28,23 +28,23 @@
         ref="min"
         class="min"
         :style="{ left: toValue(currentBlackPoint) }"
-        :title="toLabel(value.blackPoint)"
+        :title="toLabel(currentContrast.blackPoint)"
       />
       <div
         class="saved-min"
-        :style="{ left: toValue(value.savedBlackPoint) }"
-        :title="`Saved: ${toLabel(value.savedBlackPoint)}`"
+        :style="{ left: toValue(currentContrast.savedBlackPoint) }"
+        :title="`Saved: ${toLabel(currentContrast.savedBlackPoint)}`"
       />
       <div
         ref="max"
         class="max"
         :style="{ right: toValue(currentWhitePoint, true) }"
-        :title="toLabel(value.whitePoint)"
+        :title="toLabel(currentContrast.whitePoint)"
       />
       <div
         class="saved-max"
-        :style="{ right: toValue(value.savedWhitePoint, true) }"
-        :title="`Saved: ${toLabel(value.savedWhitePoint)}`"
+        :style="{ right: toValue(currentContrast.savedWhitePoint, true) }"
+        :title="`Saved: ${toLabel(currentContrast.savedWhitePoint)}`"
       />
       <resize-observer @notify="handleResize" />
     </div>
@@ -125,7 +125,11 @@ const THROTTLE = 1; // ms
 })
 export default class ContrastHistogram extends Vue {
   @Prop()
-  readonly value!: IContrast;
+  readonly configurationContrast!: IContrast;
+
+  @Prop()
+  readonly viewContrast!: IContrast | null;
+
   @Prop()
   readonly histogram!: Promise<ITileHistogram>;
 
@@ -141,8 +145,12 @@ export default class ContrastHistogram extends Vue {
 
   _uid!: string; // Vue has that appearantly
 
-  currentBlackPoint = this.value.blackPoint;
-  currentWhitePoint = this.value.whitePoint;
+  get currentContrast() {
+    return this.viewContrast || this.configurationContrast;
+  }
+
+  currentBlackPoint = this.currentContrast.blackPoint;
+  currentWhitePoint = this.currentContrast.whitePoint;
 
   @Watch("value.blackPoint")
   onBlackPointChange(value: number) {
@@ -155,22 +163,24 @@ export default class ContrastHistogram extends Vue {
   }
 
   get mode() {
-    return this.value.mode;
+    return this.currentContrast.mode;
   }
 
   get editMin() {
-    return this.value.mode === "percentile" || !this.histData
+    return this.currentContrast.mode === "percentile" || !this.histData
       ? 0
       : this.histData.min;
   }
   get editMax() {
-    return this.value.mode === "percentile" || !this.histData
+    return this.currentContrast.mode === "percentile" || !this.histData
       ? 100
       : this.histData.max;
   }
 
   get editIcon() {
-    return this.value.mode === "percentile" ? "mdi-percent" : undefined;
+    return this.currentContrast.mode === "percentile"
+      ? "mdi-percent"
+      : undefined;
   }
 
   get histToPixel() {
@@ -191,7 +201,7 @@ export default class ContrastHistogram extends Vue {
 
   toValue(value: number, isWhite = false) {
     const base =
-      this.value.mode === "percentile"
+      this.currentContrast.mode === "percentile"
         ? this.percentageToPixel(value)
         : this.histToPixel(value);
     if (isWhite) {
@@ -201,7 +211,7 @@ export default class ContrastHistogram extends Vue {
   }
 
   toLabel(value: number) {
-    switch (this.value.mode) {
+    switch (this.currentContrast.mode) {
       case "percentile":
         return `${Math.round(value * 100) / 100}%`;
       default:
@@ -222,7 +232,7 @@ export default class ContrastHistogram extends Vue {
   private setAndVerify(data: ITileHistogram): void {
     this.histData = data;
 
-    if (this.value.mode === "percentile") {
+    if (this.currentContrast.mode === "percentile") {
       return;
     }
 
@@ -231,7 +241,7 @@ export default class ContrastHistogram extends Vue {
     }
 
     // ensure the values are within the bounds
-    const copy = Object.assign({}, this.value);
+    const copy = Object.assign({}, this.currentContrast);
     const clamp = (value: number) =>
       Math.min(Math.max(value, data.min), data.max);
     const keys: (
@@ -248,7 +258,7 @@ export default class ContrastHistogram extends Vue {
     });
 
     if (changed) {
-      this.$emit("commit", copy);
+      this.emitChange.call(this, copy);
     }
   }
 
@@ -258,19 +268,20 @@ export default class ContrastHistogram extends Vue {
     selectAll([this.$refs.min, this.$refs.max])
       .data(["blackPoint", "whitePoint"])
       .call(
-        drag<HTMLElement, any>()
-          .on("drag", (which: "blackPoint" | "whitePoint") => {
+        drag<HTMLElement, any>().on(
+          "drag",
+          (which: "blackPoint" | "whitePoint") => {
             const evt = d3Event as D3DragEvent<HTMLElement, any, any>;
             this.updatePoint(which, Math.max(0, Math.min(evt.x, this.width)));
-          })
-          .on("end", () => this.commitChanges())
+          }
+        )
       );
   }
 
   private updatePoint(which: "blackPoint" | "whitePoint", pixel: number) {
-    const copy = Object.assign({}, this.value);
+    const copy = Object.assign({}, this.currentContrast);
 
-    switch (this.value.mode) {
+    switch (this.currentContrast.mode) {
       case "percentile":
         copy[which] = roundPer(this.percentageToPixel.invert(pixel));
         break;
@@ -299,11 +310,11 @@ export default class ContrastHistogram extends Vue {
   THROTTLE);
 
   private commitChanges() {
-    this.$emit("commit", Object.assign({}, this.value));
+    this.$emit("commit", Object.assign({}, this.currentContrast));
   }
 
   set mode(value: "percentile" | "absolute") {
-    const copy = Object.assign({}, this.value);
+    const copy = Object.assign({}, this.currentContrast);
     copy.mode = value;
 
     const absToPer = (v: number) =>
@@ -317,7 +328,7 @@ export default class ContrastHistogram extends Vue {
     copy.savedBlackPoint = converter(copy.savedBlackPoint);
     copy.savedWhitePoint = converter(copy.savedWhitePoint);
 
-    this.$emit("commit", copy);
+    this.emitChange.call(this, copy);
   }
 
   get editBlackPoint() {
@@ -326,7 +337,7 @@ export default class ContrastHistogram extends Vue {
 
   set editBlackPoint(value: string | number) {
     const v = typeof value === "string" ? parseInt(value, 10) : value;
-    const copy = Object.assign({}, this.value);
+    const copy = Object.assign({}, this.currentContrast);
     copy.blackPoint = Math.min(v, copy.whitePoint);
     this.currentBlackPoint = copy.blackPoint;
     this.emitChange.call(this, copy);
@@ -338,32 +349,32 @@ export default class ContrastHistogram extends Vue {
 
   set editWhitePoint(value: string | number) {
     const v = typeof value === "string" ? parseInt(value, 10) : value;
-    const copy = Object.assign({}, this.value);
+    const copy = Object.assign({}, this.currentContrast);
     copy.whitePoint = Math.min(v, copy.blackPoint);
     this.currentWhitePoint = copy.whitePoint;
     this.emitChange.call(this, copy);
   }
 
   reset() {
-    const copy = Object.assign({}, this.value);
+    const copy = Object.assign({}, this.currentContrast);
     const scale =
-      this.value.mode === "percentile"
+      this.currentContrast.mode === "percentile"
         ? this.percentageToPixel
         : this.histToPixel;
     copy.blackPoint = scale.invert(0);
     copy.whitePoint = scale.invert(this.width);
-    this.$emit("commit", copy);
+    this.emitChange.call(this, copy);
   }
 
   revertSaved() {
-    const copy = Object.assign({}, this.value);
+    const copy = Object.assign({}, this.currentContrast);
     copy.blackPoint = copy.savedBlackPoint;
     copy.whitePoint = copy.savedWhitePoint;
-    this.$emit("commit", copy);
+    this.emitChange.call(this, copy);
   }
 
   saveCurrent() {
-    const copy = Object.assign({}, this.value);
+    const copy = Object.assign({}, this.currentContrast);
     copy.savedBlackPoint = copy.blackPoint;
     copy.savedWhitePoint = copy.whitePoint;
     this.$emit("commit", copy);

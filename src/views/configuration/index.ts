@@ -2,7 +2,7 @@ import Configuration from "./Configuration.vue";
 import ConfigurationInfo from "./ConfigurationInfo.vue";
 import ImportConfiguration from "./ImportConfiguration.vue";
 import NewConfiguration from "./NewConfiguration.vue";
-import Viewer from "./Viewer.vue";
+
 import { Main } from "@/store";
 import { RouteConfig } from "vue-router";
 
@@ -24,7 +24,7 @@ const routes: RouteConfig[] = [
     }
   },
   {
-    path: ":config",
+    path: ":configurationId",
     component: Configuration,
     props: true,
     meta: {
@@ -40,15 +40,6 @@ const routes: RouteConfig[] = [
         component: ConfigurationInfo,
         meta: {
           hidden: true
-        }
-      },
-      {
-        path: "view",
-        name: "view",
-        props: true,
-        component: Viewer,
-        meta: {
-          text: "Explore"
         }
       }
     ]

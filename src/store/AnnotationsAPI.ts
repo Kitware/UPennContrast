@@ -72,7 +72,7 @@ export default class AnnotationsAPI {
   async getAnnotationsForDatasetId(datasetId: string): Promise<IAnnotation[]> {
     const annotations: IAnnotation[] = [];
     const pages = await fetchAllPages(this.client, "upenn_annotation", {
-      params: { datasetId, limit: 2, sort: "_id" }
+      params: { datasetId, limit: 100000, sort: "_id" }
     });
     for (const page of pages) {
       const newAnnotations = page.map(this.toAnnotation);

@@ -46,14 +46,15 @@ export default class NewConfiguration extends Vue {
           this.store.api.createDatasetView({
             datasetId: this.store.dataset.id,
             configurationId: config.id,
-            layerContrasts: {}
+            layerContrasts: {},
+            lastViewed: Date.now()
           });
         }
         this.$router.push({
           name: "configuration",
           params: Object.assign(
             {
-              config: config.id
+              configurationId: config.id
             },
             this.$route.params
           )

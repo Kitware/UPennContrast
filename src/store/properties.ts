@@ -256,7 +256,7 @@ export class Properties extends VuexModule {
   async deleteProperty(propertyId: string) {
     // TODO: temp another configuration could be using this property!
     // await this.propertiesAPI.deleteProperty(propertyId);
-    this.setProperties(this.properties.filter(p => p.id === propertyId));
+    this.setProperties(this.properties.filter(p => p.id !== propertyId));
   }
 
   @Action

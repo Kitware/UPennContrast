@@ -1,5 +1,8 @@
 import Home from "./Home.vue";
+import DefaultRouterView from "./DefaultRouterView.vue";
 import datasetRoutes from "./dataset";
+import configurationRoutes from "./configuration";
+import datasetViewRoutes from "./datasetView";
 
 import { RouteConfig } from "vue-router";
 
@@ -12,7 +15,21 @@ const routes: RouteConfig[] = [
       hidden: true
     }
   },
-  ...datasetRoutes,
+  {
+    path: "/dataset",
+    children: datasetRoutes,
+    component: DefaultRouterView
+  },
+  {
+    path: "/configuration",
+    children: configurationRoutes,
+    component: DefaultRouterView
+  },
+  {
+    path: "/datasetView",
+    children: datasetViewRoutes,
+    component: DefaultRouterView
+  },
   {
     path: "*",
     redirect: {
