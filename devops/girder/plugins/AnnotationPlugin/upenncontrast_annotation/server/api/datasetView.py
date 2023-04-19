@@ -31,10 +31,21 @@ class DatasetView(Resource):
     @access.user
     @describeRoute(Description('Create a new dataset view.').param('body', 'Dataset View Object', paramType='body'))
     def create(self, params):
+        new_document = self.getBodyJson()
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
-        return self._datasetViewModel.create(currentUser, self.getBodyJson())
+        # Check if a view already exists with same datasetId and configurationId
+        query = {
+            'datasetId': new_document['datasetId'] ,
+            'configurationId': new_document['configurationId']
+        }
+        cursor = self._datasetViewModel.findWithPermissions(query, user=self.getCurrentUser(), level=AccessType.READ)
+        old_document = next(cursor, None)
+        # If it exists, just update the document instead of creating a new one
+        if old_document:
+            return self._datasetViewModel.update(old_document, new_document)
+        return self._datasetViewModel.create(currentUser, new_document)
     
     @describeRoute(Description('Delete an existing dataset view.').param('id', 'The dataset view\'s Id', paramType='path').errorResponse('ID was invalid.')
         .errorResponse('Write access was denied for the dataset view.', 403))
