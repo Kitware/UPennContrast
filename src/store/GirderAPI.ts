@@ -82,40 +82,9 @@ export default class GirderAPI {
     return users.map((user: IGirderUser) => user._id);
   }
 
-  async getAllPublicDatasets(): Promise<IDataset[]> {
-    const userIds = await this.getAllUserIds();
-
-    const promises = userIds.map(id => this.getDatasetsForUser(id));
-    const datasets = await Promise.all(promises);
-    return datasets.reduce(
-      (array, currentDatasets) => [...array, ...currentDatasets],
-      []
-    );
-  }
-
-  async getDatasetsForUser(userId: string = "me"): Promise<IDataset[]> {
-    const publicFolder = await this.getUserPublicFolder(userId);
-    const result = await this.client.get(
-      `folder?parentType=folder&parentId=${publicFolder._id}`
-    );
-    if (result.status !== 200) {
-      throw new Error(
-        `Could not get a list of datasets for folder ${publicFolder.name}: ${result.status}: ${result.statusText}`
-      );
-      return [];
-    }
-    if (result.data?.length) {
-      const folders = result.data;
-      const datasetFolders = folders.filter(
-        (folder: IGirderFolder) =>
-          (folder.meta || {}).subtype === "contrastDataset"
-      );
-      return datasetFolders.map((folder: IGirderFolder) => asDataset(folder));
-    }
-    return [];
-  }
-
-  async getUserPublicFolder(userId: string = "me"): Promise<IGirderFolder> {
+  async getUserPublicFolder(
+    userId: string = "me"
+  ): Promise<IGirderFolder | null> {
     const parentId =
       userId === "me" ? (await this.client.get("user/me")).data._id : userId;
 

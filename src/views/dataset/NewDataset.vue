@@ -27,6 +27,28 @@
         rows="2"
       />
 
+      <v-card>
+        <v-card-title>Location:</v-card-title>
+        <v-card-text>
+          <v-container>
+            <v-row>
+              <girder-location-chooser
+                v-model="path"
+                title="Select a Folder to Import the New Dataset"
+                root-location-disabled
+                new-folder-enabled
+              />
+              <girder-breadcrumb
+                v-if="path"
+                class="pl-4"
+                root-location-disabled
+                :location="path"
+              />
+            </v-row>
+          </v-container>
+        </v-card-text>
+      </v-card>
+
       <div class="button-bar">
         <v-btn
           :disabled="!valid || !filesSelected || uploading"
@@ -51,13 +73,7 @@ import store from "@/store";
 import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 import { IDataset } from "@/store/model";
-import {
-  collectFilenameMetadata,
-  triggers,
-  makeAlternation
-} from "@/utils/parsing";
-import { IGirderFile } from "@/girder";
-import { IGirderFolder } from "@/girder";
+import { triggers, makeAlternation } from "@/utils/parsing";
 
 interface FileUpload {
   file: File;
@@ -113,7 +129,9 @@ function findCommonPrefix(strings: string[]): string {
 @Component({
   components: {
     GirderLocationChooser,
-    GirderUpload: () => import("@/girder/components").then(mod => mod.Upload)
+    GirderUpload: () => import("@/girder/components").then(mod => mod.Upload),
+    GirderBreadcrumb: () =>
+      import("@/girder/components").then(mod => mod.Breadcrumb)
   }
 })
 export default class NewDataset extends Vue {
@@ -172,14 +190,14 @@ export default class NewDataset extends Vue {
   }
 
   async submit() {
-    if (!this.valid) {
+    if (!this.valid || !this.path) {
       return;
     }
 
     this.dataset = await this.store.createDataset({
       name: this.name,
       description: this.description,
-      path: this.path!
+      path: this.path
     });
 
     if (this.dataset === null) {
@@ -189,10 +207,7 @@ export default class NewDataset extends Vue {
 
     this.failedDataset = "";
 
-    this.path = {
-      _modelType: "folder",
-      _id: this.dataset.id
-    } as IGirderFolder;
+    this.path = await this.store.api.getFolder(this.dataset.id);
     await Vue.nextTick();
 
     this.uploading = true;

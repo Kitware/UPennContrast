@@ -1,33 +1,37 @@
 <template>
-  <v-dialog v-model="open" max-width="50vw">
+  <v-dialog v-model="open" scrollable width="auto">
     <template #activator="{ on }">
       <v-btn v-on="on">
         Choose...
       </v-btn>
     </template>
-    <v-card>
+    <v-card class="pa-2">
       <v-card-title>{{ title }}</v-card-title>
-      <v-card-text>
+      <v-card-text style="height: 70vh;">
         <girder-file-manager
-          @rowclick="onRowClick"
-          :location="value"
-          :new-folder-enabled="allowNewFolder"
-          :initial-items-per-page="itemsPerPage"
-          :items-per-page-options="itemsPerPageOptions"
+          :location.sync="selected"
+          v-bind="$attrs"
+          :initial-items-per-page="-1"
+          :items-per-page-options="[-1]"
         />
       </v-card-text>
       <v-card-actions>
-        <div class="grow">{{ selectedName }}</div>
-        <v-btn @click.prevent="select" :disabled="!selected">Select</v-btn>
+        <v-spacer />
+        <v-btn @click.prevent="open = false" color="warning">
+          Cancel
+        </v-btn>
+        <v-btn @click.prevent="select" :disabled="!selected" color="primary">
+          Select
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop } from "vue-property-decorator";
+import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
-import { IGirderLocation, IGirderSelectAble } from "@/girder";
+import { IGirderSelectAble } from "@/girder";
 
 @Component({
   components: {
@@ -46,19 +50,14 @@ export default class GirderLocationChooser extends Vue {
   })
   title!: string;
 
-  @Prop({
-    default: false
-  })
-  chooseItem!: boolean;
-
-  @Prop({
-    default: false
-  })
-  allowNewFolder!: boolean;
-
   open = false;
 
   selected: IGirderSelectAble | null = this.value;
+
+  @Watch("value")
+  valueChanged() {
+    this.selected = this.value;
+  }
 
   get selectedName() {
     return this.selected ? this.selected.name : "Select a folder...";
@@ -67,19 +66,6 @@ export default class GirderLocationChooser extends Vue {
   select() {
     this.open = false;
     this.$emit("input", this.selected);
-  }
-
-  onRowClick(data: IGirderSelectAble) {
-    if ((data._modelType === "item") === this.chooseItem) {
-      this.selected = data;
-    }
-  }
-
-  data() {
-    return {
-      itemsPerPage: 100,
-      itemsPerPageOptions: [10, 20, 50, 100, -1]
-    };
   }
 }
 </script>
