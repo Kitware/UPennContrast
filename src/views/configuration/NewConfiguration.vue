@@ -15,9 +15,21 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
+import routeMapper from "@/utils/routeMapper";
+
+const Mapper = routeMapper(
+  {},
+  {
+    datasetId: {
+      parse: String,
+      get: () => store.selectedDatasetId,
+      set: (value: string) => store.setSelectedConfiguration(value)
+    }
+  }
+);
 
 @Component
-export default class NewConfiguration extends Vue {
+export default class NewConfiguration extends Mapper {
   readonly store = store;
 
   valid = false;

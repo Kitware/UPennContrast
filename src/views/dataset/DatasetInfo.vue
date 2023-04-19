@@ -58,7 +58,8 @@
               color="primary"
               :to="{
                 name: 'newconfiguration',
-                params: Object.assign({ datasetId: '' }, $route.params)
+                params: {},
+                query: { datasetId: dataset ? dataset.id : '' }
               }"
             >
               Create Configuration

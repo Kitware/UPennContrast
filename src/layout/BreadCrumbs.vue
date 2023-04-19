@@ -45,10 +45,14 @@ export default class BreadCrumbs extends Vue {
     return null;
   }
 
-  get datasetId() {
-    const routeId = this.$route.params.datasetId;
-    if (routeId) {
-      return Promise.resolve(routeId);
+  get datasetId(): Promise<string> | null {
+    const paramsId = this.$route.params.datasetId;
+    const queryId = this.$route.query.datasetId;
+    if (paramsId) {
+      return Promise.resolve(paramsId);
+    }
+    if (queryId && typeof queryId === "string") {
+      return Promise.resolve(queryId);
     }
     if (this.datasetView) {
       return this.datasetView.then(({ datasetId }) => datasetId);
@@ -60,10 +64,14 @@ export default class BreadCrumbs extends Vue {
     return this.datasetId?.then(id => this.store.api.getFolder(id)) || null;
   }
 
-  get configurationId() {
-    const routeId = this.$route.params.configurationId;
-    if (routeId) {
-      return Promise.resolve(routeId);
+  get configurationId(): Promise<string> | null {
+    const paramsId = this.$route.params.configurationId;
+    const queryId = this.$route.query.configurationId;
+    if (paramsId) {
+      return Promise.resolve(paramsId);
+    }
+    if (queryId && typeof queryId === "string") {
+      return Promise.resolve(queryId);
     }
     if (this.datasetView) {
       return this.datasetView.then(({ configurationId }) => configurationId);

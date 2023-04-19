@@ -560,13 +560,16 @@ export class Main extends VuexModule {
     name: string;
     description: string;
   }) {
+    if (!this.dataset) {
+      return null;
+    }
     try {
       sync.setSaving(true);
       const config = await this.api.createConfigurationFromDataset(
         name,
         description,
-        this.dataset!.id,
-        this.dataset!
+        this.dataset.id,
+        this.dataset
       );
       sync.setSaving(false);
       return config;
