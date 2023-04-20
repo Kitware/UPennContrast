@@ -50,6 +50,7 @@
                   v-on="on"
                   v-bind="attrs"
                   class="mx-1"
+                  small
                   color="primary"
                   :to="{
                     name: 'importconfiguration',
@@ -68,6 +69,7 @@
                   v-on="on"
                   v-bind="attrs"
                   class="mx-1"
+                  small
                   color="primary"
                   :to="{
                     name: 'duplicateimportconfiguration',
@@ -87,6 +89,7 @@
                   v-on="on"
                   v-bind="attrs"
                   class="mx-1"
+                  small
                   color="primary"
                   :to="{
                     name: 'newconfiguration',
