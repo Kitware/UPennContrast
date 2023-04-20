@@ -35,8 +35,6 @@
               <girder-location-chooser
                 v-model="path"
                 title="Select a Folder to Import the New Dataset"
-                root-location-disabled
-                new-folder-enabled
               />
               <girder-breadcrumb
                 v-if="path"

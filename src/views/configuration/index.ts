@@ -2,6 +2,7 @@ import Configuration from "./Configuration.vue";
 import ConfigurationInfo from "./ConfigurationInfo.vue";
 import ImportConfiguration from "./ImportConfiguration.vue";
 import NewConfiguration from "./NewConfiguration.vue";
+import DuplicateImportConfiguration from "./DuplicateImportConfiguration.vue";
 
 import { Main } from "@/store";
 import { RouteConfig } from "vue-router";
@@ -20,7 +21,15 @@ const routes: RouteConfig[] = [
     name: "importconfiguration",
     component: ImportConfiguration,
     meta: {
-      text: "Import an existing configuration"
+      text: "Import one or several existing configurations"
+    }
+  },
+  {
+    path: "duplicate-import",
+    name: "duplicateimportconfiguration",
+    component: DuplicateImportConfiguration,
+    meta: {
+      text: "Duplicate and import one or several existing configurations"
     }
   },
   {

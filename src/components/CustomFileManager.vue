@@ -26,8 +26,6 @@
           <v-list class="pa-0">
             <girder-location-chooser
               @input="moveLocation => move(selected, moveLocation)"
-              root-location-disabled
-              new-folder-enabled
             >
               <template v-slot:activator="{ on }">
                 <v-list-item v-on="on">
@@ -64,8 +62,6 @@
           <v-list class="pa-0">
             <girder-location-chooser
               @input="moveLocation => move([props.item], moveLocation)"
-              root-location-disabled
-              new-folder-enabled
             >
               <template v-slot:activator="{ on }">
                 <v-list-item v-on="on">

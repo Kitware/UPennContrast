@@ -37,6 +37,7 @@ export interface IGirderFolder {
   description: string;
   meta: any;
   icon?: string;
+  parentId?: string;
 }
 
 export interface IGirderFile {

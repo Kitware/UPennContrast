@@ -70,6 +70,25 @@
                   class="mx-1"
                   color="primary"
                   :to="{
+                    name: 'duplicateimportconfiguration',
+                    query: { datasetId }
+                  }"
+                >
+                  Import configuration from collection…
+                </v-btn>
+              </template>
+              Create a copy of a collection from an existing collection and
+              apply to the current dataset. Changes to the original collection
+              don't apply to the copied collection and vice-versa
+            </v-tooltip>
+            <v-tooltip top max-width="50vh">
+              <template v-slot:activator="{ on, attrs }">
+                <v-btn
+                  v-on="on"
+                  v-bind="attrs"
+                  class="mx-1"
+                  color="primary"
+                  :to="{
                     name: 'newconfiguration',
                     params: {},
                     query: { datasetId: dataset ? dataset.id : '' }
