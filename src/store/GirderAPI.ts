@@ -10,7 +10,6 @@ import {
   IDataset,
   IDatasetConfiguration,
   IDisplayLayer,
-  isConfigurationItem,
   IFrameInfo,
   IImage,
   IContrast,
@@ -31,6 +30,7 @@ import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { fetchAllPages } from "@/utils/fetch";
+import { isConfigurationItem } from "@/utils/girderSelectable";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
 // using HTML 2 might improve that slightly).  For a single layer, if we set
@@ -365,6 +365,7 @@ export default class GirderAPI {
     // Create metadata for the configuration item
     const metadata: { [key: string]: any } = {
       subtype: "contrastConfiguration",
+      compatibility: {},
       ...toConfiguationMetadata(base)
     };
 

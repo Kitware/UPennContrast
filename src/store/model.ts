@@ -466,14 +466,6 @@ export interface ILayerStackImage {
   };
 }
 
-export function isConfigurationItem(item: IGirderItem) {
-  return item.meta.subtype === "contrastConfiguration";
-}
-
-export function isDatasetFolder(folder: IGirderFolder) {
-  return folder.meta.subtype === "contrastDataset";
-}
-
 // Fallback colors for channels with unknown names or with duplicate colors.
 // Keep the same uppercase/lowercase as the `channelColors` color values.
 const colors = [

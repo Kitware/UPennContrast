@@ -87,6 +87,12 @@ import {
   IGirderLocation,
   IGirderSelectAble
 } from "@/girder";
+import {
+  isConfigurationItem,
+  isDatasetFolder,
+  toConfigurationItem,
+  toDatasetFolder
+} from "@/utils/girderSelectable";
 
 interface IChipAttrs {
   text: string;
@@ -163,21 +169,19 @@ export default class CustomFileManager extends Vue {
     }
   }
 
-  renderItem(item: IGirderSelectAble) {
-    const isDataset =
-      item._modelType === "folder" && item.meta.subtype === "contrastDataset";
-    const isConfiguration =
-      item._modelType === "item" &&
-      item.meta.subtype === "contrastConfiguration";
-    if (isDataset) {
-      item.icon = "fileMultiple";
+  renderItem(selectable: IGirderSelectAble) {
+    const datasetFolder = toDatasetFolder(selectable);
+    const configurationItem = toConfigurationItem(selectable);
+    if (datasetFolder) {
+      datasetFolder.icon = "fileMultiple";
     }
-    if (isConfiguration) {
-      item.icon = "settings";
+    if (configurationItem) {
+      configurationItem.icon = "settings";
     }
-    if ((isDataset || isConfiguration) && !this.knownLocations[item._id]) {
-      this.knownLocations[item._id] = item;
-      this.addChipPromise(item);
+    const folderOrItem = datasetFolder || configurationItem;
+    if (folderOrItem && !this.knownLocations[selectable._id]) {
+      this.knownLocations[selectable._id] = folderOrItem;
+      this.addChipPromise(selectable);
     }
   }
 
@@ -214,22 +218,19 @@ export default class CustomFileManager extends Vue {
     }
   }
 
-  async itemToChips(item: IGirderSelectAble) {
+  async itemToChips(selectable: IGirderSelectAble) {
     const ret: IChipAttrs[] = [];
     const baseChip = {
       color: "blue"
     };
     // Add chips if item is a dataset
-    if (
-      item._modelType === "folder" &&
-      item.meta.subtype === "contrastDataset"
-    ) {
+    if (isDatasetFolder(selectable)) {
       // Dataset chip
       ret.push({ text: "Dataset", color: "green" });
       // A chip per view
       if (this.viewChipsEnabled) {
         const views = await this.store.api.findDatasetViews({
-          datasetId: item._id
+          datasetId: selectable._id
         });
         await Promise.all(
           views.map(view => {
@@ -250,16 +251,13 @@ export default class CustomFileManager extends Vue {
       }
     }
     // Add chips if item is a configuration
-    if (
-      item._modelType === "item" &&
-      item.meta.subtype === "contrastConfiguration"
-    ) {
+    if (isConfigurationItem(selectable)) {
       // Configuration chip
       ret.push({ text: "Configuration", color: "green" });
       // A chip per view
       if (this.viewChipsEnabled) {
         const views = await this.store.api.findDatasetViews({
-          configurationId: item._id
+          configurationId: selectable._id
         });
         await Promise.all(
           views.map(view => {

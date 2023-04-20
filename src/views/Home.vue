@@ -77,6 +77,7 @@ import {
 import { IDatasetView } from "@/store/model";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 import CustomFileManager from "@/components/CustomFileManager.vue";
+import { isConfigurationItem, isDatasetFolder } from "@/utils/girderSelectable";
 
 @Component({
   components: {
@@ -143,20 +144,17 @@ export default class Home extends Vue {
     this.fetchDatasetsAndConfigurations();
   }
 
-  onRowClick(data: IGirderSelectAble) {
-    if (
-      data._modelType === "folder" &&
-      data.meta.subtype === "contrastDataset"
-    ) {
-      this.$router.push({ name: "dataset", params: { datasetId: data._id } });
+  onRowClick(selectable: IGirderSelectAble) {
+    if (isDatasetFolder(selectable)) {
+      this.$router.push({
+        name: "dataset",
+        params: { datasetId: selectable._id }
+      });
     }
-    if (
-      data._modelType === "item" &&
-      data.meta.subtype === "contrastConfiguration"
-    ) {
+    if (isConfigurationItem(selectable)) {
       this.$router.push({
         name: "configuration",
-        params: { configurationId: data._id }
+        params: { configurationId: selectable._id }
       });
     }
   }
