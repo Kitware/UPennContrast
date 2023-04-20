@@ -44,26 +44,42 @@
           <v-toolbar>
             <v-toolbar-title>Configurations</v-toolbar-title>
             <v-spacer></v-spacer>
-            <v-btn
-              color="primary"
-              :to="{
-                name: 'importconfiguration',
-                params: Object.assign({ datasetId: '' }, $route.params)
-              }"
-            >
-              Import Configuration
-            </v-btn>
-            <v-btn
-              class="mx-2"
-              color="primary"
-              :to="{
-                name: 'newconfiguration',
-                params: {},
-                query: { datasetId: dataset ? dataset.id : '' }
-              }"
-            >
-              Create Configuration
-            </v-btn>
+            <v-tooltip top max-width="50vh">
+              <template v-slot:activator="{ on, attrs }">
+                <v-btn
+                  v-on="on"
+                  v-bind="attrs"
+                  class="mx-1"
+                  color="primary"
+                  :to="{
+                    name: 'importconfiguration',
+                    query: { datasetId }
+                  }"
+                >
+                  Add to existing collection…
+                </v-btn>
+              </template>
+              Add this dataset to an existing collection to apply an existing
+              configuration
+            </v-tooltip>
+            <v-tooltip top max-width="50vh">
+              <template v-slot:activator="{ on, attrs }">
+                <v-btn
+                  v-on="on"
+                  v-bind="attrs"
+                  class="mx-1"
+                  color="primary"
+                  :to="{
+                    name: 'newconfiguration',
+                    params: {},
+                    query: { datasetId: dataset ? dataset.id : '' }
+                  }"
+                >
+                  Create New Configuration…
+                </v-btn>
+              </template>
+              Create a new collection and add the current dataset to it
+            </v-tooltip>
           </v-toolbar>
           <v-card-text>
             <v-dialog
@@ -201,6 +217,10 @@ export default class DatasetInfo extends Vue {
     return this.dataset?.name || "";
   }
 
+  get datasetId() {
+    return this.dataset?.id || "";
+  }
+
   get report() {
     return [
       {
@@ -311,7 +331,8 @@ export default class DatasetInfo extends Vue {
     });
   }
 
-  @Watch("configurations")
+  @Watch("datasetViews")
+  @Watch("dataset")
   async ensureDefaultConfiguration() {
     if (this.dataset === null || this.datasetViews.length > 0) {
       return;
@@ -323,7 +344,7 @@ export default class DatasetInfo extends Vue {
     });
 
     if (defaultConfig === null) {
-      throw new Error("Configuration not set");
+      throw new Error("Failed to create default configuration");
     }
 
     const defaultView = await this.store.api.createDatasetView({
