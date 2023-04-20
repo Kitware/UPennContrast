@@ -555,10 +555,12 @@ export class Main extends VuexModule {
   @Action
   async createConfiguration({
     name,
-    description
+    description,
+    folderId
   }: {
     name: string;
     description: string;
+    folderId: string;
   }) {
     if (!this.dataset) {
       return null;
@@ -568,7 +570,7 @@ export class Main extends VuexModule {
       const config = await this.api.createConfigurationFromDataset(
         name,
         description,
-        this.dataset.id,
+        folderId,
         this.dataset
       );
       sync.setSaving(false);

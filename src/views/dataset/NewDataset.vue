@@ -34,13 +34,8 @@
             <v-row>
               <girder-location-chooser
                 v-model="path"
+                :breadcrumb="true"
                 title="Select a Folder to Import the New Dataset"
-              />
-              <girder-breadcrumb
-                v-if="path"
-                class="pl-4"
-                root-location-disabled
-                :location="path"
               />
             </v-row>
           </v-container>
@@ -127,9 +122,7 @@ function findCommonPrefix(strings: string[]): string {
 @Component({
   components: {
     GirderLocationChooser,
-    GirderUpload: () => import("@/girder/components").then(mod => mod.Upload),
-    GirderBreadcrumb: () =>
-      import("@/girder/components").then(mod => mod.Breadcrumb)
+    GirderUpload: () => import("@/girder/components").then(mod => mod.Upload)
   }
 })
 export default class NewDataset extends Vue {

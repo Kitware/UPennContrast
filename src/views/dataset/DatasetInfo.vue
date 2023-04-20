@@ -273,9 +273,7 @@ export default class DatasetInfo extends Vue {
   }
 
   mounted() {
-    if (this.dataset) {
-      this.updateDatasetViews();
-    }
+    this.updateDatasetViews();
   }
 
   @Watch("dataset")
@@ -351,32 +349,6 @@ export default class DatasetInfo extends Vue {
       name: "configuration",
       params: Object.assign({ configurationId: config.id }, this.$route.params)
     });
-  }
-
-  @Watch("datasetViews")
-  @Watch("dataset")
-  async ensureDefaultConfiguration() {
-    if (this.dataset === null || this.datasetViews.length > 0) {
-      return;
-    }
-
-    const defaultConfig = await store.createConfiguration({
-      name: `${this.datasetName} default configuration`,
-      description: "Default configuration"
-    });
-
-    if (defaultConfig === null) {
-      throw new Error("Failed to create default configuration");
-    }
-
-    const defaultView = await this.store.api.createDatasetView({
-      datasetId: this.dataset.id,
-      configurationId: defaultConfig.id,
-      layerContrasts: {},
-      lastViewed: Date.now()
-    });
-
-    this.datasetViews = [defaultView];
   }
 }
 </script>

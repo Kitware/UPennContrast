@@ -1,11 +1,19 @@
 <template>
   <v-dialog v-model="open" scrollable width="auto">
     <template #activator="{ on }">
-      <slot name="activator" v-bind="{ on }">
-        <v-btn v-on="on">
-          Choose...
-        </v-btn>
-      </slot>
+      <div class="d-flex">
+        <slot name="activator" v-bind="{ on }">
+          <v-btn v-on="on">
+            Choose...
+          </v-btn>
+        </slot>
+        <girder-breadcrumb
+          v-if="breadcrumb && selected"
+          class="pl-4"
+          root-location-disabled
+          :location="selected"
+        />
+      </div>
     </template>
     <v-card class="pa-2" style="min-width: 70vh;">
       <v-card-title>{{ title }}</v-card-title>
@@ -40,7 +48,9 @@ import CustomFileManager from "@/components/CustomFileManager.vue";
 
 @Component({
   components: {
-    CustomFileManager
+    CustomFileManager,
+    GirderBreadcrumb: () =>
+      import("@/girder/components").then(mod => mod.Breadcrumb)
   }
 })
 export default class GirderLocationChooser extends Vue {
@@ -53,6 +63,11 @@ export default class GirderLocationChooser extends Vue {
     default: "Select a Folder"
   })
   title!: string;
+
+  @Prop({
+    default: false
+  })
+  breadcrumb!: boolean;
 
   open = false;
 

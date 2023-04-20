@@ -12,13 +12,8 @@
         <div class="d-flex">
           <girder-location-chooser
             v-model="path"
+            :breadcrumb="true"
             title="Select a Folder to Import the New Dataset"
-          />
-          <girder-breadcrumb
-            v-if="path"
-            class="pl-4"
-            root-location-disabled
-            :location="path"
           />
         </div>
       </v-card-text>
@@ -41,9 +36,7 @@ import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 @Component({
   components: {
     ConfigurationSelect,
-    GirderLocationChooser,
-    GirderBreadcrumb: () =>
-      import("@/girder/components").then(mod => mod.Breadcrumb)
+    GirderLocationChooser
   }
 })
 export default class DuplicateImportConfiguration extends Vue {
