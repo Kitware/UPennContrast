@@ -26,6 +26,7 @@ export interface IGirderItem {
   description: string;
   folderId: string;
   meta: any;
+  icon?: string;
 }
 
 export interface IGirderFolder {
@@ -35,6 +36,7 @@ export interface IGirderFolder {
   name: string;
   description: string;
   meta: any;
+  icon?: string;
 }
 
 export interface IGirderFile {

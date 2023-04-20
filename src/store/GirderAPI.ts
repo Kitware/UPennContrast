@@ -94,6 +94,26 @@ export default class GirderAPI {
     return result.data.length > 0 ? result.data[0] : null;
   }
 
+  async move(resources: IGirderSelectAble[], folderId: string) {
+    const resourceObj: { folder: string[]; item: string[] } = {
+      folder: [],
+      item: []
+    };
+    for (const resource of resources) {
+      const type = resource._modelType;
+      if (type === "folder" || type === "item") {
+        resourceObj[type].push(resource._id);
+      }
+    }
+    return this.client.put("resource/move", null, {
+      params: {
+        resources: JSON.stringify(resourceObj),
+        parentType: "folder",
+        parentId: folderId
+      }
+    });
+  }
+
   async generateTiles(itemId: string) {
     return this.client.post(`item/${itemId}/tiles`);
   }

@@ -1,18 +1,22 @@
 <template>
   <v-dialog v-model="open" scrollable width="auto">
     <template #activator="{ on }">
-      <v-btn v-on="on">
-        Choose...
-      </v-btn>
+      <slot name="activator" v-bind="{ on }">
+        <v-btn v-on="on">
+          Choose...
+        </v-btn>
+      </slot>
     </template>
-    <v-card class="pa-2">
+    <v-card class="pa-2" style="min-width: 70vh;">
       <v-card-title>{{ title }}</v-card-title>
       <v-card-text style="height: 70vh;">
-        <girder-file-manager
+        <custom-file-manager
           :location.sync="selected"
           v-bind="$attrs"
           :initial-items-per-page="-1"
           :items-per-page-options="[-1]"
+          :menu-enabled="false"
+          :view-chips-enabled="false"
         />
       </v-card-text>
       <v-card-actions>
@@ -32,11 +36,11 @@
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
 import { IGirderSelectAble } from "@/girder";
+import CustomFileManager from "@/components/CustomFileManager.vue";
 
 @Component({
   components: {
-    GirderFileManager: () =>
-      import("@/girder/components").then(mod => mod.FileManager)
+    CustomFileManager
   }
 })
 export default class GirderLocationChooser extends Vue {
@@ -52,7 +56,11 @@ export default class GirderLocationChooser extends Vue {
 
   open = false;
 
-  selected: IGirderSelectAble | null = this.value;
+  selected: IGirderSelectAble | null = null;
+
+  mounted() {
+    this.valueChanged();
+  }
 
   @Watch("value")
   valueChanged() {

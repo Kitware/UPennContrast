@@ -18,3 +18,14 @@ body {
     margin-left: 1em;
   }
 }
+
+.girder-data-table.v-data-table tr .nobreak {
+  padding-left: 1em;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.girder-data-table.v-data-table td {
+  max-width: 100vh;
+}

@@ -53,14 +53,12 @@
       </v-list>
     </section>
 
-    <section v-if="store.isLoggedIn">
+    <section>
       <v-subheader>Browse</v-subheader>
-      <girder-file-manager
-        drag-enabled
-        new-folder-enabled
+      <custom-file-manager
         :location.sync="location"
-        :initial-items-per-page="itemsPerPage"
-        :items-per-page-options="itemsPerPageOptions"
+        :initial-items-per-page="100"
+        :items-per-page-options="[10, 20, 50, 100, -1]"
         @rowclick="onRowClick"
       />
     </section>
@@ -77,16 +75,18 @@ import {
   IGirderSelectAble
 } from "@/girder";
 import { IDatasetView } from "@/store/model";
+import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
+import CustomFileManager from "@/components/CustomFileManager.vue";
 
 @Component({
   components: {
-    GirderFileManager: () =>
-      import("@/girder/components").then(mod => mod.FileManager)
+    GirderLocationChooser,
+    CustomFileManager
   }
 })
-export default class Upload extends Vue {
+export default class Home extends Vue {
   readonly store = store;
-  location: IGirderLocation = { type: "root" };
+  location: IGirderLocation | null = null;
   datasetInfo: {
     [datasetId: string]: IGirderFolder;
   } = {};
@@ -159,13 +159,6 @@ export default class Upload extends Vue {
         params: { configurationId: data._id }
       });
     }
-  }
-
-  data() {
-    return {
-      itemsPerPage: 100,
-      itemsPerPageOptions: [10, 20, 50, 100, -1]
-    };
   }
 }
 </script>
