@@ -4,7 +4,7 @@ export function isConfigurationItem(selectable: IGirderSelectAble): boolean {
   return (
     selectable._modelType === "item" &&
     selectable.meta.subtype === "contrastConfiguration" &&
-    selectable.meta.compatiblity
+    selectable.meta.compatibility
   );
 }
 

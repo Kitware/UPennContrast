@@ -26,22 +26,23 @@ export default class ImportConfiguration extends Vue {
   }
 
   async submit(configurations: IDatasetConfiguration[]) {
-    if (!this.store.dataset) {
+    const dataset = this.store.dataset;
+    if (!dataset) {
       return;
     }
 
     // Create a view for each configuration
-    const promises: Promise<any>[] = [];
-    for (const configuration of configurations) {
-      promises.push(
+    const now = Date.now();
+    await Promise.all(
+      configurations.map(configuration =>
         this.store.api.createDatasetView({
           configurationId: configuration.id,
-          datasetId: this.store.dataset.id,
+          datasetId: dataset.id,
           layerContrasts: {},
-          lastViewed: Date.now()
+          lastViewed: now
         })
-      );
-    }
+      )
+    );
 
     this.$router.back();
   }

@@ -74,7 +74,7 @@ export default class PropertiesAPI {
       this.client,
       "annotation_property_values",
       {
-        params: { datasetId, limit: 100000, sort: "_id" }
+        params: { datasetId, sort: "_id" }
       }
     );
     for (const page of pages) {

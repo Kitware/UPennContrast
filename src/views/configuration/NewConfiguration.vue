@@ -9,7 +9,7 @@
       <girder-location-chooser
         v-model="path"
         :breadcrumb="true"
-        title="Select a Folder to Import the New Dataset"
+        title="Select a Folder to Create the New Configuration"
       />
 
       <div class="button-bar">
@@ -21,10 +21,11 @@
   </v-container>
 </template>
 <script lang="ts">
-import { Component } from "vue-property-decorator";
+import { Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import routeMapper from "@/utils/routeMapper";
 import { IGirderSelectAble } from "@/girder";
+import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 
 const Mapper = routeMapper(
   {},
@@ -37,7 +38,7 @@ const Mapper = routeMapper(
   }
 );
 
-@Component
+@Component({ components: { GirderLocationChooser } })
 export default class NewConfiguration extends Mapper {
   readonly store = store;
 
@@ -45,6 +46,29 @@ export default class NewConfiguration extends Mapper {
   name = "";
   description = "";
   path: IGirderSelectAble | null = null;
+
+  get dataset() {
+    return this.store.dataset;
+  }
+
+  mounted() {
+    this.fetchDefaultPath();
+  }
+
+  @Watch("dataset")
+  async fetchDefaultPath() {
+    const datasetId = this.store.dataset?.id;
+    if (datasetId) {
+      const datasetFolder = await this.store.api.getFolder(datasetId);
+      const parentId = datasetFolder.parentId;
+      if (parentId) {
+        const parentFolder = await this.store.api.getFolder(parentId);
+        this.path = parentFolder;
+        return;
+      }
+    }
+    this.path = this.store.girderUser;
+  }
 
   get rules() {
     return [(v: string) => v.trim().length > 0 || `value is required`];

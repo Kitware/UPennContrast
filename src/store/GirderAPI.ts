@@ -94,7 +94,7 @@ export default class GirderAPI {
     return result.data.length > 0 ? result.data[0] : null;
   }
 
-  async move(resources: IGirderSelectAble[], folderId: string) {
+  move(resources: IGirderSelectAble[], folderId: string) {
     const resourceObj: { folder: string[]; item: string[] } = {
       folder: [],
       item: []
@@ -275,12 +275,12 @@ export default class GirderAPI {
     datasetId?: string;
     configurationId?: string;
   }) {
-    const params: AxiosRequestConfig["params"] = {
-      limit: 100000,
-      sort: "lastViewed",
-      ...options
-    };
-    const pages = await fetchAllPages(this.client, "dataset_view", { params });
+    const pages = await fetchAllPages(this.client, "dataset_view", {
+      params: {
+        sort: "lastViewed",
+        ...options
+      }
+    });
     const datasetViews: IDatasetView[] = [];
     for (const page of pages) {
       for (const data of page) {
@@ -556,14 +556,13 @@ function getDatasetCompatibility(
 export function defaultConfigurationBase(
   dataset: IDataset
 ): IDatasetConfigurationBase {
-  const config: IDatasetConfigurationBase = {
+  return {
     compatibility: getDatasetCompatibility(dataset),
     layers: getDefaultLayers(dataset),
     tools: [],
     propertyIds: [],
     snapshots: []
   };
-  return config;
 }
 
 function toConfiguationMetadata(data: Partial<IDatasetConfigurationBase>) {

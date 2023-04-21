@@ -90,7 +90,7 @@ export default class BreadCrumbs extends Vue {
   @Watch("$route")
   async refreshItems() {
     let index = 0;
-    for (const { title, to, recordPromise } of [
+    const breadCrumbs = [
       {
         title: "Dataset:",
         to: {
@@ -110,7 +110,9 @@ export default class BreadCrumbs extends Vue {
         },
         recordPromise: this.configurationItem
       }
-    ]) {
+    ];
+    this.items = [];
+    for (const { title, to, recordPromise } of breadCrumbs) {
       if (recordPromise) {
         const capturedIndex = index;
         recordPromise.then(record => {

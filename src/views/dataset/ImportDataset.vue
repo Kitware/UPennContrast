@@ -33,11 +33,7 @@ import store from "@/store";
 import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 
-@Component({
-  components: {
-    GirderLocationChooser
-  }
-})
+@Component({ components: { GirderLocationChooser } })
 export default class ImportDataset extends Vue {
   readonly store = store;
 

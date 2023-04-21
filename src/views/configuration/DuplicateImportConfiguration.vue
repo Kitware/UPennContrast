@@ -78,9 +78,9 @@ export default class DuplicateImportConfiguration extends Vue {
     }
 
     // Duplicate each configuration and create a view for it
-    const promises: Promise<any>[] = [];
-    for (const configuration of configurations) {
-      promises.push(
+    const now = Date.now();
+    await Promise.all(
+      configurations.map(configuration =>
         this.store.api
           .duplicateConfiguration(configuration, parentFolder?._id)
           .then(newConfiguration =>
@@ -88,11 +88,11 @@ export default class DuplicateImportConfiguration extends Vue {
               configurationId: newConfiguration.id,
               datasetId: dataset.id,
               layerContrasts: {},
-              lastViewed: Date.now()
+              lastViewed: now
             })
           )
-      );
-    }
+      )
+    );
 
     this.$router.back();
   }

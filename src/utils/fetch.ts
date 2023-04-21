@@ -10,7 +10,7 @@ export async function fetchAllPages(
   const pages: any[] = [];
   let totalCount = -1;
   const formData: AxiosRequestConfig = { ...baseFormData };
-  const params = { limit: 1000, sort: "_id", ...formData.params, offset: 0 };
+  const params = { limit: 100000, sort: "_id", ...formData.params, offset: 0 };
   formData.params = params;
 
   const fetchPage = () =>
