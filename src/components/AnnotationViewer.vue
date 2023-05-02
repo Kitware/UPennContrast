@@ -1219,8 +1219,8 @@ export default class AnnotationViewer extends Vue {
     this.refreshAnnotationMode();
   }
 
-  // Fetch annotations for the current configuration
-  @Watch("configuration")
+  // Fetch annotations for the current dataset
+  @Watch("dataset")
   fetchAnnotations() {
     this.annotationStore.fetchAnnotations();
   }

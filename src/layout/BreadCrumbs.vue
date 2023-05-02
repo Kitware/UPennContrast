@@ -2,11 +2,27 @@
   <v-breadcrumbs :items="items" divider="">
     <template v-slot:item="{ item }">
       <span class="mx-0 px-1">
-        <v-breadcrumbs-item class="ma-0 pa-0">
+        <v-breadcrumbs-item>
           {{ item.title }}
         </v-breadcrumbs-item>
-        <v-breadcrumbs-item v-bind="item" class="px-2">
-          {{ item.text }}
+        <v-breadcrumbs-item v-if="item.subItems" :to="item.to">
+          <v-select
+            :value="getCurrentViewItem(item.subItems)"
+            @input="goToView"
+            dense
+            hide-details
+            single-line
+            height="1em"
+            :items="item.subItems"
+            class="body-2 small-input"
+            @click.prevent
+          />
+          <v-icon>mdi-information</v-icon>
+        </v-breadcrumbs-item>
+        <v-breadcrumbs-item v-else :to="item.to">
+          <span class="px-2">
+            {{ item.text }}
+          </span>
         </v-breadcrumbs-item>
       </span>
     </template>
@@ -22,20 +38,24 @@
 <script lang="ts">
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
+import { Location } from "vue-router";
+import { IDatasetView } from "@/store/model";
 import { Dictionary } from "vue-router/types/router";
+
+interface IBreadCrumbItem {
+  title: string;
+  to: Location;
+  text: string;
+  subItems?: {
+    text: string;
+    value: string;
+  }[];
+}
 
 @Component
 export default class BreadCrumbs extends Vue {
   readonly store = store;
-  items: {
-    exact: boolean;
-    text: string;
-    to: {
-      name: string;
-      params: Dictionary<string>;
-    };
-    title: string;
-  }[] = [];
+  items: IBreadCrumbItem[] = [];
 
   get datasetView() {
     const { datasetViewId } = this.$route.params;
@@ -60,10 +80,6 @@ export default class BreadCrumbs extends Vue {
     return null;
   }
 
-  get datasetFolder() {
-    return this.datasetId?.then(id => this.store.api.getFolder(id)) || null;
-  }
-
   get configurationId(): Promise<string> | null {
     const paramsId = this.$route.params.configurationId;
     const queryId = this.$route.query.configurationId;
@@ -79,53 +95,110 @@ export default class BreadCrumbs extends Vue {
     return null;
   }
 
-  get configurationItem() {
-    return this.configurationId?.then(id => this.store.api.getItem(id)) || null;
-  }
-
   mounted() {
     this.refreshItems();
   }
 
   @Watch("$route")
   async refreshItems() {
-    let index = 0;
-    const breadCrumbs = [
-      {
+    const [configurationId, datasetId] = await Promise.all([
+      this.configurationId,
+      this.datasetId
+    ]);
+    this.items = [];
+
+    // Dataset Item
+    let datasetItem: IBreadCrumbItem | undefined;
+    const params: Dictionary<string> = {};
+    if (datasetId) {
+      params.datasetId = datasetId;
+    }
+    if (configurationId) {
+      params.configurationId = configurationId;
+    }
+    if (datasetId) {
+      datasetItem = {
         title: "Dataset:",
         to: {
           name: "dataset",
-          params: { ...this.$route.params, datasetId: await this.datasetId }
+          params
         },
-        recordPromise: this.datasetFolder
-      },
-      {
+        text: "Unknown dataset"
+      };
+      this.items.push(datasetItem);
+      // Get name asynchronously
+      const capturedItem = datasetItem;
+      this.store.api
+        .getFolder(datasetId)
+        .then(folder => Vue.set(capturedItem, "text", folder.name));
+    }
+
+    // Configuration Item
+    let configurationItem: IBreadCrumbItem | undefined;
+    if (configurationId) {
+      configurationItem = {
         title: "Configuration:",
         to: {
           name: "configuration",
-          params: {
-            ...this.$route.params,
-            configurationId: await this.configurationId
-          }
+          params
         },
-        recordPromise: this.configurationItem
-      }
-    ];
-    this.items = [];
-    for (const { title, to, recordPromise } of breadCrumbs) {
-      if (recordPromise) {
-        const capturedIndex = index;
-        recordPromise.then(record => {
-          Vue.set(this.items, capturedIndex, {
-            exact: true,
-            text: record.name,
-            to,
-            title
-          });
-        });
-        index++;
-      }
+        text: "Unknown configuration"
+      };
+      this.items.push(configurationItem);
+      // Get name asynchronously
+      const capturedItem = configurationItem;
+      this.store.api
+        .getItem(configurationId)
+        .then(item => Vue.set(capturedItem, "text", item.name));
     }
+
+    // Drop-down if datasetItem and configurationId
+    if (datasetItem && configurationId && this.$route.name === "datasetview") {
+      const capturedDatasetItem = datasetItem;
+      this.store.api.findDatasetViews({ configurationId }).then(views => {
+        if (!views.length) {
+          return;
+        }
+        const datasetItems: IBreadCrumbItem["subItems"] = views.map(view => {
+          const viewItem = {
+            text: "Unknown dataset",
+            value: view.id
+          };
+          // Get name asynchronously
+          const capturedItem = viewItem;
+          this.store.api
+            .getFolder(view.datasetId)
+            .then(folder => Vue.set(capturedItem, "text", folder.name));
+          return viewItem;
+        });
+        Vue.set(capturedDatasetItem, "subItems", datasetItems);
+      });
+    }
+  }
+
+  getCurrentViewItem(subitems: IBreadCrumbItem["subItems"]) {
+    if (!subitems) {
+      return null;
+    }
+    const { datasetViewId } = this.$route.params;
+    if (!datasetViewId) {
+      return null;
+    }
+    return subitems.find(subitem => subitem.value === datasetViewId) || null;
+  }
+
+  goToView(datasetViewId: string) {
+    const currentDatasetViewId = this.$route.params?.datasetViewId;
+    if (currentDatasetViewId === datasetViewId) {
+      return;
+    }
+    this.$router.push({ name: "datasetview", params: { datasetViewId } });
   }
 }
 </script>
+
+<style>
+.small-input input {
+  width: 1em;
+}
+</style>
