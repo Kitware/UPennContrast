@@ -69,14 +69,11 @@ export default class AnnotationsAPI {
       });
   }
 
-  async getAnnotationsForDatasetId(id: string): Promise<IAnnotation[]> {
+  async getAnnotationsForDatasetId(datasetId: string): Promise<IAnnotation[]> {
     const annotations: IAnnotation[] = [];
-    const pages = await fetchAllPages(
-      this.client,
-      "upenn_annotation",
-      id,
-      100000
-    );
+    const pages = await fetchAllPages(this.client, "upenn_annotation", {
+      params: { datasetId, sort: "_id" }
+    });
     for (const page of pages) {
       const newAnnotations = page.map(this.toAnnotation);
       annotations.push(...newAnnotations);
@@ -156,15 +153,12 @@ export default class AnnotationsAPI {
   }
 
   async getConnectionsForDatasetId(
-    id: string
+    datasetId: string
   ): Promise<IAnnotationConnection[]> {
     const connections: IAnnotationConnection[] = [];
-    const pages = await fetchAllPages(
-      this.client,
-      "annotation_connection",
-      id,
-      100000
-    );
+    const pages = await fetchAllPages(this.client, "annotation_connection", {
+      params: { datasetId, sort: "_id" }
+    });
     for (const page of pages) {
       const newConnections = page.map(this.toConnection);
       connections.push(...newConnections);
@@ -192,7 +186,7 @@ export default class AnnotationsAPI {
     },
     workerInterface: IWorkerInterfaceValues
   ) {
-    const { configurationId, description, id, name, type, values } = tool;
+    const { id, name, type, values } = tool;
     const image = values.image.image;
     const { annotation, connectTo, jobDateTag } = values;
     let tags = annotation.tags;
@@ -210,9 +204,7 @@ export default class AnnotationsAPI {
       tags = [...tags, computedTag];
     }
     const params = {
-      configurationId,
       datasetId,
-      description,
       type,
       id,
       name,

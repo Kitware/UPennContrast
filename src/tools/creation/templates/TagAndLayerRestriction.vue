@@ -20,7 +20,6 @@
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
-import toolsStore from "@/store/tool";
 import { IToolConfiguration } from "@/store/model";
 import LayerSelect from "@/components/LayerSelect.vue";
 import TagPicker from "@/components/TagPicker.vue";
@@ -34,7 +33,6 @@ import TagPicker from "@/components/TagPicker.vue";
 })
 export default class TagAndLayerRestriction extends Vue {
   readonly store = store;
-  readonly toolsStore = toolsStore;
 
   newTags: string[] = [];
   selectedLayer: number | null = null;
@@ -58,7 +56,7 @@ export default class TagAndLayerRestriction extends Vue {
 
   // list of existing tags for autocomplete
   get tagList(): string[] {
-    return this.toolsStore.tools
+    return this.store.tools
       .filter(
         (tool: IToolConfiguration) =>
           (tool.type === "create" || tool.type === "snap") &&

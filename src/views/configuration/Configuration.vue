@@ -6,10 +6,10 @@ import store from "@/store";
 import routeMapper from "@/utils/routeMapper";
 
 export default routeMapper({
-  datasetId: {
+  configurationId: {
     parse: String,
-    get: () => store.selectedDatasetId,
-    set: (value: string) => store.setSelectedDataset(value)
+    get: () => store.selectedConfigurationId,
+    set: (value: string) => store.setSelectedConfiguration(value)
   }
 });
 </script>

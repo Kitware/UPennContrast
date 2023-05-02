@@ -81,10 +81,8 @@
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import propertiesStore from "@/store/properties";
-import toolsStore from "@/store/tool";
 import annotationStore from "@/store/annotation";
 import {
-  IAnnotationProperty,
   AnnotationShape,
   IWorkerLabels,
   AnnotationNames,
@@ -109,10 +107,9 @@ import PropertyWorkerMenu from "@/components/PropertyWorkerMenu.vue";
 export default class PropertyCreation extends Vue {
   readonly store = store;
   readonly propertyStore = propertiesStore;
-  readonly toolsStore = toolsStore;
   readonly annotationStore = annotationStore;
 
-  availableShapes = toolsStore.availableShapes;
+  availableShapes = this.store.availableToolShapes;
 
   areTagsExclusive: boolean = false;
   filteringTags: string[] = [];

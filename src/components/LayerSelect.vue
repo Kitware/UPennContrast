@@ -13,7 +13,6 @@
 <script lang="ts">
 import { Vue, Component, Prop, VModel } from "vue-property-decorator";
 import store from "@/store";
-import toolsStore from "@/store/tool";
 
 // Interface element selecting a layer
 @Component({
@@ -21,7 +20,6 @@ import toolsStore from "@/store/tool";
 })
 export default class LayerSelect extends Vue {
   readonly store = store;
-  readonly toolsStore = toolsStore;
 
   // Adds an "Any" selection choice
   @Prop()
@@ -33,7 +31,7 @@ export default class LayerSelect extends Vue {
   @VModel({ type: Number }) layer!: Number;
 
   get layers() {
-    return this.store.configuration?.view.layers || [];
+    return this.store.layers;
   }
 
   get layerItems() {

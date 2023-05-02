@@ -10,26 +10,27 @@ import {
   IDataset,
   IDatasetConfiguration,
   IDisplayLayer,
-  isConfigurationItem,
   IFrameInfo,
   IImage,
   IContrast,
-  IImageTile,
-  IToolSet,
+  IDatasetConfigurationBase,
+  configurationBaseKeys,
   newLayer,
-  IViewConfiguration,
-  IToolConfiguration
+  copyLayerWithoutPrivateAttributes,
+  IDatasetView,
+  IDatasetViewBase
 } from "./model";
 import {
   toStyle,
-  ITileOptions,
   ITileOptionsBands,
   mergeHistograms,
   ITileHistogram
 } from "./images";
 import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
-import Vue from "vue";
+import { AxiosRequestConfig, AxiosResponse } from "axios";
+import { fetchAllPages } from "@/utils/fetch";
+import { isConfigurationItem } from "@/utils/girderSelectable";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
 // using HTML 2 might improve that slightly).  For a single layer, if we set
@@ -37,7 +38,6 @@ import Vue from "vue";
 // capacity slack.  If it is too great (thousands, for instance), browsers can
 // fail.  9 is a balance that is somewhat low but was measured as fast as
 // higher values in a limited set of tests.
-const ImageConcurrency: number = 9;
 const HistogramConcurrency: number = 9;
 
 interface HTMLImageElementLocal extends HTMLImageElement {
@@ -82,90 +82,9 @@ export default class GirderAPI {
     return users.map((user: IGirderUser) => user._id);
   }
 
-  async getAllPublicDatasets(): Promise<IDataset[]> {
-    const userIds = await this.getAllUserIds();
-
-    const promises = userIds.map(id => this.getDatasetsForUser(id));
-    const datasets = await Promise.all(promises);
-    return datasets.reduce(
-      (array, currentDatasets) => [...array, ...currentDatasets],
-      []
-    );
-  }
-  async getTool(toolId: string): Promise<IToolConfiguration> {
-    try {
-      const item = await this.getItem(toolId);
-      return asToolConfiguration(item);
-    } catch (e) {
-      throw e;
-    }
-  }
-
-  async getAllTools(): Promise<IToolConfiguration[]> {
-    const userIds = await this.getAllUserIds();
-    const promises = userIds.map(id => this.getToolsForUser(id));
-    const tools = await Promise.all(promises);
-    return tools.reduce(
-      (array, currentTools) => [...array, ...currentTools],
-      []
-    );
-  }
-
-  async getToolsForUser(userId: string = "me"): Promise<IToolConfiguration[]> {
-    const publicFolder = await this.getUserPublicFolder(userId);
-
-    const toolFolderName = "TOOLS";
-    const toolsFolderResult = await this.client.get(
-      `folder?parentType=folder&parentId=${publicFolder._id}&name=${toolFolderName}`
-    );
-    const toolsFolder: IGirderFolder = toolsFolderResult.data[0];
-    if (toolsFolder?.meta?.subtype !== "toolFolder") {
-      return [];
-    }
-
-    const toolsResult = await this.client.get(
-      `item?folderId=${toolsFolder._id}`
-    );
-    if (toolsResult.status !== 200) {
-      throw new Error(
-        `Could not get a list of tools for folder ${toolsFolder.name}: ${toolsResult.status}: ${toolsResult.statusText}`
-      );
-      return [];
-    }
-
-    if (toolsResult.data?.length) {
-      const items = toolsResult.data;
-      const toolItems = items.filter(
-        (item: IGirderItem) => (item.meta || {}).subtype === "toolConfiguration"
-      );
-      return toolItems.map((item: IGirderItem) => asToolConfiguration(item));
-    }
-    return [];
-  }
-
-  async getDatasetsForUser(userId: string = "me"): Promise<IDataset[]> {
-    const publicFolder = await this.getUserPublicFolder(userId);
-    const result = await this.client.get(
-      `folder?parentType=folder&parentId=${publicFolder._id}`
-    );
-    if (result.status !== 200) {
-      throw new Error(
-        `Could not get a list of datasets for folder ${publicFolder.name}: ${result.status}: ${result.statusText}`
-      );
-      return [];
-    }
-    if (result.data?.length) {
-      const folders = result.data;
-      const datasetFolders = folders.filter(
-        (folder: IGirderFolder) =>
-          (folder.meta || {}).subtype === "contrastDataset"
-      );
-      return datasetFolders.map((folder: IGirderFolder) => asDataset(folder));
-    }
-    return [];
-  }
-
-  async getUserPublicFolder(userId: string = "me"): Promise<IGirderFolder> {
+  async getUserPublicFolder(
+    userId: string = "me"
+  ): Promise<IGirderFolder | null> {
     const parentId =
       userId === "me" ? (await this.client.get("user/me")).data._id : userId;
 
@@ -173,6 +92,26 @@ export default class GirderAPI {
       `folder?parentType=user&parentId=${parentId}&name=Public`
     );
     return result.data.length > 0 ? result.data[0] : null;
+  }
+
+  move(resources: IGirderSelectAble[], folderId: string) {
+    const resourceObj: { folder: string[]; item: string[] } = {
+      folder: [],
+      item: []
+    };
+    for (const resource of resources) {
+      const type = resource._modelType;
+      if (type === "folder" || type === "item") {
+        resourceObj[type].push(resource._id);
+      }
+    }
+    return this.client.put("resource/move", null, {
+      params: {
+        resources: JSON.stringify(resourceObj),
+        parentType: "folder",
+        parentId: folderId
+      }
+    });
   }
 
   async generateTiles(itemId: string) {
@@ -183,10 +122,15 @@ export default class GirderAPI {
     return this.client.delete(`item/${item._id}/tiles`);
   }
 
-  async uploadJSONFile(name: string, parentId: string, content: string) {
+  uploadJSONFile(
+    name: string,
+    content: string,
+    parentId: string,
+    parentType: "folder" | "item" = "folder"
+  ) {
     const blob = new Blob([content], { type: "application/json" });
     return this.client.post(
-      `file?parentId=${parentId}&parentType=folder&name=${name}&size=${blob.size}`,
+      `file?parentId=${parentId}&parentType=${parentType}&name=${name}&size=${blob.size}`,
       blob,
       {
         headers: {
@@ -194,15 +138,6 @@ export default class GirderAPI {
         }
       }
     );
-  }
-
-  getFiles(item: string | IGirderItem): Promise<IGirderFile[]> {
-    return this.client.get(`item/${toId(item)}/files`).then(r => r.data);
-  }
-  downloadUrl(item: string | IGirderItem) {
-    const url = new URL(`${this.client.apiRoot}/item/${toId(item)}/download`);
-    url.searchParams.set("contentDisposition", "inline");
-    return url.href;
   }
 
   tileTemplateUrl(
@@ -277,19 +212,6 @@ export default class GirderAPI {
       .then(r => r.data);
   }
 
-  getRecentConfigurations(): Promise<IGirderItem[]> {
-    return this.client
-      .get("item/query", {
-        params: {
-          query: '{"meta.subtype":"contrastConfiguration"}',
-          limit: 5,
-          sort: "updated",
-          sortdir: -1
-        }
-      })
-      .then(r => r.data);
-  }
-
   getImages(folderId: string): Promise<IGirderItem[]> {
     return this.getItems(folderId).then(items =>
       items.filter(d => (d as any).largeImage)
@@ -307,80 +229,99 @@ export default class GirderAPI {
         // just use the first image if it exists
         const folderDataset = asDataset(folder);
         const imageItem = items.find(d => (d as any).largeImage);
-        const configurations = items
+        const configPromises = items
           .filter(isConfigurationItem)
-          .map(asConfigurationItem);
-        const baseDataset = { ...folderDataset, configurations };
-        if (imageItem === undefined) {
-          return baseDataset;
-        } else {
-          return this.getTiles(imageItem).then(tiles => ({
-            ...baseDataset,
-            ...parseTiles(imageItem, tiles, unrollXY, unrollZ, unrollT)
-          }));
-        }
+          .map(item => this.getConfiguration(item._id));
+        return Promise.all(configPromises).then(configurations => {
+          const baseDataset = { ...folderDataset, configurations };
+          if (imageItem === undefined) {
+            return baseDataset;
+          } else {
+            return this.getTiles(imageItem).then(tiles => ({
+              ...baseDataset,
+              ...parseTiles(imageItem, tiles, unrollXY, unrollZ, unrollT)
+            }));
+          }
+        });
       }
     );
   }
 
-  getDatasetConfiguration(id: string): Promise<IDatasetConfiguration> {
+  getConfiguration(id: string): Promise<IDatasetConfiguration> {
     return this.getItem(id).then(asConfigurationItem);
   }
 
-  async createTool(
-    name: string,
-    description: string,
-    dataset: IDataset,
-    configuration: IDatasetConfiguration
-  ): Promise<IToolConfiguration> {
-    const toolFolderName = "TOOLS";
-
-    // Create a tools directory if not created
-    const publicFolder = await this.getUserPublicFolder();
-
-    // Create tools folder
-    const toolsFolderData = new FormData();
-    toolsFolderData.set("parentType", publicFolder._modelType);
-    toolsFolderData.set("parentId", publicFolder._id);
-    toolsFolderData.set("name", toolFolderName);
-    toolsFolderData.set(
-      "description",
-      "A directory for all tools that were created by this user"
-    );
-    toolsFolderData.set("reuseExisting", "true");
-    toolsFolderData.set("metadata", JSON.stringify({ subtype: "toolFolder" }));
-
-    const resp = await this.client.post("folder", toolsFolderData);
-    const toolsFolder: IGirderFolder = resp.data;
-
-    // Use this directory as parent for all items
-    const itemData = new FormData();
-    itemData.set("folderId", toolsFolder._id);
-    itemData.set("name", name);
-    itemData.set("description", description);
-    itemData.set("reuseExisting", "false");
-    itemData.set(
-      "metadata",
-      JSON.stringify({
-        subtype: "toolConfiguration",
-        datasetId: dataset.id,
-        configurationId: configuration.id
-      })
-    );
-
+  createDatasetView(datasetViewBase: IDatasetViewBase) {
     return this.client
-      .post("item", itemData)
-      .then(r => asToolConfiguration(r.data));
+      .post("dataset_view", datasetViewBase)
+      .then(r => asDatasetView(r.data));
   }
 
-  updateTool(tool: IToolConfiguration): Promise<IToolConfiguration> {
+  getDatasetView(id: string) {
     return this.client
-      .put(`/item/${tool.id}/metadata`, {
-        type: tool.type,
-        template: tool.template,
-        values: tool.values
-      })
-      .then(() => tool);
+      .get(`dataset_view/${id}`)
+      .then(r => asDatasetView(r.data));
+  }
+
+  deleteDatasetView(id: string) {
+    return this.client.delete(`dataset_view/${id}`);
+  }
+
+  updateDatasetView(datasetView: IDatasetView) {
+    return this.client.put(`dataset_view/${datasetView.id}`, datasetView);
+  }
+
+  async findDatasetViews(options?: {
+    datasetId?: string;
+    configurationId?: string;
+  }) {
+    const pages = await fetchAllPages(this.client, "dataset_view", {
+      params: {
+        sort: "lastViewed",
+        ...options
+      }
+    });
+    const datasetViews: IDatasetView[] = [];
+    for (const page of pages) {
+      for (const data of page) {
+        datasetViews.push(asDatasetView(data));
+      }
+    }
+    return datasetViews;
+  }
+
+  async getRecentDatasetViews(limit: number, offset: number = 0) {
+    const formData: AxiosRequestConfig = {
+      params: {
+        limit,
+        offset,
+        sort: "lastViewed",
+        sortdir: -1
+      }
+    };
+    const response = await this.client.get("dataset_view", formData);
+    return (response.data as any[]).map(asDatasetView);
+  }
+
+  async getCompatibleConfigurations(dataset: IDataset) {
+    const compatibility = getDatasetCompatibility(dataset);
+    const pages = await fetchAllPages(this.client, "item/query", {
+      params: {
+        query: JSON.stringify({
+          "meta.subtype": "contrastConfiguration",
+          "meta.compatibility": compatibility
+        }),
+        sort: "updated",
+        sortdir: -1
+      }
+    });
+    const configurations: IDatasetConfiguration[] = [];
+    for (const page of pages) {
+      for (const data of page) {
+        configurations.push(asConfigurationItem(data));
+      }
+    }
+    return configurations;
   }
 
   createDataset(
@@ -415,61 +356,69 @@ export default class GirderAPI {
     return this.client.delete(`/folder/${dataset.id}`).then(() => dataset);
   }
 
-  createConfiguration(
+  async createConfigurationFromBase(
     name: string,
     description: string,
-    dataset: IDataset
+    folderId: string,
+    base: IDatasetConfigurationBase
   ): Promise<IDatasetConfiguration> {
+    // Create metadata for the configuration item
+    const metadata: { [key: string]: any } = {
+      subtype: "contrastConfiguration",
+      compatibility: {},
+      ...toConfiguationMetadata(base)
+    };
+
+    // Create the item
     const data = new FormData();
-    data.set("folderId", dataset.id);
+    data.set("folderId", folderId);
     data.set("name", name);
     data.set("description", description);
     data.set("reuseExisting", "false");
-    const channels = dataset.channels.slice(0, 6);
-    const layers: IDisplayLayer[] = [];
-    channels.forEach((_, idx) =>
-      Vue.set(layers, idx, newLayer(dataset, layers))
-    );
-    const view: IViewConfiguration = { layers };
-    const toolset: IToolSet = { name: "Default Toolset", toolIds: [] };
-    data.set(
-      "metadata",
-      JSON.stringify({
-        subtype: "contrastConfiguration",
-        view,
-        toolset
-      })
-    );
-    return this.client
-      .post("item", data)
-      .then(r => asConfigurationItem(r.data));
+    data.set("metadata", JSON.stringify(metadata));
+    const item: IGirderItem = (await this.client.post("item", data)).data;
+
+    // Create configuration from item and configBase
+    return asConfigurationItem(item);
   }
 
-  updateConfiguration(
-    config: IDatasetConfiguration
-  ): Promise<IDatasetConfiguration> {
-    return this.client
-      .put(`/item/${config.id}/metadata`, {
-        view: {
-          layers: config.view.layers.map(l =>
-            Object.fromEntries(
-              Object.entries(l).filter(([k]) => !k.startsWith("_"))
-            )
-          )
-        },
-        toolset: config.toolset
-      })
-      .then(() => config);
+  async createConfigurationFromDataset(
+    name: string,
+    description: string,
+    folderId: string,
+    dataset: IDataset
+  ) {
+    return this.createConfigurationFromBase(
+      name,
+      description,
+      folderId,
+      defaultConfigurationBase(dataset)
+    );
   }
 
-  updateSnapshots(
-    config: IDatasetConfiguration
-  ): Promise<IDatasetConfiguration> {
-    return this.client
-      .put(`/item/${config.id}/metadata`, {
-        snapshots: config.snapshots! || []
-      })
-      .then(() => config);
+  duplicateConfiguration(
+    configuration: IDatasetConfiguration,
+    folderId: string
+  ) {
+    return this.createConfigurationFromBase(
+      configuration.name,
+      configuration.description,
+      folderId,
+      configuration
+    );
+  }
+
+  async updateConfigurationKey(
+    config: IDatasetConfiguration,
+    key: keyof IDatasetConfigurationBase
+  ): Promise<any> {
+    const metadata = toConfiguationMetadata({ [key]: config[key] });
+    const data = new FormData();
+    data.set("metadata", JSON.stringify(metadata));
+    const item: IGirderItem = (
+      await this.client.put(`item/${config.id}/metadata`, data)
+    ).data;
+    return item;
   }
 
   deleteConfiguration(
@@ -564,7 +513,6 @@ export default class GirderAPI {
 function asDataset(folder: IGirderFolder): IDataset {
   return {
     id: folder._id,
-    _girder: folder,
     name: folder.name,
     description: folder.description,
     xy: [],
@@ -580,41 +528,83 @@ function asDataset(folder: IGirderFolder): IDataset {
   };
 }
 
-function asToolConfiguration(item: IGirderItem): IToolConfiguration {
-  const {
-    values,
-    template,
-    type,
-    hotkey,
-    datasetId,
-    configurationId
-  } = item.meta;
-  const tool = {
-    id: item._id,
-    _girder: item,
-    name: item.name,
-    description: item.description,
-    hotkey: hotkey,
-    type,
-    values,
-    template,
-    configurationId,
-    datasetId
+function getDefaultLayers(dataset: IDataset) {
+  const nLayers = Math.min(6, dataset.channels.length);
+  const layers: IDisplayLayer[] = [];
+  for (let i = 0; i < nLayers; ++i) {
+    layers.push(newLayer(dataset, layers));
+  }
+  return layers;
+}
+
+function getDatasetCompatibility(
+  dataset: IDataset
+): IDatasetConfigurationBase["compatibility"] {
+  const channelNames: IDatasetConfigurationBase["compatibility"]["channels"] = {};
+  for (const channel of dataset.channels) {
+    channelNames[channel] =
+      dataset.channelNames.get(channel) || "Unnamed channel";
+  }
+  return {
+    xyDimensions: dataset.xy.length > 1 ? "multiple" : "one",
+    zDimensions: dataset.z.length > 1 ? "multiple" : "one",
+    tDimensions: dataset.time.length > 1 ? "multiple" : "one",
+    channels: channelNames
   };
-  return tool;
+}
+
+export function defaultConfigurationBase(
+  dataset: IDataset
+): IDatasetConfigurationBase {
+  return {
+    compatibility: getDatasetCompatibility(dataset),
+    layers: getDefaultLayers(dataset),
+    tools: [],
+    propertyIds: [],
+    snapshots: []
+  };
+}
+
+function toConfiguationMetadata(data: Partial<IDatasetConfigurationBase>) {
+  let metadata: Partial<IDatasetConfigurationBase> = {};
+  for (const key in data) {
+    // Keep in metadata only keys that are part of IDatasetConfigurationBase
+    if ((configurationBaseKeys as Set<string>).has(key)) {
+      const typedKey = key as keyof IDatasetConfigurationBase;
+      // Strip private attributes from layers (_histogram)
+      let values = data[typedKey]!;
+      if (typedKey === "layers") {
+        values = data[typedKey]!.map(copyLayerWithoutPrivateAttributes);
+      }
+      // metadata[typedKey] = values; doesn't work because of typescript
+      metadata = { ...metadata, [typedKey]: values };
+    }
+  }
+  return metadata;
 }
 
 function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
-  const configuration = {
+  const config: Partial<IDatasetConfiguration> = {
     id: item._id,
-    _girder: item,
     name: item.name,
-    description: item.description,
-    view: item.meta.view || { layers: item.meta.layers || [] },
-    toolset: item.meta.toolset || { name: "Default toolset", toolIds: [] },
-    snapshots: item.meta.snapshots || []
+    description: item.description
   };
-  return configuration;
+  for (const key of configurationBaseKeys) {
+    if (key in item.meta) {
+      config[key] = item.meta[key];
+    }
+  }
+  return config as IDatasetConfiguration;
+}
+
+function asDatasetView(data: AxiosResponse["data"]): IDatasetView {
+  return {
+    id: data._id,
+    configurationId: data.configurationId,
+    datasetId: data.datasetId,
+    layerContrasts: data.layerContrasts,
+    lastViewed: data.lastViewed
+  };
 }
 
 export interface IHistogramOptions {

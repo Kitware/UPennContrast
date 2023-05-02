@@ -29,7 +29,7 @@
       </v-expansion-panel-header>
       <v-expansion-panel-content>
         <!-- List toolset tools -->
-        <v-list v-if="toolset && toolset.toolIds && toolsetTools.length" dense>
+        <v-list v-if="toolsetTools.length" dense>
           <v-list-item-group v-model="selectedToolId">
             <draggable>
               <template v-for="(tool, index) in toolsetTools">
@@ -62,9 +62,6 @@
                       </v-list-item-avatar>
                       <v-list-item-content
                         ><v-list-item-title>{{ tool.name }}</v-list-item-title>
-                        <v-list-item-subtitle>
-                          {{ tool.description }}
-                        </v-list-item-subtitle>
                       </v-list-item-content>
                       <v-list-item-action
                         ><v-btn icon @click="removeToolId(tool.id)"
@@ -101,9 +98,7 @@
             "
           />
         </v-list>
-        <v-subheader
-          v-if="!toolset || !toolset.toolIds || !toolsetTools.length"
-        >
+        <v-subheader v-if="!toolsetTools.length">
           No tools in the current toolset.
         </v-subheader>
       </v-expansion-panel-content>
@@ -112,10 +107,9 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Watch, Prop } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import draggable from "vuedraggable";
 import store from "@/store";
-import toolsStore from "@/store/tool";
 import {
   AnnotationNames,
   AnnotationShape,
@@ -138,30 +132,23 @@ import CircleToDotMenu from "@/components/CircleToDotMenu.vue";
 })
 export default class Toolset extends Vue {
   readonly store = store;
-  readonly toolsStore = toolsStore;
 
   panels: number = 0;
 
   get selectedToolId() {
-    return this.toolsStore.selectedToolId || "";
+    return this.store.selectedTool?.id || "";
   }
 
   set selectedToolId(id: string) {
-    this.toolsStore.setSelectedToolId(id);
-  }
-
-  get toolset() {
-    return this.store.configuration?.toolset;
+    this.store.setSelectedToolId(id);
   }
 
   get tools() {
-    return this.toolsStore.tools;
+    return this.store.tools;
   }
 
   get toolsetTools() {
-    return (
-      this.toolset?.toolIds.map(this.getToolById).filter(tool => !!tool) || []
-    );
+    return this.configuration?.tools || [];
   }
 
   get configuration() {
@@ -169,24 +156,14 @@ export default class Toolset extends Vue {
   }
 
   get selectedTool(): IToolConfiguration | null {
-    return this.toolsStore.selectedTool;
+    return this.store.selectedTool;
   }
 
   toolCreationDialogOpen: boolean = false;
   toolPickerDialogOpen: boolean = false;
 
-  getToolById(toolId: string) {
-    return this.toolsStore.tools.find(
-      (tool: IToolConfiguration) => tool.id === toolId
-    );
-  }
-
   getToolPropertiesDescription(tool: IToolConfiguration): string[][] {
     const propDesc: string[][] = [["Name", tool.name]];
-
-    if (tool.description) {
-      propDesc.push(["Description", tool.description]);
-    }
 
     if (tool.values) {
       const { values } = tool;
@@ -211,8 +188,8 @@ export default class Toolset extends Vue {
       ) {
         propDesc.push(["Connect to tags", values.connectTo.tags.join(", ")]);
         const layerIdx = values.connectTo.layer;
-        const layers = this.store.configuration?.view.layers;
-        if (layers && typeof values.connectTo.layer === "number") {
+        const layers = this.store.layers;
+        if (typeof values.connectTo.layer === "number") {
           propDesc.push(["Connect only on layer", layers[layerIdx].name]);
         }
       }
@@ -225,17 +202,8 @@ export default class Toolset extends Vue {
     if (toolId === this.selectedToolId) {
       this.selectedToolId = "";
     }
-    this.toolsStore.removeToolIdFromCurrentToolset({ id: toolId });
-    this.store.syncConfiguration();
-  }
-
-  mounted() {
-    this.toolsStore.refreshToolsInCurrentToolset();
-  }
-
-  @Watch("configuration")
-  toolsetChanged() {
-    this.toolsStore.refreshToolsInCurrentToolset();
+    this.store.removeToolFromConfiguration(toolId);
+    this.store.syncConfiguration("tools");
   }
 }
 </script>

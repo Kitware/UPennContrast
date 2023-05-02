@@ -67,26 +67,15 @@ export interface IToolTemplate {
 
 export interface IToolConfiguration {
   readonly id: string;
-  readonly _girder: IGirderItem;
-
   name: string;
-  description: string;
-
   hotkey: string | null;
-
   type: string;
-
   values: any;
-
   template: IToolTemplate;
-
-  configurationId: string;
-  datasetId: string;
 }
 
 export interface IDataset {
   readonly id: string;
-  readonly _girder: IGirderFolder;
 
   name: string;
   description: string;
@@ -106,11 +95,6 @@ export interface IDataset {
 
 export interface IViewConfiguration {
   layers: IDisplayLayer[];
-}
-
-export interface IToolSet {
-  name: string;
-  toolIds: string[];
 }
 
 export type TLayerMode = "single" | "multiple" | "unroll";
@@ -147,17 +131,38 @@ export interface ISnapshot {
   };
 }
 
-export interface IDatasetConfiguration {
+export type IDimensionCompatibility = "one" | "multiple";
+
+export interface IDatasetConfigurationBase {
+  compatibility: {
+    xyDimensions: IDimensionCompatibility;
+    zDimensions: IDimensionCompatibility;
+    tDimensions: IDimensionCompatibility;
+    channels: { [key: number]: string };
+  };
+  layers: IDisplayLayer[];
+  tools: IToolConfiguration[];
+  snapshots: ISnapshot[];
+  propertyIds: string[];
+}
+
+export interface IDatasetConfiguration extends IDatasetConfigurationBase {
   readonly id: string;
-  readonly _girder: IGirderItem;
+  readonly name: string;
+  readonly description: string;
+}
 
-  name: string;
-  description: string;
+export interface IDatasetViewBase {
+  datasetId: string;
+  configurationId: string;
+  layerContrasts: {
+    [layerId: string]: IContrast;
+  };
+  lastViewed: number;
+}
 
-  view: IViewConfiguration;
-  toolset: IToolSet;
-
-  snapshots?: ISnapshot[];
+export interface IDatasetView extends IDatasetViewBase {
+  readonly id: string;
 }
 
 export type TDisplaySliceType = "current" | "max-merge" | "constant" | "offset";
@@ -461,14 +466,6 @@ export interface ILayerStackImage {
   };
 }
 
-export function isConfigurationItem(item: IGirderItem) {
-  return item.meta.subtype === "contrastConfiguration";
-}
-
-export function isDatasetFolder(folder: IGirderFolder) {
-  return folder.meta.subtype === "contrastDataset";
-}
-
 // Fallback colors for channels with unknown names or with duplicate colors.
 // Keep the same uppercase/lowercase as the `channelColors` color values.
 const colors = [
@@ -546,11 +543,7 @@ const channelColors: { [key: string]: string } = {
   GFP: "#00FF00"
 };
 
-function randomId() {
-  return Math.random()
-    .toString(36)
-    .substr(2, 5);
-}
+import { v4 as uuidv4 } from "uuid";
 
 export function newLayer(
   dataset: IDataset,
@@ -577,7 +570,7 @@ export function newLayer(
 
   // guess a good new layer
   return {
-    id: randomId(),
+    id: uuidv4(),
     name: layerName,
     visible: true,
     channel: nextChannel[0] || 0,
@@ -603,6 +596,36 @@ export function newLayer(
     }
   };
 }
+
+export function copyLayerWithoutPrivateAttributes(
+  layer: IDisplayLayer
+): IDisplayLayer {
+  const newLayer: IDisplayLayer = { ...layer };
+  for (const key of Object.keys(newLayer)) {
+    if (key.startsWith("_")) {
+      delete newLayer[key as keyof IDisplayLayer];
+    }
+  }
+  return newLayer;
+}
+
+// To get all the keys of IDatasetConfigurationBase without missing one
+const exampleConfigurationBase: IDatasetConfigurationBase = {
+  compatibility: {
+    xyDimensions: "multiple",
+    zDimensions: "multiple",
+    tDimensions: "multiple",
+    channels: {}
+  },
+  layers: [],
+  tools: [],
+  snapshots: [],
+  propertyIds: []
+};
+
+export const configurationBaseKeys = new Set(
+  Object.keys(exampleConfigurationBase)
+) as Set<keyof IDatasetConfigurationBase>;
 
 export enum AnnotationSelectionTypes {
   ADD = "ADD",

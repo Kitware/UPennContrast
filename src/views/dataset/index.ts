@@ -2,14 +2,13 @@ import Dataset from "./Dataset.vue";
 import NewDataset from "./NewDataset.vue";
 import ImportDataset from "./ImportDataset.vue";
 import DatasetInfo from "./DatasetInfo.vue";
-import configurationRoutes from "./configuration";
 import { Main } from "@/store";
 import { RouteConfig } from "vue-router";
 import MultiSourceConfiguration from "./MultiSourceConfiguration.vue";
 
 const routes: RouteConfig[] = [
   {
-    path: "/new",
+    path: "new",
     name: "newdataset",
     component: NewDataset,
     meta: {
@@ -17,12 +16,12 @@ const routes: RouteConfig[] = [
     }
   },
   {
-    path: "/multi/:id",
+    path: "multi/:datasetId",
     name: "multi",
     component: MultiSourceConfiguration
   },
   {
-    path: "/import",
+    path: "import",
     name: "importdataset",
     component: ImportDataset,
     meta: {
@@ -30,7 +29,7 @@ const routes: RouteConfig[] = [
     }
   },
   {
-    path: "/:id",
+    path: ":datasetId",
     props: true,
     component: Dataset,
     children: [
@@ -41,8 +40,7 @@ const routes: RouteConfig[] = [
         meta: {
           hidden: true
         }
-      },
-      ...configurationRoutes
+      }
     ],
     meta: {
       name: "dataset",

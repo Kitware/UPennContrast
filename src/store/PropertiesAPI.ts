@@ -31,10 +31,15 @@ export default class PropertiesAPI {
       });
   }
 
-  async getProperties(): Promise<IAnnotationProperty[]> {
-    return this.client.get("annotation_property?limit=1000").then(res => {
-      return res.data.map(this.toProperty);
-    });
+  async getProperties(propertyIds: string[]): Promise<IAnnotationProperty[]> {
+    const promises: Promise<IAnnotationProperty>[] = [];
+    for (const id of propertyIds) {
+      const propertyPromise = this.client
+        .get(`annotation_property/${id}`)
+        .then(res => this.toProperty(res.data));
+      promises.push(propertyPromise);
+    }
+    return Promise.all(promises);
   }
 
   async getPropertyHistogram(
@@ -68,8 +73,9 @@ export default class PropertiesAPI {
     const pages = await fetchAllPages(
       this.client,
       "annotation_property_values",
-      datasetId,
-      100000
+      {
+        params: { datasetId, sort: "_id" }
+      }
     );
     for (const page of pages) {
       for (const { annotationId, values } of page) {
@@ -146,12 +152,10 @@ export default class PropertiesAPI {
       tile: IAnnotationLocation;
     }
   ) {
-    const { configurationId, description, id, name, type, values } = tool;
+    const { id, name, type, values } = tool;
     const { annotation, connectTo } = values;
     const params = {
-      configurationId,
       datasetId,
-      description,
       type,
       id,
       name,

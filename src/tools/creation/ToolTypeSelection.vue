@@ -10,8 +10,8 @@
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
-import toolsStore from "@/store/tool";
 import propertiesStore from "@/store/properties";
+import store from "@/store";
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 
 const defaultValues = {
@@ -43,8 +43,8 @@ interface AugmentedItem extends Item {
   }
 })
 export default class ToolTypeSelection extends Vue {
-  readonly toolStore = toolsStore;
   readonly propertyStore = propertiesStore;
+  readonly store = store;
 
   @Prop()
   private value: any;
@@ -85,7 +85,7 @@ export default class ToolTypeSelection extends Vue {
           }));
           break;
         case "annotation":
-          items = this.toolStore.availableShapes;
+          items = this.store.availableToolShapes;
           break;
         case "dockerImage":
           for (const image in this.propertyStore.workerImageList) {
@@ -191,7 +191,7 @@ export default class ToolTypeSelection extends Vue {
   }
 
   get templates() {
-    return this.toolStore.toolTemplateList;
+    return this.store.toolTemplateList;
   }
 
   @Watch("templates")

@@ -1,11 +1,12 @@
 declare module "@girder/components/src/components" {
-  import Vue, { VueConstructor, Component } from "vue";
+  import { Component } from "vue";
 
   export const Upload: Component;
+  export const Breadcrumb: Component;
 }
 
 declare module "@girder/components/src/components/Snippet" {
-  import Vue, { VueConstructor, Component } from "vue";
+  import { Component } from "vue";
 
   export const FileManager: Component;
 }

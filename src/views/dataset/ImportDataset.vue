@@ -32,14 +32,9 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
-import { IDataset } from "@/store/model";
 
-@Component({
-  components: {
-    GirderLocationChooser
-  }
-})
-export default class NewDataset extends Vue {
+@Component({ components: { GirderLocationChooser } })
+export default class ImportDataset extends Vue {
   readonly store = store;
 
   valid = false;
@@ -91,7 +86,7 @@ export default class NewDataset extends Vue {
       if (ds) {
         this.$router.push({
           name: "dataset",
-          params: { id: ds.id }
+          params: { datasetId: ds.id }
         });
       }
     });

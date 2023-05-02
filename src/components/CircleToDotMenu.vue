@@ -19,7 +19,6 @@ import store from "@/store";
 import annotationsStore from "@/store/annotation";
 import propertiesStore from "@/store/properties";
 import { IToolConfiguration } from "@/store/model";
-import tool from "@/store/tool";
 import { VCard, VCardSubtitle, VRow, VSlider } from "vuetify/lib";
 import { Action } from "vuex-module-decorators";
 // Popup for new tool configuration

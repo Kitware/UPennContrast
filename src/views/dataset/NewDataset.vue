@@ -27,6 +27,21 @@
         rows="2"
       />
 
+      <v-card>
+        <v-card-title>Location:</v-card-title>
+        <v-card-text>
+          <v-container>
+            <v-row>
+              <girder-location-chooser
+                v-model="path"
+                :breadcrumb="true"
+                title="Select a Folder to Import the New Dataset"
+              />
+            </v-row>
+          </v-container>
+        </v-card-text>
+      </v-card>
+
       <div class="button-bar">
         <v-btn
           :disabled="!valid || !filesSelected || uploading"
@@ -51,11 +66,7 @@ import store from "@/store";
 import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 import { IDataset } from "@/store/model";
-import {
-  collectFilenameMetadata,
-  triggers,
-  makeAlternation
-} from "@/utils/parsing";
+import { triggers, makeAlternation } from "@/utils/parsing";
 
 interface FileUpload {
   file: File;
@@ -133,10 +144,6 @@ export default class NewDataset extends Vue {
     return this.dataset != null;
   }
 
-  get pathName() {
-    return this.path ? this.path.name : "";
-  }
-
   get rules() {
     return [(v: string) => v.trim().length > 0 || `value is required`];
   }
@@ -174,14 +181,14 @@ export default class NewDataset extends Vue {
   }
 
   async submit() {
-    if (!this.valid) {
+    if (!this.valid || !this.path) {
       return;
     }
 
     this.dataset = await this.store.createDataset({
       name: this.name,
       description: this.description,
-      path: this.path!
+      path: this.path
     });
 
     if (this.dataset === null) {
@@ -191,8 +198,7 @@ export default class NewDataset extends Vue {
 
     this.failedDataset = "";
 
-    this.path = this.dataset!._girder;
-
+    this.path = await this.store.api.getFolder(this.dataset.id);
     await Vue.nextTick();
 
     this.uploading = true;
@@ -215,10 +221,6 @@ export default class NewDataset extends Vue {
   nextStep() {
     this.hideUploader = true;
 
-    const filenameMetadata = collectFilenameMetadata(
-      this.files.map(f => f.file.name)
-    );
-
     if (this.dataset?.id) {
       this.store.scheduleTileFramesComputation(this.dataset.id);
       this.store.scheduleMaxMergeCache(this.dataset.id);
@@ -227,7 +229,7 @@ export default class NewDataset extends Vue {
     this.$router.push({
       name: "multi",
       params: {
-        id: this.dataset!.id
+        datasetId: this.dataset!.id
       }
     });
   }

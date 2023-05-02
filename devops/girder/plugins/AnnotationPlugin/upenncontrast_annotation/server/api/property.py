@@ -77,7 +77,7 @@ class AnnotationProperty(Resource):
 
     @access.user
     @describeRoute(Description("Get a property by its id.")
-        .param('id', 'The annotation\'s id', paramType='path'))
+        .param('id', 'The annotation property\'s id', paramType='path'))
     @loadmodel(model='annotation_property', plugin='upenncontrast_annotation', level=AccessType.READ)
     def get(self, annotation_property, params):
         return annotation_property

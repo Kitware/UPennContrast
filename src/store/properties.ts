@@ -179,7 +179,7 @@ export class Properties extends VuexModule {
     property: IAnnotationProperty;
     callback: (success: boolean) => void;
   }) {
-    if (!main.dataset?.id || !main.configuration?.view?.layers) {
+    if (!main.dataset) {
       return;
     }
 
@@ -206,8 +206,15 @@ export class Properties extends VuexModule {
   }
 
   @Mutation
-  setProperties(properties: IAnnotationProperty[]) {
+  protected setPropertiesImpl(properties: IAnnotationProperty[]) {
     this.properties = [...properties];
+  }
+
+  @Action
+  protected setProperties(properties: IAnnotationProperty[]) {
+    this.setPropertiesImpl(properties);
+    const propertyIds = this.properties.map(p => p.id);
+    this.context.dispatch("updateConfigurationProperties", propertyIds);
   }
 
   @Mutation
@@ -216,10 +223,14 @@ export class Properties extends VuexModule {
   }
 
   @Action
+  // Fetch properties corresponding of the configuration
+  // This action should be called when changing configuration
   async fetchProperties() {
-    const properties = await this.propertiesAPI.getProperties();
-    if (properties) {
-      this.setProperties(properties);
+    if (main.configuration) {
+      const properties = await this.propertiesAPI.getProperties(
+        main.configuration.propertyIds
+      );
+      this.setPropertiesImpl(properties);
     }
   }
 
@@ -243,8 +254,9 @@ export class Properties extends VuexModule {
 
   @Action
   async deleteProperty(propertyId: string) {
-    await this.propertiesAPI.deleteProperty(propertyId);
-    await this.fetchProperties();
+    // TODO: temp another configuration could be using this property!
+    // await this.propertiesAPI.deleteProperty(propertyId);
+    this.setProperties(this.properties.filter(p => p.id !== propertyId));
   }
 
   @Action

@@ -11,11 +11,10 @@
   </div>
 </template>
 <script lang="ts">
-import { Vue, Component, Inject, Prop } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import ViewerToolbar from "@/components/ViewerToolbar.vue";
 import DisplayLayers from "@/components/DisplayLayers.vue";
 import ImageViewer from "@/components/ImageViewer.vue";
-import store from "@/store";
 
 @Component({
   components: {
@@ -24,9 +23,7 @@ import store from "@/store";
     ImageViewer
   }
 })
-export default class Viewer extends Vue {
-  readonly store = store;
-}
+export default class Viewer extends Vue {}
 </script>
 
 <style lang="scss" scoped>
