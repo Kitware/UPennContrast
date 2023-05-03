@@ -854,14 +854,26 @@ export class Main extends VuexModule {
 
   @Action
   async saveContrastInView({
-    index,
+    layerIdx,
     contrast
   }: {
-    index: number;
+    layerIdx: number;
     contrast: IContrast;
   }) {
     if (this.datasetView) {
-      Vue.set(this.datasetView.layerContrasts, this.layers[index].id, contrast);
+      Vue.set(
+        this.datasetView.layerContrasts,
+        this.layers[layerIdx].id,
+        contrast
+      );
+      this.api.updateDatasetView(this.datasetView);
+    }
+  }
+
+  @Action
+  async resetContrastInView(layerIdx: number) {
+    if (this.datasetView) {
+      Vue.delete(this.datasetView.layerContrasts, this.layers[layerIdx].id);
       this.api.updateDatasetView(this.datasetView);
     }
   }
@@ -989,9 +1001,7 @@ export class Main extends VuexModule {
                 {
                   mode: "percentile",
                   blackPoint: 0,
-                  whitePoint: 100,
-                  savedBlackPoint: 0,
-                  savedWhitePoint: 100
+                  whitePoint: 100
                 },
                 hist,
                 layer,
@@ -1044,9 +1054,7 @@ export class Main extends VuexModule {
             {
               mode: "percentile",
               blackPoint: 0,
-              whitePoint: 100,
-              savedBlackPoint: 0,
-              savedWhitePoint: 100
+              whitePoint: 100
             },
             hist,
             layer,

@@ -59,9 +59,10 @@
       />
       <contrast-histogram
         :configurationContrast="configurationContrast"
-        :viewContrast="viewContrast"
+        :viewContrast="currentContrast"
         @change="changeContrast($event, false)"
         @commit="changeContrast($event, true)"
+        @revert="resetContrastInView()"
         :histogram="histogram"
       />
       <v-menu
@@ -178,11 +179,22 @@ export default class DisplayLayer extends Vue {
   }
 
   get configurationContrast() {
-    return this.value.contrast;
+    const layerId = this.value.id;
+    const configuration = this.store.configuration;
+    if (!configuration) {
+      return null;
+    }
+    const configurationLayer = configuration.layers.find(
+      layer => layer.id === layerId
+    );
+    if (!configurationLayer) {
+      return null;
+    }
+    return configurationLayer.contrast;
   }
 
-  get viewContrast() {
-    return this.store.datasetView?.layerContrasts[this.value.id] || null;
+  get currentContrast() {
+    return this.value.contrast;
   }
 
   channelName(channel: number): string {
@@ -298,8 +310,12 @@ export default class DisplayLayer extends Vue {
         contrast
       });
     } else {
-      this.store.saveContrastInView({ index: this.index, contrast });
+      this.store.saveContrastInView({ layerIdx: this.index, contrast });
     }
+  }
+
+  resetContrastInView() {
+    this.store.resetContrastInView(this.index);
   }
 
   removeLayer() {

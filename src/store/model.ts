@@ -419,8 +419,6 @@ export interface IContrast {
   mode: "percentile" | "absolute";
   blackPoint: number;
   whitePoint: number;
-  savedBlackPoint: number;
-  savedWhitePoint: number;
 }
 
 export interface IUISetting {
@@ -590,9 +588,7 @@ export function newLayer(
     contrast: {
       mode: "percentile",
       blackPoint: 0,
-      savedBlackPoint: 0,
-      whitePoint: 100,
-      savedWhitePoint: 100
+      whitePoint: 100
     }
   };
 }
