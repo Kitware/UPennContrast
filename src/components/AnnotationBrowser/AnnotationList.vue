@@ -53,7 +53,9 @@
         v-model="selected"
         item-key="id"
         show-select
-        :options.sync="tableOptions"
+        :page="page"
+        @update:items-per-page="itemsPerPage = $event"
+        @update:group-by="groupBy = $event"
         ref="dataTable"
       >
         <template v-slot:body="{ items }">
@@ -171,9 +173,12 @@ export default class AnnotationList extends Vue {
 
   tableItemClass = "px-1"; // To enable dividers, use v-data-table__divider
 
-  tableOptions: any = {};
-
   annotationFilteredDialog: boolean = false;
+
+  // These are "from" or "to" v-data-table
+  page: number = 0; // one-way binding :page
+  itemsPerPage: number = 10; // one-way binding @update:items-per-page
+  groupBy: string | string[] = []; // one-way binding @update:group-by
 
   get selected() {
     return this.annotationStore.selectedAnnotations.filter(annotation =>
@@ -298,10 +303,6 @@ export default class AnnotationList extends Vue {
     return this.annotationStore.hoveredAnnotationId;
   }
 
-  get itemsPerPage() {
-    return this.tableOptions.itemsPerPage;
-  }
-
   get vDataTable() {
     const vDataTableParent = this.$refs.dataTable as any;
     if (!vDataTableParent) {
@@ -317,7 +318,7 @@ export default class AnnotationList extends Vue {
     }
     let tableItems = vDataTable.filteredItems.slice();
     if (
-      (!vDataTable.disableSort || this.tableOptions.groupBy?.length) &&
+      (!vDataTable.disableSort || this.groupBy?.length) &&
       vDataTable.serverItemsLength <= 0
     ) {
       tableItems = vDataTable.sortItems(tableItems);
@@ -349,7 +350,7 @@ export default class AnnotationList extends Vue {
       return;
     }
     // Change page
-    this.tableOptions.page = this.getPageFromItemId(this.hoveredId);
+    this.page = this.getPageFromItemId(this.hoveredId);
     // Get the tr element from the refs if it exists
     let annotationRef = this.$refs[this.hoveredId];
     if (annotationRef === undefined) {
