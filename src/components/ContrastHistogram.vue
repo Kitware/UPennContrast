@@ -152,12 +152,12 @@ export default class ContrastHistogram extends Vue {
   currentBlackPoint = this.currentContrast.blackPoint;
   currentWhitePoint = this.currentContrast.whitePoint;
 
-  @Watch("value.blackPoint")
+  @Watch("currentContrast.blackPoint")
   onBlackPointChange(value: number) {
     this.currentBlackPoint = value;
   }
 
-  @Watch("value.whitePoint")
+  @Watch("currentContrast.whitePoint")
   onWhitePointChange(value: number) {
     this.currentWhitePoint = value;
   }
