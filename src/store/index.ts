@@ -793,8 +793,8 @@ export class Main extends VuexModule {
 
     if (mode === "single") {
       this.verifySingleLayerMode();
-      await this.syncConfiguration("layers");
     }
+    await this.syncConfiguration("layers");
   }
 
   @Action

@@ -258,7 +258,11 @@ export default class DisplayLayer extends Vue {
   }
 
   set channel(value: number) {
-    this.changeProp("channel", value);
+    // value can be undefined when going to another route:
+    // routeMapper sets datasetId = null -> channels becomes [] -> channel = undefined
+    if (value !== undefined) {
+      this.changeProp("channel", value);
+    }
   }
 
   get maxXY() {
