@@ -56,6 +56,15 @@ interface IBreadCrumbItem {
 export default class BreadCrumbs extends Vue {
   readonly store = store;
   items: IBreadCrumbItem[] = [];
+  previousRefreshInfo: {
+    datasetId: string | null;
+    configurationId: string | null;
+    routeName: string | null | undefined;
+  } = {
+    datasetId: null,
+    configurationId: null,
+    routeName: null
+  };
 
   get datasetView() {
     const { datasetViewId } = this.$route.params;
@@ -99,12 +108,27 @@ export default class BreadCrumbs extends Vue {
     this.refreshItems();
   }
 
-  @Watch("$route")
+  @Watch("datasetId")
+  @Watch("configurationId")
   async refreshItems() {
     const [configurationId, datasetId] = await Promise.all([
       this.configurationId,
       this.datasetId
     ]);
+
+    // Cache items if parameters are the same
+    // This is useful when route query changes frequently but dataset and configuration don't
+    if (
+      datasetId === this.previousRefreshInfo.datasetId &&
+      configurationId === this.previousRefreshInfo.configurationId &&
+      this.$route.name === this.previousRefreshInfo.routeName
+    ) {
+      return;
+    }
+    this.previousRefreshInfo.datasetId = datasetId;
+    this.previousRefreshInfo.configurationId = configurationId;
+    this.previousRefreshInfo.routeName = this.$route.name;
+
     this.items = [];
 
     // Dataset Item
