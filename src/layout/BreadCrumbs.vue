@@ -192,7 +192,11 @@ export default class BreadCrumbs extends Vue {
     if (currentDatasetViewId === datasetViewId) {
       return;
     }
-    this.$router.push({ name: "datasetview", params: { datasetViewId } });
+    this.$router.push({
+      name: "datasetview",
+      params: { datasetViewId },
+      query: { ...this.$route.query }
+    });
   }
 }
 </script>
