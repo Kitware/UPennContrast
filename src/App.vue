@@ -19,7 +19,7 @@
         <v-icon>mdi-theme-light-dark</v-icon>
       </v-btn>
       <v-divider class="ml-4" vertical />
-      <template v-if="store.dataset && routeName === 'view'">
+      <template v-if="store.dataset && routeName === 'datasetview'">
         <v-btn class="ml-4" @click.stop="toggleRightPanel('analyzePanel')">
           <v-badge dot color="red" :value="hasUncomputedProperties">
             Analyze
@@ -211,7 +211,7 @@ export default class App extends Vue {
 
   @Watch("routeName")
   datasetChanged() {
-    if (this.routeName !== "view") {
+    if (this.routeName !== "datasetview") {
       this.toggleRightPanel(null);
     }
   }
