@@ -175,6 +175,8 @@ export default class AnnotationList extends Vue {
 
   annotationFilteredDialog: boolean = false;
 
+  annotationIdToIndex: Map<string, number> = new Map();
+
   // These are "from" or "to" v-data-table
   page: number = 0; // one-way binding :page
   itemsPerPage: number = 10; // one-way binding @update:items-per-page
@@ -222,8 +224,9 @@ export default class AnnotationList extends Vue {
     );
   }
 
-  get annotationIdToIndex() {
-    return this.annotationStore.annotationIdToIdx;
+  @Watch("annotationStore.annotationIdToIdx")
+  updateAnnotationIndices() {
+    this.annotationIdToIndex = this.annotationStore.annotationIdToIdx;
   }
 
   updateAnnotationName(name: string, id: string) {

@@ -11,6 +11,9 @@ import filterStore from "@/store/filters";
 import geojs from "geojs";
 import { snapCoordinates } from "@/utils/itk";
 
+import { throttle } from "lodash-es";
+const THROTTLE = 100;
+
 import {
   IAnnotation,
   IAnnotationConnection,
@@ -279,7 +282,10 @@ export default class AnnotationViewer extends Vue {
     this.drawTooltips();
   }
 
-  drawAnnotations() {
+  drawAnnotations = throttle(this.drawAnnotationsNoThrottle, THROTTLE).bind(
+    this
+  );
+  drawAnnotationsNoThrottle() {
     if (!this.annotationLayer) {
       return;
     }
@@ -313,7 +319,8 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.draw();
   }
 
-  drawTooltips() {
+  drawTooltips = throttle(this.drawTooltipsNoThrottle, THROTTLE).bind(this);
+  drawTooltipsNoThrottle() {
     this.textLayer.features().forEach((feature: any) => {
       this.textLayer.deleteFeature(feature);
     });

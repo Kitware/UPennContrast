@@ -212,6 +212,20 @@ export class Annotations extends VuexModule {
 
   @Mutation
   public setAnnotations(values: IAnnotation[]) {
+    const nAnnotations = values.length;
+    // Check if annotations are the same
+    if (nAnnotations === this.annotations.length) {
+      let equals = true;
+      for (let i = 0; i < nAnnotations; ++i) {
+        if (values[i].id !== this.annotations[i].id) {
+          equals = false;
+          break;
+        }
+      }
+      if (equals) {
+        return;
+      }
+    }
     this.annotations = values;
   }
 
@@ -314,9 +328,9 @@ export class Annotations extends VuexModule {
 
   @Action
   async fetchAnnotations() {
-    this.setAnnotations([]);
-    this.setConnections([]);
     if (!main.dataset || !main.configuration) {
+      this.setAnnotations([]);
+      this.setConnections([]);
       return;
     }
     try {
@@ -335,13 +349,19 @@ export class Annotations extends VuexModule {
         ]) => {
           if (connections?.length) {
             this.setConnections(connections);
+          } else {
+            this.setConnections([]);
           }
           if (annotations?.length) {
             this.setAnnotations(annotations);
+          } else {
+            this.setAnnotations([]);
           }
         }
       );
     } catch (error) {
+      this.setAnnotations([]);
+      this.setConnections([]);
       error(error.message);
     }
   }
