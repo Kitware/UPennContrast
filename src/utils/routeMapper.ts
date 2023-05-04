@@ -32,22 +32,32 @@ export default function routeMapper(
   };
 
   return Vue.extend({
-    beforeRouteEnter(
+    async beforeRouteEnter(
       to: Route,
       _from: Route,
       next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any
     ) {
+      const pr = Object.keys(params).map(key =>
+        handleReset(to.params, key, params[key])
+      );
+      const qr = Object.keys(query).map(key =>
+        handleReset(to.query, key, query[key])
+      );
+      await Promise.all([...pr, ...qr]);
+
       const ps = Object.keys(params).map(key =>
         handle(to.params, key, params[key])
       );
       const qs = Object.keys(query).map(key =>
         handle(to.query, key, query[key])
       );
-      Promise.all([...ps, ...qs]).then(() => next());
+      await Promise.all([...ps, ...qs]);
+
+      next();
     },
     // when route changes and this component is already rendered,
     // the logic will be slightly different.
-    beforeRouteUpdate(
+    async beforeRouteUpdate(
       to: Route,
       _from: Route,
       next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any
@@ -58,21 +68,8 @@ export default function routeMapper(
       const qs = Object.keys(query).map(key =>
         handle(to.query, key, query[key])
       );
-      Promise.all([...ps, ...qs]).then(() => next());
-    },
-
-    beforeRouteLeave(
-      to: Route,
-      _from: Route,
-      next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any
-    ) {
-      const ps = Object.keys(params).map(key =>
-        handleReset(to.params, key, params[key])
-      );
-      const qs = Object.keys(query).map(key =>
-        handleReset(to.query, key, query[key])
-      );
-      Promise.all([...ps, ...qs]).then(() => next());
+      await Promise.all([...ps, ...qs]);
+      next();
     }
   });
 }
