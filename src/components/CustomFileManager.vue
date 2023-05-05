@@ -24,9 +24,7 @@
             </v-btn>
           </template>
           <v-list class="pa-0">
-            <girder-location-chooser
-              @input="moveLocation => move(selected, moveLocation)"
-            >
+            <girder-location-chooser @input="move(selected, $event)">
               <template v-slot:activator="{ on }">
                 <v-list-item v-on="on">
                   <v-list-item-title>
@@ -60,9 +58,7 @@
             </v-btn>
           </template>
           <v-list class="pa-0">
-            <girder-location-chooser
-              @input="moveLocation => move([props.item], moveLocation)"
-            >
+            <girder-location-chooser @input="move([props.item], $event)">
               <template v-slot:activator="{ on }">
                 <v-list-item v-on="on">
                   <v-list-item-title>
@@ -93,11 +89,12 @@ import {
   toConfigurationItem,
   toDatasetFolder
 } from "@/utils/girderSelectable";
+import { RawLocation } from "vue-router";
 
 interface IChipAttrs {
   text: string;
   color: string;
-  to?: object;
+  to?: RawLocation;
 }
 
 @Component({
@@ -119,7 +116,12 @@ export default class CustomFileManager extends Vue {
   @Prop({
     default: true
   })
-  viewChipsEnabled!: boolean;
+  moreChips!: boolean;
+
+  @Prop({
+    default: true
+  })
+  clickableChips!: boolean;
 
   @Prop({
     default: null
@@ -222,25 +224,40 @@ export default class CustomFileManager extends Vue {
     // Add chips if item is a dataset
     if (isDatasetFolder(selectable)) {
       // Dataset chip
-      ret.push({ text: "Dataset", color: "green" });
+      const firstChip: IChipAttrs = {
+        text: "Dataset",
+        color: "green"
+      };
+      if (this.clickableChips) {
+        firstChip.to = {
+          name: "dataset",
+          params: { datasetId: selectable._id }
+        };
+      }
+      ret.push(firstChip);
       // A chip per view
-      if (this.viewChipsEnabled) {
+      if (this.moreChips) {
         const views = await this.store.api.findDatasetViews({
           datasetId: selectable._id
         });
         await Promise.all(
           views.map(view => {
-            this.getItemFromId(view.configurationId, "item").then(configInfo =>
-              ret.push({
-                ...baseChip,
-                text: configInfo.name,
-                to: {
-                  name: "datasetview",
-                  params: {
-                    datasetViewId: view.id
-                  }
+            this.getItemFromId(view.configurationId, "item").then(
+              configInfo => {
+                const newChip: IChipAttrs = {
+                  ...baseChip,
+                  text: configInfo.name
+                };
+                if (this.clickableChips) {
+                  newChip.to = {
+                    name: "configuration",
+                    params: {
+                      configurationId: view.configurationId
+                    }
+                  };
                 }
-              })
+                ret.push(newChip);
+              }
             );
           })
         );
@@ -249,26 +266,39 @@ export default class CustomFileManager extends Vue {
     // Add chips if item is a configuration
     if (isConfigurationItem(selectable)) {
       // Configuration chip
-      ret.push({ text: "Configuration", color: "green" });
+      const firstChip: IChipAttrs = {
+        text: "Configuration",
+        color: "green"
+      };
+      if (this.clickableChips) {
+        firstChip.to = {
+          name: "configuration",
+          params: { configurationId: selectable._id }
+        };
+      }
+      ret.push(firstChip);
       // A chip per view
-      if (this.viewChipsEnabled) {
+      if (this.moreChips) {
         const views = await this.store.api.findDatasetViews({
           configurationId: selectable._id
         });
         await Promise.all(
           views.map(view => {
-            this.getItemFromId(view.datasetId, "folder").then(datasetInfo =>
-              ret.push({
+            this.getItemFromId(view.datasetId, "folder").then(datasetInfo => {
+              const newChip: IChipAttrs = {
                 ...baseChip,
-                text: datasetInfo.name,
-                to: {
-                  name: "datasetview",
+                text: datasetInfo.name
+              };
+              if (this.clickableChips) {
+                newChip.to = {
+                  name: "dataset",
                   params: {
-                    datasetViewId: view.id
+                    datasetId: view.datasetId
                   }
-                }
-              })
-            );
+                };
+              }
+              ret.push(newChip);
+            });
           })
         );
       }
