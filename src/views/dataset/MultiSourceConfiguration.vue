@@ -6,11 +6,22 @@
       <v-data-table :headers="headers" :items="items" item-key="key" />
     </v-card>
     <v-card class="pa-4 my-4">
-      <v-subheader class="headline">Assignments</v-subheader>
+      <div class="d-flex">
+        <v-subheader class="headline">Assignments</v-subheader>
+        <v-spacer />
+        <v-btn
+          @click="resetDimensionsToDefault"
+          :disabled="areDimensionsSetToDefault()"
+          class="ml-4"
+        >
+          Reset to defaults
+          <v-icon class="pl-1">mdi-reload</v-icon>
+        </v-btn>
+      </div>
       <v-divider class="my-2" />
       <v-container>
         <v-row
-          v-for="[dimension, dimensionName] in Object.entries(dimensionNames)"
+          v-for="[dimension, dimensionName] in dimesionNamesEntries"
           :key="dimension"
         >
           <v-col cols="2" class="body-1">
@@ -26,11 +37,7 @@
               hide-selected
               hide-details
               dense
-              :disabled="
-                (assignments[dimension] &&
-                  assignments[dimension].value.source === 'file') ||
-                  assignmentItems.length === 0
-              "
+              :disabled="assignmentDisabled(dimension)"
             >
               <template v-slot:selection="{ item }">
                 {{ item.text }}
@@ -51,11 +58,7 @@
           <v-col cols="2" class="d-flex">
             <v-spacer />
             <v-btn
-              :disabled="
-                !assignments[dimension] ||
-                  (assignments[dimension] &&
-                    assignments[dimension].value.source === 'file')
-              "
+              :disabled="clearDisabled(dimension)"
               @click="assignments[dimension] = null"
             >
               Clear
@@ -66,15 +69,8 @@
     </v-card>
     <v-row>
       <v-col class="d-flex justify-end">
-        <v-btn @click="generateJson" :disabled="!canSubmit()">
+        <v-btn @click="generateJson" color="green" :disabled="!submitEnabled()">
           Submit
-        </v-btn>
-        <v-btn
-          @click="resetDimensionsToDefault"
-          :disabled="areDimensionsSetToDefault()"
-          class="ml-4"
-        >
-          Reset to defaults
         </v-btn>
       </v-col>
     </v-row>
@@ -265,6 +261,11 @@ export default class MultiSourceConfiguration extends Vue {
     C: "Channels"
   };
 
+  readonly dimesionNamesEntries = Object.entries(this.dimensionNames) as [
+    TUpDim,
+    string
+  ][];
+
   assignmentOptionToAssignmentItem(dimension: IAssignmentOption): IAssignment {
     return {
       text: dimension.name,
@@ -454,7 +455,20 @@ export default class MultiSourceConfiguration extends Vue {
     );
   }
 
-  canSubmit() {
+  assignmentDisabled(dimension: TUpDim) {
+    const currentAssignment = this.assignments[dimension];
+    return (
+      currentAssignment?.value.source === "file" ||
+      this.assignmentItems.length === 0
+    );
+  }
+
+  clearDisabled(dimension: TUpDim) {
+    const currentAssignment = this.assignments[dimension];
+    return !currentAssignment || currentAssignment.value.source === "file";
+  }
+
+  submitEnabled() {
     const filledAssignments = Object.values(this.assignments).reduce(
       (count, assignment) => (assignment ? ++count : count),
       0
