@@ -41,34 +41,28 @@
                   v-if="tool"
                 >
                   <template v-slot:activator="{ on, attrs }">
-                    <v-list-item
-                      dense
-                      :value="tool.id"
-                      v-bind="attrs"
-                      v-on="on"
-                      v-mousetrap="
-                        tool.hotkey
-                          ? {
-                              bind: tool.hotkey,
-                              handler: () =>
-                                (selectedToolId =
-                                  selectedToolId === tool.id ? '' : tool.id)
-                            }
-                          : []
-                      "
-                    >
-                      <v-list-item-avatar>
-                        <tool-icon :tool="tool" />
-                      </v-list-item-avatar>
-                      <v-list-item-content
-                        ><v-list-item-title>{{ tool.name }}</v-list-item-title>
-                      </v-list-item-content>
-                      <v-list-item-action
-                        ><v-btn icon @click="removeToolId(tool.id)"
-                          ><v-icon>mdi-close</v-icon></v-btn
-                        ></v-list-item-action
+                    <!-- If type === segmentation, add an annotation worker menu -->
+                    <template v-if="tool.type === 'segmentation'">
+                      <v-menu
+                        offset-x
+                        :closeOnClick="false"
+                        :closeOnContentClick="false"
+                        :value="
+                          selectedTool &&
+                            selectedTool.id === tool.id &&
+                            selectedTool.type === 'segmentation'
+                        "
                       >
-                    </v-list-item>
+                        <template #activator="{}">
+                          <tool-item :tool="tool" v-bind="attrs" v-on="on" />
+                        </template>
+                        <annotation-worker-menu :tool="tool" />
+                      </v-menu>
+                    </template>
+                    <!-- Otherwiser, only tool item -->
+                    <template v-else>
+                      <tool-item :tool="tool" v-bind="attrs" v-on="on" />
+                    </template>
                   </template>
                   <div class="d-flex flex-column">
                     <div style="margin: 5px;">
@@ -85,10 +79,6 @@
               </template>
             </draggable>
           </v-list-item-group>
-          <annotation-worker-menu
-            :tool="selectedTool"
-            v-if="selectedTool && selectedTool.type === 'segmentation'"
-          ></annotation-worker-menu>
           <circle-to-dot-menu
             :tool="selectedTool"
             v-if="
@@ -115,16 +105,17 @@ import {
   AnnotationShape,
   IToolConfiguration
 } from "@/store/model";
-import ToolIcon from "@/tools/ToolIcon.vue";
-import ToolCreation from "@/tools/creation/ToolCreation.vue";
+
 import AnnotationWorkerMenu from "@/components/AnnotationWorkerMenu.vue";
 import CircleToDotMenu from "@/components/CircleToDotMenu.vue";
+import ToolCreation from "@/tools/creation/ToolCreation.vue";
+import ToolItem from "./ToolItem.vue";
 
 // Lists tools from a toolset, allows selecting a tool from the list, and adding new tools
 @Component({
   components: {
     ToolCreation,
-    ToolIcon,
+    ToolItem,
     AnnotationWorkerMenu,
     CircleToDotMenu,
     draggable
@@ -136,11 +127,11 @@ export default class Toolset extends Vue {
   panels: number = 0;
 
   get selectedToolId() {
-    return this.store.selectedTool?.id || "";
+    return this.store.selectedTool?.id || null;
   }
 
-  set selectedToolId(id: string) {
-    this.store.setSelectedToolId(id);
+  set selectedToolId(id: string | null) {
+    this.store.setSelectedToolId(id || null);
   }
 
   get tools() {
@@ -196,14 +187,6 @@ export default class Toolset extends Vue {
     }
 
     return propDesc;
-  }
-
-  removeToolId(toolId: string) {
-    if (toolId === this.selectedToolId) {
-      this.selectedToolId = "";
-    }
-    this.store.removeToolFromConfiguration(toolId);
-    this.store.syncConfiguration("tools");
   }
 }
 </script>
