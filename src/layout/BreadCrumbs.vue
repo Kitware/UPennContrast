@@ -92,14 +92,14 @@ export default class BreadCrumbs extends Vue {
   get configurationId(): Promise<string> | null {
     const paramsId = this.$route.params.configurationId;
     const queryId = this.$route.query.configurationId;
+    if (this.datasetView) {
+      return this.datasetView.then(({ configurationId }) => configurationId);
+    }
     if (paramsId) {
       return Promise.resolve(paramsId);
     }
     if (queryId && typeof queryId === "string") {
       return Promise.resolve(queryId);
-    }
-    if (this.datasetView) {
-      return this.datasetView.then(({ configurationId }) => configurationId);
     }
     return null;
   }
