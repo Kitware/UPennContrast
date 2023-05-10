@@ -187,7 +187,7 @@ export default class GirderAPI {
     const o: Readonly<IHistogramOptions> = Object.assign(
       {
         frame: 0,
-        bins: 512,
+        bins: 4096,
         width: 2048,
         height: 2048,
         resample: false

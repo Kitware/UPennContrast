@@ -16,37 +16,37 @@
       :id="`input-${_uid}`"
     />
     <div class="wrapper">
-      <svg :width="width" :height="height">
-        <path class="path" :d="areaPath" />
+      <svg :width="width" :height="height" ref="svg">
+        <path class="path" :d="areaPath" ref="path" />
       </svg>
       <div
         class="min-hint"
-        :style="{ width: toValue(currentContrast.blackPoint, 'black') }"
+        :style="{ width: toValue(currentContrast, 'black') }"
       />
       <div
         class="max-hint"
-        :style="{ width: toValue(currentContrast.whitePoint, 'white') }"
+        :style="{ width: toValue(currentContrast, 'white') }"
       />
       <div
         ref="min"
         class="min"
-        :style="{ left: toValue(currentContrast.blackPoint, 'black') }"
+        :style="{ left: toValue(currentContrast, 'black') }"
         :title="toLabel(currentContrast.blackPoint)"
       />
       <div
         class="saved-min"
-        :style="{ left: toValue(configurationContrast.blackPoint, 'black') }"
+        :style="{ left: toValue(configurationContrast, 'black') }"
         :title="`Saved: ${toLabel(configurationContrast.blackPoint)}`"
       />
       <div
         ref="max"
         class="max"
-        :style="{ right: toValue(currentContrast.whitePoint, 'white') }"
+        :style="{ right: toValue(currentContrast, 'white') }"
         :title="toLabel(currentContrast.whitePoint)"
       />
       <div
         class="saved-max"
-        :style="{ right: toValue(configurationContrast.whitePoint, 'white') }"
+        :style="{ right: toValue(configurationContrast, 'white') }"
         :title="`Saved: ${toLabel(configurationContrast.whitePoint)}`"
       />
       <resize-observer @notify="handleResize" />
@@ -106,9 +106,10 @@ import { IContrast } from "../store/model";
 import { ITileHistogram } from "../store/images";
 import { scaleLinear, scalePoint } from "d3-scale";
 import { area, curveStep } from "d3-shape";
-import { selectAll, event as d3Event } from "d3-selection";
+import { select, selectAll, event as d3Event } from "d3-selection";
 import { drag, D3DragEvent } from "d3-drag";
 import { throttle } from "lodash-es";
+import { zoom, D3ZoomEvent, ZoomBehavior } from "d3-zoom";
 
 function roundPer(v: number) {
   return Math.round(v * 100) / 100;
@@ -141,10 +142,17 @@ export default class ContrastHistogram extends Vue {
 
   histData: ITileHistogram | null = null;
 
+  scale: number = 1;
+  translation: number = 0;
+
   $refs!: {
     min: HTMLElement;
     max: HTMLElement;
+    svg: HTMLElement;
+    path: HTMLElement;
   };
+
+  _zoomBehavior: ZoomBehavior<HTMLElement, any> | null = null;
 
   _uid!: string; // Vue has that appearantly
 
@@ -175,10 +183,14 @@ export default class ContrastHistogram extends Vue {
     }
   }
 
+  get pixelRange() {
+    return [this.translation, this.translation + this.scale * this.width];
+  }
+
   get histToPixel() {
     const scale = scaleLinear()
       .domain([0, 100])
-      .range([0, this.width]);
+      .range(this.pixelRange);
     if (this.histData) {
       scale.domain([this.histData.min, this.histData.max]);
     }
@@ -188,20 +200,23 @@ export default class ContrastHistogram extends Vue {
   get percentageToPixel() {
     return scaleLinear()
       .domain([0, 100])
-      .range([0, this.width]);
+      .range(this.pixelRange);
   }
 
-  toValue(value: number, color: "white" | "black") {
-    const base =
-      this.mode === "percentile"
-        ? this.percentageToPixel(value)
-        : this.histToPixel(value);
-    switch (color) {
-      case "white":
-        return `${this.width - base}px`;
-      case "black":
-        return `${base}px`;
-    }
+  get toValue() {
+    const clamp = (x: number) => Math.min(this.width, Math.max(0, x));
+    return (contrast: IContrast, color: "white" | "black") => {
+      const convert =
+        contrast.mode === "percentile"
+          ? this.percentageToPixel
+          : this.histToPixel;
+      switch (color) {
+        case "white":
+          return `${clamp(this.width - convert(contrast.whitePoint))}px`;
+        case "black":
+          return `${clamp(convert(contrast.blackPoint))}px`;
+      }
+    };
   }
 
   toLabel(value: number) {
@@ -216,39 +231,11 @@ export default class ContrastHistogram extends Vue {
   @Watch("histogram")
   onValueChange(hist: Promise<ITileHistogram>) {
     this.histData = null;
-    hist.then(data => this.setAndVerify(data));
+    hist.then(data => (this.histData = data));
   }
 
   created() {
-    this.histogram.then(data => this.setAndVerify(data));
-  }
-
-  private setAndVerify(data: ITileHistogram): void {
-    this.histData = data;
-
-    if (this.mode === "percentile") {
-      return;
-    }
-
-    if (data.max - data.min <= 1) {
-      return;
-    }
-
-    // ensure the values are within the bounds
-    const copy = Object.assign({}, this.currentContrast);
-    const clamp = (value: number) =>
-      Math.min(Math.max(value, data.min), data.max);
-    const keys: ("blackPoint" | "whitePoint")[] = ["blackPoint", "whitePoint"];
-    let changed = false;
-    keys.forEach(key => {
-      const v = clamp(copy[key]);
-      changed = changed || v !== copy[key];
-      copy[key] = v;
-    });
-
-    if (changed) {
-      this.emitChange.call(this, copy);
-    }
+    this.histogram.then(data => (this.histData = data));
   }
 
   mounted() {
@@ -265,6 +252,31 @@ export default class ContrastHistogram extends Vue {
           }
         )
       );
+
+    select(this.$refs.svg).call(this.getZoomBehavior());
+  }
+
+  @Watch("width")
+  getZoomBehavior() {
+    if (!this._zoomBehavior) {
+      this._zoomBehavior = zoom<HTMLElement, any>()
+        .scaleExtent([1, 32])
+        .on("zoom", this.updatePanAndZoom);
+    }
+    return this._zoomBehavior.translateExtent([
+      [0, 0],
+      [this.width, 0]
+    ]);
+  }
+
+  updatePanAndZoom() {
+    const evt = d3Event as D3ZoomEvent<HTMLElement, any>;
+    const transform = evt.transform;
+    this.translation = transform.x;
+    this.scale = transform.k;
+    const transformString =
+      "translate(" + this.translation + ",0" + ") scale(" + this.scale + ",1)";
+    select(this.$refs.path).attr("transform", transformString);
   }
 
   private updatePoint(which: "blackPoint" | "whitePoint", pixel: number) {
