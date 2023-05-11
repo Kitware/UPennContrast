@@ -1,6 +1,182 @@
 <template>
   <v-container flex>
     <v-row>
+      <v-col cols="8">
+        <v-card class="my-3">
+          <v-toolbar>
+            <v-toolbar-title>Configurations</v-toolbar-title>
+          </v-toolbar>
+          <v-card-text>
+            <v-dialog
+              v-model="removeDatasetViewConfirm"
+              max-width="33vw"
+              v-if="viewToRemove"
+            >
+              <v-card>
+                <v-card-title>
+                  Are you sure to remove the view for configuration "{{
+                    configInfo[viewToRemove.configurationId]
+                      ? configInfo[viewToRemove.configurationId].name
+                      : "Unnamed configuration"
+                  }}"?
+                </v-card-title>
+                <v-card-actions class="button-bar">
+                  <v-btn @click="closeRemoveConfigurationDialog()">
+                    Cancel
+                  </v-btn>
+                  <v-btn @click="removeDatasetView()" color="warning">
+                    Remove
+                  </v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+            <v-card class="ma-3">
+              <v-card-title class="title">
+                Actions
+              </v-card-title>
+              <v-card-text>
+                <div v-if="datasetViewItems.length <= 0">
+                  <v-text-field
+                    v-model="defaultConfigurationName"
+                    label="Configuration Name"
+                    dense
+                    hide-details
+                    class="ma-1"
+                  ></v-text-field>
+                  <v-tooltip top max-width="50vh">
+                    <template v-slot:activator="{ on, attrs }">
+                      <v-btn
+                        v-on="on"
+                        v-bind="attrs"
+                        class="ma-1"
+                        color="green"
+                        @click="viewDefault"
+                      >
+                        View Dataset
+                      </v-btn>
+                    </template>
+                    Create a default configuration with the given name in the
+                    same folder as the dataset and view it
+                  </v-tooltip>
+                  <v-divider class="my-1" />
+                </div>
+                <div>
+                  <v-tooltip top max-width="50vh">
+                    <template v-slot:activator="{ on, attrs }">
+                      <v-btn
+                        v-on="on"
+                        v-bind="attrs"
+                        class="ma-1"
+                        small
+                        color="primary"
+                        :to="{
+                          name: 'importconfiguration',
+                          query: { datasetId }
+                        }"
+                      >
+                        Add to existing collection…
+                      </v-btn>
+                    </template>
+                    Add this dataset to an existing collection to apply an
+                    existing configuration
+                  </v-tooltip>
+                </div>
+                <div>
+                  <v-tooltip top max-width="50vh">
+                    <template v-slot:activator="{ on, attrs }">
+                      <v-btn
+                        v-on="on"
+                        v-bind="attrs"
+                        class="ma-1"
+                        small
+                        color="primary"
+                        :to="{
+                          name: 'duplicateimportconfiguration',
+                          query: { datasetId }
+                        }"
+                      >
+                        Import configuration from collection…
+                      </v-btn>
+                    </template>
+                    Create a copy of a collection from an existing collection
+                    and apply to the current dataset. Changes to the original
+                    collection don't apply to the copied collection and
+                    vice-versa
+                  </v-tooltip>
+                </div>
+                <!-- <div>
+                  <v-tooltip top max-width="50vh">
+                    <template v-slot:activator="{ on, attrs }">
+                      <v-btn
+                        v-on="on"
+                        v-bind="attrs"
+                        class="ma-1"
+                        small
+                        color="primary"
+                        :to="{
+                          name: 'newconfiguration',
+                          params: {},
+                          query: { datasetId: dataset ? dataset.id : '' }
+                        }"
+                      >
+                        Create New Configuration…
+                      </v-btn>
+                    </template>
+                    Create a new collection and add the current dataset to it
+                  </v-tooltip>
+                </div> -->
+              </v-card-text>
+            </v-card>
+            <v-list two-line>
+              <v-list-item
+                v-for="d in datasetViewItems"
+                :key="d.datasetView.id"
+                @click="$router.push(toRoute(d.datasetView))"
+              >
+                <v-list-item-content>
+                  <v-list-item-title>
+                    {{
+                      d.configInfo ? d.configInfo.name : "Unnamed configuration"
+                    }}
+                  </v-list-item-title>
+                  <v-list-item-subtitle>
+                    {{
+                      d.configInfo ? d.configInfo.description : "No description"
+                    }}
+                  </v-list-item-subtitle>
+                </v-list-item-content>
+                <v-list-item-action>
+                  <span class="button-bar">
+                    <v-btn
+                      color="warning"
+                      v-on:click.stop="
+                        openRemoveConfigurationDialog(d.datasetView)
+                      "
+                    >
+                      <v-icon left>mdi-close</v-icon>remove
+                    </v-btn>
+                    <girder-location-chooser
+                      @input="duplicateView(d.datasetView, $event)"
+                      title="Select a Folder for Duplicated Configuration"
+                    >
+                      <template v-slot:activator="{ on }">
+                        <v-btn color="primary" v-on="on">
+                          <v-icon left>mdi-content-duplicate</v-icon>
+                          duplicate
+                        </v-btn>
+                      </template>
+                    </girder-location-chooser>
+                    <v-btn color="primary" :to="toRoute(d.datasetView)">
+                      <v-icon left>mdi-eye</v-icon>
+                      view
+                    </v-btn>
+                  </span>
+                </v-list-item-action>
+              </v-list-item>
+            </v-list>
+          </v-card-text>
+        </v-card>
+      </v-col>
       <v-col cols="4">
         <v-card class="my-3">
           <v-toolbar>
@@ -39,150 +215,21 @@
           </v-card-text>
         </v-card>
       </v-col>
-      <v-col>
-        <v-card class="my-3">
-          <v-toolbar>
-            <v-toolbar-title>Configurations</v-toolbar-title>
-            <v-spacer></v-spacer>
-            <v-tooltip top max-width="50vh">
-              <template v-slot:activator="{ on, attrs }">
-                <v-btn
-                  v-on="on"
-                  v-bind="attrs"
-                  class="mx-1"
-                  small
-                  color="primary"
-                  :to="{
-                    name: 'importconfiguration',
-                    query: { datasetId }
-                  }"
-                >
-                  Add to existing collection…
-                </v-btn>
-              </template>
-              Add this dataset to an existing collection to apply an existing
-              configuration
-            </v-tooltip>
-            <v-tooltip top max-width="50vh">
-              <template v-slot:activator="{ on, attrs }">
-                <v-btn
-                  v-on="on"
-                  v-bind="attrs"
-                  class="mx-1"
-                  small
-                  color="primary"
-                  :to="{
-                    name: 'duplicateimportconfiguration',
-                    query: { datasetId }
-                  }"
-                >
-                  Import configuration from collection…
-                </v-btn>
-              </template>
-              Create a copy of a collection from an existing collection and
-              apply to the current dataset. Changes to the original collection
-              don't apply to the copied collection and vice-versa
-            </v-tooltip>
-            <v-tooltip top max-width="50vh">
-              <template v-slot:activator="{ on, attrs }">
-                <v-btn
-                  v-on="on"
-                  v-bind="attrs"
-                  class="mx-1"
-                  small
-                  color="primary"
-                  :to="{
-                    name: 'newconfiguration',
-                    params: {},
-                    query: { datasetId: dataset ? dataset.id : '' }
-                  }"
-                >
-                  Create New Configuration…
-                </v-btn>
-              </template>
-              Create a new collection and add the current dataset to it
-            </v-tooltip>
-          </v-toolbar>
-          <v-card-text>
-            <v-dialog
-              v-model="removeDatasetViewConfirm"
-              max-width="33vw"
-              v-if="viewToRemove"
-            >
-              <v-card>
-                <v-card-title>
-                  Are you sure to remove the view for configuration "{{
-                    configInfo[viewToRemove.configurationId]
-                      ? configInfo[viewToRemove.configurationId].name
-                      : "Unnamed configuration"
-                  }}"?
-                </v-card-title>
-                <v-card-actions class="button-bar">
-                  <v-btn @click="closeRemoveConfigurationDialog()">
-                    Cancel
-                  </v-btn>
-                  <v-btn @click="removeDatasetView()" color="warning">
-                    Remove
-                  </v-btn>
-                </v-card-actions>
-              </v-card>
-            </v-dialog>
-            <v-list two-line>
-              <v-list-item
-                v-for="d in datasetViewItems"
-                :key="d.datasetView.id"
-                @click="$router.push(toRoute(d.datasetView))"
-              >
-                <v-list-item-content>
-                  <v-list-item-title>
-                    {{
-                      d.configInfo ? d.configInfo.name : "Unnamed configuration"
-                    }}
-                  </v-list-item-title>
-                  <v-list-item-subtitle>
-                    {{
-                      d.configInfo ? d.configInfo.description : "No description"
-                    }}
-                  </v-list-item-subtitle>
-                </v-list-item-content>
-                <v-list-item-action>
-                  <span class="button-bar">
-                    <v-btn
-                      color="warning"
-                      v-on:click.stop="
-                        openRemoveConfigurationDialog(d.datasetView)
-                      "
-                    >
-                      <v-icon left>mdi-close</v-icon>remove
-                    </v-btn>
-                    <v-btn
-                      color="primary"
-                      @click="duplicateView(d.datasetView)"
-                    >
-                      <v-icon left>mdi-content-duplicate</v-icon>
-                      duplicate
-                    </v-btn>
-                    <v-btn color="primary" :to="toRoute(d.datasetView)">
-                      <v-icon left>mdi-eye</v-icon>
-                      view
-                    </v-btn>
-                  </span>
-                </v-list-item-action>
-              </v-list-item>
-            </v-list>
-          </v-card-text>
-        </v-card>
-      </v-col>
     </v-row>
   </v-container>
 </template>
 <script lang="ts">
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
-import { IDatasetConfiguration, IDatasetView } from "../../store/model";
-import { IGirderItem } from "@/girder";
+import { IDatasetView } from "@/store/model";
+import { IGirderItem, IGirderSelectAble } from "@/girder";
 
-@Component
+@Component({
+  components: {
+    GirderLocationChooser: () =>
+      import("@/components/GirderLocationChooser.vue").then(mod => mod)
+  }
+})
 export default class DatasetInfo extends Vue {
   readonly store = store;
 
@@ -193,6 +240,8 @@ export default class DatasetInfo extends Vue {
 
   datasetViews: IDatasetView[] = [];
   configInfo: { [configurationId: string]: IGirderItem } = {};
+
+  defaultConfigurationName: string = "";
 
   readonly headers = [
     {
@@ -274,6 +323,7 @@ export default class DatasetInfo extends Vue {
 
   mounted() {
     this.updateDatasetViews();
+    this.updateDefaultConfigurationName();
   }
 
   @Watch("dataset")
@@ -286,6 +336,11 @@ export default class DatasetInfo extends Vue {
       this.datasetViews = [];
     }
     return this.datasetViews;
+  }
+
+  @Watch("datasetName")
+  updateDefaultConfigurationName() {
+    this.defaultConfigurationName = (this.datasetName || "Default") + " View";
   }
 
   toRoute(datasetView: IDatasetView) {
@@ -326,9 +381,11 @@ export default class DatasetInfo extends Vue {
     }
   }
 
-  async duplicateView(datasetView: IDatasetView) {
-    // TODO: temp choose location of the duplicated config
-    if (!this.dataset) {
+  async duplicateView(
+    datasetView: IDatasetView,
+    configurationFolder: IGirderSelectAble | null
+  ) {
+    if (!this.dataset || configurationFolder?._modelType !== "folder") {
       return;
     }
     const baseConfig = await this.store.api.getConfiguration(
@@ -336,7 +393,7 @@ export default class DatasetInfo extends Vue {
     );
     const config = await store.api.duplicateConfiguration(
       baseConfig,
-      this.dataset.id
+      configurationFolder._id
     );
     await this.store.api.createDatasetView({
       datasetId: this.dataset.id,
@@ -348,6 +405,34 @@ export default class DatasetInfo extends Vue {
     this.$router.push({
       name: "configuration",
       params: Object.assign({ configurationId: config.id }, this.$route.params)
+    });
+  }
+
+  async viewDefault() {
+    if (!this.dataset) {
+      return;
+    }
+    const datasetFolder = await this.store.api.getFolder(this.dataset.id);
+    if (!datasetFolder.parentId) {
+      return;
+    }
+    const config = await this.store.api.createConfigurationFromDataset(
+      this.defaultConfigurationName,
+      "",
+      datasetFolder.parentId,
+      this.dataset
+    );
+    const view = await this.store.api.createDatasetView({
+      datasetId: this.dataset.id,
+      configurationId: config.id,
+      layerContrasts: {},
+      lastViewed: Date.now()
+    });
+    this.$router.push({
+      name: "datasetview",
+      params: Object.assign({}, this.$route.params, {
+        datasetViewId: view.id
+      })
     });
   }
 }

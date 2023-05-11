@@ -17,12 +17,6 @@ class DatasetViewSchema:
             },
             'whitePoint': {
                 'type': 'number'
-            },
-            'savedBlackPoint': {
-                'type': 'number'
-            },
-            'savedWhitePoint': {
-                'type': 'number'
             }
         }
     }

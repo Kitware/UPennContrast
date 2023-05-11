@@ -56,6 +56,15 @@ interface IBreadCrumbItem {
 export default class BreadCrumbs extends Vue {
   readonly store = store;
   items: IBreadCrumbItem[] = [];
+  previousRefreshInfo: {
+    datasetId: string | null;
+    configurationId: string | null;
+    routeName: string | null | undefined;
+  } = {
+    datasetId: null,
+    configurationId: null,
+    routeName: null
+  };
 
   get datasetView() {
     const { datasetViewId } = this.$route.params;
@@ -83,14 +92,14 @@ export default class BreadCrumbs extends Vue {
   get configurationId(): Promise<string> | null {
     const paramsId = this.$route.params.configurationId;
     const queryId = this.$route.query.configurationId;
+    if (this.datasetView) {
+      return this.datasetView.then(({ configurationId }) => configurationId);
+    }
     if (paramsId) {
       return Promise.resolve(paramsId);
     }
     if (queryId && typeof queryId === "string") {
       return Promise.resolve(queryId);
-    }
-    if (this.datasetView) {
-      return this.datasetView.then(({ configurationId }) => configurationId);
     }
     return null;
   }
@@ -99,12 +108,27 @@ export default class BreadCrumbs extends Vue {
     this.refreshItems();
   }
 
-  @Watch("$route")
+  @Watch("datasetId")
+  @Watch("configurationId")
   async refreshItems() {
     const [configurationId, datasetId] = await Promise.all([
       this.configurationId,
       this.datasetId
     ]);
+
+    // Cache items if parameters are the same
+    // This is useful when route query changes frequently but dataset and configuration don't
+    if (
+      datasetId === this.previousRefreshInfo.datasetId &&
+      configurationId === this.previousRefreshInfo.configurationId &&
+      this.$route.name === this.previousRefreshInfo.routeName
+    ) {
+      return;
+    }
+    this.previousRefreshInfo.datasetId = datasetId;
+    this.previousRefreshInfo.configurationId = configurationId;
+    this.previousRefreshInfo.routeName = this.$route.name;
+
     this.items = [];
 
     // Dataset Item
@@ -192,7 +216,11 @@ export default class BreadCrumbs extends Vue {
     if (currentDatasetViewId === datasetViewId) {
       return;
     }
-    this.$router.push({ name: "datasetview", params: { datasetViewId } });
+    this.$router.push({
+      name: "datasetview",
+      params: { datasetViewId },
+      query: { ...this.$route.query }
+    });
   }
 }
 </script>
