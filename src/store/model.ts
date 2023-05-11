@@ -89,8 +89,6 @@ export interface IDataset {
   height: number;
   images(z: number, zTime: number, xy: number, channel: number): IImage[];
   anyImage(): IImage | null;
-
-  configurations: IDatasetConfiguration[];
 }
 
 export interface IViewConfiguration {

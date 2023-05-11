@@ -303,12 +303,6 @@ export class Main extends VuexModule {
     if (!data) {
       return;
     }
-
-    if (this.dataset) {
-      if (!this.dataset.configurations.find(d => d.id === data.id)) {
-        this.dataset.configurations.push(data);
-      }
-    }
   }
 
   @Mutation
@@ -591,14 +585,6 @@ export class Main extends VuexModule {
     }
     if (this.selectedConfigurationId === configuration.id) {
       this.selectedConfigurationId = null;
-    }
-    if (this.dataset) {
-      const index = this.dataset.configurations.findIndex(
-        d => d.id === configuration.id
-      );
-      if (index >= 0) {
-        this.dataset.configurations.splice(index, 1);
-      }
     }
   }
 

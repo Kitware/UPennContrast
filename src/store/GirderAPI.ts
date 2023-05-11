@@ -226,23 +226,16 @@ export default class GirderAPI {
   ): Promise<IDataset> {
     return Promise.all([this.getFolder(id), this.getItems(id)]).then(
       ([folder, items]) => {
+        const baseDataset = asDataset(folder);
         // just use the first image if it exists
-        const folderDataset = asDataset(folder);
         const imageItem = items.find(d => (d as any).largeImage);
-        const configPromises = items
-          .filter(isConfigurationItem)
-          .map(item => this.getConfiguration(item._id));
-        return Promise.all(configPromises).then(configurations => {
-          const baseDataset = { ...folderDataset, configurations };
-          if (imageItem === undefined) {
-            return baseDataset;
-          } else {
-            return this.getTiles(imageItem).then(tiles => ({
-              ...baseDataset,
-              ...parseTiles(imageItem, tiles, unrollXY, unrollZ, unrollT)
-            }));
-          }
-        });
+        if (imageItem === undefined) {
+          return baseDataset;
+        }
+        return this.getTiles(imageItem).then(tiles => ({
+          ...baseDataset,
+          ...parseTiles(imageItem, tiles, unrollXY, unrollZ, unrollT)
+        }));
       }
     );
   }
@@ -523,8 +516,7 @@ function asDataset(folder: IGirderFolder): IDataset {
     channels: [],
     channelNames: new Map<number, string>(),
     images: () => [],
-    anyImage: () => null,
-    configurations: []
+    anyImage: () => null
   };
 }
 
