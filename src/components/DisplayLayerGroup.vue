@@ -1,8 +1,35 @@
 <template>
   <div :class="{ background: !singleLayer }">
-    <div v-if="!singleLayer" class="pl-4 py-1 subtitle-1">
-      Group
-    </div>
+    <v-row dense v-if="!singleLayer" class="pl-4 py-1">
+      <div class="subtitle-1">
+        Group
+      </div>
+      <v-col class="denseCol">
+        <v-switch
+          @click.native.stop
+          @mousedown.native.stop
+          @mouseup.native.stop
+          class="toggleButton"
+          v-model="isZMaxMerge"
+          :title="`Toggle Z Max Merge for all layers`"
+          v-show="displayZ"
+          dense
+          hide-details
+        />
+      </v-col>
+      <v-col class="denseCol">
+        <v-switch
+          @click.native.stop
+          @mousedown.native.stop
+          @mouseup.native.stop
+          class="toggleButton"
+          v-model="visible"
+          :title="`Toggle Visibility for all layers`"
+          dense
+          hide-details
+        />
+      </v-col>
+    </v-row>
     <draggable
       v-bind="$attrs"
       :value="indexedLayers"
@@ -17,6 +44,7 @@
       <transition-group type="transition">
         <div v-for="indexedLayer in indexedLayers" :key="indexedLayer.layerIdx">
           <display-layer
+            ref="displayLayers"
             :value="indexedLayer.layer"
             :index="indexedLayer.layerIdx"
           />
@@ -47,6 +75,38 @@ export default class DisplayLayerGroup extends Vue {
 
   @Prop()
   readonly indexedLayers!: IIndexedLayer[];
+
+  displayLayers: DisplayLayer[] = [];
+
+  $refs!: {
+    displayLayers: DisplayLayer[];
+  };
+
+  mounted() {
+    this.displayLayers = this.$refs.displayLayers;
+  }
+
+  get displayZ() {
+    return this.store.z;
+  }
+
+  get isZMaxMerge() {
+    return this.displayLayers.every(displayLayer => displayLayer.isZMaxMerge);
+  }
+
+  set isZMaxMerge(value: boolean) {
+    this.displayLayers.forEach(
+      displayLayer => (displayLayer.isZMaxMerge = value)
+    );
+  }
+
+  get visible() {
+    return this.displayLayers.every(displayLayer => displayLayer.visible);
+  }
+
+  set visible(value: boolean) {
+    this.displayLayers.forEach(displayLayer => (displayLayer.visible = value));
+  }
 
   update(value: IIndexedLayer[]) {
     this.$emit("update", value);

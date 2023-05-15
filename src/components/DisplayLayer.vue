@@ -19,8 +19,8 @@
             }"
             class="toggleButton"
             v-model="isZMaxMerge"
+            v-show="displayZ"
             :title="`Toggle Z Max Merge (hotkey ${zMaxMergeBinding(index)})`"
-            :displayed="displayZ"
             dense
             hide-details
           />

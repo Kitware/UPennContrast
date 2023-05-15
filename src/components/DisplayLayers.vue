@@ -18,7 +18,11 @@
               Create group
             </draggable>
           </v-col>
-          <v-col class="text-caption header-col" title="hotkey Z">
+          <v-col
+            class="text-caption header-col"
+            title="hotkey Z"
+            v-show="displayZ"
+          >
             Z max-merge
           </v-col>
           <v-col class="text-caption header-col" title="hotkey 0">
@@ -101,6 +105,10 @@ export default class DisplayLayers extends Vue {
   readonly singleLayerPrefix = singleLayerPrefix;
 
   isDragging: boolean = false;
+
+  get displayZ() {
+    return this.store.z;
+  }
 
   // Maps a layer groupId to a list of layers
   get groupsMap() {
