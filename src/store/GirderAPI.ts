@@ -18,7 +18,8 @@ import {
   newLayer,
   copyLayerWithoutPrivateAttributes,
   IDatasetView,
-  IDatasetViewBase
+  IDatasetViewBase,
+  exampleConfigurationBase
 } from "./model";
 import {
   toStyle,
@@ -590,9 +591,8 @@ function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
     description: item.description
   };
   for (const key of configurationBaseKeys) {
-    if (key in item.meta) {
-      config[key] = item.meta[key];
-    }
+    config[key] =
+      key in item.meta ? item.meta[key] : exampleConfigurationBase[key];
   }
   return config as IDatasetConfiguration;
 }
