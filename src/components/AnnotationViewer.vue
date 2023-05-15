@@ -456,14 +456,14 @@ export default class AnnotationViewer extends Vue {
         const layerChannelAnnotations =
           channelToAnnotationIds.get(layer.channel) || [];
         const sliceIndexes = this.store.layerSliceIndexes(layer);
+        const allXY = this.store.unrollXY || layer.xy.type === "max-merge";
+        const allZ = this.store.unrollZ || layer.z.type === "max-merge";
+        const allT = this.store.unrollT || layer.time.type === "max-merge";
         for (const annotation of layerChannelAnnotations) {
           if (
-            (this.store.unrollXY ||
-              annotation.location.XY === sliceIndexes?.xyIndex) &&
-            (this.store.unrollZ ||
-              annotation.location.Z === sliceIndexes?.zIndex) &&
-            (this.store.unrollT ||
-              annotation.location.Time === sliceIndexes?.tIndex)
+            (allXY || annotation.location.XY === sliceIndexes?.xyIndex) &&
+            (allZ || annotation.location.Z === sliceIndexes?.zIndex) &&
+            (allT || annotation.location.Time === sliceIndexes?.tIndex)
           ) {
             annotationIdsSet.set(annotation.id, annotation);
           }
