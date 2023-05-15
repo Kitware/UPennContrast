@@ -1,46 +1,43 @@
 <template>
-  <v-expansion-panels>
-    <v-expansion-panel v-model="show" v-if="tool">
-      <v-expansion-panel-header>
-        {{ tool.name }} worker menu
-      </v-expansion-panel-header>
-      <v-expansion-panel-content>
-        <v-container>
-          <v-row>
-            <v-col>
-              <v-subheader>Image: {{ tool.values.image.image }}</v-subheader>
-            </v-col>
-          </v-row>
-          <v-row>
-            <worker-interface-values
-              :workerInterface="workerInterface"
-              v-model="interfaceValues"
-            />
-          </v-row>
-          <v-row>
-            <v-btn @click="preview">preview</v-btn>
-            <v-spacer></v-spacer>
-            <v-btn @click="compute" :disabled="running"
-              ><v-progress-circular
-                size="16"
-                v-if="running"
-                indeterminate
-              ></v-progress-circular>
-              <v-icon v-if="previousRunStatus === false">mdi-close</v-icon>
-              <v-icon v-if="previousRunStatus === true">mdi-check</v-icon>
-              <span>Compute</span></v-btn
-            >
-          </v-row>
-          <v-row>
-            <v-checkbox
-              v-model="displayWorkerPreview"
-              label="Display Previews"
-            ></v-checkbox>
-          </v-row>
-        </v-container>
-      </v-expansion-panel-content>
-    </v-expansion-panel>
-  </v-expansion-panels>
+  <v-card v-if="tool">
+    <v-card-title class="subtitle-1">
+      Worker menu
+    </v-card-title>
+    <v-card-text>
+      <v-container v-if="fetchingWorkerInterface">
+        <v-progress-circular indeterminate />
+      </v-container>
+      <v-container v-else>
+        <v-row>
+          <v-col>
+            <v-subheader>Image: {{ tool.values.image.image }}</v-subheader>
+          </v-col>
+        </v-row>
+        <v-row>
+          <worker-interface-values
+            :workerInterface="workerInterface"
+            v-model="interfaceValues"
+          />
+        </v-row>
+        <v-row>
+          <v-btn @click="preview">preview</v-btn>
+          <v-spacer></v-spacer>
+          <v-btn @click="compute" :disabled="running">
+            <v-progress-circular size="16" v-if="running" indeterminate />
+            <v-icon v-if="previousRunStatus === false">mdi-close</v-icon>
+            <v-icon v-if="previousRunStatus === true">mdi-check</v-icon>
+            <span>Compute</span>
+          </v-btn>
+        </v-row>
+        <v-row>
+          <v-checkbox
+            v-model="displayWorkerPreview"
+            label="Display Previews"
+          ></v-checkbox>
+        </v-row>
+      </v-container>
+    </v-card-text>
+  </v-card>
 </template>
 
 <script lang="ts">
@@ -65,7 +62,7 @@ export default class annotationWorkerMenu extends Vue {
   readonly annotationsStore = annotationsStore;
   readonly propertyStore = propertiesStore;
 
-  show: boolean = true;
+  fetchingWorkerInterface: boolean = false;
   running: boolean = false;
   previousRunStatus: boolean | null = null;
 
@@ -113,7 +110,6 @@ export default class annotationWorkerMenu extends Vue {
         this.previousRunStatus = success;
       }
     });
-    this.show = false;
   }
 
   preview() {
@@ -129,9 +125,14 @@ export default class annotationWorkerMenu extends Vue {
   }
 
   @Watch("tool")
-  updateInterface() {
-    if (Object.keys(this.workerInterface).length === 0) {
-      this.propertyStore.fetchWorkerInterface(this.image);
+  async updateInterface() {
+    if (
+      Object.keys(this.workerInterface).length === 0 &&
+      !this.fetchingWorkerInterface
+    ) {
+      this.fetchingWorkerInterface = true;
+      await this.propertyStore.fetchWorkerInterface(this.image).finally();
+      this.fetchingWorkerInterface = false;
     }
   }
 }

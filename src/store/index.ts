@@ -216,6 +216,9 @@ export class Main extends VuexModule {
 
   @Action
   removeToolFromConfiguration(toolId: string) {
+    if (this.selectedTool?.id === toolId) {
+      this.setSelectedToolId(null);
+    }
     if (this.configuration) {
       this.configuration.tools = this.tools.filter(t => t.id !== toolId);
       this.syncConfiguration("tools");
