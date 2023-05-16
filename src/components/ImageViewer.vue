@@ -202,15 +202,22 @@ export default class ImageViewer extends Vue {
   get mapLayerList(): ILayerStackImage[][] {
     let llist = [this.layerStackImages];
     if (this.store.layerMode === "unroll") {
-      llist = [[]];
-      let visible = 0;
+      // Bind each group id (not nullish) to a llist index
+      const layerGroups: Map<string, number> = new Map();
+      llist = [];
       this.layerStackImages.forEach(lsi => {
-        if (visible && lsi.layer.visible) {
-          llist.push([]);
-        }
-        llist[llist.length - 1].push(lsi);
         if (lsi.layer.visible) {
-          visible += 1;
+          const group = lsi.layer.layerGroup;
+          if (group) {
+            if (!layerGroups.has(group)) {
+              layerGroups.set(group, llist.length);
+              llist.push([]);
+            }
+            const groupIdx = layerGroups.get(group)!;
+            llist[groupIdx].push(lsi);
+          } else {
+            llist.push([lsi]);
+          }
         }
       });
     }
