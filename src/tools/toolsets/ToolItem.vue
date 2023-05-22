@@ -10,6 +10,8 @@
           }
         : []
     "
+    v-bind="$attrs"
+    v-on="$listeners"
   >
     <v-list-item-avatar>
       <tool-icon :tool="tool" />
