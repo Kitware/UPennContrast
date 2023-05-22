@@ -35,12 +35,15 @@ export default class Viewer extends Vue {
   }
 
   get hoverValueText() {
-    if (!this.hoverValue) {
+    const hoverValue = this.hoverValue;
+    if (!hoverValue) {
       return "";
     }
     const valuesText = [];
-    for (const [name, value] of Object.entries(this.hoverValue)) {
-      valuesText.push(name + ": " + value);
+    for (const { name, id } of this.store.layers) {
+      if (id in hoverValue) {
+        valuesText.push(name + ": " + hoverValue[id]);
+      }
     }
     return valuesText.join(" | ");
   }

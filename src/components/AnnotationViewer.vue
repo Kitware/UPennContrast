@@ -1349,7 +1349,7 @@ export default class AnnotationViewer extends Vue {
     if (!this.dataset) {
       return;
     }
-    const values: { [layerName: string]: number[] } = {};
+    const values: { [layerId: string]: number[] } = {};
     const promises: Promise<void>[] = [];
     for (const layer of this.validLayers) {
       if (layer.visible) {
@@ -1359,7 +1359,7 @@ export default class AnnotationViewer extends Vue {
             .getPixelValue(image, e.geo.x, e.geo.y)
             .then(pixel => {
               if (pixel.value) {
-                values[layer.name] = pixel.value;
+                values[layer.id] = pixel.value;
               }
             });
           promises.push(setPromise);

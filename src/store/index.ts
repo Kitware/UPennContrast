@@ -77,7 +77,7 @@ export class Main extends VuexModule {
   filteredAnnotationTooltips: boolean = false;
 
   valueOnHover: boolean = true;
-  hoverValue: { [layerName: string]: number[] } | null = null;
+  hoverValue: { [layerId: string]: number[] } | null = null;
 
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
@@ -169,7 +169,7 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  public setHoverValue(value: { [layerName: string]: number[] } | null) {
+  public setHoverValue(value: { [layerId: string]: number[] } | null) {
     this.hoverValue = value;
   }
 
