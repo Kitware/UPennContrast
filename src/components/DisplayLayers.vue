@@ -15,7 +15,7 @@
               class="ma-1 pa-1 drop"
               :class="{ dragging: isDragging, 'not-dragging': !isDragging }"
             >
-              Create group
+              Drag layer here to create group
             </draggable>
           </v-col>
           <v-col
