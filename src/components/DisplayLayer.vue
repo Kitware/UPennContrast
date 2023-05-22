@@ -8,6 +8,9 @@
         <v-col class="textCol">
           <div class="header pa-1">{{ value.name }}</div>
         </v-col>
+        <v-col v-if="hoverValue !== null" class="denseCol">
+          {{ hoverValue }}
+        </v-col>
         <v-col class="denseCol">
           <div v-if="index === 0" class="text-caption pb-2" title="hotkey Z">
             Z max-merge
@@ -169,6 +172,11 @@ export default class DisplayLayer extends Vue {
   readonly index!: number;
 
   showColorPicker = false;
+
+  get hoverValue() {
+    const layerId = this.value.id;
+    return this.store.hoverValue?.[layerId]?.join(", ") ?? null;
+  }
 
   get histogram() {
     return this.store.getLayerHistogram(this.value);
