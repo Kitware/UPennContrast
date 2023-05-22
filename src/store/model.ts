@@ -195,8 +195,8 @@ export interface IDisplayLayer {
 }
 
 export interface IPixel {
-  l: number;
-  value: number[];
+  l?: number;
+  value?: number[];
 }
 
 export interface IGeoJSLayer {

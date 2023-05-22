@@ -1358,7 +1358,9 @@ export default class AnnotationViewer extends Vue {
           const setPromise = this.store.api
             .getPixelValue(image, e.geo.x, e.geo.y)
             .then(pixel => {
-              values[layer.name] = pixel.value;
+              if (pixel.value) {
+                values[layer.name] = pixel.value;
+              }
             });
           promises.push(setPromise);
         }

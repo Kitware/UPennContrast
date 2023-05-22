@@ -195,16 +195,23 @@ export default class GirderAPI {
       .then(r => r.data[0]); // TODO deal with multiple channel data
   }
 
-  getPixelValue(image: IImage, geoX: number, geoY: number): Promise<IPixel> {
-    const params = {
-      left: geoX,
-      top: geoY,
-      frame: image.frameIndex
-    };
+  async getPixelValue(
+    image: IImage,
+    geoX: number,
+    geoY: number
+  ): Promise<IPixel> {
+    if (geoX < 0 || geoY < 0) {
+      return {};
+    }
+    const left = Math.floor(geoX);
+    const top = Math.floor(geoY);
+    const frame = image.frameIndex;
+    const params = { left, top, frame };
     const itemId = toId(image.item);
-    return this.client
-      .get(`item/${itemId}/tiles/pixel`, { params })
-      .then(r => r.data);
+    const response = await this.client.get(`item/${itemId}/tiles/pixel`, {
+      params
+    });
+    return response.data;
   }
 
   getItems(folderId: string): Promise<IGirderItem[]> {
