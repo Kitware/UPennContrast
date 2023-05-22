@@ -8,6 +8,9 @@
       </viewer-toolbar>
     </aside>
     <image-viewer class="main" />
+    <v-snackbar :value="!!hoverValue" :timeout="-1" bottom right>
+      {{ hoverValueText }}
+    </v-snackbar>
   </div>
 </template>
 <script lang="ts">
@@ -15,6 +18,7 @@ import { Vue, Component } from "vue-property-decorator";
 import ViewerToolbar from "@/components/ViewerToolbar.vue";
 import DisplayLayers from "@/components/DisplayLayers.vue";
 import ImageViewer from "@/components/ImageViewer.vue";
+import store from "@/store";
 
 @Component({
   components: {
@@ -23,7 +27,24 @@ import ImageViewer from "@/components/ImageViewer.vue";
     ImageViewer
   }
 })
-export default class Viewer extends Vue {}
+export default class Viewer extends Vue {
+  readonly store = store;
+
+  get hoverValue() {
+    return this.store.hoverValue;
+  }
+
+  get hoverValueText() {
+    if (!this.hoverValue) {
+      return "";
+    }
+    const valuesText = [];
+    for (const [name, value] of Object.entries(this.hoverValue)) {
+      valuesText.push(name + ": " + value);
+    }
+    return valuesText.join(" | ");
+  }
+}
 </script>
 
 <style lang="scss" scoped>

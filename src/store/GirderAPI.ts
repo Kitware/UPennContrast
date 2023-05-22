@@ -2,7 +2,6 @@ import {
   RestClientInstance,
   IGirderItem,
   IGirderFolder,
-  IGirderFile,
   IGirderSelectAble,
   IGirderUser
 } from "@/girder";
@@ -18,7 +17,8 @@ import {
   newLayer,
   copyLayerWithoutPrivateAttributes,
   IDatasetView,
-  IDatasetViewBase
+  IDatasetViewBase,
+  IPixel
 } from "./model";
 import {
   toStyle,
@@ -30,7 +30,6 @@ import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { fetchAllPages } from "@/utils/fetch";
-import { isConfigurationItem } from "@/utils/girderSelectable";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
 // using HTML 2 might improve that slightly).  For a single layer, if we set
@@ -40,11 +39,6 @@ import { isConfigurationItem } from "@/utils/girderSelectable";
 // higher values in a limited set of tests.
 const HistogramConcurrency: number = 9;
 
-interface HTMLImageElementLocal extends HTMLImageElement {
-  _waitForHistogram?: boolean;
-  _promise: () => Promise<void | null> | null;
-}
-
 function toId(item: string | { _id: string }) {
   return typeof item === "string" ? item : item._id;
 }
@@ -53,7 +47,6 @@ export default class GirderAPI {
   readonly client: RestClientInstance;
 
   private readonly imageCache = new Map<string, HTMLImageElement>();
-  private readonly fullImageCache = new Map<string, HTMLImageElement>();
   private readonly histogramCache = new Map<string, Promise<ITileHistogram>>();
   private readonly resolvedHistogramCache = new Map<string, ITileHistogram>();
 
@@ -200,6 +193,18 @@ export default class GirderAPI {
         params: o
       })
       .then(r => r.data[0]); // TODO deal with multiple channel data
+  }
+
+  getPixelValue(image: IImage, geoX: number, geoY: number): Promise<IPixel> {
+    const params = {
+      left: geoX,
+      top: geoY,
+      frame: image.frameIndex
+    };
+    const itemId = toId(image.item);
+    return this.client
+      .get(`item/${itemId}/tiles/pixel`, { params })
+      .then(r => r.data);
   }
 
   getItems(folderId: string): Promise<IGirderItem[]> {

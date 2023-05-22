@@ -30,7 +30,7 @@ import filterStore from "@/store/filters";
 export default class AnnotationBrowser extends Vue {
   readonly filterStore = filterStore;
 
-  expanded: number[] = [4];
+  expanded: number[] = [2];
 
   clickedTag(tag: string) {
     this.filterStore.addTagToTagFilter(tag);

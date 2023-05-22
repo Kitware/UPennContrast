@@ -76,6 +76,9 @@ export class Main extends VuexModule {
   showTooltips: boolean = false;
   filteredAnnotationTooltips: boolean = false;
 
+  valueOnHover: boolean = true;
+  hoverValue: { [layerName: string]: number[] } | null = null;
+
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
   drawAnnotationConnections: boolean = true;
@@ -158,6 +161,16 @@ export class Main extends VuexModule {
   @Mutation
   public setFilteredAnnotationTooltips(value: boolean) {
     this.filteredAnnotationTooltips = value;
+  }
+
+  @Mutation
+  public setValueOnHover(value: boolean) {
+    this.valueOnHover = value;
+  }
+
+  @Mutation
+  public setHoverValue(value: { [layerName: string]: number[] } | null) {
+    this.hoverValue = value;
   }
 
   @Mutation
@@ -929,12 +942,8 @@ export class Main extends VuexModule {
   }
 
   get getImagesFromLayer() {
-    return (layerIdx: number) => {
+    return (layer: IDisplayLayer) => {
       if (!this.dataset) {
-        return [];
-      }
-      const layer = this.layers[layerIdx];
-      if (!layer) {
         return [];
       }
       const indexes = this.layerSliceIndexes(layer);

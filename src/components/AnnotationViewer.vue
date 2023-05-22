@@ -1,5 +1,5 @@
 <template>
-  <div v-mousetrap="mousetrapAnnotations"></div>
+  <div></div>
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
@@ -11,7 +11,7 @@ import filterStore from "@/store/filters";
 import geojs from "geojs";
 import { snapCoordinates } from "@/utils/itk";
 
-import { throttle } from "lodash-es";
+import { throttle, debounce } from "lodash-es";
 const THROTTLE = 100;
 
 import {
@@ -158,6 +158,10 @@ export default class AnnotationViewer extends Vue {
     return this.workerImage
       ? this.propertyStore.getWorkerPreview(this.workerImage)
       : { text: null, image: "" };
+  }
+
+  get valueOnHover() {
+    return this.store.valueOnHover;
   }
 
   // Check if an annotation is selected on store using its girderId
@@ -1315,9 +1319,61 @@ export default class AnnotationViewer extends Vue {
     this.drawAnnotationsAndTooltips();
   }
 
+  @Watch("annotationLayer")
+  @Watch("valueOnHover")
+  updateValueOnHover() {
+    this.store.setHoverValue(null);
+    if (this.valueOnHover) {
+      this.annotationLayer.geoOn(
+        geojs.event.mousemove,
+        this.handleValueOnMouseMove
+      );
+    } else {
+      this.annotationLayer.geoOff(
+        geojs.event.mousemove,
+        this.handleValueOnMouseMove
+      );
+    }
+  }
+
+  handleValueOnMouseMove(e: any) {
+    this.store.setHoverValue(null);
+    this.handleValueOnMouseMoveDebounce(e);
+  }
+
+  handleValueOnMouseMoveDebounce = debounce(
+    this.handleValueOnMouseMoveNoDebounce,
+    100
+  );
+  async handleValueOnMouseMoveNoDebounce(e: any) {
+    if (!this.dataset) {
+      return;
+    }
+    const values: { [layerName: string]: number[] } = {};
+    const promises: Promise<void>[] = [];
+    for (const layer of this.validLayers) {
+      if (layer.visible) {
+        const image = this.store.getImagesFromLayer(layer)[0];
+        if (image) {
+          const setPromise = this.store.api
+            .getPixelValue(image, e.geo.x, e.geo.y)
+            .then(pixel => {
+              values[layer.name] = pixel.value;
+            });
+          promises.push(setPromise);
+        }
+      }
+    }
+    await Promise.all(promises);
+    if (Object.keys(values).length > 0) {
+      this.store.setHoverValue(values);
+    }
+  }
+
   mounted() {
     this.fetchAnnotations();
     this.bind();
+    this.updateValueOnHover();
 
     this.propertyStore.fetchProperties();
     this.propertyStore.fetchPropertyValues();
@@ -1329,22 +1385,6 @@ export default class AnnotationViewer extends Vue {
       }
     });
   }
-
-  // Mousetrap bindings
-  mousetrapAnnotations = [
-    {
-      bind: "a",
-      handler: () => {
-        this.store.setDrawAnnotations(!this.store.drawAnnotations);
-      }
-    },
-    {
-      bind: "t",
-      handler: () => {
-        this.store.setShowTooltips(!this.store.showTooltips);
-      }
-    }
-  ];
 }
 </script>
 

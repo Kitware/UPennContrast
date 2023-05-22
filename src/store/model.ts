@@ -194,6 +194,11 @@ export interface IDisplayLayer {
   };
 }
 
+export interface IPixel {
+  l: number;
+  value: number[];
+}
+
 export interface IGeoJSLayer {
   addAnnotation: (annotation: IGeoJSAnnotation) => IGeoJSLayer;
   visible: (value?: boolean) => boolean | IGeoJSLayer;

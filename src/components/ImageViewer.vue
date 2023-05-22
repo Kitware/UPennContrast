@@ -1,5 +1,5 @@
 <template>
-  <div class="image">
+  <div class="image" v-mousetrap="mousetrapAnnotations">
     <annotation-viewer
       v-for="(mapentry, index) in maps.filter(
         mapentry =>
@@ -147,6 +147,22 @@ function generateFilterURL(
 @Component({ components: { AnnotationViewer } })
 export default class ImageViewer extends Vue {
   readonly store = store;
+
+  // Mousetrap bindings
+  readonly mousetrapAnnotations = [
+    {
+      bind: "a",
+      handler: () => {
+        this.store.setDrawAnnotations(!this.store.drawAnnotations);
+      }
+    },
+    {
+      bind: "t",
+      handler: () => {
+        this.store.setShowTooltips(!this.store.showTooltips);
+      }
+    }
+  ];
 
   private refsMounted = false;
 

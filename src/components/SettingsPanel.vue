@@ -4,8 +4,9 @@
       Annotation Settings
     </v-card-title>
     <v-card-text class="pa-1">
-      <v-expansion-panels hover multiple>
+      <v-expansion-panels hover multiple v-model="panels">
         <annotation-toggles />
+        <viewer-settings />
       </v-expansion-panels>
     </v-card-text>
   </v-card>
@@ -14,7 +15,10 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import AnnotationToggles from "@/components/AnnotationBrowser/AnnotationToggles.vue";
+import ViewerSettings from "@/components/ViewerSettings.vue";
 
-@Component({ components: { AnnotationToggles } })
-export default class AnnotationsSettings extends Vue {}
+@Component({ components: { AnnotationToggles, ViewerSettings } })
+export default class AnnotationsSettings extends Vue {
+  panels: number[] = [0, 1];
+}
 </script>
