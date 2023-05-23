@@ -52,6 +52,7 @@
                             selectedTool.id === tool.id &&
                             selectedTool.type === 'segmentation'
                         "
+                        z-index="100"
                       >
                         <template #activator="{}">
                           <tool-item :tool="tool" v-bind="attrs" v-on="on" />
