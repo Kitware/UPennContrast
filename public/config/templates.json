@@ -143,6 +143,37 @@
     ]
   },
   {
+    "name": "Connect annotations",
+    "type": "connect",
+    "shortName": "Connect",
+    "interface": [
+      {
+        "name": "Selection shape",
+        "type": "select",
+        "id": "selectionType",
+        "isSubmenu": true,
+        "meta": {
+          "items": [
+            {
+              "text": "Lasso",
+              "value": "lasso"
+            }
+          ]
+        }
+      },
+      {
+        "name": "Parent Annotation",
+        "id": "parentAnnotation",
+        "type": "restrictTagsAndLayer"
+      },
+      {
+        "name": "Child Annotation",
+        "id": "childAnnotation",
+        "type": "restrictTagsAndLayer"
+      }
+    ]
+  },
+  {
     "name": "Annotation edit tools",
     "type": "edit",
     "interface": [

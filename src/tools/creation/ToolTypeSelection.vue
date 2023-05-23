@@ -75,9 +75,9 @@ export default class ToolTypeSelection extends Vue {
       const submenuInterfaceIdx = template.interface.findIndex(
         (elem: any) => elem.isSubmenu
       );
-      const submenuInterface = template.interface[submenuInterfaceIdx];
+      const submenuInterface = template.interface[submenuInterfaceIdx] || {};
       let items: any[] = [];
-      switch (submenuInterface?.type) {
+      switch (submenuInterface.type) {
         case "select":
           items = submenuInterface.meta.items.map((item: any) => ({
             ...item,
@@ -99,7 +99,10 @@ export default class ToolTypeSelection extends Vue {
           }
           break;
         default:
-          items.push({ text: "No Submenu", value: "defaultSubmenu" });
+          items.push({
+            text: template.name || "No Submenu",
+            value: "defaultSubmenu"
+          });
           break;
       }
       const keydItems: Item[] = items.map((item, itemIdx) => ({

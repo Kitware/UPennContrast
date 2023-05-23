@@ -818,11 +818,7 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-  private async selectAnnotations(selectAnnotation: any) {
-    if (!selectAnnotation) {
-      return;
-    }
-
+  private getSelectedAnnotationsFromAnnotation(selectAnnotation: any) {
     const coordinates = selectAnnotation.coordinates();
     const type = selectAnnotation.type();
 
@@ -866,6 +862,16 @@ export default class AnnotationViewer extends Vue {
         },
         []
       );
+    return selectedAnnotations;
+  }
+
+  private selectAnnotations(selectAnnotation: any) {
+    if (!selectAnnotation) {
+      return;
+    }
+    const selectedAnnotations = this.getSelectedAnnotationsFromAnnotation(
+      selectAnnotation
+    );
 
     // Update annotation store
     switch (this.annotationSelectionType) {
@@ -878,6 +884,69 @@ export default class AnnotationViewer extends Vue {
       case AnnotationSelectionTypes.TOGGLE:
         this.annotationStore.toggleSelected(selectedAnnotations);
     }
+
+    // Remove the selection annotation from layer (do not show the annotation used to select)
+    this.annotationLayer.removeAnnotation(selectAnnotation);
+  }
+
+  private connectAnnotations(selectAnnotation: any) {
+    const datasetId = this.dataset?.id;
+    if (!selectAnnotation || !datasetId) {
+      return;
+    }
+    const selectedAnnotations = this.getSelectedAnnotationsFromAnnotation(
+      selectAnnotation
+    );
+
+    const parentTemplate = this.selectedTool?.values?.parentAnnotation;
+    const childTemplate = this.selectedTool?.values?.childAnnotation;
+    if (!this.selectedTool || !parentTemplate || !childTemplate) {
+      return;
+    }
+    // Get all the parents
+    let parents = selectedAnnotations;
+    if (parentTemplate.tags.length > 0) {
+      const parentTags = parentTemplate.tags;
+      parents = parents.filter(annotation =>
+        parentTags.every((tag: string) => annotation.tags.includes(tag))
+      );
+    }
+    if (parentTemplate.layer !== null) {
+      const parentChannel = this.layers[parentTemplate.layer].channel;
+      parents = parents.filter(
+        annotation => annotation.channel === parentChannel
+      );
+    }
+    // Get all the children
+    let children = selectedAnnotations;
+    if (childTemplate.tags.length > 0) {
+      const childTags = childTemplate.tags;
+      children = children.filter(annotation =>
+        childTags.every((tag: string) => annotation.tags.includes(tag))
+      );
+    }
+    if (childTemplate.layer !== null) {
+      const childChannel = this.layers[childTemplate.layer].channel;
+      children = children.filter(
+        annotation => annotation.channel === childChannel
+      );
+    }
+
+    const promises = [];
+    for (const parent of parents) {
+      for (const child of children) {
+        promises.push(
+          this.annotationStore.createConnection({
+            label: this.selectedTool.name,
+            tags: [],
+            parentId: parent.id,
+            childId: child.id,
+            datasetId
+          })
+        );
+      }
+    }
+    Promise.all(promises).then(this.annotationStore.fetchAnnotations);
 
     // Remove the selection annotation from layer (do not show the annotation used to select)
     this.annotationLayer.removeAnnotation(selectAnnotation);
@@ -1120,6 +1189,7 @@ export default class AnnotationViewer extends Vue {
         // TODO: for now with just a compute button, but later previews, custom forms served from the started worker ?
         break;
       case "select":
+      case "connect":
         const selectionType =
           this.selectedTool.values.selectionType.value === "pointer"
             ? "point"
@@ -1201,6 +1271,9 @@ export default class AnnotationViewer extends Vue {
               break;
             case "select":
               this.selectAnnotations(evt.annotation);
+              break;
+            case "connect":
+              this.connectAnnotations(evt.annotation);
               break;
           }
         } else if (evt.annotation) {
