@@ -185,6 +185,8 @@ export interface IDisplayLayer {
 
   contrast: IContrast;
 
+  layerGroup: string | null;
+
   _histogram?: {
     promise: Promise<null | ITileHistogram>;
     lastHistogram: null | ITileHistogram;
@@ -192,6 +194,12 @@ export interface IDisplayLayer {
     nextImages: IImage[] | null;
     lock: boolean;
   };
+}
+
+export interface IIndexedLayer {
+  layer: IDisplayLayer; // configurationLayer + contrast override from datasetView
+  configurationLayer: IDisplayLayer; // layer as saved in configuration item
+  layerIdx: number;
 }
 
 export interface IPixel {
@@ -591,7 +599,8 @@ export function newLayer(
       mode: "percentile",
       blackPoint: 0,
       whitePoint: 100
-    }
+    },
+    layerGroup: null
   };
 }
 
@@ -608,7 +617,7 @@ export function copyLayerWithoutPrivateAttributes(
 }
 
 // To get all the keys of IDatasetConfigurationBase without missing one
-const exampleConfigurationBase: IDatasetConfigurationBase = {
+export const exampleConfigurationBase: IDatasetConfigurationBase = {
   compatibility: {
     xyDimensions: "multiple",
     zDimensions: "multiple",

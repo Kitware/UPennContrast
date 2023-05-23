@@ -2,9 +2,7 @@
   <div class="viewer">
     <aside class="side">
       <viewer-toolbar class="toolbar">
-        <div class="layers">
-          <display-layers />
-        </div>
+        <display-layers />
       </viewer-toolbar>
     </aside>
     <image-viewer class="main" />
@@ -46,11 +44,6 @@ export default class Viewer extends Vue {}
   flex-direction: column;
   height: 100%;
   padding-bottom: 0;
-}
-
-.layers {
-  flex: 1 1 0;
-  overflow: auto;
 }
 
 .main {

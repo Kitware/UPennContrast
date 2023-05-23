@@ -12,9 +12,6 @@
           {{ hoverValue }}
         </v-col>
         <v-col class="denseCol">
-          <div v-if="index === 0" class="text-caption pb-2" title="hotkey Z">
-            Z max-merge
-          </div>
           <v-switch
             @click.native.stop
             @mousedown.native.stop
@@ -25,16 +22,13 @@
             }"
             class="toggleButton"
             v-model="isZMaxMerge"
+            v-show="displayZ"
             :title="`Toggle Z Max Merge (hotkey ${zMaxMergeBinding(index)})`"
-            :displayed="displayZ"
             dense
             hide-details
           />
         </v-col>
         <v-col class="denseCol">
-          <div v-if="index === 0" class="text-caption pb-2" title="hotkey 0">
-            Channel on/off
-          </div>
           <v-switch
             @click.native.stop
             @mousedown.native.stop

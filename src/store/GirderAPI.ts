@@ -6,19 +6,20 @@ import {
   IGirderUser
 } from "@/girder";
 import {
+  configurationBaseKeys,
+  copyLayerWithoutPrivateAttributes,
+  exampleConfigurationBase,
+  IContrast,
   IDataset,
   IDatasetConfiguration,
+  IDatasetConfigurationBase,
+  IDatasetView,
+  IDatasetViewBase,
   IDisplayLayer,
   IFrameInfo,
   IImage,
-  IContrast,
-  IDatasetConfigurationBase,
-  configurationBaseKeys,
-  newLayer,
-  copyLayerWithoutPrivateAttributes,
-  IDatasetView,
-  IDatasetViewBase,
-  IPixel
+  IPixel,
+  newLayer
 } from "./model";
 import {
   toStyle,
@@ -594,9 +595,8 @@ function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
     description: item.description
   };
   for (const key of configurationBaseKeys) {
-    if (key in item.meta) {
-      config[key] = item.meta[key];
-    }
+    config[key] =
+      key in item.meta ? item.meta[key] : exampleConfigurationBase[key];
   }
   return config as IDatasetConfiguration;
 }
