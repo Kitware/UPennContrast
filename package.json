@@ -13,7 +13,7 @@
     "jest-test": "vue-cli-service test:unit"
   },
   "dependencies": {
-    "@girder/components": "^2.1.0",
+    "@girder/components": "^3.2.0",
     "@types/bluebird": "^3.5.32",
     "@types/d3-array": "^3.0.1",
     "@types/d3-color": "^1.2.2",
