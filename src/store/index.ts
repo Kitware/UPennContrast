@@ -114,7 +114,7 @@ export class Main extends VuexModule {
     // Use contrast from dataset view
     return configurationLayers.map(layer => {
       const contrast = this.datasetView?.layerContrasts[layer.id];
-      return contrast ? { ...layer, contrast } : layer;
+      return contrast ? { ...layer, contrast } : { ...layer };
     });
   }
 
@@ -1250,6 +1250,16 @@ export class Main extends VuexModule {
   }
 
   @Action
+  async setConfigurationLayers(layers: IDisplayLayer[]) {
+    if (!this.configuration) {
+      return;
+    }
+    this.configuration.layers = [];
+    layers.forEach(this.pushLayer);
+    await this.syncConfiguration("layers");
+  }
+
+  @Action
   async loadSnapshot(name: string): Promise<ISnapshot | undefined> {
     if (!this.configuration || !this.dataset) {
       return;
@@ -1258,10 +1268,8 @@ export class Main extends VuexModule {
     if (!snapshot) {
       return;
     }
-    this.configuration.layers = [];
-    snapshot.layers.forEach(this.pushLayer);
-    this.loadSnapshotImpl(snapshot);
-    await this.syncConfiguration("layers");
+    // TODO: this loads the snapshot layers, overriding contrasts, existing layers...
+    await this.setConfigurationLayers(snapshot.layers);
     // note that this doesn't set viewport, snapshot name, description, tags,
     // map rotation, or screenshot parameters
     return snapshot;
