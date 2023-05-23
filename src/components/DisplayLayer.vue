@@ -8,6 +8,9 @@
         <v-col class="textCol">
           <div class="header pa-1">{{ value.name }}</div>
         </v-col>
+        <v-col v-if="hoverValue !== null" class="denseCol">
+          {{ hoverValue }}
+        </v-col>
         <v-col class="denseCol">
           <v-switch
             @click.native.stop
@@ -163,6 +166,11 @@ export default class DisplayLayer extends Vue {
   readonly index!: number;
 
   showColorPicker = false;
+
+  get hoverValue() {
+    const layerId = this.value.id;
+    return this.store.hoverValue?.[layerId]?.join(", ") ?? null;
+  }
 
   get histogram() {
     return this.store.getLayerHistogram(this.value);

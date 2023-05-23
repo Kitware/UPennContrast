@@ -89,8 +89,6 @@ export interface IDataset {
   height: number;
   images(z: number, zTime: number, xy: number, channel: number): IImage[];
   anyImage(): IImage | null;
-
-  configurations: IDatasetConfiguration[];
 }
 
 export interface IViewConfiguration {
@@ -202,6 +200,11 @@ export interface IIndexedLayer {
   layer: IDisplayLayer; // configurationLayer + contrast override from datasetView
   configurationLayer: IDisplayLayer; // layer as saved in configuration item
   layerIdx: number;
+}
+
+export interface IPixel {
+  l?: number;
+  value?: number[];
 }
 
 export interface IGeoJSLayer {

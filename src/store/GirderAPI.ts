@@ -2,24 +2,24 @@ import {
   RestClientInstance,
   IGirderItem,
   IGirderFolder,
-  IGirderFile,
   IGirderSelectAble,
   IGirderUser
 } from "@/girder";
 import {
+  configurationBaseKeys,
+  copyLayerWithoutPrivateAttributes,
+  exampleConfigurationBase,
+  IContrast,
   IDataset,
   IDatasetConfiguration,
+  IDatasetConfigurationBase,
+  IDatasetView,
+  IDatasetViewBase,
   IDisplayLayer,
   IFrameInfo,
   IImage,
-  IContrast,
-  IDatasetConfigurationBase,
-  configurationBaseKeys,
-  newLayer,
-  copyLayerWithoutPrivateAttributes,
-  IDatasetView,
-  IDatasetViewBase,
-  exampleConfigurationBase
+  IPixel,
+  newLayer
 } from "./model";
 import {
   toStyle,
@@ -31,7 +31,6 @@ import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { fetchAllPages } from "@/utils/fetch";
-import { isConfigurationItem } from "@/utils/girderSelectable";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
 // using HTML 2 might improve that slightly).  For a single layer, if we set
@@ -41,11 +40,6 @@ import { isConfigurationItem } from "@/utils/girderSelectable";
 // higher values in a limited set of tests.
 const HistogramConcurrency: number = 9;
 
-interface HTMLImageElementLocal extends HTMLImageElement {
-  _waitForHistogram?: boolean;
-  _promise: () => Promise<void | null> | null;
-}
-
 function toId(item: string | { _id: string }) {
   return typeof item === "string" ? item : item._id;
 }
@@ -54,7 +48,6 @@ export default class GirderAPI {
   readonly client: RestClientInstance;
 
   private readonly imageCache = new Map<string, HTMLImageElement>();
-  private readonly fullImageCache = new Map<string, HTMLImageElement>();
   private readonly histogramCache = new Map<string, Promise<ITileHistogram>>();
   private readonly resolvedHistogramCache = new Map<string, ITileHistogram>();
 
@@ -203,6 +196,25 @@ export default class GirderAPI {
       .then(r => r.data[0]); // TODO deal with multiple channel data
   }
 
+  async getPixelValue(
+    image: IImage,
+    geoX: number,
+    geoY: number
+  ): Promise<IPixel> {
+    if (geoX < 0 || geoY < 0) {
+      return {};
+    }
+    const left = Math.floor(geoX);
+    const top = Math.floor(geoY);
+    const frame = image.frameIndex;
+    const params = { left, top, frame };
+    const itemId = toId(image.item);
+    const response = await this.client.get(`item/${itemId}/tiles/pixel`, {
+      params
+    });
+    return response.data;
+  }
+
   getItems(folderId: string): Promise<IGirderItem[]> {
     return this.client
       .get(`item`, {
@@ -227,23 +239,16 @@ export default class GirderAPI {
   ): Promise<IDataset> {
     return Promise.all([this.getFolder(id), this.getItems(id)]).then(
       ([folder, items]) => {
+        const baseDataset = asDataset(folder);
         // just use the first image if it exists
-        const folderDataset = asDataset(folder);
         const imageItem = items.find(d => (d as any).largeImage);
-        const configPromises = items
-          .filter(isConfigurationItem)
-          .map(item => this.getConfiguration(item._id));
-        return Promise.all(configPromises).then(configurations => {
-          const baseDataset = { ...folderDataset, configurations };
-          if (imageItem === undefined) {
-            return baseDataset;
-          } else {
-            return this.getTiles(imageItem).then(tiles => ({
-              ...baseDataset,
-              ...parseTiles(imageItem, tiles, unrollXY, unrollZ, unrollT)
-            }));
-          }
-        });
+        if (imageItem === undefined) {
+          return baseDataset;
+        }
+        return this.getTiles(imageItem).then(tiles => ({
+          ...baseDataset,
+          ...parseTiles(imageItem, tiles, unrollXY, unrollZ, unrollT)
+        }));
       }
     );
   }
@@ -524,8 +529,7 @@ function asDataset(folder: IGirderFolder): IDataset {
     channels: [],
     channelNames: new Map<number, string>(),
     images: () => [],
-    anyImage: () => null,
-    configurations: []
+    anyImage: () => null
   };
 }
 

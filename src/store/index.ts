@@ -76,6 +76,9 @@ export class Main extends VuexModule {
   showTooltips: boolean = false;
   filteredAnnotationTooltips: boolean = false;
 
+  valueOnHover: boolean = true;
+  hoverValue: { [layerId: string]: number[] } | null = null;
+
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
   drawAnnotationConnections: boolean = true;
@@ -158,6 +161,16 @@ export class Main extends VuexModule {
   @Mutation
   public setFilteredAnnotationTooltips(value: boolean) {
     this.filteredAnnotationTooltips = value;
+  }
+
+  @Mutation
+  public setValueOnHover(value: boolean) {
+    this.valueOnHover = value;
+  }
+
+  @Mutation
+  public setHoverValue(value: { [layerId: string]: number[] } | null) {
+    this.hoverValue = value;
   }
 
   @Mutation
@@ -302,12 +315,6 @@ export class Main extends VuexModule {
     this.configuration = data;
     if (!data) {
       return;
-    }
-
-    if (this.dataset) {
-      if (!this.dataset.configurations.find(d => d.id === data.id)) {
-        this.dataset.configurations.push(data);
-      }
     }
   }
 
@@ -591,14 +598,6 @@ export class Main extends VuexModule {
     }
     if (this.selectedConfigurationId === configuration.id) {
       this.selectedConfigurationId = null;
-    }
-    if (this.dataset) {
-      const index = this.dataset.configurations.findIndex(
-        d => d.id === configuration.id
-      );
-      if (index >= 0) {
-        this.dataset.configurations.splice(index, 1);
-      }
     }
   }
 
@@ -943,12 +942,8 @@ export class Main extends VuexModule {
   }
 
   get getImagesFromLayer() {
-    return (layerIdx: number) => {
+    return (layer: IDisplayLayer) => {
       if (!this.dataset) {
-        return [];
-      }
-      const layer = this.layers[layerIdx];
-      if (!layer) {
         return [];
       }
       const indexes = this.layerSliceIndexes(layer);

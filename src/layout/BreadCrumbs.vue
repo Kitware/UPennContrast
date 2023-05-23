@@ -1,5 +1,5 @@
 <template>
-  <v-breadcrumbs :items="items" divider="">
+  <v-breadcrumbs :items="items" divider="" class="py-0">
     <template v-slot:item="{ item }">
       <span class="mx-0 px-1">
         <v-breadcrumbs-item>

@@ -642,9 +642,9 @@ export default class Snapshots extends Vue {
     const promises: Promise<any>[] = [];
     const pushBand = bands.push.bind(bands);
     if (this.exportLayer === "composite" || this.exportLayer === "all") {
-      layers.forEach((layer, layerIdx) => {
+      layers.forEach(layer => {
         if (layer.visible || this.exportLayer === "all") {
-          promises.push(this.getBandOption(layer, layerIdx).then(pushBand));
+          promises.push(this.getBandOption(layer).then(pushBand));
         }
       });
     } else {
@@ -653,7 +653,7 @@ export default class Snapshots extends Vue {
       if (!layer) {
         return [];
       }
-      promises.push(this.getBandOption(layer, layerIdx).then(pushBand));
+      promises.push(this.getBandOption(layer).then(pushBand));
     }
     await Promise.all(promises);
 
@@ -676,8 +676,8 @@ export default class Snapshots extends Vue {
   }
 
   // Returns the style of the layer combined with the frame idx
-  getBandOption(layer: IDisplayLayer, layerIdx: number) {
-    const image = this.store.getImagesFromLayer(layerIdx)[0];
+  getBandOption(layer: IDisplayLayer) {
+    const image = this.store.getImagesFromLayer(layer)[0];
     const histogramPromise = this.store.getLayerHistogram(layer);
     const bandPromise = histogramPromise.then(histogram => {
       const style = this.getLayerStyle(layer, histogram, image);
