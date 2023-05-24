@@ -1,30 +1,6 @@
 <template>
   <v-container class="ma-0 pa-0">
     <v-row class="mr-4">
-      <!-- In list checkbox -->
-      <v-col class="px-0" cols="1">
-        <div>
-          <v-checkbox
-            dense
-            hide-details
-            :value="list"
-            @click.stop="toggleList"
-            class="ma-0"
-          />
-        </div>
-      </v-col>
-      <!-- As filter checkbox -->
-      <v-col class="px-0" cols="1">
-        <div>
-          <v-checkbox
-            dense
-            hide-details
-            :value="filter"
-            @click.stop="toggleFilter"
-            class="ma-0"
-          />
-        </div>
-      </v-col>
       <!-- Property name -->
       <v-col class="d-flex px-2">
         <div class="d-flex align-center">
@@ -62,7 +38,6 @@ import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
-import filterStore from "@/store/filters";
 import { IAnnotationProperty } from "@/store/model";
 
 @Component({
@@ -74,7 +49,6 @@ import { IAnnotationProperty } from "@/store/model";
 export default class AnnotationProperty extends Vue {
   readonly propertyStore = propertyStore;
   readonly annotationStore = annotationStore;
-  readonly filterStore = filterStore;
   readonly store = store;
   @Prop()
   readonly property!: IAnnotationProperty;
@@ -82,32 +56,8 @@ export default class AnnotationProperty extends Vue {
   running: boolean = false;
   previousRunStatus: boolean | null = null;
 
-  get filter() {
-    return this.filterStore.filterIds.includes(this.property.id);
-  }
-
-  get list() {
-    return this.propertyStore.annotationListIds.includes(this.property.id);
-  }
-
   get uncomputed() {
     return this.propertyStore.uncomputedAnnotationsPerProperty;
-  }
-
-  toggleFilter() {
-    if (this.filter) {
-      this.filterStore.removeFilterId(this.property.id);
-    } else {
-      this.filterStore.addFilterId(this.property.id);
-    }
-  }
-
-  toggleList() {
-    if (this.list) {
-      this.propertyStore.removeAnnotationListId(this.property.id);
-    } else {
-      this.propertyStore.addAnnotationListId(this.property.id);
-    }
   }
 
   compute() {
