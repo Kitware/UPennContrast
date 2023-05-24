@@ -37,6 +37,40 @@ import {
   geojsAnnotationFactory
 } from "@/utils/annotation";
 
+function filterAnnotations(
+  annotations: IAnnotation[],
+  {
+    tags,
+    tagsInclusive,
+    layer: layerIdx
+  }: {
+    tags: string[];
+    tagsInclusive: boolean;
+    layer: number | null;
+  }
+) {
+  let output = annotations;
+  if (tagsInclusive) {
+    // There is a tag of "tags" in the annotation tags
+    // Filter on: annotation has tag1 OR tag2 OR tag3...
+    output = output.filter(annotation =>
+      tags.some((tag: string) => annotation.tags.includes(tag))
+    );
+  } else {
+    // All tags of "tags" are in the annotation tags
+    // Filter on: annotation has tag1 AND tag2 AND tag3...
+    output = output.filter(annotation =>
+      tags.every((tag: string) => annotation.tags.includes(tag))
+    );
+  }
+  // layerIdx === null <==> any layer
+  if (layerIdx !== null) {
+    const parentChannel = store.layers[layerIdx].channel;
+    output = output.filter(annotation => annotation.channel === parentChannel);
+  }
+  return output;
+}
+
 // Draws annotations on the given layer, and provides functionnality for the user selected tool.
 @Component({ components: {} })
 export default class AnnotationViewer extends Vue {
@@ -903,34 +937,9 @@ export default class AnnotationViewer extends Vue {
     if (!this.selectedTool || !parentTemplate || !childTemplate) {
       return;
     }
-    // Get all the parents
-    let parents = selectedAnnotations;
-    if (parentTemplate.tags.length > 0) {
-      const parentTags = parentTemplate.tags;
-      parents = parents.filter(annotation =>
-        parentTags.every((tag: string) => annotation.tags.includes(tag))
-      );
-    }
-    if (parentTemplate.layer !== null) {
-      const parentChannel = this.layers[parentTemplate.layer].channel;
-      parents = parents.filter(
-        annotation => annotation.channel === parentChannel
-      );
-    }
-    // Get all the children
-    let children = selectedAnnotations;
-    if (childTemplate.tags.length > 0) {
-      const childTags = childTemplate.tags;
-      children = children.filter(annotation =>
-        childTags.every((tag: string) => annotation.tags.includes(tag))
-      );
-    }
-    if (childTemplate.layer !== null) {
-      const childChannel = this.layers[childTemplate.layer].channel;
-      children = children.filter(
-        annotation => annotation.channel === childChannel
-      );
-    }
+    // Get all the parents and children
+    const parents = filterAnnotations(selectedAnnotations, parentTemplate);
+    const children = filterAnnotations(selectedAnnotations, childTemplate);
 
     const promises = [];
     for (const parent of parents) {

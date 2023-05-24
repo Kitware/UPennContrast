@@ -14,6 +14,9 @@
         "name": "Connect to nearest annotation with Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
+        "meta": {
+          "inclusiveToggle": false
+        },
         "advanced": true
       }
     ]
@@ -114,6 +117,9 @@
         "name": "Connect to nearest annotation with Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
+        "meta": {
+          "inclusiveToggle": false
+        },
         "advanced": true
       }
     ]
@@ -164,12 +170,18 @@
       {
         "name": "Parent Annotation",
         "id": "parentAnnotation",
-        "type": "restrictTagsAndLayer"
+        "type": "restrictTagsAndLayer",
+        "meta": {
+          "inclusiveToggle": true
+        }
       },
       {
         "name": "Child Annotation",
         "id": "childAnnotation",
-        "type": "restrictTagsAndLayer"
+        "type": "restrictTagsAndLayer",
+        "meta": {
+          "inclusiveToggle": true
+        }
       }
     ]
   },
@@ -215,12 +227,18 @@
                   {
                     "name": "Join From",
                     "id": "joinFrom",
-                    "type": "restrictTagsAndLayer"
+                    "type": "restrictTagsAndLayer",
+                    "meta": {
+                      "inclusiveToggle": false
+                    }
                   },
                   {
                     "name": "Join To",
                     "id": "joinTo",
-                    "type": "restrictTagsAndLayer"
+                    "type": "restrictTagsAndLayer",
+                    "meta": {
+                      "inclusiveToggle": false
+                    }
                   },
                   {
                     "name": "Existing Connections",
@@ -276,6 +294,9 @@
         "name": "Connect to nearest annotation with Tag",
         "id": "connectTo",
         "type": "restrictTagsAndLayer",
+        "meta": {
+          "inclusiveToggle": false
+        },
         "advanced": true
       }
     ]
