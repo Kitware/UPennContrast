@@ -5,35 +5,35 @@
     </v-expansion-panel-header>
     <v-expansion-panel-content>
       <v-container>
-        <v-row
-          ><v-col><v-btn @click="deleteSelected">Delete Selected</v-btn></v-col>
-          <v-col>
-            <v-dialog v-model="tagSelectedDialog" width="50%">
-              <template v-slot:activator="{ on, attrs }">
-                <v-btn v-bind="attrs" v-on="on">Tag Selected</v-btn>
-              </template>
-              <v-card>
-                <v-card-title>
-                  Add tags to selected annotations
-                </v-card-title>
-                <tag-picker class="ma-4 pa-4" v-model="tagsToAdd"></tag-picker>
-                <v-divider></v-divider>
-                <v-card-actions>
-                  <v-spacer></v-spacer>
-                  <v-btn color="warning" @click="tagsToAdd = []">
-                    Clear
-                  </v-btn>
-                  <v-btn color="primary" @click="tagSelected">
-                    Submit
-                  </v-btn>
-                </v-card-actions>
-              </v-card>
-            </v-dialog>
+        <v-row>
+          <v-col class="pa-1">
+            <v-btn
+              v-if="selectionFilterEnabled"
+              @click.native="clearSelection"
+              block
+            >
+              Clear selection filter
+            </v-btn>
+            <v-btn v-else @click.native="filterBySelection" block>
+              Use selection as filter
+            </v-btn>
           </v-col>
-          <v-col
-            ><v-btn @click="connectSelected">Connect Selected</v-btn></v-col
-          ></v-row
-        >
+          <v-col class="pa-1">
+            <annotation-csv-dialog
+              block
+              :annotations="filteredAnnotations"
+              :propertyIds="propertyIds"
+            ></annotation-csv-dialog>
+          </v-col>
+        </v-row>
+        <v-row>
+          <v-col class="pa-1">
+            <annotation-import block />
+          </v-col>
+          <v-col class="pa-1">
+            <annotation-export block />
+          </v-col>
+        </v-row>
       </v-container>
     </v-expansion-panel-content>
   </v-expansion-panel>
@@ -42,39 +42,42 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import annotationStore from "@/store/annotation";
-import TagPicker from "@/components/TagPicker.vue";
+import propertyStore from "@/store/properties";
+import filterStore from "@/store/filters";
+
+import AnnotationCsvDialog from "@/components/AnnotationBrowser/AnnotationCSVDialog.vue";
+import AnnotationExport from "@/components/AnnotationBrowser/AnnotationExport.vue";
+import AnnotationImport from "@/components/AnnotationBrowser/AnnotationImport.vue";
 
 @Component({
-  components: { TagPicker }
+  components: {
+    AnnotationCsvDialog,
+    AnnotationExport,
+    AnnotationImport
+  }
 })
 export default class AnnotationActions extends Vue {
   readonly annotationStore = annotationStore;
+  readonly propertyStore = propertyStore;
+  readonly filterStore = filterStore;
 
-  deleteSelected() {
-    this.annotationStore.deleteSelectedAnnotations();
+  get filteredAnnotations() {
+    return this.filterStore.filteredAnnotations;
   }
 
-  deleteInactive() {
-    this.annotationStore.deleteInactiveAnnotations();
+  get selectionFilterEnabled() {
+    return this.filterStore.selectionFilter.enabled;
   }
 
-  activateSelected() {
-    this.annotationStore.activateSelectedAnnotations();
-  }
-  inactivateSelected() {
-    this.annotationStore.deactivateSelectedAnnotations();
+  get propertyIds() {
+    return this.propertyStore.properties.map(p => p.id);
   }
 
-  tagSelectedDialog: boolean = false;
-  tagsToAdd: string[] = [];
-  tagSelected() {
-    this.annotationStore.tagSelectedAnnotations(this.tagsToAdd);
-    this.tagSelectedDialog = false;
-    this.tagsToAdd = [];
+  clearSelection() {
+    this.filterStore.clearSelection();
   }
-
-  connectSelected() {
-    // TODO:
+  filterBySelection() {
+    this.filterStore.addSelectionAsFilter();
   }
 }
 </script>
