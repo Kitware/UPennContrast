@@ -114,16 +114,6 @@ export class Annotations extends VuexModule {
     this.toggleActiveAnnotations([id]);
   }
 
-  @Action
-  public activateSelectedAnnotations() {
-    this.activateAnnotations(this.selectedAnnotationIds);
-  }
-
-  @Action
-  public deactivateSelectedAnnotations() {
-    this.deactivateAnnotations(this.selectedAnnotationIds);
-  }
-
   @Mutation
   public setSelected(selected: IAnnotation[]) {
     this.selectedAnnotations = selected;
@@ -319,11 +309,6 @@ export class Annotations extends VuexModule {
   @Action
   public tagSelectedAnnotations(tags: string[]) {
     this.tagAnnotationIds({ annotationIds: this.selectedAnnotationIds, tags });
-  }
-
-  @Action
-  public deleteInactiveAnnotations() {
-    this.deleteAnnotations(this.inactiveAnnotationIds);
   }
 
   @Action

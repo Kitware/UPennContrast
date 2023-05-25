@@ -2,35 +2,36 @@
   <v-expansion-panel>
     <v-expansion-panel-header class="py-1">
       Annotation List
-      <v-spacer></v-spacer>
+      <v-spacer />
       <v-container style="width: auto;">
         <v-row>
           <v-col class="pa-1">
-            <v-btn
-              v-if="selectionFilterEnabled"
-              @click.native.stop="clearSelection"
-              block
-            >
-              Clear selection filter
-            </v-btn>
-            <v-btn v-else @click.native.stop="filterBySelection" block>
-              Use selection as filter
-            </v-btn>
+            <v-btn block @click.stop="deleteSelected">Delete Selected</v-btn>
           </v-col>
           <v-col class="pa-1">
-            <annotation-csv-dialog
-              block
-              :annotations="filteredAnnotations"
-              :propertyIds="propertyIds"
-            ></annotation-csv-dialog>
-          </v-col>
-        </v-row>
-        <v-row>
-          <v-col class="pa-1">
-            <annotation-import block />
-          </v-col>
-          <v-col class="pa-1">
-            <annotation-export block />
+            <v-dialog v-model="tagSelectedDialog" width="50%">
+              <template v-slot:activator="{ on, attrs }">
+                <v-btn block v-bind="attrs" v-on="on" @click.stop>
+                  Tag Selected
+                </v-btn>
+              </template>
+              <v-card>
+                <v-card-title>
+                  Add tags to selected annotations
+                </v-card-title>
+                <tag-picker class="ma-4 pa-4" v-model="tagsToAdd"></tag-picker>
+                <v-divider></v-divider>
+                <v-card-actions>
+                  <v-spacer></v-spacer>
+                  <v-btn color="warning" @click="tagsToAdd = []">
+                    Clear
+                  </v-btn>
+                  <v-btn color="primary" @click="tagSelected">
+                    Submit
+                  </v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
           </v-col>
         </v-row>
       </v-container>
@@ -50,8 +51,6 @@
       <v-data-table
         :items="filteredItems"
         :headers="headers"
-        v-model="selected"
-        item-key="id"
         show-select
         :page="page"
         @update:items-per-page="itemsPerPage = $event"
@@ -62,26 +61,24 @@
           <tbody>
             <tr
               v-for="item in items"
-              :key="item.id"
-              @mouseover="hover(item.id)"
+              :key="item.annotation.id"
+              @mouseover="hover(item.annotation.id)"
               @mouseleave="hover(null)"
-              @click="goToAnnotationIdLocation(item.id)"
+              @click="goToAnnotationIdLocation(item.annotation.id)"
               title="Go to annotation location"
-              :class="item.id === hoveredId ? 'is-hovered' : ''"
-              :ref="item.id"
+              :class="item.annotation.id === hoveredId ? 'is-hovered' : ''"
+              :ref="item.annotation.id"
             >
               <td :class="tableItemClass">
                 <v-checkbox
                   hide-details
                   multiple
-                  :value="item"
-                  v-model="selected"
-                  @click.capture.stop
                   title
-                ></v-checkbox>
+                  @click.stop="() => toggleAnnotationSelection(item.annotation)"
+                />
               </td>
               <td :class="tableItemClass">
-                <span>{{ annotationIdToIndex.get(item.id) }}</span>
+                <span>{{ annotationIdToIndex.get(item.annotation.id) }}</span>
               </td>
               <td :class="tableItemClass">
                 <span>
@@ -91,7 +88,7 @@
               <td :class="tableItemClass">
                 <span>
                   <v-chip
-                    v-for="tag in item.tags"
+                    v-for="tag in item.annotation.tags"
                     :key="tag"
                     x-small
                     @click="clickedTag(tag)"
@@ -100,29 +97,29 @@
                 </span>
               </td>
               <td>
-                {{ item.location.XY + 1 }}
+                {{ item.annotation.location.XY + 1 }}
               </td>
               <td>
-                {{ item.location.Z + 1 }}
+                {{ item.annotation.location.Z + 1 }}
               </td>
               <td>
-                {{ item.location.Time + 1 }}
+                {{ item.annotation.location.Time + 1 }}
               </td>
               <td :class="tableItemClass">
                 <v-text-field
                   hide-details
-                  :value="item.name || ''"
+                  :value="item.annotation.name || ''"
                   dense
                   flat
                   outlined
-                  @change="updateAnnotationName($event, item.id)"
+                  @change="updateAnnotationName($event, item.annotation.id)"
                   @click.capture.stop
                   title
                 >
                 </v-text-field>
               </td>
               <td
-                v-for="propertyId in propertyIds"
+                v-for="propertyId in showedPropertyIds"
                 :key="propertyId"
                 :class="tableItemClass"
               >
@@ -147,27 +144,22 @@ import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 
+import TagPicker from "@/components/TagPicker.vue";
+
 import {
   AnnotationNames,
   IAnnotation,
   IAnnotationProperty
 } from "@/store/model";
 
-import AnnotationCsvDialog from "@/components/AnnotationBrowser/AnnotationCSVDialog.vue";
-import AnnotationExport from "@/components/AnnotationBrowser/AnnotationExport.vue";
-import AnnotationImport from "@/components/AnnotationBrowser/AnnotationImport.vue";
-
-interface IAnnotationListItem extends IAnnotation {
+interface IAnnotationListItem {
+  annotation: IAnnotation;
   shapeName: string;
   [propertyId: string]: any;
 }
 
 @Component({
-  components: {
-    AnnotationCsvDialog,
-    AnnotationExport,
-    AnnotationImport
-  }
+  components: { TagPicker }
 })
 export default class AnnotationList extends Vue {
   readonly store = store;
@@ -196,12 +188,12 @@ export default class AnnotationList extends Vue {
     this.annotationStore.setSelected(selected);
   }
 
-  get filteredAnnotationIdToIdx() {
-    return this.filterStore.filteredAnnotationIdToIdx;
+  toggleAnnotationSelection(annotation: IAnnotation) {
+    this.annotationStore.toggleSelected([annotation]);
   }
 
-  get filteredAnnotations() {
-    return this.filterStore.filteredAnnotations;
+  get filteredAnnotationIdToIdx() {
+    return this.filterStore.filteredAnnotationIdToIdx;
   }
 
   get filteredItems() {
@@ -210,7 +202,7 @@ export default class AnnotationList extends Vue {
 
   annotationToItem(annotation: IAnnotation) {
     const item: IAnnotationListItem = {
-      ...annotation,
+      annotation,
       shapeName: AnnotationNames[annotation.shape]
     };
     this.properties.forEach((property: IAnnotationProperty) => {
@@ -222,10 +214,8 @@ export default class AnnotationList extends Vue {
     return item;
   }
 
-  get propertyIds() {
-    return this.propertyStore.annotationListIds.sort((a: string, b: string) =>
-      a.localeCompare(b)
-    );
+  get showedPropertyIds() {
+    return this.propertyStore.annotationListIds;
   }
 
   @Watch("annotationStore.annotationIdToIdx")
@@ -251,7 +241,8 @@ export default class AnnotationList extends Vue {
 
   get properties() {
     return this.propertyStore.properties.filter(
-      (property: IAnnotationProperty) => this.propertyIds.includes(property.id)
+      (property: IAnnotationProperty) =>
+        this.showedPropertyIds.includes(property.id)
     );
   }
 
@@ -385,14 +376,16 @@ export default class AnnotationList extends Vue {
     this.annotationStore.setHoveredAnnotationId(annotationId);
   }
 
-  get selectionFilterEnabled() {
-    return this.filterStore.selectionFilter.enabled;
+  tagSelectedDialog: boolean = false;
+  tagsToAdd: string[] = [];
+  tagSelected() {
+    this.annotationStore.tagSelectedAnnotations(this.tagsToAdd);
+    this.tagSelectedDialog = false;
+    this.tagsToAdd = [];
   }
-  clearSelection() {
-    this.filterStore.clearSelection();
-  }
-  filterBySelection() {
-    this.filterStore.addSelectionAsFilter();
+
+  deleteSelected() {
+    this.annotationStore.deleteSelectedAnnotations();
   }
 }
 </script>
