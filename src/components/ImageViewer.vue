@@ -168,6 +168,8 @@ export default class ImageViewer extends Vue {
 
   private ready = { layers: [] };
 
+  private resetMapsOnDraw = false;
+
   maps: IMapEntry[] = [];
   tileWidth: number = 0;
   tileHeight: number = 0;
@@ -278,7 +280,12 @@ export default class ImageViewer extends Vue {
   private blankUrl =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQIHWNgYAAAAAMAAU9ICq8AAAAASUVORK5CYII=";
 
-  private _setupMap(mllidx: number, parentElement: Element, someImage: IImage) {
+  private _setupMap(
+    mllidx: number,
+    parentElement: Element,
+    someImage: IImage,
+    forceReset: boolean = false
+  ) {
     const mapElement = parentElement.querySelector(`#map-${mllidx}`);
     if (!mapElement) {
       return;
@@ -306,10 +313,9 @@ export default class ImageViewer extends Vue {
     params.layer.url = this.blankUrl;
     params.map.max += 5;
 
-    let needReset = false;
-    if (this.maps.length > mllidx && !mapElement.firstChild) {
-      this.maps[mllidx].map.exit();
-      needReset = true;
+    let needReset = forceReset || (this.maps[mllidx] && !mapElement.firstChild);
+    if (needReset) {
+      this.maps[mllidx]?.map.exit();
     }
 
     let map: any;
@@ -323,11 +329,7 @@ export default class ImageViewer extends Vue {
         params: params,
         baseLayerIndex: mllidx ? undefined : 0
       };
-      if (this.maps.length <= mllidx) {
-        this.maps.push(mapentry);
-      } else {
-        this.maps[mllidx] = mapentry;
-      }
+      this.maps[mllidx] = mapentry;
 
       /* remove default key bindings */
       let interactorOpts = map.interactor().options();
@@ -629,6 +631,11 @@ export default class ImageViewer extends Vue {
     );
   }
 
+  @Watch("dataset")
+  onDatasetChanged() {
+    this.resetMapsOnDraw = true;
+  }
+
   private draw(parentElement: HTMLElement) {
     if ((this.width == this.height && this.width == 1) || !this.dataset) {
       return;
@@ -663,8 +670,10 @@ export default class ImageViewer extends Vue {
       }
     }
     let baseLayerIndex = 0;
+    const currentResetMaps = this.resetMapsOnDraw;
+    this.resetMapsOnDraw = false;
     mapLayerList.forEach((mll, mllidx) => {
-      this._setupMap(mllidx, parentElement, someImage);
+      this._setupMap(mllidx, parentElement, someImage, currentResetMaps);
       const mapentry = this.maps[mllidx];
       if (!mapentry) {
         return;
