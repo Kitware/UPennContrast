@@ -137,7 +137,7 @@ export default class PropertyCreation extends Vue {
   get generatedName() {
     let nameList = [];
     if (this.filteringTags.length) {
-      nameList.push("[", this.filteringTags.join(", "), "]");
+      nameList.push(this.filteringTags.join(", "));
     } else {
       nameList.push("No tag");
     }

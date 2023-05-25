@@ -7,6 +7,7 @@
       <v-expansion-panels hover multiple v-model="expanded">
         <annotation-filters></annotation-filters>
         <annotation-actions></annotation-actions>
+        <annotation-properties></annotation-properties>
         <annotation-list @clickedTag="clickedTag"></annotation-list>
       </v-expansion-panels>
     </v-card-text>
@@ -18,19 +19,21 @@ import { Vue, Component } from "vue-property-decorator";
 import AnnotationFilters from "@/components/AnnotationBrowser/AnnotationFilters.vue";
 import AnnotationList from "@/components/AnnotationBrowser/AnnotationList.vue";
 import AnnotationActions from "@/components/AnnotationBrowser/AnnotationActions.vue";
+import AnnotationProperties from "@/components/AnnotationBrowser/AnnotationProperties.vue";
 import filterStore from "@/store/filters";
 
 @Component({
   components: {
     AnnotationActions,
     AnnotationList,
-    AnnotationFilters
+    AnnotationFilters,
+    AnnotationProperties
   }
 })
 export default class AnnotationBrowser extends Vue {
   readonly filterStore = filterStore;
 
-  expanded: number[] = [2];
+  expanded: number[] = [3];
 
   clickedTag(tag: string) {
     this.filterStore.addTagToTagFilter(tag);
