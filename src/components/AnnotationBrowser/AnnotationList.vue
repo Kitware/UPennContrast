@@ -126,7 +126,11 @@
                 :key="propertyId"
                 :class="tableItemClass"
               >
-                <span>{{ item[propertyId] }}</span>
+                <span>{{
+                  typeof item[propertyId] === "number"
+                    ? Math.round(item[propertyId] * 100) / 100
+                    : item[propertyId]
+                }}</span>
               </td>
             </tr>
           </tbody>
