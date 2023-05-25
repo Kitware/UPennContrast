@@ -1,11 +1,27 @@
 <template>
   <v-container>
     <v-row class="pa-0">
-      <v-col class="pa-0 pr-2">
+      <v-col class="pa-0 pr-2 d-flex">
         <!-- tags -->
         <tag-picker v-model="newTags"></tag-picker>
+        <v-btn
+          v-if="inclusiveToggle"
+          class="mx-2"
+          :title="
+            `Current tags selection mode: ${
+              areTagsInclusive ? 'inclusive' : 'exclusive'
+            }`
+          "
+          x-small
+          fab
+          @click="areTagsInclusive = !areTagsInclusive"
+        >
+          <v-icon>
+            {{ areTagsInclusive ? "mdi-set-all" : "mdi-set-center" }}
+          </v-icon>
+        </v-btn>
       </v-col>
-      <v-col class="pa-0 pr-2">
+      <v-col class="pa-0 pr-2 d-flex">
         <!-- layers -->
         <layer-select
           any
@@ -35,10 +51,14 @@ export default class TagAndLayerRestriction extends Vue {
   readonly store = store;
 
   newTags: string[] = [];
+  areTagsInclusive: boolean = true;
   selectedLayer: number | null = null;
 
   @Prop()
   readonly value!: any;
+
+  @Prop({ default: true })
+  readonly inclusiveToggle!: boolean;
 
   mounted() {
     this.reset();
@@ -46,6 +66,7 @@ export default class TagAndLayerRestriction extends Vue {
 
   reset() {
     this.newTags = [];
+    this.areTagsInclusive = true;
     this.selectedLayer = null;
     this.changed();
   }
@@ -83,9 +104,18 @@ export default class TagAndLayerRestriction extends Vue {
 
   @Watch("newTags")
   @Watch("selectedLayer")
+  @Watch("areTagsInclusive")
   changed() {
     this.tagSearchInput = "";
-    this.$emit("input", { tags: this.newTags, layer: this.selectedLayer });
+    const result: {
+      tags: string[];
+      layer: number | null;
+      tagsInclusive?: boolean;
+    } = { tags: this.newTags, layer: this.selectedLayer };
+    if (this.inclusiveToggle) {
+      result.tagsInclusive = this.areTagsInclusive;
+    }
+    this.$emit("input", result);
     this.$emit("change");
   }
 }

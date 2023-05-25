@@ -37,6 +37,40 @@ import {
   geojsAnnotationFactory
 } from "@/utils/annotation";
 
+function filterAnnotations(
+  annotations: IAnnotation[],
+  {
+    tags,
+    tagsInclusive,
+    layer: layerIdx
+  }: {
+    tags: string[];
+    tagsInclusive: boolean;
+    layer: number | null;
+  }
+) {
+  let output = annotations;
+  if (tagsInclusive) {
+    // There is a tag of "tags" in the annotation tags
+    // Filter on: annotation has tag1 OR tag2 OR tag3...
+    output = output.filter(annotation =>
+      tags.some((tag: string) => annotation.tags.includes(tag))
+    );
+  } else {
+    // All tags of "tags" are in the annotation tags
+    // Filter on: annotation has tag1 AND tag2 AND tag3...
+    output = output.filter(annotation =>
+      tags.every((tag: string) => annotation.tags.includes(tag))
+    );
+  }
+  // layerIdx === null <==> any layer
+  if (layerIdx !== null) {
+    const parentChannel = store.layers[layerIdx].channel;
+    output = output.filter(annotation => annotation.channel === parentChannel);
+  }
+  return output;
+}
+
 // Draws annotations on the given layer, and provides functionnality for the user selected tool.
 @Component({ components: {} })
 export default class AnnotationViewer extends Vue {
@@ -818,11 +852,7 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-  private async selectAnnotations(selectAnnotation: any) {
-    if (!selectAnnotation) {
-      return;
-    }
-
+  private getSelectedAnnotationsFromAnnotation(selectAnnotation: any) {
     const coordinates = selectAnnotation.coordinates();
     const type = selectAnnotation.type();
 
@@ -866,6 +896,16 @@ export default class AnnotationViewer extends Vue {
         },
         []
       );
+    return selectedAnnotations;
+  }
+
+  private selectAnnotations(selectAnnotation: any) {
+    if (!selectAnnotation) {
+      return;
+    }
+    const selectedAnnotations = this.getSelectedAnnotationsFromAnnotation(
+      selectAnnotation
+    );
 
     // Update annotation store
     switch (this.annotationSelectionType) {
@@ -878,6 +918,44 @@ export default class AnnotationViewer extends Vue {
       case AnnotationSelectionTypes.TOGGLE:
         this.annotationStore.toggleSelected(selectedAnnotations);
     }
+
+    // Remove the selection annotation from layer (do not show the annotation used to select)
+    this.annotationLayer.removeAnnotation(selectAnnotation);
+  }
+
+  private connectAnnotations(selectAnnotation: any) {
+    const datasetId = this.dataset?.id;
+    if (!selectAnnotation || !datasetId) {
+      return;
+    }
+    const selectedAnnotations = this.getSelectedAnnotationsFromAnnotation(
+      selectAnnotation
+    );
+
+    const parentTemplate = this.selectedTool?.values?.parentAnnotation;
+    const childTemplate = this.selectedTool?.values?.childAnnotation;
+    if (!this.selectedTool || !parentTemplate || !childTemplate) {
+      return;
+    }
+    // Get all the parents and children
+    const parents = filterAnnotations(selectedAnnotations, parentTemplate);
+    const children = filterAnnotations(selectedAnnotations, childTemplate);
+
+    const promises = [];
+    for (const parent of parents) {
+      for (const child of children) {
+        promises.push(
+          this.annotationStore.createConnection({
+            label: this.selectedTool.name,
+            tags: [],
+            parentId: parent.id,
+            childId: child.id,
+            datasetId
+          })
+        );
+      }
+    }
+    Promise.all(promises).then(this.annotationStore.fetchAnnotations);
 
     // Remove the selection annotation from layer (do not show the annotation used to select)
     this.annotationLayer.removeAnnotation(selectAnnotation);
@@ -1120,6 +1198,7 @@ export default class AnnotationViewer extends Vue {
         // TODO: for now with just a compute button, but later previews, custom forms served from the started worker ?
         break;
       case "select":
+      case "connect":
         const selectionType =
           this.selectedTool.values.selectionType.value === "pointer"
             ? "point"
@@ -1201,6 +1280,9 @@ export default class AnnotationViewer extends Vue {
               break;
             case "select":
               this.selectAnnotations(evt.annotation);
+              break;
+            case "connect":
+              this.connectAnnotations(evt.annotation);
               break;
           }
         } else if (evt.annotation) {
