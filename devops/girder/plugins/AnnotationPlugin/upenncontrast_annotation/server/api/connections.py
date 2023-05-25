@@ -21,6 +21,7 @@ class AnnotationConnection(Resource):
         self.route('PUT', (':id',), self.update)
         self.route('POST',('connectTo',) , self.connectToNearest)
         self.route('POST', ('multiple',), self.multipleCreate)
+        self.route('DELETE', ('multiple',), self.deleteMultiple)
 
     # TODO: anytime a dataset is mentioned, load the dataset and check for existence and that the user has access to it
     # TODO: load both childe and parent annotations, and check that they share existence, access and location
@@ -49,6 +50,13 @@ class AnnotationConnection(Resource):
     @loadmodel(model='annotation_connection', plugin='upenncontrast_annotation', level=AccessType.WRITE)
     def delete(self, annotation_connection, params):
         self._connectionModel.remove(annotation_connection)
+    
+    @access.user
+    @describeRoute(Description("Delete all annotation connections in the id list")
+                   .param('body', 'A list of all annotation connection ids to delete.', paramType='body'))
+    def deleteMultiple(self, params):
+        stringIds = [stringId for stringId in self.getBodyJson()]
+        self._connectionModel.deleteMultiple(stringIds)
 
     @describeRoute(Description("Update an existing connection")
                    .param('id', 'The ID of the connection.', paramType='path')

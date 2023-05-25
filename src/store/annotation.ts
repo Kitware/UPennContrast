@@ -227,7 +227,7 @@ export class Annotations extends VuexModule {
   }: {
     annotationsIds: string[];
     tags: string[];
-    channelId: number|null;
+    channelId: number | null;
   }) {
     sync.setSaving(true);
     const connections = await this.annotationsAPI.createConnections(
@@ -237,6 +237,52 @@ export class Annotations extends VuexModule {
     );
     sync.setSaving(false);
     return connections;
+  }
+
+  @Action
+  public async createAllConnections({
+    parentIds, childIds, label, tags
+  }: {
+    parentIds: string[];
+    childIds: string[];
+    label: string;
+    tags: string[];
+  }) {
+    if (!main.dataset) {
+      return [];
+    }
+    sync.setSaving(true);
+    const connectionBases: IAnnotationConnectionBase[] = [];
+    for (const parentId of parentIds) {
+      for (const childId of childIds) {
+        connectionBases.push({
+          label,
+          tags,
+          parentId,
+          childId,
+          datasetId: main.dataset.id
+        });
+      }
+    }
+    const connections = await this.annotationsAPI.createMultipleConnections(connectionBases);
+    sync.setSaving(false);
+    return connections || [];
+  }
+
+  @Action
+  public async deleteAllConnections({
+    parentIds, childIds
+  }: {
+    parentIds: string[];
+    childIds: string[];
+  }) {
+    sync.setSaving(true);
+    const parentsSet = new Set(parentIds);
+    const childrenSet = new Set(childIds);
+    const connectionsToDelete = this.annotationConnections.filter(connection => parentsSet.has(connection.parentId) && childrenSet.has(connection.childId));
+    await this.annotationsAPI.deleteMultipleConnections(connectionsToDelete.map(connection => connection.id));
+    sync.setSaving(false);
+    return connectionsToDelete;
   }
 
   @Action
@@ -277,7 +323,7 @@ export class Annotations extends VuexModule {
   }
 
   @Action
-  public async tagAnnotationIds({annotationIds, tags}: {annotationIds: string[], tags: string[]}) {
+  public async tagAnnotationIds({ annotationIds, tags }: { annotationIds: string[], tags: string[] }) {
     sync.setSaving(true);
     await Promise.all(
       annotationIds
@@ -295,7 +341,7 @@ export class Annotations extends VuexModule {
             },
             annotation.tags
           );
-          const newAnnotation = {...annotation, tags: newTags};
+          const newAnnotation = { ...annotation, tags: newTags };
           this.setAnnotation({
             annotation: newAnnotation,
             index: annotationIndex

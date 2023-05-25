@@ -74,6 +74,12 @@ export interface IToolConfiguration {
   template: IToolTemplate;
 }
 
+export interface IRestrictTagsAndLayer {
+  tags: string[];
+  tagsInclusive: boolean;
+  layer: number | null;
+}
+
 export interface IDataset {
   readonly id: string;
 

@@ -25,7 +25,8 @@ import {
   AnnotationShape,
   AnnotationSelectionTypes,
   IAnnotationLocation,
-  IGeoJSAnnotation
+  IGeoJSAnnotation,
+  IRestrictTagsAndLayer
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -39,15 +40,7 @@ import {
 
 function filterAnnotations(
   annotations: IAnnotation[],
-  {
-    tags,
-    tagsInclusive,
-    layer: layerIdx
-  }: {
-    tags: string[];
-    tagsInclusive: boolean;
-    layer: number | null;
-  }
+  { tags, tagsInclusive, layer: layerIdx }: IRestrictTagsAndLayer
 ) {
   let output = annotations;
   if (tagsInclusive) {
@@ -538,6 +531,12 @@ export default class AnnotationViewer extends Vue {
     return annotationList;
   }
 
+  get connectionIdsSet() {
+    const result: Set<string> = new Set();
+    this.annotationConnections.forEach(({ id }) => result.add(id));
+    return result;
+  }
+
   // Remove from the layer annotations that should no longer be renderered (index change, layer change...)
   clearOldAnnotations(clearAll = false, redraw = true) {
     this.annotationLayer
@@ -570,6 +569,7 @@ export default class AnnotationViewer extends Vue {
           const parent = this.getAnnotationFromId(parentId);
           const child = this.getAnnotationFromId(childId);
           if (
+            !this.connectionIdsSet.has(girderId) ||
             !this.shouldDrawConnections ||
             !parent ||
             !child ||
@@ -923,39 +923,44 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.removeAnnotation(selectAnnotation);
   }
 
-  private connectAnnotations(selectAnnotation: any) {
+  private async handleAnnotationConnections(selectAnnotation: any) {
     const datasetId = this.dataset?.id;
-    if (!selectAnnotation || !datasetId) {
+    if (!selectAnnotation || !datasetId || !this.selectedTool) {
       return;
     }
     const selectedAnnotations = this.getSelectedAnnotationsFromAnnotation(
       selectAnnotation
     );
 
-    const parentTemplate = this.selectedTool?.values?.parentAnnotation;
-    const childTemplate = this.selectedTool?.values?.childAnnotation;
-    if (!this.selectedTool || !parentTemplate || !childTemplate) {
+    const parentTemplate = this.selectedTool.values
+      ?.parentAnnotation as IRestrictTagsAndLayer;
+    const childTemplate = this.selectedTool.values
+      ?.childAnnotation as IRestrictTagsAndLayer;
+    if (!parentTemplate || !childTemplate) {
       return;
     }
     // Get all the parents and children
     const parents = filterAnnotations(selectedAnnotations, parentTemplate);
     const children = filterAnnotations(selectedAnnotations, childTemplate);
+    const parentIds = parents.map(a => a.id);
+    const childIds = children.map(a => a.id);
 
-    const promises = [];
-    for (const parent of parents) {
-      for (const child of children) {
-        promises.push(
-          this.annotationStore.createConnection({
-            label: this.selectedTool.name,
-            tags: [],
-            parentId: parent.id,
-            childId: child.id,
-            datasetId
-          })
-        );
-      }
+    if (this.selectedTool.values.action.value === "add") {
+      // Add all connections between a parent and a child
+      await this.annotationStore.createAllConnections({
+        parentIds,
+        childIds,
+        label: this.selectedTool.name,
+        tags: [...parentTemplate.tags, ...childTemplate.tags]
+      });
+    } else {
+      // Delete any connection between a parent and a child
+      await this.annotationStore.deleteAllConnections({
+        parentIds,
+        childIds
+      });
     }
-    Promise.all(promises).then(this.annotationStore.fetchAnnotations);
+    this.annotationStore.fetchAnnotations();
 
     // Remove the selection annotation from layer (do not show the annotation used to select)
     this.annotationLayer.removeAnnotation(selectAnnotation);
@@ -1197,8 +1202,10 @@ export default class AnnotationViewer extends Vue {
         // TODO: when computation is triggered, toggle a bool that enables a v-menu
         // TODO: for now with just a compute button, but later previews, custom forms served from the started worker ?
         break;
+      case "connection":
+        this.annotationLayer.mode("polygon");
+        break;
       case "select":
-      case "connect":
         const selectionType =
           this.selectedTool.values.selectionType.value === "pointer"
             ? "point"
@@ -1281,8 +1288,8 @@ export default class AnnotationViewer extends Vue {
             case "select":
               this.selectAnnotations(evt.annotation);
               break;
-            case "connect":
-              this.connectAnnotations(evt.annotation);
+            case "connection":
+              this.handleAnnotationConnections(evt.annotation);
               break;
           }
         } else if (evt.annotation) {

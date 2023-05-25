@@ -149,20 +149,24 @@
     ]
   },
   {
-    "name": "Connect annotations",
-    "type": "connect",
-    "shortName": "Connect",
+    "name": "Annotation Connections",
+    "type": "connection",
+    "shortName": "Connection",
     "interface": [
       {
-        "name": "Selection shape",
+        "name": "Action",
         "type": "select",
-        "id": "selectionType",
+        "id": "action",
         "isSubmenu": true,
         "meta": {
           "items": [
             {
-              "text": "Lasso",
-              "value": "lasso"
+              "text": "Add",
+              "value": "add"
+            },
+            {
+              "text": "Delete",
+              "value": "delete"
             }
           ]
         }

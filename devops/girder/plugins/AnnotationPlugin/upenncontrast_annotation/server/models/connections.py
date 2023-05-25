@@ -100,6 +100,12 @@ class AnnotationConnection(AccessControlledModel):
   def delete(self, connection):
     self.remove(self.find(connection))
 
+  def deleteMultiple(self, connectionStringIds):
+    query = {
+      '_id': { '$in': [ObjectId(stringId) for stringId in connectionStringIds] },
+    }
+    self.removeWithQuery(query)
+
   def update(self, connection):
     return self.save(connection)
   

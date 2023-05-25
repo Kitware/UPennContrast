@@ -152,6 +152,12 @@ export default class AnnotationsAPI {
       });
   }
 
+  deleteMultipleConnections(connectionIds: string[]) {
+    return this.client.delete("annotation_connection/multiple", {
+      data: connectionIds
+    });
+  }
+
   async getConnectionsForDatasetId(
     datasetId: string
   ): Promise<IAnnotationConnection[]> {
