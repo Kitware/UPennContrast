@@ -51,6 +51,11 @@ export class Annotations extends VuexModule {
     );
   }
 
+  get isAnnotationSelected() {
+    const annotationIdsSet = new Set(this.selectedAnnotationIds);
+    return (annotationId: string) => annotationIdsSet.has(annotationId);
+  }
+
   get inactiveAnnotationIds() {
     return this.annotations
       .map((annotation: IAnnotation) => annotation.id)

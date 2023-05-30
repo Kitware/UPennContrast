@@ -52,6 +52,8 @@
         :items="filteredItems"
         :headers="headers"
         show-select
+        item-key="annotation.id"
+        v-model="selectedItems"
         :page="page"
         @update:items-per-page="itemsPerPage = $event"
         @update:group-by="groupBy = $event"
@@ -72,8 +74,8 @@
               <td :class="tableItemClass">
                 <v-checkbox
                   hide-details
-                  multiple
                   title
+                  :value="item.isSelected"
                   @click.stop="() => toggleAnnotationSelection(item.annotation)"
                 />
               </td>
@@ -124,9 +126,9 @@
                 :class="tableItemClass"
               >
                 <span>{{
-                  typeof item[propertyId] === "number"
-                    ? Math.round(item[propertyId] * 100) / 100
-                    : item[propertyId]
+                  typeof item.properties[propertyId] === "number"
+                    ? Math.round(item.properties[propertyId] * 100) / 100
+                    : item.properties[propertyId]
                 }}</span>
               </td>
             </tr>
@@ -155,7 +157,10 @@ import {
 interface IAnnotationListItem {
   annotation: IAnnotation;
   shapeName: string;
-  [propertyId: string]: any;
+  isSelected: boolean;
+  properties: {
+    [propertyId: string]: any;
+  };
 }
 
 @Component({
@@ -188,6 +193,14 @@ export default class AnnotationList extends Vue {
     this.annotationStore.setSelected(selected);
   }
 
+  get selectedItems() {
+    return this.filteredItems.filter(item => item.isSelected);
+  }
+
+  set selectedItems(items) {
+    this.selected = items.map(item => item.annotation);
+  }
+
   toggleAnnotationSelection(annotation: IAnnotation) {
     this.annotationStore.toggleSelected([annotation]);
   }
@@ -203,10 +216,12 @@ export default class AnnotationList extends Vue {
   annotationToItem(annotation: IAnnotation) {
     const item: IAnnotationListItem = {
       annotation,
-      shapeName: AnnotationNames[annotation.shape]
+      shapeName: AnnotationNames[annotation.shape],
+      isSelected: this.annotationStore.isAnnotationSelected(annotation.id),
+      properties: []
     };
     this.properties.forEach((property: IAnnotationProperty) => {
-      item[property.id] = this.getPropertyValueForAnnotationId(
+      item.properties[property.id] = this.getPropertyValueForAnnotationId(
         annotation.id,
         property.id
       );
