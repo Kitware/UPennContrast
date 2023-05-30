@@ -279,7 +279,7 @@
         "type": "checkbox",
         "meta": {
           "label": "Add job date tag (e.g. \"my-image job 1985-10-26 21:00:00 UTC-5\")",
-          "value": true
+          "value": false
         }
       },
       {
