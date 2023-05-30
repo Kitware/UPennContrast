@@ -4,7 +4,6 @@
       v-if="currentLocation"
       :location.sync="currentLocation"
       new-folder-enabled
-      root-location-disabled
       :selectable="menuEnabled"
       v-model="selected"
       v-bind="$attrs"
