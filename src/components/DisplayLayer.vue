@@ -1,7 +1,7 @@
 <template>
   <v-expansion-panel>
     <v-expansion-panel-header class="displayLayerHeader">
-      <v-row dense class="layerHeader">
+      <v-row dense class="align-center">
         <v-col class="denseCol">
           <v-icon :color="value.color" left>mdi-circle</v-icon>
         </v-col>
@@ -22,7 +22,7 @@
             }"
             class="toggleButton"
             v-model="isZMaxMerge"
-            v-show="displayZ"
+            v-show="hasMultipleZ"
             :title="`Toggle Z Max Merge (hotkey ${zMaxMergeBinding(index)})`"
             dense
             hide-details
@@ -293,6 +293,10 @@ export default class DisplayLayer extends Vue {
     return this.store.z;
   }
 
+  get hasMultipleZ() {
+    return this.store.dataset && this.store.dataset.z.length > 1;
+  }
+
   get displayTime() {
     return this.store.time;
   }
@@ -346,18 +350,6 @@ export default class DisplayLayer extends Vue {
 .toggleButton {
   margin: 0;
   flex: 0 0 auto;
-}
-
-.layerHeader {
-  align-items: flex-end;
-}
-
-.denseCol {
-  flex-grow: 0;
-}
-
-.textCol {
-  overflow: hidden;
 }
 
 .buttons {
