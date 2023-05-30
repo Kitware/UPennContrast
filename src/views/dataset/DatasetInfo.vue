@@ -340,7 +340,8 @@ export default class DatasetInfo extends Vue {
 
   @Watch("datasetName")
   updateDefaultConfigurationName() {
-    this.defaultConfigurationName = (this.datasetName || "Default") + " View";
+    this.defaultConfigurationName =
+      (this.datasetName || "Default") + " Configuration";
   }
 
   toRoute(datasetView: IDatasetView) {
