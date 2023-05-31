@@ -55,10 +55,20 @@
         item-key="annotation.id"
         v-model="selectedItems"
         :page="page"
+        :footer-props="{
+          'items-per-page-options': [10, 50, 200]
+        }"
         @update:items-per-page="itemsPerPage = $event"
         @update:group-by="groupBy = $event"
         ref="dataTable"
       >
+        <template v-slot:header.data-table-select>
+          <v-simple-checkbox
+            :value="selectAllValue"
+            :indeterminate="selectAllIndeterminate"
+            @click="selectAllCallback"
+          />
+        </template>
         <template v-slot:body="{ items }">
           <tbody>
             <tr
@@ -75,7 +85,7 @@
                 <v-checkbox
                   hide-details
                   title
-                  :value="item.isSelected"
+                  :input-value="item.isSelected"
                   @click.stop="() => toggleAnnotationSelection(item.annotation)"
                 />
               </td>
@@ -213,20 +223,22 @@ export default class AnnotationList extends Vue {
     return this.filterStore.filteredAnnotations.map(this.annotationToItem);
   }
 
-  annotationToItem(annotation: IAnnotation) {
-    const item: IAnnotationListItem = {
-      annotation,
-      shapeName: AnnotationNames[annotation.shape],
-      isSelected: this.annotationStore.isAnnotationSelected(annotation.id),
-      properties: []
+  get annotationToItem() {
+    return (annotation: IAnnotation) => {
+      const item: IAnnotationListItem = {
+        annotation,
+        shapeName: AnnotationNames[annotation.shape],
+        isSelected: this.annotationStore.isAnnotationSelected(annotation.id),
+        properties: []
+      };
+      this.properties.forEach((property: IAnnotationProperty) => {
+        item.properties[property.id] = this.getPropertyValueForAnnotationId(
+          annotation.id,
+          property.id
+        );
+      });
+      return item;
     };
-    this.properties.forEach((property: IAnnotationProperty) => {
-      item.properties[property.id] = this.getPropertyValueForAnnotationId(
-        annotation.id,
-        property.id
-      );
-    });
-    return item;
   }
 
   get showedPropertyIds() {
@@ -242,16 +254,14 @@ export default class AnnotationList extends Vue {
     this.annotationStore.updateAnnotationName({ name, id });
   }
 
-  getPropertyValueForAnnotationId(annotationId: string, propertyId: string) {
-    const values = this.propertyStore.propertyValues[annotationId];
-    if (!values) {
-      return "-";
-    }
-
-    if (!Object.keys(values).includes(propertyId)) {
-      return "-";
-    }
-    return values[propertyId];
+  get getPropertyValueForAnnotationId() {
+    return (annotationId: string, propertyId: string) => {
+      const values = this.propertyStore.propertyValues[annotationId];
+      if (!values || !Object.keys(values).includes(propertyId)) {
+        return "-";
+      }
+      return values[propertyId];
+    };
   }
 
   get properties() {
@@ -259,6 +269,23 @@ export default class AnnotationList extends Vue {
       (property: IAnnotationProperty) =>
         this.showedPropertyIds.includes(property.id)
     );
+  }
+
+  get selectAllIndeterminate() {
+    const nSelected = this.selectedItems.length;
+    return nSelected > 0 && nSelected < this.filteredItems.length;
+  }
+
+  get selectAllValue() {
+    return this.selectedItems.length === this.filteredItems.length;
+  }
+
+  selectAllCallback() {
+    if (this.selectAllValue) {
+      this.selectedItems = [];
+    } else {
+      this.selectedItems = this.filteredItems;
+    }
   }
 
   get headers() {
