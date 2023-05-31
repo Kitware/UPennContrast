@@ -35,7 +35,7 @@
                 Actions
               </v-card-title>
               <v-card-text>
-                <div v-if="datasetViewItems.length <= 0">
+                <div v-if="dataset && datasetViewItems.length <= 0">
                   <v-text-field
                     v-model="defaultConfigurationName"
                     label="New Configuration Name"
