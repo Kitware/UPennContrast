@@ -182,6 +182,9 @@ export default class ToolCreation extends Vue {
     if (this.selectedTemplate?.shortName) {
       toolNameStrings.push(this.selectedTemplate.shortName);
     }
+    if (this.toolValues?.action) {
+      toolNameStrings.push(this.toolValues.action.text);
+    }
     if (this.toolValues?.annotation) {
       const toolShape: AnnotationShape = this.toolValues.annotation.shape;
       toolNameStrings.push(AnnotationNames[toolShape]);
