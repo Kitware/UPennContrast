@@ -191,9 +191,8 @@ export default class AnnotationViewer extends Vue {
     return this.store.valueOnHover;
   }
 
-  // Check if an annotation is selected on store using its girderId
-  isAnnotationSelected(annotationId: string) {
-    return this.annotationStore.selectedAnnotationIds.includes(annotationId);
+  get isAnnotationSelected() {
+    return this.annotationStore.isAnnotationSelected;
   }
 
   @Watch("displayWorkerPreview")
