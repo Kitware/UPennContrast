@@ -12,12 +12,10 @@
           :template="selectedTemplate"
           :defaultValues="selectedDefaultValues"
           v-model="toolValues"
-          @submit="createTool"
-          @reset="reset"
           ref="toolConfiguration"
         />
-        <!-- Tool name with autofill -->
         <v-container v-if="selectedTemplate" class="pa-4">
+          <!-- Tool name with autofill -->
           <v-row dense>
             <v-col>
               <div class="title white--text">
@@ -36,6 +34,7 @@
               />
             </v-col>
           </v-row>
+          <!-- Tool hotkey -->
           <v-row dense>
             <v-col>
               <div class="title white--text">
@@ -44,26 +43,8 @@
             </v-col>
           </v-row>
           <v-row dense class="px-4">
-            <v-col class="d-inline-flex">
-              <div>
-                {{
-                  hotkey === null
-                    ? "No hotkey yet"
-                    : `Current hotkey: ${hotkey}`
-                }}
-              </div>
-              <v-spacer />
-              <v-progress-circular indeterminate v-if="isRecordingHotkey" />
-              <v-btn
-                class="mx-2"
-                @click="editHotkey()"
-                :disabled="isRecordingHotkey"
-              >
-                {{ isRecordingHotkey ? "Recording..." : "Record hotkey" }}
-              </v-btn>
-              <v-btn class="mx-2" @click="hotkey = null">
-                Clear hotkey
-              </v-btn>
+            <v-col>
+              <hotkey-selection v-model="hotkey" />
             </v-col>
           </v-row>
         </v-container>
@@ -97,7 +78,7 @@ import {
 
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";
-import Mousetrap from "mousetrap";
+import HotkeySelection from "@/components/HotkeySelection.vue";
 import { v4 as uuidv4 } from "uuid";
 
 const defaultValues = {
@@ -109,7 +90,8 @@ const defaultValues = {
 @Component({
   components: {
     ToolConfiguration,
-    ToolTypeSelection
+    ToolTypeSelection,
+    HotkeySelection
   }
 })
 export default class ToolCreation extends Vue {
@@ -127,7 +109,6 @@ export default class ToolCreation extends Vue {
   userToolName = false;
   toolName = "New Tool";
 
-  isRecordingHotkey: boolean = false;
   hotkey: string | null = null;
 
   @Prop()
@@ -212,17 +193,6 @@ export default class ToolCreation extends Vue {
       return;
     }
     this.toolName = "New Tool";
-  }
-
-  editHotkey() {
-    // The extensions of Mousetrap are loaded in main.ts
-    // but they don't update the types, hence the ts-ignore
-    this.isRecordingHotkey = true;
-    // @ts-ignore
-    Mousetrap.record((sequence: string[]) => {
-      this.hotkey = sequence.join(" ");
-      this.isRecordingHotkey = false;
-    });
   }
 
   @Watch("open")

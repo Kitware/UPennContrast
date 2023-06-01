@@ -115,7 +115,7 @@ export default class ToolConfiguration extends Vue {
   reset() {
     this.advancedPanel = undefined;
     this.toolValues = this.defaultValues
-      ? { ...this.defaultValues }
+      ? structuredClone(this.defaultValues)
       : { name: "New Tool", description: "" };
     this.initialize();
     this.changed();
@@ -125,7 +125,7 @@ export default class ToolConfiguration extends Vue {
     this.valueTemplates = {};
     this.updateInterface();
     this.setDefaultValues();
-    this.$emit("input", { ...this.toolValues });
+    this.$emit("input", this.toolValues);
   }
 
   @Watch("toolValues")
@@ -138,36 +138,38 @@ export default class ToolConfiguration extends Vue {
       if (this.toolValues[item.id] !== undefined) {
         return;
       }
+      const setItemValue = (value: any) =>
+        Vue.set(this.toolValues, item.id, value);
       switch (item.type) {
         case "select":
           if (item?.meta?.items.length) {
             const [firstValue] = item.meta.items;
-            this.toolValues[item.id] = { ...firstValue };
+            setItemValue({ ...firstValue });
           }
           break;
 
         case "radio":
           if (item.values?.length) {
             const [firstValue] = item.values;
-            this.toolValues[item.id] = firstValue.value;
+            setItemValue(firstValue.value);
           }
           break;
 
         case "text":
           if (item.meta?.value) {
-            this.toolValues[item.id] = item.meta?.value;
+            setItemValue(item.meta?.value);
           } else if (item.meta?.type === "number") {
-            this.toolValues[item.id] = "0.0";
+            setItemValue("0.0");
           } else {
-            this.toolValues[item.id] = "";
+            setItemValue("");
           }
           break;
 
         case "checkbox":
           if (item.meta?.value) {
-            this.toolValues[item.id] = !!item.meta?.value;
+            setItemValue(!!item.meta?.value);
           } else {
-            this.toolValues[item.id] = false;
+            setItemValue(false);
           }
           break;
 
@@ -185,7 +187,7 @@ export default class ToolConfiguration extends Vue {
               case "annotation":
                 const annotations = innerComponents as AnnotationConfiguration[];
                 if (annotations.length) {
-                  this.toolValues[item.id] = {};
+                  setItemValue({});
                   annotations.forEach(annotation => annotation.reset());
                 }
                 break;
@@ -193,7 +195,7 @@ export default class ToolConfiguration extends Vue {
               case "restrictTagsAndLayer":
                 const restricts = innerComponents as TagAndLayerRestriction[];
                 if (restricts.length) {
-                  this.toolValues[item.id] = {};
+                  setItemValue({});
                   restricts.forEach(restrict => restrict.reset());
                 }
                 break;
@@ -201,7 +203,7 @@ export default class ToolConfiguration extends Vue {
               case "dockerImage":
                 const dockerImages = innerComponents as DockerImage[];
                 if (dockerImages.length) {
-                  this.toolValues[item.id] = null;
+                  setItemValue(null);
                   dockerImages.forEach(dockerImage => dockerImage.reset());
                 }
                 break;

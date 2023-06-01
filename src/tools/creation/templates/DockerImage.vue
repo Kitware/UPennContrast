@@ -17,6 +17,10 @@ import store from "@/store";
 import DockerImageSelect from "@/components/DockerImageSelect.vue";
 import { IWorkerLabels } from "@/store/model";
 
+interface IImageSetup {
+  image: string | null;
+}
+
 // Tool creation interface element for choosing a docker image among available ones
 @Component({
   components: {
@@ -26,17 +30,24 @@ import { IWorkerLabels } from "@/store/model";
 export default class DockerImage extends Vue {
   readonly store = store;
 
-  image: String | null = null;
+  image: string | null = null;
 
   annotationImageFilter(labels: IWorkerLabels) {
     return labels.isAnnotationWorker !== undefined;
   }
 
   @Prop()
-  readonly value!: any;
+  readonly value?: IImageSetup;
 
   mounted() {
-    this.reset();
+    this.updateFromValue();
+  }
+
+  updateFromValue() {
+    if (!this.value) {
+      return;
+    }
+    this.image = this.value.image;
   }
 
   reset() {
@@ -49,7 +60,8 @@ export default class DockerImage extends Vue {
 
   @Watch("image")
   changed() {
-    this.$emit("input", { image: this.image });
+    const result: IImageSetup = { image: this.image };
+    this.$emit("input", result);
     this.$emit("change");
   }
 }
