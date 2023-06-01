@@ -239,6 +239,23 @@ export class Main extends VuexModule {
   }
 
   @Action
+  editToolInConfiguration(tool: IToolConfiguration) {
+    const configurationTools = this.configuration?.tools;
+    if (!configurationTools) {
+      return;
+    }
+    const toolIdx = configurationTools.findIndex(({ id }) => id === tool.id);
+    if (toolIdx < 0) {
+      return;
+    }
+    Vue.set(configurationTools, toolIdx, tool);
+    if (this.selectedTool?.id === tool.id) {
+      this.setSelectedToolImpl(tool);
+    }
+    this.syncConfiguration("tools");
+  }
+
+  @Action
   protected async loggedIn({
     girderUrl,
     girderRest

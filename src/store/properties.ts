@@ -15,7 +15,8 @@ import {
   IWorkerImageList,
   IAnnotationPropertyConfiguration,
   IAnnotation,
-  IWorkerInterfaceValues
+  IWorkerInterfaceValues,
+  IComputeJob
 } from "./model";
 
 import Vue from "vue";
@@ -155,7 +156,7 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  computeProperty({
+  async computeProperty({
     property,
     callback = () => {}
   }: {
@@ -163,29 +164,32 @@ export class Properties extends VuexModule {
     callback: (success: boolean) => void;
   }) {
     if (!main.dataset) {
-      return;
+      return null;
     }
+    const datasetId = main.dataset.id;
 
-    this.propertiesAPI
-      .computeProperty(property.id, main.dataset.id, property)
-      .then((response: any) => {
-        // Keep track of running jobs
-        const job = response.data[0];
-        if (!job) {
-          return;
-        }
-        if (job && job._id) {
-          jobs.addJob({
-            jobId: job._id,
-            datasetId: main.dataset!.id,
-            callback: (success: boolean) => {
-              this.fetchPropertyValues();
-              filters.updateHistograms();
-              callback(success);
-            }
-          });
-        }
-      });
+    const response = await this.propertiesAPI.computeProperty(
+      property.id,
+      datasetId,
+      property
+    );
+
+    // Keep track of running jobs
+    const jobId = response.data[0]?._id;
+    if (!jobId) {
+      return null;
+    }
+    const computeJob: IComputeJob = {
+      jobId,
+      datasetId,
+      callback: (success: boolean) => {
+        this.fetchPropertyValues();
+        filters.updateHistograms();
+        callback(success);
+      }
+    };
+    jobs.addJob(computeJob);
+    return computeJob;
   }
 
   @Mutation

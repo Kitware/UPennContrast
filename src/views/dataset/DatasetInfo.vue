@@ -35,14 +35,14 @@
                 Actions
               </v-card-title>
               <v-card-text>
-                <div v-if="datasetViewItems.length <= 0">
+                <div v-if="dataset && datasetViewItems.length <= 0">
                   <v-text-field
                     v-model="defaultConfigurationName"
-                    label="Configuration Name"
+                    label="New Configuration Name"
                     dense
                     hide-details
-                    class="ma-1"
-                  ></v-text-field>
+                    class="ma-1 pb-2 important-field"
+                  />
                   <v-tooltip top max-width="50vh">
                     <template v-slot:activator="{ on, attrs }">
                       <v-btn
@@ -58,7 +58,7 @@
                     Create a default configuration with the given name in the
                     same folder as the dataset and view it
                   </v-tooltip>
-                  <v-divider class="my-1" />
+                  <v-divider class="my-4" />
                 </div>
                 <div>
                   <v-tooltip top max-width="50vh">
@@ -340,7 +340,8 @@ export default class DatasetInfo extends Vue {
 
   @Watch("datasetName")
   updateDefaultConfigurationName() {
-    this.defaultConfigurationName = (this.datasetName || "Default") + " View";
+    this.defaultConfigurationName =
+      (this.datasetName || "Default") + " Configuration";
   }
 
   toRoute(datasetView: IDatasetView) {
@@ -437,3 +438,10 @@ export default class DatasetInfo extends Vue {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.important-field ::v-deep .v-label {
+  font-size: 22px;
+  font-weight: bold;
+}
+</style>

@@ -1,9 +1,11 @@
 <template>
   <div :class="{ background: !singleLayer }">
-    <v-row dense v-if="!singleLayer" class="pl-4 py-1">
-      <div class="subtitle-1">
-        Group
-      </div>
+    <v-row dense v-if="!singleLayer" class="pl-4 py-1 pr-8">
+      <v-col class="textCol">
+        <div class="subtitle-1">
+          Group
+        </div>
+      </v-col>
       <v-col class="denseCol">
         <v-switch
           @click.native.stop
@@ -12,7 +14,7 @@
           class="toggleButton"
           v-model="isZMaxMerge"
           :title="`Toggle Z Max Merge for all layers`"
-          v-show="displayZ"
+          v-show="hasMultipleZ"
           dense
           hide-details
         />
@@ -86,8 +88,8 @@ export default class DisplayLayerGroup extends Vue {
     this.displayLayers = this.$refs.displayLayers;
   }
 
-  get displayZ() {
-    return this.store.z;
+  get hasMultipleZ() {
+    return this.store.dataset && this.store.dataset.z.length > 1;
   }
 
   get isZMaxMerge() {
@@ -126,8 +128,19 @@ export default class DisplayLayerGroup extends Vue {
 .draggable-group {
   margin-left: 6px;
 }
+
 .background {
   border-radius: 14px;
   background-color: grey;
+}
+</style>
+
+<style>
+.denseCol {
+  flex-grow: 0;
+}
+
+.textCol {
+  overflow: hidden;
 }
 </style>

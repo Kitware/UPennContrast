@@ -40,6 +40,12 @@ import { IToolConfiguration } from "@/store/model";
 import LayerSelect from "@/components/LayerSelect.vue";
 import TagPicker from "@/components/TagPicker.vue";
 
+interface IRestrictionSetup {
+  tags: string[];
+  layer: number | null;
+  tagsInclusive?: boolean;
+}
+
 // Tool creation interface element for picking tags and layers for connections
 @Component({
   components: {
@@ -55,13 +61,23 @@ export default class TagAndLayerRestriction extends Vue {
   selectedLayer: number | null = null;
 
   @Prop()
-  readonly value!: any;
+  readonly value?: IRestrictionSetup;
 
   @Prop({ default: true })
   readonly inclusiveToggle!: boolean;
 
   mounted() {
-    this.reset();
+    this.updateFromValue();
+  }
+
+  @Watch("value")
+  updateFromValue() {
+    if (!this.value) {
+      return;
+    }
+    this.newTags = this.value.tags;
+    this.areTagsInclusive = !!this.value.tagsInclusive;
+    this.selectedLayer = this.value.layer;
   }
 
   reset() {
@@ -107,11 +123,10 @@ export default class TagAndLayerRestriction extends Vue {
   @Watch("areTagsInclusive")
   changed() {
     this.tagSearchInput = "";
-    const result: {
-      tags: string[];
-      layer: number | null;
-      tagsInclusive?: boolean;
-    } = { tags: this.newTags, layer: this.selectedLayer };
+    const result: IRestrictionSetup = {
+      tags: this.newTags,
+      layer: this.selectedLayer
+    };
     if (this.inclusiveToggle) {
       result.tagsInclusive = this.areTagsInclusive;
     }

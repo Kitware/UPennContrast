@@ -95,8 +95,30 @@ import { AnnotationNames, AnnotationShape } from "@/store/model";
 
 type VForm = Vue & { validate: () => boolean };
 
+interface IAnnotationSetup {
+  tags: string[];
+  coordinateAssignments: {
+    layer: number;
+    Z: {
+      type: string;
+      value: number;
+      max: number;
+    };
+    Time: {
+      type: string;
+      value: number;
+      max: number;
+    };
+  };
+  shape: AnnotationShape;
+}
+
 // Properties of AnnotationConfiguration that are emitted as input
-const standardValueKeys = ["tags", "coordinateAssignments", "shape"];
+const standardValueKeys = [
+  "tags",
+  "coordinateAssignments",
+  "shape"
+] as (keyof IAnnotationSetup)[];
 
 // Interface element for configuring an annotation creation tool
 @Component({
@@ -124,7 +146,7 @@ export default class AnnotationConfiguration extends Vue {
   readonly defaultShape!: AnnotationShape;
 
   @Prop()
-  readonly value!: any;
+  readonly value?: IAnnotationSetup;
 
   @Prop()
   readonly advanced!: boolean;
@@ -151,7 +173,7 @@ export default class AnnotationConfiguration extends Vue {
   get standardValue() {
     if (
       typeof this.value === "object" &&
-      standardValueKeys.every(key => this.value.hasOwnProperty(key))
+      standardValueKeys.every(key => this.value?.hasOwnProperty(key))
     ) {
       return this.value;
     } else {
@@ -176,7 +198,17 @@ export default class AnnotationConfiguration extends Vue {
   };
 
   mounted() {
-    this.reset();
+    this.updateFromValue();
+  }
+
+  @Watch("value")
+  updateFromValue() {
+    if (!this.value) {
+      return;
+    }
+    this.coordinateAssignments = this.value.coordinateAssignments;
+    this.shape = this.value.shape;
+    this.tags = this.value.tags;
   }
 
   @Watch("defaultShape")
@@ -220,10 +252,11 @@ export default class AnnotationConfiguration extends Vue {
     if (!this.standardValue) {
       return;
     }
+    const capturedValue = this.standardValue;
     let changed = false;
     standardValueKeys.forEach(key => {
-      if ((this as any)[key] !== this.standardValue[key]) {
-        (this as any)[key] = this.standardValue[key];
+      if ((this as any)[key] !== capturedValue[key]) {
+        (this as any)[key] = capturedValue[key];
         changed = true;
       }
     });

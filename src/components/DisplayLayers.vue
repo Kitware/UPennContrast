@@ -21,7 +21,7 @@
           <v-col
             class="text-caption header-col"
             title="hotkey Z"
-            v-show="displayZ"
+            v-show="hasMultipleZ"
           >
             Z max-merge
           </v-col>
@@ -106,8 +106,8 @@ export default class DisplayLayers extends Vue {
 
   isDragging: boolean = false;
 
-  get displayZ() {
-    return this.store.z;
+  get hasMultipleZ() {
+    return this.store.dataset && this.store.dataset.z.length > 1;
   }
 
   // Maps a layer groupId to a list of layers

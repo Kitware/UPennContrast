@@ -19,7 +19,8 @@ import {
   IToolConfiguration,
   IAnnotationBase,
   IAnnotationConnectionBase,
-  IWorkerInterfaceValues
+  IWorkerInterfaceValues,
+  IComputeJob
 } from "./model";
 
 import Vue from "vue";
@@ -413,38 +414,40 @@ export class Annotations extends VuexModule {
     callback: (success: boolean) => void;
   }) {
     if (!main.dataset || !main.configuration) {
-      return;
+      return null;
     }
     const datasetId = main.dataset.id;
-    const { location, channel } = await this.getAnnotationLocationFromTool(
+
+    const { location, channel } = this.getAnnotationLocationFromTool(
       tool
     );
     const tile = { XY: main.xy, Z: main.z, Time: main.time };
-    this.annotationsAPI
-      .computeAnnotationWithWorker(
-        tool,
-        datasetId,
-        {
-          location,
-          channel,
-          tile
-        },
-        workerInterface
-      )
-      .then((response: any) => {
-        const job = response.data[0];
-        if (!job || !job._id) {
-          return;
-        }
-        jobs.addJob({
-          jobId: job._id,
-          datasetId: main.dataset?.id ? main.dataset.id : null,
-          callback: (success: boolean) => {
-            this.fetchAnnotations();
-            callback(success);
-          }
-        });
-      });
+    const response = await this.annotationsAPI.computeAnnotationWithWorker(
+      tool,
+      datasetId,
+      {
+        location,
+        channel,
+        tile
+      },
+      workerInterface
+    );
+
+    // Keep track of running jobs
+    const jobId = response.data[0]?._id;
+    if (!jobId) {
+      return null;
+    }
+    const computeJob: IComputeJob = {
+      jobId,
+      datasetId,
+      callback: (success: boolean) => {
+        this.fetchAnnotations();
+        callback(success);
+      }
+    };
+    jobs.addJob(computeJob);
+    return computeJob;
   }
 
   @Action

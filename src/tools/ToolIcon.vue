@@ -11,7 +11,8 @@ const toolTypeToIcon = {
   snap: "mdi-arrow-collapse-vertical",
   select: "mdi-select-drag",
   edit: "mdi-vector-polygon",
-  segmentation: "mdi-shape-polygon-plus"
+  segmentation: "mdi-shape-polygon-plus",
+  connection: "mdi-vector-line"
 } as const;
 
 const createShapeToIcon = {
