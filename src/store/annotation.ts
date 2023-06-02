@@ -418,7 +418,7 @@ export class Annotations extends VuexModule {
     }
     const datasetId = main.dataset.id;
 
-    const { location, channel } = this.getAnnotationLocationFromTool(
+    const { location, channel } = await this.getAnnotationLocationFromTool(
       tool
     );
     const tile = { XY: main.xy, Z: main.z, Time: main.time };
