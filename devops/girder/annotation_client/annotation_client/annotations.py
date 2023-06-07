@@ -2,6 +2,7 @@ import girder_client
 
 PATHS = {
     'annotation': '/upenn_annotation/',
+    'multiple_annotations': '/upenn_annotation/multiple',
     'annotation_by_id': '/upenn_annotation/{annotationId}',
     'annotation_by_dataset': '/upenn_annotation?datasetId={datasetId}',
 
@@ -72,6 +73,19 @@ class UPennContrastAnnotationClient:
         :rtype: dict
         """
         return self.client.post(PATHS['annotation'], json=annotation)
+
+    def createMultipleAnnotations(self, annotations):
+        """
+        Create multiple annotations with the specified metadata.
+        The annotations data should match the standard UPennContrast annotation schema
+        Note: you can add an additional 'properties' field to the annotation to directly specify property values.
+        The 'properties' field will be extracted and added to the property values in the database.
+
+        :param list annotations: The list of annotations metadata
+        :return: The created annotation object (Note: will contain the _id field)
+        :rtype: dict
+        """
+        return self.client.post(PATHS['multiple_annotations'], json=annotations)
 
     def updateAnnotation(self, annotationId, annotation):
         """
