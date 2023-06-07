@@ -169,7 +169,7 @@ interface IAnnotationListItem {
   shapeName: string;
   isSelected: boolean;
   properties: {
-    [propertyId: string]: any;
+    [propertyId: string]: number | "-";
   };
 }
 
@@ -229,7 +229,7 @@ export default class AnnotationList extends Vue {
         annotation,
         shapeName: AnnotationNames[annotation.shape],
         isSelected: this.annotationStore.isAnnotationSelected(annotation.id),
-        properties: []
+        properties: {}
       };
       this.properties.forEach((property: IAnnotationProperty) => {
         item.properties[property.id] = this.getPropertyValueForAnnotationId(
@@ -351,7 +351,7 @@ export default class AnnotationList extends Vue {
     return vDataTableParent.$children?.[0] || null;
   }
 
-  get dataTableItems() {
+  get dataTableItems(): IAnnotationListItem[] {
     const vDataTable = this.vDataTable;
     if (!vDataTable) {
       return [];
@@ -369,7 +369,7 @@ export default class AnnotationList extends Vue {
   get getPageFromItemId() {
     return (itemId: string) => {
       const entryIndex = this.dataTableItems.findIndex(
-        ({ id }: any) => id === itemId
+        ({ annotation }) => annotation.id === itemId
       );
       if (entryIndex <= 0) {
         return 0;
