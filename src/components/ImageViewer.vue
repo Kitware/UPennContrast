@@ -82,6 +82,7 @@
 // in cosole debugging, you can access the map via
 //  $('.geojs-map').data('data-geojs-map')
 import { Vue, Component, Watch } from "vue-property-decorator";
+import annotationStore from "@/store/annotation";
 import store from "@/store";
 import geojs from "geojs";
 
@@ -160,6 +161,12 @@ export default class ImageViewer extends Vue {
       bind: "t",
       handler: () => {
         this.store.setShowTooltips(!this.store.showTooltips);
+      }
+    },
+    {
+      bind: "mod+backspace",
+      handler: () => {
+        annotationStore.deleteSelectedAnnotations();
       }
     }
   ];
