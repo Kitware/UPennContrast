@@ -1,5 +1,5 @@
 <template>
-  <v-card v-if="tool">
+  <v-card v-if="tool" class="menu">
     <v-card-title class="subtitle-1">
       Worker menu
     </v-card-title>
@@ -137,3 +137,9 @@ export default class annotationWorkerMenu extends Vue {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.menu {
+  border: solid 10px rgba($color: #888, $alpha: 0.5);
+}
+</style>
