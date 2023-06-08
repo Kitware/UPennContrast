@@ -527,10 +527,16 @@ export class Main extends VuexModule {
       datasetView.lastViewed = Date.now();
       this.setDatasetViewImpl(datasetView);
       const promises: Promise<any>[] = [
-        this.api.updateDatasetView(datasetView),
-        this.setSelectedDataset(datasetView.datasetId),
-        this.setSelectedConfiguration(datasetView.configurationId)
+        this.api.updateDatasetView(datasetView)
       ];
+      if (this.dataset?.id !== datasetView.datasetId) {
+        promises.push(this.setSelectedDataset(datasetView.datasetId));
+      }
+      if (this.configuration?.id !== datasetView.configurationId) {
+        promises.push(
+          this.setSelectedConfiguration(datasetView.configurationId)
+        );
+      }
       await Promise.all(promises);
     }
   }
