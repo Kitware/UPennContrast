@@ -73,6 +73,7 @@ export default class TagAndLayerRestriction extends Vue {
   @Watch("value")
   updateFromValue() {
     if (!this.value) {
+      this.reset();
       return;
     }
     this.newTags = this.value.tags;

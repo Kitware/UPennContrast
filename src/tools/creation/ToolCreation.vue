@@ -143,7 +143,7 @@ export default class ToolCreation extends Vue {
   }
 
   @Watch("selectedTemplate")
-  @Watch("toolValues")
+  @Watch("toolValues", { deep: true })
   @Watch("userToolName")
   updateAutoToolName() {
     if (this.userToolName) {

@@ -204,6 +204,7 @@ export default class AnnotationConfiguration extends Vue {
   @Watch("value")
   updateFromValue() {
     if (!this.value) {
+      this.reset();
       return;
     }
     this.coordinateAssignments = this.value.coordinateAssignments;

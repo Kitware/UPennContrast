@@ -45,6 +45,7 @@ export default class DockerImage extends Vue {
 
   updateFromValue() {
     if (!this.value) {
+      this.reset();
       return;
     }
     this.image = this.value.image;
