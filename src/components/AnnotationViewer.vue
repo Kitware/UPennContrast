@@ -1228,39 +1228,38 @@ export default class AnnotationViewer extends Vue {
   }
 
   setHoveredAnnotationFromCoordinates(gcsCoordinates: IGeoJSPoint) {
-    const hasSet = this.annotationLayer
-      .annotations()
-      .some((geoJSAnnotation: any) => {
-        const id = geoJSAnnotation.options("girderId");
-        if (!id) {
-          return false;
-        }
-        const annotation = this.getAnnotationFromId(id);
-        if (!annotation) {
-          return false;
-        }
-        const unitsPerPixel = this.getMapUnitsPerPixel();
-        if (
-          this.shouldSelectAnnotation(
-            AnnotationShape.Point,
-            [gcsCoordinates],
-            annotation,
-            geoJSAnnotation.style(),
-            unitsPerPixel
-          )
-        ) {
-          if (this.annotationStore.hoveredAnnotationId === id) {
-            this.annotationStore.setHoveredAnnotationId(null);
-          } else {
-            this.annotationStore.setHoveredAnnotationId(id);
-          }
-          return true;
-        } else {
-          return false;
-        }
-      });
-    if (!hasSet) {
+    const geoAnnotations: IGeoJSAnnotation[] = this.annotationLayer.annotations();
+    let annotationToToggle: IAnnotation | null = null;
+    for (let i = 0; i < geoAnnotations.length; ++i) {
+      const geoAnnotation = geoAnnotations[i];
+      const id = geoAnnotation.options("girderId");
+      if (!id) {
+        continue;
+      }
+      const annotation = this.getAnnotationFromId(id);
+      if (!annotation) {
+        continue;
+      }
+      const unitsPerPixel = this.getMapUnitsPerPixel();
+      const shouldSelect = this.shouldSelectAnnotation(
+        AnnotationShape.Point,
+        [gcsCoordinates],
+        annotation,
+        geoAnnotation.style(),
+        unitsPerPixel
+      );
+      if (shouldSelect) {
+        annotationToToggle = annotation;
+        break;
+      }
+    }
+    if (
+      !annotationToToggle ||
+      this.annotationStore.hoveredAnnotationId === annotationToToggle.id
+    ) {
       this.annotationStore.setHoveredAnnotationId(null);
+    } else {
+      this.annotationStore.setHoveredAnnotationId(annotationToToggle.id);
     }
   }
 
@@ -1469,6 +1468,11 @@ export default class AnnotationViewer extends Vue {
     this.propertyStore.fetchPropertyValues();
     this.filterStore.updateHistograms();
 
+    this.addHoverCallback();
+  }
+
+  @Watch("annotationLayer")
+  addHoverCallback() {
     this.annotationLayer.geoOn(geojs.event.mouseclick, (evt: any) => {
       if (this.selectedTool === null && evt?.geo) {
         this.setHoveredAnnotationFromCoordinates(evt.geo);
