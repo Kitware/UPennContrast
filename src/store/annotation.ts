@@ -365,9 +365,9 @@ export class Annotations extends VuexModule {
 
   @Action
   async fetchAnnotations() {
+    this.setAnnotations([]);
+    this.setConnections([]);
     if (!main.dataset || !main.configuration) {
-      this.setAnnotations([]);
-      this.setConnections([]);
       return;
     }
     try {
