@@ -118,12 +118,15 @@ class AnnotationConnection(AccessControlledModel):
 
     Returns:
         Tuple(Annotation, Number): Returns a tuple of 2 items: the closest annotation and the minimum distance
+        None: if no closest annotation is found
     """
     
-    annotations2 = [annotation for annotation in annotations if annotation["_id"] != annotationRef["_id"]]
-    distances = np.array([(annotation, annotationToAnnotationDistance(annotationRef, annotation)) for annotation in annotations2])
-    sortDistances = np.argsort(distances[:,1])
-    return distances[sortDistances[0],:]
+    filteredAnnotations = [annotation for annotation in annotations if annotation["_id"] != annotationRef["_id"]]
+    if len(filteredAnnotations) == 0:
+      return None
+    distances = np.array([annotationToAnnotationDistance(annotationRef, annotation) for annotation in filteredAnnotations])
+    closestAnnotationIdx = np.argmin(distances)
+    return (filteredAnnotations[closestAnnotationIdx], distances[closestAnnotationIdx])
     
   def connectToNearest(self, info, user=None):
     # annotation ids, a list of tags and a channel index.
@@ -153,8 +156,6 @@ class AnnotationConnection(AccessControlledModel):
       if annotation is None:
         print("Annotation not defined", id)
         continue
-      # Compute distance
-      closestAnnotation = None
 
       # Only work on annotations that are placed in the same tile
       location = annotation["location"]
@@ -173,15 +174,16 @@ class AnnotationConnection(AccessControlledModel):
       annotations = list(Annotation().find(query))
 
       # Find the closest annotation
-      (closestAnnotation, _) = self.getClosestAnnotation(annotation, annotations)
+      result = self.getClosestAnnotation(annotation, annotations)
       
       # Define connection
-      connections.append(self.create(creator=user, connection={
-        "tags": [],
-        "label": "A Connection -- automatic",
-        "parentId": str(closestAnnotation['_id']),
-        "childId": str(id),
-        "datasetId": annotation["datasetId"]
-      }))
+      if result is not None:
+        connections.append(self.create(creator=user, connection={
+          "tags": [],
+          "label": "A Connection -- automatic",
+          "parentId": str(result[0]['_id']),
+          "childId": str(id),
+          "datasetId": annotation["datasetId"]
+        }))
 
     return connections
