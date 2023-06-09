@@ -312,7 +312,7 @@ export class Annotations extends VuexModule {
   @Action
   public async deleteAnnotations(ids: string[]) {
     sync.setSaving(true);
-    await Promise.all(ids.map(id => this.annotationsAPI.deleteAnnotation(id)));
+    await this.annotationsAPI.deleteMultipleAnnotations(ids);
     sync.setSaving(false);
 
     this.setAnnotations(
