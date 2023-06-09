@@ -26,13 +26,6 @@ import {
 import Vue, { markRaw } from "vue";
 import { simpleCentroid } from "@/utils/annotation";
 
-function markElementsRaw<T extends object>(list: T[]) {
-  for (let i = 0; i < list.length; ++i) {
-    markRaw(list[i]);
-  }
-  return list;
-}
-
 @Module({ dynamic: true, store, name: "annotation" })
 export class Annotations extends VuexModule {
   annotationsAPI = main.annotationsAPI;
@@ -170,7 +163,7 @@ export class Annotations extends VuexModule {
 
   @Mutation
   public addAnnotation(value: IAnnotation) {
-    this.annotations.push(markRaw(value));
+    this.annotations.push(value);
     Vue.set(this.annotationCentroids, value.id, simpleCentroid(value.coordinates));
     Vue.set(this.annotationIdToIdx, value.id, this.annotations.length - 1);
   }
@@ -183,7 +176,7 @@ export class Annotations extends VuexModule {
     annotation: IAnnotation;
     index: number;
   }) {
-    Vue.set(this.annotations, index, markRaw(annotation));
+    Vue.set(this.annotations, index, annotation);
     Vue.set(this.annotationCentroids, annotation.id, simpleCentroid(annotation.coordinates));
     Vue.set(this.annotationIdToIdx, annotation.id, index);
   }
@@ -196,7 +189,7 @@ export class Annotations extends VuexModule {
     if (annotation) {
       this.annotationsAPI.updateAnnotation({ ...annotation, name });
       this.setAnnotation({
-        annotation: { ...annotation, name },
+        annotation: markRaw({ ...annotation, name }),
         index: this.annotations.indexOf(annotation)
       });
     }
@@ -333,9 +326,9 @@ export class Annotations extends VuexModule {
     sync.setSaving(false);
 
     this.setAnnotations(
-      markElementsRaw(this.annotations.filter(
+      this.annotations.filter(
         (annotation: IAnnotation) => !ids.includes(annotation.id)
-      ))
+      )
     );
   }
 
@@ -364,7 +357,7 @@ export class Annotations extends VuexModule {
             },
             annotation.tags
           );
-          const newAnnotation = { ...annotation, tags: newTags };
+          const newAnnotation = markRaw({ ...annotation, tags: newTags });
           this.setAnnotation({
             annotation: newAnnotation,
             index: annotationIndex
@@ -407,7 +400,7 @@ export class Annotations extends VuexModule {
             this.setConnections([]);
           }
           if (annotations?.length) {
-            this.setAnnotations(markElementsRaw(annotations));
+            this.setAnnotations(annotations);
           } else {
             this.setAnnotations([]);
           }
