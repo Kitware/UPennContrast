@@ -23,8 +23,15 @@ import {
   IComputeJob
 } from "./model";
 
-import Vue from "vue";
+import Vue, { markRaw } from "vue";
 import { simpleCentroid } from "@/utils/annotation";
+
+function markElementsRaw<T extends object>(list: T[]) {
+  for (let i = 0; i < list.length; ++i) {
+    markRaw(list[i]);
+  }
+  return list;
+}
 
 @Module({ dynamic: true, store, name: "annotation" })
 export class Annotations extends VuexModule {
@@ -35,16 +42,12 @@ export class Annotations extends VuexModule {
   // Connections from the current dataset and configuration
   annotationConnections: IAnnotationConnection[] = [];
 
+  
+  annotationCentroids: { [annotationId: string]: IGeoJSPoint } = {};
+  annotationIdToIdx: { [annotationId: string]: number } = {};
+
   selectedAnnotations: IAnnotation[] = [];
   activeAnnotationIds: string[] = [];
-
-  get annotationCentroids() {
-    const centroids: { [annotationId: string]: IGeoJSPoint } = {};
-    for (const annotation of this.annotations) {
-      centroids[annotation.id] = simpleCentroid(annotation.coordinates);
-    }
-    return centroids;
-  }
 
   get selectedAnnotationIds() {
     return this.selectedAnnotations.map(
@@ -63,22 +66,11 @@ export class Annotations extends VuexModule {
       .filter((id: string) => !this.activeAnnotationIds.includes(id));
   }
 
-  get annotationIdToIdx() {
-    // Cache the annotations to avoid the getter overhead in the for loop
-    const annotations = this.annotations;
-    const idToIdx: Map<string, number> = new Map();
-    for (let idx = 0; idx < annotations.length; ++idx) {
-      idToIdx.set(annotations[idx].id, idx);
-    }
-    return idToIdx;
-  }
-
   get getAnnotationFromId() {
-    const getAnnotationFromId = (annotationId: string) => {
-      const idx = this.annotationIdToIdx.get(annotationId);
+    return (annotationId: string) => {
+      const idx = this.annotationIdToIdx[annotationId];
       return idx === undefined ? undefined : this.annotations[idx];
-    };
-    return getAnnotationFromId;
+    }
   }
 
   hoveredAnnotationId: string | null = null;
@@ -178,18 +170,22 @@ export class Annotations extends VuexModule {
 
   @Mutation
   public addAnnotation(value: IAnnotation) {
-    this.annotations = [...this.annotations, value];
+    this.annotations.push(markRaw(value));
+    Vue.set(this.annotationCentroids, value.id, simpleCentroid(value.coordinates));
+    Vue.set(this.annotationIdToIdx, value.id, this.annotations.length);
   }
 
   @Mutation
-  public setAnnotation({
+  private setAnnotation({
     annotation,
     index
   }: {
     annotation: IAnnotation;
     index: number;
   }) {
-    Vue.set(this.annotations, index, annotation);
+    Vue.set(this.annotations, index, markRaw(annotation));
+    Vue.set(this.annotationCentroids, annotation.id, simpleCentroid(annotation.coordinates));
+    Vue.set(this.annotationIdToIdx, annotation.id, index);
   }
 
   @Action
@@ -223,6 +219,13 @@ export class Annotations extends VuexModule {
       }
     }
     this.annotations = values;
+    this.annotationCentroids = {};
+    this.annotationIdToIdx = {};
+    for (let idx = 0; idx < this.annotations.length; ++idx) {
+      const annotation = this.annotations[idx];
+      Vue.set(this.annotationCentroids, annotation.id, simpleCentroid(annotation.coordinates));
+      Vue.set(this.annotationIdToIdx, annotation.id, idx);
+    }
   }
 
   @Action
@@ -316,9 +319,9 @@ export class Annotations extends VuexModule {
     sync.setSaving(false);
 
     this.setAnnotations(
-      this.annotations.filter(
+      markElementsRaw(this.annotations.filter(
         (annotation: IAnnotation) => !ids.includes(annotation.id)
-      )
+      ))
     );
   }
 
@@ -390,7 +393,7 @@ export class Annotations extends VuexModule {
             this.setConnections([]);
           }
           if (annotations?.length) {
-            this.setAnnotations(annotations);
+            this.setAnnotations(markElementsRaw(annotations));
           } else {
             this.setAnnotations([]);
           }

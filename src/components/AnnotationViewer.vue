@@ -382,10 +382,7 @@ export default class AnnotationViewer extends Vue {
         })
         .style({
           text: (annotation: IAnnotation) => {
-            const index = this.annotationStore.annotations.findIndex(
-              (annotationCandidate: IAnnotation) =>
-                annotationCandidate.id === annotation.id
-            );
+            const index = this.annotationStore.annotationIdToIdx[annotation.id];
             return (
               "ID=" + index + " Tags:[ " + annotation.tags.join(", ") + " ]"
             );
@@ -982,7 +979,7 @@ export default class AnnotationViewer extends Vue {
     const layerNumber = this.selectedTool?.values?.annotation
       ?.coordinateAssignments?.layer;
     const layerId =
-      typeof layerNumber !== "number" ? this.layers[layerNumber].id : undefined;
+      typeof layerNumber === "number" ? this.layers[layerNumber].id : undefined;
 
     this.addAnnotation(newAnnotation, layerId);
     this.annotationLayer.removeAnnotation(annotation);
