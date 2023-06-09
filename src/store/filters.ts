@@ -150,34 +150,42 @@ export class Filters extends VuexModule {
   }
 
   get filteredAnnotations() {
+    const shapeFilter = this.shapeFilter;
+    const selectionFilter = this.selectionFilter;
+    const tagFilter = this.tagFilter;
+    const propertyFilters = this.propertyFilters;
+    const enabledPropertyFilters = propertyFilters.filter(
+      (filter: IPropertyAnnotationFilter) => filter.enabled
+    );
+    const roiFilters = this.roiFilters;
+    const enabledRoiFilters = roiFilters.filter(
+      (filter: IROIAnnotationFilter) => filter.enabled
+    );
     return annotation.annotations.filter((annotation: IAnnotation) => {
       // shape filter
-      if (
-        this.shapeFilter.enabled &&
-        annotation.shape !== this.shapeFilter.shape
-      ) {
+      if (shapeFilter.enabled && annotation.shape !== shapeFilter.shape) {
         return false;
       }
 
       // Selection filter
       if (
-        this.selectionFilter.enabled &&
-        !this.selectionFilter.annotationIds.includes(annotation.id)
+        selectionFilter.enabled &&
+        !selectionFilter.annotationIds.includes(annotation.id)
       ) {
         return false;
       }
 
       // Tag filter
-      if (this.tagFilter.enabled) {
-        const hasAllTags = this.tagFilter.tags.reduce(
+      if (tagFilter.enabled) {
+        const hasAllTags = tagFilter.tags.reduce(
           (val: boolean, tag: string) => val && annotation.tags.includes(tag),
           true
         );
         if (
           hasAllTags &&
-          this.tagFilter.exclusive &&
+          tagFilter.exclusive &&
           !annotation.tags
-            .map((tag: string) => this.tagFilter.tags.includes(tag))
+            .map((tag: string) => tagFilter.tags.includes(tag))
             .every((val: boolean) => val)
         ) {
           return false;
@@ -190,44 +198,28 @@ export class Filters extends VuexModule {
 
       // Property filters
       const propertyValues = properties.propertyValues[annotation.id] || {};
-      const matchesProperties = this.propertyFilters
-        .filter((filter: IPropertyAnnotationFilter) => filter.enabled)
-        .reduce((val: boolean, filter: IPropertyAnnotationFilter) => {
-          if (!val) {
-            return false;
-          }
-          if (!Object.keys(propertyValues).includes(filter.propertyId)) {
-            return false;
-          }
+      const matchesProperties = enabledPropertyFilters.every(
+        (filter: IPropertyAnnotationFilter) => {
           const value = propertyValues[filter.propertyId];
-          return value >= filter.range.min && value <= filter.range.max;
-        }, true);
-
+          return (
+            value !== undefined &&
+            value >= filter.range.min &&
+            value <= filter.range.max
+          );
+        }
+      );
       if (!matchesProperties) {
         return false;
       }
 
       // ROI filters
-      const roiFilters = this.roiFilters.filter(
-        (filter: IROIAnnotationFilter) => filter.enabled
-      );
-      if (!roiFilters.length) {
-        return true;
-      }
-      const isInROI = roiFilters.reduce(
-        (isIn, filter: IROIAnnotationFilter) => {
-          return (
-            isIn ||
-            annotation.coordinates.reduce(
-              (onePointIn: boolean, point: IGeoJSPoint) =>
-                onePointIn || geo.util.pointInPolygon(point, filter.roi),
-              false
-            )
-          );
-        },
-        false
-      );
-
+      const isInROI =
+        enabledRoiFilters.length === 0 ||
+        enabledRoiFilters.some((filter: IROIAnnotationFilter) =>
+          annotation.coordinates.some((point: IGeoJSPoint) =>
+            geo.util.pointInPolygon(point, filter.roi)
+          )
+        );
       return isInROI;
     });
   }

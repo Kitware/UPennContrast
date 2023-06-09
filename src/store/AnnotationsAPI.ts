@@ -13,6 +13,7 @@ import {
 
 import { logError } from "@/utils/log";
 import { fetchAllPages } from "@/utils/fetch";
+import { markRaw } from "vue";
 
 export default class AnnotationsAPI {
   private readonly client: RestClientInstance;
@@ -108,7 +109,7 @@ export default class AnnotationsAPI {
       _id,
       datasetId
     } = item;
-    return {
+    return markRaw({
       name,
       tags,
       shape,
@@ -117,7 +118,7 @@ export default class AnnotationsAPI {
       coordinates,
       id: _id,
       datasetId
-    };
+    });
   };
 
   createConnection(

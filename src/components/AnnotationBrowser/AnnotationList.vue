@@ -90,7 +90,7 @@
                 />
               </td>
               <td :class="tableItemClass">
-                <span>{{ annotationIdToIndex.get(item.annotation.id) }}</span>
+                <span>{{ annotationIdToIndex[item.annotation.id] }}</span>
               </td>
               <td :class="tableItemClass">
                 <span>
@@ -186,8 +186,6 @@ export default class AnnotationList extends Vue {
 
   annotationFilteredDialog: boolean = false;
 
-  annotationIdToIndex: Map<string, number> = new Map();
-
   // These are "from" or "to" v-data-table
   page: number = 0; // one-way binding :page
   itemsPerPage: number = 10; // one-way binding @update:items-per-page
@@ -245,9 +243,8 @@ export default class AnnotationList extends Vue {
     return this.propertyStore.annotationListIds;
   }
 
-  @Watch("annotationStore.annotationIdToIdx")
-  updateAnnotationIndices() {
-    this.annotationIdToIndex = this.annotationStore.annotationIdToIdx;
+  get annotationIdToIndex() {
+    return this.annotationStore.annotationIdToIdx;
   }
 
   updateAnnotationName(name: string, id: string) {

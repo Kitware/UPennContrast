@@ -5,41 +5,55 @@ import { AxiosRequestConfig } from "axios";
 export async function fetchAllPages(
   client: RestClientInstance,
   endpoint: string,
-  baseFormData?: AxiosRequestConfig
+  baseFormData?: AxiosRequestConfig,
+  firstPage?: number
 ) {
   const pages: any[] = [];
   let totalCount = -1;
-  const formData: AxiosRequestConfig = { ...baseFormData };
-  const params = { limit: 100000, sort: "_id", ...formData.params, offset: 0 };
-  formData.params = params;
+  const baseParams = {
+    limit: 100000,
+    sort: "_id",
+    ...baseFormData?.params,
+    offset: 0
+  };
+  const basePageSize = baseParams.limit;
+  const firstPageSize = firstPage === undefined ? basePageSize : firstPage;
 
-  const fetchPage = () =>
-    client
-      .get(endpoint, formData)
-      .then((res: any) => {
-        totalCount = Number(res.headers["girder-total-count"]);
-        pages.push(res.data);
-        return true;
-      })
-      .catch((err: any) => {
-        logError(`Could not get all ${endpoint} pages:\n${err}`);
-        return false;
-      });
-
-  // Fetch first page
-  if (!(await fetchPage())) {
-    return [];
-  }
-
-  // Fetch remaining pages if needed
-  for (
-    params.offset = params.limit;
-    params.offset < totalCount;
-    params.offset += params.limit
-  ) {
-    if (!(await fetchPage())) {
-      return [];
+  const fetchPage = async (offset: number, limit: number) => {
+    const formData: AxiosRequestConfig = {
+      ...baseFormData,
+      params: {
+        ...baseParams,
+        offset,
+        limit
+      }
+    };
+    try {
+      const res = await client.get(endpoint, formData);
+      totalCount = Number(res.headers["girder-total-count"]);
+      pages.push(res.data);
+    } catch (err) {
+      logError(`Could not get all ${endpoint} pages:\n${err}`);
+      throw err;
     }
+  };
+
+  try {
+    // Fetch first page
+    await fetchPage(0, firstPageSize);
+
+    // Fetch remaining pages if needed
+    const promises: Promise<any>[] = [];
+    for (
+      let offset = firstPageSize;
+      offset < totalCount;
+      offset += basePageSize
+    ) {
+      promises.push(fetchPage(offset, basePageSize));
+    }
+    await Promise.all(promises);
+  } catch {
+    return [];
   }
 
   return pages;
