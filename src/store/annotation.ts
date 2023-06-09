@@ -172,7 +172,7 @@ export class Annotations extends VuexModule {
   public addAnnotation(value: IAnnotation) {
     this.annotations.push(markRaw(value));
     Vue.set(this.annotationCentroids, value.id, simpleCentroid(value.coordinates));
-    Vue.set(this.annotationIdToIdx, value.id, this.annotations.length);
+    Vue.set(this.annotationIdToIdx, value.id, this.annotations.length - 1);
   }
 
   @Mutation
@@ -274,6 +274,9 @@ export class Annotations extends VuexModule {
       }
     }
     const connections = await this.annotationsAPI.createMultipleConnections(connectionBases);
+    if (connections) {
+      this.addMultipleConnections(connections);
+    }
     sync.setSaving(false);
     return connections || [];
   }
@@ -290,6 +293,7 @@ export class Annotations extends VuexModule {
     const childrenSet = new Set(childIds);
     const connectionsToDelete = this.annotationConnections.filter(connection => parentsSet.has(connection.parentId) && childrenSet.has(connection.childId));
     await this.annotationsAPI.deleteMultipleConnections(connectionsToDelete.map(connection => connection.id));
+    this.deleteMultipleConnections(connectionsToDelete.map(connection => connection.id));
     sync.setSaving(false);
     return connectionsToDelete;
   }
@@ -303,8 +307,18 @@ export class Annotations extends VuexModule {
   }
 
   @Mutation
+  public addMultipleConnections(value: IAnnotationConnection[]) {
+    this.annotationConnections.push(...value);
+  }
+
+  public deleteMultipleConnections(connectionIds: string[]) {
+    const idsSet = new Set(connectionIds);
+    this.annotationConnections = this.annotationConnections.filter((connection) => !idsSet.has(connection.id));
+  }
+
+  @Mutation
   public addConnection(value: IAnnotationConnection) {
-    this.annotationConnections = [...this.annotationConnections, value];
+    this.annotationConnections.push(value);
   }
 
   @Mutation

@@ -956,7 +956,6 @@ export default class AnnotationViewer extends Vue {
         childIds
       });
     }
-    this.annotationStore.fetchAnnotations();
 
     // Remove the selection annotation from layer (do not show the annotation used to select)
     this.annotationLayer.removeAnnotation(selectAnnotation);
