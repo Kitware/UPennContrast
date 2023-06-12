@@ -1,26 +1,27 @@
 <template>
-  <v-container>
-    <v-row>
-      <v-btn @click="addNewFilter">
-        Add new region filter
-      </v-btn>
-    </v-row>
-    <v-row v-for="filter in filters" :key="filter.id">
-      <v-col>
-        <v-checkbox
+  <div>
+    <v-btn small @click="addNewFilter">
+      Add region filter
+    </v-btn>
+    <div class="d-flex flex-column">
+      <div
+        v-for="filter in filters"
+        :key="filter.id"
+        class="d-flex justify-space-between align-center"
+      >
+        <v-simple-checkbox
+          class="d-inline ml-2"
           :value="filter.enabled"
           :input-value="filter.enabled"
           @click="toggleEnabled(filter.id)"
-        ></v-checkbox>
-      </v-col>
-      <v-col>{{ filter.id }}</v-col>
-      <v-col
-        ><v-btn icon small @click="removeFilter(filter.id)"
-          ><v-icon>mdi-close</v-icon></v-btn
-        ></v-col
-      >
-    </v-row>
-  </v-container>
+        />
+        {{ filter.id }}
+        <v-btn class="mx-2" icon small @click="removeFilter(filter.id)">
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script lang="ts">

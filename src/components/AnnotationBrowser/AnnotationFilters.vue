@@ -1,33 +1,16 @@
 <template>
-  <v-expansion-panel dense>
-    <v-expansion-panel-header>
-      Filters <v-spacer></v-spacer>
-    </v-expansion-panel-header>
-    <v-expansion-panel-content>
-      <v-container>
-        <v-row>
-          <v-col class="pa-0">
-            <tag-filter-editor v-model="tagFilter"></tag-filter-editor>
-          </v-col>
-        </v-row>
-        <v-row>
-          <v-col class="pa-0">
-            <shape-filter-editor v-model="shapeFilter"></shape-filter-editor>
-          </v-col>
-        </v-row>
-        <v-row v-for="propertyId in propertyIds" :key="propertyId">
-          <property-filter-histogram
-            :propertyId="propertyId"
-          ></property-filter-histogram>
-        </v-row>
-        <v-row>
-          <v-col>
-            <roi-filters></roi-filters>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-expansion-panel-content>
-  </v-expansion-panel>
+  <v-container class="filter-main-container">
+    <shape-filter-editor
+      class="filter-element"
+      id="shape-filter"
+      v-model="shapeFilter"
+    />
+    <tag-filter-editor class="filter-element" v-model="tagFilter" />
+    <roi-filters class="filter-element" />
+    <template v-for="propertyId in propertyIds">
+      <property-filter-histogram :key="propertyId" :propertyId="propertyId" />
+    </template>
+  </v-container>
 </template>
 
 <script lang="ts">
@@ -80,3 +63,33 @@ export default class AnnotationFilters extends Vue {
   }
 }
 </script>
+
+<style lang="scss">
+.filter-main-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: center;
+  justify-content: space-between;
+}
+
+.filter-main-container .v-text-field {
+  margin: 0;
+}
+
+.filter-element {
+  display: flex;
+  align-items: center;
+  align-content: center;
+  flex: 1;
+  max-width: fit-content;
+  margin-top: 12px;
+  margin-bottom: 12px;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+#shape-filter .v-select__slot {
+  max-width: 70px;
+}
+</style>
