@@ -93,6 +93,7 @@ import LayerSelect from "@/components/LayerSelect.vue";
 import DockerImageSelect from "@/components/DockerImageSelect.vue";
 import TagPicker from "@/components/TagPicker.vue";
 import PropertyWorkerMenu from "@/components/PropertyWorkerMenu.vue";
+import { tagFilterFunction } from "@/utils/annotation";
 
 // Popup for new tool configuration
 @Component({
@@ -190,10 +191,11 @@ export default class PropertyCreation extends Vue {
     const counts: { [key: string]: number } = {};
     for (const annotation of this.annotationStore.annotations) {
       if (
-        (this.areTagsExclusive &&
-          this.filteringTags.every(tag => annotation.tags.includes(tag))) ||
-        (!this.areTagsExclusive &&
-          this.filteringTags.some(tag => annotation.tags.includes(tag)))
+        tagFilterFunction(
+          annotation.tags,
+          this.filteringTags,
+          this.areTagsExclusive
+        )
       ) {
         if (counts[annotation.shape] === undefined) {
           counts[annotation.shape] = 0;

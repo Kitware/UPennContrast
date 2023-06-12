@@ -17,7 +17,7 @@
           @click="areTagsInclusive = !areTagsInclusive"
         >
           <v-icon>
-            {{ areTagsInclusive ? "mdi-set-all" : "mdi-set-center" }}
+            {{ areTagsInclusive ? "mdi-approximately-equal" : "mdi-equal" }}
           </v-icon>
         </v-btn>
       </v-col>
