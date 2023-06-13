@@ -11,7 +11,7 @@
           <v-col cols="7">
             <draggable
               v-model="dropZoneArray"
-              group="indexedLayer"
+              group="layerZoneElement"
               class="ma-1 pa-1 drop"
               :class="{ dragging: isDragging, 'not-dragging': !isDragging }"
             >
@@ -39,13 +39,13 @@
       :swapThreshold="0.65"
     >
       <transition-group type="transition">
-        <template v-for="[groupId, indexedLayers] in groupsArrayWithSpacers">
+        <template v-for="[groupId, combinedLayers] in groupsArrayWithSpacers">
           <display-layer-group
-            v-if="indexedLayers"
+            v-if="combinedLayers"
             :key="groupId"
-            group="indexedLayer"
+            group="layerZoneElement"
             :single-layer="groupId.startsWith(singleLayerPrefix)"
-            :indexed-layers="indexedLayers"
+            :combined-layers="combinedLayers"
             @start="isDragging = true"
             @end="isDragging = false"
             @update="changeLayersInGroup($event, groupId)"
@@ -55,7 +55,7 @@
             :value="[]"
             :key="groupId"
             @input="spacerUpdate($event, groupId)"
-            group="indexedLayer"
+            group="layerZoneElement"
             class="group-spacer"
           />
         </template>
@@ -69,7 +69,7 @@
   </v-expansion-panels>
 </template>
 <script lang="ts">
-import { IDisplayLayer, IIndexedLayer } from "@/store/model";
+import { IDisplayLayer, ICombinedLayer } from "@/store/model";
 import { v4 as uuidv4 } from "uuid";
 import { Vue, Component } from "vue-property-decorator";
 import DisplayLayerGroup from "./DisplayLayerGroup.vue";
@@ -113,7 +113,7 @@ export default class DisplayLayers extends Vue {
   // Maps a layer groupId to a list of layers
   get groupsMap() {
     // A Map remembers order of insertion
-    const groups: Map<string, IIndexedLayer[]> = new Map();
+    const groups: Map<string, ICombinedLayer[]> = new Map();
     if (!this.store.configuration) {
       return groups;
     }
@@ -126,7 +126,7 @@ export default class DisplayLayers extends Vue {
       if (!groups.has(groupId)) {
         groups.set(groupId, []);
       }
-      groups.get(groupId)!.push({ layer, configurationLayer, layerIdx });
+      groups.get(groupId)!.push({ layer, configurationLayer });
     }
     return groups;
   }
@@ -134,7 +134,7 @@ export default class DisplayLayers extends Vue {
   // A list of tuples [groupId | spacerId, layers | null]
   get groupsArrayWithSpacers() {
     const groupsArray = Array.from(this.groupsMap.entries());
-    const withSpacers: [string, IIndexedLayer[] | null][] = [];
+    const withSpacers: [string, ICombinedLayer[] | null][] = [];
     groupsArray.forEach(e =>
       withSpacers.push([spacerIdBeforeGroup(e[0]), null], e)
     );
@@ -152,7 +152,7 @@ export default class DisplayLayers extends Vue {
   }
 
   // Create a group from the layer dropped in the zone
-  set dropZoneArray(value: IIndexedLayer[]) {
+  set dropZoneArray(value: ICombinedLayer[]) {
     if (value.length <= 0) {
       return;
     }
@@ -160,13 +160,13 @@ export default class DisplayLayers extends Vue {
   }
 
   // Change the order of the groups
-  changeGroupsInWrapper(groups: [string, IIndexedLayer[] | null][]) {
+  changeGroupsInWrapper(groups: [string, ICombinedLayer[] | null][]) {
     this.isDragging = false;
     // Groups have changed position
     const newConfigurationLayers = [];
-    for (const [_, indexedLayers] of groups) {
-      if (indexedLayers) {
-        for (const { configurationLayer } of indexedLayers) {
+    for (const [_, combinedLayers] of groups) {
+      if (combinedLayers) {
+        for (const { configurationLayer } of combinedLayers) {
           newConfigurationLayers.push(configurationLayer);
         }
       }
@@ -175,20 +175,18 @@ export default class DisplayLayers extends Vue {
   }
 
   // The user dropped a layer in the spacer between two groups
-  spacerUpdate(indexedLayers: IIndexedLayer[], spacerId: string) {
+  spacerUpdate(combinedLayers: ICombinedLayer[], spacerId: string) {
     this.isDragging = false;
-    if (!this.store.configuration || indexedLayers.length !== 1) {
+    if (!this.store.configuration || combinedLayers.length !== 1) {
       return;
     }
     const configurationLayers = this.store.configuration.layers;
-    const layerToMove = indexedLayers[0].layer;
+    const layerToMove = combinedLayers[0].layer;
     const groupId = groupIdAfterSpacer(spacerId);
 
     // Find current position of item to move
-    const currentPosition = configurationLayers.findIndex(
-      layer => layer.id === layerToMove.id
-    );
-    if (currentPosition < 0) {
+    const currentPosition = this.store.getLayerIndexFromId(layerToMove.id);
+    if (currentPosition === null) {
       return;
     }
 
@@ -224,7 +222,7 @@ export default class DisplayLayers extends Vue {
   }
 
   // The user moved a layer within a group
-  changeLayersInGroup(indexedLayers: IIndexedLayer[], groupId: string) {
+  changeLayersInGroup(combinedLayers: ICombinedLayer[], groupId: string) {
     this.isDragging = false;
     // Layers of this group have changed (layer added, removed or changed position)
     if (!this.store.configuration) {
@@ -234,7 +232,7 @@ export default class DisplayLayers extends Vue {
 
     // Get the id of all layers in the group
     const layerIdsInGroup = new Set();
-    for (const { configurationLayer } of indexedLayers) {
+    for (const { configurationLayer } of combinedLayers) {
       layerIdsInGroup.add(configurationLayer.id);
     }
 
@@ -273,9 +271,9 @@ export default class DisplayLayers extends Vue {
       }
     }
 
-    // Sort layers in group as in indexedLayers parameter
+    // Sort layers in group as in combinedLayers parameter
     const orderedLayersInGroup = [];
-    for (const { configurationLayer } of indexedLayers) {
+    for (const { configurationLayer } of combinedLayers) {
       const layerId = configurationLayer.id;
       const newLayer = layersInGroup.get(layerId);
       if (newLayer) {
@@ -291,10 +289,10 @@ export default class DisplayLayers extends Vue {
     ]);
   }
 
-  createGroupFromLayer(indexedLayer: IIndexedLayer) {
+  createGroupFromLayer(combinedLayer: ICombinedLayer) {
     const newGroupId = uuidv4();
     this.store.changeLayer({
-      index: indexedLayer.layerIdx,
+      layerId: combinedLayer.layer.id,
       delta: {
         layerGroup: newGroupId
       }

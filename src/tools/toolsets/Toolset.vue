@@ -179,10 +179,10 @@ export default class Toolset extends Vue {
         values.connectTo.tags.length
       ) {
         propDesc.push(["Connect to tags", values.connectTo.tags.join(", ")]);
-        const layerIdx = values.connectTo.layer;
-        const layers = this.store.layers;
-        if (typeof values.connectTo.layer === "number") {
-          propDesc.push(["Connect only on layer", layers[layerIdx].name]);
+        const layerId = values.connectTo.layer;
+        const layer = this.store.getLayerFromId(layerId);
+        if (layer) {
+          propDesc.push(["Connect only on layer", layer.name]);
         }
       }
     }

@@ -740,17 +740,21 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  private toggleLayer(index: number) {
+  private toggleLayer(layerId: string) {
     if (!this.configuration) {
       return;
     }
     const layers = this.configuration.layers;
     switch (this.layerMode) {
       case "single":
-        layers.forEach((l, i) => (l.visible = i === index));
+        layers.forEach(l => (l.visible = l.id === layerId));
         break;
       case "multiple":
       case "unroll":
+        const index = layers.findIndex(l => l.id === layerId);
+        if (index === null) {
+          break;
+        }
         layers[index].visible = !layers[index].visible;
         Vue.set(layers, index, layers[index]);
         break;
@@ -823,16 +827,11 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async toggleLayerVisibility(layerIndex: number) {
-    if (
-      !this.dataset ||
-      !this.configuration ||
-      layerIndex < 0 ||
-      layerIndex >= this.layers.length
-    ) {
+  async toggleLayerVisibility(layerId: string) {
+    if (!this.dataset || !this.configuration) {
       return;
     }
-    this.toggleLayer(layerIndex);
+    this.toggleLayer(layerId);
     await this.syncConfiguration("layers");
   }
 
@@ -855,79 +854,73 @@ export class Main extends VuexModule {
   async toggleGlobalLayerVisibility() {
     const layers = this.layers;
     const currentVisibility = layers.every(layer => layer.visible);
-    layers.forEach((layer, layerIdx) => {
+    layers.forEach(layer => {
       if (layer.visible === currentVisibility) {
-        this.toggleLayerVisibility(layerIdx);
+        this.toggleLayerVisibility(layer.id);
       }
     });
   }
 
   @Action
   async saveContrastInConfiguration({
-    index,
+    layerId,
     contrast
   }: {
-    index: number;
+    layerId: string;
     contrast: IContrast;
   }) {
-    this.changeLayer({ index, delta: { contrast }, sync: true });
+    this.changeLayer({ layerId, delta: { contrast }, sync: true });
     if (this.datasetView) {
-      Vue.delete(this.datasetView.layerContrasts, this.layers[index].id);
+      Vue.delete(this.datasetView.layerContrasts, layerId);
       this.api.updateDatasetView(this.datasetView);
     }
   }
 
   @Action
   async saveContrastInView({
-    layerIdx,
+    layerId,
     contrast
   }: {
-    layerIdx: number;
+    layerId: string;
     contrast: IContrast;
   }) {
     if (this.datasetView) {
-      Vue.set(
-        this.datasetView.layerContrasts,
-        this.layers[layerIdx].id,
-        contrast
-      );
+      Vue.set(this.datasetView.layerContrasts, layerId, contrast);
       this.api.updateDatasetView(this.datasetView);
     }
   }
 
   @Action
-  async resetContrastInView(layerIdx: number) {
+  async resetContrastInView(layerId: string) {
     if (this.datasetView) {
-      Vue.delete(this.datasetView.layerContrasts, this.layers[layerIdx].id);
+      Vue.delete(this.datasetView.layerContrasts, layerId);
       this.api.updateDatasetView(this.datasetView);
     }
   }
 
   @Mutation
   private changeLayerImpl({
-    index,
+    layerId,
     delta
   }: {
-    index: number;
+    layerId: string;
     delta: Partial<IDisplayLayer>;
   }) {
-    if (
-      !this.configuration ||
-      index < 0 ||
-      index >= this.configuration.layers.length
-    ) {
+    if (!this.configuration) {
       return;
     }
-    Vue.set(
-      this.configuration.layers,
-      index,
-      Object.assign({}, this.configuration.layers[index], delta)
-    );
+    const confLayers = this.configuration.layers;
+    const index = confLayers.findIndex(l => l.id === layerId);
+    if (index === null) {
+      return;
+    }
+    const layer = confLayers[index];
+    Vue.set(confLayers, index, Object.assign({}, layer, delta));
   }
 
   @Action
   async changeLayer(args: {
-    index: number;
+    layerId: string;
     delta: Partial<IDisplayLayer>;
     sync?: boolean;
   }) {
@@ -938,20 +931,21 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  private removeLayerImpl(index: number) {
-    if (
-      !this.configuration ||
-      index < 0 ||
-      index >= this.configuration.layers.length
-    ) {
+  private removeLayerImpl(layerId: string) {
+    if (!this.configuration) {
       return;
     }
-    this.configuration.layers.splice(index, 1);
+    const layers = this.configuration.layers;
+    const index = layers.findIndex(l => l.id === layerId);
+    if (index === null) {
+      return;
+    }
+    layers.splice(index, 1);
   }
 
   @Action
-  async removeLayer(index: number) {
-    this.removeLayerImpl(index);
+  async removeLayer(layerId: string) {
+    this.removeLayerImpl(layerId);
     await this.syncConfiguration("layers");
   }
 
@@ -1209,6 +1203,23 @@ export class Main extends VuexModule {
       layerId === undefined
         ? undefined
         : this.layers.find(layer => layer.id === layerId);
+  }
+
+  get getConfigurationLayerFromId() {
+    return (layerId: string) =>
+      this.configuration?.layers.find(layer => layer.id === layerId);
+  }
+
+  get getLayerIndexFromId() {
+    return (layerId: string) => {
+      const index = this.configuration?.layers.findIndex(
+        layer => layer.id === layerId
+      );
+      if (index === undefined || index < 0) {
+        return null;
+      }
+      return index;
+    };
   }
 
   @Mutation

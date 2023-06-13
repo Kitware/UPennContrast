@@ -77,7 +77,7 @@ export interface IToolConfiguration {
 export interface IRestrictTagsAndLayer {
   tags: string[];
   tagsInclusive: boolean;
-  layer: number | null;
+  layerId: string | null;
 }
 
 export interface IDataset {
@@ -202,10 +202,9 @@ export interface IDisplayLayer {
   };
 }
 
-export interface IIndexedLayer {
+export interface ICombinedLayer {
   layer: IDisplayLayer; // configurationLayer + contrast override from datasetView
   configurationLayer: IDisplayLayer; // layer as saved in configuration item
-  layerIdx: number;
 }
 
 export interface IPixel {

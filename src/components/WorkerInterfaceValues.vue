@@ -102,7 +102,7 @@ export default class WorkerInterfaceValues extends Vue {
         return [];
 
       case "layer":
-        return 0;
+        return undefined;
 
       case "select":
         return "";

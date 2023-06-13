@@ -98,7 +98,7 @@ type VForm = Vue & { validate: () => boolean };
 interface IAnnotationSetup {
   tags: string[];
   coordinateAssignments: {
-    layer: number;
+    layer: string | null | undefined;
     Z: {
       type: string;
       value: number;
@@ -181,8 +181,8 @@ export default class AnnotationConfiguration extends Vue {
     }
   }
 
-  isMaxMerge(axis: string, layerIndex: number) {
-    const layer = this.layers[layerIndex];
+  isMaxMerge(axis: string, layerId: string) {
+    const layer = this.store.getLayerFromId(layerId);
     if (!layer) {
       return false;
     }
@@ -191,8 +191,8 @@ export default class AnnotationConfiguration extends Vue {
   }
 
   coordinates = ["Z", "Time"];
-  coordinateAssignments = {
-    layer: 0,
+  coordinateAssignments: IAnnotationSetup["coordinateAssignments"] = {
+    layer: null,
     Z: { type: "layer", value: 1, max: this.maxZ },
     Time: { type: "layer", value: 1, max: this.maxTime }
   };
@@ -216,7 +216,7 @@ export default class AnnotationConfiguration extends Vue {
   reset() {
     // Set internal values to the current input, or defaults
     this.coordinateAssignments = {
-      layer: 0,
+      layer: undefined, // Setting layer to undefined will reset the layer in layer-select
       Z: { type: "layer", value: 1, max: this.maxZ },
       Time: { type: "layer", value: 1, max: this.maxTime }
     };

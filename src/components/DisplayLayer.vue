@@ -35,7 +35,7 @@
             @mouseup.native.stop
             v-mousetrap="{
               bind: `${index + 1}`,
-              handler: () => store.toggleLayerVisibility(index)
+              handler: () => store.toggleLayerVisibility(value.id)
             }"
             class="toggleButton"
             v-model="visible"
@@ -162,10 +162,11 @@ export default class DisplayLayer extends Vue {
   @Prop()
   readonly value!: IDisplayLayer;
 
-  @Prop()
-  readonly index!: number;
-
   showColorPicker = false;
+
+  get index() {
+    return this.store.getLayerIndexFromId(this.value.id)!;
+  }
 
   get hoverValue() {
     const layerId = this.value.id;
@@ -186,9 +187,7 @@ export default class DisplayLayer extends Vue {
     if (!configuration) {
       return null;
     }
-    const configurationLayer = configuration.layers.find(
-      layer => layer.id === layerId
-    );
+    const configurationLayer = this.store.getConfigurationLayerFromId(layerId);
     if (!configurationLayer) {
       return null;
     }
@@ -252,7 +251,7 @@ export default class DisplayLayer extends Vue {
     if (this.visible === value) {
       return;
     }
-    this.store.toggleLayerVisibility(this.index);
+    this.store.toggleLayerVisibility(this.value.id);
   }
 
   get channel() {
@@ -306,7 +305,7 @@ export default class DisplayLayer extends Vue {
       return;
     }
     this.store.changeLayer({
-      index: this.index,
+      layerId: this.value.id,
       delta: {
         [prop]: value
       }
@@ -316,20 +315,20 @@ export default class DisplayLayer extends Vue {
   changeContrast(contrast: IContrast, syncConfiguration: boolean) {
     if (syncConfiguration) {
       this.store.saveContrastInConfiguration({
-        index: this.index,
+        layerId: this.value.id,
         contrast
       });
     } else {
-      this.store.saveContrastInView({ layerIdx: this.index, contrast });
+      this.store.saveContrastInView({ layerId: this.value.id, contrast });
     }
   }
 
   resetContrastInView() {
-    this.store.resetContrastInView(this.index);
+    this.store.resetContrastInView(this.value.id);
   }
 
   removeLayer() {
-    this.store.removeLayer(this.index);
+    this.store.removeLayer(this.value.id);
   }
 }
 </script>
