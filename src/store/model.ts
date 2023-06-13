@@ -213,6 +213,12 @@ export interface IPixel {
   value?: number[];
 }
 
+export interface IGeoJSInteractor {}
+
+export interface IGeoJSMap {
+  interactor: () => null;
+}
+
 export interface IGeoJSLayer {
   addAnnotation: (annotation: IGeoJSAnnotation) => IGeoJSLayer;
   visible: (value?: boolean) => boolean | IGeoJSLayer;
@@ -221,6 +227,7 @@ export interface IGeoJSLayer {
     arg?: string | null,
     editAnnotation?: IGeoJSAnnotation
   ) => string | null | IGeoJSLayer;
+  map: () => IGeoJSMap;
   modes: {
     edit: "edit";
     cursor: "cursor";
