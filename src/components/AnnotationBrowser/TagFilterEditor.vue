@@ -1,33 +1,21 @@
 <template>
-  <div v-if="filter">
-    <v-container>
-      <v-row align-content="start">
-        <v-col class="pa-1" v-if="!property">
-          <v-checkbox
-            dense
-            hide-details
-            label="Enable Tag Filter"
-            v-model="enabled"
-          ></v-checkbox>
-        </v-col>
-        <v-col cols="auto" class="pa-1">
-          <tag-picker v-model="tags" :disabled="!enabled"> </tag-picker>
-        </v-col>
-        <v-col class="pa-1">
-          <v-checkbox
-            dense
-            hide-details
-            label="Exclusive"
-            v-model="exclusive"
-            :disabled="!enabled"
-          ></v-checkbox>
-        </v-col>
-      </v-row>
-    </v-container>
+  <div class="body-1">
+    Show
+    <v-select
+      dense
+      hide-details
+      single-line
+      class="mx-2 select-exclusive-filter"
+      v-model="exclusive"
+      :items="exclusiveItems"
+      item-text="text"
+      item-value="value"
+    />
+    <tag-picker v-model="tags" />
   </div>
 </template>
 <script lang="ts">
-import { Vue, Component, Watch, Prop, VModel } from "vue-property-decorator";
+import { Vue, Component, VModel } from "vue-property-decorator";
 import { ITagAnnotationFilter } from "@/store/model";
 import TagPicker from "@/components/TagPicker.vue";
 
@@ -39,23 +27,23 @@ import TagPicker from "@/components/TagPicker.vue";
 export default class TagFilterEditor extends Vue {
   @VModel({ type: Object }) filter!: ITagAnnotationFilter;
 
-  @Prop()
-  readonly property!: boolean;
+  readonly exclusiveItems = [
+    {
+      text: "Any",
+      value: false
+    },
+    {
+      text: "Only",
+      value: true
+    }
+  ];
 
   get tags() {
     return this.filter.tags;
   }
 
   set tags(tags: string[]) {
-    this.filter = { ...this.filter, tags };
-  }
-
-  get enabled() {
-    return this.filter.enabled;
-  }
-
-  set enabled(enabled: boolean) {
-    this.filter = { ...this.filter, enabled };
+    this.filter = { ...this.filter, enabled: true, tags };
   }
 
   get exclusive() {
@@ -63,7 +51,13 @@ export default class TagFilterEditor extends Vue {
   }
 
   set exclusive(exclusive: boolean) {
-    this.filter = { ...this.filter, exclusive };
+    this.filter = { ...this.filter, enabled: true, exclusive };
   }
 }
 </script>
+
+<style lang="scss">
+.select-exclusive-filter .v-select__selections {
+  width: 40px;
+}
+</style>

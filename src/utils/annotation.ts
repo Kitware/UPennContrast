@@ -166,9 +166,24 @@ export function canComputeAnnotationProperty(
 ) {
   return (
     property.shape === annotation.shape &&
-    ((property.tags.exclusive &&
-      property.tags.tags.every(tag => annotation.tags.includes(tag))) ||
-      (!property.tags.exclusive &&
-        property.tags.tags.some(tag => annotation.tags.includes(tag))))
+    tagFilterFunction(
+      annotation.tags,
+      property.tags.tags,
+      property.tags.exclusive
+    )
   );
+}
+
+// Return wether the list of tags match the filter
+// Exclusive filter: the lists of tags are exactly equals
+// Inclusive filter: the input list of tags is included in the filter list of tags
+export function tagFilterFunction(
+  inputTags: string[],
+  filterTags: string[],
+  exclusive: boolean
+) {
+  if (exclusive && inputTags.length !== filterTags.length) {
+    return false;
+  }
+  return filterTags.every(filterTag => inputTags.includes(filterTag));
 }

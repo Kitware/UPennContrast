@@ -11,6 +11,8 @@ import main from "./index";
 import annotation from "./annotation";
 import properties from "./properties";
 
+import { tagFilterFunction } from "@/utils/annotation";
+
 import Vue from "vue";
 
 import {
@@ -176,24 +178,11 @@ export class Filters extends VuexModule {
       }
 
       // Tag filter
-      if (tagFilter.enabled) {
-        const hasAllTags = tagFilter.tags.reduce(
-          (val: boolean, tag: string) => val && annotation.tags.includes(tag),
-          true
-        );
-        if (
-          hasAllTags &&
-          tagFilter.exclusive &&
-          !annotation.tags
-            .map((tag: string) => tagFilter.tags.includes(tag))
-            .every((val: boolean) => val)
-        ) {
-          return false;
-        }
-
-        if (!hasAllTags) {
-          return false;
-        }
+      if (
+        tagFilter.enabled &&
+        !tagFilterFunction(annotation.tags, tagFilter.tags, tagFilter.exclusive)
+      ) {
+        return false;
       }
 
       // Property filters

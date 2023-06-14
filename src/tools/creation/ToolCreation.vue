@@ -175,10 +175,10 @@ export default class ToolCreation extends Vue {
       const childValues = this.toolValues.childAnnotation;
       const newString =
         (parentValues.tags.join(", ") ||
-          (parentValues.tagsInclusive ? "None" : "All")) +
+          (parentValues.tagsInclusive ? "All" : "No tag")) +
         " to " +
         (childValues.tags.join(", ") ||
-          (childValues.tagsInclusive ? "None" : "All"));
+          (childValues.tagsInclusive ? "All" : "No tag"));
       toolNameStrings.push(newString);
     }
     if (toolNameStrings.length > 0) {

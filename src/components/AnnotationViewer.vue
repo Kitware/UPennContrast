@@ -35,27 +35,17 @@ import {
   pointDistance,
   getAnnotationStyleFromLayer,
   unrollIndexFromImages,
-  geojsAnnotationFactory
+  geojsAnnotationFactory,
+  tagFilterFunction
 } from "@/utils/annotation";
 
 function filterAnnotations(
   annotations: IAnnotation[],
   { tags, tagsInclusive, layer: layerIdx }: IRestrictTagsAndLayer
 ) {
-  let output = annotations;
-  if (tagsInclusive) {
-    // There is a tag of "tags" in the annotation tags
-    // Filter on: annotation has tag1 OR tag2 OR tag3...
-    output = output.filter(annotation =>
-      tags.some((tag: string) => annotation.tags.includes(tag))
-    );
-  } else {
-    // All tags of "tags" are in the annotation tags
-    // Filter on: annotation has tag1 AND tag2 AND tag3...
-    output = output.filter(annotation =>
-      tags.every((tag: string) => annotation.tags.includes(tag))
-    );
-  }
+  let output = annotations.filter(annotation =>
+    tagFilterFunction(annotation.tags, tags, !tagsInclusive)
+  );
   // layerIdx === null <==> any layer
   if (layerIdx !== null) {
     const parentChannel = store.layers[layerIdx].channel;
