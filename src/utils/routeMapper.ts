@@ -20,14 +20,7 @@ export default function routeMapper(
     if (params[key] && obj.get() !== obj.parse(params[key])) {
       return obj.set(obj.parse(params[key]));
     } else {
-      return Promise.resolve(null);
-    }
-  };
-  const handleReset = (params: any, key: string, obj: IMapper<any>) => {
-    if (!params[key]) {
-      return obj.set(null);
-    } else {
-      return Promise.resolve(null);
+      return Promise.resolve();
     }
   };
 
@@ -37,14 +30,6 @@ export default function routeMapper(
       _from: Route,
       next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any
     ) {
-      const pr = Object.keys(params).map(key =>
-        handleReset(to.params, key, params[key])
-      );
-      const qr = Object.keys(query).map(key =>
-        handleReset(to.query, key, query[key])
-      );
-      await Promise.all([...pr, ...qr]);
-
       const ps = Object.keys(params).map(key =>
         handle(to.params, key, params[key])
       );

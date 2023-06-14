@@ -146,7 +146,7 @@
         :items-per-page="5"
         item-key="key"
         class="accent-1"
-        @click:row="item => loadSnapshot(item.name)"
+        @click:row="loadSnapshot"
       >
         <!-- Search bar -->
         <template v-slot:top>
@@ -887,7 +887,9 @@ export default class Snapshots extends Vue {
       );
     }
     if (this.bboxLayer) {
-      this.bboxLayer.mode(null);
+      if (this.bboxLayer.map().interactor()) {
+        this.bboxLayer.mode(null);
+      }
       this.bboxLayer.draw();
     }
     if (allDone !== true) {
@@ -924,8 +926,8 @@ export default class Snapshots extends Vue {
     return results;
   }
 
-  async loadSnapshot(name: string) {
-    const snapshot = await this.store.loadSnapshot(name);
+  async loadSnapshot(item: ISnapshotItem) {
+    const snapshot = await this.store.loadSnapshot(item.name);
     if (!snapshot) {
       return;
     }
