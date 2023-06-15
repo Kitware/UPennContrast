@@ -112,7 +112,7 @@ export class Main extends VuexModule {
     return this.configuration?.tools || [];
   }
 
-  get layers() {
+  get layers(): IDisplayLayer[] {
     const configurationLayers = this.configuration?.layers || [];
     // Use contrast from dataset view
     return configurationLayers.map(layer => {

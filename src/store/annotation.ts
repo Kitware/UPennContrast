@@ -440,7 +440,8 @@ export class Annotations extends VuexModule {
         channel,
         tile
       },
-      workerInterface
+      workerInterface,
+      main.layers
     );
 
     // Keep track of running jobs

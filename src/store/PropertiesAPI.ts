@@ -7,7 +7,8 @@ import {
   IWorkerImageList,
   IAnnotationPropertyConfiguration,
   IWorkerInterfaceValues,
-  IAnnotationLocation
+  IAnnotationLocation,
+  IDisplayLayer
 } from "./model";
 
 import { fetchAllPages } from "@/utils/fetch";
@@ -150,10 +151,15 @@ export default class PropertiesAPI {
       channel: Number;
       location: IAnnotationLocation;
       tile: IAnnotationLocation;
-    }
+    },
+    layers: IDisplayLayer[]
   ) {
     const { id, name, type, values } = tool;
     const { annotation, connectTo } = values;
+    const connectToLayerId = connectTo.layer;
+    const connectToLayer = layers.find(layer => layer.id === connectToLayerId);
+    const connectToChannel = connectToLayer ? connectToLayer.channel : null;
+    const augmentedConnectTo = { ...connectTo, channel: connectToChannel };
     const params = {
       datasetId,
       type,
@@ -164,7 +170,7 @@ export default class PropertiesAPI {
       assignment: metadata.location,
       tags: annotation.tags,
       tile: metadata.tile,
-      connectTo,
+      connectTo: augmentedConnectTo,
       workerInterface
     };
     return this.client.post(

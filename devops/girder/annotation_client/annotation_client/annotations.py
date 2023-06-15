@@ -191,7 +191,7 @@ class UPennContrastAnnotationClient:
         body = {
             "annotationsIds": annotationsIds,
             "tags": connectTo['tags'],
-            "channelId": connectTo['layer'] # TODO: doesn't work: connectTo['layer'] is a layer ID
+            "channelId": connectTo['channel']
         }
         
         return self.client.post(PATHS['connect_to_nearest'], json=body)
