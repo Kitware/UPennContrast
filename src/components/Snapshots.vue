@@ -734,10 +734,16 @@ export default class Snapshots extends Vue {
   showSnapshot(show: boolean) {
     const map = Vue.prototype.$currentMap;
     if (this.bboxHeight <= 0 && this.bboxWidth <= 0) {
-      this.bboxLeft = 0;
-      this.bboxTop = 0;
-      this.bboxRight = store.dataset?.width || 0;
-      this.bboxBottom = store.dataset?.height || 0;
+      const inset = 20; // in pixels
+      const topLeft = map.displayToGcs({ x: inset, y: inset });
+      const bottomRight = map.displayToGcs({
+        x: map.size().width - inset,
+        y: map.size().height - inset
+      });
+      this.bboxLeft = topLeft.x;
+      this.bboxTop = topLeft.y;
+      this.bboxRight = bottomRight.x;
+      this.bboxBottom = bottomRight.y;
     }
     if (show && map) {
       const bounds = map.bounds();
