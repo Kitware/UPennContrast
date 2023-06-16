@@ -42,7 +42,7 @@ import TagPicker from "@/components/TagPicker.vue";
 
 interface IRestrictionSetup {
   tags: string[];
-  layer: number | null;
+  layer: string | null;
   tagsInclusive?: boolean;
 }
 
@@ -58,7 +58,7 @@ export default class TagAndLayerRestriction extends Vue {
 
   newTags: string[] = [];
   areTagsInclusive: boolean = true;
-  selectedLayer: number | null = null;
+  selectedLayer: string | null = null;
 
   @Prop()
   readonly value?: IRestrictionSetup;

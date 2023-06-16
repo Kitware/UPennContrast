@@ -440,7 +440,8 @@ export class Annotations extends VuexModule {
         channel,
         tile
       },
-      workerInterface
+      workerInterface,
+      main.layers
     );
 
     // Keep track of running jobs
@@ -469,19 +470,16 @@ export class Annotations extends VuexModule {
       Z: main.z,
       Time: main.time
     };
-    const layers = main.layers;
-    if (!layers) {
-      return { location, channel: 0 };
-    }
 
-    const layer = layers[toolAnnotation.coordinateAssignments.layer];
-    const channel = layer.channel;
-    const assign = toolAnnotation.coordinateAssignments;
+    const layerId = toolAnnotation.coordinateAssignments.layer;
+    const layer = main.getLayerFromId(layerId);
+    const channel = layer?.channel ?? 0;
     if (layer) {
       const indexes = main.layerSliceIndexes(layer);
       if (indexes) {
         const { xyIndex, zIndex, tIndex } = indexes;
         location.XY = xyIndex;
+        const assign = toolAnnotation.coordinateAssignments;
         location.Z =
           assign.Z.type === "layer" ? zIndex : Number.parseInt(assign.Z.value);
         location.Time =

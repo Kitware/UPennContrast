@@ -34,7 +34,7 @@
     </v-row>
     <draggable
       v-bind="$attrs"
-      :value="indexedLayers"
+      :value="combinedLayers"
       :class="{ 'draggable-group': !singleLayer }"
       :animation="200"
       :fallbackOnBody="true"
@@ -44,12 +44,11 @@
       @input="update"
     >
       <transition-group type="transition">
-        <div v-for="indexedLayer in indexedLayers" :key="indexedLayer.layerIdx">
-          <display-layer
-            ref="displayLayers"
-            :value="indexedLayer.layer"
-            :index="indexedLayer.layerIdx"
-          />
+        <div
+          v-for="combinedLayer in combinedLayers"
+          :key="combinedLayer.layer.id"
+        >
+          <display-layer ref="displayLayers" :value="combinedLayer.layer" />
         </div>
       </transition-group>
     </draggable>
@@ -57,7 +56,7 @@
 </template>
 
 <script lang="ts">
-import { IIndexedLayer } from "@/store/model";
+import { ICombinedLayer } from "@/store/model";
 import { SortableEvent } from "sortablejs";
 import { Vue, Component, Prop } from "vue-property-decorator";
 import DisplayLayer from "./DisplayLayer.vue";
@@ -76,7 +75,7 @@ export default class DisplayLayerGroup extends Vue {
   readonly singleLayer!: boolean;
 
   @Prop()
-  readonly indexedLayers!: IIndexedLayer[];
+  readonly combinedLayers!: ICombinedLayer[];
 
   displayLayers: DisplayLayer[] = [];
 
@@ -110,7 +109,7 @@ export default class DisplayLayerGroup extends Vue {
     this.displayLayers.forEach(displayLayer => (displayLayer.visible = value));
   }
 
-  update(value: IIndexedLayer[]) {
+  update(value: ICombinedLayer[]) {
     this.$emit("update", value);
   }
 

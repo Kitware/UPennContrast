@@ -8,7 +8,8 @@ import {
   IToolConfiguration,
   IAnnotationConnectionBase,
   IWorkerInterfaceValues,
-  IAnnotationLocation
+  IAnnotationLocation,
+  IDisplayLayer
 } from "./model";
 
 import { logError } from "@/utils/log";
@@ -191,7 +192,8 @@ export default class AnnotationsAPI {
       location: IAnnotationLocation;
       tile: IAnnotationLocation;
     },
-    workerInterface: IWorkerInterfaceValues
+    workerInterface: IWorkerInterfaceValues,
+    layers: IDisplayLayer[]
   ) {
     const { id, name, type, values } = tool;
     const image = values.image.image;
@@ -210,6 +212,10 @@ export default class AnnotationsAPI {
       const computedTag = image + " job " + dateString;
       tags = [...tags, computedTag];
     }
+    const connectToLayerId = connectTo.layer;
+    const connectToLayer = layers.find(layer => layer.id === connectToLayerId);
+    const connectToChannel = connectToLayer ? connectToLayer.channel : null;
+    const augmentedConnectTo = { ...connectTo, channel: connectToChannel };
     const params = {
       datasetId,
       type,
@@ -220,7 +226,7 @@ export default class AnnotationsAPI {
       assignment: metadata.location,
       tags,
       tile: metadata.tile,
-      connectTo,
+      connectTo: augmentedConnectTo,
       workerInterface
     };
     return this.client.post(

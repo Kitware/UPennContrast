@@ -41,15 +41,20 @@ import {
 
 function filterAnnotations(
   annotations: IAnnotation[],
-  { tags, tagsInclusive, layer: layerIdx }: IRestrictTagsAndLayer
+  { tags, tagsInclusive, layerId }: IRestrictTagsAndLayer
 ) {
   let output = annotations.filter(annotation =>
     tagFilterFunction(annotation.tags, tags, !tagsInclusive)
   );
-  // layerIdx === null <==> any layer
-  if (layerIdx !== null) {
-    const parentChannel = store.layers[layerIdx].channel;
-    output = output.filter(annotation => annotation.channel === parentChannel);
+  // layerId === null <==> any layer
+  if (layerId !== null) {
+    const layer = store.getLayerFromId(layerId);
+    if (layer) {
+      const parentChannel = layer.channel;
+      output = output.filter(
+        annotation => annotation.channel === parentChannel
+      );
+    }
   }
   return output;
 }
@@ -965,10 +970,8 @@ export default class AnnotationViewer extends Vue {
     if (!newAnnotation) {
       return;
     }
-    const layerNumber = this.selectedTool?.values?.annotation
-      ?.coordinateAssignments?.layer;
-    const layerId =
-      typeof layerNumber === "number" ? this.layers[layerNumber].id : undefined;
+    const layerId = this.selectedTool?.values?.annotation?.coordinateAssignments
+      ?.layer;
 
     this.addAnnotation(newAnnotation, layerId);
     this.annotationLayer.removeAnnotation(annotation);
@@ -985,7 +988,7 @@ export default class AnnotationViewer extends Vue {
     if (connectTo && connectTo.tags && connectTo.tags.length) {
       // Find eligible annotations (matching tags and channel)
       const connectToChannel =
-        connectTo.layer === null ? null : this.layers[connectTo.layer].channel;
+        this.store.getLayerFromId(connectTo.layer)?.channel ?? null;
       const connections = await this.annotationStore.createConnections({
         annotationsIds: [annotation.id],
         tags: this.selectedTool.values.connectTo.tags,
@@ -1031,8 +1034,12 @@ export default class AnnotationViewer extends Vue {
       logError("Invalid snapping tool, annotation was not configured properly");
       return;
     }
-    const layer = location.layer;
-    const layerImage = mapentry.imageLayers[layer * 2];
+    const layerId = location.layer;
+    const layerIndex = this.store.getLayerIndexFromId(layerId);
+    if (layerIndex === null) {
+      return;
+    }
+    const layerImage = mapentry.imageLayers[layerIndex * 2];
     if (!layerImage) {
       return;
     }

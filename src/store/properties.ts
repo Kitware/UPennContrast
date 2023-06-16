@@ -297,11 +297,18 @@ export class Properties extends VuexModule {
     );
     const tile = { XY: main.xy, Z: main.z, Time: main.time };
     this.propertiesAPI
-      .requestWorkerPreview(image, tool, datasetId, workerInterface, {
-        location,
-        channel,
-        tile
-      })
+      .requestWorkerPreview(
+        image,
+        tool,
+        datasetId,
+        workerInterface,
+        {
+          location,
+          channel,
+          tile
+        },
+        main.layers
+      )
       .then((response: any) => {
         // Keep track of running jobs
         const job = response.data[0];
