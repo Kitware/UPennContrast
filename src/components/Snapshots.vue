@@ -34,45 +34,55 @@
             <v-card-title>
               Create New Snapshot
             </v-card-title>
-            <v-card-text
-              title="Add a name, description, or tags to create a new snapshot."
+            <v-form
+              lazy-validation
+              ref="saveSnapshotForm"
+              @input="updateFormValidation"
+              @submit="saveSnapshot"
             >
-              <v-row>
-                <v-col>
-                  <v-text-field
-                    label="Snapshot name"
-                    v-model="newName"
-                    dense
-                    hide-details
-                  />
-                </v-col>
-              </v-row>
-              <v-row>
-                <v-col>
-                  <tag-picker v-model="newTags" />
-                </v-col>
-              </v-row>
-              <v-row>
-                <v-col>
-                  <v-text-field
-                    label="Snapshot description"
-                    v-model="newDescription"
-                    dense
-                    hide-details
-                  />
-                </v-col>
-              </v-row>
-            </v-card-text>
-            <v-card-actions>
-              <v-spacer />
-              <v-btn
-                color="primary"
-                :disabled="!newName.trim()"
-                @click="saveSnapshot"
+              <v-card-text
+                title="Add a name, description, or tags to create a new snapshot."
               >
-                Create
-              </v-btn>
-            </v-card-actions>
+                <v-row>
+                  <v-col>
+                    <v-text-field
+                      label="Snapshot name"
+                      v-model="newName"
+                      dense
+                      hide-details
+                      autofocus
+                      :rules="nameRules"
+                      required
+                    />
+                  </v-col>
+                </v-row>
+                <v-row>
+                  <v-col>
+                    <tag-picker v-model="newTags" />
+                  </v-col>
+                </v-row>
+                <v-row>
+                  <v-col>
+                    <v-text-field
+                      label="Snapshot description"
+                      v-model="newDescription"
+                      dense
+                      hide-details
+                    />
+                  </v-col>
+                </v-row>
+              </v-card-text>
+              <v-card-actions>
+                <v-spacer />
+                <v-btn
+                  color="primary"
+                  :disabled="!isSaveSnapshotValid"
+                  type="submit"
+                >
+                  Create
+                </v-btn>
+              </v-card-actions>
+            </v-form>
           </v-card>
         </v-dialog>
       </v-row>
@@ -352,6 +362,13 @@ export default class Snapshots extends Vue {
   newName: string = "";
   newDescription: string = "";
   newTags: string[] = [];
+  readonly nameRules = [(name: string) => !!name.trim() || "Name is required"];
+  isSaveSnapshotValid: boolean = true;
+
+  $refs!: {
+    // https://github.com/vuetifyjs/vuetify/issues/5962
+    saveSnapshotForm: HTMLFormElement;
+  };
 
   snapshotSearch: string = "";
 
@@ -365,6 +382,12 @@ export default class Snapshots extends Vue {
   exportLayer: "all" | "composite" | string = "all";
   exportChannel: "all" | number = "all";
   format: string = "png";
+
+  mounted() {
+    this.isSaveSnapshotValid = true;
+    // const formElem = this.$refs.saveSnapshotForm;
+    // formElem.resetValidation();
+  }
 
   get formatList() {
     if (this.downloadMode === "layers") {
@@ -992,8 +1015,23 @@ export default class Snapshots extends Vue {
     this.markCurrentArea();
   }
 
+  updateFormValidation() {
+    const formElem = this.$refs.saveSnapshotForm;
+    if (formElem) {
+      this.isSaveSnapshotValid = formElem.validate();
+    }
+  }
+
+  resetFormValidation() {
+    const formElem = this.$refs.saveSnapshotForm;
+    if (formElem) {
+      formElem.resetValidation();
+    }
+  }
+
   saveSnapshot(): void {
-    if (!this.newName.trim()) {
+    this.updateFormValidation();
+    if (!this.isSaveSnapshotValid) {
       return;
     }
     const map = Vue.prototype.$currentMap;
@@ -1028,15 +1066,16 @@ export default class Snapshots extends Vue {
         }
       }
     };
-    this.reset();
+    this.resetAndCloseForm();
     this.store.addSnapshot(snapshot);
   }
 
-  reset() {
+  resetAndCloseForm() {
     this.createDialog = false;
     this.newName = "";
     this.newDescription = "";
     this.newTags = [];
+    this.resetFormValidation();
   }
 
   removeSnapshot(name: string): void {
