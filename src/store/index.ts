@@ -1270,17 +1270,6 @@ export class Main extends VuexModule {
     await this.syncSnapshots();
   }
 
-  @Mutation
-  public loadSnapshotImpl(snapshot: { [key: string]: any }) {
-    this.unrollXY = snapshot.unrollXY;
-    this.unrollZ = snapshot.unrollZ;
-    this.unrollT = snapshot.unrollT;
-    this.xy = snapshot.xy;
-    this.z = snapshot.z;
-    this.time = snapshot.time;
-    this.layerMode = snapshot.layerMode;
-  }
-
   @Action
   async setConfigurationLayers(layers: IDisplayLayer[]) {
     if (!this.configuration) {
@@ -1291,20 +1280,36 @@ export class Main extends VuexModule {
     await this.syncConfiguration("layers");
   }
 
+  @Mutation
+  resetDatasetViewContrasts() {
+    if (!this.datasetView) {
+      return;
+    }
+    Vue.set(this.datasetView, "layerContrasts", {});
+    this.api.updateDatasetView(this.datasetView);
+  }
+
+  @Mutation
+  setDatasetViewContrasts(contrasts: IDatasetView["layerContrasts"]) {
+    if (!this.datasetView) {
+      return;
+    }
+    Vue.set(this.datasetView, "layerContrasts", contrasts);
+    this.api.updateDatasetView(this.datasetView);
+  }
+
   @Action
-  async loadSnapshot(name: string): Promise<ISnapshot | undefined> {
-    if (!this.configuration || !this.dataset) {
-      return;
-    }
-    const snapshot = this.configuration.snapshots?.find(d => d.name == name);
-    if (!snapshot) {
-      return;
-    }
-    // TODO: this loads the snapshot layers, overriding contrasts, existing layers...
+  async loadSnapshotLayersInConfiguration(snapshot: ISnapshot) {
     await this.setConfigurationLayers(snapshot.layers);
-    // note that this doesn't set viewport, snapshot name, description, tags,
-    // map rotation, or screenshot parameters
-    return snapshot;
+  }
+
+  @Action
+  async loadLayersContrastsInDatasetView(layers: IDisplayLayer[]) {
+    const contrasts: IDatasetView["layerContrasts"] = {};
+    for (const layer of layers) {
+      contrasts[layer.id] = layer.contrast;
+    }
+    this.setDatasetViewContrasts(contrasts);
   }
 
   @Action

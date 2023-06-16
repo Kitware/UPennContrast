@@ -1,278 +1,310 @@
 <template>
-  <v-card v-if="store.configuration">
-    <v-card-title class="headline">
-      Snapshot
-    </v-card-title>
+  <div>
+    <v-card v-if="store.configuration">
+      <v-card-title class="headline">
+        Snapshot
+      </v-card-title>
 
-    <v-dialog v-model="imageTooBigDialog">
-      <v-alert class="ma-0" type="error">
-        <div class="title">
-          Image can't be downloaded
-        </div>
-        <div class="ma-2">
-          Image size can't exceed {{ maxPixels }} pixels.<br />
-          When downloading raw channels, subsampling is not allowed.<br />
-          Downloading layers allows subsampling image to {{ maxPixels }} pixels
-          if the image is too big.
-        </div>
-        <div class="d-flex">
-          <v-spacer />
-          <v-btn @click="imageTooBigDialog = false">OK</v-btn>
+      <v-dialog v-model="imageTooBigDialog">
+        <v-alert class="ma-0" type="error">
+          <div class="title">
+            Image can't be downloaded
+          </div>
+          <div class="ma-2">
+            Image size can't exceed {{ maxPixels }} pixels.<br />
+            When downloading raw channels, subsampling is not allowed.<br />
+            Downloading layers allows subsampling image to
+            {{ maxPixels }} pixels if the image is too big.
+          </div>
+          <div class="d-flex">
+            <v-spacer />
+            <v-btn @click="imageTooBigDialog = false">OK</v-btn>
+          </div>
+        </v-alert>
+      </v-dialog>
+
+      <v-card-text>
+        <v-row justify="center">
+          <v-dialog v-model="createDialog">
+            <template v-slot:activator="{ on, attrs }">
+              <v-btn color="primary" v-on="on" v-bind="attrs">
+                Save as Snapshot...
+              </v-btn>
+            </template>
+            <v-card>
+              <v-card-title>
+                Create New Snapshot
+              </v-card-title>
+              <v-form
+                lazy-validation
+                ref="saveSnapshotForm"
+                @input="updateFormValidation"
+                @submit="saveSnapshot"
+              >
+                <v-card-text
+                  title="Add a name, description, or tags to create a new snapshot."
+                >
+                  <v-row>
+                    <v-col>
+                      <v-text-field
+                        label="Snapshot name"
+                        v-model="newName"
+                        dense
+                        hide-details
+                        autofocus
+                        :rules="nameRules"
+                        required
+                      />
+                    </v-col>
+                  </v-row>
+                  <v-row>
+                    <v-col>
+                      <tag-picker v-model="newTags" />
+                    </v-col>
+                  </v-row>
+                  <v-row>
+                    <v-col>
+                      <v-text-field
+                        label="Snapshot description"
+                        v-model="newDescription"
+                        dense
+                        hide-details
+                      />
+                    </v-col>
+                  </v-row>
+                </v-card-text>
+                <v-card-actions>
+                  <v-spacer />
+                  <v-btn
+                    color="primary"
+                    :disabled="!isSaveSnapshotValid"
+                    type="submit"
+                  >
+                    Create
+                  </v-btn>
+                </v-card-actions>
+              </v-form>
+            </v-card>
+          </v-dialog>
+        </v-row>
+        <v-row :currentArea="markCurrentArea()">
+          <v-col class="title">
+            Resolution and Area:
+          </v-col>
+        </v-row>
+        <v-row v-if="store.dataset">
+          <v-col>
+            <v-text-field
+              label="Left"
+              v-model="bboxLeft"
+              type="number"
+              :max="store.dataset.width"
+              dense
+              hide-details
+            />
+          </v-col>
+          <v-col>
+            <v-text-field
+              label="Top"
+              v-model="bboxTop"
+              type="number"
+              :max="store.dataset.height"
+              dense
+              hide-details
+            />
+          </v-col>
+          <v-col>
+            <v-text-field
+              label="Width"
+              v-model="bboxWidth"
+              type="number"
+              :max="store.dataset.width"
+              dense
+              hide-details
+            />
+          </v-col>
+          <v-col>
+            <v-text-field
+              label="Height"
+              v-model="bboxHeight"
+              type="number"
+              :max="store.dataset.height"
+              dense
+              hide-details
+            />
+          </v-col>
+        </v-row>
+        <v-row justify="center">
+          <v-btn
+            class="my-2"
+            @click="setArea('viewport')"
+            :disabled="isRotated()"
+          >
+            Set frame to current viewport
+          </v-btn>
+          <v-btn class="my-2" @click="setArea('full')">
+            Set frame to maximum
+          </v-btn>
+        </v-row>
+      </v-card-text>
+
+      <v-divider />
+
+      <v-card-text>
+        <v-data-table
+          :items="snapshotList()"
+          :headers="tableHeaders"
+          :items-per-page="5"
+          item-key="key"
+          class="accent-1"
+          @click:row="loadSnapshot"
+        >
+          <!-- Search bar -->
+          <template v-slot:top>
+            <v-text-field
+              label="Filter by name..."
+              v-model="snapshotSearch"
+              clearable
+              hide-details
+              class="ma-2"
+            />
+          </template>
+          <!-- Tags -->
+          <template v-slot:item.tags="{ item }">
+            <v-chip
+              v-for="t in item.record.tags"
+              :key="'tag_' + item.name + '_' + t"
+              @click.stop="snapshotSearch = t"
+              x-small
+              >{{ t }}</v-chip
+            >
+          </template>
+          <!-- Delete icon -->
+          <template v-slot:item.delete="{ item }">
+            <v-btn
+              fab
+              small
+              color="red"
+              @click.stop="removeSnapshot(item.name)"
+            >
+              <v-icon>mdi-trash-can</v-icon>
+            </v-btn>
+          </template>
+        </v-data-table>
+      </v-card-text>
+
+      <v-divider />
+
+      <v-card-title class="headline">
+        Download
+      </v-card-title>
+      <v-card-text>
+        <v-row>
+          <v-col cols="5">
+            <v-radio-group v-model="downloadMode">
+              <v-radio label="Scaled Layers" value="layers" />
+              <v-radio label="Raw channels" value="channels" />
+            </v-radio-group>
+          </v-col>
+          <v-col>
+            <v-select
+              v-if="downloadMode === 'layers'"
+              v-model="exportLayer"
+              :items="layerItems"
+              label="Layer"
+              dense
+              hide-details
+            />
+            <v-select
+              v-if="downloadMode === 'channels'"
+              v-model="exportChannel"
+              :items="channelItems"
+              label="Channel"
+              dense
+              hide-details
+            />
+          </v-col>
+        </v-row>
+        <v-row>
+          <v-col>
+            <v-select
+              v-model="format"
+              :items="formatList"
+              label="Format"
+              dense
+              hide-details
+            />
+          </v-col>
+        </v-row>
+        <v-row>
+          <v-col>
+            <v-slider
+              v-if="format === 'jpeg'"
+              label="JPEG Quality"
+              v-model="jpegQuality"
+              min="80"
+              max="95"
+              step="5"
+            >
+              <template v-slot:append>
+                <v-text-field
+                  v-model="jpegQuality"
+                  class="mt-0 pt-0"
+                  type="number"
+                  step="5"
+                  style="width: 3em"
+                />
+              </template>
+            </v-slider>
+          </v-col>
+        </v-row>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer />
+        <v-btn
+          color="primary"
+          @click="getDownload()"
+          :disabled="unroll || downloading"
+        >
+          <v-progress-circular v-if="downloading" indeterminate />
+          Download Snapshot images...
+        </v-btn>
+      </v-card-actions>
+
+      <v-divider />
+
+      <div class="d-flex pa-4 justify-center">
+        <v-btn color="primary" @click="screenshotViewport()">
+          Download Screenshot of Current Viewport
+        </v-btn>
+      </div>
+    </v-card>
+    <v-dialog width="min-content" v-model="layersOverwritePanel" persistent>
+      <v-alert prominent type="warning" class="ma-0">
+        <div>
+          <v-card-title>
+            Snaphsot layers incompatibility
+          </v-card-title>
+          <v-card-text>
+            The selected snapshot layers are not compatible with the current
+            configuration layers. It can be because some layers have been
+            removed or because layer channels have changed.
+          </v-card-text>
+          <v-card-actions class="d-flex justify-end">
+            <v-btn @click="overwriteConfigurationLayers" color="red">
+              Overwrite configuration layers
+            </v-btn>
+            <v-btn @click="changeDatasetViewContrasts" color="secondary">
+              Try to apply contrasts anyway
+            </v-btn>
+            <v-btn @click="layersOverwritePanel = false" color="primary">
+              Don't change layers
+            </v-btn>
+          </v-card-actions>
         </div>
       </v-alert>
     </v-dialog>
-
-    <v-card-text>
-      <v-row justify="center">
-        <v-dialog v-model="createDialog">
-          <template v-slot:activator="{ on, attrs }">
-            <v-btn color="primary" v-on="on" v-bind="attrs">
-              Save as Snapshot...
-            </v-btn>
-          </template>
-          <v-card>
-            <v-card-title>
-              Create New Snapshot
-            </v-card-title>
-            <v-form
-              lazy-validation
-              ref="saveSnapshotForm"
-              @input="updateFormValidation"
-              @submit="saveSnapshot"
-            >
-              <v-card-text
-                title="Add a name, description, or tags to create a new snapshot."
-              >
-                <v-row>
-                  <v-col>
-                    <v-text-field
-                      label="Snapshot name"
-                      v-model="newName"
-                      dense
-                      hide-details
-                      autofocus
-                      :rules="nameRules"
-                      required
-                    />
-                  </v-col>
-                </v-row>
-                <v-row>
-                  <v-col>
-                    <tag-picker v-model="newTags" />
-                  </v-col>
-                </v-row>
-                <v-row>
-                  <v-col>
-                    <v-text-field
-                      label="Snapshot description"
-                      v-model="newDescription"
-                      dense
-                      hide-details
-                    />
-                  </v-col>
-                </v-row>
-              </v-card-text>
-              <v-card-actions>
-                <v-spacer />
-                <v-btn
-                  color="primary"
-                  :disabled="!isSaveSnapshotValid"
-                  type="submit"
-                >
-                  Create
-                </v-btn>
-              </v-card-actions>
-            </v-form>
-          </v-card>
-        </v-dialog>
-      </v-row>
-      <v-row :currentArea="markCurrentArea()">
-        <v-col class="title">
-          Resolution and Area:
-        </v-col>
-      </v-row>
-      <v-row v-if="store.dataset">
-        <v-col>
-          <v-text-field
-            label="Left"
-            v-model="bboxLeft"
-            type="number"
-            :max="store.dataset.width"
-            dense
-            hide-details
-          />
-        </v-col>
-        <v-col>
-          <v-text-field
-            label="Top"
-            v-model="bboxTop"
-            type="number"
-            :max="store.dataset.height"
-            dense
-            hide-details
-          />
-        </v-col>
-        <v-col>
-          <v-text-field
-            label="Width"
-            v-model="bboxWidth"
-            type="number"
-            :max="store.dataset.width"
-            dense
-            hide-details
-          />
-        </v-col>
-        <v-col>
-          <v-text-field
-            label="Height"
-            v-model="bboxHeight"
-            type="number"
-            :max="store.dataset.height"
-            dense
-            hide-details
-          />
-        </v-col>
-      </v-row>
-      <v-row justify="center">
-        <v-btn
-          class="my-2"
-          @click="setArea('viewport')"
-          :disabled="isRotated()"
-        >
-          Set frame to current viewport
-        </v-btn>
-        <v-btn class="my-2" @click="setArea('full')">
-          Set frame to maximum
-        </v-btn>
-      </v-row>
-    </v-card-text>
-
-    <v-divider />
-
-    <v-card-text>
-      <v-data-table
-        :items="snapshotList()"
-        :headers="tableHeaders"
-        :items-per-page="5"
-        item-key="key"
-        class="accent-1"
-        @click:row="loadSnapshot"
-      >
-        <!-- Search bar -->
-        <template v-slot:top>
-          <v-text-field
-            label="Filter by name..."
-            v-model="snapshotSearch"
-            clearable
-            hide-details
-            class="ma-2"
-          />
-        </template>
-        <!-- Tags -->
-        <template v-slot:item.tags="{ item }">
-          <v-chip
-            v-for="t in item.record.tags"
-            :key="'tag_' + item.name + '_' + t"
-            @click.stop="snapshotSearch = t"
-            x-small
-            >{{ t }}</v-chip
-          >
-        </template>
-        <!-- Delete icon -->
-        <template v-slot:item.delete="{ item }">
-          <v-btn fab small color="red" @click.stop="removeSnapshot(item.name)">
-            <v-icon>mdi-trash-can</v-icon>
-          </v-btn>
-        </template>
-      </v-data-table>
-    </v-card-text>
-
-    <v-divider />
-
-    <v-card-title class="headline">
-      Download
-    </v-card-title>
-    <v-card-text>
-      <v-row>
-        <v-col cols="5">
-          <v-radio-group v-model="downloadMode">
-            <v-radio label="Scaled Layers" value="layers" />
-            <v-radio label="Raw channels" value="channels" />
-          </v-radio-group>
-        </v-col>
-        <v-col>
-          <v-select
-            v-if="downloadMode === 'layers'"
-            v-model="exportLayer"
-            :items="layerItems"
-            label="Layer"
-            dense
-            hide-details
-          />
-          <v-select
-            v-if="downloadMode === 'channels'"
-            v-model="exportChannel"
-            :items="channelItems"
-            label="Channel"
-            dense
-            hide-details
-          />
-        </v-col>
-      </v-row>
-      <v-row>
-        <v-col>
-          <v-select
-            v-model="format"
-            :items="formatList"
-            label="Format"
-            dense
-            hide-details
-          />
-        </v-col>
-      </v-row>
-      <v-row>
-        <v-col>
-          <v-slider
-            v-if="format === 'jpeg'"
-            label="JPEG Quality"
-            v-model="jpegQuality"
-            min="80"
-            max="95"
-            step="5"
-          >
-            <template v-slot:append>
-              <v-text-field
-                v-model="jpegQuality"
-                class="mt-0 pt-0"
-                type="number"
-                step="5"
-                style="width: 3em"
-              />
-            </template>
-          </v-slider>
-        </v-col>
-      </v-row>
-    </v-card-text>
-    <v-card-actions>
-      <v-spacer />
-      <v-btn
-        color="primary"
-        @click="getDownload()"
-        :disabled="unroll || downloading"
-      >
-        <v-progress-circular v-if="downloading" indeterminate />
-        Download Snapshot images...
-      </v-btn>
-    </v-card-actions>
-
-    <v-divider />
-
-    <div class="d-flex pa-4 justify-center">
-      <v-btn color="primary" @click="screenshotViewport()">
-        Download Screenshot of Current Viewport
-      </v-btn>
-    </div>
-  </v-card>
+  </div>
 </template>
 
 <script lang="ts">
@@ -297,7 +329,7 @@ import { DeflateOptions, Zip, ZipDeflate } from "fflate";
 interface ISnapshotItem {
   name: string;
   key: string;
-  record: any;
+  record: ISnapshot;
   modified: string;
 }
 
@@ -382,6 +414,9 @@ export default class Snapshots extends Vue {
   exportLayer: "all" | "composite" | string = "all";
   exportChannel: "all" | number = "all";
   format: string = "png";
+
+  layersOverwritePanel: boolean = false;
+  overwrittingLayers: IDisplayLayer[] = [];
 
   mounted() {
     this.isSaveSnapshotValid = true;
@@ -955,10 +990,39 @@ export default class Snapshots extends Vue {
     return results;
   }
 
+  areCurrentLayersCompatible(snapshot: ISnapshot) {
+    // Returns true if all layers of the snapshot also exist in the store and have the same channel
+    const currentLayers = this.store.layers;
+    return snapshot.layers.every(snapshotLayer => {
+      const storeLayer = currentLayers.find(
+        layer => layer.id === snapshotLayer.id
+      );
+      return !!storeLayer && storeLayer.channel === snapshotLayer.channel;
+    });
+  }
+
+  openConfigurationLayersOverwritePanel(layers: IDisplayLayer[]) {
+    this.layersOverwritePanel = true;
+    this.overwrittingLayers = layers;
+  }
+
+  changeDatasetViewContrasts() {
+    this.store.loadLayersContrastsInDatasetView(this.overwrittingLayers);
+    this.layersOverwritePanel = false;
+  }
+
+  overwriteConfigurationLayers() {
+    this.store.setConfigurationLayers(this.overwrittingLayers);
+    this.store.resetDatasetViewContrasts();
+    this.layersOverwritePanel = false;
+  }
+
   async loadSnapshot(item: ISnapshotItem) {
-    const snapshot = await this.store.loadSnapshot(item.name);
-    if (!snapshot) {
-      return;
+    const snapshot = item.record;
+    if (this.areCurrentLayersCompatible(snapshot)) {
+      await this.store.loadLayersContrastsInDatasetView(snapshot.layers);
+    } else {
+      this.openConfigurationLayersOverwritePanel(snapshot.layers);
     }
     this.newName = snapshot.name || "";
     this.newDescription = snapshot.description || "";
