@@ -825,8 +825,8 @@ export class Main extends VuexModule {
 
     if (mode === "single") {
       this.verifySingleLayerMode();
+      await this.syncConfiguration("layers");
     }
-    await this.syncConfiguration("layers");
   }
 
   @Action
@@ -1299,8 +1299,22 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async loadSnapshotLayersInConfiguration(snapshot: ISnapshot) {
-    await this.setConfigurationLayers(snapshot.layers);
+  async loadSnapshotLayers(snapshot: ISnapshot) {
+    await this.setLayerMode(snapshot.layerMode);
+    await this.loadLayersContrastsInDatasetView(snapshot.layers);
+    await this.loadLayersVisibilityInConfiguration(snapshot.layers);
+  }
+
+  @Action
+  async loadLayersVisibilityInConfiguration(layers: IDisplayLayer[]) {
+    for (const layer of layers) {
+      this.changeLayer({
+        layerId: layer.id,
+        delta: { visible: layer.visible },
+        sync: false
+      });
+    }
+    await this.syncConfiguration("layers");
   }
 
   @Action

@@ -283,7 +283,7 @@
       <v-alert prominent type="warning" class="ma-0">
         <div>
           <v-card-title>
-            Snaphsot layers incompatibility
+            Snapshot layers incompatibility
           </v-card-title>
           <v-card-text>
             The selected snapshot layers are not compatible with the current
@@ -298,7 +298,7 @@
               Try to apply contrasts anyway
             </v-btn>
             <v-btn @click="layersOverwritePanel = false" color="primary">
-              Don't change layers
+              Do not change layers
             </v-btn>
           </v-card-actions>
         </div>
@@ -416,13 +416,7 @@ export default class Snapshots extends Vue {
   format: string = "png";
 
   layersOverwritePanel: boolean = false;
-  overwrittingLayers: IDisplayLayer[] = [];
-
-  mounted() {
-    this.isSaveSnapshotValid = true;
-    // const formElem = this.$refs.saveSnapshotForm;
-    // formElem.resetValidation();
-  }
+  overwrittingSnaphot: ISnapshot | null = null;
 
   get formatList() {
     if (this.downloadMode === "layers") {
@@ -1001,28 +995,35 @@ export default class Snapshots extends Vue {
     });
   }
 
-  openConfigurationLayersOverwritePanel(layers: IDisplayLayer[]) {
+  openConfigurationLayersOverwritePanel(snapshot: ISnapshot) {
     this.layersOverwritePanel = true;
-    this.overwrittingLayers = layers;
+    this.overwrittingSnaphot = snapshot;
   }
 
   changeDatasetViewContrasts() {
-    this.store.loadLayersContrastsInDatasetView(this.overwrittingLayers);
+    if (this.overwrittingSnaphot) {
+      this.store.loadSnapshotLayers(this.overwrittingSnaphot);
+      this.overwrittingSnaphot = null;
+    }
     this.layersOverwritePanel = false;
   }
 
   overwriteConfigurationLayers() {
-    this.store.setConfigurationLayers(this.overwrittingLayers);
-    this.store.resetDatasetViewContrasts();
+    const layers = this.overwrittingSnaphot?.layers;
+    if (layers) {
+      this.store.setConfigurationLayers(layers);
+      this.overwrittingSnaphot = null;
+      this.store.resetDatasetViewContrasts();
+    }
     this.layersOverwritePanel = false;
   }
 
   async loadSnapshot(item: ISnapshotItem) {
     const snapshot = item.record;
     if (this.areCurrentLayersCompatible(snapshot)) {
-      await this.store.loadLayersContrastsInDatasetView(snapshot.layers);
+      await this.store.loadSnapshotLayers(snapshot);
     } else {
-      this.openConfigurationLayersOverwritePanel(snapshot.layers);
+      this.openConfigurationLayersOverwritePanel(snapshot);
     }
     this.newName = snapshot.name || "";
     this.newDescription = snapshot.description || "";
