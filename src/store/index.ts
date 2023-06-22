@@ -15,7 +15,6 @@ import { getLayerImages, getLayerSliceIndexes } from "./images";
 import {
   IDataset,
   IDatasetConfiguration,
-  IDatasetConfigurationMeta,
   IDisplayLayer,
   IImage,
   newLayer,
@@ -29,7 +28,8 @@ import {
   AnnotationNames,
   AnnotationShape,
   IDatasetView,
-  IContrast
+  IContrast,
+  IMapEntry
 } from "./model";
 
 import persister from "./Persister";
@@ -87,6 +87,8 @@ export class Main extends VuexModule {
   unrollZ: boolean = false;
   unrollT: boolean = false;
   snapshot?: string;
+
+  maps: IMapEntry[] = [];
 
   isAnnotationPanelOpen: boolean = false;
   annotationPanelBadge: boolean = false;

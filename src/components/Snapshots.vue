@@ -318,6 +318,7 @@ import {
   IDisplayLayer,
   IGeoJSAnnotation,
   IGeoJSLayer,
+  IGeoJSMap,
   IImage,
   ISnapshot,
   copyLayerWithoutPrivateAttributes
@@ -461,9 +462,16 @@ export default class Snapshots extends Vue {
     return store.unroll;
   }
 
+  get geoJSMaps() {
+    return this.store.maps.map(map => map.map);
+  }
+
+  get firstMap(): IGeoJSMap | undefined {
+    return this.geoJSMaps[0];
+  }
+
   isRotated(): boolean {
-    const map = Vue.prototype.$currentMap;
-    return map && !!map.rotation();
+    return this.geoJSMaps.some(map => !!map.rotation());
   }
 
   get layerItems() {
@@ -552,11 +560,14 @@ export default class Snapshots extends Vue {
   }
 
   async screenshotViewport() {
-    const map = Vue.prototype.$currentMap;
+    const map = this.firstMap;
+    if (!map) {
+      return;
+    }
     const layers = map
       .layers()
       .filter(
-        (layer: any) =>
+        layer =>
           layer !== this.bboxLayer &&
           layer.node().css("visibility") !== "hidden"
       );
@@ -783,8 +794,21 @@ export default class Snapshots extends Vue {
     );
   }
 
+  @Watch("firstMap")
+  resetBboxLayer() {
+    if (this.snapshotVisible) {
+      this.showSnapshot(false);
+      this.showSnapshot(true);
+      this.markCurrentArea();
+      this.drawBoundingBox();
+    }
+  }
+
   showSnapshot(show: boolean) {
-    const map = Vue.prototype.$currentMap;
+    const map = this.firstMap;
+    if (!map) {
+      return;
+    }
     if (this.bboxHeight <= 0 && this.bboxWidth <= 0) {
       const inset = 20; // in pixels
       const topLeft = map.displayToGcs({ x: inset, y: inset });
@@ -877,9 +901,9 @@ export default class Snapshots extends Vue {
       { x: this.bboxRight, y: this.bboxBottom },
       { x: this.bboxLeft, y: this.bboxBottom }
     ];
-    if (this.bboxLayer && this.bboxAnnotation) {
+    const map = this.firstMap;
+    if (this.bboxLayer && this.bboxAnnotation && map) {
       this.bboxLayer.visible(true);
-      const map = Vue.prototype.$currentMap;
       coordinates = geojs.transform.transformCoordinates(
         map.ingcs(),
         map.gcs(),
@@ -895,7 +919,10 @@ export default class Snapshots extends Vue {
   }
 
   setArea(mode: string) {
-    const map = Vue.prototype.$currentMap;
+    const map = this.firstMap;
+    if (!map) {
+      return;
+    }
     if (mode === "full" && store.dataset) {
       this.setBoundingBox(0, 0, store.dataset.width, store.dataset.height);
     } else if (mode === "viewport" && map && store.dataset) {
@@ -911,7 +938,10 @@ export default class Snapshots extends Vue {
       this.bboxLayer.mode(this.bboxLayer.modes.edit, this.bboxAnnotation);
       this.bboxLayer.draw();
     }
-    const map = Vue.prototype.$currentMap;
+    const map = this.firstMap;
+    if (!map) {
+      return;
+    }
     map.geoOff(geojs.event.annotation.mode, this.doneBoundingBox);
     map.geoOff(geojs.event.annotation.coordinates, this.boundingBoxCoordinates);
     map.geoOn(geojs.event.annotation.mode, this.doneBoundingBox);
@@ -932,7 +962,10 @@ export default class Snapshots extends Vue {
   }
 
   doneBoundingBox(allDone: boolean) {
-    const map = Vue.prototype.$currentMap;
+    const map = this.firstMap;
+    if (!map) {
+      return;
+    }
     map.geoOff(geojs.event.annotation.mode, this.doneBoundingBox);
     map.geoOff(geojs.event.annotation.coordinates, this.boundingBoxCoordinates);
     const coord = this.bboxAnnotation?.coordinates();
@@ -1034,7 +1067,7 @@ export default class Snapshots extends Vue {
     this.bboxRight = snapshot.screenshot!.bbox!.right;
     this.bboxBottom = snapshot.screenshot!.bbox!.bottom;
 
-    this.$router
+    await this.$router
       .replace({
         query: {
           ...this.$route.query,
@@ -1049,7 +1082,10 @@ export default class Snapshots extends Vue {
       })
       .catch(() => {}); /* catch redundant navigation warnings */
 
-    const map = Vue.prototype.$currentMap;
+    const map = this.firstMap;
+    if (!map) {
+      return;
+    }
     map.bounds({
       left: Math.min(
         snapshot.viewport.tl.x,
@@ -1096,10 +1132,10 @@ export default class Snapshots extends Vue {
 
   saveSnapshot(): void {
     this.updateFormValidation();
-    if (!this.isSaveSnapshotValid) {
+    const map = this.firstMap;
+    if (!this.isSaveSnapshotValid || !map) {
       return;
     }
-    const map = Vue.prototype.$currentMap;
     const snapshot: ISnapshot = {
       name: this.newName.trim(),
       description: this.newDescription.trim(),
