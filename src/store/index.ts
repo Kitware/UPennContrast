@@ -15,7 +15,6 @@ import { getLayerImages, getLayerSliceIndexes } from "./images";
 import {
   IDataset,
   IDatasetConfiguration,
-  IDatasetConfigurationMeta,
   IDisplayLayer,
   IImage,
   newLayer,
@@ -29,7 +28,8 @@ import {
   AnnotationNames,
   AnnotationShape,
   IDatasetView,
-  IContrast
+  IContrast,
+  IMapEntry
 } from "./model";
 
 import persister from "./Persister";
@@ -87,6 +87,8 @@ export class Main extends VuexModule {
   unrollZ: boolean = false;
   unrollT: boolean = false;
   snapshot?: string;
+
+  maps: IMapEntry[] = [];
 
   isAnnotationPanelOpen: boolean = false;
   annotationPanelBadge: boolean = false;
@@ -825,8 +827,8 @@ export class Main extends VuexModule {
 
     if (mode === "single") {
       this.verifySingleLayerMode();
+      await this.syncConfiguration("layers");
     }
-    await this.syncConfiguration("layers");
   }
 
   @Action
@@ -1270,17 +1272,6 @@ export class Main extends VuexModule {
     await this.syncSnapshots();
   }
 
-  @Mutation
-  public loadSnapshotImpl(snapshot: { [key: string]: any }) {
-    this.unrollXY = snapshot.unrollXY;
-    this.unrollZ = snapshot.unrollZ;
-    this.unrollT = snapshot.unrollT;
-    this.xy = snapshot.xy;
-    this.z = snapshot.z;
-    this.time = snapshot.time;
-    this.layerMode = snapshot.layerMode;
-  }
-
   @Action
   async setConfigurationLayers(layers: IDisplayLayer[]) {
     if (!this.configuration) {
@@ -1291,20 +1282,50 @@ export class Main extends VuexModule {
     await this.syncConfiguration("layers");
   }
 
+  @Mutation
+  resetDatasetViewContrasts() {
+    if (!this.datasetView) {
+      return;
+    }
+    Vue.set(this.datasetView, "layerContrasts", {});
+    this.api.updateDatasetView(this.datasetView);
+  }
+
+  @Mutation
+  setDatasetViewContrasts(contrasts: IDatasetView["layerContrasts"]) {
+    if (!this.datasetView) {
+      return;
+    }
+    Vue.set(this.datasetView, "layerContrasts", contrasts);
+    this.api.updateDatasetView(this.datasetView);
+  }
+
   @Action
-  async loadSnapshot(name: string): Promise<ISnapshot | undefined> {
-    if (!this.configuration || !this.dataset) {
-      return;
+  async loadSnapshotLayers(snapshot: ISnapshot) {
+    await this.setLayerMode(snapshot.layerMode);
+    await this.loadLayersContrastsInDatasetView(snapshot.layers);
+    await this.loadLayersVisibilityInConfiguration(snapshot.layers);
+  }
+
+  @Action
+  async loadLayersVisibilityInConfiguration(layers: IDisplayLayer[]) {
+    for (const layer of layers) {
+      this.changeLayer({
+        layerId: layer.id,
+        delta: { visible: layer.visible },
+        sync: false
+      });
     }
-    const snapshot = this.configuration.snapshots?.find(d => d.name == name);
-    if (!snapshot) {
-      return;
+    await this.syncConfiguration("layers");
+  }
+
+  @Action
+  async loadLayersContrastsInDatasetView(layers: IDisplayLayer[]) {
+    const contrasts: IDatasetView["layerContrasts"] = {};
+    for (const layer of layers) {
+      contrasts[layer.id] = layer.contrast;
     }
-    // TODO: this loads the snapshot layers, overriding contrasts, existing layers...
-    await this.setConfigurationLayers(snapshot.layers);
-    // note that this doesn't set viewport, snapshot name, description, tags,
-    // map rotation, or screenshot parameters
-    return snapshot;
+    this.setDatasetViewContrasts(contrasts);
   }
 
   @Action

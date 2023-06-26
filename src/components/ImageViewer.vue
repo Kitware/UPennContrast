@@ -177,7 +177,14 @@ export default class ImageViewer extends Vue {
 
   private resetMapsOnDraw = false;
 
-  maps: IMapEntry[] = [];
+  get maps() {
+    return this.store.maps;
+  }
+
+  set maps(value: IMapEntry[]) {
+    this.store.maps = value;
+  }
+
   tileWidth: number = 0;
   tileHeight: number = 0;
 
@@ -266,7 +273,7 @@ export default class ImageViewer extends Vue {
         if (idx === mapidx) {
           return;
         }
-        mapentry.map.zoom(map.zoom(), true, true);
+        mapentry.map.zoom(map.zoom(), undefined, true, true);
         mapentry.map.rotation(map.rotation(), undefined, true);
         mapentry.map.center(map.center(), undefined, true, true);
       });
@@ -336,7 +343,7 @@ export default class ImageViewer extends Vue {
         params: params,
         baseLayerIndex: mllidx ? undefined : 0
       };
-      this.maps[mllidx] = mapentry;
+      Vue.set(this.maps, mllidx, mapentry);
 
       /* remove default key bindings */
       let interactorOpts = map.interactor().options();
@@ -344,7 +351,6 @@ export default class ImageViewer extends Vue {
       /* We can keep some actions, if wanted */
       interactorOpts.keyboard.actions = { "rotate.0": actions["rotate.0"] };
       map.interactor().options(interactorOpts);
-      Vue.prototype.$currentMap = map;
       mapentry.annotationLayer = map.createLayer("annotation", {
         annotations: geojs.listAnnotations(),
         autoshareRenderer: false,
@@ -687,11 +693,14 @@ export default class ImageViewer extends Vue {
       }
       const map = mapentry.map;
       const mapnode = map.node();
+      const nodeWidth = mapnode.width();
+      const nodeHeight = mapnode.height();
       if (
-        mapnode.width() != map.size().width ||
-        mapnode.height() != map.size().height
+        nodeWidth &&
+        nodeHeight &&
+        (nodeWidth != map.size().width || nodeHeight != map.size().height)
       ) {
-        map.size({ width: mapnode.width(), height: mapnode.height() });
+        map.size({ width: nodeWidth, height: nodeHeight });
       }
       this._setupTileLayers(mll, mllidx, someImage, baseLayerIndex);
       if (

@@ -26,7 +26,8 @@ import {
   AnnotationSelectionTypes,
   IAnnotationLocation,
   IGeoJSAnnotation,
-  IRestrictTagsAndLayer
+  IRestrictTagsAndLayer,
+  IMapEntry
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -118,7 +119,7 @@ export default class AnnotationViewer extends Vue {
   readonly unrollW: any;
 
   @Prop({ default: [] })
-  readonly maps!: any[];
+  readonly maps!: IMapEntry[];
 
   @Prop()
   readonly tileWidth: any;
@@ -1080,7 +1081,7 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.removeAnnotation(geojsAnnotation);
   }
 
-  get selectedToolRadius() {
+  get selectedToolRadius(): number | undefined {
     return this.selectedTool?.values?.radius;
   }
 
@@ -1119,7 +1120,7 @@ export default class AnnotationViewer extends Vue {
           x: basePositionDisplay.x - this.selectedToolRadius,
           y: basePositionDisplay.y + this.selectedToolRadius
         }
-      ].map(map.displayToGcs)
+      ].map(point => map.displayToGcs(point))
     );
     this.cursorAnnotation.draw();
     return true;

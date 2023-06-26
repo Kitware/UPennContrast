@@ -1,13 +1,5 @@
-import { IGirderItem, IGirderFolder } from "@/girder";
+import { IGirderItem } from "@/girder";
 import { ITileHistogram } from "./images";
-
-export interface IDatasetConfigurationMeta {
-  id: string;
-  datasetId: string;
-  datasetName: string;
-  name: string;
-  description: string;
-}
 
 export interface IFrameInfo {
   DeltaT: number;
@@ -214,8 +206,65 @@ export interface IPixel {
 
 export interface IGeoJSInteractor {}
 
+export interface IGeoJSBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 export interface IGeoJSMap {
   interactor: () => null;
+  bounds: (bds?: IGeoJSBounds, gcs?: string | null) => IGeoJSBounds;
+  center: ((
+    coordinates: IGeoJSPoint,
+    gcs?: string | null,
+    ignoreDiscreteZoom?: boolean,
+    ignoreClampBounds?: boolean | "limited"
+  ) => IGeoJSMap) &
+    (() => IGeoJSPoint);
+  createLayer: (layerName: string, arg: object) => IGeoJSLayer;
+  deleteLayer: (layer: IGeoJSLayer | null) => IGeoJSLayer;
+  displayToGcs: ((c: IGeoJSPoint, gcs?: string | null) => IGeoJSPoint) &
+    ((c: IGeoJSPoint[], gcs?: string | null) => IGeoJSPoint[]);
+  draw: () => IGeoJSMap;
+  exit: () => void;
+  gcs: ((arg: string) => IGeoJSMap) & (() => string);
+  gcsToDisplay: ((c: IGeoJSPoint, gcs?: string | null) => IGeoJSPoint) &
+    ((c: IGeoJSPoint[], gcs?: string | null) => IGeoJSPoint[]);
+  geoOn: (event: string, handler: Function) => IGeoJSMap;
+  geoOff: (
+    event?: string | string[],
+    arg?: Function | Function[] | null
+  ) => IGeoJSMap;
+  ingcs: ((arg: string) => IGeoJSMap) & (() => string);
+  layers: () => IGeoJSLayer[];
+  node: () => JQuery;
+  rotation: ((
+    rotation: number,
+    origin?: object,
+    ignoreRotationFunc?: boolean
+  ) => IGeoJSMap) &
+    (() => number);
+  screenshot: (
+    layers?: IGeoJSLayer | IGeoJSLayer[] | false | object,
+    type?: string,
+    encoderOptions?: number,
+    opts?: object
+  ) => Promise<string>;
+  size: ((arg: IGeoScreenSize) => IGeoJSMap) & (() => IGeoScreenSize);
+  zoom: ((
+    val: number,
+    origin?: object,
+    ingoreDiscreteZoom?: boolean,
+    ignoreClampBounds?: boolean
+  ) => IGeoJSMap) &
+    (() => number);
+}
+
+export interface IGeoScreenSize {
+  width: number;
+  height: number;
 }
 
 export interface IGeoJSLayer {
@@ -231,6 +280,9 @@ export interface IGeoJSLayer {
     edit: "edit";
     cursor: "cursor";
   };
+  node: () => JQuery<HTMLDivElement>;
+  moveToTop: () => void;
+  zIndex: (index?: number, allowDuplicate?: boolean) => number | IGeoJSLayer;
   currentAnnotation: null | IGeoJSAnnotation;
 }
 
@@ -452,7 +504,7 @@ export interface IUISetting {
 }
 
 export interface IMapEntry {
-  map: any;
+  map: IGeoJSMap;
   imageLayers: any[];
   params: any;
   baseLayerIndex: number | undefined;
