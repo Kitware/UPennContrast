@@ -1,4 +1,4 @@
-from girder.models.model_base import AccessControlledModel
+from ..helpers.proxiedModel import ProxiedAccessControlledModel
 from girder.exceptions import ValidationException
 from girder.constants import AccessType
 from ..helpers.tasks import runJobRequest
@@ -9,7 +9,7 @@ import jsonschema
 class InterfaceSchema:
     interfaceSchema = {
         '$schema': 'http://json-schema.org/schema#',
-        'id': '/girder/plugins/upenncontrast_annotation/models/annotation',
+        'id': '/girder/plugins/upenncontrast_annotation/models/workerInterfaces',
         'type': 'object',
         'properties': {
             'name': {
@@ -34,7 +34,7 @@ class InterfaceSchema:
     }
 
 
-class WorkerInterfaceModel(AccessControlledModel):
+class WorkerInterfaceModel(ProxiedAccessControlledModel):
 
     validator = jsonschema.Draft4Validator(
         InterfaceSchema.interfaceSchema

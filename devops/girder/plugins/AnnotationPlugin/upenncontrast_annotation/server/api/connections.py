@@ -1,9 +1,10 @@
 from girder.api import access
 from girder.api.describe import Description, autoDescribeRoute, describeRoute
-from girder.constants import AccessType
 from girder.api.rest import Resource, loadmodel
+from girder.constants import AccessType
+from girder.exceptions import AccessException
+from ..helpers.proxiedModel import recordable
 from ..models.connections import AnnotationConnection as ConnectionModel
-from girder.exceptions import AccessException, RestException, ValidationException
 
 
 class AnnotationConnection(Resource):
@@ -30,6 +31,7 @@ class AnnotationConnection(Resource):
 
     @access.user
     @describeRoute(Description("Create a new connection").param('body', 'Connection Object', paramType='body'))
+    @recordable('Create a connection')
     def create(self, params):
         currentUser = self.getCurrentUser()
         if not currentUser:
@@ -38,6 +40,7 @@ class AnnotationConnection(Resource):
 
     @access.user
     @describeRoute(Description("Create multiple new connections").param('body', 'Connection Object List', paramType='body'))
+    @recordable('Create multiple connections')
     def multipleCreate(self, params):
         currentUser = self.getCurrentUser()
         if not currentUser:
@@ -48,12 +51,14 @@ class AnnotationConnection(Resource):
                    .errorResponse('Write access was denied for the connection.', 403))
     @access.user
     @loadmodel(model='annotation_connection', plugin='upenncontrast_annotation', level=AccessType.WRITE)
+    @recordable('Delete a connection')
     def delete(self, annotation_connection, params):
         self._connectionModel.remove(annotation_connection)
     
     @access.user
     @describeRoute(Description("Delete all annotation connections in the id list")
                    .param('body', 'A list of all annotation connection ids to delete.', paramType='body'))
+    @recordable('Delete multiple connections')
     def deleteMultiple(self, params):
         stringIds = [stringId for stringId in self.getBodyJson()]
         self._connectionModel.deleteMultiple(stringIds)
@@ -67,6 +72,7 @@ class AnnotationConnection(Resource):
                    .errorResponse("Validation Error: JSON doesn't follow schema."))
     @access.user
     @loadmodel(model='annotation_connection', plugin='upenncontrast_annotation', level=AccessType.WRITE)
+    @recordable('Update a connection')
     def update(self, connection, params):
         connection.update(self.getBodyJson())
         self._connectionModel.update(connection)
@@ -111,6 +117,7 @@ class AnnotationConnection(Resource):
 
     @access.user
     @describeRoute(Description("Create connections between annotations").param('body', 'Connection Object', paramType='body'))
+    @recordable('Create connections with nearest')
     def connectToNearest(self, params):
         currentUser = self.getCurrentUser()
         if not currentUser:

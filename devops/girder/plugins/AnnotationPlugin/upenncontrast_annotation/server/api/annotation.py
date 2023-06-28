@@ -1,9 +1,10 @@
 from girder.api import access
-from girder.api.describe import Description, autoDescribeRoute, describeRoute
-from girder.constants import AccessType
+from girder.api.describe import Description, describeRoute
 from girder.api.rest import Resource, loadmodel
+from girder.constants import AccessType
+from girder.exceptions import AccessException, RestException
+from ..helpers.proxiedModel import recordable
 from ..models.annotation import Annotation as AnnotationModel
-from girder.exceptions import AccessException, RestException, ValidationException
 
 
 class Annotation(Resource):
@@ -32,6 +33,7 @@ class Annotation(Resource):
 
     @access.user
     @describeRoute(Description("Create a new annotation").param('body', 'Annotation Object', paramType='body'))
+    @recordable('Create an annotation')
     def create(self, params):
         currentUser = self.getCurrentUser()
         if not currentUser:
@@ -40,6 +42,7 @@ class Annotation(Resource):
 
     @access.user
     @describeRoute(Description("Create multiple new annotations").param('body', 'Annotation Object List', paramType='body'))
+    @recordable('Create multiple annotations')
     def createMultiple(self, params):
         currentUser = self.getCurrentUser()
         if not currentUser:
@@ -50,12 +53,14 @@ class Annotation(Resource):
                    .errorResponse('Write access was denied for the annotation.', 403))
     @access.user
     @loadmodel(model='upenn_annotation', plugin='upenncontrast_annotation', level=AccessType.WRITE)
+    @recordable('Delete an annotation')
     def delete(self, upenn_annotation, params):
         self._annotationModel.delete(upenn_annotation)
 
     @access.user
     @describeRoute(Description("Delete all annotations in the id list")
                    .param('body', 'A list of all annotation ids to delete.', paramType='body'))
+    @recordable('Delete multiple annotations')
     def deleteMultiple(self, params):
         stringIds = [stringId for stringId in self.getBodyJson()]
         self._annotationModel.deleteMultiple(stringIds)
@@ -69,6 +74,7 @@ class Annotation(Resource):
                    .errorResponse("Validation Error: JSON doesn't follow schema."))
     @access.user
     @loadmodel(model='upenn_annotation', plugin='upenncontrast_annotation', level=AccessType.WRITE)
+    @recordable('Update an annotation')
     def update(self, upenn_annotation, params):
         upenn_annotation.update(self.getBodyJson())
         self._annotationModel.update(upenn_annotation)

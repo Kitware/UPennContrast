@@ -1,6 +1,6 @@
 from girder.constants import AccessType
 from girder.exceptions import ValidationException
-from girder.models.model_base import AccessControlledModel
+from ..helpers.proxiedModel import ProxiedAccessControlledModel
 
 import jsonschema
 
@@ -22,7 +22,7 @@ class DatasetViewSchema:
     }
     datasetViewSchema = {
         '$schema': 'http://json-schema.org/schema#',
-        'id': '/girder/plugins/upenncontrast_annotation/models/annotation',
+        'id': '/girder/plugins/upenncontrast_annotation/models/datasetView',
         'type': 'object',
         'properties': {
             'datasetId': {
@@ -40,7 +40,7 @@ class DatasetViewSchema:
         'required': ['datasetId', 'configurationId', 'layerContrasts']
     }
 
-class DatasetView(AccessControlledModel):
+class DatasetView(ProxiedAccessControlledModel):
     validator = jsonschema.Draft4Validator(
         DatasetViewSchema.datasetViewSchema
     )

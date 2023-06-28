@@ -1,5 +1,5 @@
-from girder.models.model_base import AccessControlledModel
-from girder.exceptions import AccessException, ValidationException, RestException
+from ..helpers.proxiedModel import ProxiedAccessControlledModel
+from girder.exceptions import ValidationException, RestException
 from girder.constants import AccessType
 from ..helpers.tasks import runJobRequest
 
@@ -10,7 +10,7 @@ import jsonschema
 class PropertySchema:
     propertySchema = {
         '$schema': 'http://json-schema.org/schema#',
-        'id': '/girder/plugins/upenncontrast_annotation/models/annotation',
+        'id': '/girder/plugins/upenncontrast_annotation/models/property',
         'type': 'object',
         'properties': {
             'name': {
@@ -44,7 +44,7 @@ class PropertySchema:
     }
 
 
-class AnnotationProperty(AccessControlledModel):
+class AnnotationProperty(ProxiedAccessControlledModel):
     # TODO: write lock
     # TODO: delete hooks: remove all computed values if the property is deleted ? (big operation)
 
