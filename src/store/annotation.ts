@@ -389,7 +389,7 @@ export class Annotations extends VuexModule {
           this.annotationsAPI.getAnnotationsForDatasetId(main.dataset.id),
           this.annotationsAPI.getConnectionsForDatasetId(main.dataset.id)
         ];
-      Promise.all(promises).then(
+      await Promise.all(promises).then(
         ([annotations, connections]: [
           IAnnotation[],
           IAnnotationConnection[]

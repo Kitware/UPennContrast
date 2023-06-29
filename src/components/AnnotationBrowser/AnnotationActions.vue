@@ -7,6 +7,33 @@
       <v-container>
         <v-row>
           <v-col class="pa-1">
+            <v-btn :disabled="!undoEntry || isDoing" @click.native="undo" block>
+              <template v-if="undoEntry">
+                Undo {{ undoEntry.actionName }}
+              </template>
+              <template v-else>
+                No Undo Available
+              </template>
+            </v-btn>
+          </v-col>
+          <v-col class="pa-1">
+            <v-btn :disabled="!redoEntry || isDoing" @click.native="redo" block>
+              <template v-if="redoEntry">
+                Redo {{ redoEntry.actionName }}
+              </template>
+              <template v-else>
+                No Redo Available
+              </template>
+            </v-btn>
+          </v-col>
+        </v-row>
+        <v-row>
+          <v-col>
+            <v-divider />
+          </v-col>
+        </v-row>
+        <v-row>
+          <v-col class="pa-1">
             <v-btn
               v-if="selectionFilterEnabled"
               @click.native="clearSelection"
@@ -41,6 +68,7 @@
 
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
+import store from "@/store";
 import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
@@ -57,9 +85,20 @@ import AnnotationImport from "@/components/AnnotationBrowser/AnnotationImport.vu
   }
 })
 export default class AnnotationActions extends Vue {
+  readonly store = store;
   readonly annotationStore = annotationStore;
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
+
+  isDoing: boolean = false;
+
+  get undoEntry() {
+    return this.history.find(entry => !entry.isUndone);
+  }
+
+  get redoEntry() {
+    return this.history.findLast(entry => entry.isUndone);
+  }
 
   get filteredAnnotations() {
     return this.filterStore.filteredAnnotations;
@@ -71,6 +110,32 @@ export default class AnnotationActions extends Vue {
 
   get propertyIds() {
     return this.propertyStore.properties.map(p => p.id);
+  }
+
+  get history() {
+    return this.store.history;
+  }
+
+  async do(undo: boolean) {
+    try {
+      this.isDoing = true;
+      if (undo) {
+        await this.store.api.undo();
+      } else {
+        await this.store.api.redo();
+      }
+      await this.annotationStore.fetchAnnotations();
+    } finally {
+      this.isDoing = false;
+    }
+  }
+
+  async undo() {
+    await this.do(true);
+  }
+
+  async redo() {
+    await this.do(false);
   }
 
   clearSelection() {
