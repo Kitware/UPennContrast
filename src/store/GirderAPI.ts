@@ -109,17 +109,22 @@ export default class GirderAPI {
     });
   }
 
-  undo() {
-    return this.client.put("history/undo");
+  undo(datasetId: string) {
+    return this.client.put("history/undo", undefined, {
+      params: { datasetId }
+    });
   }
 
-  redo() {
-    return this.client.put("history/redo");
+  redo(datasetId: string) {
+    return this.client.put("history/redo", undefined, {
+      params: { datasetId }
+    });
   }
 
-  async getHistoryEntries(): Promise<IHistoryEntry[]> {
+  async getHistoryEntries(datasetId: string): Promise<IHistoryEntry[]> {
     try {
-      const response = await this.client.get("history");
+      const params = { datasetId };
+      const response = await this.client.get("history", { params });
       return response.data.map(toHistoryEntry);
     } catch {
       return [];

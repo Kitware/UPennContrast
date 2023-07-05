@@ -59,6 +59,10 @@ class HistorySchema:
             'isUndone': {
                 'type': 'boolean',
             },
+            'datasetId': {
+                # Special type defined in a custom validator
+                'type': 'objectId',
+            },
         },
         'required': ['actionName', 'record', 'actionDate', 'userId', 'isUndone']
     }
@@ -99,25 +103,29 @@ class History(AccessControlledModel):
             raise ValidationException(exp)
         return document
 
-    def getLastEntries(self, user):
+    def getLastEntries(self, user, datasetId: ObjectId):
         """
         Get the history entries for this user, sorted by descending actionDate
         Only return some fields from the model, as the record can be heavy and the userId is useless
         """
-        query = { 'userId': user['_id'] }
+        query = { 'userId': user['_id'], 'datasetId': datasetId }
         sort = [('actionDate', SortDir.DESCENDING)]
         fields = { '_id': 0, 'actionName': 1, 'actionDate': 1, 'isUndone': 1 }
         return self.findWithPermissions(query, sort=sort, fields=fields, user=user)
 
-    def undo(self, user):
-        self.undoOrRedo(user, True)
+    def undo(self, user, datasetId):
+        self.undoOrRedo(user, datasetId, True)
 
-    def redo(self, user):
-        self.undoOrRedo(user, False)
+    def redo(self, user, datasetId):
+        self.undoOrRedo(user, datasetId, False)
 
-    def undoOrRedo(self, user, undo: bool):
+    def undoOrRedo(self, user, datasetId, undo: bool):
         # Get the most recent action which has (not) been undone
-        query = { 'userId': user['_id'], 'isUndone': not undo }
+        query = {
+            'userId': user['_id'],
+            'datasetId': datasetId,
+            'isUndone': not undo,
+        }
         sort = [('actionDate', SortDir.DESCENDING if undo else SortDir.ASCENDING)]
         history_entry = next(self.findWithPermissions(query, sort=sort, user=user, level=AccessType.WRITE, limit=1), None)
         if history_entry is None:

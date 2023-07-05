@@ -3,8 +3,46 @@ from girder.api.describe import Description, autoDescribeRoute, describeRoute
 from girder.api.rest import Resource, loadmodel
 from girder.constants import AccessType
 from girder.exceptions import AccessException
-from ..helpers.proxiedModel import recordable
+from ..helpers.proxiedModel import recordable, cacheBodyJson
 from ..models.connections import AnnotationConnection as ConnectionModel
+from ..models.annotation import Annotation as AnnotationModel
+
+from bson.objectid import ObjectId
+
+
+# Helper functions to get dataset ID for recordable endpoints
+
+def getDatasetIdFromConnectionInBody(self: 'AnnotationConnection', *args, **kwargs):
+    connection = self.getBodyJson()
+    return connection['datasetId']
+
+def getDatasetIdFromConnectionListInBody(self: 'AnnotationConnection', *args, **kwargs):
+    connections = self.getBodyJson()
+    return None if len(connections) <= 0 else connections[0]['datasetId']
+
+def getDatasetIdFromLoadedConnection(self: 'AnnotationConnection', *args, **kwargs):
+    connection = kwargs['annotation_connection']
+    return connection['datasetId']
+
+def getDatasetIdFromConnectionIdListInBody(self: 'AnnotationConnection', *args, **kwargs):
+    connectionStringIds = self.getBodyJson()
+    query = {
+      '_id': { '$in': [ObjectId(stringId) for stringId in connectionStringIds] },
+    }
+    cursor = self._connectionModel.findWithPermissions(query, user=self.getCurrentUser(), level=AccessType.READ, limit=1)
+    connection = next(cursor, None)
+    return None if connection is None else connection['datasetId']
+    
+def getDatasetIdFromInfoInBody(self: 'AnnotationConnection', *args, **kwargs):
+    info = self.getBodyJson()
+    annotationsIdsToConnect = info['annotationsIds']
+    annotationModel: AnnotationModel = AnnotationModel()
+    for stringId in annotationsIdsToConnect:
+        id = ObjectId(stringId)
+        annotation = annotationModel.getAnnotationById(id, self.getCurrentUser())
+        if annotation is not None:
+            return annotation['datasetId']
+    return None
 
 
 class AnnotationConnection(Resource):
@@ -13,7 +51,7 @@ class AnnotationConnection(Resource):
         super().__init__()
         self.resourceName = 'annotation_connection'
 
-        self._connectionModel = ConnectionModel()
+        self._connectionModel: ConnectionModel = ConnectionModel()
 
         self.route('DELETE', (':id',), self.delete)
         self.route('GET', (':id',), self.get)
@@ -29,18 +67,20 @@ class AnnotationConnection(Resource):
     # TODO: creation date, update date, creatorId
     # TODO: error handling and documentation
 
+    @cacheBodyJson
     @access.user
     @describeRoute(Description("Create a new connection").param('body', 'Connection Object', paramType='body'))
-    @recordable('Create a connection')
+    @recordable('Create a connection', getDatasetIdFromConnectionInBody)
     def create(self, params):
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
         return self._connectionModel.create(currentUser, self.getBodyJson())
 
+    @cacheBodyJson
     @access.user
     @describeRoute(Description("Create multiple new connections").param('body', 'Connection Object List', paramType='body'))
-    @recordable('Create multiple connections')
+    @recordable('Create multiple connections', getDatasetIdFromConnectionListInBody)
     def multipleCreate(self, params):
         currentUser = self.getCurrentUser()
         if not currentUser:
@@ -51,14 +91,15 @@ class AnnotationConnection(Resource):
                    .errorResponse('Write access was denied for the connection.', 403))
     @access.user
     @loadmodel(model='annotation_connection', plugin='upenncontrast_annotation', level=AccessType.WRITE)
-    @recordable('Delete a connection')
+    @recordable('Delete a connection', getDatasetIdFromLoadedConnection)
     def delete(self, annotation_connection, params):
         self._connectionModel.remove(annotation_connection)
-    
+
+    @cacheBodyJson
     @access.user
     @describeRoute(Description("Delete all annotation connections in the id list")
                    .param('body', 'A list of all annotation connection ids to delete.', paramType='body'))
-    @recordable('Delete multiple connections')
+    @recordable('Delete multiple connections', getDatasetIdFromConnectionIdListInBody)
     def deleteMultiple(self, params):
         stringIds = [stringId for stringId in self.getBodyJson()]
         self._connectionModel.deleteMultiple(stringIds)
@@ -72,7 +113,7 @@ class AnnotationConnection(Resource):
                    .errorResponse("Validation Error: JSON doesn't follow schema."))
     @access.user
     @loadmodel(model='annotation_connection', plugin='upenncontrast_annotation', level=AccessType.WRITE)
-    @recordable('Update a connection')
+    @recordable('Update a connection', getDatasetIdFromLoadedConnection)
     def update(self, connection, params):
         connection.update(self.getBodyJson())
         self._connectionModel.update(connection)
@@ -115,9 +156,10 @@ class AnnotationConnection(Resource):
         return annotation_connection
 
 
+    @cacheBodyJson
     @access.user
     @describeRoute(Description("Create connections between annotations").param('body', 'Connection Object', paramType='body'))
-    @recordable('Create connections with nearest')
+    @recordable('Create connections with nearest', getDatasetIdFromInfoInBody)
     def connectToNearest(self, params):
         currentUser = self.getCurrentUser()
         if not currentUser:

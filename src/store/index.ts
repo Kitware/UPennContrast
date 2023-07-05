@@ -731,8 +731,31 @@ export class Main extends VuexModule {
   @Action
   @Debounce(100, { leading: false, trailing: true })
   async fetchHistory() {
-    const history = await this.api.getHistoryEntries();
-    this.setHistory(history);
+    const datasetId = this.dataset?.id;
+    if (datasetId !== undefined) {
+      const history = await this.api.getHistoryEntries(datasetId);
+      this.setHistory(history);
+    } else {
+      this.setHistory([]);
+    }
+  }
+
+  @Action
+  async do(undo: boolean) {
+    const datasetId = this.dataset?.id;
+    if (datasetId !== undefined) {
+      try {
+        sync.setSaving(true);
+        if (undo) {
+          await this.api.undo(datasetId);
+        } else {
+          await this.api.redo(datasetId);
+        }
+        sync.setSaving(false);
+      } catch (error) {
+        sync.setSaving(error);
+      }
+    }
   }
 
   @Action

@@ -1,23 +1,78 @@
 from girder import events
 from girder.api import rest
 from girder.exceptions import AccessException
-from girder.models.model_base import AccessControlledModel, Model
+from girder.models.model_base import AccessControlledModel
 
 from dataclasses import dataclass
 from ..models.history import History as HistoryModel
 
+from types import MethodType
+from functools import wraps
+from bson.objectid import ObjectId
+
+def cacheBodyJson(func):
+    '''
+    A decorator on rest.Resource methods to cache the result of self.getBodyJson()
+    This is usefull when some decorators and the decorated function use it
+    For example, when using @recordable
+    Use this decorator before any other decorator, for example:
+    ```
+    @cacheBodyJson
+    @recordable('Foo', bar)
+    def f(self, *args, **kwargs):
+        pass
+    ```
+    instead of
+    ```
+    @recordable('Foo', bar)
+    @cacheBodyJson
+    def f(self, *args, **kwargs):
+        pass
+    ```
+    '''
+    @wraps(func)
+    def wrapped(self: rest.Resource, *args, **kwargs):
+        # Get the resul of getBodyJson
+        error = None
+        bodyJson = None
+        try:
+            bodyJson = self.getBodyJson()
+        except rest.RestException as err:
+            error = err
+
+        # Create memoised version of the method
+        def getCachedBodyJson(self):
+            if error is None:
+                return bodyJson
+            else:
+                raise error
+            
+        # Wrap the function call
+        originalGetBodyJson = self.getBodyJson
+        self.getBodyJson = MethodType(getCachedBodyJson, self)
+        val = func(self, *args, **kwargs)
+        self.getBodyJson = originalGetBodyJson
+        return val
+
+    return wrapped
 
 class recordable:
     """
     A decorator which makes a function able to record the write operations on the database
     """
-    def __init__(self, actionName):
+    def __init__(self, actionName, findDatasetIdFn):
         self.historyModel: HistoryModel = HistoryModel()
         self.actionName = actionName
+        self.findDatasetIdFn = findDatasetIdFn
 
     def __call__(self, fun):
         def wrapped_fun(*args, **kwargs):
             actionDate = HistoryModel.now()
+
+            # Find dataset ID
+            datasetId = self.findDatasetIdFn(*args, **kwargs)
+            if datasetId is None:
+                return fun(*args, **kwargs)
 
             # Wrap original endpoint between a start and a stop recording
             events.trigger('proxiedModel.startRecording')
@@ -34,6 +89,7 @@ class recordable:
                 'actionDate': actionDate,
                 'userId': user['_id'], # type: ignore
                 'isUndone': False,
+                'datasetId': ObjectId(datasetId),
             }
             self.historyModel.create(user, document)
 
@@ -46,7 +102,7 @@ class ModelRecord:
     """
     A record of changes made to the database
     "changes" associates a string id (not an ObjectId) with a dict:
-    { before: document or None, after: document or None }
+    { 'before': document or None, 'after': document or None }
     """
     def __init__(self):
         self.changes = {}
@@ -58,8 +114,8 @@ class ModelRecord:
         string_id = str(doc_with_id['_id'])
         old_change = self.changes.get(string_id, None)
         if old_change:
-            # old_change[after] == before
-            old_change[after] = after
+            # old_change['after'] == before
+            old_change['after'] = after
         else:
             self.changes[string_id] = { 'before': before, 'after': after }
 
