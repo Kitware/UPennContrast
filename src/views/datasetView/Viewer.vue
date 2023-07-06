@@ -9,10 +9,14 @@
   </div>
 </template>
 <script lang="ts">
-import { Vue, Component } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import ViewerToolbar from "@/components/ViewerToolbar.vue";
 import DisplayLayers from "@/components/DisplayLayers.vue";
 import ImageViewer from "@/components/ImageViewer.vue";
+
+import store from "@/store";
+import annotationStore from "@/store/annotation";
+import propertiesStore from "@/store/properties";
 
 @Component({
   components: {
@@ -21,7 +25,36 @@ import ImageViewer from "@/components/ImageViewer.vue";
     ImageViewer
   }
 })
-export default class Viewer extends Vue {}
+export default class Viewer extends Vue {
+  readonly store = store;
+  readonly annotationStore = annotationStore;
+  readonly propertyStore = propertiesStore;
+
+  mounted() {
+    this.datasetChanged();
+    this.configurationChanged();
+  }
+
+  get dataset() {
+    return this.store.dataset;
+  }
+
+  get configuration() {
+    return this.store.configuration;
+  }
+
+  // Fetch annotations for the current dataset
+  @Watch("dataset")
+  datasetChanged() {
+    this.annotationStore.fetchAnnotations();
+    this.propertyStore.fetchPropertyValues();
+  }
+
+  @Watch("configuration")
+  configurationChanged() {
+    this.propertyStore.fetchProperties();
+  }
+}
 </script>
 
 <style lang="scss" scoped>
