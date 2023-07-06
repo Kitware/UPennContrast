@@ -107,18 +107,36 @@ interface IFileSourceData {
 
 interface IFilenameSourceData extends IVariableGuess {}
 
-interface IAssignmentOption {
+interface IBaseAssignmentOption {
   id: number;
   guess: TDimensions; // Guessed dimension
   size: number; // Number of elements on this dimension
-  data: IFileSourceData | IFilenameSourceData | null; // To compute which image should be taken from the tiles
   name: string; // Displayed name
-  source: Sources; // Source of the dimension
 }
+
+interface IFileAssignmentOption extends IBaseAssignmentOption {
+  source: Sources.File;
+  data: IFileSourceData; // To compute which image should be taken from the tiles
+}
+
+interface IFilenameAssignementOption extends IBaseAssignmentOption {
+  source: Sources.Filename;
+  data: IFilenameSourceData; // To compute which image should be taken from the tiles
+}
+
+interface IImageAssinmentOption extends IBaseAssignmentOption {
+  source: Sources.Images;
+  data: null;
+}
+
+type TAssignmentOption =
+  | IFileAssignmentOption
+  | IFilenameAssignementOption
+  | IImageAssinmentOption;
 
 interface IAssignment {
   text: string;
-  value: IAssignmentOption;
+  value: TAssignmentOption;
 }
 
 type TUpDim = "XY" | "Z" | "T" | "C";
@@ -209,7 +227,7 @@ export default class MultiSourceConfiguration extends Vue {
   get items() {
     return this.dimensions
       .filter(dim => dim.size > 0)
-      .map((dim: IAssignmentOption) => {
+      .map((dim: TAssignmentOption) => {
         let values = "";
         switch (dim.source) {
           case Sources.Filename:
@@ -229,7 +247,7 @@ export default class MultiSourceConfiguration extends Vue {
       });
   }
 
-  dimensions: IAssignmentOption[] = [];
+  dimensions: TAssignmentOption[] = [];
 
   headers = [
     {
@@ -266,7 +284,7 @@ export default class MultiSourceConfiguration extends Vue {
     string
   ][];
 
-  assignmentOptionToAssignmentItem(dimension: IAssignmentOption): IAssignment {
+  assignmentOptionToAssignmentItem(dimension: TAssignmentOption): IAssignment {
     return {
       text: dimension.name,
       value: dimension
@@ -282,7 +300,7 @@ export default class MultiSourceConfiguration extends Vue {
       [] as number[]
     );
 
-    const isNotAssigned = (dimension: IAssignmentOption) =>
+    const isNotAssigned = (dimension: TAssignmentOption) =>
       !assignedDimensions.includes(dimension.id);
     return this.items
       .filter(isNotAssigned)
@@ -305,13 +323,26 @@ export default class MultiSourceConfiguration extends Vue {
   addSizeToDimension(
     guess: TDimensions,
     size: number,
-    source: Sources,
-    data: IFileSourceData | IFilenameSourceData | null,
+    sourceData:
+      | {
+          source: Sources.File;
+          data: IFileSourceData;
+        }
+      | {
+          source: Sources.Filename;
+          data: IFilenameSourceData;
+        }
+      | {
+          source: Sources.Images;
+          data: null;
+        },
     name: string | null = null
-  ) {
+  ): void {
     if (size === 0) {
       return;
     }
+    const { source, data } = sourceData;
+
     // Merge the dimension when the source is file and source and guess match
     const dim =
       source === Sources.File &&
@@ -324,37 +355,35 @@ export default class MultiSourceConfiguration extends Vue {
         ...(data as IFileSourceData)
       };
       dim.size += size;
-    } else {
-      // If no merge, compute the name if needed and add to this.dimensions
-      let computedName = name;
-      if (!computedName) {
-        computedName = "";
-        switch (source) {
-          case Sources.Filename:
-            computedName = `Filename variable ${++this.filenameVariableCount}`;
-            break;
-          case Sources.File:
-            computedName = `Metadata ${++this.fileVariableCount} (${
-              this.dimensionNames[guess]
-            }) `;
-            break;
-          case Sources.Images:
-            computedName = `Image variable ${++this.imageVariableCount}`;
-            break;
-        }
-      }
-      this.dimensions = [
-        ...this.dimensions,
-        {
-          id: this.assignmentIdCount++,
-          guess,
-          size,
-          name: computedName,
-          source,
-          data
-        }
-      ];
+      return;
     }
+
+    // If no merge, compute the name if needed and add to this.dimensions
+    let computedName = name;
+    if (!computedName) {
+      computedName = "";
+      switch (source) {
+        case Sources.Filename:
+          computedName = `Filename variable ${++this.filenameVariableCount}`;
+          break;
+        case Sources.File:
+          computedName = `Metadata ${++this.fileVariableCount} (${
+            this.dimensionNames[guess]
+          })`;
+          break;
+        case Sources.Images:
+          computedName = `Image variable ${++this.imageVariableCount}`;
+          break;
+      }
+    }
+    const newDimension: TAssignmentOption = {
+      id: this.assignmentIdCount++,
+      guess,
+      size,
+      name: computedName,
+      ...sourceData
+    };
+    this.dimensions = [...this.dimensions, newDimension];
   }
 
   girderItems: IGirderItem[] = [];
@@ -386,12 +415,10 @@ export default class MultiSourceConfiguration extends Vue {
     const names = items.map(item => item.name);
 
     collectFilenameMetadata2(names).forEach(filenameData =>
-      this.addSizeToDimension(
-        filenameData.guess,
-        filenameData.values.length,
-        Sources.Filename,
-        filenameData
-      )
+      this.addSizeToDimension(filenameData.guess, filenameData.values.length, {
+        source: Sources.Filename,
+        data: filenameData
+      })
     );
 
     // Get info from file
@@ -415,12 +442,14 @@ export default class MultiSourceConfiguration extends Vue {
             // We know that the keys of this.dimensionNames are of type TDimensions
             dim as TDimensions,
             tile.IndexRange[indexDim],
-            Sources.File,
             {
-              [tileIdx]: {
-                range: tile.IndexRange[indexDim],
-                stride: tile.IndexStride[indexDim],
-                values: dim === "C" ? tile.channels : null
+              source: Sources.File,
+              data: {
+                [tileIdx]: {
+                  range: tile.IndexRange[indexDim],
+                  stride: tile.IndexStride[indexDim],
+                  values: dim === "C" ? tile.channels : null
+                }
               }
             }
           );
@@ -432,8 +461,10 @@ export default class MultiSourceConfiguration extends Vue {
       this.addSizeToDimension(
         "Z",
         maxFramesPerItem,
-        Sources.Images,
-        null,
+        {
+          source: Sources.Images,
+          data: null
+        },
         "All frames per item"
       );
     }
@@ -455,17 +486,30 @@ export default class MultiSourceConfiguration extends Vue {
     );
   }
 
+  isAssignmentImmutable(assignment: IAssignment) {
+    // Assignemnt is immutable when it comes from the metadata of an nd2 file
+    const value = assignment.value;
+    if (!(value.source === Sources.File)) {
+      return false;
+    }
+    const itemIndices = Object.keys(value.data).map(Number);
+    const allItemsAreNd2 = itemIndices.every(idx =>
+      this.girderItems[idx].name.toLowerCase().endsWith(".nd2")
+    );
+    return allItemsAreNd2;
+  }
+
   assignmentDisabled(dimension: TUpDim) {
     const currentAssignment = this.assignments[dimension];
     return (
-      currentAssignment?.value.source === "file" ||
+      (currentAssignment && this.isAssignmentImmutable(currentAssignment)) ||
       this.assignmentItems.length === 0
     );
   }
 
   clearDisabled(dimension: TUpDim) {
     const currentAssignment = this.assignments[dimension];
-    return !currentAssignment || currentAssignment.value.source === "file";
+    return !currentAssignment || this.isAssignmentImmutable(currentAssignment);
   }
 
   submitEnabled() {
