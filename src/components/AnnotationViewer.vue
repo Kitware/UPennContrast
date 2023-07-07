@@ -1311,12 +1311,6 @@ export default class AnnotationViewer extends Vue {
     this.refreshAnnotationMode();
   }
 
-  // Fetch annotations for the current dataset
-  @Watch("dataset")
-  fetchAnnotations() {
-    this.annotationStore.fetchAnnotations();
-  }
-
   @Watch("showTooltips")
   @Watch("filteredAnnotationTooltips")
   @Watch("filteredAnnotations")
@@ -1454,12 +1448,9 @@ export default class AnnotationViewer extends Vue {
   }
 
   mounted() {
-    this.fetchAnnotations();
     this.bind();
     this.updateValueOnHover();
 
-    this.propertyStore.fetchProperties();
-    this.propertyStore.fetchPropertyValues();
     this.filterStore.updateHistograms();
 
     this.addHoverCallback();
