@@ -71,7 +71,7 @@ class AnnotationPropertyValues(ProxiedAccessControlledModel):
 
     def delete(self, propertyId, datasetId):
         # Could use self.collection.updateMany but girder doesn't expose this method
-        for document in self.find({'datasetId': datasetId}):
+        for document in self.find({'datasetId': datasetId, '.'.join(['values', propertyId]): { '$exists': True }}):
             document['values'].pop(propertyId, None)
             if len(document['values']) == 0:
                 self.remove(document)
