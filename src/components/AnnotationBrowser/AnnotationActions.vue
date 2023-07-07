@@ -120,7 +120,6 @@ export default class AnnotationActions extends Vue {
     try {
       this.isDoing = true;
       await this.store.do(undo);
-      await this.annotationStore.fetchAnnotations();
     } finally {
       this.isDoing = false;
     }

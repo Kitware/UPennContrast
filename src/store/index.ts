@@ -751,6 +751,7 @@ export class Main extends VuexModule {
         } else {
           await this.api.redo(datasetId);
         }
+        this.context.dispatch("fetchAnnotations");
         sync.setSaving(false);
       } catch (error) {
         sync.setSaving(error);
