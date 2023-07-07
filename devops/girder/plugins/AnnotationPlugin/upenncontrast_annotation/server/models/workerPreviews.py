@@ -1,9 +1,8 @@
-from girder.models.model_base import AccessControlledModel
-from girder.exceptions import AccessException, ValidationException, RestException
+from ..helpers.proxiedModel import ProxiedAccessControlledModel
+from girder.exceptions import ValidationException, RestException
 from girder.constants import AccessType
 from ..helpers.tasks import runJobRequest
 
-from bson.objectid import ObjectId
 import jsonschema
 
 
@@ -13,7 +12,7 @@ from girder.models.folder import Folder
 class PreviewSchema:
     previewSchema = {
         '$schema': 'http://json-schema.org/schema#',
-        'id': '/girder/plugins/upenncontrast_annotation/models/annotation',
+        'id': '/girder/plugins/upenncontrast_annotation/models/workerPreviews',
         'type': 'object',
         'properties': {
             'name': {
@@ -38,7 +37,7 @@ class PreviewSchema:
     }
 
 
-class WorkerPreviewModel(AccessControlledModel):
+class WorkerPreviewModel(ProxiedAccessControlledModel):
 
     validator = jsonschema.Draft4Validator(
         PreviewSchema.previewSchema

@@ -19,6 +19,7 @@ from .server.models.property import AnnotationProperty as PropertyModel
 from .server.models.workerInterfaces import WorkerInterfaceModel as InterfaceModel
 from .server.models.workerPreviews import WorkerPreviewModel as PreviewModel
 from .server.models.datasetView import DatasetView as DatasetViewModel
+from .server.models.history import History as HistoryModel
 
 from .server.api.annotation import Annotation
 from .server.api.connections import AnnotationConnection
@@ -27,6 +28,9 @@ from .server.api.property import AnnotationProperty
 from .server.api.workerInterfaces import WorkerInterfaces
 from .server.api.workerPreviews import WorkerPreviews
 from .server.api.datasetView import DatasetView
+from .server.api.history import History
+
+
 class UPennContrastAnnotationAPIPlugin(GirderPlugin):
     DISPLAY_NAME = 'UPennContrast Annotation Plugin'
     def load(self, info):
@@ -34,9 +38,10 @@ class UPennContrastAnnotationAPIPlugin(GirderPlugin):
         ModelImporter.registerModel('annotation_connection', ConnectionModel, 'upenncontrast_annotation')
         ModelImporter.registerModel('annotation_property_values', PropertyValuesModel, 'upenncontrast_annotation')
         ModelImporter.registerModel('annotation_property', PropertyModel, 'upenncontrast_annotation')
-        ModelImporter.registerModel('worker_interface', InterfaceModel, 'upenncontrast_worker_interface')
-        ModelImporter.registerModel('worker_preview', PreviewModel, 'upenncontrast_worker_preview')
-        ModelImporter.registerModel('dataset_view', DatasetViewModel, 'upenncontrast_dataset_view')
+        ModelImporter.registerModel('worker_interface', InterfaceModel, 'upenncontrast_annotation')
+        ModelImporter.registerModel('worker_preview', PreviewModel, 'upenncontrast_annotation')
+        ModelImporter.registerModel('dataset_view', DatasetViewModel, 'upenncontrast_annotation')
+        ModelImporter.registerModel('history', HistoryModel, 'upenncontrast_annotation')
 
         info['apiRoot'].upenn_annotation = Annotation()
         info['apiRoot'].annotation_connection = AnnotationConnection()
@@ -45,4 +50,5 @@ class UPennContrastAnnotationAPIPlugin(GirderPlugin):
         info['apiRoot'].worker_interface = WorkerInterfaces()
         info['apiRoot'].worker_preview = WorkerPreviews()
         info['apiRoot'].dataset_view = DatasetView()
+        info['apiRoot'].history = History()
         system.addSystemEndpoints(info['apiRoot'])

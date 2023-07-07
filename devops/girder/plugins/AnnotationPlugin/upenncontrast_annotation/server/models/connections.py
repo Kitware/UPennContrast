@@ -1,5 +1,5 @@
-from girder.models.model_base import AccessControlledModel
-from girder.exceptions import AccessException, ValidationException
+from ..helpers.proxiedModel import ProxiedAccessControlledModel
+from girder.exceptions import ValidationException
 from girder.constants import AccessType
 from girder import events
 
@@ -35,7 +35,7 @@ class ConnectionSchema:
         'required': ['parentId', 'childId', 'datasetId', 'tags']
     }
 
-class AnnotationConnection(AccessControlledModel):
+class AnnotationConnection(ProxiedAccessControlledModel):
   # TODO: write lock
   # TODO(performance): indexing
 

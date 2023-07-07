@@ -17,6 +17,7 @@ import {
   IDatasetViewBase,
   IDisplayLayer,
   IFrameInfo,
+  IHistoryEntry,
   IImage,
   IPixel,
   newLayer
@@ -108,11 +109,33 @@ export default class GirderAPI {
     });
   }
 
-  async generateTiles(itemId: string) {
+  undo(datasetId: string) {
+    return this.client.put("history/undo", undefined, {
+      params: { datasetId }
+    });
+  }
+
+  redo(datasetId: string) {
+    return this.client.put("history/redo", undefined, {
+      params: { datasetId }
+    });
+  }
+
+  async getHistoryEntries(datasetId: string): Promise<IHistoryEntry[]> {
+    try {
+      const params = { datasetId };
+      const response = await this.client.get("history", { params });
+      return response.data.map(toHistoryEntry);
+    } catch {
+      return [];
+    }
+  }
+
+  generateTiles(itemId: string) {
     return this.client.post(`item/${itemId}/tiles`);
   }
 
-  async removeLargeImageForItem(item: IGirderItem) {
+  removeLargeImageForItem(item: IGirderItem) {
     return this.client.delete(`item/${item._id}/tiles`);
   }
 
@@ -608,6 +631,14 @@ function asDatasetView(data: AxiosResponse["data"]): IDatasetView {
     datasetId: data.datasetId,
     layerContrasts: data.layerContrasts,
     lastViewed: data.lastViewed
+  };
+}
+
+function toHistoryEntry(data: any): IHistoryEntry {
+  return {
+    actionName: data.actionName,
+    isUndone: data.isUndone,
+    actionDate: new Date(data.actionDate)
   };
 }
 

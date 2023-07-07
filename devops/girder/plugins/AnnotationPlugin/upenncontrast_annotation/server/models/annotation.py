@@ -1,9 +1,9 @@
 from ..helpers.tasks import runJobRequest
-from girder.models.model_base import AccessControlledModel
-from girder.exceptions import AccessException, ValidationException, RestException
+from ..helpers.proxiedModel import ProxiedAccessControlledModel
+from girder.exceptions import ValidationException, RestException
 from girder.constants import AccessType
 from .propertyValues import AnnotationPropertyValues as PropertiesModel
-from girder import events, logprint, logger, auditLogger
+from girder import events
 
 from bson.objectid import ObjectId
 
@@ -71,7 +71,7 @@ class AnnotationSchema:
         'required': ['coordinates', 'tags', 'channel', 'location', 'shape', 'datasetId']
     }
 
-class Annotation(AccessControlledModel):
+class Annotation(ProxiedAccessControlledModel):
   '''
     Defines a model for storing and handling UPennContrast annotations in the database.
   '''

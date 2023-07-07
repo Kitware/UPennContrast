@@ -1,6 +1,12 @@
 import { IGirderItem } from "@/girder";
 import { ITileHistogram } from "./images";
 
+export interface IHistoryEntry {
+  actionName: string;
+  isUndone: boolean;
+  actionDate: Date;
+}
+
 export interface IFrameInfo {
   DeltaT: number;
   PositionX: number;

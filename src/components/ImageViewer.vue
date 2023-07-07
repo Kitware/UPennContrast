@@ -168,6 +168,18 @@ export default class ImageViewer extends Vue {
       handler: () => {
         annotationStore.deleteSelectedAnnotations();
       }
+    },
+    {
+      bind: "mod+z",
+      handler: () => {
+        this.store.do(true);
+      }
+    },
+    {
+      bind: "mod+shift+z",
+      handler: () => {
+        this.store.do(false);
+      }
     }
   ];
 

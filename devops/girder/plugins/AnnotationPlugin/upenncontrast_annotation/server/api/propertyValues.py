@@ -1,17 +1,15 @@
 from girder.api import access
-from girder.api.describe import Description, autoDescribeRoute, describeRoute
+from girder.api.describe import Description, describeRoute
 from girder.constants import AccessType
-from girder.api.rest import Resource, loadmodel
-from ..models.annotation import Annotation as AnnotationModel
+from girder.api.rest import Resource
 from ..models.propertyValues import AnnotationPropertyValues as PropertyValuesModel
-from girder.exceptions import AccessException, RestException, ValidationException
+from girder.exceptions import AccessException, RestException
 
 
 class PropertyValues(Resource):
     def __init__(self):
         super().__init__()
         self.resourceName = 'annotation_property_values'
-        self._annotationModel = AnnotationModel()
         self._annotationPropertyValuesModel = PropertyValuesModel()
 
         self.route('DELETE', (), self.delete)

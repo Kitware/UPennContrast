@@ -29,7 +29,8 @@ import {
   AnnotationShape,
   IDatasetView,
   IContrast,
-  IMapEntry
+  IMapEntry,
+  IHistoryEntry
 } from "./model";
 
 import persister from "./Persister";
@@ -38,6 +39,8 @@ import sync from "./sync";
 import { MAX_NUMBER_OF_RECENT_DATASET_VIEWS } from "./constants";
 import Vue from "vue";
 export { default as store } from "./root";
+
+import { Debounce } from "@/utils/debounce";
 
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
@@ -53,6 +56,8 @@ export class Main extends VuexModule {
   propertiesAPI = new PropertiesAPI(this.girderRest);
 
   girderUser: IGirderUser | null = this.girderRest.user;
+
+  history: IHistoryEntry[] = [];
 
   selectedDatasetId: string | null = null;
   dataset: IDataset | null = null;
@@ -341,6 +346,11 @@ export class Main extends VuexModule {
   }
 
   @Mutation
+  protected setHistory(history: IHistoryEntry[]) {
+    this.history = history;
+  }
+
+  @Mutation
   private setXYImpl(value: number) {
     this.xy = value;
   }
@@ -425,6 +435,18 @@ export class Main extends VuexModule {
     } catch (error) {
       sync.setLoading(error);
     }
+  }
+
+  @Action
+  setupWatchers() {
+    store.watch(
+      (state: any) => state.annotation.annotations,
+      this.fetchHistory
+    );
+    store.watch(
+      (state: any) => state.annotation.annotationConnections,
+      this.fetchHistory
+    );
   }
 
   @Action
@@ -703,6 +725,37 @@ export class Main extends VuexModule {
       sync.setSaving(false);
     } catch (error) {
       sync.setSaving(error);
+    }
+  }
+
+  @Action
+  @Debounce(100, { leading: false, trailing: true })
+  async fetchHistory() {
+    const datasetId = this.dataset?.id;
+    if (datasetId !== undefined) {
+      const history = await this.api.getHistoryEntries(datasetId);
+      this.setHistory(history);
+    } else {
+      this.setHistory([]);
+    }
+  }
+
+  @Action
+  async do(undo: boolean) {
+    const datasetId = this.dataset?.id;
+    if (datasetId !== undefined) {
+      try {
+        sync.setSaving(true);
+        if (undo) {
+          await this.api.undo(datasetId);
+        } else {
+          await this.api.redo(datasetId);
+        }
+        this.context.dispatch("fetchAnnotations");
+        sync.setSaving(false);
+      } catch (error) {
+        sync.setSaving(error);
+      }
     }
   }
 

@@ -1,16 +1,14 @@
-from girder.models.model_base import AccessControlledModel
-from girder.exceptions import AccessException, ValidationException
-from girder.constants import AccessType
+from ..helpers.proxiedModel import ProxiedAccessControlledModel
+from girder.exceptions import ValidationException
 from girder import events
 
-from bson.objectid import ObjectId
 import jsonschema
 
 
 class PropertySchema:
     annotationPropertySchema = {
         '$schema': 'http://json-schema.org/schema#',
-        'id': '/girder/plugins/upenncontrast_annotation/models/annotation',
+        'id': '/girder/plugins/upenncontrast_annotation/models/propertyValues',
         'type': 'object',
         'properties': {
             'annotationId': {
@@ -28,7 +26,7 @@ class PropertySchema:
     }
 
 
-class AnnotationPropertyValues(AccessControlledModel):
+class AnnotationPropertyValues(ProxiedAccessControlledModel):
     validator = jsonschema.Draft4Validator(
         PropertySchema.annotationPropertySchema
     )
@@ -73,7 +71,7 @@ class AnnotationPropertyValues(AccessControlledModel):
 
     def delete(self, propertyId, datasetId):
         # Could use self.collection.updateMany but girder doesn't expose this method
-        for document in self.find({'datasetId': datasetId}):
+        for document in self.find({'datasetId': datasetId, '.'.join(['values', propertyId]): { '$exists': True }}):
             document['values'].pop(propertyId, None)
             if len(document['values']) == 0:
                 self.remove(document)

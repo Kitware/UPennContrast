@@ -29,6 +29,7 @@ Vue.use(VueAsyncComputed);
 Vue.use(vMousetrap);
 
 main.initialize();
+main.setupWatchers();
 
 new Vue({
   provide: {
