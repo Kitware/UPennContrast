@@ -97,7 +97,6 @@ class recordable:
 
         return wrapped_fun
 
-@dataclass
 class ModelRecord:
     """
     A record of changes made to the database
