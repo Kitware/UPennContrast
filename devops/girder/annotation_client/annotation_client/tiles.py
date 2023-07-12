@@ -7,6 +7,7 @@ PATHS = {
     'item': '/item?folderId={datasetId}',
     'region': '/item/{itemId}/tiles/region',
     'tiles': '/item/{datasetId}/tiles',
+    'tilesInternal': '/item/{datasetId}/tiles/internal_metadata',
 }
 
 
@@ -35,6 +36,8 @@ class UPennContrastDataset:
 
         self.tiles = self.getTilesForDataset(self.datasetId)
         self.map = self.buildMap(self.tiles.get('frames', None))
+
+        self.tilesInternal = self.getTilesInternalForDataset(self.datasetId)
 
     def buildMap(self, frames):
         """
@@ -83,6 +86,16 @@ class UPennContrastDataset:
         :rtype: dict
         """
         return self.client.get(PATHS['tiles'].format(datasetId=datasetId))
+
+    def getTilesInternalForDataset(self, datasetId):
+        """
+        Get the tiles internal metadata for a dataset (/item/{id}/tiles/internal_metadata)
+
+        :param str datasetId: The dataset id
+        :return: The tiles internal metadata
+        :rtype: dict
+        """
+        return self.client.get(PATHS['tilesInternal'].format(datasetId=datasetId))
 
     def coordinatesToFrameIndex(self, XY, Z=0, T=0, channel=0):
         """
