@@ -62,6 +62,10 @@
             v-if="item.type === 'channel'"
             v-model="interfaceValues[id]"
           ></channel-select>
+          <v-checkbox
+            v-if="item.type === 'checkbox'"
+            v-model="interfaceValues[id]"
+          ></v-checkbox>
         </v-col>
       </v-row>
     </v-list-item-group>
@@ -109,6 +113,9 @@ export default class WorkerInterfaceValues extends Vue {
 
       case "channel":
         return 0;
+
+      case "checkbox":
+        return false;
     }
   }
 

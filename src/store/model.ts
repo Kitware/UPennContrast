@@ -340,13 +340,19 @@ export interface IChannelWorkerInterfaceElement {
   required?: boolean;
 }
 
+export interface ICheckboxWorkerInterfaceElement {
+  type: "checkbox";
+  default?: boolean;
+}
+
 export type TWorkerInterfaceElement =
   | INumberWorkerInterfaceElement
   | ITextWorkerInterfaceElement
   | ITagsWorkerInterfaceElement
   | ILayerWorkerInterfaceElement
   | ISelectWorkerInterfaceElement
-  | IChannelWorkerInterfaceElement;
+  | IChannelWorkerInterfaceElement
+  | ICheckboxWorkerInterfaceElement;
 
 export type TWorkerInterfaceType = TWorkerInterfaceElement["type"];
 
