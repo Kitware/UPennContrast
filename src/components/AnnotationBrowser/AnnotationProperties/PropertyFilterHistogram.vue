@@ -1,21 +1,21 @@
 <template>
-  <v-container v-if="property">
+  <v-container v-if="propertyFullName">
     <v-row>
-      {{ property.name }}
+      {{ propertyFullName }}
     </v-row>
     <v-row>
       <v-col class="wrapper" ref="wrapper" :style="{ width: `${width}px` }">
         <svg :width="width" :height="height" v-if="hist">
           <path class="path" :d="area" />
         </svg>
-        <div class="min-hint" :style="{ width: toValue(minValue) }" />
-        <div class="max-hint" :style="{ width: toValue(maxValue, true) }" />
-        <div ref="min" class="min" :style="{ left: toValue(minValue) }" />
+        <div class="min-hint" :style="{ width: toValue(minValue) }"></div>
+        <div class="max-hint" :style="{ width: toValue(maxValue, true) }"></div>
+        <div ref="min" class="min" :style="{ left: toValue(minValue) }"></div>
         <div
           ref="max"
           class="max"
           :style="{ right: toValue(maxValue, true) }"
-        />
+        ></div>
       </v-col>
       <v-col>
         <v-checkbox v-model="useCDF" label="CDF"></v-checkbox>
@@ -52,12 +52,14 @@ import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
+import { arePathEquals, getValueFromObjectAndPath } from "@/utils/paths";
 import { selectAll, event as d3Event } from "d3-selection";
 import { drag, D3DragEvent } from "d3-drag";
 
 import { IPropertyAnnotationFilter } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import { area, curveStep } from "d3-shape";
+import { v4 as uuidv4 } from "uuid";
 
 import { scaleLinear, scalePoint, scaleSymlog } from "d3-scale";
 
@@ -66,10 +68,13 @@ import { scaleLinear, scalePoint, scaleSymlog } from "d3-scale";
     TagFilterEditor
   }
 })
-export default class AnnotationFilter extends Vue {
+export default class PropertyFilterHistogram extends Vue {
   readonly store = store;
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
+
+  @Prop()
+  readonly propertyPath!: string[];
 
   width = 300;
   height = 60;
@@ -144,14 +149,15 @@ export default class AnnotationFilter extends Vue {
 
   get propertyFilter() {
     const filter = this.propertyFilters.find(
-      (value: IPropertyAnnotationFilter) => value.propertyId === this.propertyId
+      (value: IPropertyAnnotationFilter) =>
+        arePathEquals(value.propertyPath, this.propertyPath)
     );
     if (!filter) {
       const newFilter: IPropertyAnnotationFilter = {
         range: { min: this.defaultMin, max: this.defaultMax },
 
-        id: this.propertyId,
-        propertyId: this.propertyId,
+        id: uuidv4(),
+        propertyPath: this.propertyPath,
         exclusive: false,
         enabled: true
       };
@@ -161,18 +167,24 @@ export default class AnnotationFilter extends Vue {
     return filter;
   }
 
-  @Prop()
-  readonly propertyId!: string;
-  get property() {
-    return this.propertyStore.getPropertyById(this.propertyId);
+  get propertyFullName() {
+    return this.propertyStore.getFullNameFromPath(this.propertyPath);
   }
 
   get values() {
-    return Object.entries(this.propertyStore.propertyValues).map(
-      ([_, propertyValues]: [string, { [propertyId: string]: number }]) => {
-        return propertyValues[this.propertyId];
+    const valuesForThisProperty: number[] = [];
+    const propertyValues = this.propertyStore.propertyValues;
+    for (const annotationId in propertyValues) {
+      const valuesPerProperty = propertyValues[annotationId];
+      const value = getValueFromObjectAndPath(
+        valuesPerProperty,
+        this.propertyPath
+      );
+      if (typeof value === "number") {
+        valuesForThisProperty.push(value);
       }
-    );
+    }
+    return valuesForThisProperty;
   }
 
   get cdf() {
@@ -186,7 +198,9 @@ export default class AnnotationFilter extends Vue {
   }
 
   get hist() {
-    return this.filterStore.histograms[this.propertyId];
+    // TODO: this.values already contains a list of all values
+    // It is easy to build the histogram on the frontend, why make a request?
+    return this.filterStore.getHistogram(this.propertyPath);
   }
 
   get bins() {
@@ -223,7 +237,7 @@ export default class AnnotationFilter extends Vue {
       .x((_, i) => scaleX(i)!)
       .y0(d => scaleY(d)!)
       .y1(scaleY(0));
-    return gen(this.curve);
+    return gen(this.curve) ?? undefined;
   }
 
   destroyed() {

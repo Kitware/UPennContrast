@@ -8,7 +8,8 @@ import {
   IAnnotationPropertyConfiguration,
   IWorkerInterfaceValues,
   IAnnotationLocation,
-  IDisplayLayer
+  IDisplayLayer,
+  TPropertyHistogram
 } from "./model";
 
 import { fetchAllPages } from "@/utils/fetch";
@@ -45,12 +46,13 @@ export default class PropertiesAPI {
 
   async getPropertyHistogram(
     datasetId: string,
-    propertyId: string,
+    propertyPath: string[],
     buckets: number = 255
-  ) {
+  ): Promise<TPropertyHistogram> {
+    const joinedPath = propertyPath.join(".");
     return this.client
       .get(
-        `annotation_property_values/histogram?datasetId=${datasetId}&propertyId=${propertyId}&buckets=${buckets}`
+        `annotation_property_values/histogram?datasetId=${datasetId}&propertyPath=${joinedPath}&buckets=${buckets}`
       )
       .then(res => res.data);
   }

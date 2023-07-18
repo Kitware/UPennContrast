@@ -16,7 +16,8 @@ import {
   IAnnotationPropertyConfiguration,
   IAnnotation,
   IWorkerInterfaceValues,
-  IComputeJob
+  IComputeJob,
+  TNestedValues
 } from "./model";
 
 import Vue from "vue";
@@ -27,6 +28,9 @@ import { canComputeAnnotationProperty } from "@/utils/annotation";
 import filters from "./filters";
 import annotations from "./annotation";
 import jobs from "./jobs";
+import { findIndexOfPath } from "@/utils/paths";
+
+type TNestedObject = { [pathName: string]: TNestedObject };
 
 @Module({ dynamic: true, store, name: "properties" })
 export class Properties extends VuexModule {
@@ -34,7 +38,7 @@ export class Properties extends VuexModule {
 
   properties: IAnnotationProperty[] = [];
 
-  annotationListIds: string[] = [];
+  displayedPropertyPaths: string[][] = [];
 
   propertyValues: IAnnotationPropertyValues = {};
 
@@ -122,19 +126,30 @@ export class Properties extends VuexModule {
   }
 
   @Mutation
-  addAnnotationListId(id: string) {
-    if (!this.annotationListIds.includes(id)) {
-      this.annotationListIds = [...this.annotationListIds, id];
+  togglePropertyPathVisibility(path: string[]) {
+    const pathIdx = findIndexOfPath(path, this.displayedPropertyPaths);
+    if (pathIdx < 0) {
+      this.displayedPropertyPaths.push(path);
+    } else {
+      this.displayedPropertyPaths.splice(pathIdx, 1);
     }
   }
 
-  @Mutation
-  removeAnnotationListId(id: string) {
-    if (this.annotationListIds.includes(id)) {
-      this.annotationListIds = this.annotationListIds.filter(
-        testId => id !== testId
-      );
-    }
+  get getFullNameFromPath() {
+    return (propertyPath: string[]) => {
+      const propertyId = propertyPath[0];
+      if (!propertyId) {
+        return null;
+      }
+      const property = this.getPropertyById(propertyId);
+      if (!property) {
+        return null;
+      }
+      const propertyName = property.name;
+      const subIds = propertyPath.slice(1);
+      const fullName = [propertyName, ...subIds].join(" / ");
+      return fullName;
+    };
   }
 
   get uncomputedAnnotationsPerProperty() {
@@ -153,6 +168,56 @@ export class Properties extends VuexModule {
       }
     }
     return uncomputed;
+  }
+
+  get computedPropertyPaths() {
+    // Combine all the property objects per annotation (e.g. {myPropertyId: { mySubId: 42 }} and {anotherPropertyId: 24} )
+    // Into a single object (e.g. {myPropertyId: {mySubId: {}}, anotherPropertyId: {} })
+    const valuesObjectPerAnnotationId = this.propertyValues;
+    const nestedAggregationObject: TNestedObject = {};
+    const aggregationStack: [TNestedObject, TNestedValues<number>][] = [];
+    for (const annotationId in valuesObjectPerAnnotationId) {
+      const valuesObject = valuesObjectPerAnnotationId[annotationId];
+      aggregationStack.push([nestedAggregationObject, valuesObject]);
+    }
+    while (aggregationStack.length > 0) {
+      const [currentLocation, valuesObject] = aggregationStack.pop()!;
+      if (typeof valuesObject === "number") {
+        continue;
+      }
+      for (const key in valuesObject) {
+        const newLocation = {};
+        const newValues = valuesObject[key];
+        currentLocation[key] = newLocation;
+        aggregationStack.push([newLocation, newValues]);
+      }
+    }
+    // Now compute each valid path to an empty object
+    // For example with {myPropertyId: {mySubId: {}}, anotherPropertyId: {} }:
+    // ["myPropertyId", "mySubId"] and ["anotherPropertyId"]
+    const collectedPaths: string[][] = [];
+    const collectionStack: [string[], TNestedObject][] = [
+      [[], nestedAggregationObject]
+    ];
+    while (collectionStack.length > 0) {
+      const [currentPath, nestedObject] = collectionStack.pop()!;
+      let isNestedObjectEmpty = true;
+      for (const pathName in nestedObject) {
+        isNestedObjectEmpty = false;
+        collectionStack.push([
+          [...currentPath, pathName],
+          nestedObject[pathName]
+        ]);
+      }
+      if (isNestedObjectEmpty) {
+        collectedPaths.push(currentPath);
+      }
+    }
+    // Special case when there is no property
+    if (collectedPaths.length === 1 && collectedPaths[0].length === 0) {
+      return [];
+    }
+    return collectedPaths;
   }
 
   @Action
@@ -182,9 +247,9 @@ export class Properties extends VuexModule {
     const computeJob: IComputeJob = {
       jobId,
       datasetId,
-      callback: (success: boolean) => {
-        this.fetchPropertyValues();
-        filters.updateHistograms();
+      callback: async (success: boolean) => {
+        await this.fetchPropertyValues();
+        await filters.updateHistograms();
         callback(success);
       }
     };

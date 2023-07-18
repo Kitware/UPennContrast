@@ -13,8 +13,6 @@ import properties from "./properties";
 
 import { tagFilterFunction } from "@/utils/annotation";
 
-import Vue from "vue";
-
 import {
   IAnnotation,
   ITagAnnotationFilter,
@@ -23,10 +21,21 @@ import {
   IIdAnnotationFilter,
   IGeoJSPoint,
   IShapeAnnotationFilter,
-  AnnotationShape
+  AnnotationShape,
+  TPropertyHistogram
 } from "./model";
 
 import geo from "geojs";
+import {
+  arePathEquals,
+  createPathStringFromPathArray,
+  findIndexOfPath,
+  getValueFromObjectAndPath
+} from "@/utils/paths";
+
+type TFilterHistograms = {
+  [joinedPropertyPath: string]: TPropertyHistogram;
+};
 
 @Module({ dynamic: true, store, name: "filters" })
 export class Filters extends VuexModule {
@@ -57,23 +66,17 @@ export class Filters extends VuexModule {
     annotationIds: []
   };
 
-  filterIds: string[] = [];
+  filterPaths: string[][] = [];
 
-  histograms: {
-    [propertyId: string]: { count: number; min: number; max: number }[];
-  } = {};
+  histograms: TFilterHistograms = {};
 
   @Mutation
-  addFilterId(id: string) {
-    if (!this.filterIds.includes(id)) {
-      this.filterIds = [...this.filterIds, id];
-    }
-  }
-
-  @Mutation
-  removeFilterId(id: string) {
-    if (this.filterIds.includes(id)) {
-      this.filterIds = this.filterIds.filter(testId => id !== testId);
+  togglePropertyPathFiltering(path: string[]) {
+    const pathIdx = findIndexOfPath(path, this.filterPaths);
+    if (pathIdx < 0) {
+      this.filterPaths.push(path);
+    } else {
+      this.filterPaths.splice(pathIdx, 1);
     }
   }
 
@@ -189,9 +192,12 @@ export class Filters extends VuexModule {
       const propertyValues = properties.propertyValues[annotation.id] || {};
       const matchesProperties = enabledPropertyFilters.every(
         (filter: IPropertyAnnotationFilter) => {
-          const value = propertyValues[filter.propertyId];
+          const value = getValueFromObjectAndPath(
+            propertyValues,
+            filter.propertyPath
+          );
           return (
-            value !== undefined &&
+            typeof value === "number" &&
             value >= filter.range.min &&
             value <= filter.range.max
           );
@@ -227,7 +233,7 @@ export class Filters extends VuexModule {
     this.propertyFilters = [
       ...this.propertyFilters.filter(
         (filter: IPropertyAnnotationFilter) =>
-          filter.propertyId !== value.propertyId
+          !arePathEquals(filter.propertyPath, value.propertyPath)
       ),
       value
     ];
@@ -253,29 +259,35 @@ export class Filters extends VuexModule {
     });
   }
 
+  get getHistogram() {
+    return (path: string[]): TPropertyHistogram | null => {
+      const key = createPathStringFromPathArray(path);
+      return this.histograms[key] || null;
+    };
+  }
+
   @Mutation
-  public setPropertyHistogram({
-    propertyId,
-    histogram
-  }: {
-    propertyId: string;
-    histogram: { count: number; min: number; max: number }[];
-  }) {
-    Vue.set(this.histograms, propertyId, histogram);
+  public setPropertyHistograms(histograms: TFilterHistograms) {
+    this.histograms = histograms;
   }
 
   @Action
   async updateHistograms() {
-    this.filterIds.forEach((id: string) => {
-      if (!main.dataset) {
-        return;
-      }
+    const dataset = main.dataset;
+    if (!dataset) {
+      this.setPropertyHistograms({});
+      return;
+    }
+    const histograms: TFilterHistograms = {};
+    const promises = this.filterPaths.map((path: string[]) =>
       properties.propertiesAPI
-        .getPropertyHistogram(main.dataset.id, id)
-        .then((histogram: { count: number; min: number; max: number }[]) => {
-          this.setPropertyHistogram({ propertyId: id, histogram });
-        });
-    });
+        .getPropertyHistogram(dataset.id, path)
+        .then((histogram: TPropertyHistogram) => {
+          const key = createPathStringFromPathArray(path);
+          histograms[key] = histogram;
+        })
+    );
+    Promise.all(promises).then(() => this.setPropertyHistograms(histograms));
   }
 }
 

@@ -39,6 +39,7 @@ import {
   geojsAnnotationFactory,
   tagFilterFunction
 } from "@/utils/annotation";
+import { getValueFromObjectAndPath } from "@/utils/paths";
 
 function filterAnnotations(
   annotations: IAnnotation[],
@@ -385,43 +386,43 @@ export default class AnnotationViewer extends Vue {
           ...baseStyle
         });
       yOffset += 12;
-      for (const propertyId of this.toggledPropertiesId) {
-        const property = this.properties.find(
-          property => property.id === propertyId
-        );
-        if (property) {
+      for (const propertyPath of this.displayedPropertyPaths) {
+        const fullName = this.propertyStore.getFullNameFromPath(propertyPath);
+        if (fullName) {
+          const propertyValues = this.propertyValues;
+          const propertyData: Map<string, string> = new Map();
+          const filteredIds: string[] = [];
+          for (const annotation of this.displayedAnnotations) {
+            const value = getValueFromObjectAndPath(
+              propertyValues[annotation.id],
+              propertyPath
+            );
+            if (typeof value !== "number") {
+              continue;
+            }
+            const fixedValue = value.toFixed(2);
+            const fixedError = Math.abs(value - parseFloat(fixedValue));
+            const precisedValue = value.toPrecision(3);
+            const precisedError = Math.abs(value - parseFloat(precisedValue));
+            const stringValue =
+              fixedError <= precisedError ? fixedValue : precisedValue;
+            propertyData.set(annotation.id, stringValue);
+            filteredIds.push(annotation.id);
+          }
           this.textLayer
             .createFeature("text")
-            .data(
-              this.displayedAnnotations.filter(
-                (annotation: IAnnotation) =>
-                  this.propertyValues[annotation.id]?.[propertyId] !== undefined
-              )
+            .data(filteredIds)
+            .position(
+              (annotationId: string) => unrolledCoordinates[annotationId]
             )
-            .position((annotation: IAnnotation) => {
-              return unrolledCoordinates[annotation.id];
-            })
             .style({
               // This is the part where we display the property value.
               // Right now, one issue is that if you have multiple properties to show and
               // one of them isn't defined for an annotation, the yOffset will be wrong.
               // That could be fixed by looping through the annotations independently, but I'm
               // worried that that would create performance issues, so leaving it as is for now.
-              text: (annotation: IAnnotation) => {
-                const value = this.propertyValues[annotation.id]?.[propertyId];
-                if (value === undefined) {
-                  return "";
-                }
-                const fixedValue = value.toFixed(2);
-                const fixedError = Math.abs(value - parseFloat(fixedValue));
-                const precisedValue = value.toPrecision(3);
-                const precisedError = Math.abs(
-                  value - parseFloat(precisedValue)
-                );
-                const stringValue =
-                  fixedError < precisedError ? fixedValue : precisedValue;
-                return `${property.name}=${stringValue}`;
-              },
+              text: (annotationId: string) =>
+                `${fullName}=${propertyData.get(annotationId)}`,
               offset: { x: 0, y: yOffset },
               ...baseStyle
             });
@@ -433,8 +434,8 @@ export default class AnnotationViewer extends Vue {
     this.textLayer.draw();
   }
 
-  get toggledPropertiesId() {
-    return this.propertyStore.annotationListIds;
+  get displayedPropertyPaths() {
+    return this.propertyStore.displayedPropertyPaths;
   }
 
   get properties() {
@@ -1334,7 +1335,7 @@ export default class AnnotationViewer extends Vue {
   @Watch("filteredAnnotations")
   @Watch("properties")
   @Watch("propertyValues")
-  @Watch("toggledPropertiesId")
+  @Watch("displayedPropertyPaths")
   onDrawTooltipsChanged() {
     this.drawTooltips();
   }

@@ -7,8 +7,11 @@
     />
     <tag-filter-editor class="filter-element" v-model="tagFilter" />
     <roi-filters class="filter-element" />
-    <template v-for="propertyId in propertyIds">
-      <property-filter-histogram :key="propertyId" :propertyId="propertyId" />
+    <template v-for="(propertyPath, idx) in propertyPaths">
+      <property-filter-histogram
+        :key="'property ' + idx"
+        :propertyPath="propertyPath"
+      />
     </template>
   </v-container>
 </template>
@@ -33,6 +36,7 @@ import RoiFilters from "@/components/AnnotationBrowser/ROIFilters.vue";
 })
 export default class AnnotationFilters extends Vue {
   readonly filterStore = filterStore;
+
   @Prop()
   readonly additionalTags!: string[];
 
@@ -54,8 +58,8 @@ export default class AnnotationFilters extends Vue {
     this.filterStore.setShapeFilter(filter);
   }
 
-  get propertyIds() {
-    return this.filterStore.filterIds;
+  get propertyPaths() {
+    return this.filterStore.filterPaths;
   }
 
   get propertyFilters() {

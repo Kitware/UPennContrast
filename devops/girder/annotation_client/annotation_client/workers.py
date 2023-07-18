@@ -116,7 +116,11 @@ class UPennContrastWorkerClient:
         return image
 
     def add_annotation_property_values(self, annotation, values):
-
+        """
+        Add property values to this annotation
+        :param dict annotation: The annotation having the properties
+        :param (number|dict) values: The value for this property (a number or a dict of numbers)
+        """
         if not np.isnan(values):
             property_values = {self.propertyId: values}
             self.annotationClient.addAnnotationPropertyValues(self.datasetId, annotation['_id'], property_values)
