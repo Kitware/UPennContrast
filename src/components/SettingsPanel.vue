@@ -7,6 +7,7 @@
       <v-expansion-panels hover multiple v-model="panels">
         <annotation-toggles />
         <viewer-settings />
+        <u-i-settings />
       </v-expansion-panels>
     </v-card-text>
   </v-card>
@@ -16,9 +17,10 @@
 import { Vue, Component } from "vue-property-decorator";
 import AnnotationToggles from "@/components/AnnotationBrowser/AnnotationToggles.vue";
 import ViewerSettings from "@/components/ViewerSettings.vue";
+import UISettings from "@/components/UISettings.vue";
 
-@Component({ components: { AnnotationToggles, ViewerSettings } })
+@Component({ components: { AnnotationToggles, ViewerSettings, UISettings } })
 export default class AnnotationsSettings extends Vue {
-  panels: number[] = [0, 1];
+  panels: number[] = [0, 1, 2];
 }
 </script>
