@@ -3,7 +3,7 @@ from girder.api import rest
 from girder.exceptions import AccessException
 from girder.models.model_base import AccessControlledModel
 
-from dataclasses import dataclass
+from copy import deepcopy
 from ..models.history import History as HistoryModel
 
 from types import MethodType
@@ -32,7 +32,7 @@ def cacheBodyJson(func):
     '''
     @wraps(func)
     def wrapped(self: rest.Resource, *args, **kwargs):
-        # Get the resul of getBodyJson
+        # Get the result of getBodyJson
         error = None
         bodyJson = None
         try:
@@ -42,17 +42,19 @@ def cacheBodyJson(func):
 
         # Create memoised version of the method
         def getCachedBodyJson(self):
-            if error is None:
-                return bodyJson
-            else:
-                raise error
-            
+            return deepcopy(bodyJson)
+        def raiseBodyJsonError(self):
+            raise error
+        newFunction = getCachedBodyJson if error is None else raiseBodyJsonError
+        newMethod = MethodType(newFunction, self)
+
         # Wrap the function call
-        originalGetBodyJson = self.getBodyJson
-        self.getBodyJson = MethodType(getCachedBodyJson, self)
-        val = func(self, *args, **kwargs)
-        self.getBodyJson = originalGetBodyJson
-        return val
+        originalMethod = self.getBodyJson
+        try:
+            self.getBodyJson = newMethod
+            return func(self, *args, **kwargs)
+        finally:
+            self.getBodyJson = originalMethod
 
     return wrapped
 
@@ -66,6 +68,7 @@ class recordable:
         self.findDatasetIdFn = findDatasetIdFn
 
     def __call__(self, fun):
+        @wraps(fun)
         def wrapped_fun(*args, **kwargs):
             actionDate = HistoryModel.now()
 
