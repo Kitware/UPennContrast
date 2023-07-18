@@ -14,10 +14,6 @@
       >
         Upload Data
       </v-btn>
-      <user-menu class="ml-4" />
-      <v-btn text icon class="ml-4" @click="dark = !dark">
-        <v-icon>mdi-theme-light-dark</v-icon>
-      </v-btn>
       <v-divider class="ml-4" vertical />
       <template v-if="store.dataset && routeName === 'datasetview'">
         <v-btn class="ml-4" @click.stop="toggleRightPanel('analyzePanel')">
