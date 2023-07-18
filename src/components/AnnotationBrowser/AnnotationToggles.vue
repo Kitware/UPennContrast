@@ -1,7 +1,7 @@
 <template>
   <v-expansion-panel>
     <v-expansion-panel-header>
-      Annotation Controls
+      Object display and selection controls
     </v-expansion-panel-header>
     <v-expansion-panel-content>
       <v-list dense class="py-0">
@@ -10,7 +10,7 @@
             hide-details
             v-model="drawAnnotations"
             dense
-            label="Show Annotations (hotkey A)"
+            label="Show objects (hotkey A)"
           ></v-checkbox>
         </v-list-item>
         <v-list-item v-if="drawAnnotations">
@@ -20,7 +20,7 @@
                 hide-details
                 dense
                 v-model="filteredDraw"
-                label="Filtered"
+                label="Show only objects passing filters"
               ></v-switch>
             </v-list-item>
             <v-list-item>
@@ -28,7 +28,7 @@
                 hide-details
                 dense
                 v-model="drawConnections"
-                label="Show Connections"
+                label="Show connections between objects"
               ></v-checkbox>
             </v-list-item>
             <v-list-item>
@@ -36,7 +36,7 @@
                 hide-details
                 dense
                 v-model="showTooltips"
-                label="Show Tooltips (hotkey T)"
+                label="Show object tooltips (hotkey T)"
               ></v-checkbox>
             </v-list-item>
             <v-list-item v-if="showTooltips">
@@ -46,7 +46,7 @@
                     hide-details
                     dense
                     v-model="filteredAnnotationTooltips"
-                    label="Filtered"
+                    label="Show tooltips only for objects passing filters"
                   ></v-switch>
                 </v-list-item>
               </v-list>
@@ -59,7 +59,8 @@
             :items="annotationsSelectionTypeItems"
             item-text="text"
             item-value="value"
-            label="Annotation Selection Type"
+            label="Object selection mode"
+            title="When adding to a selection, you can add, remove, or toggle the selection of objects"
           ></v-select>
         </v-list-item>
       </v-list>

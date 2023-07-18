@@ -1,7 +1,7 @@
 <template>
   <v-card class="ma-1">
     <v-card-title>
-      Annotation Settings
+      NimbusImage settings
     </v-card-title>
     <v-card-text class="pa-1">
       <v-expansion-panels hover multiple v-model="panels">
