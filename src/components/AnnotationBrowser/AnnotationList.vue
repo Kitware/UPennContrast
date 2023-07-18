@@ -131,14 +131,12 @@
                 </v-text-field>
               </td>
               <td
-                v-for="propertyId in showedPropertyIds"
-                :key="propertyId"
+                v-for="(propertyPath, idx) in displayedPropertyPaths"
+                :key="item.annotation.id + ' property ' + idx"
                 :class="tableItemClass"
               >
                 <span>{{
-                  typeof item.properties[propertyId] === "number"
-                    ? Math.round(item.properties[propertyId] * 100) / 100
-                    : item.properties[propertyId]
+                  getStringFromPropertiesAndPath(item.properties, propertyPath)
                 }}</span>
               </td>
             </tr>
@@ -155,22 +153,21 @@ import store from "@/store";
 import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
+import { getStringFromPropertiesAndPath } from "@/utils/paths";
 
 import TagPicker from "@/components/TagPicker.vue";
 
 import {
   AnnotationNames,
   IAnnotation,
-  IAnnotationProperty
+  IAnnotationPropertyValues
 } from "@/store/model";
 
 interface IAnnotationListItem {
   annotation: IAnnotation;
   shapeName: string;
   isSelected: boolean;
-  properties: {
-    [propertyId: string]: number | "-";
-  };
+  properties: IAnnotationPropertyValues[0];
 }
 
 @Component({
@@ -181,6 +178,7 @@ export default class AnnotationList extends Vue {
   readonly annotationStore = annotationStore;
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
+  readonly getStringFromPropertiesAndPath = getStringFromPropertiesAndPath;
 
   tableItemClass = "px-1"; // To enable dividers, use v-data-table__divider
 
@@ -222,25 +220,16 @@ export default class AnnotationList extends Vue {
   }
 
   get annotationToItem() {
-    return (annotation: IAnnotation) => {
-      const item: IAnnotationListItem = {
-        annotation,
-        shapeName: AnnotationNames[annotation.shape],
-        isSelected: this.annotationStore.isAnnotationSelected(annotation.id),
-        properties: {}
-      };
-      this.properties.forEach((property: IAnnotationProperty) => {
-        item.properties[property.id] = this.getPropertyValueForAnnotationId(
-          annotation.id,
-          property.id
-        );
-      });
-      return item;
-    };
+    return (annotation: IAnnotation) => ({
+      annotation,
+      shapeName: AnnotationNames[annotation.shape],
+      isSelected: this.annotationStore.isAnnotationSelected(annotation.id),
+      properties: this.propertyStore.propertyValues[annotation.id] || {}
+    });
   }
 
-  get showedPropertyIds() {
-    return this.propertyStore.annotationListIds;
+  get displayedPropertyPaths() {
+    return this.propertyStore.displayedPropertyPaths;
   }
 
   get annotationIdToIndex() {
@@ -259,13 +248,6 @@ export default class AnnotationList extends Vue {
       }
       return values[propertyId];
     };
-  }
-
-  get properties() {
-    return this.propertyStore.properties.filter(
-      (property: IAnnotationProperty) =>
-        this.showedPropertyIds.includes(property.id)
-    );
   }
 
   get selectAllIndeterminate() {
@@ -315,15 +297,21 @@ export default class AnnotationList extends Vue {
         text: "Name",
         value: "name"
       },
-      ...this.properties
-        .sort((a: IAnnotationProperty, b: IAnnotationProperty) =>
-          a.id.localeCompare(b.id)
-        )
-        .map((property: IAnnotationProperty) => ({
-          text: property.name,
-          value: property.id
-        }))
+      ...this.propertyHeaders
     ];
+  }
+
+  get propertyHeaders() {
+    const propertyHeaders = [];
+    // Order is important, it should be the same as in the <td v-for="x in y"> above
+    for (const path of this.displayedPropertyPaths) {
+      const fullName = this.propertyStore.getFullNameFromPath(path);
+      propertyHeaders.push({
+        text: fullName,
+        value: "" // Not optional but not used because the slot "body" is used
+      });
+    }
+    return propertyHeaders;
   }
 
   goToAnnotationIdLocation(annotationId: string) {

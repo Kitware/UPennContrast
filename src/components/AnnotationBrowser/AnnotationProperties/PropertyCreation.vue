@@ -243,7 +243,7 @@ export default class PropertyCreation extends Vue {
         workerInterface: this.interfaceValues
       })
       .then(property => {
-        this.propertyStore.addAnnotationListId(property.id);
+        this.propertyStore.togglePropertyPathVisibility([property.id]);
       });
     this.reset();
   }
