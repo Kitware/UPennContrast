@@ -1,9 +1,9 @@
 <template>
   <v-app id="inspire">
     <v-app-bar class="elevation-1" app clipped-right>
-      <v-toolbar-title @click="goHome" class="logo"
-        >NimbusImage</v-toolbar-title
-      >
+      <v-toolbar-title @click="goHome" class="logo">
+        <img src="/img/icons/NimbusImageIcon.png" alt="Icon" class="logo-icon" />
+      </v-toolbar-title>
       <bread-crumbs />
       <v-spacer />
       <v-btn
@@ -240,5 +240,12 @@ body > div {
 
 .v-navigation-drawer {
   z-index: 100;
+}
+</style>
+<style lang="scss" scoped>
+.logo-icon {
+  height: 50px; // Adjust as needed
+  width: 50px; // Adjust as needed
+  margin-top: 10px;
 }
 </style>
