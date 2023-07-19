@@ -121,6 +121,5 @@ class UPennContrastWorkerClient:
         :param dict annotation: The annotation having the properties
         :param (number|dict) values: The value for this property (a number or a dict of numbers)
         """
-        if not np.isnan(values):
-            property_values = {self.propertyId: values}
-            self.annotationClient.addAnnotationPropertyValues(self.datasetId, annotation['_id'], property_values)
+        property_values = {self.propertyId: values}
+        self.annotationClient.addAnnotationPropertyValues(self.datasetId, annotation['_id'], property_values)
