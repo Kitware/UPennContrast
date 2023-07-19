@@ -13,28 +13,31 @@
             label="Show objects (hotkey A)"
           ></v-checkbox>
         </v-list-item>
-        <v-list-item v-if="drawAnnotations">
+        <v-list-item>
           <v-list dense class="py-0">
+                        <v-list-item>
+              <v-checkbox
+                hide-details
+                dense
+                :disabled="!drawAnnotations"
+                v-model="drawConnections"
+                label="Show connections between objects"
+              ></v-checkbox>
+            </v-list-item>
             <v-list-item>
               <v-switch
                 hide-details
                 dense
+                :disabled="!drawAnnotations"
                 v-model="filteredDraw"
-                label="Show only objects passing filters"
+                label="Only show objects passing filters"
               ></v-switch>
             </v-list-item>
             <v-list-item>
               <v-checkbox
                 hide-details
                 dense
-                v-model="drawConnections"
-                label="Show connections between objects"
-              ></v-checkbox>
-            </v-list-item>
-            <v-list-item>
-              <v-checkbox
-                hide-details
-                dense
+                :disabled="!drawAnnotations"
                 v-model="showTooltips"
                 label="Show object tooltips (hotkey T)"
               ></v-checkbox>
@@ -45,7 +48,7 @@
                   <v-switch
                     hide-details
                     dense
-                    :disabled="!showTooltips"
+                    :disabled="!showTooltips||!drawAnnotations"
                     v-model="filteredAnnotationTooltips"
                     label="Show tooltips only for objects passing filters"
                   ></v-switch>
