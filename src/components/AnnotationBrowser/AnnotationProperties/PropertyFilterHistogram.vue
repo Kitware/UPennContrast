@@ -1,6 +1,6 @@
 <template>
   <v-container v-if="propertyFullName">
-    <v-row>
+    <v-row class="title text--primary">
       {{ propertyFullName }}
     </v-row>
     <v-row>
@@ -58,10 +58,10 @@ import { drag, D3DragEvent } from "d3-drag";
 
 import { IPropertyAnnotationFilter } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
-import { area, curveStep } from "d3-shape";
+import { area, curveStepBefore } from "d3-shape";
 import { v4 as uuidv4 } from "uuid";
 
-import { scaleLinear, scalePoint, scaleSymlog } from "d3-scale";
+import { scaleLinear, scaleSymlog } from "d3-scale";
 
 @Component({
   components: {
@@ -187,57 +187,53 @@ export default class PropertyFilterHistogram extends Vue {
     return valuesForThisProperty;
   }
 
-  get cdf() {
-    const data = [...this.bins];
-    for (let i = 0; i < data.length; ++i) {
-      if (i > 0) {
-        data[i] += data[i - 1];
-      }
-    }
-    return data;
-  }
-
   get hist() {
-    // TODO: this.values already contains a list of all values
-    // It is easy to build the histogram on the frontend, why make a request?
-    return this.filterStore.getHistogram(this.propertyPath);
-  }
-
-  get bins() {
-    const hist = this.hist;
-    if (!hist) {
-      return [];
-    }
-    return hist.map(({ count }: { count: number }) => count);
-  }
-
-  get curve() {
-    return this.useCDF ? this.cdf : this.bins;
+    return this.filterStore.getHistogram(this.propertyPath) || [];
   }
 
   get area() {
-    if (!this.curve?.length) {
+    const nInitial = this.hist.length;
+    if (nInitial === 0) {
       return "";
     }
-    const scaleY = this.useLog
-      ? scaleSymlog()
-          .domain([0, Math.max(...this.curve)])
-          // .constant(0.01)
-          .range([this.height, 0])
-      : scaleLinear()
-          .domain([0, Math.max(...this.curve)])
-          .range([this.height, 0]);
+    // Create a dummy point in histogram because of curveStepBefore
+    const minIntensity = this.hist[0].min;
+    const maxIntensity = this.hist[nInitial - 1].max;
+    const dummyFirstPoint = {
+      count: 0,
+      min: minIntensity,
+      max: minIntensity
+    };
+    const hist = [dummyFirstPoint, ...this.hist];
 
-    const scaleX = scalePoint<number>()
-      .domain(this.curve.map((_: number, i: number) => i))
-      .range([0, this.width]);
+    // We need to show densities instead of counts on the Y axis
+    // Density of the dummyFirstPoint is 0 and won't cause problems
+    const densities = hist.map(({ count, min, max }) =>
+      max <= min ? 0 : count / (max - min)
+    );
+    if (this.useCDF) {
+      for (let i = 1; i < densities.length; ++i) {
+        densities[i] += densities[i - 1];
+      }
+    }
+
+    // On the x axis
+    const intensities = hist.map(({ max }) => max);
+
+    const scaleY = this.useLog ? scaleSymlog() : scaleLinear();
+    scaleY.domain([0, Math.max(...densities)]);
+    scaleY.range([this.height, 0]);
+
+    const scaleX = scaleLinear();
+    scaleX.domain([minIntensity, maxIntensity]);
+    scaleX.range([0, this.width]);
 
     const gen = area<number>()
-      .curve(curveStep)
-      .x((_, i) => scaleX(i)!)
-      .y0(d => scaleY(d)!)
-      .y1(scaleY(0));
-    return gen(this.curve) ?? undefined;
+      .curve(curveStepBefore)
+      .x((_, i) => scaleX(intensities[i])!)
+      .y0(scaleY(0))
+      .y1(d => scaleY(d)!);
+    return gen(densities) ?? undefined;
   }
 
   destroyed() {
