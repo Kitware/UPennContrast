@@ -18,14 +18,8 @@
       <template v-if="store.dataset && routeName === 'datasetview'">
         <v-btn class="ml-4" @click.stop="toggleRightPanel('analyzePanel')">
           <v-badge dot color="red" :value="hasUncomputedProperties">
-            Analyze
+            Measure objects
           </v-badge>
-        </v-btn>
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('settingsPanel')">
-          Settings
-        </v-btn>
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('snapshotPanel')">
-          Snapshots
         </v-btn>
         <v-btn
           class="ml-4"
@@ -35,8 +29,15 @@
           "
         >
           <v-badge dot color="green" :value="annotationPanelBadge">
-            Annotations
+            Object list
           </v-badge>
+        </v-btn>
+        <v-divider class="ml-4" vertical />
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('snapshotPanel')">
+          Snapshots
+        </v-btn>
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('settingsPanel')">
+          Settings
         </v-btn>
       </template>
       <server-status />

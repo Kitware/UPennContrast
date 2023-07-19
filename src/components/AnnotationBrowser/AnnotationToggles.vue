@@ -39,12 +39,13 @@
                 label="Show object tooltips (hotkey T)"
               ></v-checkbox>
             </v-list-item>
-            <v-list-item v-if="showTooltips">
+            <v-list-item>
               <v-list dense class="py-0">
                 <v-list-item>
                   <v-switch
                     hide-details
                     dense
+                    :disabled="!showTooltips"
                     v-model="filteredAnnotationTooltips"
                     label="Show tooltips only for objects passing filters"
                   ></v-switch>
