@@ -367,7 +367,7 @@ export default class AnnotationViewer extends Vue {
         textBaseline: "middle",
         color: "white",
         textStrokeColor: "black",
-        textStrokeWidth: 3
+        textStrokeWidth: 2
       };
       let yOffset = 0;
       this.textLayer
@@ -380,7 +380,7 @@ export default class AnnotationViewer extends Vue {
           text: (annotation: IAnnotation) => {
             const index = this.annotationStore.annotationIdToIdx[annotation.id];
             return (
-              "ID=" + index + " Tags:[ " + annotation.tags.join(", ") + " ]"
+              index + ": " + annotation.tags.join(", ")
             );
           },
           offset: { x: 0, y: yOffset },
