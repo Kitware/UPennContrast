@@ -394,15 +394,34 @@ export default class AnnotationViewer extends Vue {
         if (property) {
           this.textLayer
             .createFeature("text")
-            .data(this.displayedAnnotations)
+            .data(
+              this.displayedAnnotations.filter(
+                (annotation: IAnnotation) =>
+                  this.propertyValues[annotation.id]?.[propertyId] !== undefined
+              )
+            )
             .position((annotation: IAnnotation) => {
               return unrolledCoordinates[annotation.id];
             })
             .style({
+              // This is the part where we display the property value.
+              // Right now, one issue is that if you have multiple properties to show and
+              // one of them isn't defined for an annotation, the yOffset will be wrong.
+              // That could be fixed by looping through the annotations independently, but I'm
+              // worried that that would create performance issues, so leaving it as is for now.
               text: (annotation: IAnnotation) => {
-                let value =
-                  this.propertyValues[annotation.id]?.[propertyId] || "unknown";
-                return `${property.name}=${value}`;
+                let value = this.propertyValues[annotation.id]?.[propertyId];
+                if (value) {
+                  let numValue = Number(value);
+                  if (!isNaN(numValue)) {
+                    let fixedValue = numValue.toFixed(2);  // preserve up to 2 decimal points
+                    let precisedValue = numValue.toPrecision(3);  // preserve up to 3 significant digits
+                    value = parseFloat(fixedValue) < parseFloat(precisedValue) ? fixedValue : precisedValue;
+                  }
+                  return `${property.name}=${value}`;
+                } else {
+                  return "";
+                }
               },
               offset: { x: 0, y: yOffset },
               ...baseStyle
