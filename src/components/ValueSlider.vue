@@ -1,42 +1,61 @@
 <template>
-  <v-slider
-    v-model="slider"
-    :max="max + offset"
-    :min="min + offset"
-    hide-details
-    :label="label"
-    :disabled="min === max"
-  >
-    <template #append>
-      <v-container>
-        <v-row>
-          <v-col class="pa-0">
-            <v-text-field
-              v-model="slider"
-              class="mt-0 pt-0"
-              hide-details
-              single-line
-              type="number"
-              :min="min + offset"
-              :max="max + offset"
-              :disabled="min === max"
-              style="width: 60px"
-              dense
-            >
-            </v-text-field>
-          </v-col>
-        </v-row>
-        <v-row>
-          <v-col class="text-right pa-0">
-            <span class="mt-2 caption font-weight-light">{{
-              `of ${max + offset}`
-            }}</span>
-          </v-col>
-        </v-row>
-      </v-container>
-    </template>
-  </v-slider>
+  <v-row>
+    <v-col cols="3" class="text-right align-center label-column">
+      {{ label }}
+    </v-col>
+    <v-col cols="9" class="slider-column">
+      <v-slider
+        v-model="slider"
+        :max="max + offset"
+        :min="min + offset"
+        hide-details
+        :disabled="min === max"
+      >
+        <template #append>
+          <v-container>
+            <v-row>
+              <v-col class="pa-0 text-field-column">
+                <v-text-field
+                  v-model="slider"
+                  class="mt-0 pt-0"
+                  hide-details
+                  single-line
+                  type="number"
+                  :min="min + offset"
+                  :max="max + offset"
+                  :disabled="min === max"
+                  style="width: 50px"
+                  dense
+                >
+                </v-text-field>
+              </v-col>
+            </v-row>
+            <v-row>
+              <v-col class="text-right pa-0">
+                <span class="mt-2 caption font-weight-light">{{ `of ${max + offset}` }}</span>
+              </v-col>
+            </v-row>
+          </v-container>
+        </template>
+      </v-slider>
+    </v-col>
+  </v-row>
 </template>
+
+<style scoped>
+.label-column {
+  transform: translateY(2px); /* Adjust this value to move the label vertically */
+}
+
+.slider-column {
+  padding-left: 0px; /* Adjust this value to reduce padding around the slider */
+}
+
+.text-field-column {
+  transform: translateY(-4px); /* Adjust this value to move the text input field vertically */
+}
+</style>
+
 
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";

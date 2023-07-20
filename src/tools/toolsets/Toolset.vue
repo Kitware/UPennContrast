@@ -194,8 +194,9 @@ export default class Toolset extends Vue {
 <style scoped>
 .v-list {
   width: 100%;
-  /* height: 40vh; */
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 5px; /* Add padding to tighten the list */
+  line-height: 1.2; /* Add line-height to tighten the list */
 }
 </style>
