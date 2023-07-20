@@ -413,7 +413,9 @@ export default class AnnotationViewer extends Vue {
                 let value = this.propertyValues[annotation.id]?.[propertyId];
                 if (value) {
                   let numValue = Number(value);
-                  if (!isNaN(numValue)) {
+                  if (!isNaN(numValue)) { // if value is a number, otherwise, just return the string
+                    // Idea here: keep up to 2 decimal points or 3 significant digits, whichever is more precise
+                    // Not entirely sure the logic is sound, but close enough.
                     let fixedValue = numValue.toFixed(2);  // preserve up to 2 decimal points
                     let precisedValue = numValue.toPrecision(3);  // preserve up to 3 significant digits
                     value = parseFloat(fixedValue) < parseFloat(precisedValue) ? fixedValue : precisedValue;
