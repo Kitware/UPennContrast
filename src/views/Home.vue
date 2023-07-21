@@ -89,10 +89,10 @@ export default class Home extends Vue {
   readonly store = store;
   location: IGirderLocation | null = null;
   datasetInfo: {
-    [datasetId: string]: IGirderFolder;
+    [datasetId: string]: IGirderFolder | null;
   } = {};
   configInfo: {
-    [configurationId: string]: IGirderItem;
+    [configurationId: string]: IGirderItem | null;
   } = {};
 
   get datasetViews() {
@@ -108,13 +108,16 @@ export default class Home extends Vue {
   }
 
   get datasetViewItems() {
-    return this.datasetViews.map(datasetView => {
-      return {
-        datasetView,
-        configInfo: this.configInfo[datasetView.configurationId] || {},
-        datasetInfo: this.datasetInfo[datasetView.datasetId] || {}
-      };
-    });
+    const items = [];
+    for (const datasetView of this.datasetViews) {
+      const configInfo = this.configInfo[datasetView.configurationId];
+      const datasetInfo = this.datasetInfo[datasetView.datasetId];
+      if (!configInfo || !datasetInfo) {
+        continue;
+      }
+      items.push({ datasetView, configInfo, datasetInfo });
+    }
+    return items;
   }
 
   @Watch("datasetViews")
@@ -126,6 +129,7 @@ export default class Home extends Vue {
           this.store.api
             .getFolder(d.datasetId)
             .then(folder => Vue.set(this.datasetInfo, d.datasetId, folder))
+            .catch(() => Vue.set(this.datasetInfo, d.datasetId, null))
         );
       }
       if (!(d.configurationId in this.configInfo)) {
@@ -133,6 +137,7 @@ export default class Home extends Vue {
           this.store.api
             .getItem(d.configurationId)
             .then(item => Vue.set(this.configInfo, d.configurationId, item))
+            .catch(() => Vue.set(this.configInfo, d.configurationId, null))
         );
       }
     }
