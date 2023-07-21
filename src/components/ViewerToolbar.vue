@@ -63,11 +63,12 @@
         <v-radio value="multiple" label="Multiple" class="smaller" />
         <v-radio value="unroll" label="Unroll" class="smaller" />
       </v-radio-group>
+      <toolset></toolset>
     </div>
     <div class="lowertools">
       <slot></slot>
     </div>
-    <toolset></toolset>
+    
   </div>
 </template>
 
