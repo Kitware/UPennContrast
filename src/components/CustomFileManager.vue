@@ -22,17 +22,7 @@
               <v-icon>mdi-dots-vertical</v-icon>
             </v-btn>
           </template>
-          <v-list class="pa-0">
-            <girder-location-chooser @input="move(selected, $event)">
-              <template v-slot:activator="{ on }">
-                <v-list-item v-on="on">
-                  <v-list-item-title>
-                    Move
-                  </v-list-item-title>
-                </v-list-item>
-              </template>
-            </girder-location-chooser>
-          </v-list>
+          <file-manager-options @itemsChanged="reloadItems" :items="selected" />
         </v-menu>
       </template>
       <template #row-widget="props">
@@ -56,17 +46,10 @@
               <v-icon>mdi-dots-vertical</v-icon>
             </v-btn>
           </template>
-          <v-list class="pa-0">
-            <girder-location-chooser @input="move([props.item], $event)">
-              <template v-slot:activator="{ on }">
-                <v-list-item v-on="on">
-                  <v-list-item-title>
-                    Move
-                  </v-list-item-title>
-                </v-list-item>
-              </template>
-            </girder-location-chooser>
-          </v-list>
+          <file-manager-options
+            @itemsChanged="reloadItems"
+            :items="[props.item]"
+          />
         </v-menu>
       </template>
     </girder-file-manager>
@@ -89,6 +72,7 @@ import {
   toDatasetFolder
 } from "@/utils/girderSelectable";
 import { RawLocation } from "vue-router";
+import FileManagerOptions from "./FileManagerOptions.vue";
 
 interface IChipAttrs {
   text: string;
@@ -98,8 +82,7 @@ interface IChipAttrs {
 
 @Component({
   components: {
-    GirderLocationChooser: () =>
-      import("@/components/GirderLocationChooser.vue").then(mod => mod),
+    FileManagerOptions,
     GirderFileManager: () =>
       import("@/girder/components").then(mod => mod.FileManager)
   }
@@ -139,6 +122,13 @@ export default class CustomFileManager extends Vue {
   lastPendingChip: Promise<any> = Promise.resolve();
   knownLocations: { [itemId: string]: IGirderFolder | IGirderItem } = {};
   selected: IGirderSelectAble[] = [];
+
+  async reloadItems() {
+    const location = this.currentLocation;
+    this.currentLocation = null;
+    await Vue.nextTick();
+    this.currentLocation = location;
+  }
 
   get currentLocation() {
     if (this.useDefaultLocation && this.location === null) {
@@ -206,12 +196,6 @@ export default class CustomFileManager extends Vue {
       return await this.store.api.getFolder(id);
     } else {
       return await this.store.api.getItem(id);
-    }
-  }
-
-  move(items: IGirderSelectAble[], location: IGirderFolder | null) {
-    if (location) {
-      this.store.api.move(items, location._id);
     }
   }
 

@@ -45,6 +45,20 @@ function toId(item: string | { _id: string }) {
   return typeof item === "string" ? item : item._id;
 }
 
+function itemsToResourceObject(items: IGirderSelectAble[]) {
+  const resourceObj: { folder: string[]; item: string[] } = {
+    folder: [],
+    item: []
+  };
+  for (const resource of items) {
+    const type = resource._modelType;
+    if (type === "folder" || type === "item") {
+      resourceObj[type].push(resource._id);
+    }
+  }
+  return resourceObj;
+}
+
 export default class GirderAPI {
   readonly client: RestClientInstance;
 
@@ -89,22 +103,31 @@ export default class GirderAPI {
     return result.data.length > 0 ? result.data[0] : null;
   }
 
-  move(resources: IGirderSelectAble[], folderId: string) {
-    const resourceObj: { folder: string[]; item: string[] } = {
-      folder: [],
-      item: []
-    };
-    for (const resource of resources) {
-      const type = resource._modelType;
-      if (type === "folder" || type === "item") {
-        resourceObj[type].push(resource._id);
-      }
-    }
+  moveItems(items: IGirderSelectAble[], folderId: string) {
+    const resourceObj = itemsToResourceObject(items);
     return this.client.put("resource/move", null, {
       params: {
         resources: JSON.stringify(resourceObj),
         parentType: "folder",
         parentId: folderId
+      }
+    });
+  }
+
+  renameItem(item: IGirderSelectAble, name: string) {
+    const type = item._modelType;
+    if (!(type === "folder" || type === "item")) {
+      return;
+    }
+    const id = item._id;
+    return this.client.put(`${type}/${id}`, null, { params: { name } });
+  }
+
+  deleteItems(items: IGirderSelectAble[]) {
+    const resourceObj = itemsToResourceObject(items);
+    return this.client.delete("resource", {
+      params: {
+        resources: JSON.stringify(resourceObj)
       }
     });
   }
