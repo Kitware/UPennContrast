@@ -39,6 +39,7 @@
         <v-btn class="ml-4" @click.stop="toggleRightPanel('settingsPanel')">
           Settings
         </v-btn>
+        <user-menu class="ml-4" />
       </template>
       <server-status />
     </v-app-bar>
