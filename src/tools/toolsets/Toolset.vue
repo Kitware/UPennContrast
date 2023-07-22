@@ -1,8 +1,8 @@
 <template>
   <v-expansion-panels v-model="panels">
     <v-expansion-panel expand v-model="panels">
-      <v-expansion-panel-header class="pa-4">
-        <v-toolbar-title> Make objects </v-toolbar-title>
+      <v-expansion-panel-header class="pa-2">
+        <v-toolbar-title :style="{fontSize: '16px'}"> Make objects </v-toolbar-title>
         <!-- Tool creation -->
         <v-dialog v-model="toolCreationDialogOpen" width="60%">
           <template v-slot:activator="{ on: dialog }">
@@ -29,7 +29,7 @@
       </v-expansion-panel-header>
       <v-expansion-panel-content>
         <!-- List toolset tools -->
-        <v-list v-if="toolsetTools.length" dense>
+        <v-list v-if="toolsetTools.length" dense class="tight-list">
           <v-list-item-group v-model="selectedToolId">
             <draggable>
               <template v-for="(tool, index) in toolsetTools">
@@ -192,11 +192,7 @@ export default class Toolset extends Vue {
 }
 </script>
 <style scoped>
-.v-list {
-  width: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 5px; /* Add padding to tighten the list */
-  line-height: 1.2; /* Add line-height to tighten the list */
+.tight-list .v-list-item {
+  padding: 0px; /* Adjust as needed */
 }
 </style>

@@ -2,6 +2,7 @@
   <v-list-item
     dense
     :value="tool.id"
+    :style="{ 'max-height': '32px' }"
     v-mousetrap="
       tool.hotkey
         ? {
