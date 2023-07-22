@@ -50,6 +50,7 @@
           :disabled="!(maxTime > 0 || unrollT)"
         />
       </v-layout>
+      <toolset></toolset>
       <v-radio-group
         v-model="layerMode"
         label="Layers: "
@@ -63,7 +64,7 @@
         <v-radio value="multiple" label="Multiple" class="smaller" />
         <v-radio value="unroll" label="Unroll" class="smaller" />
       </v-radio-group>
-      <toolset></toolset>
+      
     </div>
     <div class="lowertools">
       <slot></slot>
