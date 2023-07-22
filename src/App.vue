@@ -14,8 +14,8 @@
       >
         Upload Data
       </v-btn>
-      <user-menu class="ml-4" />
-      <v-divider class="ml-4" vertical />
+      <user-menu class="ml-1" />
+      <v-divider class="ml-1" vertical />
       <template v-if="store.dataset && routeName === 'datasetview'">
         <v-btn class="ml-4" @click.stop="toggleRightPanel('analyzePanel')">
           <v-badge dot color="red" :value="hasUncomputedProperties">
