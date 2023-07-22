@@ -14,6 +14,7 @@
       >
         Upload Data
       </v-btn>
+      <user-menu class="ml-4" />
       <v-divider class="ml-4" vertical />
       <template v-if="store.dataset && routeName === 'datasetview'">
         <v-btn class="ml-4" @click.stop="toggleRightPanel('analyzePanel')">
@@ -39,7 +40,6 @@
         <v-btn class="ml-4" @click.stop="toggleRightPanel('settingsPanel')">
           Settings
         </v-btn>
-        <user-menu class="ml-4" />
       </template>
       <server-status />
     </v-app-bar>

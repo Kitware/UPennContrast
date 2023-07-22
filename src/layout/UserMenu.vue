@@ -47,33 +47,31 @@
       v-model="userMenu"
       close-on-click
       offset-y
-      :close-on-content-click="store.isLoggedIn"
-      transition="slide-y"
-      style="z-index: 20"
+      :close-on-content-click="false"
     >
       <template #activator="{ on }">
-        <v-btn v-on="on">{{ store.userName }}</v-btn>
+        <v-btn icon v-on="on">
+          <v-icon>mdi-account-circle</v-icon>
+        </v-btn>
       </template>
-      <v-list dense>
-        <v-divider />
-        <v-list-item @click="logout">
-          <v-list-item-content>
-            <v-list-item-title>
-              <v-icon left>mdi-logout</v-icon>
-              Logout
-            </v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-      </v-list>
+      <v-card>
+        <user-profile-settings />
+      </v-card>
     </v-menu>
   </div>
 </template>
 
+
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
+import UserProfileSettings from "@/components/UserProfileSettings.vue";
 
-@Component
+@Component({
+  components: {
+    UserProfileSettings,
+  },
+})
 export default class UserMenu extends Vue {
   readonly store = store;
 
@@ -122,14 +120,9 @@ export default class UserMenu extends Vue {
       this.userMenu = false;
     }
   }
-
-  async logout() {
-    await this.store.logout();
-    this.userMenu = false;
-    this.$router.push({ name: "root" });
-  }
 }
 </script>
+
 <style lang="scss" scoped>
 .loginDialog.theme--light {
   background: white;
