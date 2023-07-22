@@ -1,7 +1,7 @@
 <template>
   <v-app id="inspire">
     <v-app-bar class="elevation-1" app clipped-right>
-      <v-toolbar-title @click="goHome" class="logo">
+      <v-toolbar-title @click="goHome" class="logo" title="NimbusImage home">
         <img src="/img/icons/NimbusImageIcon.png" alt="Icon" class="logo-icon" />
       </v-toolbar-title>
       <bread-crumbs />
@@ -11,6 +11,7 @@
         class="ml-4"
         :to="{ name: 'newdataset' }"
         :disabled="!store.isLoggedIn"
+        title="Upload a new dataset"
       >
         Upload Data
       </v-btn>
@@ -243,7 +244,7 @@ body > div {
 <style lang="scss" scoped>
 .logo-icon {
   height: 50px; // Adjust as needed
-  width: 50px; // Adjust as needed
+  
   margin-top: 10px;
 }
 </style>
