@@ -30,7 +30,10 @@
         <!-- tags -->
         <v-row class="my-0">
           <v-col class="py-0">
-            <tag-picker v-model="tags"></tag-picker>
+            <tag-picker
+              v-model="tags"
+              @input="useAutoTags = false"
+            ></tag-picker>
           </v-col>
         </v-row>
       </template>
@@ -156,7 +159,26 @@ export default class AnnotationConfiguration extends Vue {
 
   label: string = "";
   shape: AnnotationShape = this.defaultShape;
-  tags: string[] = [];
+  tagsInternal: string[] = [];
+  useAutoTags: boolean = true;
+
+  get tags() {
+    if (this.useAutoTags) {
+      return this.autoTags;
+    }
+    return this.tagsInternal;
+  }
+
+  set tags(value: string[]) {
+    this.tagsInternal = value;
+  }
+
+  get autoTags() {
+    const layerId = this.coordinateAssignments.layer;
+    const layerName = layerId ? store.getLayerFromId(layerId)?.name || "" : "";
+    const shapeName = AnnotationNames[this.shape].toLowerCase();
+    return [`${layerName} ${shapeName}`];
+  }
 
   get layers() {
     return this.store.layers;
@@ -209,7 +231,7 @@ export default class AnnotationConfiguration extends Vue {
     }
     this.coordinateAssignments = this.value.coordinateAssignments;
     this.shape = this.value.shape;
-    this.tags = this.value.tags;
+    this.tagsInternal = this.value.tags;
   }
 
   @Watch("defaultShape")
@@ -220,14 +242,15 @@ export default class AnnotationConfiguration extends Vue {
       Z: { type: "layer", value: 1, max: this.maxZ },
       Time: { type: "layer", value: 1, max: this.maxTime }
     };
-    this.tags = [];
+    this.useAutoTags = true;
+    this.tagsInternal = [];
     this.shape = this.defaultShape;
     this.changed();
   }
 
-  @Watch("coordinateAssignments.layer")
-  @Watch("coordinateAssignments")
+  @Watch("coordinateAssignments", { deep: true })
   @Watch("tags")
+  @Watch("shape")
   changed() {
     const form = this.$refs.form as VForm;
     if (!form?.validate()) {
@@ -245,25 +268,6 @@ export default class AnnotationConfiguration extends Vue {
       shape: this.shape
     });
     this.$emit("change");
-  }
-
-  // Synchronise advanced and basic attributes
-  @Watch("standardValue")
-  standardValueChanged() {
-    if (!this.standardValue) {
-      return;
-    }
-    const capturedValue = this.standardValue;
-    let changed = false;
-    standardValueKeys.forEach(key => {
-      if ((this as any)[key] !== capturedValue[key]) {
-        (this as any)[key] = capturedValue[key];
-        changed = true;
-      }
-    });
-    if (changed) {
-      this.changed();
-    }
   }
 }
 </script>
