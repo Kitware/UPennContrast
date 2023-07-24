@@ -349,6 +349,11 @@ interface IDownloadParameters {
   tiffCompression?: string;
 }
 
+function intFromString(value: string) {
+  const parsedValue = parseInt("0" + value, 10);
+  return Number.isNaN(parsedValue) ? 0 : parsedValue;
+}
+
 @Component({ components: { TagPicker } })
 export default class Snapshots extends Vue {
   readonly store = store;
@@ -446,16 +451,16 @@ export default class Snapshots extends Vue {
     return (this.bboxRight || 0) - (this.bboxLeft || 0);
   }
 
-  set bboxWidth(value: number) {
-    this.bboxRight = (this.bboxLeft || 0) + parseInt("" + value, 10);
+  set bboxWidth(value: string) {
+    this.bboxRight = (this.bboxLeft || 0) + intFromString(value);
   }
 
   get bboxHeight(): number {
     return (this.bboxBottom || 0) - (this.bboxTop || 0);
   }
 
-  set bboxHeight(value: number) {
-    this.bboxBottom = (this.bboxTop || 0) + parseInt("" + value, 0);
+  set bboxHeight(value: string) {
+    this.bboxBottom = (this.bboxTop || 0) + intFromString(value);
   }
 
   get unroll(): boolean {
