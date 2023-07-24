@@ -10,10 +10,6 @@
           <p>{{ store.userName }}</p>
         </div>
         <div>
-          <h3>Email:</h3>
-          <!-- Add email from store -->
-        </div>
-        <div>
           <h3>Girder domain:</h3>
           <p>{{ store.girderUrl }}</p>
         </div>

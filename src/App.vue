@@ -2,7 +2,11 @@
   <v-app id="inspire">
     <v-app-bar class="elevation-1" app clipped-right>
       <v-toolbar-title @click="goHome" class="logo" title="NimbusImage home">
-        <img src="/img/icons/NimbusImageIcon.png" alt="Icon" class="logo-icon" />
+        <img
+          src="/img/icons/NimbusImageIcon.png"
+          alt="Icon"
+          class="logo-icon"
+        />
       </v-toolbar-title>
       <bread-crumbs />
       <v-spacer />
@@ -243,8 +247,8 @@ body > div {
 </style>
 <style lang="scss" scoped>
 .logo-icon {
-  height: 50px; // Adjust as needed
-  
+  height: 50px;
+
   margin-top: 10px;
 }
 </style>

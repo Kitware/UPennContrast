@@ -32,7 +32,9 @@
             </v-row>
             <v-row>
               <v-col class="text-right pa-0">
-                <span class="mt-2 caption font-weight-light">{{ `of ${max + offset}` }}</span>
+                <span class="mt-2 caption font-weight-light">{{
+                  `of ${max + offset}`
+                }}</span>
               </v-col>
             </v-row>
           </v-container>
@@ -44,18 +46,17 @@
 
 <style scoped>
 .label-column {
-  transform: translateY(2px); /* Adjust this value to move the label vertically */
+  transform: translateY(2px); /* Move the label vertically */
 }
 
 .slider-column {
-  padding-left: 0px; /* Adjust this value to reduce padding around the slider */
+  padding-left: 0px; /* Reduce padding around the slider */
 }
 
 .text-field-column {
-  transform: translateY(-4px); /* Adjust this value to move the text input field vertically */
+  transform: translateY(-4px); /* Move the text input field vertically */
 }
 </style>
-
 
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";

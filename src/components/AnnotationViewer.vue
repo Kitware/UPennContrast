@@ -379,9 +379,7 @@ export default class AnnotationViewer extends Vue {
         .style({
           text: (annotation: IAnnotation) => {
             const index = this.annotationStore.annotationIdToIdx[annotation.id];
-            return (
-              index + ": " + annotation.tags.join(", ")
-            );
+            return index + ": " + annotation.tags.join(", ");
           },
           offset: { x: 0, y: yOffset },
           ...baseStyle
@@ -410,20 +408,19 @@ export default class AnnotationViewer extends Vue {
               // That could be fixed by looping through the annotations independently, but I'm
               // worried that that would create performance issues, so leaving it as is for now.
               text: (annotation: IAnnotation) => {
-                let value = this.propertyValues[annotation.id]?.[propertyId];
-                if (value) {
-                  let numValue = Number(value);
-                  if (!isNaN(numValue)) { // if value is a number, otherwise, just return the string
-                    // Idea here: keep up to 2 decimal points or 3 significant digits, whichever is more precise
-                    // Not entirely sure the logic is sound, but close enough.
-                    let fixedValue = numValue.toFixed(2);  // preserve up to 2 decimal points
-                    let precisedValue = numValue.toPrecision(3);  // preserve up to 3 significant digits
-                    value = parseFloat(fixedValue) < parseFloat(precisedValue) ? fixedValue : precisedValue;
-                  }
-                  return `${property.name}=${value}`;
-                } else {
+                const value = this.propertyValues[annotation.id]?.[propertyId];
+                if (value === undefined) {
                   return "";
                 }
+                const fixedValue = value.toFixed(2);
+                const fixedError = Math.abs(value - parseFloat(fixedValue));
+                const precisedValue = value.toPrecision(3);
+                const precisedError = Math.abs(
+                  value - parseFloat(precisedValue)
+                );
+                const stringValue =
+                  fixedError < precisedError ? fixedValue : precisedValue;
+                return `${property.name}=${stringValue}`;
               },
               offset: { x: 0, y: yOffset },
               ...baseStyle

@@ -2,7 +2,7 @@
   <v-expansion-panels v-model="panels">
     <v-expansion-panel expand v-model="panels">
       <v-expansion-panel-header class="pa-2">
-        <v-toolbar-title :style="{fontSize: '16px'}"> Make objects </v-toolbar-title>
+        <v-subtitle-1> Make objects </v-subtitle-1>
         <!-- Tool creation -->
         <v-dialog v-model="toolCreationDialogOpen" width="60%">
           <template v-slot:activator="{ on: dialog }">
@@ -193,6 +193,6 @@ export default class Toolset extends Vue {
 </script>
 <style scoped>
 .tight-list .v-list-item {
-  padding: 0px; /* Adjust as needed */
+  padding: 0px;
 }
 </style>

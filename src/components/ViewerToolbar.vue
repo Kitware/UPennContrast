@@ -1,7 +1,6 @@
 <template>
   <div>
     <div v-mousetrap="mousetrapSliders">
-      
       <v-layout>
         <value-slider
           v-model="xy"
@@ -12,7 +11,7 @@
           :offset="1"
         />
         <v-checkbox
-        class="ml-3 my-checkbox"
+          class="ml-3 my-checkbox"
           v-model="unrollXY"
           label="Unroll"
           :disabled="!(maxXY > 0 || unrollXY)"
@@ -44,7 +43,7 @@
           :offset="1"
         />
         <v-checkbox
-        class="ml-3 my-checkbox"
+          class="ml-3 my-checkbox"
           v-model="unrollT"
           label="Unroll"
           :disabled="!(maxTime > 0 || unrollT)"
@@ -64,12 +63,10 @@
         <v-radio value="multiple" label="Multiple" class="smaller" />
         <v-radio value="unroll" label="Unroll" class="smaller" />
       </v-radio-group>
-      
     </div>
     <div class="lowertools">
       <slot></slot>
     </div>
-    
   </div>
 </template>
 
@@ -77,9 +74,6 @@
 .my-checkbox::v-deep .v-input__control {
   transform: scale(0.9) translateY(5%);
 }
-</style>
-
-<style lang="scss" scoped>
 .v-input--selection-controls {
   margin-top: 0;
 }
