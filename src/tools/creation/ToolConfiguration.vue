@@ -116,7 +116,7 @@ export default class ToolConfiguration extends Vue {
     this.advancedPanel = undefined;
     this.toolValues = this.defaultValues
       ? structuredClone(this.defaultValues)
-      : { name: "New Tool", description: "" };
+      : {};
     this.initialize();
     this.changed();
   }

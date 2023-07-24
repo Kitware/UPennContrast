@@ -14,11 +14,6 @@ import propertiesStore from "@/store/properties";
 import store from "@/store";
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 
-const defaultValues = {
-  name: "New Tool",
-  description: ""
-};
-
 interface Item {
   text: string;
   value: any;
@@ -50,7 +45,7 @@ export default class ToolTypeSelection extends Vue {
   private value: any;
 
   computedTemplate: any = null;
-  defaultToolValues: any = { ...defaultValues };
+  defaultToolValues: any = {};
 
   isMainMenuVisible = false;
   selectedItem: AugmentedItem | null = null;
@@ -132,7 +127,7 @@ export default class ToolTypeSelection extends Vue {
     this.isMainMenuVisible = false;
 
     let computedTemplate = template;
-    let defaultToolValues: any = { ...defaultValues };
+    let defaultToolValues: any = {};
 
     // template references to the store template
     // Shallow copy some parts of it to avoid overwriting
@@ -209,7 +204,7 @@ export default class ToolTypeSelection extends Vue {
   reset() {
     this.selectedItem = null;
     this.computedTemplate = null;
-    this.defaultToolValues = { ...defaultValues };
+    this.defaultToolValues = {};
     this.handleChange();
     this.refreshWorkers();
   }
