@@ -1,24 +1,24 @@
 <template>
   <v-list class="pa-0" :disabled="disableOptions">
     <!-- Moving -->
-    <girder-location-chooser @input="move" :disabled="disableOptions">
-      <template v-slot:activator="{ on }">
-        <v-list-item v-on="on">
-          <v-list-item-title>
-            Move
-          </v-list-item-title>
-        </v-list-item>
-      </template>
-    </girder-location-chooser>
+    <v-list-item @click.stop="moveDialog = true">
+      <v-list-item-title>
+        Move
+      </v-list-item-title>
+    </v-list-item>
+    <girder-location-chooser
+      :dialog.sync="moveDialog"
+      @input="move"
+      :disabled="disableOptions"
+      activator-disabled
+    />
     <!-- Deleting -->
+    <v-list-item @click.stop="deleteDialog = true">
+      <v-list-item-title>
+        Delete
+      </v-list-item-title>
+    </v-list-item>
     <v-dialog v-model="deleteDialog">
-      <template v-slot:activator="{ on }">
-        <v-list-item v-on="on">
-          <v-list-item-title>
-            Delete
-          </v-list-item-title>
-        </v-list-item>
-      </template>
       <v-card>
         <v-card-title>
           Delete items
@@ -43,31 +43,31 @@
       </v-card>
     </v-dialog>
     <!-- Renaming -->
-    <v-dialog v-model="renameDialog" v-if="items.length === 1">
-      <template v-slot:activator="{ on }">
-        <v-list-item v-on="on">
-          <v-list-item-title>
-            Rename
-          </v-list-item-title>
-        </v-list-item>
-      </template>
-      <v-card>
-        <v-card-title>
-          New name
-        </v-card-title>
-        <v-card-text>
-          <v-form @submit="rename">
-            <v-text-field v-model="newName" autofocus />
-            <div class="d-flex">
-              <v-spacer />
-              <v-btn type="submit" color="primary" :disabled="disableOptions">
-                Submit
-              </v-btn>
-            </div>
-          </v-form>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
+    <template v-if="items.length === 1">
+      <v-list-item @click.stop="renameDialog = true">
+        <v-list-item-title>
+          Rename
+        </v-list-item-title>
+      </v-list-item>
+      <v-dialog v-model="renameDialog">
+        <v-card>
+          <v-card-title>
+            New name
+          </v-card-title>
+          <v-card-text>
+            <v-form @submit="rename">
+              <v-text-field v-model="newName" autofocus />
+              <div class="d-flex">
+                <v-spacer />
+                <v-btn type="submit" color="primary" :disabled="disableOptions">
+                  Submit
+                </v-btn>
+              </div>
+            </v-form>
+          </v-card-text>
+        </v-card>
+      </v-dialog>
+    </template>
   </v-list>
 </template>
 
@@ -77,7 +77,7 @@ import store from "@/store";
 import { IGirderFolder, IGirderSelectAble } from "@/girder";
 import { createDecorator } from "vue-class-component";
 
-const Action = createDecorator((options, key) => {
+const OptionAction = createDecorator((options, key) => {
   const methods = options.methods;
   if (!methods) {
     return;
@@ -112,6 +112,8 @@ export default class FileManagerOptions extends Vue {
 
   disableOptions: boolean = false;
 
+  moveDialog: boolean = false;
+
   renameDialog: boolean = false;
   newName: string = "";
 
@@ -137,7 +139,26 @@ export default class FileManagerOptions extends Vue {
     }
   }
 
-  @Action
+  get openedDialogs() {
+    return [this.moveDialog, this.renameDialog, this.deleteDialog];
+  }
+
+  get isADialogOpen() {
+    return this.openedDialogs.some(dialog => dialog);
+  }
+
+  @Watch("isADialogOpen")
+  closeMenuOnDialogClose(isOpen: boolean, wasOpen: boolean) {
+    if (wasOpen && !isOpen) {
+      this.closeMenu();
+    }
+  }
+
+  closeMenu() {
+    this.$emit("closeMenu");
+  }
+
+  @OptionAction
   async move(location: IGirderFolder | null) {
     if (!location || !this.items.length) {
       return;
@@ -145,7 +166,7 @@ export default class FileManagerOptions extends Vue {
     await this.store.api.moveItems(this.items, location._id);
   }
 
-  @Action
+  @OptionAction
   async rename() {
     if (this.items.length !== 1) {
       return;
@@ -156,7 +177,7 @@ export default class FileManagerOptions extends Vue {
     this.renameDialog = false;
   }
 
-  @Action
+  @OptionAction
   async deleteItems() {
     await this.store.api.deleteItems(this.items);
     this.deleteDialog = false;

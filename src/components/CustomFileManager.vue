@@ -10,19 +10,18 @@
       v-on="$listeners"
     >
       <template v-if="menuEnabled" #headerwidget>
-        <v-menu bottom offset-y>
+        <v-menu v-model="selectedItemsOptionsMenu" bottom offset-y>
           <template v-slot:activator="{ on, attrs }">
-            <v-btn
-              dark
-              v-bind="attrs"
-              v-on="on"
-              :disabled="selected.length === 0"
-            >
+            <v-btn v-bind="attrs" v-on="on" :disabled="selected.length === 0">
               Selected Items Actions
               <v-icon>mdi-dots-vertical</v-icon>
             </v-btn>
           </template>
-          <file-manager-options @itemsChanged="reloadItems" :items="selected" />
+          <file-manager-options
+            @itemsChanged="reloadItems"
+            @closeMenu="selectedItemsOptionsMenu = false"
+            :items="selected"
+          />
         </v-menu>
       </template>
       <template #row-widget="props">
@@ -40,15 +39,16 @@
           </v-chip>
         </div>
         <v-spacer />
-        <v-menu v-if="menuEnabled">
+        <v-menu v-model="rowOptionsMenu[props.item._id]" v-if="menuEnabled">
           <template v-slot:activator="{ on, attrs }">
-            <v-btn dark icon v-bind="attrs" v-on="on">
+            <v-btn icon v-bind="attrs" v-on="on">
               <v-icon>mdi-dots-vertical</v-icon>
             </v-btn>
           </template>
           <file-manager-options
             @itemsChanged="reloadItems"
             :items="[props.item]"
+            @closeMenu="rowOptionsMenu[props.item._id] = false"
           />
         </v-menu>
       </template>
@@ -122,6 +122,9 @@ export default class CustomFileManager extends Vue {
   lastPendingChip: Promise<any> = Promise.resolve();
   knownLocations: { [itemId: string]: IGirderFolder | IGirderItem } = {};
   selected: IGirderSelectAble[] = [];
+
+  selectedItemsOptionsMenu: boolean = false;
+  rowOptionsMenu: { [itemId: string]: boolean } = {};
 
   async reloadItems() {
     const location = this.currentLocation;
