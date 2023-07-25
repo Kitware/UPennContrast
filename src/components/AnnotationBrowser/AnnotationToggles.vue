@@ -15,7 +15,7 @@
         </v-list-item>
         <v-list-item>
           <v-list dense class="py-0">
-                        <v-list-item>
+            <v-list-item>
               <v-checkbox
                 hide-details
                 dense
@@ -48,7 +48,7 @@
                   <v-switch
                     hide-details
                     dense
-                    :disabled="!showTooltips||!drawAnnotations"
+                    :disabled="!showTooltips || !drawAnnotations"
                     v-model="filteredAnnotationTooltips"
                     label="Show tooltips only for objects passing filters"
                   ></v-switch>

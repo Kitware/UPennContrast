@@ -5,14 +5,7 @@
     </v-expansion-panel-header>
     <v-expansion-panel-content>
       <v-container>
-        
-
-        <v-switch
-          hide-details
-          dense
-          v-model="darkMode"
-          label="Dark mode"
-        />
+        <v-switch hide-details dense v-model="darkMode" label="Dark mode" />
       </v-container>
     </v-expansion-panel-content>
   </v-expansion-panel>
@@ -23,7 +16,7 @@ import { Vue, Component } from "vue-property-decorator";
 import store from "@/store/index";
 
 @Component
-export default class InterfaceSettings extends Vue {
+export default class UISettings extends Vue {
   readonly store = store;
 
   get darkMode() {

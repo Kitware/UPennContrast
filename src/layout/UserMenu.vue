@@ -61,7 +61,6 @@
   </div>
 </template>
 
-
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
@@ -69,8 +68,8 @@ import UserProfileSettings from "@/components/UserProfileSettings.vue";
 
 @Component({
   components: {
-    UserProfileSettings,
-  },
+    UserProfileSettings
+  }
 })
 export default class UserMenu extends Vue {
   readonly store = store;

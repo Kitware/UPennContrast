@@ -218,15 +218,6 @@ export default class App extends Vue {
       this.toggleRightPanel(null);
     }
   }
-
-  get dark() {
-    return this.$vuetify.theme.dark;
-  }
-
-  set dark(value: boolean) {
-    Persister.set("theme", value ? "dark" : "light");
-    this.$vuetify.theme.dark = value;
-  }
 }
 </script>
 <style lang="scss" scoped>
@@ -244,8 +235,7 @@ body > div {
 .v-navigation-drawer {
   z-index: 100;
 }
-</style>
-<style lang="scss" scoped>
+
 .logo-icon {
   height: 50px;
 
