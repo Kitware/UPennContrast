@@ -62,7 +62,7 @@
       </transition-group>
     </draggable>
     <v-expansion-panel readonly class="add-layer">
-      <v-btn @click="addLayer" icon>
+      <v-btn @click="addLayer" icon title="Add new layer">
         <v-icon>mdi-plus-circle</v-icon>
       </v-btn>
     </v-expansion-panel>
