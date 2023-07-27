@@ -9,7 +9,6 @@
 </template>
 
 <script lang="ts">
-import { mapState } from "vuex";
 import DisplayLayer from "./DisplayLayer.vue"; // Assuming DisplayLayer.vue is in the same directory
 import store from "@/store";
 
