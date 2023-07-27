@@ -21,9 +21,6 @@ export default {
     layers() {
       return store.layers;
     }
-  },
-  created() {
-    console.log(this.layers);
   }
 };
 </script>
