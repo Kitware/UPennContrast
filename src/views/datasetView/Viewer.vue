@@ -2,6 +2,7 @@
   <div class="viewer">
     <aside class="side">
       <viewer-toolbar class="toolbar">
+        <!-- <contrast-panels /> -->
         <display-layers />
       </viewer-toolbar>
     </aside>
@@ -13,6 +14,7 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import ViewerToolbar from "@/components/ViewerToolbar.vue";
 import DisplayLayers from "@/components/DisplayLayers.vue";
 import ImageViewer from "@/components/ImageViewer.vue";
+import ContrastPanels from "@/components/ContrastPanels.vue";
 
 import store from "@/store";
 import annotationStore from "@/store/annotation";
@@ -22,7 +24,8 @@ import propertiesStore from "@/store/properties";
   components: {
     ViewerToolbar,
     DisplayLayers,
-    ImageViewer
+    ImageViewer,
+    ContrastPanels
   }
 })
 export default class Viewer extends Vue {
