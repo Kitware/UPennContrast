@@ -44,12 +44,13 @@
       @input="update"
     >
       <transition-group type="transition">
-        <div
+        <v-card
           v-for="combinedLayer in combinedLayers"
           :key="combinedLayer.layer.id"
+          class="mb-1 mx-1"
         >
           <display-layer ref="displayLayers" :value="combinedLayer.layer" />
-        </div>
+        </v-card>
       </transition-group>
     </draggable>
   </div>
