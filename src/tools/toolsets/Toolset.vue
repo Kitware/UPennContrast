@@ -2,7 +2,7 @@
   <v-expansion-panels v-model="panels">
     <v-expansion-panel expand v-model="panels">
       <v-expansion-panel-header class="pa-2">
-        <v-subtitle-1> Make objects </v-subtitle-1>
+        <v-subheader> Make objects </v-subheader>
         <!-- Tool creation -->
         <v-dialog v-model="toolCreationDialogOpen" width="60%">
           <template v-slot:activator="{ on: dialog }">
