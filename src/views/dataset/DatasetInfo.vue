@@ -221,6 +221,7 @@
 <script lang="ts">
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
+import girderResources from "@/store/girderResources";
 import { IDatasetView } from "@/store/model";
 import { IGirderItem, IGirderSelectAble } from "@/girder";
 
@@ -232,6 +233,7 @@ import { IGirderItem, IGirderSelectAble } from "@/girder";
 })
 export default class DatasetInfo extends Vue {
   readonly store = store;
+  readonly girderResources = girderResources;
 
   removeDatasetConfirm = false;
 
@@ -271,7 +273,7 @@ export default class DatasetInfo extends Vue {
   fetchConfigurationsInfo() {
     for (const datasetView of this.datasetViews) {
       if (!(datasetView.configurationId in this.configInfo)) {
-        this.store.api
+        this.girderResources
           .getItem(datasetView.configurationId)
           .then(item =>
             Vue.set(this.configInfo, datasetView.configurationId, item)
@@ -389,9 +391,12 @@ export default class DatasetInfo extends Vue {
     if (!this.dataset || configurationFolder?._modelType !== "folder") {
       return;
     }
-    const baseConfig = await this.store.api.getConfiguration(
+    const baseConfig = await this.girderResources.getConfiguration(
       datasetView.configurationId
     );
+    if (!baseConfig) {
+      return;
+    }
     const config = await store.api.duplicateConfiguration(
       baseConfig,
       configurationFolder._id
@@ -413,8 +418,8 @@ export default class DatasetInfo extends Vue {
     if (!this.dataset) {
       return;
     }
-    const datasetFolder = await this.store.api.getFolder(this.dataset.id);
-    if (!datasetFolder.parentId) {
+    const datasetFolder = await this.girderResources.getFolder(this.dataset.id);
+    if (!datasetFolder?.parentId) {
       return;
     }
     const config = await this.store.api.createConfigurationFromDataset(

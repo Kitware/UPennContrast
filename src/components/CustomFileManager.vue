@@ -59,12 +59,8 @@
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
-import {
-  IGirderFolder,
-  IGirderItem,
-  IGirderLocation,
-  IGirderSelectAble
-} from "@/girder";
+import girderResources from "@/store/girderResources";
+import { IGirderLocation, IGirderSelectAble } from "@/girder";
 import {
   isConfigurationItem,
   isDatasetFolder,
@@ -89,6 +85,7 @@ interface IChipAttrs {
 })
 export default class CustomFileManager extends Vue {
   readonly store = store;
+  readonly girderResources = girderResources;
 
   @Prop({
     default: true
@@ -120,7 +117,7 @@ export default class CustomFileManager extends Vue {
   debouncedChipsPerItemId: { [itemId: string]: IChipAttrs[] } = {};
   pendingChips: number = 0;
   lastPendingChip: Promise<any> = Promise.resolve();
-  knownLocations: { [itemId: string]: IGirderFolder | IGirderItem } = {};
+  computedChipsIds: Set<string> = new Set();
   selected: IGirderSelectAble[] = [];
 
   selectedItemsOptionsMenu: boolean = false;
@@ -169,8 +166,8 @@ export default class CustomFileManager extends Vue {
       configurationItem.icon = "settings";
     }
     const folderOrItem = datasetFolder || configurationItem;
-    if (folderOrItem && !this.knownLocations[selectable._id]) {
-      this.knownLocations[selectable._id] = folderOrItem;
+    if (folderOrItem && !this.computedChipsIds.has(selectable._id)) {
+      this.computedChipsIds.add(selectable._id);
       this.addChipPromise(selectable);
     }
   }
@@ -188,18 +185,6 @@ export default class CustomFileManager extends Vue {
         this.debouncedChipsPerItemId = { ...this.chipsPerItemId };
       }
     });
-  }
-
-  async getItemFromId(id: string, type: "folder" | "item") {
-    const knowItem = this.knownLocations[id];
-    if (knowItem) {
-      return knowItem;
-    }
-    if (type === "folder") {
-      return await this.store.api.getFolder(id);
-    } else {
-      return await this.store.api.getItem(id);
-    }
   }
 
   async itemToChips(selectable: IGirderSelectAble) {
@@ -228,8 +213,12 @@ export default class CustomFileManager extends Vue {
         });
         await Promise.all(
           views.map(view => {
-            this.getItemFromId(view.configurationId, "item").then(
-              configInfo => {
+            this.girderResources
+              .getItem(view.configurationId)
+              .then(configInfo => {
+                if (!configInfo) {
+                  return;
+                }
                 const newChip: IChipAttrs = {
                   ...baseChip,
                   text: configInfo.name
@@ -243,8 +232,7 @@ export default class CustomFileManager extends Vue {
                   };
                 }
                 ret.push(newChip);
-              }
-            );
+              });
           })
         );
       }
@@ -270,7 +258,10 @@ export default class CustomFileManager extends Vue {
         });
         await Promise.all(
           views.map(view => {
-            this.getItemFromId(view.datasetId, "folder").then(datasetInfo => {
+            this.girderResources.getFolder(view.datasetId).then(datasetInfo => {
+              if (!datasetInfo) {
+                return;
+              }
               const newChip: IChipAttrs = {
                 ...baseChip,
                 text: datasetInfo.name

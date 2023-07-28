@@ -74,6 +74,7 @@ import {
   IGirderLocation,
   IGirderSelectAble
 } from "@/girder";
+import girderResources from "@/store/girderResources";
 import { IDatasetView } from "@/store/model";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 import CustomFileManager from "@/components/CustomFileManager.vue";
@@ -87,13 +88,9 @@ import { isConfigurationItem, isDatasetFolder } from "@/utils/girderSelectable";
 })
 export default class Home extends Vue {
   readonly store = store;
+  readonly girderResources = girderResources;
+
   location: IGirderLocation | null = null;
-  datasetInfo: {
-    [datasetId: string]: IGirderFolder | null;
-  } = {};
-  configInfo: {
-    [configurationId: string]: IGirderItem | null;
-  } = {};
 
   get datasetViews() {
     const result: IDatasetView[] = [];
@@ -105,6 +102,30 @@ export default class Home extends Vue {
       }
     });
     return result;
+  }
+
+  get datasetInfo() {
+    const infos: {
+      [datasetId: string]: IGirderFolder | null;
+    } = {};
+    for (const datasetView of this.datasetViews) {
+      const id = datasetView.datasetId;
+      const folder = this.girderResources.watchFolder(id);
+      infos[id] = folder || null;
+    }
+    return infos;
+  }
+
+  get configInfo() {
+    const infos: {
+      [configId: string]: IGirderItem | null;
+    } = {};
+    for (const datasetView of this.datasetViews) {
+      const id = datasetView.configurationId;
+      const item = this.girderResources.watchItem(id);
+      infos[id] = item || null;
+    }
+    return infos;
   }
 
   get datasetViewItems() {
@@ -121,27 +142,12 @@ export default class Home extends Vue {
   }
 
   @Watch("datasetViews")
+  @Watch("girderResources.resources")
   fetchDatasetsAndConfigurations() {
-    const promises = [];
     for (const d of this.datasetViews) {
-      if (!(d.datasetId in this.datasetInfo)) {
-        promises.push(
-          this.store.api
-            .getFolder(d.datasetId)
-            .then(folder => Vue.set(this.datasetInfo, d.datasetId, folder))
-            .catch(() => Vue.set(this.datasetInfo, d.datasetId, null))
-        );
-      }
-      if (!(d.configurationId in this.configInfo)) {
-        promises.push(
-          this.store.api
-            .getItem(d.configurationId)
-            .then(item => Vue.set(this.configInfo, d.configurationId, item))
-            .catch(() => Vue.set(this.configInfo, d.configurationId, null))
-        );
-      }
+      this.girderResources.getFolder(d.datasetId);
+      this.girderResources.getItem(d.configurationId);
     }
-    return Promise.all(promises);
   }
 
   mounted() {

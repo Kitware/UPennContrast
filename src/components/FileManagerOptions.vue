@@ -74,6 +74,7 @@
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
+import girderResources from "@/store/girderResources";
 import { IGirderFolder, IGirderSelectAble } from "@/girder";
 import { createDecorator } from "vue-class-component";
 
@@ -106,6 +107,7 @@ const OptionAction = createDecorator((options, key) => {
 })
 export default class FileManagerOptions extends Vue {
   readonly store = store;
+  readonly girderResources = girderResources;
 
   @Prop()
   items!: IGirderSelectAble[];
@@ -128,6 +130,9 @@ export default class FileManagerOptions extends Vue {
   }
 
   afterAction() {
+    for (const item of this.items) {
+      this.girderResources.ressourceChanged(item._id);
+    }
     this.$emit("itemsChanged");
     this.disableOptions = false;
   }

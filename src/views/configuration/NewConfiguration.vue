@@ -23,6 +23,7 @@
 <script lang="ts">
 import { Component, Watch } from "vue-property-decorator";
 import store from "@/store";
+import girderResources from "@/store/girderResources";
 import routeMapper from "@/utils/routeMapper";
 import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
@@ -33,7 +34,7 @@ const Mapper = routeMapper(
     datasetId: {
       parse: String,
       get: () => store.selectedDatasetId,
-      set: (value: string) => store.setSelectedConfiguration(value)
+      set: (value: string) => store.setSelectedDataset(value)
     }
   }
 );
@@ -41,6 +42,7 @@ const Mapper = routeMapper(
 @Component({ components: { GirderLocationChooser } })
 export default class NewConfiguration extends Mapper {
   readonly store = store;
+  readonly girderResources = girderResources;
 
   valid = false;
   name = "";
@@ -59,10 +61,10 @@ export default class NewConfiguration extends Mapper {
   async fetchDefaultPath() {
     const datasetId = this.store.dataset?.id;
     if (datasetId) {
-      const datasetFolder = await this.store.api.getFolder(datasetId);
-      const parentId = datasetFolder.parentId;
+      const datasetFolder = await this.girderResources.getFolder(datasetId);
+      const parentId = datasetFolder?.parentId;
       if (parentId) {
-        const parentFolder = await this.store.api.getFolder(parentId);
+        const parentFolder = await this.girderResources.getFolder(parentId);
         this.path = parentFolder;
         return;
       }

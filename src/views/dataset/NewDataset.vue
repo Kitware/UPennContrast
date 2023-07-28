@@ -63,6 +63,7 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store";
+import girderResources from "@/store/girderResources";
 import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 import { IDataset } from "@/store/model";
@@ -127,6 +128,7 @@ function findCommonPrefix(strings: string[]): string {
 })
 export default class NewDataset extends Vue {
   readonly store = store;
+  readonly girderResources = girderResources;
 
   valid = false;
   failedDataset = "";
@@ -198,7 +200,7 @@ export default class NewDataset extends Vue {
 
     this.failedDataset = "";
 
-    this.path = await this.store.api.getFolder(this.dataset.id);
+    this.path = await this.girderResources.getFolder(this.dataset.id);
     await Vue.nextTick();
 
     this.uploading = true;

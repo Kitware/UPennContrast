@@ -27,6 +27,7 @@ export interface IGirderItem {
   folderId: string;
   meta: any;
   icon?: string;
+  largeImage?: any;
 }
 
 export interface IGirderFolder {

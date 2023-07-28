@@ -53,7 +53,7 @@ const Mapper = routeMapper(
     datasetId: {
       parse: String,
       get: () => store.selectedDatasetId,
-      set: (value: string) => store.setSelectedConfiguration(value)
+      set: (value: string) => store.setSelectedDataset(value)
     }
   }
 );

@@ -516,12 +516,12 @@ export class Main extends VuexModule {
     }
     try {
       sync.setLoading(true);
-      const r = await this.api.getDataset(
+      const r = await this.context.dispatch("getDataset", {
         id,
-        this.unrollXY,
-        this.unrollZ,
-        this.unrollT
-      );
+        unrollXY: this.unrollXY,
+        unrollZ: this.unrollZ,
+        unrollT: this.unrollT
+      });
       this.setDataset({ id, data: r });
       sync.setLoading(false);
     } catch (error) {
@@ -537,8 +537,12 @@ export class Main extends VuexModule {
     }
     try {
       sync.setLoading(true);
-      const r = await this.api.getConfiguration(id);
-      this.setConfiguration({ id, data: r });
+      const configuration = await this.context.dispatch("getConfiguration", id);
+      if (!configuration) {
+        this.setConfiguration({ id: null, data: null });
+      } else {
+        this.setConfiguration({ id, data: configuration });
+      }
       sync.setLoading(false);
     } catch (error) {
       sync.setLoading(error);
@@ -688,7 +692,8 @@ export class Main extends VuexModule {
       for (const { id } of views) {
         promises.push(this.api.deleteDatasetView(id));
       }
-      await Promise.all(promises);
+      await Promise.allSettled(promises);
+      await this.context.dispatch("ressourceDeleted", configuration.id);
       this.deleteConfigurationImpl(configuration);
       sync.setSaving(false);
     } catch (error) {
@@ -835,6 +840,7 @@ export class Main extends VuexModule {
     sync.setSaving(true);
     try {
       await this.api.updateConfigurationKey(this.configuration, key);
+      this.context.dispatch("ressourceChanged", this.configuration.id);
       sync.setSaving(false);
     } catch (error) {
       sync.setSaving(error);

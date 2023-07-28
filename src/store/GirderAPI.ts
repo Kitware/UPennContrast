@@ -72,11 +72,17 @@ export default class GirderAPI {
 
   histogramsLoaded = 0;
 
-  getItem(itemId: string): Promise<IGirderItem> {
-    return this.client.get(`item/${itemId}`).then(r => r.data);
-  }
-  getFolder(folderId: string): Promise<IGirderFolder> {
-    return this.client.get(`folder/${folderId}`).then(r => r.data);
+  async getResource(
+    id: string,
+    type: IGirderSelectAble["_modelType"]
+  ): Promise<IGirderSelectAble> {
+    const config = { params: { type } };
+    const response = await this.client.get(`resource/${id}`, config);
+    const resource = response.data;
+    if (resource) {
+      resource._modelType = type;
+    }
+    return response.data;
   }
 
   async getAllUserIds(): Promise<string[]> {
@@ -273,34 +279,8 @@ export default class GirderAPI {
 
   getImages(folderId: string): Promise<IGirderItem[]> {
     return this.getItems(folderId).then(items =>
-      items.filter(d => (d as any).largeImage)
+      items.filter(d => d.largeImage)
     );
-  }
-
-  getDataset(
-    id: string,
-    unrollXY: boolean,
-    unrollZ: boolean,
-    unrollT: boolean
-  ): Promise<IDataset> {
-    return Promise.all([this.getFolder(id), this.getItems(id)]).then(
-      ([folder, items]) => {
-        const baseDataset = asDataset(folder);
-        // just use the first image if it exists
-        const imageItem = items.find(d => (d as any).largeImage);
-        if (imageItem === undefined) {
-          return baseDataset;
-        }
-        return this.getTiles(imageItem).then(tiles => ({
-          ...baseDataset,
-          ...parseTiles(imageItem, tiles, unrollXY, unrollZ, unrollT)
-        }));
-      }
-    );
-  }
-
-  getConfiguration(id: string): Promise<IDatasetConfiguration> {
-    return this.getItem(id).then(asConfigurationItem);
   }
 
   createDatasetView(datasetViewBase: IDatasetViewBase) {
@@ -562,7 +542,7 @@ export default class GirderAPI {
   }
 }
 
-function asDataset(folder: IGirderFolder): IDataset {
+export function asDataset(folder: IGirderFolder): IDataset {
   return {
     id: folder._id,
     name: folder.name,
@@ -634,7 +614,7 @@ function toConfiguationMetadata(data: Partial<IDatasetConfigurationBase>) {
   return metadata;
 }
 
-function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
+export function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
   const config: Partial<IDatasetConfiguration> = {
     id: item._id,
     name: item.name,
@@ -714,7 +694,7 @@ function toKey(
   return `z${z}:t${time}:xy${xy}:c${c}`;
 }
 
-function parseTiles(
+export function parseTiles(
   item: IGirderItem,
   tile: ITileMeta,
   unrollXY: boolean,
