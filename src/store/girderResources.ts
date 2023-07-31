@@ -151,7 +151,7 @@ export class GirderResources extends VuexModule {
     }
     const baseDataset = asDataset(folder);
     // Just use the first image if it exists
-    const imageItem = items.find(d => d.largeImage);
+    const imageItem = items!.find(d => d.largeImage);
     if (imageItem === undefined) {
       return baseDataset;
     }
