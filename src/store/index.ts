@@ -447,6 +447,10 @@ export class Main extends VuexModule {
       (state: any) => state.annotation.annotationConnections,
       this.fetchHistory
     );
+    store.watch(
+      (state: any) => state.properties.propertyValues,
+      () => this.context.dispatch("updateDisplayedFromComputedProperties")
+    );
   }
 
   @Action
