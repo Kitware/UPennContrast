@@ -29,6 +29,7 @@ import filters from "./filters";
 import annotations from "./annotation";
 import jobs from "./jobs";
 import { findIndexOfPath } from "@/utils/paths";
+import { arePathEquals } from "@/utils/paths";
 
 type TNestedObject = { [pathName: string]: TNestedObject };
 
@@ -213,11 +214,32 @@ export class Properties extends VuexModule {
         collectedPaths.push(currentPath);
       }
     }
-    // Special case when there is no property
-    if (collectedPaths.length === 1 && collectedPaths[0].length === 0) {
-      return [];
-    }
-    return collectedPaths;
+    return collectedPaths.filter(path => {
+      // Check that the values have a corresponding path
+      if (path.length < 1) {
+        return false;
+      }
+      const property = this.getPropertyById(path[0]);
+      return property !== null;
+    });
+  }
+
+  @Mutation
+  private setDisplayedPropertyPaths(paths: string[][]) {
+    this.displayedPropertyPaths = paths;
+  }
+
+  @Action
+  updateDisplayedFromComputedProperties() {
+    // This action is called in a global watcher (see "setupWatchers" in main store)
+    // When propertyValues changes, some paths may be removed
+    const availablePaths = this.computedPropertyPaths;
+    const newPaths = this.displayedPropertyPaths.filter(displayedPath =>
+      availablePaths.some(availablePath =>
+        arePathEquals(displayedPath, availablePath)
+      )
+    );
+    this.setDisplayedPropertyPaths(newPaths);
   }
 
   @Action
