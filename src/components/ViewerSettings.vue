@@ -1,7 +1,7 @@
 <template>
   <v-expansion-panel>
     <v-expansion-panel-header>
-      Viewer Settings
+      Viewer settings
     </v-expansion-panel-header>
     <v-expansion-panel-content>
       <v-container>
@@ -9,7 +9,8 @@
           hide-details
           dense
           v-model="valueOnHover"
-          label="Channel values on hover"
+          label="Show channel values on hover"
+          title="Show pixel intensity values when hovering cursor over image"
         />
       </v-container>
     </v-expansion-panel-content>

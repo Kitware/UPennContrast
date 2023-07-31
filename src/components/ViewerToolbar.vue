@@ -1,18 +1,17 @@
 <template>
   <div>
     <div v-mousetrap="mousetrapSliders">
-      <toolset></toolset>
       <v-layout>
         <value-slider
           v-model="xy"
           label="XY"
           :min="0"
           :max="maxXY"
-          :title="maxXY > 0 ? maxXY + 1 + ' XY Values (hotkeys w/r)' : ''"
+          :title="maxXY > 0 ? maxXY + 1 + ' XY Values (Hotkeys w/r)' : ''"
           :offset="1"
         />
         <v-checkbox
-          class="ml-3"
+          class="ml-3 my-checkbox"
           v-model="unrollXY"
           label="Unroll"
           :disabled="!(maxXY > 0 || unrollXY)"
@@ -24,11 +23,11 @@
           label="Z"
           :min="0"
           :max="maxZ"
-          :title="maxZ > 0 ? maxZ + 1 + ' Z Values (hotkeys d/e)' : ''"
+          :title="maxZ > 0 ? maxZ + 1 + ' Z Values (Hotkeys d/e)' : ''"
           :offset="1"
         />
         <v-checkbox
-          class="ml-3"
+          class="ml-3 my-checkbox"
           v-model="unrollZ"
           label="Unroll"
           :disabled="!(maxZ > 0 || unrollZ)"
@@ -40,16 +39,17 @@
           label="Time"
           :min="0"
           :max="maxTime"
-          :title="maxTime > 0 ? maxTime + 1 + ' Time Values (hotkeys s/f)' : ''"
+          :title="maxTime > 0 ? maxTime + 1 + ' Time Values (Hotkeys s/f)' : ''"
           :offset="1"
         />
         <v-checkbox
-          class="ml-3"
+          class="ml-3 my-checkbox"
           v-model="unrollT"
           label="Unroll"
           :disabled="!(maxTime > 0 || unrollT)"
         />
       </v-layout>
+      <toolset></toolset>
       <v-radio-group
         v-model="layerMode"
         label="Layers: "
@@ -69,7 +69,11 @@
     </div>
   </div>
 </template>
+
 <style lang="scss" scoped>
+.my-checkbox::v-deep .v-input__control {
+  transform: scale(0.9) translateY(5%);
+}
 .v-input--selection-controls {
   margin-top: 0;
 }

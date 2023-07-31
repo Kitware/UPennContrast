@@ -367,7 +367,7 @@ export default class AnnotationViewer extends Vue {
         textBaseline: "middle",
         color: "white",
         textStrokeColor: "black",
-        textStrokeWidth: 3
+        textStrokeWidth: 2
       };
       let yOffset = 0;
       this.textLayer
@@ -379,9 +379,7 @@ export default class AnnotationViewer extends Vue {
         .style({
           text: (annotation: IAnnotation) => {
             const index = this.annotationStore.annotationIdToIdx[annotation.id];
-            return (
-              "ID=" + index + " Tags:[ " + annotation.tags.join(", ") + " ]"
-            );
+            return index + ": " + annotation.tags.join(", ");
           },
           offset: { x: 0, y: yOffset },
           ...baseStyle
@@ -394,15 +392,35 @@ export default class AnnotationViewer extends Vue {
         if (property) {
           this.textLayer
             .createFeature("text")
-            .data(this.displayedAnnotations)
+            .data(
+              this.displayedAnnotations.filter(
+                (annotation: IAnnotation) =>
+                  this.propertyValues[annotation.id]?.[propertyId] !== undefined
+              )
+            )
             .position((annotation: IAnnotation) => {
               return unrolledCoordinates[annotation.id];
             })
             .style({
+              // This is the part where we display the property value.
+              // Right now, one issue is that if you have multiple properties to show and
+              // one of them isn't defined for an annotation, the yOffset will be wrong.
+              // That could be fixed by looping through the annotations independently, but I'm
+              // worried that that would create performance issues, so leaving it as is for now.
               text: (annotation: IAnnotation) => {
-                let value =
-                  this.propertyValues[annotation.id]?.[propertyId] || "unknown";
-                return `${property.name}=${value}`;
+                const value = this.propertyValues[annotation.id]?.[propertyId];
+                if (value === undefined) {
+                  return "";
+                }
+                const fixedValue = value.toFixed(2);
+                const fixedError = Math.abs(value - parseFloat(fixedValue));
+                const precisedValue = value.toPrecision(3);
+                const precisedError = Math.abs(
+                  value - parseFloat(precisedValue)
+                );
+                const stringValue =
+                  fixedError < precisedError ? fixedValue : precisedValue;
+                return `${property.name}=${stringValue}`;
               },
               offset: { x: 0, y: yOffset },
               ...baseStyle

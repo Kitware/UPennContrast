@@ -1,9 +1,13 @@
 <template>
   <v-app id="inspire">
     <v-app-bar class="elevation-1" app clipped-right>
-      <v-toolbar-title @click="goHome" class="logo"
-        >NimbusImage</v-toolbar-title
-      >
+      <v-toolbar-title @click="goHome" class="logo" title="NimbusImage home">
+        <img
+          src="/img/icons/NimbusImageIcon.png"
+          alt="Icon"
+          class="logo-icon"
+        />
+      </v-toolbar-title>
       <bread-crumbs />
       <v-spacer />
       <v-btn
@@ -11,25 +15,16 @@
         class="ml-4"
         :to="{ name: 'newdataset' }"
         :disabled="!store.isLoggedIn"
+        title="Upload a new dataset"
       >
         Upload Data
       </v-btn>
-      <user-menu class="ml-4" />
-      <v-btn text icon class="ml-4" @click="dark = !dark">
-        <v-icon>mdi-theme-light-dark</v-icon>
-      </v-btn>
-      <v-divider class="ml-4" vertical />
+      <v-divider class="ml-1" vertical />
       <template v-if="store.dataset && routeName === 'datasetview'">
         <v-btn class="ml-4" @click.stop="toggleRightPanel('analyzePanel')">
           <v-badge dot color="red" :value="hasUncomputedProperties">
-            Analyze
+            Measure objects
           </v-badge>
-        </v-btn>
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('settingsPanel')">
-          Settings
-        </v-btn>
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('snapshotPanel')">
-          Snapshots
         </v-btn>
         <v-btn
           class="ml-4"
@@ -39,11 +34,19 @@
           "
         >
           <v-badge dot color="green" :value="annotationPanelBadge">
-            Annotations
+            Object list
           </v-badge>
+        </v-btn>
+        <v-divider class="ml-4" vertical />
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('snapshotPanel')">
+          Snapshots
+        </v-btn>
+        <v-btn class="ml-4" @click.stop="toggleRightPanel('settingsPanel')">
+          Settings
         </v-btn>
       </template>
       <server-status />
+      <user-menu class="ml-1" />
     </v-app-bar>
 
     <v-main>
@@ -215,15 +218,6 @@ export default class App extends Vue {
       this.toggleRightPanel(null);
     }
   }
-
-  get dark() {
-    return this.$vuetify.theme.dark;
-  }
-
-  set dark(value: boolean) {
-    Persister.set("theme", value ? "dark" : "light");
-    this.$vuetify.theme.dark = value;
-  }
 }
 </script>
 <style lang="scss" scoped>
@@ -240,5 +234,11 @@ body > div {
 
 .v-navigation-drawer {
   z-index: 100;
+}
+
+.logo-icon {
+  height: 50px;
+
+  margin-top: 10px;
 }
 </style>
