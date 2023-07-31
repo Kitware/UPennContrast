@@ -152,21 +152,12 @@ export default class ToolCreation extends Vue {
     const toolNameStrings: string[] = [];
     if (this.toolValues?.annotation) {
       toolNameStrings.push(this.toolValues.annotation.tags.join(", "));
-      const layerId = this.toolValues.annotation.coordinateAssignments.layer;
-      const layerName = this.store.getLayerFromId(layerId)?.name;
-      if (layerName) {
-        toolNameStrings.push(layerName);
-      }
     }
     if (this.selectedTemplate?.shortName) {
-      toolNameStrings.push(this.selectedTemplate.shortName);
+      toolNameStrings.push(`(${this.selectedTemplate.shortName})`);
     }
     if (this.toolValues?.action) {
       toolNameStrings.push(this.toolValues.action.text);
-    }
-    if (this.toolValues?.annotation) {
-      const toolShape: AnnotationShape = this.toolValues.annotation.shape;
-      toolNameStrings.push(AnnotationNames[toolShape]);
     }
     if (this.toolValues?.parentAnnotation && this.toolValues?.childAnnotation) {
       const parentValues = this.toolValues.parentAnnotation;
