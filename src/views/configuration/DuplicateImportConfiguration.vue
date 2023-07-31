@@ -30,6 +30,7 @@ import { IDatasetConfiguration } from "@/store/model";
 import { IGirderSelectAble } from "@/girder";
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
+import girderResources from "@/store/girderResources";
 import ConfigurationSelect from "@/components/ConfigurationSelect.vue";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 
@@ -41,6 +42,7 @@ import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 })
 export default class DuplicateImportConfiguration extends Vue {
   readonly store = store;
+  readonly girderResources = girderResources;
 
   path: IGirderSelectAble | null = null;
 
@@ -58,12 +60,12 @@ export default class DuplicateImportConfiguration extends Vue {
     if (!this.dataset) {
       return;
     }
-    const datasetFolder = await this.store.api.getFolder(this.dataset.id);
-    const pathId = datasetFolder.parentId;
-    if (!pathId) {
+    const datasetFolder = await this.girderResources.getFolder(this.dataset.id);
+    const parentId = datasetFolder?.parentId;
+    if (!parentId) {
       return;
     }
-    this.path = await this.store.api.getFolder(pathId);
+    this.path = await this.girderResources.getFolder(parentId);
   }
 
   mounted() {

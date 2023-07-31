@@ -45,6 +45,20 @@ function toId(item: string | { _id: string }) {
   return typeof item === "string" ? item : item._id;
 }
 
+function itemsToResourceObject(items: IGirderSelectAble[]) {
+  const resourceObj: { folder: string[]; item: string[] } = {
+    folder: [],
+    item: []
+  };
+  for (const resource of items) {
+    const type = resource._modelType;
+    if (type === "folder" || type === "item") {
+      resourceObj[type].push(resource._id);
+    }
+  }
+  return resourceObj;
+}
+
 export default class GirderAPI {
   readonly client: RestClientInstance;
 
@@ -58,11 +72,17 @@ export default class GirderAPI {
 
   histogramsLoaded = 0;
 
-  getItem(itemId: string): Promise<IGirderItem> {
-    return this.client.get(`item/${itemId}`).then(r => r.data);
-  }
-  getFolder(folderId: string): Promise<IGirderFolder> {
-    return this.client.get(`folder/${folderId}`).then(r => r.data);
+  async getResource(
+    id: string,
+    type: IGirderSelectAble["_modelType"]
+  ): Promise<IGirderSelectAble> {
+    const config = { params: { type } };
+    const response = await this.client.get(`resource/${id}`, config);
+    const resource = response.data;
+    if (resource) {
+      resource._modelType = type;
+    }
+    return response.data;
   }
 
   async getAllUserIds(): Promise<string[]> {
@@ -89,22 +109,31 @@ export default class GirderAPI {
     return result.data.length > 0 ? result.data[0] : null;
   }
 
-  move(resources: IGirderSelectAble[], folderId: string) {
-    const resourceObj: { folder: string[]; item: string[] } = {
-      folder: [],
-      item: []
-    };
-    for (const resource of resources) {
-      const type = resource._modelType;
-      if (type === "folder" || type === "item") {
-        resourceObj[type].push(resource._id);
-      }
-    }
+  moveItems(items: IGirderSelectAble[], folderId: string) {
+    const resourceObj = itemsToResourceObject(items);
     return this.client.put("resource/move", null, {
       params: {
         resources: JSON.stringify(resourceObj),
         parentType: "folder",
         parentId: folderId
+      }
+    });
+  }
+
+  renameItem(item: IGirderSelectAble, name: string) {
+    const type = item._modelType;
+    if (!(type === "folder" || type === "item")) {
+      return;
+    }
+    const id = item._id;
+    return this.client.put(`${type}/${id}`, null, { params: { name } });
+  }
+
+  deleteItems(items: IGirderSelectAble[]) {
+    const resourceObj = itemsToResourceObject(items);
+    return this.client.delete("resource", {
+      params: {
+        resources: JSON.stringify(resourceObj)
       }
     });
   }
@@ -250,34 +279,8 @@ export default class GirderAPI {
 
   getImages(folderId: string): Promise<IGirderItem[]> {
     return this.getItems(folderId).then(items =>
-      items.filter(d => (d as any).largeImage)
+      items.filter(d => d.largeImage)
     );
-  }
-
-  getDataset(
-    id: string,
-    unrollXY: boolean,
-    unrollZ: boolean,
-    unrollT: boolean
-  ): Promise<IDataset> {
-    return Promise.all([this.getFolder(id), this.getItems(id)]).then(
-      ([folder, items]) => {
-        const baseDataset = asDataset(folder);
-        // just use the first image if it exists
-        const imageItem = items.find(d => (d as any).largeImage);
-        if (imageItem === undefined) {
-          return baseDataset;
-        }
-        return this.getTiles(imageItem).then(tiles => ({
-          ...baseDataset,
-          ...parseTiles(imageItem, tiles, unrollXY, unrollZ, unrollT)
-        }));
-      }
-    );
-  }
-
-  getConfiguration(id: string): Promise<IDatasetConfiguration> {
-    return this.getItem(id).then(asConfigurationItem);
   }
 
   createDatasetView(datasetViewBase: IDatasetViewBase) {
@@ -539,7 +542,7 @@ export default class GirderAPI {
   }
 }
 
-function asDataset(folder: IGirderFolder): IDataset {
+export function asDataset(folder: IGirderFolder): IDataset {
   return {
     id: folder._id,
     name: folder.name,
@@ -611,7 +614,7 @@ function toConfiguationMetadata(data: Partial<IDatasetConfigurationBase>) {
   return metadata;
 }
 
-function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
+export function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
   const config: Partial<IDatasetConfiguration> = {
     id: item._id,
     name: item.name,
@@ -691,7 +694,7 @@ function toKey(
   return `z${z}:t${time}:xy${xy}:c${c}`;
 }
 
-function parseTiles(
+export function parseTiles(
   item: IGirderItem,
   tile: ITileMeta,
   unrollXY: boolean,

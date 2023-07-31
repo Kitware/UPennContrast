@@ -1,11 +1,9 @@
 <template>
   <v-breadcrumbs :items="items" divider="" class="py-0">
     <template v-slot:item="{ item }">
-      <span class="mx-0 px-1">
-        <v-breadcrumbs-item>
-          {{ item.title }}
-        </v-breadcrumbs-item>
-        <v-breadcrumbs-item v-if="item.subItems" :to="item.to">
+      <v-breadcrumbs-item class="mx-0 px-1 breadcrumb-item">
+        {{ item.title }}
+        <template v-if="item.subItems">
           <v-select
             :value="getCurrentViewItem(item.subItems)"
             @input="goToView"
@@ -14,17 +12,17 @@
             single-line
             height="1em"
             :items="item.subItems"
-            class="body-2 small-input"
+            class="body-2 ml-2 breadcrumb-select"
             @click.prevent
           />
-          <v-icon>mdi-information</v-icon>
-        </v-breadcrumbs-item>
-        <v-breadcrumbs-item v-else :to="item.to">
-          <span class="px-2">
+          <v-icon :to="item.to">mdi-information</v-icon>
+        </template>
+        <template v-else>
+          <span class="px-2" :to="item.to">
             {{ item.text }}
           </span>
-        </v-breadcrumbs-item>
-      </span>
+        </template>
+      </v-breadcrumbs-item>
     </template>
   </v-breadcrumbs>
 </template>
@@ -38,8 +36,8 @@
 <script lang="ts">
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
+import girderResources from "@/store/girderResources";
 import { Location } from "vue-router";
-import { IDatasetView } from "@/store/model";
 import { Dictionary } from "vue-router/types/router";
 
 interface IBreadCrumbItem {
@@ -55,6 +53,8 @@ interface IBreadCrumbItem {
 @Component
 export default class BreadCrumbs extends Vue {
   readonly store = store;
+  readonly girderResources = girderResources;
+
   items: IBreadCrumbItem[] = [];
   previousRefreshInfo: {
     datasetId: string | null;
@@ -108,6 +108,17 @@ export default class BreadCrumbs extends Vue {
     this.refreshItems();
   }
 
+  async setItemTextWithResourceName(
+    item: { text: string },
+    id: string,
+    type: "item" | "folder"
+  ) {
+    const resource = await this.girderResources.getResource({ id, type });
+    if (resource) {
+      Vue.set(item, "text", resource.name);
+    }
+  }
+
   @Watch("datasetId")
   @Watch("configurationId")
   async refreshItems() {
@@ -151,10 +162,7 @@ export default class BreadCrumbs extends Vue {
       };
       this.items.push(datasetItem);
       // Get name asynchronously
-      const capturedItem = datasetItem;
-      this.store.api
-        .getFolder(datasetId)
-        .then(folder => Vue.set(capturedItem, "text", folder.name));
+      this.setItemTextWithResourceName(datasetItem, datasetId, "folder");
     }
 
     // Configuration Item
@@ -170,10 +178,11 @@ export default class BreadCrumbs extends Vue {
       };
       this.items.push(configurationItem);
       // Get name asynchronously
-      const capturedItem = configurationItem;
-      this.store.api
-        .getItem(configurationId)
-        .then(item => Vue.set(capturedItem, "text", item.name));
+      this.setItemTextWithResourceName(
+        configurationItem,
+        configurationId,
+        "item"
+      );
     }
 
     // Drop-down if datasetItem and configurationId
@@ -189,10 +198,7 @@ export default class BreadCrumbs extends Vue {
             value: view.id
           };
           // Get name asynchronously
-          const capturedItem = viewItem;
-          this.store.api
-            .getFolder(view.datasetId)
-            .then(folder => Vue.set(capturedItem, "text", folder.name));
+          this.setItemTextWithResourceName(viewItem, view.datasetId, "folder");
           return viewItem;
         });
         Vue.set(capturedDatasetItem, "subItems", datasetItems);
@@ -226,7 +232,7 @@ export default class BreadCrumbs extends Vue {
 </script>
 
 <style>
-.small-input input {
-  width: 1em;
+.breadcrumb-select input {
+  width: 20px;
 }
 </style>

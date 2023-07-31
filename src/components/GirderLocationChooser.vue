@@ -1,6 +1,6 @@
 <template>
-  <v-dialog v-model="open" scrollable width="auto">
-    <template #activator="{ on }">
+  <v-dialog v-model="dialogInternal" scrollable width="auto">
+    <template #activator="{ on }" v-if="activatorDisabled === false">
       <div class="d-flex">
         <slot name="activator" v-bind="{ on }">
           <v-btn v-on="on">
@@ -30,7 +30,7 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn @click.prevent="open = false" color="warning">
+        <v-btn @click.prevent="dialogInternal = false" color="warning">
           Cancel
         </v-btn>
         <v-btn @click.prevent="select" :disabled="!selected" color="primary">
@@ -70,7 +70,15 @@ export default class GirderLocationChooser extends Vue {
   })
   breadcrumb!: boolean;
 
-  open = false;
+  @Prop({
+    default: false
+  })
+  activatorDisabled!: boolean;
+
+  @Prop({
+    default: false
+  })
+  dialog!: boolean;
 
   selected: IGirderSelectAble | null = null;
 
@@ -83,12 +91,20 @@ export default class GirderLocationChooser extends Vue {
     this.selected = this.value;
   }
 
+  get dialogInternal() {
+    return this.dialog;
+  }
+
+  set dialogInternal(value: boolean) {
+    this.$emit("update:dialog", value);
+  }
+
   get selectedName() {
     return this.selected ? this.selected.name : "Select a folder...";
   }
 
   select() {
-    this.open = false;
+    this.dialogInternal = false;
     this.$emit("input", this.selected);
   }
 }

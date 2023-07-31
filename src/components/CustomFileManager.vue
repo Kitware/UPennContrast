@@ -10,29 +10,18 @@
       v-on="$listeners"
     >
       <template v-if="menuEnabled" #headerwidget>
-        <v-menu bottom offset-y>
+        <v-menu v-model="selectedItemsOptionsMenu" bottom offset-y>
           <template v-slot:activator="{ on, attrs }">
-            <v-btn
-              dark
-              v-bind="attrs"
-              v-on="on"
-              :disabled="selected.length === 0"
-            >
+            <v-btn v-bind="attrs" v-on="on" :disabled="selected.length === 0">
               Selected Items Actions
               <v-icon>mdi-dots-vertical</v-icon>
             </v-btn>
           </template>
-          <v-list class="pa-0">
-            <girder-location-chooser @input="move(selected, $event)">
-              <template v-slot:activator="{ on }">
-                <v-list-item v-on="on">
-                  <v-list-item-title>
-                    Move
-                  </v-list-item-title>
-                </v-list-item>
-              </template>
-            </girder-location-chooser>
-          </v-list>
+          <file-manager-options
+            @itemsChanged="reloadItems"
+            @closeMenu="selectedItemsOptionsMenu = false"
+            :items="selected"
+          />
         </v-menu>
       </template>
       <template #row-widget="props">
@@ -50,23 +39,17 @@
           </v-chip>
         </div>
         <v-spacer />
-        <v-menu v-if="menuEnabled">
+        <v-menu v-model="rowOptionsMenu[props.item._id]" v-if="menuEnabled">
           <template v-slot:activator="{ on, attrs }">
-            <v-btn dark icon v-bind="attrs" v-on="on">
+            <v-btn icon v-bind="attrs" v-on="on">
               <v-icon>mdi-dots-vertical</v-icon>
             </v-btn>
           </template>
-          <v-list class="pa-0">
-            <girder-location-chooser @input="move([props.item], $event)">
-              <template v-slot:activator="{ on }">
-                <v-list-item v-on="on">
-                  <v-list-item-title>
-                    Move
-                  </v-list-item-title>
-                </v-list-item>
-              </template>
-            </girder-location-chooser>
-          </v-list>
+          <file-manager-options
+            @itemsChanged="reloadItems"
+            :items="[props.item]"
+            @closeMenu="rowOptionsMenu[props.item._id] = false"
+          />
         </v-menu>
       </template>
     </girder-file-manager>
@@ -76,12 +59,8 @@
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
-import {
-  IGirderFolder,
-  IGirderItem,
-  IGirderLocation,
-  IGirderSelectAble
-} from "@/girder";
+import girderResources from "@/store/girderResources";
+import { IGirderLocation, IGirderSelectAble } from "@/girder";
 import {
   isConfigurationItem,
   isDatasetFolder,
@@ -89,6 +68,7 @@ import {
   toDatasetFolder
 } from "@/utils/girderSelectable";
 import { RawLocation } from "vue-router";
+import FileManagerOptions from "./FileManagerOptions.vue";
 
 interface IChipAttrs {
   text: string;
@@ -98,14 +78,14 @@ interface IChipAttrs {
 
 @Component({
   components: {
-    GirderLocationChooser: () =>
-      import("@/components/GirderLocationChooser.vue").then(mod => mod),
+    FileManagerOptions,
     GirderFileManager: () =>
       import("@/girder/components").then(mod => mod.FileManager)
   }
 })
 export default class CustomFileManager extends Vue {
   readonly store = store;
+  readonly girderResources = girderResources;
 
   @Prop({
     default: true
@@ -137,8 +117,18 @@ export default class CustomFileManager extends Vue {
   debouncedChipsPerItemId: { [itemId: string]: IChipAttrs[] } = {};
   pendingChips: number = 0;
   lastPendingChip: Promise<any> = Promise.resolve();
-  knownLocations: { [itemId: string]: IGirderFolder | IGirderItem } = {};
+  computedChipsIds: Set<string> = new Set();
   selected: IGirderSelectAble[] = [];
+
+  selectedItemsOptionsMenu: boolean = false;
+  rowOptionsMenu: { [itemId: string]: boolean } = {};
+
+  async reloadItems() {
+    const location = this.currentLocation;
+    this.currentLocation = null;
+    await Vue.nextTick();
+    this.currentLocation = location;
+  }
 
   get currentLocation() {
     if (this.useDefaultLocation && this.location === null) {
@@ -176,8 +166,8 @@ export default class CustomFileManager extends Vue {
       configurationItem.icon = "settings";
     }
     const folderOrItem = datasetFolder || configurationItem;
-    if (folderOrItem && !this.knownLocations[selectable._id]) {
-      this.knownLocations[selectable._id] = folderOrItem;
+    if (folderOrItem && !this.computedChipsIds.has(selectable._id)) {
+      this.computedChipsIds.add(selectable._id);
       this.addChipPromise(selectable);
     }
   }
@@ -195,24 +185,6 @@ export default class CustomFileManager extends Vue {
         this.debouncedChipsPerItemId = { ...this.chipsPerItemId };
       }
     });
-  }
-
-  async getItemFromId(id: string, type: "folder" | "item") {
-    const knowItem = this.knownLocations[id];
-    if (knowItem) {
-      return knowItem;
-    }
-    if (type === "folder") {
-      return await this.store.api.getFolder(id);
-    } else {
-      return await this.store.api.getItem(id);
-    }
-  }
-
-  move(items: IGirderSelectAble[], location: IGirderFolder | null) {
-    if (location) {
-      this.store.api.move(items, location._id);
-    }
   }
 
   async itemToChips(selectable: IGirderSelectAble) {
@@ -241,8 +213,12 @@ export default class CustomFileManager extends Vue {
         });
         await Promise.all(
           views.map(view => {
-            this.getItemFromId(view.configurationId, "item").then(
-              configInfo => {
+            this.girderResources
+              .getItem(view.configurationId)
+              .then(configInfo => {
+                if (!configInfo) {
+                  return;
+                }
                 const newChip: IChipAttrs = {
                   ...baseChip,
                   text: configInfo.name
@@ -256,8 +232,7 @@ export default class CustomFileManager extends Vue {
                   };
                 }
                 ret.push(newChip);
-              }
-            );
+              });
           })
         );
       }
@@ -283,7 +258,10 @@ export default class CustomFileManager extends Vue {
         });
         await Promise.all(
           views.map(view => {
-            this.getItemFromId(view.datasetId, "folder").then(datasetInfo => {
+            this.girderResources.getFolder(view.datasetId).then(datasetInfo => {
+              if (!datasetInfo) {
+                return;
+              }
               const newChip: IChipAttrs = {
                 ...baseChip,
                 text: datasetInfo.name

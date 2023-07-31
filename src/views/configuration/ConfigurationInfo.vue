@@ -59,8 +59,8 @@
           <v-card>
             <v-card-title>
               Are you sure to remove the view for dataset "{{
-                datasetInfo[viewToRemove.datasetId]
-                  ? datasetInfo[viewToRemove.datasetId].name
+                datasetInfoCache[viewToRemove.datasetId]
+                  ? datasetInfoCache[viewToRemove.datasetId].name
                   : "Unnamed dataset"
               }}"?
             </v-card-title>
@@ -109,12 +109,14 @@
 <script lang="ts">
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
+import girderResources from "@/store/girderResources";
 import { IDatasetView, IDisplaySlice } from "@/store/model";
 import { IGirderFolder } from "@/girder";
 
 @Component
 export default class ConfigurationInfo extends Vue {
   readonly store = store;
+  readonly girderResources = girderResources;
 
   removeConfirm = false;
 
@@ -122,7 +124,7 @@ export default class ConfigurationInfo extends Vue {
   viewToRemove: IDatasetView | null = null;
 
   datasetViews: IDatasetView[] = [];
-  datasetInfo: { [datasetId: string]: IGirderFolder } = {};
+  datasetInfoCache: { [datasetId: string]: IGirderFolder } = {};
 
   get name() {
     return store.configuration ? store.configuration.name : "";
@@ -162,20 +164,18 @@ export default class ConfigurationInfo extends Vue {
   }[] {
     return this.datasetViews.map(datasetView => ({
       datasetView,
-      datasetInfo: this.datasetInfo[datasetView.datasetId]
+      datasetInfo: this.datasetInfoCache[datasetView.datasetId]
     }));
   }
 
   @Watch("datasetViews")
   fetchDatasetsInfo() {
     for (const datasetView of this.datasetViews) {
-      if (!(datasetView.datasetId in this.datasetInfo)) {
-        this.store.api
-          .getFolder(datasetView.datasetId)
-          .then(folder =>
-            Vue.set(this.datasetInfo, datasetView.datasetId, folder)
-          );
-      }
+      this.girderResources
+        .getFolder(datasetView.datasetId)
+        .then(folder =>
+          Vue.set(this.datasetInfoCache, datasetView.datasetId, folder)
+        );
     }
   }
 
