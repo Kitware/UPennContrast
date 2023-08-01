@@ -7,11 +7,14 @@ import {
   Mutation,
   VuexModule
 } from "vuex-module-decorators";
+
 import AnnotationsAPI from "./AnnotationsAPI";
 import PropertiesAPI from "./PropertiesAPI";
-
 import GirderAPI from "./GirderAPI";
+
 import { getLayerImages, getLayerSliceIndexes } from "./images";
+import jobs from "./jobs";
+
 import {
   IDataset,
   IDatasetConfiguration,
@@ -30,7 +33,9 @@ import {
   IDatasetView,
   IContrast,
   IMapEntry,
-  IHistoryEntry
+  IHistoryEntry,
+  IComputeJob,
+  IJobEventData
 } from "./model";
 
 import persister from "./Persister";
@@ -397,7 +402,7 @@ export class Main extends VuexModule {
       await this.girderRest.logout();
       sync.setSaving(false);
     } catch (error) {
-      sync.setSaving(error);
+      sync.setSaving(error as Error);
     }
     this.loggedOut();
   }
@@ -433,7 +438,7 @@ export class Main extends VuexModule {
       sync.setLoading(false);
       await this.fetchRecentDatasetViews();
     } catch (error) {
-      sync.setLoading(error);
+      sync.setLoading(error as Error);
     }
   }
 
@@ -487,7 +492,8 @@ export class Main extends VuexModule {
       sync.setLoading(true);
       await this.girderRest.login(username, password);
       sync.setLoading(false);
-    } catch (err) {
+    } catch (error) {
+      const err = error as any;
       if (!err.response || err.response.status !== 401) {
         sync.setLoading(err);
         return "Unknown error occurred";
@@ -525,7 +531,7 @@ export class Main extends VuexModule {
       this.setDataset({ id, data: r });
       sync.setLoading(false);
     } catch (error) {
-      sync.setLoading(error);
+      sync.setLoading(error as Error);
     }
   }
 
@@ -545,7 +551,7 @@ export class Main extends VuexModule {
       }
       sync.setLoading(false);
     } catch (error) {
-      sync.setLoading(error);
+      sync.setLoading(error as Error);
     }
   }
 
@@ -598,7 +604,7 @@ export class Main extends VuexModule {
       sync.setSaving(false);
       return ds;
     } catch (error) {
-      sync.setSaving(error);
+      sync.setSaving(error as Error);
     }
     return null;
   }
@@ -611,7 +617,7 @@ export class Main extends VuexModule {
       sync.setSaving(false);
       return ds;
     } catch (error) {
-      sync.setSaving(error);
+      sync.setSaving(error as Error);
     }
     return null;
   }
@@ -640,7 +646,7 @@ export class Main extends VuexModule {
       sync.setSaving(false);
       return config;
     } catch (error) {
-      sync.setSaving(error);
+      sync.setSaving(error as Error);
     }
     return null;
   }
@@ -658,26 +664,66 @@ export class Main extends VuexModule {
   @Action
   async addMultiSourceMetadata({
     parentId,
-    metadata
+    metadata,
+    transcode,
+    eventCallback
   }: {
     parentId: string;
     metadata: string;
+    transcode: boolean;
+    eventCallback?: (data: IJobEventData) => void;
   }) {
-    const newFile = (
-      await this.api.uploadJSONFile(
-        "multi-source2.json",
-        metadata,
-        parentId,
-        "folder"
-      )
-    ).data;
+    try {
+      sync.setSaving(true);
+      const newFile = (
+        await this.api.uploadJSONFile(
+          "multi-source2.json",
+          metadata,
+          parentId,
+          "folder"
+        )
+      ).data;
+      const itemId: string = newFile.itemId;
 
-    const items = await this.api.getItems(parentId);
-    const promises = items
-      .filter((item: any) => !!item.largeImage && item._id !== newFile.itemId)
-      .map((item: IGirderItem) => this.api.removeLargeImageForItem(item));
-    await Promise.all(promises);
-    return newFile.itemId;
+      const items = await this.api.getItems(parentId);
+
+      // When transcoding, remove all large image
+      // Otherwise, remove large image only for items that are large image but not the uploaded one
+      const itemsToRemoveLargeImage = transcode
+        ? items
+        : items.filter((item: any) => !!item.largeImage && item._id !== itemId);
+      const removePromises = itemsToRemoveLargeImage.map((item: IGirderItem) =>
+        this.api.removeLargeImageForItem(item._id)
+      );
+      await Promise.all(removePromises);
+
+      // When transcoding, force the regeneration of large image for the new file
+      if (transcode) {
+        const response = await this.api.generateTiles(itemId, true, true);
+        const jobId = response.data?._id;
+        if (!jobId) {
+          throw new Error(
+            "Failed to transcode the large image: no job received"
+          );
+        }
+        const success = await new Promise(resolve =>
+          jobs.addJob({
+            jobId,
+            datasetId: parentId,
+            callback: (success: boolean) => resolve(success),
+            eventCallback
+          })
+        );
+        if (!success) {
+          throw new Error("Failed to transcode the large image: job failed");
+        }
+      }
+
+      return itemId;
+    } catch (error) {
+      sync.setSaving(error as Error);
+      return null;
+    }
   }
 
   @Action
@@ -697,7 +743,7 @@ export class Main extends VuexModule {
       this.deleteConfigurationImpl(configuration);
       sync.setSaving(false);
     } catch (error) {
-      sync.setSaving(error);
+      sync.setSaving(error as Error);
     }
   }
 
@@ -729,7 +775,7 @@ export class Main extends VuexModule {
       this.deleteDatasetImpl(dataset);
       sync.setSaving(false);
     } catch (error) {
-      sync.setSaving(error);
+      sync.setSaving(error as Error);
     }
   }
 
@@ -759,7 +805,7 @@ export class Main extends VuexModule {
         this.context.dispatch("fetchAnnotations");
         sync.setSaving(false);
       } catch (error) {
-        sync.setSaving(error);
+        sync.setSaving(error as Error);
       }
     }
   }
@@ -843,7 +889,7 @@ export class Main extends VuexModule {
       this.context.dispatch("ressourceChanged", this.configuration.id);
       sync.setSaving(false);
     } catch (error) {
-      sync.setSaving(error);
+      sync.setSaving(error as Error);
     }
   }
 
