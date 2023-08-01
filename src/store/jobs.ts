@@ -95,6 +95,10 @@ export class Jobs extends VuexModule {
     this.setLatestNotificationTime(notificationTime);
 
     const jobData = data.data;
+    const jobTask = this.runningJobs.find(
+      (job: IComputeJob) => job.jobId === jobData._id
+    );
+    jobTask?.eventCallback?.(jobData);
     const status = jobData.status;
     if (
       ![jobStates.cancelled, jobStates.success, jobStates.error].includes(
@@ -104,11 +108,7 @@ export class Jobs extends VuexModule {
       return;
     }
 
-    const jobTask = this.runningJobs.find(
-      (job: IComputeJob) => job.jobId === jobData._id
-    );
     if (jobTask) {
-      const status = jobData.status;
       if (status === jobStates.success) {
         jobTask.callback(true);
       } else {

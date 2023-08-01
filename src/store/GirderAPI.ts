@@ -160,12 +160,14 @@ export default class GirderAPI {
     }
   }
 
-  generateTiles(itemId: string) {
-    return this.client.post(`item/${itemId}/tiles`);
+  generateTiles(itemId: string, force: boolean, localJob: boolean) {
+    return this.client.post(`item/${itemId}/tiles`, undefined, {
+      params: { force, localJob }
+    });
   }
 
-  removeLargeImageForItem(item: IGirderItem) {
-    return this.client.delete(`item/${item._id}/tiles`);
+  removeLargeImageForItem(itemId: string) {
+    return this.client.delete(`item/${itemId}/tiles`);
   }
 
   uploadJSONFile(

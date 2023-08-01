@@ -488,10 +488,17 @@ export interface ISerializedData {
   annotationPropertyValues: IAnnotationPropertyValues;
 }
 
+export interface IJobEventData {
+  title?: string;
+  text?: string;
+  status?: number;
+}
+
 export interface IComputeJob {
   jobId: string;
   callback: (success: boolean) => void;
   datasetId: string | null;
+  eventCallback?: (data: IJobEventData) => void;
 }
 export interface IAnnotationComputeJob extends IComputeJob {
   tool: IToolConfiguration;
