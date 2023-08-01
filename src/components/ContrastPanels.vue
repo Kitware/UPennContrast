@@ -28,20 +28,29 @@ export default {
 <style scoped>
 .contrast-panel {
   display: flex;
-  overflow-x: auto; /* allows for horizontal scrolling */
-  white-space: nowrap; /* prevents line break, so items stay in a single line */
+  flex-direction: row;
+  align-items: flex-start;
+  overflow-x: auto;
+  white-space: nowrap;
 }
 
-.panel-image {
-  width: 100%;
-  height: auto;
-  object-fit: cover;
-  min-width: 200px; /* min-width can be adjusted as per requirement */
-  margin-right: 10px; /* add some space between images */
+.v-expansion-panel {
+  width: 300px;
+  margin-right: 3px; /* Add some space between panels */
+  margin-left: 0; /* Ensure no left margin */
+  padding: 0; /* Ensure no padding */
 }
+
 .panel-flex {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
+  flex: 0 1 auto;
+}
+</style>
+
+<style lang="scss">
+.v-expansion-panel {
+  flex: 0 1 auto !important; /* There is a default style applied here by Vuetify that expands the children to take up all the space. Overriding that here gives the desired behavior. */
 }
 </style>
