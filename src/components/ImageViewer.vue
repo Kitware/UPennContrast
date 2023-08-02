@@ -86,8 +86,14 @@ import annotationStore from "@/store/annotation";
 import store from "@/store";
 import geojs from "geojs";
 
-import { IImage, ILayerStackImage, IMapEntry } from "../store/model";
-import setFrameQuad from "../utils/setFrameQuad.js";
+import {
+  IGeoJSTile,
+  IImage,
+  ILayerStackImage,
+  IMapEntry,
+  IXYPoint
+} from "../store/model";
+import setFrameQuad from "@/utils/setFrameQuad";
 
 import AnnotationViewer from "@/components/AnnotationViewer.vue";
 import { ITileHistogram } from "@/store/images";
@@ -441,7 +447,7 @@ export default class ImageViewer extends Vue {
       (mapentry.baseLayerIndex !== baseLayerIndex &&
         mapentry.imageLayers.length)
     ) {
-      map.deleteLayer(mapentry.imageLayers.pop());
+      map.deleteLayer(mapentry.imageLayers.pop()!);
     }
     mapentry.baseLayerIndex = baseLayerIndex;
     while (mapentry.imageLayers.length < mll.length * 2) {
@@ -486,19 +492,20 @@ export default class ImageViewer extends Vue {
         };
         const imageNum =
           Math.floor(x / txy.x) + Math.floor(y / txy.y) * this.unrollW;
-        if (!layer._imageUrls || !layer._imageUrls[imageNum]) {
+        const url = layer._imageUrls?.[imageNum];
+        if (!url) {
           return this.blankUrl;
         }
         const tx = x % txy.x;
         const ty = y % txy.y;
-        const result = layer._imageUrls[imageNum]
-          .replace("{z}", level)
-          .replace("{x}", tx)
-          .replace("{y}", ty);
+        const result = url
+          .replace("{z}", level.toString())
+          .replace("{x}", tx.toString())
+          .replace("{y}", ty.toString());
         return result;
       });
-      layer._tileBounds = (tile: any) => {
-        const s = Math.pow(2, someImage.levels - 1 - tile.index.level);
+      layer._tileBounds = (tile: IGeoJSTile) => {
+        const s = Math.pow(2, someImage.levels - 1 - (tile.index.level || 0));
         const w = Math.ceil(someImage.sizeX / s),
           h = Math.ceil(someImage.sizeY / s);
         const txy = {
@@ -521,7 +528,7 @@ export default class ImageViewer extends Vue {
         };
         return result;
       };
-      layer.tileAtPoint = (point: any, level: number) => {
+      layer.tileAtPoint = (point: IXYPoint, level: number) => {
         point = layer.displayToLevel(
           layer.map().gcsToDisplay(point, null),
           someImage.levels - 1
@@ -576,7 +583,7 @@ export default class ImageViewer extends Vue {
         layerIndex += baseLayerIndex;
         fullLayer.node().css("filter", `url(#recolor-${layerIndex})`);
         adjLayer.node().css("filter", "none");
-        if (!fullUrls[0] || !urls[0]) {
+        if (!fullUrls[0] || !urls[0] || !baseQuadOptions) {
           if (singleFrame !== null && fullLayer.setFrameQuad) {
             fullLayer.setFrameQuad(singleFrame);
             fullLayer.visible(true);
@@ -597,10 +604,11 @@ export default class ImageViewer extends Vue {
         adjLayer.visible(true);
         // use css visibility so that geojs will still load tiles when not
         // visible.
+        const layerImageUrls = fullLayer._imageUrls;
         if (
-          !fullLayer._imageUrls ||
-          fullUrls.length !== fullLayer._imageUrls.length ||
-          fullUrls.some((url, idx) => url !== fullLayer._imageUrls[idx])
+          !layerImageUrls ||
+          fullUrls.length !== layerImageUrls.length ||
+          fullUrls.some((url, idx) => url !== layerImageUrls[idx])
         ) {
           fullLayer._imageUrls = fullUrls;
           fullLayer.reset();
@@ -620,21 +628,24 @@ export default class ImageViewer extends Vue {
                 }
               });
             }
-            fullLayer.setFrameQuad(singleFrame);
+            fullLayer.setFrameQuad!(singleFrame);
           }
         }
+        const adjImageUrls = adjLayer._imageUrls;
         if (
-          !adjLayer._imageUrls ||
-          urls.length !== adjLayer._imageUrls.length ||
-          urls.some((url, idx) => url !== adjLayer._imageUrls[idx])
+          !adjImageUrls ||
+          urls.length !== adjImageUrls.length ||
+          urls.some((url, idx) => url !== adjImageUrls[idx])
         ) {
           adjLayer._imageUrls = urls;
           adjLayer.reset();
           adjLayer.map().draw();
           adjLayer.onIdle(() => {
             if (
-              fullUrls.every((url, idx) => url === fullLayer._imageUrls[idx]) &&
-              urls.every((url, idx) => url === adjLayer._imageUrls[idx])
+              fullUrls.every(
+                (url, idx) => url === fullLayer._imageUrls?.[idx]
+              ) &&
+              urls.every((url, idx) => url === adjLayer._imageUrls?.[idx])
             ) {
               fullLayer.node().css("visibility", "hidden");
               adjLayer
