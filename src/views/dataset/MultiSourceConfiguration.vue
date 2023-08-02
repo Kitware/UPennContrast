@@ -69,11 +69,26 @@
     </v-card>
     <v-row>
       <v-col class="d-flex justify-end">
-        <v-btn @click="generateJson" color="green" :disabled="!submitEnabled()">
+        <v-checkbox
+          dense
+          hide-details
+          class="mr-8"
+          v-model="transcode"
+          label="Transcode into optimized TIFF file"
+        />
+        <v-btn
+          @click="generateJson"
+          color="green"
+          :disabled="!submitEnabled() || isUploading"
+        >
+          <v-progress-circular size="16" v-if="isUploading" indeterminate />
           Submit
         </v-btn>
       </v-col>
     </v-row>
+    <div class="code-container" v-if="isUploading && logs">
+      <code class="code-block">{{ logs }}</code>
+    </div>
   </v-container>
 </template>
 
@@ -88,7 +103,8 @@ import {
 } from "@/utils/parsing";
 import { IGirderItem } from "@/girder";
 import { ITileMeta } from "@/store/GirderAPI";
-import { IGeoJSPoint } from "@/store/model";
+import { IGeoJSPoint, IJobEventData } from "@/store/model";
+import { logError } from "@/utils/log";
 
 // Possible sources for variables
 enum Sources {
@@ -176,6 +192,11 @@ export default class MultiSourceConfiguration extends Vue {
   tilesMetadata: ITileMeta[] | null = null;
 
   enableCompositing: boolean = false;
+
+  transcode: boolean = false;
+
+  isUploading: boolean = false;
+  logs: string = "";
 
   get datasetId() {
     return this.$route.params.datasetId;
@@ -413,6 +434,9 @@ export default class MultiSourceConfiguration extends Vue {
 
     //  Get info from filename
     const names = items.map(item => item.name);
+
+    // Enbale transcoding by default except for ND2 files
+    this.transcode = !names.every(name => name.toLowerCase().endsWith("nd2"));
 
     collectFilenameMetadata2(names).forEach(filenameData =>
       this.addSizeToDimension(filenameData.guess, filenameData.values.length, {
@@ -711,16 +735,50 @@ export default class MultiSourceConfiguration extends Vue {
       }
     }
 
-    await this.store.addMultiSourceMetadata({
-      parentId: this.datasetId,
-      metadata: JSON.stringify({ channels, sources })
-    });
-    this.$router.push({
-      name: "dataset",
-      params: {
-        datasetId: this.datasetId
+    this.logs = "";
+    this.isUploading = true;
+    const eventCallback = (jobData: IJobEventData) => {
+      if (jobData.text) {
+        this.logs += jobData.text;
       }
-    });
+    };
+
+    try {
+      const itemId = await this.store.addMultiSourceMetadata({
+        parentId: this.datasetId,
+        metadata: JSON.stringify({ channels, sources }),
+        transcode: this.transcode,
+        eventCallback
+      });
+
+      if (!itemId) {
+        throw new Error("Failed to add multi source");
+      }
+
+      this.$router.push({
+        name: "dataset",
+        params: {
+          datasetId: this.datasetId
+        }
+      });
+    } catch (error) {
+      logError((error as Error).message);
+    }
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.code-container {
+  display: flex;
+  flex-direction: column-reverse;
+  margin: 20px 0;
+  width: 100%;
+  height: 300px;
+  overflow-y: scroll;
+}
+
+.code-block {
+  white-space: pre-wrap;
+}
+</style>
