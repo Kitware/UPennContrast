@@ -75,10 +75,12 @@ export default class GirderLocationChooser extends Vue {
   })
   activatorDisabled!: boolean;
 
+  // Use the computed dialogInternal instead of dialog or dialogInternalCache
   @Prop({
-    default: false
+    default: null
   })
-  dialog!: boolean;
+  private dialog!: boolean | null;
+  private dialogInternalCache: boolean = false;
 
   selected: IGirderSelectAble | null = null;
 
@@ -92,10 +94,11 @@ export default class GirderLocationChooser extends Vue {
   }
 
   get dialogInternal() {
-    return this.dialog;
+    return this.dialog ?? this.dialogInternalCache;
   }
 
   set dialogInternal(value: boolean) {
+    this.dialogInternalCache = value;
     this.$emit("update:dialog", value);
   }
 
