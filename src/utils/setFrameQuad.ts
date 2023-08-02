@@ -1,16 +1,11 @@
 import { ITileMeta } from "@/store/GirderAPI";
-import {
-  IGeoJSOsmLayer,
-  IGeoJSQuad,
-  IQuadInformation,
-  IQuadQuery
-} from "@/store/model";
+import { IGeoJSOsmLayer, IGeoJSQuad, IQuadInformation } from "@/store/model";
 
-export interface ISetQuadStatusOptions extends IQuadInformation {
+export interface ISetQuadStatusOptions {
   progress: (status: ISetQuadStatus) => void;
-  adjustMinLevel?: boolean;
-  crossOrigin?: string;
-  redrawOnFirstLoad?: boolean;
+  adjustMinLevel: boolean;
+  crossOrigin: string;
+  redrawOnFirstLoad: boolean;
 }
 
 export interface ISetQuadStatus {
@@ -40,39 +35,50 @@ export interface ISetQuadStatus {
  * @param {geo.tileLayer} layer The GeoJS layer to add the function to.  This
  *   is also used to get a maximal texture size if the layer is a webGL
  *   layer.
- * @param {object} options Additional options for the function. It extends
- *   IQuadInformation which come from ILayerStackImage["baseQuadOptions"]. The
- *   attributes added to this object are described below.
- * @param {number} [options.adjustMinLevel=true] If truthy, adjust the tile
- *   layer's minLevel after the quads are loaded.
- * @param {string} [options.crossOrigin="anonymous"] If specified, use this as the
- *   crossOrigin policy for images.
- * @param {string} [options.progress] If specified, a function to call whenever
- *   a texture image is loaded.
- * @param {boolean} [options.redrawOnFirstLoad=true] If truthy, redraw the
- *   layer after the base quad is first loaded if a frame value has been set.
+ * @param {object} quadInformation Informations from
+ *   ILayerStackImage["baseQuadOptions"]
+ * @param {object} partialOptions Additional options for the function.
+ * @param {number} [partialOptions.adjustMinLevel=true] If truthy, adjust the
+ *   tile layer's minLevel after the quads are loaded.
+ * @param {string} [partialOptions.crossOrigin="anonymous"] If specified, use
+ *   this as the crossOrigin policy for images.
+ * @param {string} [partialOptions.progress] If specified, a function to call
+ *   whenever a texture image is loaded.
+ * @param {boolean} [partialOptions.redrawOnFirstLoad=true] If truthy, redraw
+ *   the layer after the base quad is first loaded if a frame value has been
+ *   set.
  */
-function setFrameQuad(
+export default function setFrameQuad(
   tileinfo: ITileMeta,
   layer: IGeoJSOsmLayer,
-  options: ISetQuadStatusOptions
+  quadInformation: IQuadInformation,
+  partialOptions: Partial<ISetQuadStatusOptions>
 ) {
-  layer.setFrameQuad = function() {};
-  if (
-    !tileinfo ||
-    !tileinfo.sizeX ||
-    !tileinfo.sizeY ||
-    !options ||
-    !options.baseUrl
-  ) {
+  if (!tileinfo || !tileinfo.sizeX || !tileinfo.sizeY) {
     return;
   }
+  // Recompute maxTextureSize in quadInformation.queryParameters
   const renderer = layer.renderer();
-  const maxTextureSize: number =
-    renderer?._maxTextureSize ||
-    renderer?.constructor._maxTextureSize ||
-    +Infinity;
-  options = { ...options, maxTextureSize: Math.min(16384, maxTextureSize) };
+  const maxTextureSize = Math.min(
+    ...([
+      16384,
+      quadInformation.queryParameters.maxFrameSize,
+      renderer?._maxTextureSize,
+      renderer?.constructor._maxTextureSize
+    ].filter(x => x !== undefined) as number[])
+  );
+  quadInformation = {
+    ...quadInformation,
+    queryParameters: { ...quadInformation, maxTextureSize }
+  };
+  // Default options
+  const options: ISetQuadStatusOptions = {
+    progress: () => {},
+    adjustMinLevel: true,
+    crossOrigin: "anonymous",
+    redrawOnFirstLoad: true,
+    ...partialOptions
+  };
   const status: ISetQuadStatus = {
     tileinfo,
     options,
@@ -84,7 +90,6 @@ function setFrameQuad(
     loadedCount: 0,
     loaded: false
   };
-  loadImages(options, status, layer);
   layer.setFrameQuad = function(frame) {
     const idx = status.framesToIdx[frame];
     if (idx !== undefined && status.loaded) {
@@ -93,105 +98,97 @@ function setFrameQuad(
     status.frame = frame;
   };
   layer.setFrameQuad.status = status;
+  loadImages(options, quadInformation, status, layer);
 }
 
 async function loadImages(
   options: ISetQuadStatusOptions,
+  quadInformation: IQuadInformation,
   status: ISetQuadStatus,
   layer: IGeoJSOsmLayer
 ) {
   // Helper arrow function to call the progress callback
-  const progressFunction = options.progress
-    ? () => {
-        try {
-          options.progress(status);
-        } catch {}
-      }
-    : () => {};
+  const safeProgress = () => {
+    try {
+      options.progress(status);
+    } catch {}
+  };
 
-  // Options for the endpoint
-  const qiOptions: IQuadQuery = { ...options };
-  // Only keep keys that are in IQuadQuery
-  // Remove keys which come from IQuadInformation and ISetQuadStatusOptions
-  [
-    "baseUrl",
-    "restRequest",
-    "restUrl",
-
-    "progress",
-    "adjustMinLevel",
-    "crossOrigin",
-    "redrawOnFirstLoad"
-  ].forEach(k => delete (qiOptions as any)[k]);
-
-  const data = await options.restRequest({
+  // Get quad info and update status
+  const data = await quadInformation.restRequest({
     type: "GET",
-    url: `${options.restUrl}/tile_frames/quad_info`,
-    data: qiOptions
+    url: `${quadInformation.restUrl}/tile_frames/quad_info`,
+    data: quadInformation.queryParameters
   });
   status.quads = data.quads;
   status.frames = data.frames;
   status.framesToIdx = data.framesToIdx;
 
-  for (let idx = 0; idx < data.src.length; idx += 1) {
+  // Create an Image element for each src in the quad info
+  for (let idx = 0; idx < data.src.length; idx++) {
     const img = new Image();
+
+    // Set the created image in images array and quads array
+    status.images[idx] = img;
     for (let qidx = 0; qidx < data.quads.length; qidx += 1) {
       if (data.quadsToIdx[qidx] === idx) {
         status.quads[qidx].image = img;
       }
     }
+
+    // Cross origin option
     if (
-      options.baseUrl.indexOf(":") >= 0 &&
-      options.baseUrl.indexOf("/") === options.baseUrl.indexOf(":") + 1
+      quadInformation.baseUrl.indexOf(":") >= 0 &&
+      quadInformation.baseUrl.indexOf("/") ===
+        quadInformation.baseUrl.indexOf(":") + 1
     ) {
-      img.crossOrigin = options.crossOrigin || "anonymous";
+      img.crossOrigin = options.crossOrigin;
     }
+
+    // Compute the src and set the img's src
     const paramsObj: { [key: string]: number | boolean | string } =
       data.src[idx];
     const params = Object.entries(paramsObj)
       .map(([k, v]) => encodeURIComponent(k) + "=" + encodeURIComponent(v))
       .join("&");
-    const src = `${options.baseUrl}/tile_frames?` + params;
-    status.src.push(src);
-    if (idx === data.src.length - 1) {
-      img.onload = function() {
-        status.loadedCount += 1;
-        status.loaded = true;
-        if (
-          layer._options &&
-          layer._options.minLevel !== undefined &&
-          (!("adjustMinLevel" in options) || options.adjustMinLevel) &&
-          status.minLevel !== undefined &&
-          status.minLevel > layer._options.minLevel
-        ) {
-          const layerMax = layer._options.maxLevel;
-          layer._options.minLevel =
-            layerMax !== undefined
-              ? Math.min(layerMax, status.minLevel)
-              : status.minLevel;
-        }
-        progressFunction();
-        if (status.frame !== undefined) {
-          layer.baseQuad = {
-            ...status.quads[status.framesToIdx[status.frame]]
-          };
-          if (!("redrawOnFirstLoad" in options) || options.redrawOnFirstLoad) {
-            layer.draw();
-          }
-        }
-      };
-    } else {
-      img.onload = function() {
-        status.loadedCount += 1;
-        status.images[idx + 1].src = status.src[idx + 1];
-        progressFunction();
-      };
-    }
-    status.images.push(img);
+    const src = `${quadInformation.baseUrl}/tile_frames?` + params;
+    status.src[idx] = src;
+    img.src = src;
+
+    // Wait for the image to load
+    await new Promise<void>(resolve => {
+      const voidResolve = () => resolve();
+      img.onload = voidResolve;
+      img.onerror = voidResolve;
+    });
+    status.loadedCount += 1;
+    safeProgress();
   }
-  status.images[0].src = status.src[0];
-  progressFunction();
+
+  // Done loading all images
+  status.loaded = true;
+  safeProgress();
+
+  // Adjust min level of the layer
+  if (
+    options.adjustMinLevel &&
+    layer._options?.minLevel !== undefined &&
+    status.minLevel !== undefined &&
+    status.minLevel > layer._options.minLevel
+  ) {
+    const layerMax = layer._options.maxLevel;
+    layer._options.minLevel =
+      layerMax !== undefined
+        ? Math.min(layerMax, status.minLevel)
+        : status.minLevel;
+  }
+
+  // Set frame quad if a call to setFrameQuad has been made while loading
+  if (status.frame !== undefined) {
+    layer.setFrameQuad?.(status.frame);
+    if (options.redrawOnFirstLoad) {
+      layer.draw();
+    }
+  }
   return status;
 }
-
-export default setFrameQuad;

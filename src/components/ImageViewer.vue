@@ -617,8 +617,7 @@ export default class ImageViewer extends Vue {
             fullLayer.baseQuad = null;
           } else {
             if (!fullLayer.setFrameQuad) {
-              setFrameQuad(someImage.tileinfo, fullLayer, {
-                ...baseQuadOptions,
+              setFrameQuad(someImage.tileinfo, fullLayer, baseQuadOptions, {
                 progress: (status: any) => {
                   if (status.loadedCount === 0) {
                     this.cacheProgressTotal += status.images.length;

@@ -605,10 +605,11 @@ export interface IQuadQuery {
   query?: string;
 }
 
-export interface IQuadInformation extends IQuadQuery {
+export interface IQuadInformation {
   baseUrl: string;
   restRequest: (params: any) => Promise<any>;
   restUrl: string;
+  queryParameters: IQuadQuery;
 }
 
 export interface ILayerStackImage {
