@@ -19,8 +19,18 @@ class PropertySchema:
             },
             'values': {
                 'type': 'object',
-                'additionalProperties': {'type': 'number'}
-            }
+                'additionalProperties': {
+                    'anyOf': [
+                        {
+                            'type': 'number',
+                        },
+                        {
+                            'type': 'object',
+                            'additionalProperties': 'number',
+                        },
+                    ],
+                },
+            },
         },
         # 'additionalProperties': False
     }
@@ -78,8 +88,8 @@ class AnnotationPropertyValues(ProxiedAccessControlledModel):
             else:
                 self.save(document, False)
 
-    def histogram(self, propertyId, datasetId, buckets=255):
-        valueKey = 'values.' + propertyId
+    def histogram(self, propertyPath, datasetId, buckets=255):
+        valueKey = 'values.' + propertyPath
         match = {
             '$match': {
                 'datasetId': datasetId,

@@ -18,12 +18,15 @@
           </v-col>
         </v-row>
         <v-divider class="my-2" />
-        <div v-for="property of properties" :key="property.id">
+        <div
+          v-for="(propertyPath, idx) of computedPropertyPaths"
+          :key="'property ' + idx"
+        >
           <v-row>
             <v-col>
-              {{ property.name }}
+              {{ propertyStore.getFullNameFromPath(propertyPath) }}
               <v-chip
-                v-for="(tag, idx) in property.tags.tags"
+                v-for="(tag, idx) in getTagsForPath(propertyPath)"
                 :key="idx"
                 small
                 class="mx-1"
@@ -37,8 +40,13 @@
                 <v-checkbox
                   dense
                   hide-details
-                  :value="propertyIdsInAnnotationList.includes(property.id)"
-                  @click.stop="() => toggleList(property.id)"
+                  :value="
+                    findIndexOfPath(
+                      propertyPath,
+                      propertyStore.displayedPropertyPaths
+                    ) >= 0
+                  "
+                  @click.stop="() => toggleList(propertyPath)"
                   class="ma-0"
                 />
               </div>
@@ -49,8 +57,10 @@
                 <v-checkbox
                   dense
                   hide-details
-                  :value="propertyIdsInFilter.includes(property.id)"
-                  @click.stop="() => toggleFilter(property.id)"
+                  :value="
+                    findIndexOfPath(propertyPath, filterStore.filterPaths) >= 0
+                  "
+                  @click.stop="() => toggleFilter(propertyPath)"
                   class="ma-0"
                 />
               </div>
@@ -67,38 +77,29 @@
 import { Vue, Component } from "vue-property-decorator";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
+import { findIndexOfPath } from "@/utils/paths";
 
 @Component
 export default class AnnotationProperties extends Vue {
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
+  readonly findIndexOfPath = findIndexOfPath;
 
-  get properties() {
-    return this.propertyStore.properties;
+  get computedPropertyPaths() {
+    return this.propertyStore.computedPropertyPaths;
   }
 
-  get propertyIdsInAnnotationList() {
-    return this.propertyStore.annotationListIds;
+  getTagsForPath(path: string[]) {
+    const property = this.propertyStore.getPropertyById(path[0]);
+    return property?.tags.tags || [];
   }
 
-  get propertyIdsInFilter() {
-    return this.filterStore.filterIds;
+  toggleList(propertyPath: string[]) {
+    this.propertyStore.togglePropertyPathVisibility(propertyPath);
   }
 
-  toggleList(propertyId: string) {
-    if (this.propertyIdsInAnnotationList.includes(propertyId)) {
-      this.propertyStore.removeAnnotationListId(propertyId);
-    } else {
-      this.propertyStore.addAnnotationListId(propertyId);
-    }
-  }
-
-  toggleFilter(propertyId: string) {
-    if (this.propertyIdsInFilter.includes(propertyId)) {
-      this.filterStore.removeFilterId(propertyId);
-    } else {
-      this.filterStore.addFilterId(propertyId);
-    }
+  toggleFilter(propertyPath: string[]) {
+    this.filterStore.togglePropertyPathFiltering(propertyPath);
   }
 }
 </script>

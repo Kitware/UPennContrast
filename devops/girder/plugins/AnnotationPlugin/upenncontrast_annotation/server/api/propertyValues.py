@@ -23,7 +23,7 @@ class PropertyValues(Resource):
     # TODO(performance): use objectId whenever possible
 
     @access.user
-    @describeRoute(Description("Save computed property values").param('body', 'Property values', paramType='body')
+    @describeRoute(Description("Save computed property values").param('body', 'Property values of type { [propertyId: string]: number | Map<string, number> }', paramType='body')
                    .param('annotationId', 'The ID of the annotation')
                    .param('datasetId', 'The ID of the dataset'))
     def add(self, params):
@@ -51,8 +51,6 @@ class PropertyValues(Resource):
                    .responseClass('annotation')
                    .param('datasetId', 'Get all property values for this dataset', required=False)
                    .param('annotationId', 'Get all property values for this annotation', required=False)
-                   # TODO: figure out how to implement this. But do we need it ?
-                   .param('propertyId', 'Restrict results to this property', required=False)
                    .pagingParams(defaultSort='_id')
                    .errorResponse()
                    )
@@ -67,12 +65,12 @@ class PropertyValues(Resource):
 
     @access.user
     @describeRoute(Description("Get a histogram for property values in the specified dataset")
-    .param('propertyId', 'The id of the property')
+    .param('propertyPath', 'The path to the property: a property ID and eventually subIds separated with dots (e.g. propertyId.subId0.subId1)')
     .param('datasetId', 'The id of the dataset')
     .param('buckets', 'The number of buckets', required=False)
     )
     def histogram(self, params):
         if 'buckets' in params:
-            return self._annotationPropertyValuesModel.histogram(params['propertyId'], params['datasetId'], int(params['buckets']))
+            return self._annotationPropertyValuesModel.histogram(params['propertyPath'], params['datasetId'], int(params['buckets']))
         else:
-            return self._annotationPropertyValuesModel.histogram(params['propertyId'], params['datasetId'])
+            return self._annotationPropertyValuesModel.histogram(params['propertyPath'], params['datasetId'])

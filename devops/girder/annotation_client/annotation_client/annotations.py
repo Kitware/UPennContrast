@@ -13,7 +13,7 @@ PATHS = {
     'add_property_values': '/annotation_property_values?datasetId={datasetId}&annotationId={annotationId}',
     'get_dataset_properties': '/annotation_property_values?datasetId={datasetId}',
     'get_annotation_properties': '/annotation_property_values?datasetId={datasetId}&annotationId={annotationId}',
-    'histogram': '/annotation_property_values/histogram?propertyId={propertyId}&datasetId={datasetId}&buckets={buckets}'
+    'histogram': '/annotation_property_values/histogram?propertyPath={propertyPath}&datasetId={datasetId}&buckets={buckets}'
 }
 
 
@@ -203,20 +203,20 @@ class UPennContrastAnnotationClient:
           Save one or multiple computed property values for the specified annotation
           :param str datasetId: The dataset id
           :param str annotationId: The annotation id
-          :param dict values: A dict of values - {[propertyId]: value}
+          :param dict values: A dict of values - { [propertyId]: number | Map<string, number> }
         """
         return self.client.post(PATHS['add_property_values'].format(datasetId=datasetId, annotationId=annotationId), json=values)
 
-    def getPropertyHistogram(self, propertyId, datasetId, buckets=255):
+    def getPropertyHistogram(self, propertyPath, datasetId, buckets=255):
         """
           Get a histogram of the specified property across all annotations in the specified dataset
-          :param str propertyId: The property id
+          :param str propertyPath: The property path: '.'.join([propertyId, subId0, subId1]). Usually the propertyId
           :param str datasetId: The dataset id
           :param str buckets: The number of buckets in the histogram
           :return: The list of bins
           :rtype: list
         """
-        return self.client.get(PATHS['histogram'].format(propertyId=propertyId, datasetId=datasetId, buckets=buckets))
+        return self.client.get(PATHS['histogram'].format(propertyPath=propertyPath, datasetId=datasetId, buckets=buckets))
 
     def getPropertyValuesForDataset(self, datasetId):
         """

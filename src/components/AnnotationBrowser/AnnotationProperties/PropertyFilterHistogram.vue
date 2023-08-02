@@ -1,21 +1,21 @@
 <template>
-  <v-container v-if="property">
-    <v-row>
-      {{ property.name }}
+  <v-container v-if="propertyFullName">
+    <v-row class="title text--primary">
+      {{ propertyFullName }}
     </v-row>
     <v-row>
       <v-col class="wrapper" ref="wrapper" :style="{ width: `${width}px` }">
         <svg :width="width" :height="height" v-if="hist">
           <path class="path" :d="area" />
         </svg>
-        <div class="min-hint" :style="{ width: toValue(minValue) }" />
-        <div class="max-hint" :style="{ width: toValue(maxValue, true) }" />
-        <div ref="min" class="min" :style="{ left: toValue(minValue) }" />
+        <div class="min-hint" :style="{ width: toValue(minValue) }"></div>
+        <div class="max-hint" :style="{ width: toValue(maxValue, true) }"></div>
+        <div ref="min" class="min" :style="{ left: toValue(minValue) }"></div>
         <div
           ref="max"
           class="max"
           :style="{ right: toValue(maxValue, true) }"
-        />
+        ></div>
       </v-col>
       <v-col>
         <v-checkbox v-model="useCDF" label="CDF"></v-checkbox>
@@ -52,24 +52,29 @@ import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
+import { arePathEquals, getValueFromObjectAndPath } from "@/utils/paths";
 import { selectAll, event as d3Event } from "d3-selection";
 import { drag, D3DragEvent } from "d3-drag";
 
 import { IPropertyAnnotationFilter } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
-import { area, curveStep } from "d3-shape";
+import { area, curveStepBefore } from "d3-shape";
+import { v4 as uuidv4 } from "uuid";
 
-import { scaleLinear, scalePoint, scaleSymlog } from "d3-scale";
+import { scaleLinear, scaleSymlog } from "d3-scale";
 
 @Component({
   components: {
     TagFilterEditor
   }
 })
-export default class AnnotationFilter extends Vue {
+export default class PropertyFilterHistogram extends Vue {
   readonly store = store;
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
+
+  @Prop()
+  readonly propertyPath!: string[];
 
   width = 300;
   height = 60;
@@ -144,14 +149,15 @@ export default class AnnotationFilter extends Vue {
 
   get propertyFilter() {
     const filter = this.propertyFilters.find(
-      (value: IPropertyAnnotationFilter) => value.propertyId === this.propertyId
+      (value: IPropertyAnnotationFilter) =>
+        arePathEquals(value.propertyPath, this.propertyPath)
     );
     if (!filter) {
       const newFilter: IPropertyAnnotationFilter = {
         range: { min: this.defaultMin, max: this.defaultMax },
 
-        id: this.propertyId,
-        propertyId: this.propertyId,
+        id: uuidv4(),
+        propertyPath: this.propertyPath,
         exclusive: false,
         enabled: true
       };
@@ -161,69 +167,73 @@ export default class AnnotationFilter extends Vue {
     return filter;
   }
 
-  @Prop()
-  readonly propertyId!: string;
-  get property() {
-    return this.propertyStore.getPropertyById(this.propertyId);
+  get propertyFullName() {
+    return this.propertyStore.getFullNameFromPath(this.propertyPath);
   }
 
   get values() {
-    return Object.entries(this.propertyStore.propertyValues).map(
-      ([_, propertyValues]: [string, { [propertyId: string]: number }]) => {
-        return propertyValues[this.propertyId];
-      }
-    );
-  }
-
-  get cdf() {
-    const data = [...this.bins];
-    for (let i = 0; i < data.length; ++i) {
-      if (i > 0) {
-        data[i] += data[i - 1];
+    const valuesForThisProperty: number[] = [];
+    const propertyValues = this.propertyStore.propertyValues;
+    for (const annotationId in propertyValues) {
+      const valuesPerProperty = propertyValues[annotationId];
+      const value = getValueFromObjectAndPath(
+        valuesPerProperty,
+        this.propertyPath
+      );
+      if (typeof value === "number") {
+        valuesForThisProperty.push(value);
       }
     }
-    return data;
+    return valuesForThisProperty;
   }
 
   get hist() {
-    return this.filterStore.histograms[this.propertyId];
-  }
-
-  get bins() {
-    const hist = this.hist;
-    if (!hist) {
-      return [];
-    }
-    return hist.map(({ count }: { count: number }) => count);
-  }
-
-  get curve() {
-    return this.useCDF ? this.cdf : this.bins;
+    return this.filterStore.getHistogram(this.propertyPath) || [];
   }
 
   get area() {
-    if (!this.curve?.length) {
+    const nInitial = this.hist.length;
+    if (nInitial === 0) {
       return "";
     }
-    const scaleY = this.useLog
-      ? scaleSymlog()
-          .domain([0, Math.max(...this.curve)])
-          // .constant(0.01)
-          .range([this.height, 0])
-      : scaleLinear()
-          .domain([0, Math.max(...this.curve)])
-          .range([this.height, 0]);
+    // Create a dummy point in histogram because of curveStepBefore
+    const minIntensity = this.hist[0].min;
+    const maxIntensity = this.hist[nInitial - 1].max;
+    const dummyFirstPoint = {
+      count: 0,
+      min: minIntensity,
+      max: minIntensity
+    };
+    const hist = [dummyFirstPoint, ...this.hist];
 
-    const scaleX = scalePoint<number>()
-      .domain(this.curve.map((_: number, i: number) => i))
-      .range([0, this.width]);
+    // We need to show densities instead of counts on the Y axis
+    // Density of the dummyFirstPoint is 0 and won't cause problems
+    const densities = hist.map(({ count, min, max }) =>
+      max <= min ? 0 : count / (max - min)
+    );
+    if (this.useCDF) {
+      for (let i = 1; i < densities.length; ++i) {
+        densities[i] += densities[i - 1];
+      }
+    }
+
+    // On the x axis
+    const intensities = hist.map(({ max }) => max);
+
+    const scaleY = this.useLog ? scaleSymlog() : scaleLinear();
+    scaleY.domain([0, Math.max(...densities)]);
+    scaleY.range([this.height, 0]);
+
+    const scaleX = scaleLinear();
+    scaleX.domain([minIntensity, maxIntensity]);
+    scaleX.range([0, this.width]);
 
     const gen = area<number>()
-      .curve(curveStep)
-      .x((_, i) => scaleX(i)!)
-      .y0(d => scaleY(d)!)
-      .y1(scaleY(0));
-    return gen(this.curve);
+      .curve(curveStepBefore)
+      .x((_, i) => scaleX(intensities[i])!)
+      .y0(scaleY(0))
+      .y1(d => scaleY(d)!);
+    return gen(densities) ?? undefined;
   }
 
   destroyed() {

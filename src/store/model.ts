@@ -443,7 +443,7 @@ export interface IShapeAnnotationFilter extends IAnnotationFilter {
 }
 
 export interface IPropertyAnnotationFilter extends IAnnotationFilter {
-  propertyId: string;
+  propertyPath: string[];
   range: {
     min: number;
     max: number;
@@ -475,11 +475,19 @@ export interface IAnnotationProperty extends IAnnotationPropertyConfiguration {
   id: string;
 }
 
+export type TNestedValues<T> = T | { [pathName: string]: TNestedValues<T> };
+
 export interface IAnnotationPropertyValues {
   [annotationId: string]: {
-    [propertyId: string]: number;
+    [propertyId: string]: TNestedValues<number>;
   };
 }
+
+export type TPropertyHistogram = {
+  count: number;
+  min: number;
+  max: number;
+}[];
 
 export interface ISerializedData {
   annotations: IAnnotation[];
