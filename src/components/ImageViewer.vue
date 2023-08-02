@@ -93,7 +93,7 @@ import {
   IMapEntry,
   IXYPoint
 } from "../store/model";
-import setFrameQuad from "@/utils/setFrameQuad";
+import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
 import AnnotationViewer from "@/components/AnnotationViewer.vue";
 import { ITileHistogram } from "@/store/images";
@@ -618,9 +618,9 @@ export default class ImageViewer extends Vue {
           } else {
             if (!fullLayer.setFrameQuad) {
               setFrameQuad(someImage.tileinfo, fullLayer, baseQuadOptions, {
-                progress: (status: any) => {
+                progress: (status: ISetQuadStatus) => {
                   if (status.loadedCount === 0) {
-                    this.cacheProgressTotal += status.images.length;
+                    this.cacheProgressTotal += status.totalToLoad;
                   } else if (this.cacheProgress < this.cacheProgressTotal) {
                     this.cacheProgress += 1;
                   }

@@ -17,6 +17,7 @@ export interface ISetQuadStatus {
   frames: number[];
   framesToIdx: { [frame: number]: number };
   loadedCount: number;
+  totalToLoad: number;
   loaded: boolean;
   frame?: number;
   minLevel?: number;
@@ -62,14 +63,14 @@ export default function setFrameQuad(
   const maxTextureSize = Math.min(
     ...([
       16384,
-      quadInformation.queryParameters.maxFrameSize,
+      quadInformation.queryParameters.maxTextureSize,
       renderer?._maxTextureSize,
       renderer?.constructor._maxTextureSize
     ].filter(x => x !== undefined) as number[])
   );
-  quadInformation = {
+  const maxTexQuadInformation: IQuadInformation = {
     ...quadInformation,
-    queryParameters: { ...quadInformation, maxTextureSize }
+    queryParameters: { ...quadInformation.queryParameters, maxTextureSize }
   };
   // Default options
   const options: ISetQuadStatusOptions = {
@@ -88,6 +89,7 @@ export default function setFrameQuad(
     frames: [],
     framesToIdx: {},
     loadedCount: 0,
+    totalToLoad: 0,
     loaded: false
   };
   layer.setFrameQuad = function(frame) {
@@ -98,7 +100,7 @@ export default function setFrameQuad(
     status.frame = frame;
   };
   layer.setFrameQuad.status = status;
-  loadImages(options, quadInformation, status, layer);
+  loadImages(options, maxTexQuadInformation, status, layer);
 }
 
 async function loadImages(
@@ -123,6 +125,8 @@ async function loadImages(
   status.quads = data.quads;
   status.frames = data.frames;
   status.framesToIdx = data.framesToIdx;
+  status.totalToLoad = data.src.length;
+  safeProgress();
 
   // Create an Image element for each src in the quad info
   for (let idx = 0; idx < data.src.length; idx++) {
