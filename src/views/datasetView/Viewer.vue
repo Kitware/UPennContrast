@@ -6,7 +6,23 @@
         <display-layers />
       </viewer-toolbar>
     </aside>
+    <v-card v-show="drawer" class="custom-drawer">
+      <contrast-panels />
+    </v-card>
     <image-viewer class="main" />
+    <v-btn
+      :style="{ zIndex: 200 }"
+      fixed
+      small
+      dark
+      fab
+      left
+      bottom
+      color="primary"
+      @click="drawer = !drawer"
+    >
+      <v-icon>mdi-menu</v-icon>
+    </v-btn>
   </div>
 </template>
 <script lang="ts">
@@ -33,9 +49,17 @@ export default class Viewer extends Vue {
   readonly annotationStore = annotationStore;
   readonly propertyStore = propertiesStore;
 
+  drawer: boolean = false;
+
   mounted() {
     this.datasetChanged();
     this.configurationChanged();
+  }
+
+  data() {
+    return {
+      drawer: false // Initialize drawer to be closed
+    };
   }
 
   get dataset() {
@@ -86,10 +110,16 @@ export default class Viewer extends Vue {
   flex: 1 1 0;
 }
 </style>
-<style>
-.toolbar .v-expansion-panel-content__wrap,
-.toolbar .v-expansion-panel-header {
-  padding-left: 1px;
-  padding-right: 5px;
+<style scoped>
+.custom-drawer {
+  position: fixed;
+  display: flex;
+  flex-direction: row;
+  justify-content: start;
+  align-items: flex-start;
+  bottom: 0;
+  width: 50%;
+  height: 200px;
+  z-index: 200;
 }
 </style>
