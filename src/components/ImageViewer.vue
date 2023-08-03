@@ -32,36 +32,40 @@
         :key="'geojsmap-' + index"
       />
     </div>
-    <div class="loading" v-if="!fullyReady">
-      <v-progress-circular indeterminate />
-    </div>
-    <template v-if="fullyReady">
-      <div
-        class="loading"
-        v-for="(cacheObj, cacheIdx) in cacheProgresses"
-        :key="'cache-' + cacheIdx"
+    <div class="loading" v-if="readyLayersCount < readyLayersTotal">
+      <v-progress-linear
+        :value="(100 * readyLayersCount) / readyLayersTotal"
+        style="height: 100%;"
       >
-        <v-progress-linear
-          :indeterminate="cacheObj.total === 0"
-          :value="(100 * cacheObj.progress) / cacheObj.total"
-          color="#CCC"
-          background-color="blue-grey"
-          style="width: 200px; height: 20px"
-        >
-          <template v-slot:default>
-            <strong>
-              <template v-if="cacheObj.total === 0">
-                Caching
-              </template>
-              <template v-else>
-                {{ ((100 * cacheObj.progress) / cacheObj.total).toFixed(1) }}%
-                cached ({{ cacheObj.progress }} / {{ cacheObj.total }})
-              </template>
-            </strong>
+        <strong>
+          {{ ((100 * readyLayersCount) / readyLayersTotal).toFixed(1) }}% layers
+          ready {{ readyLayersCount }} / {{ readyLayersTotal }}
+        </strong>
+      </v-progress-linear>
+    </div>
+    <div
+      class="loading"
+      v-for="(cacheObj, cacheIdx) in cacheProgresses"
+      :key="'cache-' + cacheIdx"
+    >
+      <v-progress-linear
+        :indeterminate="cacheObj.total === 0"
+        :value="(100 * cacheObj.progress) / cacheObj.total"
+        color="#CCC"
+        background-color="blue-grey"
+        style="height: 100%;"
+      >
+        <strong>
+          <template v-if="cacheObj.total === 0">
+            Caching
           </template>
-        </v-progress-linear>
-      </div>
-    </template>
+          <template v-else>
+            {{ ((100 * cacheObj.progress) / cacheObj.total).toFixed(1) }}%
+            cached ({{ cacheObj.progress }} / {{ cacheObj.total }})
+          </template>
+        </strong>
+      </v-progress-linear>
+    </div>
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="0"
@@ -198,7 +202,7 @@ export default class ImageViewer extends Vue {
 
   private refsMounted = false;
 
-  private ready: { layers: boolean[] } = { layers: [] };
+  private readyLayers: boolean[] = [];
 
   private resetMapsOnDraw = false;
 
@@ -224,8 +228,15 @@ export default class ImageViewer extends Vue {
     geojsmap: HTMLElement;
   };
 
-  get fullyReady() {
-    return this.ready.layers.every(d => d);
+  get readyLayersCount() {
+    return this.readyLayers.reduce(
+      (count, ready) => (ready ? count + 1 : count),
+      0
+    );
+  }
+
+  get readyLayersTotal() {
+    return this.readyLayers.length;
   }
 
   get dataset() {
@@ -565,7 +576,6 @@ export default class ImageViewer extends Vue {
         return result;
       };
     }
-    this.ready.layers.splice(this.layerStackImages.length);
   }
 
   /**
@@ -583,8 +593,8 @@ export default class ImageViewer extends Vue {
         { layer, urls, fullUrls, hist, singleFrame, baseQuadOptions },
         layerIndex: number
       ) => {
-        let fullLayer = mapentry.imageLayers[layerIndex * 2];
-        let adjLayer = mapentry.imageLayers[layerIndex * 2 + 1];
+        const fullLayer = mapentry.imageLayers[layerIndex * 2];
+        const adjLayer = mapentry.imageLayers[layerIndex * 2 + 1];
         mapentry.lowestLayer = baseLayerIndex;
         layerIndex += baseLayerIndex;
         fullLayer.node().css("filter", `url(#recolor-${layerIndex})`);
@@ -602,7 +612,6 @@ export default class ImageViewer extends Vue {
           }
           adjLayer.visible(false);
           adjLayer.node().css("visibility", "hidden");
-          Vue.set(this.ready.layers, layerIndex, true);
           return;
         }
         generateFilterURL(layerIndex, layer.contrast, layer.color, hist);
@@ -660,7 +669,6 @@ export default class ImageViewer extends Vue {
               adjLayer
                 .node()
                 .css("visibility", layer.visible ? "visible" : "hidden");
-              Vue.set(this.ready.layers, layerIndex, true);
             }
           });
         }
@@ -671,7 +679,6 @@ export default class ImageViewer extends Vue {
         adjLayer
           .node()
           .css("visibility", idle && layer.visible ? "visible" : "hidden");
-        Vue.set(this.ready.layers, layerIndex, idle);
       }
     );
   }
@@ -752,6 +759,36 @@ export default class ImageViewer extends Vue {
       baseLayerIndex += mll.length;
       map.draw();
     });
+
+    // Track progress of layers
+    const readyLayers: boolean[] = [];
+    let readyLayersIdx = 0;
+    for (let mllidx = 0; mllidx < mapLayerList.length; ++mllidx) {
+      const mapentry = this.maps[mllidx];
+      if (!mapentry) {
+        continue;
+      }
+      for (
+        let layerIdx = 0;
+        layerIdx < mapLayerList[mllidx].length;
+        ++layerIdx
+      ) {
+        // Fresh binding of readyLayersIdx to use it in the arrow function
+        const capturedIdx = readyLayersIdx++;
+
+        const fullLayer = mapentry.imageLayers[2 * layerIdx];
+        const adjLayer = mapentry.imageLayers[2 * layerIdx + 1];
+        Vue.set(readyLayers, capturedIdx, false);
+        const setReady = () => {
+          if (fullLayer.idle && adjLayer.idle) {
+            Vue.set(readyLayers, capturedIdx, true);
+          }
+        };
+        fullLayer.onIdle(setReady);
+        adjLayer.onIdle(setReady);
+      }
+    }
+    this.readyLayers = readyLayers;
   }
 
   beforeDestroy() {
@@ -771,6 +808,9 @@ export default class ImageViewer extends Vue {
 .loading {
   color: white;
   font-size: 12px;
+  margin-bottom: 2px;
+  width: 200px;
+  height: 20px;
 }
 .map-layout {
   position: absolute;
