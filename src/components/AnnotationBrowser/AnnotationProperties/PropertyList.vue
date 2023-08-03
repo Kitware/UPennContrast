@@ -75,8 +75,6 @@ export default class PropertyList extends Vue {
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
 
-  uncomputedRunning: number = 0;
-
   get properties() {
     return propertyStore.properties;
   }
@@ -94,15 +92,19 @@ export default class PropertyList extends Vue {
     return res;
   }
 
+  get uncomputedRunning() {
+    let value = 0;
+    for (const property of this.uncomputedProperties) {
+      if (this.propertyStore.propertyStatuses[property.id]?.running) {
+        value++;
+      }
+    }
+    return value;
+  }
+
   computeUncomputedProperties() {
     for (const property of this.uncomputedProperties) {
-      ++this.uncomputedRunning;
-      this.propertyStore.computeProperty({
-        property,
-        callback: () => {
-          --this.uncomputedRunning;
-        }
-      });
+      this.propertyStore.computeProperty(property);
     }
   }
 }

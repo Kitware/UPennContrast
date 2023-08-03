@@ -12,10 +12,10 @@
         <v-btn small fab @click.native.stop :disabled="false" @click="compute">
           <v-badge
             color="red"
-            :value="uncomputed[property.id].length > 0 && !running"
+            :value="uncomputed[property.id].length > 0 && !status.running"
             :content="uncomputed[property.id].length"
           >
-            <template v-if="running">
+            <template v-if="status.running">
               <v-progress-circular indeterminate />
             </template>
             <template v-else>
@@ -27,6 +27,18 @@
         </v-btn>
       </v-col>
     </v-row>
+    <v-row v-if="status.running">
+      <v-progress-linear
+        :indeterminate="!status.progressInfo.progress"
+        :value="100 * (status.progressInfo.progress || 0)"
+        style="height: 20px;"
+      >
+        <strong class="pr-4">
+          {{ status.progressInfo.title }}
+        </strong>
+        {{ status.progressInfo.info }}
+      </v-progress-linear>
+    </v-row>
   </v-container>
 </template>
 
@@ -37,7 +49,7 @@ import LayerSelect from "@/components/LayerSelect.vue";
 import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
-import propertyStore from "@/store/properties";
+import propertyStore, { IPropertyStatus } from "@/store/properties";
 import { IAnnotationProperty } from "@/store/model";
 
 @Component({
@@ -53,27 +65,19 @@ export default class AnnotationProperty extends Vue {
   @Prop()
   readonly property!: IAnnotationProperty;
 
-  running: boolean = false;
-  previousRunStatus: boolean | null = null;
+  get status(): IPropertyStatus {
+    return this.propertyStore.getStatus(this.property.id);
+  }
 
   get uncomputed() {
     return this.propertyStore.uncomputedAnnotationsPerProperty;
   }
 
   compute() {
-    if (this.running) {
+    if (this.status.running) {
       return;
     }
-    this.running = true;
-    this.previousRunStatus = null;
-
-    this.propertyStore.computeProperty({
-      property: this.property,
-      callback: success => {
-        this.running = false;
-        this.previousRunStatus = success;
-      }
-    });
+    this.propertyStore.computeProperty(this.property);
   }
 }
 </script>

@@ -33,6 +33,22 @@ import { arePathEquals } from "@/utils/paths";
 
 type TNestedObject = { [pathName: string]: TNestedObject };
 
+export interface IPropertyStatus {
+  running: boolean;
+  previousRun: boolean | null;
+  progressInfo: {
+    title?: string;
+    info?: string;
+    progress?: number;
+  };
+}
+
+const defaultStatus: () => IPropertyStatus = () => ({
+  running: false,
+  previousRun: null,
+  progressInfo: {}
+});
+
 @Module({ dynamic: true, store, name: "properties" })
 export class Properties extends VuexModule {
   propertiesAPI = main.propertiesAPI;
@@ -43,10 +59,20 @@ export class Properties extends VuexModule {
 
   propertyValues: IAnnotationPropertyValues = {};
 
+  propertyStatuses: {
+    [propertyId: string]: IPropertyStatus;
+  } = {};
+
   workerImageList: IWorkerImageList = {};
   workerInterfaces: { [image: string]: IWorkerInterface } = {};
   workerPreviews: { [image: string]: { text: string; image: string } } = {};
   displayWorkerPreview = true;
+
+  get getStatus() {
+    return (propertyId: string) => {
+      return this.propertyStatuses[propertyId] || defaultStatus();
+    };
+  }
 
   get getWorkerInterface() {
     return (image: string) => this.workerInterfaces[image];
@@ -243,17 +269,18 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  async computeProperty({
-    property,
-    callback = () => {}
-  }: {
-    property: IAnnotationProperty;
-    callback: (success: boolean) => void;
-  }) {
+  async computeProperty(property: IAnnotationProperty) {
     if (!main.dataset) {
       return null;
     }
     const datasetId = main.dataset.id;
+
+    if (!this.propertyStatuses[property.id]) {
+      Vue.set(this.propertyStatuses, property.id, defaultStatus());
+    }
+    const status = this.propertyStatuses[property.id];
+    Vue.set(status, "running", true);
+    Vue.set(status, "previousRun", null);
 
     const response = await this.propertiesAPI.computeProperty(
       property.id,
@@ -272,7 +299,30 @@ export class Properties extends VuexModule {
       callback: async (success: boolean) => {
         await this.fetchPropertyValues();
         await filters.updateHistograms();
-        callback(success);
+        Vue.set(status, "running", false);
+        Vue.set(status, "previousRun", success);
+        Vue.set(status, "progressInfo", {});
+      },
+      eventCallback: jobData => {
+        const text = jobData.text;
+        if (!text || typeof text !== "string") {
+          return;
+        }
+        for (const line of text.split("\n")) {
+          if (!line) {
+            continue;
+          }
+          try {
+            const progress = JSON.parse(line);
+            // The only required property is "progress"
+            if (typeof progress.progress === "number") {
+              Vue.set(status, "progressInfo", {
+                ...status.progressInfo,
+                ...progress
+              });
+            }
+          } catch {}
+        }
       }
     };
     jobs.addJob(computeJob);
