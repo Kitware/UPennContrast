@@ -35,26 +35,33 @@
     <div class="loading" v-if="!fullyReady">
       <v-progress-circular indeterminate />
     </div>
-    <div
-      class="loading"
-      v-if="
-        fullyReady && cacheProgress > 0 && cacheProgress < cacheProgressTotal
-      "
-    >
-      <v-progress-linear
-        :value="(100 * cacheProgress) / cacheProgressTotal"
-        color="#CCC"
-        background-color="blue-grey"
-        style="width: 200px; height: 20px"
+    <template v-if="fullyReady">
+      <div
+        class="loading"
+        v-for="(cacheObj, cacheIdx) in cacheProgresses"
+        :key="'cache-' + cacheIdx"
       >
-        <template v-slot:default>
-          <strong>
-            {{ ((100 * cacheProgress) / cacheProgressTotal).toFixed(1) }}%
-            cached
-          </strong>
-        </template>
-      </v-progress-linear>
-    </div>
+        <v-progress-linear
+          :indeterminate="cacheObj.total === 0"
+          :value="(100 * cacheObj.progress) / cacheObj.total"
+          color="#CCC"
+          background-color="blue-grey"
+          style="width: 200px; height: 20px"
+        >
+          <template v-slot:default>
+            <strong>
+              <template v-if="cacheObj.total === 0">
+                Caching
+              </template>
+              <template v-else>
+                {{ ((100 * cacheObj.progress) / cacheObj.total).toFixed(1) }}%
+                cached ({{ cacheObj.progress }} / {{ cacheObj.total }})
+              </template>
+            </strong>
+          </template>
+        </v-progress-linear>
+      </div>
+    </template>
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="0"
@@ -191,7 +198,7 @@ export default class ImageViewer extends Vue {
 
   private refsMounted = false;
 
-  private ready = { layers: [] };
+  private ready: { layers: boolean[] } = { layers: [] };
 
   private resetMapsOnDraw = false;
 
@@ -211,8 +218,7 @@ export default class ImageViewer extends Vue {
 
   private _inPan: number | undefined = undefined;
 
-  cacheProgress = 0; // 0 to cacheProgressTotal
-  cacheProgressTotal = 0;
+  cacheProgresses: { progress: number; total: number }[] = [];
 
   $refs!: {
     geojsmap: HTMLElement;
@@ -617,12 +623,16 @@ export default class ImageViewer extends Vue {
             fullLayer.baseQuad = null;
           } else {
             if (!fullLayer.setFrameQuad) {
+              const progessObject = { progress: 0, total: 0 };
+              this.cacheProgresses.push(progessObject);
               setFrameQuad(someImage.tileinfo, fullLayer, baseQuadOptions, {
                 progress: (status: ISetQuadStatus) => {
-                  if (status.loadedCount === 0) {
-                    this.cacheProgressTotal += status.totalToLoad;
-                  } else if (this.cacheProgress < this.cacheProgressTotal) {
-                    this.cacheProgress += 1;
+                  progessObject.progress = status.loadedCount;
+                  progessObject.total = status.totalToLoad;
+                  if (progessObject.progress >= progessObject.total) {
+                    this.cacheProgresses = this.cacheProgresses.filter(
+                      obj => obj !== progessObject
+                    );
                   }
                 }
               });
