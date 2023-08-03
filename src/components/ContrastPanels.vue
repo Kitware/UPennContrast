@@ -1,6 +1,6 @@
 <template>
   <div class="contrast-panel">
-    <v-expansion-panels class="panel-flex">
+    <v-expansion-panels class="panel-flex" multiple>
       <v-expansion-panel v-for="(layer, index) in layers" :key="index">
         <display-layer :value="layer" />
       </v-expansion-panel>
