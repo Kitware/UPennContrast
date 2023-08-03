@@ -1,0 +1,412 @@
+<template>
+  <v-card>
+    <v-card-title class="displayLayerHeader">
+      <v-row dense class="align-center">
+        <v-col class="denseCol">
+          <v-icon :color="value.color" left>mdi-circle</v-icon>
+        </v-col>
+        <v-col class="textCol">
+          <div class="header pa-1">{{ value.name }}</div>
+        </v-col>
+        <v-col v-if="hoverValue !== null" class="textCol">
+          <div class="header pa-1">{{ hoverValue }}</div>
+        </v-col>
+        <v-col class="denseCol">
+          <v-switch
+            @click.native.stop
+            @mousedown.native.stop
+            @mouseup.native.stop
+            v-mousetrap="{
+              bind: zMaxMergeBinding(index),
+              handler: () => (isZMaxMerge = !isZMaxMerge)
+            }"
+            class="toggleButton"
+            v-model="isZMaxMerge"
+            v-show="hasMultipleZ"
+            :title="`Toggle Z Max Merge (hotkey ${zMaxMergeBinding(index)})`"
+            dense
+            hide-details
+          />
+        </v-col>
+        <v-col class="denseCol">
+          <v-switch
+            @click.native.stop
+            @mousedown.native.stop
+            @mouseup.native.stop
+            v-mousetrap="{
+              bind: `${index + 1}`,
+              handler: () => store.toggleLayerVisibility(value.id)
+            }"
+            class="toggleButton"
+            v-model="visible"
+            :title="`Toggle Visibility (hotkey ${index + 1})`"
+            dense
+            hide-details
+          />
+        </v-col>
+      </v-row>
+    </v-card-title>
+    <v-card-text :class="{ notVisible: !value.visible }">
+      <v-text-field
+        :value="value.name"
+        @change="changeProp('name', $event)"
+        label="Name"
+        dense
+        hide-details
+      />
+      <contrast-histogram
+        :configurationContrast="configurationContrast"
+        :viewContrast="currentContrast"
+        @change="changeContrast($event, false)"
+        @commit="changeContrast($event, true)"
+        @revert="resetContrastInView()"
+        :histogram="histogram"
+      />
+      <v-menu
+        ref="colorMenu"
+        v-model="showColorPicker"
+        :close-on-content-click="false"
+        :nudge-right="40"
+        transition="scale-transition"
+        offset-y
+        max-width="300px"
+        min-width="300px"
+      >
+        <template #activator="{ on }">
+          <v-text-field
+            :value="value.color"
+            @change="changeProp('color', $event)"
+            label="Color"
+            readonly
+            dense
+            hide-details
+            v-on="on"
+          >
+            <template #append>
+              <v-icon :color="value.color">mdi-square</v-icon>
+            </template>
+          </v-text-field>
+        </template>
+        <v-color-picker
+          v-if="showColorPicker"
+          :value="value.color"
+          hide-canvas
+          @input="changeProp('color', $event)"
+          width="300"
+        />
+      </v-menu>
+      <v-radio-group
+        row
+        v-model="channel"
+        label="Channel"
+        dense
+        hide-details
+        class="channel"
+      >
+        <v-radio
+          v-for="(channel, index) in channels"
+          :key="index"
+          :value="index"
+          :label="channelName(channel)"
+        />
+      </v-radio-group>
+    </v-card-text>
+    <v-row justify="center">
+      <v-col cols="auto">
+        <!-- <v-btn color="warning" small @click="removeLayer">Delete Layer</v-btn> -->
+        <!-- Have to decide whether I want to have the remove layer button here or not. Risk of inadvertent clicks. -->
+        <v-dialog v-model="dialog" max-width="500px">
+          <template #activator="{ on, attrs }">
+            <v-btn
+              class="small-button"
+              color="primary"
+              dark
+              v-bind="attrs"
+              v-on="on"
+              >Advanced Options</v-btn
+            >
+          </template>
+          <v-card>
+            <v-card-title>
+              {{ value.name }} Advanced Layer Options
+            </v-card-title>
+            <v-card-text>
+              <display-slice
+                :value="value.xy"
+                @change="changeProp('xy', $event)"
+                label="XY-Slice"
+                :max-value="maxXY"
+                v-if="maxXY > 0"
+                :displayed="displayXY"
+                :offset="1"
+              />
+              <display-slice
+                :value="value.z"
+                @change="changeProp('z', $event)"
+                label="Z-Slice"
+                :max-value="maxZ"
+                v-if="maxZ > 0"
+                :displayed="displayZ"
+                :offset="1"
+              />
+              <display-slice
+                :value="value.time"
+                @change="changeProp('time', $event)"
+                label="Time-Slice"
+                :max-value="maxTime"
+                v-if="maxTime > 0"
+                :displayed="displayTime"
+                :offset="1"
+              />
+              <div class="buttons">
+                <v-btn color="warning" small @click="removeLayer">Remove</v-btn>
+              </div>
+            </v-card-text>
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn color="blue darken-1" text @click="dialog = false"
+                >Done</v-btn
+              >
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+      </v-col>
+    </v-row>
+  </v-card>
+</template>
+
+<script lang="ts">
+import { Vue, Component, Prop, Emit, Watch } from "vue-property-decorator";
+import { IDisplayLayer, IContrast, IDisplaySlice } from "../store/model";
+import DisplaySlice from "./DisplaySlice.vue";
+import ContrastHistogram from "./ContrastHistogram.vue";
+import store from "../store";
+
+@Component({
+  components: {
+    DisplaySlice,
+    ContrastHistogram
+  }
+})
+export default class DisplayLayerStaticPanel extends Vue {
+  readonly store = store;
+  @Prop()
+  readonly value!: IDisplayLayer;
+
+  showColorPicker = false;
+
+  get index() {
+    return this.store.getLayerIndexFromId(this.value.id)!;
+  }
+
+  get hoverValue() {
+    const layerId = this.value.id;
+    return this.store.hoverValue?.[layerId]?.join(", ") ?? null;
+  }
+
+  get histogram() {
+    return this.store.getLayerHistogram(this.value);
+  }
+
+  get channels() {
+    return this.store.dataset ? this.store.dataset.channels : [];
+  }
+
+  get configurationContrast() {
+    const layerId = this.value.id;
+    const configuration = this.store.configuration;
+    if (!configuration) {
+      return null;
+    }
+    const configurationLayer = this.store.getConfigurationLayerFromId(layerId);
+    if (!configurationLayer) {
+      return null;
+    }
+    return configurationLayer.contrast;
+  }
+
+  get currentContrast() {
+    return this.value.contrast;
+  }
+
+  channelName(channel: number): string {
+    let result = channel.toString();
+    if (this.store.dataset) {
+      result = this.store.dataset.channelNames.get(channel) || result;
+    }
+    return result;
+  }
+
+  get visible() {
+    return this.value.visible;
+  }
+
+  alternativeZSlice: IDisplaySlice =
+    this.value.z.type === "max-merge"
+      ? { type: "current", value: null }
+      : { ...this.value.z };
+
+  zMaxMergeBinding(index: number) {
+    return `shift+${index + 1}`;
+  }
+
+  get isZMaxMerge() {
+    return this.zSlice.type === "max-merge";
+  }
+
+  set isZMaxMerge(value: boolean) {
+    if (this.isZMaxMerge === value) {
+      return;
+    }
+    const newZSlice = value
+      ? {
+          type: "max-merge",
+          value: null
+        }
+      : this.alternativeZSlice;
+    this.changeProp("z", newZSlice);
+  }
+
+  get zSlice() {
+    return this.value.z;
+  }
+
+  @Watch("zSlice")
+  zSliceChanged() {
+    if (!this.isZMaxMerge) {
+      this.alternativeZSlice = { ...this.zSlice };
+    }
+  }
+
+  set visible(value: boolean) {
+    if (this.visible === value) {
+      return;
+    }
+    this.store.toggleLayerVisibility(this.value.id);
+  }
+
+  get channel() {
+    return this.value.channel;
+  }
+
+  set channel(value: number) {
+    // value can be undefined when going to another route:
+    // routeMapper sets datasetId = null -> channels becomes [] -> channel = undefined
+    if (value !== undefined) {
+      this.changeProp("channel", value);
+    }
+  }
+
+  get maxXY() {
+    return this.store.dataset
+      ? this.store.dataset.xy.length - 1
+      : this.value.xy.value || 0;
+  }
+
+  get maxZ() {
+    return this.store.dataset
+      ? this.store.dataset.z.length - 1
+      : this.value.z.value || 0;
+  }
+
+  get maxTime() {
+    return this.store.dataset
+      ? this.store.dataset.time.length - 1
+      : this.value.time.value || 0;
+  }
+
+  get displayXY() {
+    return this.store.xy;
+  }
+
+  get displayZ() {
+    return this.store.z;
+  }
+
+  get hasMultipleZ() {
+    return this.store.dataset && this.store.dataset.z.length > 1;
+  }
+
+  get displayTime() {
+    return this.store.time;
+  }
+
+  changeProp(prop: keyof IDisplayLayer, value: any) {
+    if (this.value[prop] === value) {
+      return;
+    }
+    this.store.changeLayer({
+      layerId: this.value.id,
+      delta: {
+        [prop]: value
+      }
+    });
+  }
+
+  changeContrast(contrast: IContrast, syncConfiguration: boolean) {
+    if (syncConfiguration) {
+      this.store.saveContrastInConfiguration({
+        layerId: this.value.id,
+        contrast
+      });
+    } else {
+      this.store.saveContrastInView({ layerId: this.value.id, contrast });
+    }
+  }
+
+  resetContrastInView() {
+    this.store.resetContrastInView(this.value.id);
+  }
+
+  removeLayer() {
+    this.store.removeLayer(this.value.id);
+  }
+
+  dialog = false;
+}
+</script>
+<style lang="scss" scoped>
+.notVisible {
+  opacity: 0.5;
+}
+
+.displayLayerHeader {
+  > i {
+    flex: 0 0 auto;
+  }
+  > .header {
+    flex: 1 1 0;
+  }
+}
+.header {
+  font-weight: normal;
+  font-size: 12px;
+}
+.toggleButton {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.buttons {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.channel {
+  ::v-deep .v-label {
+    width: 100%;
+  }
+
+  ::v-deep .v-radio {
+    margin-right: 10px;
+
+    > .v-label {
+      font-size: 14px;
+    }
+  }
+}
+
+.small-button {
+  font-size: 12px;
+}
+</style>

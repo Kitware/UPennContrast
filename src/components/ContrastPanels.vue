@@ -2,20 +2,20 @@
   <div class="contrast-panel">
     <v-expansion-panels class="panel-flex" multiple>
       <v-expansion-panel v-for="(layer, index) in layers" :key="index">
-        <display-layer :value="layer" />
+        <display-layer-static-panel :value="layer" />
       </v-expansion-panel>
     </v-expansion-panels>
   </div>
 </template>
 
 <script lang="ts">
-import DisplayLayer from "./DisplayLayer.vue"; // Assuming DisplayLayer.vue is in the same directory
+import DisplayLayerStaticPanel from "./DisplayLayerStaticPanel.vue";
 import store from "@/store";
 
 export default {
   name: "ContrastPanels",
   components: {
-    DisplayLayer
+    DisplayLayerStaticPanel
   },
   computed: {
     layers() {

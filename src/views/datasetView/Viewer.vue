@@ -119,7 +119,7 @@ export default class Viewer extends Vue {
   align-items: flex-start;
   bottom: 0;
   width: 50%;
-  height: 200px;
+  height: 400px;
   z-index: 200;
 }
 </style>
