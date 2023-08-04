@@ -811,6 +811,7 @@ export default class ImageViewer extends Vue {
   margin-bottom: 2px;
   width: 200px;
   height: 20px;
+  z-index: 200;
 }
 .map-layout {
   position: absolute;
