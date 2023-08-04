@@ -10,7 +10,7 @@ import store from "./root";
 
 import main from "./index";
 import sync from "./sync";
-import jobs from "./jobs";
+import jobs, { createProgressEventCallback } from "./jobs";
 
 import {
   IAnnotation,
@@ -20,7 +20,8 @@ import {
   IAnnotationBase,
   IAnnotationConnectionBase,
   IWorkerInterfaceValues,
-  IComputeJob
+  IComputeJob,
+IProgressInfo
 } from "./model";
 
 import Vue, { markRaw } from "vue";
@@ -418,10 +419,12 @@ export class Annotations extends VuexModule {
   public async computeAnnotationsWithWorker({
     tool,
     workerInterface,
+    progress,
     callback
   }: {
     tool: IToolConfiguration;
     workerInterface: IWorkerInterfaceValues;
+    progress: IProgressInfo;
     callback: (success: boolean) => void;
   }) {
     if (!main.dataset || !main.configuration) {
@@ -456,7 +459,8 @@ export class Annotations extends VuexModule {
       callback: (success: boolean) => {
         this.fetchAnnotations();
         callback(success);
-      }
+      },
+      eventCallback: createProgressEventCallback(progress)
     };
     jobs.addJob(computeJob);
     return computeJob;
