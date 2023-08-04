@@ -32,27 +32,38 @@
         :key="'geojsmap-' + index"
       />
     </div>
-    <div class="loading" v-if="!fullyReady">
-      <v-progress-circular indeterminate />
+    <div class="loading" v-if="readyLayersCount < readyLayersTotal">
+      <v-progress-linear
+        :value="(100 * readyLayersCount) / readyLayersTotal"
+        style="height: 100%;"
+      >
+        <strong>
+          {{ ((100 * readyLayersCount) / readyLayersTotal).toFixed(1) }}% layers
+          ready {{ readyLayersCount }} / {{ readyLayersTotal }}
+        </strong>
+      </v-progress-linear>
     </div>
     <div
       class="loading"
-      v-if="
-        fullyReady && cacheProgress > 0 && cacheProgress < cacheProgressTotal
-      "
+      v-for="(cacheObj, cacheIdx) in cacheProgresses"
+      :key="'cache-' + cacheIdx"
     >
       <v-progress-linear
-        :value="(100 * cacheProgress) / cacheProgressTotal"
+        :indeterminate="cacheObj.total === 0"
+        :value="(100 * cacheObj.progress) / cacheObj.total"
         color="#CCC"
         background-color="blue-grey"
-        style="width: 200px; height: 20px"
+        style="height: 100%;"
       >
-        <template v-slot:default>
-          <strong>
-            {{ ((100 * cacheProgress) / cacheProgressTotal).toFixed(1) }}%
-            cached
-          </strong>
-        </template>
+        <strong>
+          <template v-if="cacheObj.total === 0">
+            Caching
+          </template>
+          <template v-else>
+            {{ ((100 * cacheObj.progress) / cacheObj.total).toFixed(1) }}%
+            cached ({{ cacheObj.progress }} / {{ cacheObj.total }})
+          </template>
+        </strong>
       </v-progress-linear>
     </div>
     <svg
@@ -86,8 +97,14 @@ import annotationStore from "@/store/annotation";
 import store from "@/store";
 import geojs from "geojs";
 
-import { IImage, ILayerStackImage, IMapEntry } from "../store/model";
-import setFrameQuad from "../utils/setFrameQuad.js";
+import {
+  IGeoJSTile,
+  IImage,
+  ILayerStackImage,
+  IMapEntry,
+  IXYPoint
+} from "../store/model";
+import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
 import AnnotationViewer from "@/components/AnnotationViewer.vue";
 import { ITileHistogram } from "@/store/images";
@@ -185,7 +202,7 @@ export default class ImageViewer extends Vue {
 
   private refsMounted = false;
 
-  private ready = { layers: [] };
+  private readyLayers: boolean[] = [];
 
   private resetMapsOnDraw = false;
 
@@ -205,15 +222,21 @@ export default class ImageViewer extends Vue {
 
   private _inPan: number | undefined = undefined;
 
-  cacheProgress = 0; // 0 to cacheProgressTotal
-  cacheProgressTotal = 0;
+  cacheProgresses: { progress: number; total: number }[] = [];
 
   $refs!: {
     geojsmap: HTMLElement;
   };
 
-  get fullyReady() {
-    return this.ready.layers.every(d => d);
+  get readyLayersCount() {
+    return this.readyLayers.reduce(
+      (count, ready) => (ready ? count + 1 : count),
+      0
+    );
+  }
+
+  get readyLayersTotal() {
+    return this.readyLayers.length;
   }
 
   get dataset() {
@@ -441,7 +464,7 @@ export default class ImageViewer extends Vue {
       (mapentry.baseLayerIndex !== baseLayerIndex &&
         mapentry.imageLayers.length)
     ) {
-      map.deleteLayer(mapentry.imageLayers.pop());
+      map.deleteLayer(mapentry.imageLayers.pop()!);
     }
     mapentry.baseLayerIndex = baseLayerIndex;
     while (mapentry.imageLayers.length < mll.length * 2) {
@@ -486,19 +509,20 @@ export default class ImageViewer extends Vue {
         };
         const imageNum =
           Math.floor(x / txy.x) + Math.floor(y / txy.y) * this.unrollW;
-        if (!layer._imageUrls || !layer._imageUrls[imageNum]) {
+        const url = layer._imageUrls?.[imageNum];
+        if (!url) {
           return this.blankUrl;
         }
         const tx = x % txy.x;
         const ty = y % txy.y;
-        const result = layer._imageUrls[imageNum]
-          .replace("{z}", level)
-          .replace("{x}", tx)
-          .replace("{y}", ty);
+        const result = url
+          .replace("{z}", level.toString())
+          .replace("{x}", tx.toString())
+          .replace("{y}", ty.toString());
         return result;
       });
-      layer._tileBounds = (tile: any) => {
-        const s = Math.pow(2, someImage.levels - 1 - tile.index.level);
+      layer._tileBounds = (tile: IGeoJSTile) => {
+        const s = Math.pow(2, someImage.levels - 1 - (tile.index.level || 0));
         const w = Math.ceil(someImage.sizeX / s),
           h = Math.ceil(someImage.sizeY / s);
         const txy = {
@@ -521,7 +545,7 @@ export default class ImageViewer extends Vue {
         };
         return result;
       };
-      layer.tileAtPoint = (point: any, level: number) => {
+      layer.tileAtPoint = (point: IXYPoint, level: number) => {
         point = layer.displayToLevel(
           layer.map().gcsToDisplay(point, null),
           someImage.levels - 1
@@ -552,7 +576,6 @@ export default class ImageViewer extends Vue {
         return result;
       };
     }
-    this.ready.layers.splice(this.layerStackImages.length);
   }
 
   /**
@@ -570,13 +593,13 @@ export default class ImageViewer extends Vue {
         { layer, urls, fullUrls, hist, singleFrame, baseQuadOptions },
         layerIndex: number
       ) => {
-        let fullLayer = mapentry.imageLayers[layerIndex * 2];
-        let adjLayer = mapentry.imageLayers[layerIndex * 2 + 1];
+        const fullLayer = mapentry.imageLayers[layerIndex * 2];
+        const adjLayer = mapentry.imageLayers[layerIndex * 2 + 1];
         mapentry.lowestLayer = baseLayerIndex;
         layerIndex += baseLayerIndex;
         fullLayer.node().css("filter", `url(#recolor-${layerIndex})`);
         adjLayer.node().css("filter", "none");
-        if (!fullUrls[0] || !urls[0]) {
+        if (!fullUrls[0] || !urls[0] || !baseQuadOptions) {
           if (singleFrame !== null && fullLayer.setFrameQuad) {
             fullLayer.setFrameQuad(singleFrame);
             fullLayer.visible(true);
@@ -589,7 +612,6 @@ export default class ImageViewer extends Vue {
           }
           adjLayer.visible(false);
           adjLayer.node().css("visibility", "hidden");
-          Vue.set(this.ready.layers, layerIndex, true);
           return;
         }
         generateFilterURL(layerIndex, layer.contrast, layer.color, hist);
@@ -597,10 +619,11 @@ export default class ImageViewer extends Vue {
         adjLayer.visible(true);
         // use css visibility so that geojs will still load tiles when not
         // visible.
+        const layerImageUrls = fullLayer._imageUrls;
         if (
-          !fullLayer._imageUrls ||
-          fullUrls.length !== fullLayer._imageUrls.length ||
-          fullUrls.some((url, idx) => url !== fullLayer._imageUrls[idx])
+          !layerImageUrls ||
+          fullUrls.length !== layerImageUrls.length ||
+          fullUrls.some((url, idx) => url !== layerImageUrls[idx])
         ) {
           fullLayer._imageUrls = fullUrls;
           fullLayer.reset();
@@ -609,38 +632,43 @@ export default class ImageViewer extends Vue {
             fullLayer.baseQuad = null;
           } else {
             if (!fullLayer.setFrameQuad) {
-              setFrameQuad(someImage.tileinfo, fullLayer, {
-                ...baseQuadOptions,
-                progress: (status: any) => {
-                  if (status.loadedCount === 0) {
-                    this.cacheProgressTotal += status.images.length;
-                  } else if (this.cacheProgress < this.cacheProgressTotal) {
-                    this.cacheProgress += 1;
+              const progessObject = { progress: 0, total: 0 };
+              this.cacheProgresses.push(progessObject);
+              setFrameQuad(someImage.tileinfo, fullLayer, baseQuadOptions, {
+                progress: (status: ISetQuadStatus) => {
+                  progessObject.progress = status.loadedCount;
+                  progessObject.total = status.totalToLoad;
+                  if (progessObject.progress >= progessObject.total) {
+                    this.cacheProgresses = this.cacheProgresses.filter(
+                      obj => obj !== progessObject
+                    );
                   }
                 }
               });
             }
-            fullLayer.setFrameQuad(singleFrame);
+            fullLayer.setFrameQuad!(singleFrame);
           }
         }
+        const adjImageUrls = adjLayer._imageUrls;
         if (
-          !adjLayer._imageUrls ||
-          urls.length !== adjLayer._imageUrls.length ||
-          urls.some((url, idx) => url !== adjLayer._imageUrls[idx])
+          !adjImageUrls ||
+          urls.length !== adjImageUrls.length ||
+          urls.some((url, idx) => url !== adjImageUrls[idx])
         ) {
           adjLayer._imageUrls = urls;
           adjLayer.reset();
           adjLayer.map().draw();
           adjLayer.onIdle(() => {
             if (
-              fullUrls.every((url, idx) => url === fullLayer._imageUrls[idx]) &&
-              urls.every((url, idx) => url === adjLayer._imageUrls[idx])
+              fullUrls.every(
+                (url, idx) => url === fullLayer._imageUrls?.[idx]
+              ) &&
+              urls.every((url, idx) => url === adjLayer._imageUrls?.[idx])
             ) {
               fullLayer.node().css("visibility", "hidden");
               adjLayer
                 .node()
                 .css("visibility", layer.visible ? "visible" : "hidden");
-              Vue.set(this.ready.layers, layerIndex, true);
             }
           });
         }
@@ -651,7 +679,6 @@ export default class ImageViewer extends Vue {
         adjLayer
           .node()
           .css("visibility", idle && layer.visible ? "visible" : "hidden");
-        Vue.set(this.ready.layers, layerIndex, idle);
       }
     );
   }
@@ -732,6 +759,36 @@ export default class ImageViewer extends Vue {
       baseLayerIndex += mll.length;
       map.draw();
     });
+
+    // Track progress of layers
+    const readyLayers: boolean[] = [];
+    let readyLayersIdx = 0;
+    for (let mllidx = 0; mllidx < mapLayerList.length; ++mllidx) {
+      const mapentry = this.maps[mllidx];
+      if (!mapentry) {
+        continue;
+      }
+      for (
+        let layerIdx = 0;
+        layerIdx < mapLayerList[mllidx].length;
+        ++layerIdx
+      ) {
+        // Fresh binding of readyLayersIdx to use it in the arrow function
+        const capturedIdx = readyLayersIdx++;
+
+        const fullLayer = mapentry.imageLayers[2 * layerIdx];
+        const adjLayer = mapentry.imageLayers[2 * layerIdx + 1];
+        Vue.set(readyLayers, capturedIdx, false);
+        const setReady = () => {
+          if (fullLayer.idle && adjLayer.idle) {
+            Vue.set(readyLayers, capturedIdx, true);
+          }
+        };
+        fullLayer.onIdle(setReady);
+        adjLayer.onIdle(setReady);
+      }
+    }
+    this.readyLayers = readyLayers;
   }
 
   beforeDestroy() {
@@ -751,6 +808,10 @@ export default class ImageViewer extends Vue {
 .loading {
   color: white;
   font-size: 12px;
+  margin-bottom: 2px;
+  width: 200px;
+  height: 20px;
+  z-index: 200;
 }
 .map-layout {
   position: absolute;

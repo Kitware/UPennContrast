@@ -36,7 +36,7 @@ export interface IImage {
   tileHeight: number;
   mm_x: number;
   mm_y: number;
-  tileinfo: any;
+  tileinfo: ITileMeta;
 }
 
 export interface IImageTile {
@@ -124,12 +124,7 @@ export interface ISnapshot {
   layers: IDisplayLayer[];
   screenshot: {
     format: string;
-    bbox: {
-      left: number;
-      top: number;
-      right: number;
-      bottom: number;
-    };
+    bbox: IGeoJSBounds;
   };
 }
 
@@ -229,7 +224,10 @@ export interface IGeoJSMap {
     ignoreClampBounds?: boolean | "limited"
   ) => IGeoJSMap) &
     (() => IGeoJSPoint);
-  createLayer: (layerName: string, arg: object) => IGeoJSLayer;
+  createLayer: <T extends string>(
+    layerName: T,
+    arg: object
+  ) => T extends "osm" ? IGeoJSOsmLayer : IGeoJSLayer;
   deleteLayer: (layer: IGeoJSLayer | null) => IGeoJSLayer;
   displayToGcs: ((c: IGeoJSPoint, gcs?: string | null) => IGeoJSPoint) &
     ((c: IGeoJSPoint[], gcs?: string | null) => IGeoJSPoint[]);
@@ -292,16 +290,64 @@ export interface IGeoJSLayer {
   currentAnnotation: null | IGeoJSAnnotation;
 }
 
+export interface IXYPoint {
+  x: number;
+  y: number;
+}
+
+export interface IGeoJSPoint extends IXYPoint {
+  z?: number; // Optional z coordinate
+}
+
+export interface IGeoJSFetchQueue {}
+
+export interface IGeoJSTile {
+  index: {
+    x: number;
+    y: number;
+    level?: number;
+    reference?: number;
+  };
+  size: IXYPoint;
+}
+
+export interface IGeoJSQuad {
+  crop: IGeoJSPoint & IGeoJSBounds;
+  lr: IGeoJSPoint;
+  ul: IGeoJSPoint;
+}
+
+export interface IGeoJSRenderer {
+  _maxTextureSize: number;
+  constructor: Function & { _maxTextureSize: number };
+}
+
+export interface IGeoJSOsmLayer extends IGeoJSLayer {
+  readonly idle: boolean;
+  queue: IGeoJSFetchQueue;
+  displayToLevel: (pt?: IXYPoint, zoom?: number) => IXYPoint;
+  renderer: () => IGeoJSRenderer | null;
+  reset: () => IGeoJSOsmLayer;
+  tileAtPoint: (point: IXYPoint, level: number) => IXYPoint;
+  url: (url?: string | ((...args: any[]) => string)) => string;
+
+  onIdle: (handler: () => void) => IGeoJSOsmLayer;
+
+  _imageUrls?: (string | undefined)[];
+  _tileBounds: (tile: IGeoJSTile) => IGeoJSBounds;
+  _options?: {
+    minLevel?: number;
+    maxLevel?: number;
+  };
+
+  baseQuad?: null | IGeoJSQuad;
+  setFrameQuad?: ((frame: number) => void) & { status?: ISetQuadStatus };
+}
+
 export interface IGeoJSAnnotation {
   options: (key?: string, value?: any) => any;
   style: (value?: { [key: string]: any }) => any;
   coordinates: () => IGeoJSPoint[];
-}
-
-export interface IGeoJSPoint {
-  x: number;
-  y: number;
-  z?: number; // Optional z coordinate
 }
 
 export interface INumberWorkerInterfaceElement {
@@ -532,7 +578,7 @@ export interface IUISetting {
 
 export interface IMapEntry {
   map: IGeoJSMap;
-  imageLayers: any[];
+  imageLayers: IGeoJSOsmLayer[];
   params: any;
   baseLayerIndex: number | undefined;
   annotationLayer?: any;
@@ -544,6 +590,28 @@ export interface IMapEntry {
   lowestLayer?: number;
 }
 
+export interface IQuadQuery {
+  alignment?: number;
+  format?: string;
+  frameBase?: number;
+  frameGroup?: number;
+  frameGroupFactor?: number;
+  frameGroupStride?: number;
+  frameStride?: number;
+  maxFrameSize?: number;
+  maxTextures?: number;
+  maxTextureSize?: number;
+  maxTotalTexturePixels?: number;
+  query?: string;
+}
+
+export interface IQuadInformation {
+  baseUrl: string;
+  restRequest: (params: any) => Promise<any>;
+  restUrl: string;
+  queryParameters: IQuadQuery;
+}
+
 export interface ILayerStackImage {
   layer: IDisplayLayer;
   images: IImage[];
@@ -551,18 +619,7 @@ export interface ILayerStackImage {
   fullUrls: (string | undefined)[];
   hist: ITileHistogram | null;
   singleFrame: number | null;
-  baseQuadOptions?: {
-    baseUrl: string;
-    restRequest: (params: any) => Promise<any>;
-    restUrl: string;
-    maxTextures: number;
-    maxTextureSize: number;
-    query: string;
-    frameBase?: number;
-    frameStride?: number;
-    frameGroup?: number;
-    frameGroupStride?: number;
-  };
+  baseQuadOptions?: IQuadInformation;
 }
 
 // Fallback colors for channels with unknown names or with duplicate colors.
@@ -643,6 +700,8 @@ const channelColors: { [key: string]: string } = {
 };
 
 import { v4 as uuidv4 } from "uuid";
+import { ISetQuadStatus } from "@/utils/setFrameQuad";
+import { ITileMeta } from "./GirderAPI";
 
 export function newLayer(
   dataset: IDataset,

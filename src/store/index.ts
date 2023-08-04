@@ -1204,18 +1204,20 @@ export class Main extends VuexModule {
             "item/" +
             results.fullUrls[0].split("/tiles")[0].split("item/")[1] +
             "/tiles",
-          maxTextures: 32,
-          maxTextureSize: 4096,
-          query:
-            "style=" +
-            encodeURIComponent(
-              JSON.stringify({
-                min: "min",
-                max: "max",
-                palette: ["#000000", "#ffffff"]
-              })
-            ) +
-            "&cache=true"
+          queryParameters: {
+            maxTextures: 32,
+            maxTextureSize: 4096,
+            query:
+              "style=" +
+              encodeURIComponent(
+                JSON.stringify({
+                  min: "min",
+                  max: "max",
+                  palette: ["#000000", "#ffffff"]
+                })
+              ) +
+              "&cache=true"
+          }
         };
         let anyImage = this.dataset!.anyImage();
         if (
@@ -1226,18 +1228,17 @@ export class Main extends VuexModule {
           anyImage.tileinfo.IndexRange &&
           anyImage.tileinfo.IndexRange.IndexC > 1
         ) {
-          results.baseQuadOptions.frameBase = layer.channel;
-          results.baseQuadOptions.frameStride =
-            anyImage.tileinfo.IndexRange.IndexC;
-          results.baseQuadOptions.frameGroup =
-            anyImage.tileinfo.IndexRange.IndexZ || 1;
+          const query = results.baseQuadOptions.queryParameters;
+          query.frameBase = layer.channel;
+          query.frameStride = anyImage.tileinfo.IndexRange.IndexC;
+          query.frameGroup = anyImage.tileinfo.IndexRange.IndexZ || 1;
           if (
             (anyImage.tileinfo.IndexStride || {}).IndexZ &&
             (anyImage.tileinfo.IndexStride || {}).IndexC &&
             anyImage.tileinfo.IndexStride.IndexZ >
               anyImage.tileinfo.IndexRange.IndexC
           ) {
-            results.baseQuadOptions.frameGroupStride =
+            query.frameGroupStride =
               anyImage.tileinfo.IndexStride.IndexZ /
               anyImage.tileinfo.IndexRange.IndexC;
           }
