@@ -17,7 +17,8 @@ import {
   IAnnotation,
   IWorkerInterfaceValues,
   IComputeJob,
-  TNestedValues
+  TNestedValues,
+  IProgressInfo
 } from "./model";
 
 import Vue from "vue";
@@ -27,7 +28,7 @@ import main from "./index";
 import { canComputeAnnotationProperty } from "@/utils/annotation";
 import filters from "./filters";
 import annotations from "./annotation";
-import jobs from "./jobs";
+import jobs, { createProgressEventCallback } from "./jobs";
 import { findIndexOfPath } from "@/utils/paths";
 import { arePathEquals } from "@/utils/paths";
 
@@ -36,11 +37,7 @@ type TNestedObject = { [pathName: string]: TNestedObject };
 export interface IPropertyStatus {
   running: boolean;
   previousRun: boolean | null;
-  progressInfo: {
-    title?: string;
-    info?: string;
-    progress?: number;
-  };
+  progressInfo: IProgressInfo;
 }
 
 const defaultStatus: () => IPropertyStatus = () => ({
@@ -303,27 +300,7 @@ export class Properties extends VuexModule {
         Vue.set(status, "previousRun", success);
         Vue.set(status, "progressInfo", {});
       },
-      eventCallback: jobData => {
-        const text = jobData.text;
-        if (!text || typeof text !== "string") {
-          return;
-        }
-        for (const line of text.split("\n")) {
-          if (!line) {
-            continue;
-          }
-          try {
-            const progress = JSON.parse(line);
-            // The only required property is "progress"
-            if (typeof progress.progress === "number") {
-              Vue.set(status, "progressInfo", {
-                ...status.progressInfo,
-                ...progress
-              });
-            }
-          } catch {}
-        }
-      }
+      eventCallback: createProgressEventCallback(status.progressInfo)
     };
     jobs.addJob(computeJob);
     return computeJob;
