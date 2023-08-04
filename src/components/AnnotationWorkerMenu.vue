@@ -1,5 +1,5 @@
 <template>
-  <v-card v-if="tool" class="menu">
+  <v-card :class="{ menu: true, loaded: !fetchingWorkerInterface }" v-if="tool">
     <v-card-title class="subtitle-1">
       Worker menu
     </v-card-title>
@@ -140,6 +140,11 @@ export default class annotationWorkerMenu extends Vue {
 
 <style lang="scss" scoped>
 .menu {
-  border: solid 10px rgba($color: #888, $alpha: 0.5);
+  border: solid 5px rgba($color: #888, $alpha: 0.5);
+  min-height: 600px; // Start with a reasonable height for the menu so the card doesn't resize to be off screen
+}
+// Set min-height to 0 when loaded
+.loaded {
+  min-height: 0;
 }
 </style>
