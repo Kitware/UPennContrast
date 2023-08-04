@@ -25,6 +25,7 @@ import {
 
 import Vue, { markRaw } from "vue";
 import { simpleCentroid } from "@/utils/annotation";
+import { logError } from "@/utils/log";
 
 @Module({ dynamic: true, store, name: "annotation" })
 export class Annotations extends VuexModule {
@@ -409,7 +410,7 @@ export class Annotations extends VuexModule {
     } catch (error) {
       this.setAnnotations([]);
       this.setConnections([]);
-      error(error.message);
+      logError((error as Error).message);
     }
   }
 
