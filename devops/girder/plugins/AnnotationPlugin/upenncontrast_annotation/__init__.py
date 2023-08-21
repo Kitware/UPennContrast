@@ -20,6 +20,7 @@ from .server.models.workerInterfaces import WorkerInterfaceModel as InterfaceMod
 from .server.models.workerPreviews import WorkerPreviewModel as PreviewModel
 from .server.models.datasetView import DatasetView as DatasetViewModel
 from .server.models.history import History as HistoryModel
+from .server.models.documentChange import DocumentChange as DocumentChangeModel
 
 from .server.api.annotation import Annotation
 from .server.api.connections import AnnotationConnection
@@ -42,6 +43,7 @@ class UPennContrastAnnotationAPIPlugin(GirderPlugin):
         ModelImporter.registerModel('worker_preview', PreviewModel, 'upenncontrast_annotation')
         ModelImporter.registerModel('dataset_view', DatasetViewModel, 'upenncontrast_annotation')
         ModelImporter.registerModel('history', HistoryModel, 'upenncontrast_annotation')
+        ModelImporter.registerModel('document_change', DocumentChangeModel, 'upenncontrast_annotation')
 
         info['apiRoot'].upenn_annotation = Annotation()
         info['apiRoot'].annotation_connection = AnnotationConnection()

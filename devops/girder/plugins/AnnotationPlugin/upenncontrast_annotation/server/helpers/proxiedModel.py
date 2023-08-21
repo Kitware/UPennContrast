@@ -88,13 +88,12 @@ class recordable:
                 raise AccessException('You must be logged in.')
             document = {
                 'actionName': self.actionName,
-                'record': record,
                 'actionDate': actionDate,
                 'userId': user['_id'], # type: ignore
                 'isUndone': False,
                 'datasetId': ObjectId(datasetId),
             }
-            self.historyModel.create(user, document)
+            self.historyModel.create(user, document, record)
 
             return val
 
