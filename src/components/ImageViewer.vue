@@ -32,40 +32,38 @@
         :key="'geojsmap-' + index"
       />
     </div>
-    <div class="loading" v-if="readyLayersCount < readyLayersTotal">
-      <v-progress-linear
-        :value="(100 * readyLayersCount) / readyLayersTotal"
-        style="height: 100%;"
-      >
-        <strong>
-          {{ ((100 * readyLayersCount) / readyLayersTotal).toFixed(1) }}% layers
-          ready {{ readyLayersCount }} / {{ readyLayersTotal }}
-        </strong>
-      </v-progress-linear>
-    </div>
     <div
-      class="loading"
-      v-for="(cacheObj, cacheIdx) in cacheProgresses"
+      class="progress"
+      v-for="(cacheObj, cacheIdx) in progresses"
       :key="'cache-' + cacheIdx"
     >
       <v-progress-linear
         :indeterminate="cacheObj.total === 0"
-        :value="(100 * cacheObj.progress) / cacheObj.total"
+        :value="cacheObj.total ? (100 * cacheObj.progress) / cacheObj.total : 0"
         color="#CCC"
         background-color="blue-grey"
         style="height: 100%;"
       >
-        <strong>
-          <template v-if="cacheObj.total === 0">
-            Caching
-          </template>
-          <template v-else>
-            {{ ((100 * cacheObj.progress) / cacheObj.total).toFixed(1) }}%
-            cached ({{ cacheObj.progress }} / {{ cacheObj.total }})
+        <strong class="text-center ma-1">
+          {{ cacheObj.title }}
+          <template v-if="cacheObj.total !== 0">
+            {{ ((100 * cacheObj.progress) / cacheObj.total).toFixed(1) }}% ({{
+              cacheObj.progress
+            }}&nbsp;/&nbsp;{{ cacheObj.total }})
           </template>
         </strong>
       </v-progress-linear>
     </div>
+    <v-alert
+      class="progress-done"
+      :value="loadedAndOptimized"
+      type="success"
+      dense
+      dismissible
+      transition="slide-x-transition"
+    >
+      Dataset fully loaded and optimized
+    </v-alert>
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="0"
@@ -165,6 +163,7 @@ function generateFilterURL(
 @Component({ components: { AnnotationViewer } })
 export default class ImageViewer extends Vue {
   readonly store = store;
+  readonly annotationStore = annotationStore;
 
   // Mousetrap bindings
   readonly mousetrapAnnotations = [
@@ -227,6 +226,49 @@ export default class ImageViewer extends Vue {
   $refs!: {
     geojsmap: HTMLElement;
   };
+
+  get loadedAndOptimized() {
+    return (
+      this.cacheProgresses.length === 0 &&
+      this.annotationStore.progresses.length === 0
+    );
+  }
+
+  get progresses() {
+    // Merge caching and downloading of annotations and connections
+    const progresses: {
+      progress: number;
+      total: number;
+      title: string;
+    }[] = [];
+    if (this.readyLayersCount < this.readyLayersTotal) {
+      progresses.push({
+        progress: this.readyLayersCount,
+        total: this.readyLayersTotal,
+        title: "Preparing layers"
+      });
+    }
+    for (const progress of this.cacheProgresses) {
+      progresses.push({ ...progress, title: "Optimizing performance" });
+    }
+    for (const progress of this.annotationStore.progresses) {
+      if (!progress.annotationDone) {
+        progresses.push({
+          progress: progress.annotationProgress,
+          total: progress.annotationTotal,
+          title: "Downloading annotations"
+        });
+      }
+      if (!progress.connectionDone) {
+        progresses.push({
+          progress: progress.connectionProgress,
+          total: progress.connectionTotal,
+          title: "Downloading connections"
+        });
+      }
+    }
+    return progresses;
+  }
 
   get readyLayersCount() {
     return this.readyLayers.reduce(
@@ -800,18 +842,28 @@ export default class ImageViewer extends Vue {
 }
 </script>
 
+<style lang="scss">
+.progress .v-progress-linear__content {
+  position: relative;
+}
+</style>
+
 <style lang="scss" scoped>
 .image {
   position: relative;
   overflow: hidden;
 }
-.loading {
+.progress {
   color: white;
   font-size: 12px;
   margin-bottom: 2px;
   width: 200px;
-  height: 20px;
   z-index: 200;
+}
+.progress-done {
+  width: fit-content;
+  z-index: 200;
+  margin: 4px;
 }
 .map-layout {
   position: absolute;

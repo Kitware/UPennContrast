@@ -71,11 +71,20 @@ export default class AnnotationsAPI {
       });
   }
 
-  async getAnnotationsForDatasetId(datasetId: string): Promise<IAnnotation[]> {
+  async getAnnotationsForDatasetId(
+    datasetId: string,
+    progressCallback?: (fetched: number, total: number) => void
+  ): Promise<IAnnotation[]> {
     const annotations: IAnnotation[] = [];
-    const pages = await fetchAllPages(this.client, "upenn_annotation", {
-      params: { datasetId, sort: "_id" }
-    });
+    const pages = await fetchAllPages(
+      this.client,
+      "upenn_annotation",
+      {
+        params: { datasetId, sort: "_id" }
+      },
+      undefined,
+      progressCallback
+    );
     for (const page of pages) {
       const newAnnotations = page.map(this.toAnnotation);
       annotations.push(...newAnnotations);
@@ -161,12 +170,19 @@ export default class AnnotationsAPI {
   }
 
   async getConnectionsForDatasetId(
-    datasetId: string
+    datasetId: string,
+    progressCallback?: (fetched: number, total: number) => void
   ): Promise<IAnnotationConnection[]> {
     const connections: IAnnotationConnection[] = [];
-    const pages = await fetchAllPages(this.client, "annotation_connection", {
-      params: { datasetId, sort: "_id" }
-    });
+    const pages = await fetchAllPages(
+      this.client,
+      "annotation_connection",
+      {
+        params: { datasetId, sort: "_id" }
+      },
+      undefined,
+      progressCallback
+    );
     for (const page of pages) {
       const newConnections = page.map(this.toConnection);
       connections.push(...newConnections);
