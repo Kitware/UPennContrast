@@ -3,41 +3,13 @@ from girder.exceptions import ValidationException
 from girder.models.model_base import AccessControlledModel
 from girder.utility.model_importer import ModelImporter
 
+from .documentChange import DocumentChange as DocumentChangeModel
+
 from bson.objectid import ObjectId
 import datetime
 import jsonschema
 
 class HistorySchema:
-    # Example of recordSchema (recording an addition and a deletion of annotation):
-    # {
-    #     "annotations": {
-    #         "63d7fccbbb2c4fdb6eb1b0e8": { "before": None, "after": { "shape": "point", "channel": 0, ... } },
-    #         "63d7fdf7bb2c4fdb6eb1b0f4": { "before": { "shape": "polygon", "channel": 1, ... }, "after": None },
-    #     },
-    # }
-    recordSchema = {
-        # Record per model, keys are model names
-        'type': 'object',
-        'additionalProperties': {
-            # Changes per document, keys are stringified document ids (not ObjectIds)
-            'type': 'object',
-            'additionalProperties': {
-                'type': 'object',
-                'properties': {
-                    # Document before action, can be None, keys are document ids
-                    'before': {
-                        'type': ['object', 'null'],
-                    },
-                    # Document after action, can be None, keys are document ids
-                    'after': {
-                        'type': ['object', 'null'],
-                    },
-                },
-                'required': ['before', 'after'],
-            },
-        },
-    }
-
     historySchema = {
         '$schema': 'http://json-schema.org/schema#',
         'id': '/girder/plugins/upenncontrast_annotation/models/history',
@@ -46,7 +18,6 @@ class HistorySchema:
             'actionName': {
                 'type': 'string',
             },
-            'record': recordSchema,
             # https://pymongo.readthedocs.io/en/stable/examples/datetimes.html
             'actionDate': {
                 # Special type defined in a custom validator
@@ -64,7 +35,7 @@ class HistorySchema:
                 'type': 'objectId',
             },
         },
-        'required': ['actionName', 'record', 'actionDate', 'userId', 'isUndone']
+        'required': ['actionName', 'actionDate', 'userId', 'isUndone']
     }
 
 class History(AccessControlledModel):
@@ -94,6 +65,7 @@ class History(AccessControlledModel):
 
     def initialize(self):
         self.name = "history"
+        self.documentChangeModel: DocumentChangeModel = DocumentChangeModel()
 
     def validate(self, document):
         try:
@@ -130,39 +102,79 @@ class History(AccessControlledModel):
         history_entry = next(self.findWithPermissions(query, sort=sort, user=user, level=AccessType.WRITE, limit=1), None)
         if history_entry is None:
             return
+        
+        # Find the document changes for this history entry
+        # Would have to use an aggregation pipeline to group by model_name
+        # This feature is not available in girder, use the sort instead
+        document_changes = self.documentChangeModel.findWithPermissions(
+            { 'historyId': history_entry['_id'] },
+            sort=[('model_name', SortDir.ASCENDING)],
+            user=user,
+            level=AccessType.READ,
+        )
 
         # Undo or redo the action
         change_key = 'before' if undo else 'after'
-        record_per_model = history_entry['record']
-        for model_name in record_per_model:
-            model: AccessControlledModel = ModelImporter.model(model_name, 'upenncontrast_annotation')
-            record_per_document = record_per_model[model_name]
-            for string_document_id in record_per_document:
-                change = record_per_document[string_document_id]
-                replacement = change[change_key]
-                if replacement is None:
-                    model.collection.delete_one({ '_id': ObjectId(string_document_id) })
-                else:
-                    model.collection.replace_one({ '_id': ObjectId(string_document_id) }, replacement, upsert=True)
+        previous_model_name = ''
+        model = None
+        for change in document_changes:
+            document_id = change['documentId']
+            model_name = change['modelName']
+            if model_name != previous_model_name:
+                model: AccessControlledModel = ModelImporter.model(model_name, 'upenncontrast_annotation')
+                previous_model_name = model_name
+            # Use 'before' when undoing, and 'after' when redoing
+            replacement = change[change_key]
+            if replacement is None:
+                model.collection.delete_one({ '_id': document_id })
+            else:
+                model.collection.replace_one({ '_id': document_id }, replacement, upsert=True)
 
         # Update the entry
         history_entry['isUndone'] = undo
         return self.save(history_entry)
 
-    def create(self, creator, entry):
-        # Remove history entries older than 1 hour
-        limit_date = History.now() - datetime.timedelta(hours=1)
-        self.removeWithQuery({ 'actionDate': { '$lt': limit_date } })
+    def cleanRemoveWithQuery(self, query, creator, **kwargs):
+        # Find the ids of the docs to remove
+        removed_docs = self.find(
+            query=query,
+            user=creator,
+            level=AccessType.WRITE,
+            fields={ '_id': 1 },
+            **kwargs
+        )
+        removed_ids = [entry['_id'] for entry in removed_docs]
+        if len(removed_ids) == 0:
+            return
+        # Remove the docs
+        self.removeWithQuery({ '_id': { '$in': removed_ids } })
+        # Cleanup the document changes
+        self.documentChangeModel.removeWithQuery({ 'historyId': { '$in': removed_ids } })
 
-        # Remove history entries that have been undone
-        self.removeWithQuery({ 'userId': creator['_id'], 'isUndone': True })
+    def create(self, creator, entry, record):
+        # Remove history entries older than 1 hour or that have been undone
+        min_entry_date = History.now() - datetime.timedelta(hours=1)
+        self.cleanRemoveWithQuery(
+            {
+                '$or': [
+                    { 'actionDate': { '$lt': min_entry_date } },
+                    { 'userId': creator['_id'], 'isUndone': True },
+                ]
+            },
+            creator
+        )
 
         # Cap the number of entries per user
-        limit_cap = 10
-        docs_to_remove = self.find({ 'userId': creator['_id'] }, sort=[('actionDate', SortDir.DESCENDING)], offset=limit_cap-1, fields={ '_id': 1 })
-        ids_to_remove = [doc['_id'] for doc in docs_to_remove]
-        if len(ids_to_remove) > 0:
-            self.removeWithQuery({ '_id': { '$in': ids_to_remove } })
+        max_entries_per_user = 10
+        self.cleanRemoveWithQuery(
+            { 'userId': creator['_id'] },
+            creator,
+            sort=[('actionDate', SortDir.DESCENDING)],
+            offset=max_entries_per_user-1,
+        )
 
         self.setUserAccess(entry, user=creator, level=AccessType.ADMIN, save=False)
-        return self.save(entry)
+        new_history_entry = self.save(entry)
+        self.documentChangeModel.createChangesFromRecord(new_history_entry['_id'], record)
+
+        return new_history_entry
