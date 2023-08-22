@@ -6,8 +6,9 @@ import {
   VuexModule
 } from "vuex-module-decorators";
 import store from "./root";
+import Vue from "vue";
 
-import { IComputeJob } from "./model";
+import { IComputeJob, IJobEventData, IProgressInfo } from "./model";
 
 import main from "./index";
 
@@ -22,6 +23,31 @@ const jobStates = {
   cancelled: 5,
   cancelling: 824
 };
+
+// Create a function that can be used as eventCallback of a job
+// It will parse the events and update the progress object
+export function createProgressEventCallback(progressObject: IProgressInfo) {
+  return (jobData: IJobEventData) => {
+    const text = jobData.text;
+    if (!text || typeof text !== "string") {
+      return;
+    }
+    for (const line of text.split("\n")) {
+      if (!line) {
+        continue;
+      }
+      try {
+        const progress = JSON.parse(line);
+        // The only required property is "progress"
+        if (typeof progress.progress === "number") {
+          for (const [k, v] of Object.entries(progress)) {
+            Vue.set(progressObject, k, v);
+          }
+        }
+      } catch {}
+    }
+  };
+}
 
 @Module({ dynamic: true, store, name: "jobs" })
 export class Jobs extends VuexModule {

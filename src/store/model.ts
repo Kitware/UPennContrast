@@ -548,6 +548,12 @@ export interface IJobEventData {
   status?: number;
 }
 
+export interface IProgressInfo {
+  title?: string;
+  info?: string;
+  progress?: number;
+}
+
 export interface IComputeJob {
   jobId: string;
   callback: (success: boolean) => void;

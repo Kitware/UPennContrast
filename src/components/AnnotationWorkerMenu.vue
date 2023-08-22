@@ -8,6 +8,18 @@
         <v-progress-circular indeterminate />
       </v-container>
       <v-container v-else>
+        <v-row v-if="running">
+          <v-progress-linear
+            :indeterminate="!progressInfo.progress"
+            :value="100 * (progressInfo.progress || 0)"
+            style="height: 20px;"
+          >
+            <strong class="pr-4">
+              {{ progressInfo.title }}
+            </strong>
+            {{ progressInfo.info }}
+          </v-progress-linear>
+        </v-row>
         <v-row>
           <v-col>
             <v-subheader>Image: {{ tool.values.image.image }}</v-subheader>
@@ -44,7 +56,11 @@
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationsStore from "@/store/annotation";
-import { IToolConfiguration, IWorkerInterfaceValues } from "@/store/model";
+import {
+  IProgressInfo,
+  IToolConfiguration,
+  IWorkerInterfaceValues
+} from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
 import propertiesStore from "@/store/properties";
@@ -65,6 +81,7 @@ export default class annotationWorkerMenu extends Vue {
   fetchingWorkerInterface: boolean = false;
   running: boolean = false;
   previousRunStatus: boolean | null = null;
+  progressInfo: IProgressInfo = {};
 
   interfaceValues: IWorkerInterfaceValues = {};
 
@@ -105,9 +122,11 @@ export default class annotationWorkerMenu extends Vue {
     this.annotationsStore.computeAnnotationsWithWorker({
       tool: this.tool,
       workerInterface: this.interfaceValues,
+      progress: this.progressInfo,
       callback: success => {
         this.running = false;
         this.previousRunStatus = success;
+        this.progressInfo = {};
       }
     });
   }
