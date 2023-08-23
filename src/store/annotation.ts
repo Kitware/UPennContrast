@@ -28,6 +28,15 @@ import Vue, { markRaw } from "vue";
 import { simpleCentroid } from "@/utils/annotation";
 import { logError } from "@/utils/log";
 
+interface IFetchingProgress {
+  annotationProgress: number;
+  annotationTotal: number;
+  annotationDone: boolean;
+  connectionProgress: number;
+  connectionTotal: number;
+  connectionDone: boolean;
+}
+
 @Module({ dynamic: true, store, name: "annotation" })
 export class Annotations extends VuexModule {
   annotationsAPI = main.annotationsAPI;
@@ -43,6 +52,8 @@ export class Annotations extends VuexModule {
 
   selectedAnnotations: IAnnotation[] = [];
   activeAnnotationIds: string[] = [];
+
+  progresses: IFetchingProgress[] = [];
 
   get selectedAnnotationIds() {
     return this.selectedAnnotations.map(
@@ -375,6 +386,31 @@ export class Annotations extends VuexModule {
     this.tagAnnotationIds({ annotationIds: this.selectedAnnotationIds, tags });
   }
 
+  @Mutation
+  addProgress(progressObj: IFetchingProgress) {
+    this.progresses.push(progressObj);
+  }
+
+  @Mutation
+  removeProgress(progress: IFetchingProgress) {
+    this.progresses = this.progresses.filter(otherProgress => otherProgress !== progress);
+  }
+
+  @Action
+  createProgresses() {
+    const progressObj: IFetchingProgress = { annotationProgress: 0, annotationTotal: 0, annotationDone: false, connectionProgress: 0, connectionTotal: 0, connectionDone: false };
+    const annotationCallback = (progress: number, total: number) => {
+      progressObj.annotationProgress = progress;
+      progressObj.annotationTotal = total;
+    }
+    const connectionCallback = (progress: number, total: number) => {
+      progressObj.connectionProgress = progress;
+      progressObj.connectionTotal = total;
+    }
+    this.addProgress(progressObj);
+    return { progress: progressObj, annotationCallback, connectionCallback };
+  }
+
   @Action
   async fetchAnnotations() {
     this.setAnnotations([]);
@@ -382,36 +418,39 @@ export class Annotations extends VuexModule {
     if (!main.dataset || !main.configuration) {
       return;
     }
+    const { progress, annotationCallback, connectionCallback } = await this.createProgresses();
     try {
+      const annotationsPromise = this.annotationsAPI.getAnnotationsForDatasetId(main.dataset.id, annotationCallback);
+      const connectionsPromise = this.annotationsAPI.getConnectionsForDatasetId(main.dataset.id, connectionCallback);
+      annotationsPromise.finally(() => progress.annotationDone = true);
+      connectionsPromise.finally(() => progress.connectionDone = true);
       const promises: [
         Promise<IAnnotation[]>,
         Promise<IAnnotationConnection[]>
       ] = [
-          // eslint-disable-next-line prettier/prettier
-          this.annotationsAPI.getAnnotationsForDatasetId(main.dataset.id),
-          this.annotationsAPI.getConnectionsForDatasetId(main.dataset.id)
+          annotationsPromise,
+          connectionsPromise
         ];
-      await Promise.all(promises).then(
-        ([annotations, connections]: [
-          IAnnotation[],
-          IAnnotationConnection[]
-        ]) => {
-          if (connections?.length) {
-            this.setConnections(connections);
-          } else {
-            this.setConnections([]);
-          }
-          if (annotations?.length) {
-            this.setAnnotations(annotations);
-          } else {
-            this.setAnnotations([]);
-          }
-        }
-      );
+      const [annotations, connections]: [
+        IAnnotation[],
+        IAnnotationConnection[]
+      ] = await Promise.all(promises);
+      if (connections?.length) {
+        this.setConnections(connections);
+      } else {
+        this.setConnections([]);
+      }
+      if (annotations?.length) {
+        this.setAnnotations(annotations);
+      } else {
+        this.setAnnotations([]);
+      }
     } catch (error) {
       this.setAnnotations([]);
       this.setConnections([]);
       logError((error as Error).message);
+    } finally {
+      this.removeProgress(progress);
     }
   }
 

@@ -348,6 +348,7 @@ export interface IGeoJSAnnotation {
   options: (key?: string, value?: any) => any;
   style: (value?: { [key: string]: any }) => any;
   coordinates: () => IGeoJSPoint[];
+  geojson: () => any;
 }
 
 export interface INumberWorkerInterfaceElement {

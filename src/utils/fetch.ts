@@ -6,7 +6,8 @@ export async function fetchAllPages(
   client: RestClientInstance,
   endpoint: string,
   baseFormData?: AxiosRequestConfig,
-  firstPage?: number
+  firstPage?: number,
+  progressCallback?: (fetched: number, total: number) => void
 ) {
   const pages: any[] = [];
   let totalCount = -1;
@@ -19,6 +20,7 @@ export async function fetchAllPages(
   const basePageSize = baseParams.limit;
   const firstPageSize = firstPage === undefined ? basePageSize : firstPage;
 
+  let downloaded = 0;
   const fetchPage = async (offset: number, limit: number) => {
     const formData: AxiosRequestConfig = {
       ...baseFormData,
@@ -32,6 +34,8 @@ export async function fetchAllPages(
       const res = await client.get(endpoint, formData);
       totalCount = Number(res.headers["girder-total-count"]);
       pages.push(res.data);
+      downloaded += res.data.length;
+      progressCallback?.(downloaded, totalCount);
     } catch (err) {
       logError(`Could not get all ${endpoint} pages:\n${err}`);
       throw err;
