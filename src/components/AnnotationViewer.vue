@@ -27,7 +27,8 @@ import {
   IAnnotationLocation,
   IGeoJSAnnotation,
   IRestrictTagsAndLayer,
-  IMapEntry
+  IMapEntry,
+  IGeoJSMap
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -105,6 +106,12 @@ export default class AnnotationViewer extends Vue {
   }
 
   @Prop()
+  readonly map!: IGeoJSMap;
+
+  @Prop()
+  readonly selectionPath!: IGeoJSPoint[];
+
+  @Prop()
   readonly annotationLayer: any;
 
   @Prop()
@@ -114,25 +121,25 @@ export default class AnnotationViewer extends Vue {
   readonly workerPreviewFeature: any;
 
   @Prop()
-  readonly unrollH: any;
+  readonly unrollH!: number;
 
   @Prop()
-  readonly unrollW: any;
+  readonly unrollW!: number;
 
   @Prop({ default: [] })
   readonly maps!: IMapEntry[];
 
   @Prop()
-  readonly tileWidth: any;
+  readonly tileWidth!: number;
 
   @Prop()
-  readonly tileHeight: any;
+  readonly tileHeight!: number;
 
   @Prop()
-  readonly lowestLayer: any;
+  readonly lowestLayer!: number;
 
   @Prop()
-  readonly layerCount: any;
+  readonly layerCount!: number;
 
   get displayWorkerPreview() {
     return this.propertyStore.displayWorkerPreview;
@@ -190,6 +197,51 @@ export default class AnnotationViewer extends Vue {
 
   get isAnnotationSelected() {
     return this.annotationStore.isAnnotationSelected;
+  }
+
+  selectionAnnotation: IGeoJSAnnotation | null = null;
+
+  @Watch("selectionPath")
+  updateSelection() {
+    if (this.selectionPath.length === 0) {
+      if (this.selectionAnnotation) {
+        // Selection ended
+        const coordinates = this.selectionAnnotation.coordinates();
+        this.annotationLayer.removeAnnotation(this.selectionAnnotation);
+        this.selectionAnnotation = null;
+        // Select the annotations using a point or a polygon annotation
+        let annotation;
+        if (
+          coordinates.length >= 1 &&
+          coordinates.every(
+            point =>
+              point.x === coordinates[0].x && point.y === coordinates[0].y
+          )
+        ) {
+          annotation = geojs.annotation.pointAnnotation();
+          annotation!.options("position", coordinates[0]);
+        } else {
+          annotation = geojs.annotation.polygonAnnotation();
+          annotation!.options("vertices", coordinates);
+        }
+        this.selectAnnotations(annotation);
+      }
+    } else {
+      // Update the selection annotation
+      if (!this.selectionAnnotation) {
+        this.selectionAnnotation = geojs.annotation.lineAnnotation({
+          style: {
+            strokeColor: "white",
+            strokeOpacity: 0.5,
+            strokeWidth: 2,
+            closed: true
+          }
+        });
+      }
+      this.annotationLayer.removeAnnotation(this.selectionAnnotation);
+      this.selectionAnnotation!.options("vertices", this.selectionPath);
+      this.annotationLayer.addAnnotation(this.selectionAnnotation);
+    }
   }
 
   @Watch("displayWorkerPreview")
@@ -1117,7 +1169,7 @@ export default class AnnotationViewer extends Vue {
     ) {
       return false;
     }
-    const map = this.maps[0].map;
+    const map = this.map;
     const basePositionGCS = evt?.mapgcs ? evt.mapgcs : this.lastCursorPosition;
     this.lastCursorPosition = basePositionGCS;
     const basePositionDisplay = map.gcsToDisplay(basePositionGCS);
