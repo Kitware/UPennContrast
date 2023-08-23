@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 import {
   getModule,
   Action,
@@ -21,7 +20,7 @@ import {
   IAnnotationConnectionBase,
   IWorkerInterfaceValues,
   IComputeJob,
-IProgressInfo
+  IProgressInfo
 } from "./model";
 
 import Vue, { markRaw } from "vue";
@@ -46,7 +45,6 @@ export class Annotations extends VuexModule {
   // Connections from the current dataset and configuration
   annotationConnections: IAnnotationConnection[] = [];
 
-  
   annotationCentroids: { [annotationId: string]: IGeoJSPoint } = {};
   annotationIdToIdx: { [annotationId: string]: number } = {};
 
@@ -76,7 +74,7 @@ export class Annotations extends VuexModule {
     return (annotationId: string) => {
       const idx = this.annotationIdToIdx[annotationId];
       return idx === undefined ? undefined : this.annotations[idx];
-    }
+    };
   }
 
   hoveredAnnotationId: string | null = null;
@@ -133,14 +131,23 @@ export class Annotations extends VuexModule {
 
   @Mutation
   public selectAnnotations(selected: IAnnotation[]) {
-    const selectedAnnotationIds = this.selectedAnnotations.map((annotation: IAnnotation) => annotation.id);
-    const annotationsToAdd = selected.filter(annotation => !selectedAnnotationIds.includes(annotation.id));
-    this.selectedAnnotations = [...this.selectedAnnotations, ...annotationsToAdd];
+    const selectedAnnotationIds = this.selectedAnnotations.map(
+      (annotation: IAnnotation) => annotation.id
+    );
+    const annotationsToAdd = selected.filter(
+      annotation => !selectedAnnotationIds.includes(annotation.id)
+    );
+    this.selectedAnnotations = [
+      ...this.selectedAnnotations,
+      ...annotationsToAdd
+    ];
   }
 
   @Mutation
   public unselectAnnotation(annotation: IAnnotation) {
-    const index = this.selectedAnnotations.findIndex((a: IAnnotation) => a.id === annotation.id);
+    const index = this.selectedAnnotations.findIndex(
+      (a: IAnnotation) => a.id === annotation.id
+    );
     if (index >= 0) {
       this.selectedAnnotations.splice(index, 1);
     }
@@ -148,9 +155,12 @@ export class Annotations extends VuexModule {
 
   @Mutation
   public unselectAnnotations(selected: IAnnotation[]) {
-    const selectedAnnotationsIds = selected.map((annotation: IAnnotation) => annotation.id);
+    const selectedAnnotationsIds = selected.map(
+      (annotation: IAnnotation) => annotation.id
+    );
     const annotationsToSelect = this.selectedAnnotations.filter(
-      (annotation: IAnnotation) => !selectedAnnotationsIds.includes(annotation.id)
+      (annotation: IAnnotation) =>
+        !selectedAnnotationsIds.includes(annotation.id)
     );
     this.selectedAnnotations = [...annotationsToSelect];
   }
@@ -167,9 +177,13 @@ export class Annotations extends VuexModule {
   }
 
   @Action
-  public async createAnnotation(annotationBase: IAnnotationBase): Promise<IAnnotation | null> {
+  public async createAnnotation(
+    annotationBase: IAnnotationBase
+  ): Promise<IAnnotation | null> {
     sync.setSaving(true);
-    const newAnnotation: IAnnotation | null = await this.annotationsAPI.createAnnotation(annotationBase);
+    const newAnnotation: IAnnotation | null = await this.annotationsAPI.createAnnotation(
+      annotationBase
+    );
     sync.setSaving(false);
     return newAnnotation;
   }
@@ -177,7 +191,11 @@ export class Annotations extends VuexModule {
   @Mutation
   public addAnnotation(value: IAnnotation) {
     this.annotations.push(value);
-    Vue.set(this.annotationCentroids, value.id, simpleCentroid(value.coordinates));
+    Vue.set(
+      this.annotationCentroids,
+      value.id,
+      simpleCentroid(value.coordinates)
+    );
     Vue.set(this.annotationIdToIdx, value.id, this.annotations.length - 1);
   }
 
@@ -190,7 +208,11 @@ export class Annotations extends VuexModule {
     index: number;
   }) {
     Vue.set(this.annotations, index, annotation);
-    Vue.set(this.annotationCentroids, annotation.id, simpleCentroid(annotation.coordinates));
+    Vue.set(
+      this.annotationCentroids,
+      annotation.id,
+      simpleCentroid(annotation.coordinates)
+    );
     Vue.set(this.annotationIdToIdx, annotation.id, index);
   }
 
@@ -229,7 +251,11 @@ export class Annotations extends VuexModule {
     this.annotationIdToIdx = {};
     for (let idx = 0; idx < this.annotations.length; ++idx) {
       const annotation = this.annotations[idx];
-      Vue.set(this.annotationCentroids, annotation.id, simpleCentroid(annotation.coordinates));
+      Vue.set(
+        this.annotationCentroids,
+        annotation.id,
+        simpleCentroid(annotation.coordinates)
+      );
       Vue.set(this.annotationIdToIdx, annotation.id, idx);
     }
   }
@@ -256,7 +282,10 @@ export class Annotations extends VuexModule {
 
   @Action
   public async createAllConnections({
-    parentIds, childIds, label, tags
+    parentIds,
+    childIds,
+    label,
+    tags
   }: {
     parentIds: string[];
     childIds: string[];
@@ -279,7 +308,9 @@ export class Annotations extends VuexModule {
         });
       }
     }
-    const connections = await this.annotationsAPI.createMultipleConnections(connectionBases);
+    const connections = await this.annotationsAPI.createMultipleConnections(
+      connectionBases
+    );
     if (connections) {
       this.addMultipleConnections(connections);
     }
@@ -289,7 +320,8 @@ export class Annotations extends VuexModule {
 
   @Action
   public async deleteAllConnections({
-    parentIds, childIds
+    parentIds,
+    childIds
   }: {
     parentIds: string[];
     childIds: string[];
@@ -297,17 +329,29 @@ export class Annotations extends VuexModule {
     sync.setSaving(true);
     const parentsSet = new Set(parentIds);
     const childrenSet = new Set(childIds);
-    const connectionsToDelete = this.annotationConnections.filter(connection => parentsSet.has(connection.parentId) && childrenSet.has(connection.childId));
-    await this.annotationsAPI.deleteMultipleConnections(connectionsToDelete.map(connection => connection.id));
-    this.deleteMultipleConnections(connectionsToDelete.map(connection => connection.id));
+    const connectionsToDelete = this.annotationConnections.filter(
+      connection =>
+        parentsSet.has(connection.parentId) &&
+        childrenSet.has(connection.childId)
+    );
+    await this.annotationsAPI.deleteMultipleConnections(
+      connectionsToDelete.map(connection => connection.id)
+    );
+    this.deleteMultipleConnections(
+      connectionsToDelete.map(connection => connection.id)
+    );
     sync.setSaving(false);
     return connectionsToDelete;
   }
 
   @Action
-  public async createConnection(annotationConnectionBase: IAnnotationConnectionBase): Promise<IAnnotationConnection | null> {
+  public async createConnection(
+    annotationConnectionBase: IAnnotationConnectionBase
+  ): Promise<IAnnotationConnection | null> {
     sync.setSaving(true);
-    const newConnection: IAnnotationConnection | null = await this.annotationsAPI.createConnection(annotationConnectionBase);
+    const newConnection: IAnnotationConnection | null = await this.annotationsAPI.createConnection(
+      annotationConnectionBase
+    );
     sync.setSaving(false);
     return newConnection;
   }
@@ -319,7 +363,9 @@ export class Annotations extends VuexModule {
 
   public deleteMultipleConnections(connectionIds: string[]) {
     const idsSet = new Set(connectionIds);
-    this.annotationConnections = this.annotationConnections.filter((connection) => !idsSet.has(connection.id));
+    this.annotationConnections = this.annotationConnections.filter(
+      connection => !idsSet.has(connection.id)
+    );
   }
 
   @Mutation
@@ -352,24 +398,31 @@ export class Annotations extends VuexModule {
   }
 
   @Action
-  public async tagAnnotationIds({ annotationIds, tags }: { annotationIds: string[], tags: string[] }) {
+  public async tagAnnotationIds({
+    annotationIds,
+    tags
+  }: {
+    annotationIds: string[];
+    tags: string[];
+  }) {
     sync.setSaving(true);
     await Promise.all(
       annotationIds
-        .map(annotationId => this.annotations.findIndex((annotation: IAnnotation) => annotation.id === annotationId))
+        .map(annotationId =>
+          this.annotations.findIndex(
+            (annotation: IAnnotation) => annotation.id === annotationId
+          )
+        )
         .filter((annotationIndex: number) => annotationIndex !== -1)
         .map((annotationIndex: number) => {
           const annotation = this.annotations[annotationIndex];
           // Add a tag only if it doesn't exist
-          const newTags = tags.reduce(
-            (newTags: string[], tag: string) => {
-              if (!newTags.includes(tag)) {
-                newTags.push(tag)
-              }
-              return newTags;
-            },
-            annotation.tags
-          );
+          const newTags = tags.reduce((newTags: string[], tag: string) => {
+            if (!newTags.includes(tag)) {
+              newTags.push(tag);
+            }
+            return newTags;
+          }, annotation.tags);
           const newAnnotation = markRaw({ ...annotation, tags: newTags });
           this.setAnnotation({
             annotation: newAnnotation,
@@ -393,20 +446,29 @@ export class Annotations extends VuexModule {
 
   @Mutation
   removeProgress(progress: IFetchingProgress) {
-    this.progresses = this.progresses.filter(otherProgress => otherProgress !== progress);
+    this.progresses = this.progresses.filter(
+      otherProgress => otherProgress !== progress
+    );
   }
 
   @Action
   createProgresses() {
-    const progressObj: IFetchingProgress = { annotationProgress: 0, annotationTotal: 0, annotationDone: false, connectionProgress: 0, connectionTotal: 0, connectionDone: false };
+    const progressObj: IFetchingProgress = {
+      annotationProgress: 0,
+      annotationTotal: 0,
+      annotationDone: false,
+      connectionProgress: 0,
+      connectionTotal: 0,
+      connectionDone: false
+    };
     const annotationCallback = (progress: number, total: number) => {
       progressObj.annotationProgress = progress;
       progressObj.annotationTotal = total;
-    }
+    };
     const connectionCallback = (progress: number, total: number) => {
       progressObj.connectionProgress = progress;
       progressObj.connectionTotal = total;
-    }
+    };
     this.addProgress(progressObj);
     return { progress: progressObj, annotationCallback, connectionCallback };
   }
@@ -418,19 +480,26 @@ export class Annotations extends VuexModule {
     if (!main.dataset || !main.configuration) {
       return;
     }
-    const { progress, annotationCallback, connectionCallback } = await this.createProgresses();
+    const {
+      progress,
+      annotationCallback,
+      connectionCallback
+    } = await this.createProgresses();
     try {
-      const annotationsPromise = this.annotationsAPI.getAnnotationsForDatasetId(main.dataset.id, annotationCallback);
-      const connectionsPromise = this.annotationsAPI.getConnectionsForDatasetId(main.dataset.id, connectionCallback);
-      annotationsPromise.finally(() => progress.annotationDone = true);
-      connectionsPromise.finally(() => progress.connectionDone = true);
+      const annotationsPromise = this.annotationsAPI.getAnnotationsForDatasetId(
+        main.dataset.id,
+        annotationCallback
+      );
+      const connectionsPromise = this.annotationsAPI.getConnectionsForDatasetId(
+        main.dataset.id,
+        connectionCallback
+      );
+      annotationsPromise.finally(() => (progress.annotationDone = true));
+      connectionsPromise.finally(() => (progress.connectionDone = true));
       const promises: [
         Promise<IAnnotation[]>,
         Promise<IAnnotationConnection[]>
-      ] = [
-          annotationsPromise,
-          connectionsPromise
-        ];
+      ] = [annotationsPromise, connectionsPromise];
       const [annotations, connections]: [
         IAnnotation[],
         IAnnotationConnection[]

@@ -115,8 +115,8 @@ import AnnotationBrowser from "@/components/AnnotationBrowser/AnnotationBrowser.
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
-import Persister from "@/store/Persister";
 import propertyStore from "@/store/properties";
+import { logError } from "./utils/log";
 
 @Component({
   components: {
@@ -158,7 +158,7 @@ export default class App extends Vue {
         this.store.setToolTemplateList(resp.data);
       })
       .catch(err => {
-        console.log(err); // eslint-disable-line no-console
+        logError(err);
         throw err;
       });
   }
