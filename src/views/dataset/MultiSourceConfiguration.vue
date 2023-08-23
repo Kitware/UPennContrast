@@ -737,10 +737,12 @@ export default class MultiSourceConfiguration extends Vue {
 
     this.logs = "";
     this.isUploading = true;
-    const eventCallback = (jobData: IJobEventData) => {
-      if (jobData.text) {
+    const eventCallback = (jobData: IJobEventData | null) => {
+      if (jobData && jobData.text) {
         this.logs += jobData.text;
       }
+      this.store.scheduleTileFramesComputation(this.datasetId);
+      this.store.scheduleMaxMergeCache(this.datasetId);
     };
 
     try {

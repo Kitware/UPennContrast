@@ -223,11 +223,6 @@ export default class NewDataset extends Vue {
   nextStep() {
     this.hideUploader = true;
 
-    if (this.dataset?.id) {
-      this.store.scheduleTileFramesComputation(this.dataset.id);
-      this.store.scheduleMaxMergeCache(this.dataset.id);
-    }
-
     this.$router.push({
       name: "multi",
       params: {
