@@ -1,5 +1,24 @@
 <template>
   <div>
+    <girder-search @select="searchInput">
+      <template #searchresult="item">
+        {{ renderItem(item) }}
+        <v-icon class="mr-2">{{ iconToMdi(iconFromItem(item)) }}</v-icon>
+        {{ item.name }}
+        <div class="d-flex flex-wrap">
+          <v-chip
+            small
+            v-for="(chipItem, i) in debouncedChipsPerItemId[item._id]"
+            :key="'chip ' + i + ' item ' + item._id"
+            class="ma-1"
+            v-bind="chipItem"
+            @click.stop
+          >
+            {{ chipItem.text }}
+          </v-chip>
+        </div>
+      </template>
+    </girder-search>
     <girder-file-manager
       v-if="currentLocation"
       :location.sync="currentLocation"
@@ -69,6 +88,8 @@ import {
 } from "@/utils/girderSelectable";
 import { RawLocation } from "vue-router";
 import FileManagerOptions from "./FileManagerOptions.vue";
+import { Search as GirderSearch } from "@/girder/components";
+import { vuetifyConfig } from "@/girder";
 
 interface IChipAttrs {
   text: string;
@@ -79,6 +100,7 @@ interface IChipAttrs {
 @Component({
   components: {
     FileManagerOptions,
+    GirderSearch,
     GirderFileManager: () =>
       import("@/girder/components").then(mod => mod.FileManager)
   }
@@ -156,15 +178,41 @@ export default class CustomFileManager extends Vue {
     this.defaultLocation = publicFolder || this.store.girderUser;
   }
 
+  searchInput(value: IGirderSelectAble) {
+    if (value._modelType === "item" || value._modelType === "file") {
+      return;
+    }
+    this.currentLocation = value;
+    this.$emit("rowclick", value);
+  }
+
+  iconToMdi(icon: string) {
+    return vuetifyConfig.icons.values[icon] || `mdi-${icon}`;
+  }
+
+  iconFromItem(selectable: IGirderSelectAble) {
+    if (isDatasetFolder(selectable)) {
+      return "fileMultiple";
+    }
+    if (isConfigurationItem(selectable)) {
+      return "settings";
+    }
+    switch (selectable._modelType) {
+      case "file":
+        return "file";
+      case "folder":
+        return "folder";
+      case "item":
+        return "file";
+      case "user":
+        return "user";
+    }
+  }
+
   renderItem(selectable: IGirderSelectAble) {
     const datasetFolder = toDatasetFolder(selectable);
     const configurationItem = toConfigurationItem(selectable);
-    if (datasetFolder) {
-      datasetFolder.icon = "fileMultiple";
-    }
-    if (configurationItem) {
-      configurationItem.icon = "settings";
-    }
+    selectable.icon = this.iconFromItem(selectable);
     const folderOrItem = datasetFolder || configurationItem;
     if (folderOrItem && !this.computedChipsIds.has(selectable._id)) {
       this.computedChipsIds.add(selectable._id);
