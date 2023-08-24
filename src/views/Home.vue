@@ -1,8 +1,8 @@
 <template>
   <v-container>
     <v-alert :value="!store.isLoggedIn" color="info">Login to start</v-alert>
-    <section v-if="store.isLoggedIn">
-      <v-subheader>Recent Dataset</v-subheader>
+    <section class="mb-4" v-if="store.isLoggedIn">
+      <v-subheader class="headline">Recent Dataset</v-subheader>
       <v-list two-line>
         <div v-for="d in datasetViewItems" :key="d.datasetView.id">
           <v-tooltip
@@ -53,8 +53,8 @@
       </v-list>
     </section>
 
-    <section>
-      <v-subheader>Browse</v-subheader>
+    <section class="mb-4">
+      <v-subheader class="headline">Browse</v-subheader>
       <custom-file-manager
         :location.sync="location"
         :initial-items-per-page="100"

@@ -1,24 +1,29 @@
 <template>
   <div>
-    <girder-search @select="searchInput">
-      <template #searchresult="item">
-        {{ renderItem(item) }}
-        <v-icon class="mr-2">{{ iconToMdi(iconFromItem(item)) }}</v-icon>
-        {{ item.name }}
-        <div class="d-flex flex-wrap">
-          <v-chip
-            small
-            v-for="(chipItem, i) in debouncedChipsPerItemId[item._id]"
-            :key="'chip ' + i + ' item ' + item._id"
-            class="ma-1"
-            v-bind="chipItem"
-            @click.stop
-          >
-            {{ chipItem.text }}
-          </v-chip>
-        </div>
-      </template>
-    </girder-search>
+    <div class="d-flex align-center ma-2">
+      <v-icon class="mr-2">mdi-magnify</v-icon>
+      <div class="flex-grow-1">
+        <girder-search @select="searchInput" hide-search-icon>
+          <template #searchresult="item">
+            {{ renderItem(item) }}
+            <v-icon class="mr-2">{{ iconToMdi(iconFromItem(item)) }}</v-icon>
+            {{ item.name }}
+            <div class="d-flex flex-wrap">
+              <v-chip
+                small
+                v-for="(chipItem, i) in debouncedChipsPerItemId[item._id]"
+                :key="'chip ' + i + ' item ' + item._id"
+                class="ma-1"
+                v-bind="chipItem"
+                @click.stop
+              >
+                {{ chipItem.text }}
+              </v-chip>
+            </div>
+          </template>
+        </girder-search>
+      </div>
+    </div>
     <girder-file-manager
       v-if="currentLocation"
       :location.sync="currentLocation"
@@ -199,11 +204,10 @@ export default class CustomFileManager extends Vue {
     }
     switch (selectable._modelType) {
       case "file":
+      case "item":
         return "file";
       case "folder":
         return "folder";
-      case "item":
-        return "file";
       case "user":
         return "user";
     }
