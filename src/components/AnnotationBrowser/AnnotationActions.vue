@@ -49,7 +49,7 @@
             <annotation-csv-dialog
               block
               :annotations="filteredAnnotations"
-              :propertyIds="propertyIds"
+              :propertyPaths="propertyPaths"
             ></annotation-csv-dialog>
           </v-col>
         </v-row>
@@ -91,6 +91,10 @@ export default class AnnotationActions extends Vue {
   readonly filterStore = filterStore;
 
   isDoing: boolean = false;
+
+  get propertyPaths() {
+    return propertyStore.computedPropertyPaths;
+  }
 
   get undoEntry() {
     return this.history.find(entry => !entry.isUndone);
