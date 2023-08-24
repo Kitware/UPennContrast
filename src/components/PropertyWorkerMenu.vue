@@ -8,6 +8,7 @@
     <v-row class="pa-0 ma-0">
       <v-col cols="12">
         <worker-interface-values
+          v-if="workerInterface"
           :workerInterface="workerInterface"
           v-model="interfaceValues"
         />
@@ -49,8 +50,8 @@ export default class PropertyWorkerMenu extends Vue {
 
   get workerInterface() {
     return this.image !== null
-      ? this.propertyStore.getWorkerInterface(this.image) || {}
-      : {};
+      ? this.propertyStore.getWorkerInterface(this.image)
+      : undefined;
   }
 }
 </script>

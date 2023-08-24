@@ -61,7 +61,7 @@ export class Properties extends VuexModule {
   } = {};
 
   workerImageList: IWorkerImageList = {};
-  workerInterfaces: { [image: string]: IWorkerInterface } = {};
+  workerInterfaces: { [image: string]: IWorkerInterface | null } = {};
   workerPreviews: { [image: string]: { text: string; image: string } } = {};
   displayWorkerPreview = true;
 
@@ -71,7 +71,9 @@ export class Properties extends VuexModule {
     };
   }
 
-  get getWorkerInterface() {
+  get getWorkerInterface(): (
+    image: string
+  ) => IWorkerInterface | null | undefined {
     return (image: string) => this.workerInterfaces[image];
   }
 
@@ -103,7 +105,7 @@ export class Properties extends VuexModule {
     workerInterface
   }: {
     image: string;
-    workerInterface: IWorkerInterface;
+    workerInterface: IWorkerInterface | null;
   }) {
     this.workerInterfaces = {
       ...this.workerInterfaces,
@@ -118,10 +120,14 @@ export class Properties extends VuexModule {
 
   @Action
   async fetchWorkerInterface(image: string) {
-    // First, requestWorkerInterface: girder asks the worker for its interface
-    await this.requestWorkerInterface(image);
-    // Then, getWorkerInterface: client asks girder for the interface it should have received
-    const workerInterface = await this.propertiesAPI.getWorkerInterface(image);
+    // First request to see if girder already has the worker interface
+    let workerInterface = await this.propertiesAPI.getWorkerInterface(image);
+    if (!workerInterface) {
+      // If girder didn't fetch the interface, make it ask the worker for its interface
+      await this.requestWorkerInterface(image);
+      // Then, getWorkerInterface: client asks girder for the interface it should have received
+      workerInterface = await this.propertiesAPI.getWorkerInterface(image);
+    }
     // Associate the worker interface with the image
     this.setWorkerInterface({ image, workerInterface });
   }

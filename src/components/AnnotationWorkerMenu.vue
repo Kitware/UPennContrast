@@ -27,6 +27,7 @@
         </v-row>
         <v-row>
           <worker-interface-values
+            v-if="workerInterface"
             :workerInterface="workerInterface"
             v-model="interfaceValues"
           />
@@ -89,7 +90,7 @@ export default class annotationWorkerMenu extends Vue {
   readonly tool!: IToolConfiguration;
 
   get workerInterface() {
-    return this.propertyStore.getWorkerInterface(this.image) || {};
+    return this.propertyStore.getWorkerInterface(this.image);
   }
 
   get image() {
@@ -145,10 +146,7 @@ export default class annotationWorkerMenu extends Vue {
 
   @Watch("tool")
   async updateInterface() {
-    if (
-      Object.keys(this.workerInterface).length === 0 &&
-      !this.fetchingWorkerInterface
-    ) {
+    if (this.workerInterface === undefined && !this.fetchingWorkerInterface) {
       this.fetchingWorkerInterface = true;
       await this.propertyStore.fetchWorkerInterface(this.image).finally();
       this.fetchingWorkerInterface = false;
