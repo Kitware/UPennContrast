@@ -1,5 +1,3 @@
-/* eslint-disable no-param-reassign,func-names */
-
 import Mousetrap from "mousetrap";
 import { isArray } from "lodash";
 

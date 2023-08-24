@@ -1,5 +1,11 @@
 <template>
-  <div class="image" v-mousetrap="mousetrapAnnotations">
+  <div
+    class="image"
+    v-mousetrap="mousetrapAnnotations"
+    @mousedown.capture="mouseDown"
+    @mousemove.capture="mouseMove"
+    @mouseup.capture="mouseUp"
+  >
     <annotation-viewer
       v-for="(mapentry, index) in maps.filter(
         mapentry =>
@@ -8,6 +14,8 @@
           mapentry.imageLayers &&
           mapentry.imageLayers.length
       )"
+      :map="mapentry.map"
+      :selectionPath="mapentry.map === selectionMap ? selectionMousePath : []"
       :annotationLayer="mapentry.annotationLayer"
       :textLayer="mapentry.textLayer"
       :workerPreviewFeature="mapentry.workerPreviewFeature"
@@ -28,8 +36,9 @@
     >
       <div
         v-for="(item, index) in mapLayerList"
-        :id="'map-' + index"
-        :key="'geojsmap-' + index"
+        :id="`map-${index}`"
+        :ref="`map-${index}`"
+        :key="`geojsmap-${index}`"
       />
     </div>
     <div
@@ -96,6 +105,8 @@ import store from "@/store";
 import geojs from "geojs";
 
 import {
+  IGeoJSMap,
+  IGeoJSPoint,
   IGeoJSTile,
   IImage,
   ILayerStackImage,
@@ -165,6 +176,11 @@ export default class ImageViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
 
+  $refs!: {
+    geojsmap: HTMLElement;
+    [mapRef: string]: HTMLElement | HTMLElement[]; // map-${idx}
+  };
+
   // Mousetrap bindings
   readonly mousetrapAnnotations = [
     {
@@ -222,10 +238,6 @@ export default class ImageViewer extends Vue {
   private _inPan: number | undefined = undefined;
 
   cacheProgresses: { progress: number; total: number }[] = [];
-
-  $refs!: {
-    geojsmap: HTMLElement;
-  };
 
   get loadedAndOptimized() {
     return (
@@ -331,6 +343,51 @@ export default class ImageViewer extends Vue {
       });
     }
     return llist;
+  }
+
+  selectionMap: IGeoJSMap | null = null;
+  selectionTarget: HTMLElement | null = null;
+  selectionMousePath: IGeoJSPoint[] = [];
+
+  mouseDown(evt: any) {
+    if (evt.shiftKey) {
+      // Find the map which has been clicked
+      const mapIdx = this.mapLayerList.findIndex((_, i) => {
+        const mapElem = this.$refs[`map-${i}`] as HTMLElement[];
+        return mapElem[0]?.contains(evt.target);
+      });
+      const mapEntry = this.maps?.[mapIdx];
+      if (!mapEntry) {
+        return;
+      }
+
+      // Setup selection variables
+      this.selectionMap = mapEntry.map;
+      this.selectionTarget = evt.target;
+      this.selectionMousePath = [];
+
+      // Will add the current point and stop propagation
+      this.mouseMove(evt);
+    }
+  }
+
+  mouseMove(evt: any) {
+    if (this.selectionMap) {
+      evt.stopPropagation();
+      const rect = this.selectionTarget!.getBoundingClientRect();
+      const displayPoint = { x: evt.x - rect.x, y: evt.y - rect.y };
+      const gcsPoint = this.selectionMap.displayToGcs(displayPoint);
+      this.selectionMousePath.push(gcsPoint);
+    }
+  }
+
+  mouseUp(evt: any) {
+    if (this.selectionMap) {
+      evt.stopPropagation();
+      this.selectionMap = null;
+      this.selectionTarget = null;
+      this.selectionMousePath = [];
+    }
   }
 
   /**
