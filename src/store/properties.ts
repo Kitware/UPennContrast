@@ -119,9 +119,18 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  async fetchWorkerInterface(image: string) {
+  async fetchWorkerInterface({
+    image,
+    force
+  }: {
+    image: string;
+    force?: boolean;
+  }) {
     // First request to see if girder already has the worker interface
-    let workerInterface = await this.propertiesAPI.getWorkerInterface(image);
+    let workerInterface: IWorkerInterface | null = null;
+    if (!force) {
+      workerInterface = await this.propertiesAPI.getWorkerInterface(image);
+    }
     if (!workerInterface) {
       // If girder didn't fetch the interface, make it ask the worker for its interface
       await this.requestWorkerInterface(image);
