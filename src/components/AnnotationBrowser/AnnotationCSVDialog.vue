@@ -102,8 +102,17 @@ export default class AnnotationCsvDialog extends Vue {
 
   async generateCSVStringForAnnotations() {
     // Fields
-    const fields = ["Id", "Channel", "XY", "Z", "Time", "Tags", "Shape"];
-    const quotes = [true, false, false, false, false, true, true];
+    const fields = [
+      "Id",
+      "Channel",
+      "XY",
+      "Z",
+      "Time",
+      "Tags",
+      "Shape",
+      "Name"
+    ];
+    const quotes = [true, false, false, false, false, true, true, true];
     const usedPaths: string[][] = [];
     for (const path of this.propertyPaths) {
       const pathName = this.propertyStore.getFullNameFromPath(path);
@@ -129,6 +138,7 @@ export default class AnnotationCsvDialog extends Vue {
       row.push(annotation.location.Time);
       row.push(annotation.tags.join(", "));
       row.push(annotation.shape);
+      row.push(annotation.name ?? "");
       for (let iProp = 0; iProp < usedPaths.length; ++iProp) {
         const value = getValueFromObjectAndPath(
           propValues[annotation.id],
