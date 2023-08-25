@@ -38,6 +38,7 @@
     "itk": "^14.1.1",
     "lodash-es": "^4.17.15",
     "mousetrap": "^1.6.4",
+    "papaparse": "^5.4.1",
     "reflect-metadata": "^0.1.13",
     "register-service-worker": "^1.6.2",
     "roboto-fontface": "*",
@@ -54,6 +55,7 @@
   },
   "devDependencies": {
     "@types/node": "^18.6.2",
+    "@types/papaparse": "^5.3.8",
     "@typescript-eslint/eslint-plugin": "^2.10.0",
     "@typescript-eslint/parser": "^2.10.0",
     "@vue/cli": "^4.1.1",

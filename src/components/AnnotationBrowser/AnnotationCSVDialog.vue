@@ -46,8 +46,11 @@ import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 
+import Papa from "papaparse";
+
 import { IAnnotation } from "@/store/model";
 import { downloadToClient } from "@/utils/download";
+import { getValueFromObjectAndPath } from "@/utils/paths";
 
 @Component({
   components: {}
@@ -80,10 +83,10 @@ export default class AnnotationCsvDialog extends Vue {
   text = "";
 
   @Prop()
-  readonly annotations: any;
+  readonly annotations!: IAnnotation[];
 
   @Prop()
-  readonly propertyIds: any;
+  readonly propertyPaths!: string[][];
 
   getPropertyValueForAnnotation(annotation: IAnnotation, propertyId: string) {
     const values = this.propertyStore.propertyValues[annotation.id];
@@ -98,26 +101,56 @@ export default class AnnotationCsvDialog extends Vue {
   }
 
   async generateCSVStringForAnnotations() {
-    let text = "Id, Channel, XY, Z, Time, Tags, Shape";
-    this.propertyIds?.forEach((id: string) => {
-      text += `, ${id}`;
-    });
+    // Fields
+    const fields = [
+      "Id",
+      "Channel",
+      "XY",
+      "Z",
+      "Time",
+      "Tags",
+      "Shape",
+      "Name"
+    ];
+    const quotes = [true, false, false, false, false, true, true, true];
+    const usedPaths: string[][] = [];
+    for (const path of this.propertyPaths) {
+      const pathName = this.propertyStore.getFullNameFromPath(path);
+      if (pathName) {
+        fields.push(pathName);
+        quotes.push(false);
+        usedPaths.push(path);
+      }
+    }
 
-    (this.annotations as IAnnotation[]).forEach((annotation: IAnnotation) => {
-      text += `\n${annotation.id}, ${annotation.channel}, ${
-        annotation.location.XY
-      }, ${annotation.location.Z}, ${
-        annotation.location.Time
-      }, [${annotation.tags.reduce(
-        (line: string, tag: string) => `${line} ${tag}`,
-        ""
-      )} ], ${annotation.shape}`;
-      this.propertyIds?.forEach((id: string) => {
-        const value = this.getPropertyValueForAnnotation(annotation, id);
-        text += `, ${value}`;
-      });
-    });
-    return text;
+    // Data
+    const data: (string | number)[][] = [];
+    const propValues = this.propertyStore.propertyValues;
+    const annotations = this.annotations;
+    const nAnnotations = annotations.length;
+    for (let iAnnotation = 0; iAnnotation < nAnnotations; ++iAnnotation) {
+      const annotation = annotations[iAnnotation];
+      const row: (string | number)[] = [];
+      row.push(annotation.id);
+      row.push(annotation.channel);
+      row.push(annotation.location.XY);
+      row.push(annotation.location.Z);
+      row.push(annotation.location.Time);
+      row.push(annotation.tags.join(", "));
+      row.push(annotation.shape);
+      row.push(annotation.name ?? "");
+      for (let iProp = 0; iProp < usedPaths.length; ++iProp) {
+        const value = getValueFromObjectAndPath(
+          propValues[annotation.id],
+          usedPaths[iProp]
+        );
+        row.push(typeof value === "number" ? value : "-");
+      }
+      data.push(row);
+    }
+
+    // Generate csv
+    return Papa.unparse({ fields, data }, { quotes });
   }
   @Watch("dialog")
   updateText() {
