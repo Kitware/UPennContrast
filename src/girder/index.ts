@@ -9,6 +9,7 @@ export interface IGirderUser {
   name: string; // TODO check
   _modelType: "user";
   _id: string;
+  icon?: string;
 
   login: string;
 }
@@ -46,6 +47,7 @@ export interface IGirderFile {
   _id: string;
 
   name: string;
+  icon?: string;
 }
 
 export type IGirderSelectAble =

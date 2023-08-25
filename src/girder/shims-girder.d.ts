@@ -3,6 +3,7 @@ declare module "@girder/components/src/components" {
 
   export const Upload: Component;
   export const Breadcrumb: Component;
+  export const Search: Component;
 }
 
 declare module "@girder/components/src/components/Snippet" {
