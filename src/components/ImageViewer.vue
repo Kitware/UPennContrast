@@ -1,11 +1,5 @@
 <template>
-  <div
-    class="image"
-    v-mousetrap="mousetrapAnnotations"
-    @mousedown.capture="mouseDown"
-    @mousemove.capture="mouseMove"
-    @mouseup.capture="mouseUp"
-  >
+  <div class="image" v-mousetrap="mousetrapAnnotations">
     <annotation-viewer
       v-for="(mapentry, index) in maps.filter(
         mapentry =>
@@ -30,16 +24,17 @@
     ></annotation-viewer>
     <div
       class="map-layout"
-      ref="geojsmap"
       :data-update="reactiveDraw"
       :map-count="mapLayerList.length"
     >
       <div
-        v-for="(item, index) in mapLayerList"
-        :id="`map-${index}`"
+        v-for="(_, index) in mapLayerList"
         :ref="`map-${index}`"
         :key="`geojsmap-${index}`"
-      />
+        @mousedown.capture="mouseDown($event, index)"
+        @mousemove.capture="mouseMove"
+        @mouseup.capture="mouseUp"
+      ></div>
     </div>
     <div
       class="progress"
@@ -51,7 +46,7 @@
         :value="cacheObj.total ? (100 * cacheObj.progress) / cacheObj.total : 0"
         color="#CCC"
         background-color="blue-grey"
-        style="height: 100%;"
+        style="height: 100%; z-index: inherit;"
       >
         <strong class="text-center ma-1">
           {{ cacheObj.title }}
@@ -177,7 +172,6 @@ export default class ImageViewer extends Vue {
   readonly annotationStore = annotationStore;
 
   $refs!: {
-    geojsmap: HTMLElement;
     [mapRef: string]: HTMLElement | HTMLElement[]; // map-${idx}
   };
 
@@ -310,10 +304,10 @@ export default class ImageViewer extends Vue {
   }
 
   get reactiveDraw() {
-    if (!this.refsMounted || !this.$refs.geojsmap) {
+    if (!this.refsMounted) {
       return;
     }
-    this.draw(this.$refs.geojsmap);
+    this.draw();
   }
 
   get layerStackImages() {
@@ -349,13 +343,8 @@ export default class ImageViewer extends Vue {
   selectionTarget: HTMLElement | null = null;
   selectionMousePath: IGeoJSPoint[] = [];
 
-  mouseDown(evt: any) {
+  mouseDown(evt: any, mapIdx: number) {
     if (evt.shiftKey) {
-      // Find the map which has been clicked
-      const mapIdx = this.mapLayerList.findIndex((_, i) => {
-        const mapElem = this.$refs[`map-${i}`] as HTMLElement[];
-        return mapElem[0]?.contains(evt.target);
-      });
       const mapEntry = this.maps?.[mapIdx];
       if (!mapEntry) {
         return;
@@ -418,10 +407,10 @@ export default class ImageViewer extends Vue {
   @Watch("mapLayerList")
   updateMapLayerList() {
     Vue.nextTick(() => {
-      if (!this.refsMounted || !this.$refs.geojsmap) {
+      if (!this.refsMounted) {
         return;
       }
-      this.draw(this.$refs.geojsmap);
+      this.draw();
     });
   }
 
@@ -430,11 +419,11 @@ export default class ImageViewer extends Vue {
 
   private _setupMap(
     mllidx: number,
-    parentElement: Element,
     someImage: IImage,
     forceReset: boolean = false
   ) {
-    const mapElement = parentElement.querySelector(`#map-${mllidx}`);
+    const mapRefs = this.$refs[`map-${mllidx}`] as HTMLElement[] | undefined;
+    const mapElement = mapRefs?.[0];
     if (!mapElement) {
       return;
     }
@@ -787,7 +776,7 @@ export default class ImageViewer extends Vue {
     this.resetMapsOnDraw = true;
   }
 
-  private draw(parentElement: HTMLElement) {
+  private draw() {
     if ((this.width == this.height && this.width == 1) || !this.dataset) {
       return;
     }
@@ -824,7 +813,7 @@ export default class ImageViewer extends Vue {
     const currentResetMaps = this.resetMapsOnDraw;
     this.resetMapsOnDraw = false;
     mapLayerList.forEach((mll, mllidx) => {
-      this._setupMap(mllidx, parentElement, someImage, currentResetMaps);
+      this._setupMap(mllidx, someImage, currentResetMaps);
       const mapentry = this.maps[mllidx];
       if (!mapentry) {
         return;
