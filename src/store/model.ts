@@ -101,6 +101,21 @@ export interface IViewConfiguration {
 
 export type TLayerMode = "single" | "multiple" | "unroll";
 
+export interface IDownloadParameters {
+  encoding: string;
+  contentDisposition: string;
+  contentDispositionFilename: string;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+  jpeqQuality?: number;
+  style?: string;
+  tiffCompression?: string;
+}
+
 export interface ISnapshot {
   name: string;
   description: string;
@@ -205,7 +220,19 @@ export interface IPixel {
   value?: number[];
 }
 
-export interface IGeoJSInteractor {}
+export interface IGeoJSMapInteractorSpec {
+  keyboard?: {
+    actions?: object;
+    meta?: object;
+    metakeyMouseEvents?: string[];
+    focusHighlight?: boolean;
+  };
+}
+
+export interface IGeoJSMapInteractor {
+  options: ((opt: IGeoJSMapInteractorSpec) => IGeoJSMapInteractor) &
+    (() => IGeoJSMapInteractorSpec);
+}
 
 export interface IGeoJSBounds {
   left: number;
@@ -215,7 +242,8 @@ export interface IGeoJSBounds {
 }
 
 export interface IGeoJSMap {
-  interactor: () => null;
+  interactor: ((arg: IGeoJSMapInteractor) => IGeoJSMap) &
+    (() => IGeoJSMapInteractor);
   bounds: (bds?: IGeoJSBounds, gcs?: string | null) => IGeoJSBounds;
   center: ((
     coordinates: IGeoJSPoint,
@@ -227,7 +255,11 @@ export interface IGeoJSMap {
   createLayer: <T extends string>(
     layerName: T,
     arg: object
-  ) => T extends "osm" ? IGeoJSOsmLayer : IGeoJSLayer;
+  ) => T extends "osm"
+    ? IGeoJSOsmLayer
+    : T extends "feature"
+    ? IGeoJSFeatureLayer
+    : IGeoJSLayer;
   deleteLayer: (layer: IGeoJSLayer | null) => IGeoJSLayer;
   displayToGcs: ((c: IGeoJSPoint, gcs?: string | null) => IGeoJSPoint) &
     ((c: IGeoJSPoint[], gcs?: string | null) => IGeoJSPoint[]);
@@ -257,6 +289,8 @@ export interface IGeoJSMap {
     opts?: object
   ) => Promise<string>;
   size: ((arg: IGeoScreenSize) => IGeoJSMap) & (() => IGeoScreenSize);
+  unitsPerPixel: ((zoom: number, unit: number | null) => IGeoJSMap) &
+    ((zoom?: number) => number);
   zoom: ((
     val: number,
     origin?: object,
@@ -339,6 +373,26 @@ export interface IGeoJSOsmLayer extends IGeoJSLayer {
     minLevel?: number;
     maxLevel?: number;
   };
+
+  baseQuad?: null | IGeoJSQuad;
+  setFrameQuad?: ((frame: number) => void) & { status?: ISetQuadStatus };
+}
+
+export interface IGeoJSFeature {
+  data: ((arg: any[]) => IGeoJSFeatureLayer) & (() => any[]);
+}
+
+export interface IGeoJSFeatureLayer extends IGeoJSLayer {
+  readonly idle: boolean;
+  createFeature: (featureName: string, arg: object) => IGeoJSFeature;
+  geoOn: (event: string, handler: Function) => IGeoJSFeatureLayer;
+  geoOff: (
+    event?: string | string[],
+    arg?: Function | Function[] | null
+  ) => IGeoJSFeatureLayer;
+  renderer: () => IGeoJSRenderer | null;
+
+  onIdle: (handler: () => void) => IGeoJSFeatureLayer;
 
   baseQuad?: null | IGeoJSQuad;
   setFrameQuad?: ((frame: number) => void) & { status?: ISetQuadStatus };
@@ -553,6 +607,13 @@ export interface IProgressInfo {
   title?: string;
   info?: string;
   progress?: number;
+}
+
+export interface IPanInfo {
+  center: IGeoJSPoint;
+  zoom: number;
+  rotate: number;
+  gcsBounds: IGeoJSPoint[];
 }
 
 export interface IComputeJob {

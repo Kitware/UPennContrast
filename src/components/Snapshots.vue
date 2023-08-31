@@ -315,7 +315,7 @@ import geojs from "geojs";
 import { formatDate } from "@/utils/date";
 import { downloadToClient } from "@/utils/download";
 import {
-  IDisplayLayer,
+  IDownloadParameters,
   IGeoJSAnnotation,
   IGeoJSLayer,
   IGeoJSMap,
@@ -323,7 +323,7 @@ import {
   ISnapshot,
   copyLayerWithoutPrivateAttributes
 } from "@/store/model";
-import { ITileHistogram, ITileOptionsBands, toStyle } from "@/store/images";
+import { ITileOptionsBands, getBandOption } from "@/store/images";
 import axios from "axios";
 import { DeflateOptions, Zip, ZipDeflate } from "fflate";
 
@@ -332,21 +332,6 @@ interface ISnapshotItem {
   key: string;
   record: ISnapshot;
   modified: string;
-}
-
-interface IDownloadParameters {
-  encoding: string;
-  contentDisposition: string;
-  contentDispositionFilename: string;
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-  width: number;
-  height: number;
-  jpeqQuality?: number;
-  style?: string;
-  tiffCompression?: string;
 }
 
 function intFromString(value: string) {
@@ -712,7 +697,7 @@ export default class Snapshots extends Vue {
     if (this.exportLayer === "composite" || this.exportLayer === "all") {
       layers.forEach(layer => {
         if (layer.visible || this.exportLayer === "all") {
-          promises.push(this.getBandOption(layer).then(pushBand));
+          promises.push(getBandOption(layer).then(pushBand));
         }
       });
     } else {
@@ -721,7 +706,7 @@ export default class Snapshots extends Vue {
       if (!layer) {
         return [];
       }
-      promises.push(this.getBandOption(layer).then(pushBand));
+      promises.push(getBandOption(layer).then(pushBand));
     }
     await Promise.all(promises);
 
@@ -743,17 +728,6 @@ export default class Snapshots extends Vue {
     }
   }
 
-  // Returns the style of the layer combined with the frame idx
-  getBandOption(layer: IDisplayLayer) {
-    const image = this.store.getImagesFromLayer(layer)[0];
-    const histogramPromise = this.store.getLayerHistogram(layer);
-    const bandPromise = histogramPromise.then(histogram => {
-      const style = this.getLayerStyle(layer, histogram, image);
-      return { ...style, frame: image.frameIndex };
-    });
-    return bandPromise;
-  }
-
   getBaseURL() {
     const anyImage: IImage | undefined = this.store.getImagesFromChannel(0)[0];
     const params = this.getBasicDownloadParams();
@@ -767,21 +741,6 @@ export default class Snapshots extends Vue {
       baseUrl.searchParams.set(key, value);
     }
     return baseUrl;
-  }
-
-  getLayerStyle(
-    layer: IDisplayLayer,
-    histogram: ITileHistogram | null,
-    image: IImage | null
-  ) {
-    return toStyle(
-      layer.color,
-      layer.contrast,
-      histogram,
-      layer,
-      this.store.dataset,
-      image
-    );
   }
 
   setBoundingBox(left: number, top: number, right: number, bottom: number) {

@@ -7,6 +7,7 @@ import {
   IContrast,
   IImage
 } from "./model";
+import main from "./index";
 
 const resolveSlice = (slice: IDisplaySlice, value: number) => {
   switch (slice.type) {
@@ -149,6 +150,21 @@ export function toStyle(
     }
   }
   return style;
+}
+
+// Returns the style of the layer combined with the frame idx for the current dataset
+export async function getBandOption(layer: IDisplayLayer) {
+  const image = main.getImagesFromLayer(layer)[0];
+  const histogram = await main.getLayerHistogram(layer);
+  const style = toStyle(
+    layer.color,
+    layer.contrast,
+    histogram,
+    layer,
+    main.dataset,
+    image
+  );
+  return { ...style, frame: image.frameIndex };
 }
 
 export interface ITileHistogram {
