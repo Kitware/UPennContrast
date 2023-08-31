@@ -1,5 +1,17 @@
 <template>
-  <div id="overview-map" ref="overview-map"></div>
+  <div class="wrapper" ref="overview-wrapper">
+    <div class="header" @mousedown="headerMouseDown">
+      <v-icon
+        v-for="(item, idx) in directionItems"
+        :key="`overview-header-icon-${idx}`"
+        class="header-icon"
+        @click="moveOverviewToCorner(item)"
+      >
+        {{ directionItemToIcon(item) }}
+      </v-icon>
+    </div>
+    <div class="map" ref="overview-map"></div>
+  </div>
 </template>
 
 <script lang="ts">
@@ -26,6 +38,7 @@ export default class ImageViewer extends Vue {
 
   $refs!: {
     "overview-map": HTMLElement;
+    "overview-wrapper": HTMLElement;
   };
 
   map: IGeoJSMap | null = null;
@@ -41,6 +54,72 @@ export default class ImageViewer extends Vue {
         distanceToOutline: number;
       })
     | null = null;
+
+  readonly directionItems: [boolean, boolean][] = [
+    [true, true],
+    [false, true],
+    [true, false],
+    [false, false]
+  ];
+
+  directionItemToIcon([top, left]: [boolean, boolean]) {
+    return `mdi-arrow-${top ? "top" : "bottom"}-${left ? "left" : "right"}`;
+  }
+
+  moveOverviewToCorner([top, left]: [boolean, boolean]) {
+    const elem = this.$refs["overview-wrapper"];
+    if (!elem) {
+      return;
+    }
+    elem.style.top = top ? "0" : "auto";
+    elem.style.bottom = top ? "auto" : "0";
+    elem.style.left = left ? "0" : "auto";
+    elem.style.right = left ? "auto" : "0";
+    return { top, left };
+  }
+
+  headerMouseDown(evt: MouseEvent) {
+    const elem = this.$refs["overview-wrapper"];
+    if (!elem) {
+      return;
+    }
+    const baseX = elem.offsetLeft - evt.clientX;
+    const baseY = elem.offsetTop - evt.clientY;
+
+    const mouseMove = (evt: MouseEvent) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+
+      let top = baseY + evt.clientY;
+      let left = baseX + evt.clientX;
+
+      top = Math.max(0, top);
+      left = Math.max(0, left);
+
+      const parent = elem.offsetParent;
+      if (parent) {
+        const parentBottom = parent.clientTop + parent.clientHeight;
+        const parentRight = parent.clientLeft + parent.clientWidth;
+        const elemBottom = top + elem.clientHeight;
+        const elemRight = left + elem.clientWidth;
+        top -= Math.max(0, elemBottom - parentBottom);
+        left -= Math.max(0, elemRight - parentRight);
+      }
+
+      elem.style.top = `${top}px`;
+      elem.style.left = `${left}px`;
+      elem.style.bottom = "auto";
+      elem.style.right = "auto";
+    };
+
+    const mouseUp = () => {
+      document.removeEventListener("mousemove", mouseMove);
+      document.removeEventListener("mouseup", mouseUp);
+    };
+
+    document.addEventListener("mousemove", mouseMove);
+    document.addEventListener("mouseup", mouseUp);
+  }
 
   get dataset() {
     return this.store.dataset;
@@ -266,15 +345,27 @@ export default class ImageViewer extends Vue {
 </script>
 
 <style scoped lang="scss">
-#overview-map {
+.wrapper {
   position: absolute;
-  left: 5px;
-  top: 5px;
+  background: black;
+  border: 1px solid white;
+  z-index: 100;
+}
+.map {
   width: 150px;
   height: 150px;
-  background: black;
+}
+.header {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  height: 16px;
+  background: rgb(2, 119, 189);
+  font-size: 16px;
   line-height: 0;
-  border: 2px solid white;
-  z-index: 100;
+}
+.header-icon {
+  font-size: 16px;
+  margin: 0 4px;
 }
 </style>
