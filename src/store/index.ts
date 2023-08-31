@@ -162,6 +162,11 @@ export class Main extends VuexModule {
   }
 
   @Mutation
+  public setMaps(maps: IMapEntry[]) {
+    this.maps = maps;
+  }
+
+  @Mutation
   public setDrawAnnotations(value: boolean) {
     this.drawAnnotations = value;
   }

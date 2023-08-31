@@ -228,7 +228,7 @@ export default class ImageViewer extends Vue {
   }
 
   set maps(value: IMapEntry[]) {
-    this.store.maps = value;
+    this.store.setMaps(value);
   }
 
   get overview() {
