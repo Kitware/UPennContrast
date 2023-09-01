@@ -87,6 +87,7 @@ export class Main extends VuexModule {
   filteredAnnotationTooltips: boolean = false;
 
   valueOnHover: boolean = true;
+  overview: boolean = true;
   hoverValue: { [layerId: string]: number[] } | null = null;
 
   restrictAnnotationsToFilters: boolean = true;
@@ -178,6 +179,11 @@ export class Main extends VuexModule {
   @Mutation
   public setValueOnHover(value: boolean) {
     this.valueOnHover = value;
+  }
+
+  @Mutation
+  public setOverview(value: boolean) {
+    this.overview = value;
   }
 
   @Mutation

@@ -37,6 +37,7 @@
       ></div>
     </div>
     <image-overview
+      v-if="overview"
       :parentPanInfo="panInfo"
       @centerChange="setCenter"
       @cornersChange="setCorners"
@@ -228,6 +229,10 @@ export default class ImageViewer extends Vue {
 
   set maps(value: IMapEntry[]) {
     this.store.maps = value;
+  }
+
+  get overview() {
+    return this.store.overview;
   }
 
   tileWidth: number = 0;

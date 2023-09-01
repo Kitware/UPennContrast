@@ -125,37 +125,14 @@ export default class ImageViewer extends Vue {
     return this.store.dataset;
   }
 
-  get basicDownloadParams() {
-    if (!this.dataset) {
-      return null;
-    }
-    const params: IDownloadParameters = {
-      encoding: "JPEG",
-      jpeqQuality: 90,
-      contentDisposition: "inline",
-      contentDispositionFilename: "overview.jpg",
-      left: 0,
-      top: 0,
-      right: this.dataset.width,
-      bottom: this.dataset.height,
-      width: 150,
-      height: 150
-    };
-    return params;
-  }
-
   get baseURL() {
     const anyImage = this.dataset?.anyImage();
-    const params = this.basicDownloadParams;
-    if (!anyImage || !params) {
+    if (!anyImage) {
       return null;
     }
     const itemId = anyImage.item._id;
     const apiRoot = this.store.api.client.apiRoot;
-    const baseUrl = new URL(`${apiRoot}/item/${itemId}/tiles/region`);
-    for (const [key, value] of Object.entries(params)) {
-      baseUrl.searchParams.set(key, value);
-    }
+    const baseUrl = `${apiRoot}/item/${itemId}/tiles/zxy/{z}/{x}/{y}`;
     return baseUrl;
   }
 
@@ -177,11 +154,9 @@ export default class ImageViewer extends Vue {
     });
 
     // Create URL promise
-    const url = new URL(baseUrl);
     return Promise.all(promises).then(() => {
       const style = JSON.stringify({ bands });
-      url.searchParams.set("style", style);
-      return url;
+      return baseUrl + "?style=" + encodeURIComponent(style);
     });
   }
 
@@ -206,9 +181,7 @@ export default class ImageViewer extends Vue {
     );
     params.layer.useCredentials = true;
     params.layer.url = "";
-    if (someImage.tileWidth > 8192 || someImage.tileHeight > 8192) {
-      params.layer.renderer = "canvas";
-    }
+    params.layer.renderer = "canvas";
     /* We want the actions to trigger on the overview, but affect the main
      * image, so we have to rerig all of the actions */
     params.map.interactor = geojs.mapInteractor({
