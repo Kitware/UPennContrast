@@ -743,6 +743,7 @@ export default class MultiSourceConfiguration extends Vue {
       }
       this.store.scheduleTileFramesComputation(this.datasetId);
       this.store.scheduleMaxMergeCache(this.datasetId);
+      this.store.scheduleHistogramCache(this.datasetId);
     };
 
     try {

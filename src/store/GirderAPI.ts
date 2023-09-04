@@ -72,6 +72,15 @@ export default class GirderAPI {
 
   histogramsLoaded = 0;
 
+  baseHistogramOptions: IHistogramOptions = {
+    frame: 0,
+    bins: 4096,
+    width: 2048,
+    height: 2048,
+    resample: false,
+    cache: "none"
+  };
+
   async getResource(
     id: string,
     type: IGirderSelectAble["_modelType"]
@@ -232,21 +241,13 @@ export default class GirderAPI {
     item: string | IGirderItem,
     options: Partial<IHistogramOptions> = {}
   ): Promise<ITileHistogram> {
-    const o: Readonly<IHistogramOptions> = Object.assign(
-      {
-        frame: 0,
-        bins: 4096,
-        width: 2048,
-        height: 2048,
-        resample: false
-      },
-      options
-    );
+    const params: Readonly<IHistogramOptions> = {
+      ...this.baseHistogramOptions,
+      ...options
+    };
 
     return this.client
-      .get(`item/${toId(item)}/tiles/histogram`, {
-        params: o
-      })
+      .get(`item/${toId(item)}/tiles/histogram`, { params })
       .then(r => r.data[0]); // TODO deal with multiple channel data
   }
 
@@ -542,6 +543,17 @@ export default class GirderAPI {
       });
     });
   }
+
+  async scheduleHistogramCache(datasetId: string) {
+    const largeImageItems = await this.getImages(datasetId);
+    // Don't use a Promise.all to avoid flooding the backend with requests
+    // Only send one cache request at a time
+    for (const imageItem of largeImageItems) {
+      await this.getHistogram(imageItem, {
+        cache: "schedule"
+      }).finally();
+    }
+  }
 }
 
 export function asDataset(folder: IGirderFolder): IDataset {
@@ -653,6 +665,7 @@ export interface IHistogramOptions {
   width: number;
   height: number;
   resample: boolean;
+  cache: "schedule" | "report" | "none";
 }
 
 export interface ITileMeta {

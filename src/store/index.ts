@@ -1459,6 +1459,11 @@ export class Main extends VuexModule {
   async scheduleMaxMergeCache(datasetId: string) {
     return this.api.scheduleMaxMergeCache(datasetId);
   }
+
+  @Action
+  async scheduleHistogramCache(datasetId: string) {
+    return this.api.scheduleHistogramCache(datasetId);
+  }
 }
 
 const main = getModule(Main);
