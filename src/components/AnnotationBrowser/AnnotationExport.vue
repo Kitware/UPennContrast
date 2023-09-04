@@ -23,6 +23,14 @@
           :disabled="!exportProperties || !exportAnnotations"
           label="Export property values"
         />
+        <v-textarea
+          v-model="filename"
+          class="my-2"
+          label="File name"
+          rows="1"
+          no-resize
+          hide-details
+        />
       </v-card-text>
       <v-card-actions>
         <v-spacer />
@@ -35,7 +43,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
 
@@ -60,15 +68,30 @@ export default class AnnotationImport extends Vue {
   exportProperties = true;
   exportValues = true;
 
+  filename: string = "";
+
+  get dataset() {
+    return this.store.dataset;
+  }
+
   get canExport() {
-    return !!store.dataset;
+    return !!this.store.dataset;
+  }
+
+  mounted() {
+    this.resetFilename();
+  }
+
+  @Watch("dataset")
+  resetFilename() {
+    this.filename = (this.dataset?.name ?? "unknown") + ".json";
   }
 
   submit() {
     let annotationPromise: Promise<IAnnotation[]> = Promise.resolve([]);
     if (this.exportAnnotations) {
-      annotationPromise = store.annotationsAPI.getAnnotationsForDatasetId(
-        store.dataset!.id
+      annotationPromise = this.store.annotationsAPI.getAnnotationsForDatasetId(
+        this.dataset!.id
       );
     }
 
@@ -76,8 +99,8 @@ export default class AnnotationImport extends Vue {
       []
     );
     if (this.exportConnections && this.exportAnnotations) {
-      connectionsPromise = store.annotationsAPI.getConnectionsForDatasetId(
-        store.dataset!.id
+      connectionsPromise = this.store.annotationsAPI.getConnectionsForDatasetId(
+        this.dataset!.id
       );
     }
 
@@ -90,7 +113,9 @@ export default class AnnotationImport extends Vue {
 
     let valuesPromise: Promise<IAnnotationPropertyValues> = Promise.resolve({});
     if (this.exportValues) {
-      valuesPromise = store.propertiesAPI.getPropertyValues(store.dataset!.id);
+      valuesPromise = this.store.propertiesAPI.getPropertyValues(
+        this.dataset!.id
+      );
     }
 
     Promise.all([
@@ -115,7 +140,10 @@ export default class AnnotationImport extends Vue {
           "data:text/plain;charset=utf-8," +
           encodeURIComponent(JSON.stringify(serializable));
 
-        downloadToClient({ href, download: "upennExport.json" });
+        downloadToClient({
+          href,
+          download: this.filename || "upennExport.json"
+        });
         this.dialog = false;
       }
     );
