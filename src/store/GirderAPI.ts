@@ -569,7 +569,8 @@ export function asDataset(folder: IGirderFolder): IDataset {
     channels: [],
     channelNames: new Map<number, string>(),
     images: () => [],
-    anyImage: () => null
+    anyImage: () => null,
+    allImages: []
   };
 }
 
@@ -857,22 +858,15 @@ export function parseTiles(
     });
   }
 
+  const allImages: IImage[] = [];
+  for (const images of lookup.values()) {
+    allImages.push(...images);
+  }
   return {
     images: (z: number, time: number, xy: number, channel: number) =>
       lookup.get(toKey(z, time, xy, channel)) || [],
-    anyImage: () => {
-      const values = lookup.values();
-      let it = values.next();
-      while (!it.done) {
-        if (it.value.length > 0) {
-          return it.value[0];
-        }
-
-        it = values.next();
-      }
-
-      return null;
-    },
+    anyImage: () => allImages[0] ?? null,
+    allImages,
     xy: Array.from(xys).sort((a, b) => a - b),
     z: zValues,
     time: timeValues,
