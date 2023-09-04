@@ -9,23 +9,32 @@
     <v-card>
       <v-card-title> Current Annotation List as CSV </v-card-title>
       <v-card-text>
-        <v-textarea
-          ref="fieldToCopy"
-          v-if="text && text.length"
-          v-model="text"
-          readonly
-          >{{ text }}
-          <template v-slot:append>
-            <v-btn
-              icon
-              title="Copy to clipboard"
-              @click="copyCSVText"
-              :disabled="!canUseClipboard"
-              ><v-icon>{{ "mdi-content-copy" }}</v-icon></v-btn
-            >
-          </template>
-        </v-textarea>
-        <p v-else>LOADING</p>
+        <template v-if="text && text.length">
+          <v-textarea ref="fieldToCopy" v-model="text" readonly>
+            {{ text }}
+            <template v-slot:append>
+              <v-btn
+                icon
+                title="Copy to clipboard"
+                @click="copyCSVText"
+                :disabled="!canUseClipboard"
+                ><v-icon>{{ "mdi-content-copy" }}</v-icon></v-btn
+              >
+            </template>
+          </v-textarea>
+          <v-textarea
+            v-model="filename"
+            class="my-2"
+            label="File name"
+            rows="1"
+            no-resize
+            hide-details
+          />
+        </template>
+        <template v-else>
+          <p>LOADING</p>
+          <v-progress-circular indeterminate />
+        </template>
       </v-card-text>
       <v-card-actions>
         <v-btn @click="download" :enabled="text && text.length">
@@ -61,8 +70,23 @@ export default class AnnotationCsvDialog extends Vue {
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
 
+  filename: string = "";
+
   get canUseClipboard() {
     return !!navigator || !!(navigator as Navigator)?.clipboard;
+  }
+
+  get dataset() {
+    return this.store.dataset;
+  }
+
+  mounted() {
+    this.resetFilename();
+  }
+
+  @Watch("dataset")
+  resetFilename() {
+    this.filename = (this.dataset?.name ?? "unknown") + ".csv";
   }
 
   copyCSVText() {
@@ -166,7 +190,7 @@ export default class AnnotationCsvDialog extends Vue {
   download() {
     const params = {
       href: "data:text/plain;charset=utf-8," + encodeURIComponent(this.text),
-      download: "upenn_annotation_export.csv"
+      download: this.filename || "upenn_annotation_export.csv"
     };
     downloadToClient(params);
   }
