@@ -393,13 +393,29 @@ export default class ImageViewer extends Vue {
     });
     const validityArray = await Promise.all(validityPromises);
     const filteredJobs = girderJobs.filter((_, i) => validityArray[i]);
-    const callback = () => {
-      --this.histogramCaches;
-    };
     filteredJobs.forEach((girderJob: any) => {
       const jobId = girderJob._id;
-      ++this.histogramCaches;
-      jobs.addJob({ jobId, datasetId, callback });
+      let cacheIncreased = false;
+      // Increase number of caching histograms when running
+      const eventCallback = (jobInfo: any) => {
+        const newStatus = jobInfo.status;
+        if (
+          !cacheIncreased &&
+          typeof newStatus === "number" &&
+          newStatus === jobStates.running
+        ) {
+          ++this.histogramCaches;
+          cacheIncreased = true;
+        }
+      };
+      eventCallback(girderJob);
+      // Decrease number of caching histograms if it has been increased
+      const callback = () => {
+        if (cacheIncreased) {
+          --this.histogramCaches;
+        }
+      };
+      jobs.addJob({ jobId, datasetId, callback, eventCallback });
     });
   }
 
