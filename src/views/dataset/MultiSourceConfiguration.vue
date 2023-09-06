@@ -737,22 +737,24 @@ export default class MultiSourceConfiguration extends Vue {
 
     this.logs = "";
     this.isUploading = true;
-    const eventCallback = (jobData: IJobEventData | null) => {
-      if (jobData && jobData.text) {
+    const eventCallback = (jobData: IJobEventData) => {
+      if (jobData.text) {
         this.logs += jobData.text;
       }
-      this.store.scheduleTileFramesComputation(this.datasetId);
-      this.store.scheduleMaxMergeCache(this.datasetId);
-      this.store.scheduleHistogramCache(this.datasetId);
     };
 
+    const datasetId = this.datasetId;
     try {
       const itemId = await this.store.addMultiSourceMetadata({
-        parentId: this.datasetId,
+        parentId: datasetId,
         metadata: JSON.stringify({ channels, sources }),
         transcode: this.transcode,
         eventCallback
       });
+      // Schedule caches after adding multisource (and transcoding)
+      this.store.scheduleTileFramesComputation(datasetId);
+      this.store.scheduleMaxMergeCache(datasetId);
+      this.store.scheduleHistogramCache(datasetId);
 
       if (!itemId) {
         throw new Error("Failed to add multi source");
@@ -760,9 +762,7 @@ export default class MultiSourceConfiguration extends Vue {
 
       this.$router.push({
         name: "dataset",
-        params: {
-          datasetId: this.datasetId
-        }
+        params: { datasetId }
       });
     } catch (error) {
       logError((error as Error).message);

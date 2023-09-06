@@ -617,6 +617,11 @@ export interface IPanInfo {
   gcsBounds: IGeoJSPoint[];
 }
 
+export type TJobType =
+  | "large_image_cache_histograms"
+  | "large_image_cache_tile_frames"
+  | "large_image_tiff";
+
 export interface IComputeJob {
   jobId: string;
   callback: (success: boolean) => void;

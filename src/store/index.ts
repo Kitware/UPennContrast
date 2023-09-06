@@ -686,7 +686,7 @@ export class Main extends VuexModule {
     parentId: string;
     metadata: string;
     transcode: boolean;
-    eventCallback?: (data: IJobEventData | null) => void;
+    eventCallback?: (data: IJobEventData) => void;
   }) {
     try {
       sync.setSaving(true);
@@ -732,8 +732,6 @@ export class Main extends VuexModule {
         if (!success) {
           throw new Error("Failed to transcode the large image: job failed");
         }
-      } else if (eventCallback) {
-        eventCallback(null);
       }
       return itemId;
     } catch (error) {

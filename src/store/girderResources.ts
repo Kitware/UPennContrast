@@ -18,9 +18,6 @@ import { asConfigurationItem, asDataset, parseTiles } from "./GirderAPI";
 @Module({ dynamic: true, store, name: "girderResources" })
 export class GirderResources extends VuexModule {
   resources: { [resourceId: string]: IGirderSelectAble | null } = {};
-  private pendingRequests: {
-    [type: string]: { [resourceId: string]: Promise<IGirderSelectAble> };
-  } = {};
 
   @Mutation
   public setResource({

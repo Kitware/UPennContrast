@@ -103,6 +103,7 @@
 import { Vue, Component, Watch } from "vue-property-decorator";
 import annotationStore from "@/store/annotation";
 import store from "@/store";
+import girderResources from "@/store/girderResources";
 import geojs from "geojs";
 
 import {
@@ -120,6 +121,7 @@ import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 import AnnotationViewer from "@/components/AnnotationViewer.vue";
 import ImageOverview from "@/components/ImageOverview.vue";
 import { ITileHistogram } from "@/store/images";
+import jobs, { jobStates } from "@/store/jobs";
 
 function generateFilterURL(
   index: number,
@@ -178,6 +180,7 @@ function generateFilterURL(
 export default class ImageViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
+  readonly girderResources = girderResources;
 
   $refs!: {
     [mapRef: string]: HTMLElement | HTMLElement[]; // map-${idx}
@@ -254,12 +257,14 @@ export default class ImageViewer extends Vue {
     ]
   };
 
+  histogramCaches: number = 0;
   cacheProgresses: { progress: number; total: number }[] = [];
 
   get loadedAndOptimized() {
     return (
       this.cacheProgresses.length === 0 &&
-      this.annotationStore.progresses.length === 0
+      this.annotationStore.progresses.length === 0 &&
+      this.histogramCaches <= 0
     );
   }
 
@@ -275,6 +280,13 @@ export default class ImageViewer extends Vue {
         progress: this.readyLayersCount,
         total: this.readyLayersTotal,
         title: "Preparing layers"
+      });
+    }
+    if (this.histogramCaches > 0) {
+      progresses.push({
+        progress: 0,
+        total: 0,
+        title: "Computing histograms"
       });
     }
     for (const progress of this.cacheProgresses) {
@@ -324,6 +336,7 @@ export default class ImageViewer extends Vue {
 
   mounted() {
     this.refsMounted = true;
+    this.datasetReset();
   }
 
   get reactiveDraw() {
@@ -360,6 +373,34 @@ export default class ImageViewer extends Vue {
       });
     }
     return llist;
+  }
+
+  async datasetReset() {
+    // Get histogram progresses
+    this.histogramCaches = 0;
+    const datasetId = this.dataset?.id;
+    if (!datasetId) {
+      return;
+    }
+    const girderJobs = await this.store.api.findJobs(
+      "large_image_cache_histograms",
+      [jobStates.inactive, jobStates.queued, jobStates.running]
+    );
+    const validityPromises = girderJobs.map(async (girderJob: any) => {
+      const largeImageId = girderJob?.kwargs?.itemId || null;
+      const largeImageItem = await this.girderResources.getItem(largeImageId);
+      return !!largeImageItem && datasetId === largeImageItem.folderId;
+    });
+    const validityArray = await Promise.all(validityPromises);
+    const filteredJobs = girderJobs.filter((_, i) => validityArray[i]);
+    const callback = () => {
+      --this.histogramCaches;
+    };
+    filteredJobs.forEach((girderJob: any) => {
+      const jobId = girderJob._id;
+      ++this.histogramCaches;
+      jobs.addJob({ jobId, datasetId, callback });
+    });
   }
 
   selectionMap: IGeoJSMap | null = null;
@@ -844,6 +885,7 @@ export default class ImageViewer extends Vue {
   @Watch("dataset")
   onDatasetChanged() {
     this.resetMapsOnDraw = true;
+    this.datasetReset();
   }
 
   private draw() {

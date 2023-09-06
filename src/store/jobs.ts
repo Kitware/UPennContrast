@@ -14,7 +14,7 @@ import main from "./index";
 
 import { logError } from "@/utils/log";
 
-const jobStates = {
+export const jobStates = {
   inactive: 0,
   queued: 1,
   running: 2,
@@ -121,10 +121,10 @@ export class Jobs extends VuexModule {
     this.setLatestNotificationTime(notificationTime);
 
     const jobData = data.data;
-    const jobTask = this.runningJobs.find(
-      (job: IComputeJob) => job.jobId === jobData._id
-    );
-    jobTask?.eventCallback?.(jobData);
+    const jobTasks = this.runningJobs.filter(job => job.jobId === jobData._id);
+    for (const task of jobTasks) {
+      task.eventCallback?.(jobData);
+    }
     const status = jobData.status;
     if (
       ![jobStates.cancelled, jobStates.success, jobStates.error].includes(
@@ -134,18 +134,17 @@ export class Jobs extends VuexModule {
       return;
     }
 
-    if (jobTask) {
-      if (status === jobStates.success) {
-        jobTask.callback(true);
-      } else {
-        jobTask.callback(false);
-        logError(
-          `Compute job with id ${jobTask.jobId} ${
-            status === jobStates.cancelled ? "cancelled" : "failed"
-          }`
-        );
-      }
-      this.removeJob(jobTask.jobId);
+    const success = status === jobStates.success;
+    if (!success) {
+      logError(
+        `Compute job with id ${jobData._id} ${
+          status === jobStates.cancelled ? "cancelled" : "failed"
+        }`
+      );
+    }
+    this.removeJob(jobData._id);
+    for (const jobTask of jobTasks) {
+      jobTask.callback(success);
     }
   }
 

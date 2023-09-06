@@ -20,7 +20,8 @@ import {
   IHistoryEntry,
   IImage,
   IPixel,
-  newLayer
+  newLayer,
+  TJobType
 } from "./model";
 import {
   toStyle,
@@ -32,6 +33,7 @@ import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { fetchAllPages } from "@/utils/fetch";
+import { stringify } from "qs";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
 // using HTML 2 might improve that slightly).  For a single layer, if we set
@@ -546,13 +548,33 @@ export default class GirderAPI {
 
   async scheduleHistogramCache(datasetId: string) {
     const largeImageItems = await this.getImages(datasetId);
+    const responses = [];
     // Don't use a Promise.all to avoid flooding the backend with requests
     // Only send one cache request at a time
     for (const imageItem of largeImageItems) {
-      await this.getHistogram(imageItem, {
+      const params: IHistogramOptions = {
+        ...this.baseHistogramOptions,
         cache: "schedule"
-      }).finally();
+      };
+      const response = await this.client.get(
+        `item/${imageItem._id}/tiles/histogram`,
+        { params }
+      );
+      responses.push(response);
     }
+    return responses;
+  }
+
+  async findJobs(type: TJobType, statuses: number[]): Promise<any[]> {
+    const params = {
+      types: JSON.stringify([type]),
+      statuses: JSON.stringify(statuses)
+    };
+    const response = await this.client.get("job", {
+      params,
+      paramsSerializer: stringify
+    });
+    return response.data;
   }
 }
 
