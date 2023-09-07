@@ -3,9 +3,21 @@
     <v-select
       return-object
       label="Tool type"
+      class="big-subheaders"
       :items="submenuItems"
       v-model="selectedItem"
-    />
+    >
+      <template #item="{ item }">
+        <div v-if="item.text" class="d-block">
+          <div>
+            {{ item.text }}
+          </div>
+          <div class="text--secondary caption mt-n2">
+            {{ item.description }}
+          </div>
+        </div>
+      </template>
+    </v-select>
   </v-container>
 </template>
 <script lang="ts">
@@ -16,6 +28,7 @@ import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 
 interface Item {
   text: string;
+  description: string;
   value: any;
   key: string;
   [key: string]: any;
@@ -88,6 +101,7 @@ export default class ToolTypeSelection extends Vue {
             if (labels.isAnnotationWorker !== undefined) {
               items.push({
                 text: labels.interfaceName || image,
+                description: labels.description || "",
                 value: { image }
               });
             }
@@ -216,5 +230,11 @@ export default class ToolTypeSelection extends Vue {
   display: flex;
   flex-direction: column;
   max-height: 90vh;
+}
+</style>
+
+<style lang="scss">
+.v-list .v-subheader {
+  font-size: large;
 }
 </style>
