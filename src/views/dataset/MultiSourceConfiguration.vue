@@ -375,7 +375,7 @@ export default class MultiSourceConfiguration extends Vue {
         ...(dim.data as IFileSourceData),
         ...(data as IFileSourceData)
       };
-      dim.size += size;
+      dim.size = Math.max(dim.size, size);
       return;
     }
 
@@ -684,12 +684,6 @@ export default class MultiSourceConfiguration extends Vue {
     } else {
       // No compositing
       const basicSources: IBasicSource[] = sources as IBasicSource[];
-      const dimOffset: { XY: number; Z: number; C: number; T: number } = {
-        XY: 0,
-        Z: 0,
-        C: 0,
-        T: 0
-      };
       for (let itemIdx = 0; itemIdx < this.girderItems.length; ++itemIdx) {
         const item = this.girderItems[itemIdx];
         const framesAsAxes: TFramesAsAxes = {};
@@ -697,23 +691,21 @@ export default class MultiSourceConfiguration extends Vue {
 
         for (const dim in this.assignments) {
           const upDim = dim as TUpDim;
-          const lowDim = dim.toLocaleLowerCase() as TLowDim;
+          const lowDim = dim.toLowerCase() as TLowDim;
           const assignment = this.assignments[upDim];
           // Add file strides
           if (!assignment) {
             continue;
           }
-          let dimValue = dimOffset[upDim];
+          let dimValue = 0;
           switch (assignment.value.source) {
             case Sources.File:
-              const fileSource = assignment.value.data as IFileSourceData;
+              const fileSource = assignment.value.data;
               framesAsAxes[lowDim] = fileSource[itemIdx].stride;
-              dimOffset[upDim] += fileSource[itemIdx].range;
               break;
 
             case Sources.Filename:
-              const filenameSource = assignment.value
-                .data as IFilenameSourceData;
+              const filenameSource = assignment.value.data;
               dimValue = filenameSource.valueIdxPerFilename[item.name];
               break;
 
