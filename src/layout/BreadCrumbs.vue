@@ -1,9 +1,11 @@
 <template>
   <v-breadcrumbs :items="items" divider="" class="py-0">
     <template v-slot:item="{ item }">
-      <v-breadcrumbs-item class="mx-0 px-1 breadcrumb-item">
-        {{ item.title }}
-        <template v-if="item.subItems">
+      <span class="mx-0 px-1">
+        <v-breadcrumbs-item>
+          {{ item.title }}
+        </v-breadcrumbs-item>
+        <v-breadcrumbs-item v-if="item.subItems" :to="item.to">
           <v-select
             :value="getCurrentViewItem(item.subItems)"
             @input="goToView"
@@ -15,14 +17,14 @@
             class="body-2 ml-2 breadcrumb-select"
             @click.prevent
           />
-          <v-icon :to="item.to">mdi-information</v-icon>
-        </template>
-        <template v-else>
-          <span class="px-2" :to="item.to">
+          <v-icon>mdi-information</v-icon>
+        </v-breadcrumbs-item>
+        <v-breadcrumbs-item v-else :to="item.to">
+          <span class="px-2">
             {{ item.text }}
           </span>
-        </template>
-      </v-breadcrumbs-item>
+        </v-breadcrumbs-item>
+      </span>
     </template>
   </v-breadcrumbs>
 </template>
