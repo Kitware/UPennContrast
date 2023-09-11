@@ -63,36 +63,28 @@
         :histogram="histogram"
       />
       <v-menu
-        ref="colorMenu"
-        v-model="showColorPicker"
         :close-on-content-click="false"
-        :nudge-right="40"
         transition="scale-transition"
-        offset-y
-        max-width="300px"
-        min-width="300px"
+        offset-x
       >
         <template #activator="{ on }">
-          <v-text-field
-            :value="value.color"
-            @change="changeProp('color', $event)"
-            label="Color"
-            readonly
-            dense
-            hide-details
+          <div
             v-on="on"
+            style="cursor: pointer;"
+            class="mb-4 d-flex align-center"
           >
-            <template #append>
-              <v-icon :color="value.color">mdi-square</v-icon>
-            </template>
-          </v-text-field>
+            <span class="subtitle-1">
+              Color
+            </span>
+            <span
+              :style="{ backgroundColor: value.color }"
+              class="color-bar"
+            ></span>
+          </div>
         </template>
         <v-color-picker
-          v-if="showColorPicker"
           :value="value.color"
-          hide-canvas
           @input="changeProp('color', $event)"
-          width="300"
         />
       </v-menu>
       <v-radio-group
@@ -168,8 +160,6 @@ export default class DisplayLayer extends Vue {
   readonly store = store;
   @Prop()
   readonly value!: IDisplayLayer;
-
-  showColorPicker = false;
 
   get index() {
     return this.store.getLayerIndexFromId(this.value.id)!;
@@ -339,7 +329,16 @@ export default class DisplayLayer extends Vue {
   }
 }
 </script>
+
 <style lang="scss" scoped>
+.color-bar {
+  border-radius: 6px;
+  width: 100%;
+  height: 1em;
+  margin-left: 10px;
+  border: 2px solid grey;
+}
+
 .notVisible {
   opacity: 0.5;
 }
@@ -375,5 +374,17 @@ export default class DisplayLayer extends Vue {
       font-size: 14px;
     }
   }
+}
+</style>
+
+<style lang="scss">
+.v-color-picker__dot {
+  box-shadow: 0px 0px 5px grey;
+}
+
+.v-color-picker .v-color-picker__controls .v-color-picker__edit i {
+  border: solid 2px grey;
+  border-radius: 5px;
+  padding: 12px;
 }
 </style>
