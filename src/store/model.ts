@@ -370,7 +370,7 @@ export interface ITagsWorkerInterfaceElement {
 
 export interface ILayerWorkerInterfaceElement {
   type: "layer";
-  default?: number;
+  default?: string | null;
   required?: boolean;
 }
 
@@ -403,7 +403,8 @@ export type TWorkerInterfaceElement =
 
 export type TWorkerInterfaceType = TWorkerInterfaceElement["type"];
 
-// A value can't be undefined (it comes from "default" field being optionall),
+// TWorkerInterfaceElement["default"] can be undefined because it is optional
+// A value can't be undefined
 // but it can be null when "required" field is false
 export type TWorkerInterfaceValue = Exclude<
   TWorkerInterfaceElement["default"],

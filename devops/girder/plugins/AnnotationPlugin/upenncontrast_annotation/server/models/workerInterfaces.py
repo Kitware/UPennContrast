@@ -60,7 +60,7 @@ class WorkerInterfaceModel(ProxiedAccessControlledModel):
         self.remove(self.find(interface))
 
     def update(self, creator, image, interface):
-        existing = self.getImageInterface(image)
+        existing = self.findOne({'image': image})
         if existing is None:
             return self.create(creator, image, interface)
         existing['interface'] = interface
@@ -68,7 +68,8 @@ class WorkerInterfaceModel(ProxiedAccessControlledModel):
 
     def getImageInterface(self, image):
         query = {'image': image}
-        return self.findOne(query)
+        result = self.findOne(query)
+        return None if result is None or 'interface' not in result else result['interface']
 
     def requestWorkerUpdate(self, image):
         return runJobRequest(image, None, { 'image': image }, 'interface')

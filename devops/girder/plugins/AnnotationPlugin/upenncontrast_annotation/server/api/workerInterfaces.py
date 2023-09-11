@@ -38,7 +38,7 @@ class WorkerInterfaces(Resource):
         if 'image' not in params:
             raise RestException(code=400, message="Missing 'image' parameter")
         image = params.get('image')
-        return self._interfaceModel.getImageInterface(image) or {}
+        return self._interfaceModel.getImageInterface(image)
 
     @access.user
     @describeRoute(Description("List available worker images and their corresponding labels"))

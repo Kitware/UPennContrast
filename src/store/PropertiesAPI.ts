@@ -136,12 +136,10 @@ export default class PropertiesAPI {
     );
   }
 
-  async getWorkerInterface(image: string): Promise<IWorkerInterface> {
+  async getWorkerInterface(image: string): Promise<IWorkerInterface | null> {
     return this.client
       .get(`worker_interface?image=${encodeURIComponent(image)}`)
-      .then(res => {
-        return res.data.interface || {};
-      });
+      .then(res => res.data);
   }
 
   async requestWorkerPreview(

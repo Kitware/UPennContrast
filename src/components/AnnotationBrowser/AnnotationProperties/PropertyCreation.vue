@@ -217,9 +217,9 @@ export default class PropertyCreation extends Vue {
     this.isNameGenerated = true;
     if (
       this.dockerImage &&
-      !this.propertyStore.workerInterfaces[this.dockerImage]
+      this.propertyStore.workerInterfaces[this.dockerImage] === undefined
     ) {
-      this.propertyStore.fetchWorkerInterface(this.dockerImage);
+      this.propertyStore.fetchWorkerInterface({ image: this.dockerImage });
     }
   }
 
