@@ -1050,14 +1050,20 @@ export default class ImageViewer extends Vue {
 .progress .v-progress-linear__content {
   position: relative;
 }
+
 .geojs-map .geojs-layer {
   mix-blend-mode: lighten;
 }
-.scale-widget {
-  background-color: #fff2;
+
+.geojs-scale-widget-bar {
+  stroke: white;
 }
+
+.geojs-scale-widget-text {
+  fill: white;
+}
+
 .scale-widget:hover {
-  background-color: #fff8;
   cursor: pointer;
 }
 </style>
