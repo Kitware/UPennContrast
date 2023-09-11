@@ -34,8 +34,12 @@ import {
   IContrast,
   IMapEntry,
   IHistoryEntry,
-  IComputeJob,
-  IJobEventData
+  IJobEventData,
+  IScales,
+  TUnitLength,
+  TUnitTime,
+  IScaleInformation,
+  exampleConfigurationBase
 } from "./model";
 
 import persister from "./Persister";
@@ -89,6 +93,8 @@ export class Main extends VuexModule {
   valueOnHover: boolean = true;
   overview: boolean = true;
   hoverValue: { [layerId: string]: number[] } | null = null;
+
+  showScalebar: boolean = true;
 
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
@@ -146,6 +152,18 @@ export class Main extends VuexModule {
     return this.girderUser != null;
   }
 
+  get configurationScales() {
+    return this.configuration?.scales || exampleConfigurationBase().scales;
+  }
+
+  get viewScales() {
+    return this.datasetView?.scales || {};
+  }
+
+  get scales() {
+    return { ...this.configurationScales, ...this.viewScales };
+  }
+
   get layerSliceIndexes() {
     return (layer: IDisplayLayer) => {
       if (!this.dataset) {
@@ -184,6 +202,11 @@ export class Main extends VuexModule {
   @Mutation
   public setValueOnHover(value: boolean) {
     this.valueOnHover = value;
+  }
+
+  @Mutation
+  public setShowScalebar(value: boolean) {
+    this.showScalebar = value;
   }
 
   @Mutation
@@ -421,6 +444,23 @@ export class Main extends VuexModule {
   @Mutation
   private setRecentDatasetViewsImpl(recentDatasetViews: IDatasetView[]) {
     this.recentDatasetViews = recentDatasetViews;
+  }
+
+  @Action
+  createDatasetView({
+    datasetId,
+    configurationId
+  }: {
+    datasetId: string;
+    configurationId: string;
+  }) {
+    return this.api.createDatasetView({
+      datasetId,
+      configurationId,
+      layerContrasts: {},
+      scales: {},
+      lastViewed: Date.now()
+    });
   }
 
   @Action
@@ -1018,6 +1058,42 @@ export class Main extends VuexModule {
   async resetContrastInView(layerId: string) {
     if (this.datasetView) {
       Vue.delete(this.datasetView.layerContrasts, layerId);
+      this.api.updateDatasetView(this.datasetView);
+    }
+  }
+
+  @Action
+  saveScaleInConfiguration({
+    itemId,
+    scale
+  }: {
+    itemId: keyof IScales;
+    scale: IScaleInformation<TUnitLength | TUnitTime>;
+  }) {
+    if (this.configuration) {
+      Vue.set(this.configuration.scales, itemId, scale);
+      this.syncConfiguration("scales");
+    }
+  }
+
+  @Action
+  saveScalesInView({
+    itemId,
+    scale
+  }: {
+    itemId: keyof IScales;
+    scale: IScaleInformation<TUnitLength | TUnitTime>;
+  }) {
+    if (this.datasetView) {
+      Vue.set(this.datasetView.scales, itemId, scale);
+      this.api.updateDatasetView(this.datasetView);
+    }
+  }
+
+  @Action
+  resetScalesInView(itemId: keyof IScales) {
+    if (this.datasetView) {
+      Vue.delete(this.datasetView.scales, itemId);
       this.api.updateDatasetView(this.datasetView);
     }
   }

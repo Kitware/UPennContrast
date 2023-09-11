@@ -13,6 +13,13 @@
           title="Show pixel intensity values when hovering cursor over image"
         />
         <v-switch hide-details dense v-model="overview" label="Show minimap" />
+        <v-switch
+          hide-details
+          dense
+          v-model="showScalebar"
+          label="Show scalebar"
+          title="Show the scalebarwidget on top of the image"
+        />
       </v-container>
     </v-expansion-panel-content>
   </v-expansion-panel>
@@ -40,6 +47,14 @@ export default class ViewerSettings extends Vue {
 
   set overview(value) {
     this.store.setOverview(value);
+  }
+
+  get showScalebar() {
+    return this.store.showScalebar;
+  }
+
+  set showScalebar(value) {
+    this.store.setShowScalebar(value);
   }
 }
 </script>

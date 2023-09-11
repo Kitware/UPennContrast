@@ -48,6 +48,14 @@
     </v-card>
     <v-card class="mb-4">
       <v-card-title>
+        Scale
+      </v-card-title>
+      <v-card-text>
+        <scale-settings :configuration-only="true" />
+      </v-card-text>
+    </v-card>
+    <v-card class="mb-4">
+      <v-card-title>
         Datasets
       </v-card-title>
       <v-card-text>
@@ -112,8 +120,9 @@ import store from "@/store";
 import girderResources from "@/store/girderResources";
 import { IDatasetView, IDisplaySlice } from "@/store/model";
 import { IGirderFolder } from "@/girder";
+import ScaleSettings from "@/components/ScaleSettings.vue";
 
-@Component
+@Component({ components: { ScaleSettings } })
 export default class ConfigurationInfo extends Vue {
   readonly store = store;
   readonly girderResources = girderResources;
