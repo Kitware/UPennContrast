@@ -20,7 +20,8 @@ import {
   IHistoryEntry,
   IImage,
   IPixel,
-  newLayer
+  newLayer,
+  TJobType
 } from "./model";
 import {
   toStyle,
@@ -32,6 +33,7 @@ import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { fetchAllPages } from "@/utils/fetch";
+import { stringify } from "qs";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
 // using HTML 2 might improve that slightly).  For a single layer, if we set
@@ -71,6 +73,15 @@ export default class GirderAPI {
   }
 
   histogramsLoaded = 0;
+
+  baseHistogramOptions: IHistogramOptions = {
+    frame: 0,
+    bins: 4096,
+    width: 2048,
+    height: 2048,
+    resample: false,
+    cache: "none"
+  };
 
   async getResource(
     id: string,
@@ -232,21 +243,13 @@ export default class GirderAPI {
     item: string | IGirderItem,
     options: Partial<IHistogramOptions> = {}
   ): Promise<ITileHistogram> {
-    const o: Readonly<IHistogramOptions> = Object.assign(
-      {
-        frame: 0,
-        bins: 4096,
-        width: 2048,
-        height: 2048,
-        resample: false
-      },
-      options
-    );
+    const params: Readonly<IHistogramOptions> = {
+      ...this.baseHistogramOptions,
+      ...options
+    };
 
     return this.client
-      .get(`item/${toId(item)}/tiles/histogram`, {
-        params: o
-      })
+      .get(`item/${toId(item)}/tiles/histogram`, { params })
       .then(r => r.data[0]); // TODO deal with multiple channel data
   }
 
@@ -542,6 +545,37 @@ export default class GirderAPI {
       });
     });
   }
+
+  async scheduleHistogramCache(datasetId: string) {
+    const largeImageItems = await this.getImages(datasetId);
+    const responses = [];
+    // Don't use a Promise.all to avoid flooding the backend with requests
+    // Only send one cache request at a time
+    for (const imageItem of largeImageItems) {
+      const params: IHistogramOptions = {
+        ...this.baseHistogramOptions,
+        cache: "schedule"
+      };
+      const response = await this.client.get(
+        `item/${imageItem._id}/tiles/histogram`,
+        { params }
+      );
+      responses.push(response);
+    }
+    return responses;
+  }
+
+  async findJobs(type: TJobType, statuses: number[]): Promise<any[]> {
+    const params = {
+      types: JSON.stringify([type]),
+      statuses: JSON.stringify(statuses)
+    };
+    const response = await this.client.get("job", {
+      params,
+      paramsSerializer: stringify
+    });
+    return response.data;
+  }
 }
 
 export function asDataset(folder: IGirderFolder): IDataset {
@@ -557,7 +591,8 @@ export function asDataset(folder: IGirderFolder): IDataset {
     channels: [],
     channelNames: new Map<number, string>(),
     images: () => [],
-    anyImage: () => null
+    anyImage: () => null,
+    allImages: []
   };
 }
 
@@ -653,6 +688,7 @@ export interface IHistogramOptions {
   width: number;
   height: number;
   resample: boolean;
+  cache: "schedule" | "report" | "none";
 }
 
 export interface ITileMeta {
@@ -844,22 +880,15 @@ export function parseTiles(
     });
   }
 
+  const allImages: IImage[] = [];
+  for (const images of lookup.values()) {
+    allImages.push(...images);
+  }
   return {
     images: (z: number, time: number, xy: number, channel: number) =>
       lookup.get(toKey(z, time, xy, channel)) || [],
-    anyImage: () => {
-      const values = lookup.values();
-      let it = values.next();
-      while (!it.done) {
-        if (it.value.length > 0) {
-          return it.value[0];
-        }
-
-        it = values.next();
-      }
-
-      return null;
-    },
+    anyImage: () => allImages[0] ?? null,
+    allImages,
     xy: Array.from(xys).sort((a, b) => a - b),
     z: zValues,
     time: timeValues,

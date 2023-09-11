@@ -93,6 +93,7 @@ export interface IDataset {
   height: number;
   images(z: number, zTime: number, xy: number, channel: number): IImage[];
   anyImage(): IImage | null;
+  allImages: IImage[];
 }
 
 export interface IViewConfiguration {
@@ -617,6 +618,11 @@ export interface IPanInfo {
   rotate: number;
   gcsBounds: IGeoJSPoint[];
 }
+
+export type TJobType =
+  | "large_image_cache_histograms"
+  | "large_image_cache_tile_frames"
+  | "large_image_tiff";
 
 export interface IComputeJob {
   jobId: string;
