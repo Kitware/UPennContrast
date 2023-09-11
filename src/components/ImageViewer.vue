@@ -1,11 +1,5 @@
 <template>
-  <div
-    class="image"
-    v-mousetrap="mousetrapAnnotations"
-    @mousedown.capture="mouseDown"
-    @mousemove.capture="mouseMove"
-    @mouseup.capture="mouseUp"
-  >
+  <div class="image" v-mousetrap="mousetrapAnnotations">
     <annotation-viewer
       v-for="(mapentry, index) in maps.filter(
         mapentry =>
@@ -30,17 +24,24 @@
     ></annotation-viewer>
     <div
       class="map-layout"
-      ref="geojsmap"
       :data-update="reactiveDraw"
       :map-count="mapLayerList.length"
     >
       <div
-        v-for="(item, index) in mapLayerList"
-        :id="`map-${index}`"
+        v-for="(_, index) in mapLayerList"
         :ref="`map-${index}`"
         :key="`geojsmap-${index}`"
-      />
+        @mousedown.capture="mouseDown($event, index)"
+        @mousemove.capture="mouseMove"
+        @mouseup.capture="mouseUp"
+      ></div>
     </div>
+    <image-overview
+      v-if="overview"
+      :parentPanInfo="panInfo"
+      @centerChange="setCenter"
+      @cornersChange="setCorners"
+    />
     <div
       class="progress"
       v-for="(cacheObj, cacheIdx) in progresses"
@@ -51,7 +52,7 @@
         :value="cacheObj.total ? (100 * cacheObj.progress) / cacheObj.total : 0"
         color="#CCC"
         background-color="blue-grey"
-        style="height: 100%;"
+        style="height: 100%; z-index: inherit;"
       >
         <strong class="text-center ma-1">
           {{ cacheObj.title }}
@@ -111,11 +112,13 @@ import {
   IImage,
   ILayerStackImage,
   IMapEntry,
+  IPanInfo,
   IXYPoint
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
 import AnnotationViewer from "@/components/AnnotationViewer.vue";
+import ImageOverview from "@/components/ImageOverview.vue";
 import { ITileHistogram } from "@/store/images";
 
 function generateFilterURL(
@@ -171,13 +174,12 @@ function generateFilterURL(
   setSlopeIntercept(index, "func-b", whitePoint, blackPoint, blue);
 }
 
-@Component({ components: { AnnotationViewer } })
+@Component({ components: { AnnotationViewer, ImageOverview } })
 export default class ImageViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
 
   $refs!: {
-    geojsmap: HTMLElement;
     [mapRef: string]: HTMLElement | HTMLElement[]; // map-${idx}
   };
 
@@ -229,13 +231,28 @@ export default class ImageViewer extends Vue {
     this.store.maps = value;
   }
 
+  get overview() {
+    return this.store.overview;
+  }
+
   tileWidth: number = 0;
   tileHeight: number = 0;
 
   unrollW: number = 1;
   unrollH: number = 1;
 
-  private _inPan: number | undefined = undefined;
+  private _inPan: boolean = false;
+  panInfo: IPanInfo = {
+    center: { x: 0, y: 0 },
+    zoom: 1,
+    rotate: 0,
+    gcsBounds: [
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      { x: 0, y: 0 }
+    ]
+  };
 
   cacheProgresses: { progress: number; total: number }[] = [];
 
@@ -310,10 +327,10 @@ export default class ImageViewer extends Vue {
   }
 
   get reactiveDraw() {
-    if (!this.refsMounted || !this.$refs.geojsmap) {
+    if (!this.refsMounted) {
       return;
     }
-    this.draw(this.$refs.geojsmap);
+    this.draw();
   }
 
   get layerStackImages() {
@@ -349,13 +366,8 @@ export default class ImageViewer extends Vue {
   selectionTarget: HTMLElement | null = null;
   selectionMousePath: IGeoJSPoint[] = [];
 
-  mouseDown(evt: any) {
+  mouseDown(evt: any, mapIdx: number) {
     if (evt.shiftKey) {
-      // Find the map which has been clicked
-      const mapIdx = this.mapLayerList.findIndex((_, i) => {
-        const mapElem = this.$refs[`map-${i}`] as HTMLElement[];
-        return mapElem[0]?.contains(evt.target);
-      });
       const mapEntry = this.maps?.[mapIdx];
       if (!mapEntry) {
         return;
@@ -390,38 +402,85 @@ export default class ImageViewer extends Vue {
     }
   }
 
+  setCenter(center: IGeoJSPoint) {
+    this.panInfo.center = center;
+    this.applyPanInfo();
+  }
+
+  setCorners(evt: any) {
+    const map = this.maps[0]?.map;
+    if (!map) {
+      return;
+    }
+    const mapsize = map.size();
+    const lowerLeft = map.gcsToDisplay(evt.lowerLeftGcs);
+    const upperRight = map.gcsToDisplay(evt.upperRightGcs);
+    const scaling = {
+      x: Math.abs((upperRight.x - lowerLeft.x) / mapsize.width),
+      y: Math.abs((upperRight.y - lowerLeft.y) / mapsize.height)
+    };
+    const center = map.displayToGcs(
+      {
+        x: (lowerLeft.x + upperRight.x) / 2,
+        y: (lowerLeft.y + upperRight.y) / 2
+      },
+      null
+    );
+    const zoom = map.zoom() - Math.log2(Math.max(scaling.x, scaling.y));
+    map.zoom(zoom);
+    map.center(center, null);
+  }
+
   /**
    * Synchronize all maps on any pan event.
    */
   private _handlePan(mapidx: number) {
-    if (this._inPan !== undefined) {
+    if (!this.maps) {
       return;
     }
-    if (!this.maps || this.maps.length < 2) {
+    if (this._inPan) {
       return;
     }
-    this._inPan = mapidx;
+    this._inPan = true;
+    const map = this.maps[mapidx].map;
+    const size = map.size();
+    this.panInfo = {
+      zoom: map.zoom(),
+      rotate: map.rotation(),
+      center: map.center(),
+      gcsBounds: [
+        map.displayToGcs({ x: 0, y: 0 }),
+        map.displayToGcs({ x: size.width, y: 0 }),
+        map.displayToGcs({ x: size.width, y: size.height }),
+        map.displayToGcs({ x: 0, y: size.height })
+      ]
+    };
+    if (this.maps.length >= 2) {
+      this.applyPanInfo(mapidx);
+    }
+    this._inPan = false;
+  }
+
+  applyPanInfo(excludeMapIdx?: number) {
     try {
-      const map = this.maps[mapidx].map;
       this.maps.forEach((mapentry, idx) => {
-        if (idx === mapidx) {
+        if (idx === excludeMapIdx) {
           return;
         }
-        mapentry.map.zoom(map.zoom(), undefined, true, true);
-        mapentry.map.rotation(map.rotation(), undefined, true);
-        mapentry.map.center(map.center(), undefined, true, true);
+        mapentry.map.zoom(this.panInfo.zoom, undefined, true, true);
+        mapentry.map.rotation(this.panInfo.rotate, undefined, true);
+        mapentry.map.center(this.panInfo.center, undefined, true, true);
       });
     } catch (err) {}
-    this._inPan = undefined;
   }
 
   @Watch("mapLayerList")
   updateMapLayerList() {
     Vue.nextTick(() => {
-      if (!this.refsMounted || !this.$refs.geojsmap) {
+      if (!this.refsMounted) {
         return;
       }
-      this.draw(this.$refs.geojsmap);
+      this.draw();
     });
   }
 
@@ -430,11 +489,11 @@ export default class ImageViewer extends Vue {
 
   private _setupMap(
     mllidx: number,
-    parentElement: Element,
     someImage: IImage,
     forceReset: boolean = false
   ) {
-    const mapElement = parentElement.querySelector(`#map-${mllidx}`);
+    const mapRefs = this.$refs[`map-${mllidx}`] as HTMLElement[] | undefined;
+    const mapElement = mapRefs?.[0];
     if (!mapElement) {
       return;
     }
@@ -787,7 +846,7 @@ export default class ImageViewer extends Vue {
     this.resetMapsOnDraw = true;
   }
 
-  private draw(parentElement: HTMLElement) {
+  private draw() {
     if ((this.width == this.height && this.width == 1) || !this.dataset) {
       return;
     }
@@ -824,7 +883,7 @@ export default class ImageViewer extends Vue {
     const currentResetMaps = this.resetMapsOnDraw;
     this.resetMapsOnDraw = false;
     mapLayerList.forEach((mll, mllidx) => {
-      this._setupMap(mllidx, parentElement, someImage, currentResetMaps);
+      this._setupMap(mllidx, someImage, currentResetMaps);
       const mapentry = this.maps[mllidx];
       if (!mapentry) {
         return;

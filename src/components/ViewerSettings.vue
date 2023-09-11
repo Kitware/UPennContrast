@@ -12,6 +12,7 @@
           label="Show channel values on hover"
           title="Show pixel intensity values when hovering cursor over image"
         />
+        <v-switch hide-details dense v-model="overview" label="Show minimap" />
       </v-container>
     </v-expansion-panel-content>
   </v-expansion-panel>
@@ -31,6 +32,14 @@ export default class ViewerSettings extends Vue {
 
   set valueOnHover(value) {
     this.store.setValueOnHover(value);
+  }
+
+  get overview() {
+    return this.store.overview;
+  }
+
+  set overview(value) {
+    this.store.setOverview(value);
   }
 }
 </script>
