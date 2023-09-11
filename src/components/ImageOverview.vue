@@ -2,12 +2,12 @@
   <div class="wrapper" ref="overview-wrapper">
     <div class="header" @mousedown="headerMouseDown">
       <v-icon
-        v-for="(item, idx) in directionItems"
+        v-for="(item, idx) in cornerItems"
         :key="`overview-header-icon-${idx}`"
         class="header-icon"
         @click="moveOverviewToCorner(item)"
       >
-        {{ directionItemToIcon(item) }}
+        {{ cornerToIcon(item) }}
       </v-icon>
     </div>
     <div class="map" ref="overview-map"></div>
@@ -19,7 +19,6 @@ import geojs from "geojs";
 
 import store from "@/store";
 import {
-  IDownloadParameters,
   IGeoJSFeature,
   IGeoJSFeatureLayer,
   IGeoJSMap,
@@ -28,6 +27,11 @@ import {
 } from "@/store/model";
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import { ITileOptionsBands, getBandOption } from "@/store/images";
+
+interface ICorner {
+  top: boolean;
+  left: boolean;
+}
 
 @Component({ components: {} })
 export default class ImageViewer extends Vue {
@@ -55,18 +59,20 @@ export default class ImageViewer extends Vue {
       })
     | null = null;
 
-  readonly directionItems: [boolean, boolean][] = [
-    [true, true],
-    [false, true],
-    [true, false],
-    [false, false]
+  // Each possible corner: top-left, bottom-left, top-right, bottom-right
+  // Used to display arrows in the header of the overview
+  readonly cornerItems: ICorner[] = [
+    { top: true, left: true },
+    { top: false, left: true },
+    { top: true, left: false },
+    { top: false, left: false }
   ];
 
-  directionItemToIcon([top, left]: [boolean, boolean]) {
+  cornerToIcon({ top, left }: ICorner) {
     return `mdi-arrow-${top ? "top" : "bottom"}-${left ? "left" : "right"}`;
   }
 
-  moveOverviewToCorner([top, left]: [boolean, boolean]) {
+  moveOverviewToCorner({ top, left }: ICorner) {
     const elem = this.$refs["overview-wrapper"];
     if (!elem) {
       return;
