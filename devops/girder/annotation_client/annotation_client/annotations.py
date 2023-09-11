@@ -7,6 +7,7 @@ PATHS = {
     'annotation_by_dataset': '/upenn_annotation?datasetId={datasetId}',
 
     'connection': '/annotation_connection/',
+    'multiple_connections': '/annotation_connection/multiple',
     'connection_by_id': '/annotation_connection/{connectionId}',
     'connect_to_nearest': '/annotation_connection/connectTo/',
 
@@ -86,6 +87,17 @@ class UPennContrastAnnotationClient:
         :rtype: dict
         """
         return self.client.post(PATHS['multiple_annotations'], json=annotations)
+    
+    def createMultipleConnections(self, connections):
+        """
+        Create multiple connections with the specified metadata.
+        The connections data should match the standard UPennContrast connection schema
+
+        :param list connections: The list of connections metadata
+        :return: The created connection object (Note: will contain the _id field)
+        :rtype: dict
+        """
+        return self.client.post(PATHS['multiple_connections'], json=connections)
 
     def updateAnnotation(self, annotationId, annotation):
         """
