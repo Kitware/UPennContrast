@@ -35,11 +35,15 @@ export function getAnnotationStyleFromLayer(
     style.fillColor = layerColor;
     style.strokeColor = geoColor;
   }
-  if (isSelected) {
-    style.strokeWidth = 5;
-  }
   if (isHovered) {
     style.fillOpacity = 0;
+    style.strokeWidth = 4;
+    if (layerColor) {
+      style.strokeColor = layerColor;
+    }
+  }
+  if (isSelected) {
+    style.strokeWidth = 6;
   }
   return style;
 }
