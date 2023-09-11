@@ -678,6 +678,8 @@ export default class ImageViewer extends Vue {
       if (!mapentry.scaleWidget && this.store.showScalebar) {
         mapentry.scaleWidget = mapentry.uiLayer.createWidget("scale", {
           scale: pixelSizeM,
+          strokeWidth: 5,
+          tickLength: 0,
           position: { bottom: 20, right: 10 }
         });
         const svgElement: SVGElement = mapentry.scaleWidget.parentCanvas()
@@ -1061,6 +1063,10 @@ export default class ImageViewer extends Vue {
 
 .geojs-scale-widget-text {
   fill: white;
+}
+
+.scale-widget {
+  overflow: visible;
 }
 
 .scale-widget:hover {
