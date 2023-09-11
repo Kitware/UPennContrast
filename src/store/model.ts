@@ -426,6 +426,7 @@ export interface IWorkerLabels {
   interfaceName?: string;
   interfaceCategory?: string;
   annotationShape?: AnnotationShape;
+  description?: string;
 }
 
 export interface IWorkerImageList {
