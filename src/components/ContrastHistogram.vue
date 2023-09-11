@@ -54,18 +54,16 @@
     <div class="sub">
       <v-text-field
         type="number"
-        :min="editMin"
-        :max="editMax"
         v-model="editBlackPoint"
+        @keydown="validateCachedBlackPoint"
         :append-icon="editIcon"
         hide-details
         dense
       />
       <v-text-field
         type="number"
-        :min="editMin"
-        :max="editMax"
         v-model="editWhitePoint"
+        @keydown="validateCachedWhitePoint"
         :append-icon="editIcon"
         hide-details
         dense
@@ -155,6 +153,10 @@ export default class ContrastHistogram extends Vue {
   _zoomBehavior: ZoomBehavior<HTMLElement, any> | null = null;
 
   _uid!: string; // Vue has that appearantly
+
+  // For typing contrast in text fields and hitting "Enter"
+  cachedBlackPoint: number | null = null;
+  cachedWhitePoint: number | null = null;
 
   get currentContrast() {
     return this.viewContrast || this.configurationContrast;
@@ -328,22 +330,50 @@ export default class ContrastHistogram extends Vue {
     return this.currentContrast.blackPoint;
   }
 
-  set editBlackPoint(value: string | number) {
+  set editBlackPoint(value: number) {
     const copy = Object.assign({}, this.currentContrast);
-    const v = typeof value === "string" ? parseInt(value, 10) : value;
-    copy.blackPoint = Math.min(v, copy.whitePoint);
-    this.emitChange.call(this, copy);
+    copy.blackPoint = typeof value === "string" ? parseInt(value, 10) : value;
+    if (copy.blackPoint <= copy.whitePoint) {
+      this.emitChange.call(this, copy);
+      this.cachedBlackPoint = null;
+    } else {
+      this.cachedBlackPoint = copy.blackPoint;
+    }
+  }
+
+  validateCachedBlackPoint(event: KeyboardEvent) {
+    if (
+      event.key === "Enter" &&
+      this.cachedBlackPoint !== null &&
+      this.cachedBlackPoint > this.editWhitePoint
+    ) {
+      this.editBlackPoint = this.editWhitePoint;
+    }
   }
 
   get editWhitePoint() {
     return this.currentContrast.whitePoint;
   }
 
-  set editWhitePoint(value: string | number) {
+  set editWhitePoint(value: number) {
     const copy = Object.assign({}, this.currentContrast);
-    const v = typeof value === "string" ? parseInt(value, 10) : value;
-    copy.whitePoint = Math.max(v, copy.blackPoint);
-    this.emitChange.call(this, copy);
+    copy.whitePoint = typeof value === "string" ? parseInt(value, 10) : value;
+    if (copy.blackPoint <= copy.whitePoint) {
+      this.emitChange.call(this, copy);
+      this.cachedWhitePoint = null;
+    } else {
+      this.cachedWhitePoint = copy.whitePoint;
+    }
+  }
+
+  validateCachedWhitePoint(event: KeyboardEvent) {
+    if (
+      event.key === "Enter" &&
+      this.cachedWhitePoint !== null &&
+      this.editBlackPoint > this.cachedWhitePoint
+    ) {
+      this.editWhitePoint = this.editBlackPoint;
+    }
   }
 
   reset() {
