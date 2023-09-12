@@ -6,6 +6,13 @@
       v-model="shapeFilter"
     />
     <tag-filter-editor class="filter-element" v-model="tagFilter" />
+    <v-switch
+      class="filter-element"
+      label="Current frame only"
+      v-model="onlyCurrentFrame"
+      dense
+      hide-details
+    />
     <roi-filters class="filter-element" />
     <template v-for="(propertyPath, idx) in propertyPaths">
       <property-filter-histogram
@@ -56,6 +63,14 @@ export default class AnnotationFilters extends Vue {
   }
   set shapeFilter(filter: IShapeAnnotationFilter) {
     this.filterStore.setShapeFilter(filter);
+  }
+
+  get onlyCurrentFrame() {
+    return this.filterStore.onlyCurrentFrame;
+  }
+
+  set onlyCurrentFrame(value: boolean) {
+    this.filterStore.setOnlyCurrentFrame(value);
   }
 
   get propertyPaths() {
