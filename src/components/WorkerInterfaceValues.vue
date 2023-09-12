@@ -18,6 +18,7 @@
         <v-col class="pa-0 ma-0">
           <v-slider
             v-if="item.type === 'number'"
+            v-bind="item.vueAttrs"
             v-model="interfaceValues[id]"
             :max="item.max"
             :min="item.min"
@@ -39,31 +40,37 @@
           </v-slider>
           <v-text-field
             v-if="item.type === 'text'"
+            v-bind="item.vueAttrs"
             v-model="interfaceValues[id]"
             dense
           ></v-text-field>
           <tag-picker
             v-if="item.type === 'tags'"
+            v-bind="item.vueAttrs"
             v-model="interfaceValues[id]"
           ></tag-picker>
           <layer-select
             :clearable="!item.required"
             v-if="item.type === 'layer'"
+            v-bind="item.vueAttrs"
             v-model="interfaceValues[id]"
           ></layer-select>
           <v-select
             :clearable="!item.required"
             v-if="item.type === 'select'"
+            v-bind="item.vueAttrs"
             v-model="interfaceValues[id]"
             :items="item.items"
           ></v-select>
           <channel-select
             :clearable="!item.required"
             v-if="item.type === 'channel'"
+            v-bind="item.vueAttrs"
             v-model="interfaceValues[id]"
           ></channel-select>
           <v-checkbox
             v-if="item.type === 'checkbox'"
+            v-bind="item.vueAttrs"
             v-model="interfaceValues[id]"
           ></v-checkbox>
         </v-col>
