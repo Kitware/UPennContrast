@@ -47,8 +47,9 @@ class UPennContrastAnnotationClient:
         """
         url = PATHS['annotation_by_dataset'].format(datasetId=datasetId)
 
+        url = f'{url}&limit={limit}&offset{offset}'
         if shape:
-            url = '{url}&shape={shape}&limit={limit}&offset{offset}'.format(url=url, shape=shape, limit=limit, offset=offset)
+            url = f'{url}&shape={shape}'
 
         return self.client.get(url)
 
