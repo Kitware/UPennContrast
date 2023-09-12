@@ -20,6 +20,20 @@
           label="Show scalebar"
           title="Show the scalebarwidget on top of the image"
         />
+        <v-switch
+          hide-details
+          dense
+          v-model="scaleAnnotationsWithZoom"
+          label="Scale points with zoom"
+          title="Make point annotations radius fixed in sceen size"
+        />
+        <v-slider
+          v-model="annotationsRadius"
+          :thumb-label="true"
+          min="1"
+          max="100"
+          label="Point annotations radius"
+        />
       </v-container>
     </v-expansion-panel-content>
   </v-expansion-panel>
@@ -55,6 +69,23 @@ export default class ViewerSettings extends Vue {
 
   set showScalebar(value) {
     this.store.setShowScalebar(value);
+  }
+
+  get scaleAnnotationsWithZoom() {
+    return this.store.scaleAnnotationsWithZoom;
+  }
+
+  set scaleAnnotationsWithZoom(value: boolean) {
+    this.store.setScaleAnnotationsWithZoom(value);
+  }
+
+  get annotationsRadius() {
+    return this.store.annotationsRadius;
+  }
+
+  set annotationsRadius(value: number) {
+    const zoom = typeof value === "string" ? parseFloat(value) : value;
+    this.store.setAnnotationsRadius(zoom);
   }
 }
 </script>

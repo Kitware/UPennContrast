@@ -14,7 +14,8 @@ import { logError } from "@/utils/log";
 export function getAnnotationStyleFromLayer(
   layerColor: string | undefined,
   isHovered: boolean = false,
-  isSelected: boolean = false
+  isSelected: boolean = false,
+  baseStyle?: any
 ) {
   const style = {
     stroke: true,
@@ -24,7 +25,7 @@ export function getAnnotationStyleFromLayer(
     fillColor: "white",
     fillOpacity: 0.5,
     fill: true,
-    radius: 10
+    ...baseStyle
   };
 
   if (layerColor) {

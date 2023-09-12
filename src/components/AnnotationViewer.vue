@@ -299,10 +299,23 @@ export default class AnnotationViewer extends Vue {
     return this.annotationStore.getAnnotationFromId;
   }
 
+  get baseStyle() {
+    return {
+      scaled: this.store.scaleAnnotationsWithZoom ? false : 1,
+      radius: this.store.annotationsRadius
+    };
+  }
+
   getAnnotationStyle(annotationId: string, layerColor: string | undefined) {
     const hovered = annotationId === this.hoveredAnnotationId;
     const selected = this.isAnnotationSelected(annotationId);
-    return getAnnotationStyleFromLayer(layerColor, hovered, selected);
+    const baseStyle = this.baseStyle;
+    return getAnnotationStyleFromLayer(
+      layerColor,
+      hovered,
+      selected,
+      baseStyle
+    );
   }
 
   // Get the index of the tile an annotation should be drawn in.
@@ -850,6 +863,18 @@ export default class AnnotationViewer extends Vue {
     return newAnnotation;
   }
 
+  private restyleAnnotations() {
+    for (const geoJSAnnotation of this.annotationLayer.annotations()) {
+      const { girderId, layerId, style } = geoJSAnnotation.options();
+      if (girderId) {
+        const layer = this.store.getLayerFromId(layerId);
+        const newStyle = this.getAnnotationStyle(girderId, layer?.color);
+        geoJSAnnotation.options("style", Object.assign({}, style, newStyle));
+      }
+    }
+    this.annotationLayer.draw();
+  }
+
   private shouldSelectAnnotation(
     selectionAnnotationType: AnnotationShape,
     selectionAnnotationCoordinates: any[],
@@ -1375,6 +1400,11 @@ export default class AnnotationViewer extends Vue {
   @Watch("shouldDrawConnections")
   onRedrawNeeded() {
     this.drawAnnotationsAndTooltips();
+  }
+
+  @Watch("baseStyle")
+  onRestyleNeeded() {
+    this.restyleAnnotations();
   }
 
   @Watch("unrolling")
