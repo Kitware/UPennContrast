@@ -22,7 +22,8 @@ import {
   IGeoJSPoint,
   IShapeAnnotationFilter,
   AnnotationShape,
-  TPropertyHistogram
+  TPropertyHistogram,
+  IAnnotationLocation
 } from "./model";
 
 import geo from "geojs";
@@ -53,6 +54,8 @@ export class Filters extends VuexModule {
     exclusive: true,
     shape: AnnotationShape.Point
   };
+
+  onlyCurrentFrame: boolean = false;
 
   propertyFilters: IPropertyAnnotationFilter[] = [];
 
@@ -166,8 +169,24 @@ export class Filters extends VuexModule {
     const enabledRoiFilters = roiFilters.filter(
       (filter: IROIAnnotationFilter) => filter.enabled
     );
+    const onlyCurrentFrame = this.onlyCurrentFrame;
+    const currentFrameLocation: IAnnotationLocation = {
+      XY: main.xy,
+      Z: main.z,
+      Time: main.time
+    };
     return annotation.annotations.filter((annotation: IAnnotation) => {
-      // shape filter
+      // Location filter
+      if (
+        onlyCurrentFrame &&
+        (annotation.location.XY !== currentFrameLocation.XY ||
+          annotation.location.Z !== currentFrameLocation.Z ||
+          annotation.location.Time !== currentFrameLocation.Time)
+      ) {
+        return false;
+      }
+
+      // Shape filter
       if (shapeFilter.enabled && annotation.shape !== shapeFilter.shape) {
         return false;
       }
@@ -242,6 +261,11 @@ export class Filters extends VuexModule {
   @Mutation
   public setShapeFilter(filter: IShapeAnnotationFilter) {
     this.shapeFilter = filter;
+  }
+
+  @Mutation
+  public setOnlyCurrentFrame(value: boolean) {
+    this.onlyCurrentFrame = value;
   }
 
   @Mutation
