@@ -1,67 +1,68 @@
 <template>
   <v-container>
     <v-alert :value="!store.isLoggedIn" color="info">Login to start</v-alert>
-    <section class="mb-4" v-if="store.isLoggedIn">
-      <v-subheader class="headline">Recent Dataset</v-subheader>
-      <v-list two-line>
-        <div v-for="d in datasetViewItems" :key="d.datasetView.id">
-          <v-tooltip
-            top
-            :disabled="
-              !datasetInfo[d.datasetView.datasetId] &&
-                !configInfo[d.datasetView.configurationId]
-            "
-          >
-            <template v-slot:activator="{ on, attrs }">
-              <v-list-item
-                @click="
-                  $router.push({
-                    name: 'datasetview',
-                    params: {
-                      datasetViewId: d.datasetView.id
-                    }
-                  })
-                "
-              >
-                <v-list-item-content v-bind="attrs" v-on="on">
-                  <v-list-item-title>
-                    {{
-                      d.datasetInfo.name
-                        ? d.datasetInfo.name
-                        : "Unnamed dataset"
-                    }}
-                  </v-list-item-title>
-                  <v-list-item-subtitle>
-                    {{
-                      d.configInfo.name
-                        ? d.configInfo.name
-                        : "Unnamed configuration"
-                    }}
-                  </v-list-item-subtitle>
-                </v-list-item-content>
-              </v-list-item>
-            </template>
-            <div v-if="d.datasetInfo.description">
-              {{ d.datasetInfo.description }}
-            </div>
-            <v-divider />
-            <div v-if="d.configInfo.description">
-              {{ d.configInfo.description }}
-            </div>
-          </v-tooltip>
-        </div>
-      </v-list>
-    </section>
-
-    <section class="mb-4">
-      <v-subheader class="headline">Browse</v-subheader>
-      <custom-file-manager
-        :location.sync="location"
-        :initial-items-per-page="100"
-        :items-per-page-options="[10, 20, 50, 100, -1]"
-        @rowclick="onRowClick"
-      />
-    </section>
+    <template v-if="store.isLoggedIn">
+      <section class="mb-4">
+        <v-subheader class="headline">Recent Dataset</v-subheader>
+        <v-list two-line>
+          <div v-for="d in datasetViewItems" :key="d.datasetView.id">
+            <v-tooltip
+              top
+              :disabled="
+                !datasetInfo[d.datasetView.datasetId] &&
+                  !configInfo[d.datasetView.configurationId]
+              "
+            >
+              <template v-slot:activator="{ on, attrs }">
+                <v-list-item
+                  @click="
+                    $router.push({
+                      name: 'datasetview',
+                      params: {
+                        datasetViewId: d.datasetView.id
+                      }
+                    })
+                  "
+                >
+                  <v-list-item-content v-bind="attrs" v-on="on">
+                    <v-list-item-title>
+                      {{
+                        d.datasetInfo.name
+                          ? d.datasetInfo.name
+                          : "Unnamed dataset"
+                      }}
+                    </v-list-item-title>
+                    <v-list-item-subtitle>
+                      {{
+                        d.configInfo.name
+                          ? d.configInfo.name
+                          : "Unnamed configuration"
+                      }}
+                    </v-list-item-subtitle>
+                  </v-list-item-content>
+                </v-list-item>
+              </template>
+              <div v-if="d.datasetInfo.description">
+                {{ d.datasetInfo.description }}
+              </div>
+              <v-divider />
+              <div v-if="d.configInfo.description">
+                {{ d.configInfo.description }}
+              </div>
+            </v-tooltip>
+          </div>
+        </v-list>
+      </section>
+      <section class="mb-4">
+        <v-subheader class="headline">Browse</v-subheader>
+        <custom-file-manager
+          :location.sync="location"
+          :initial-items-per-page="100"
+          :items-per-page-options="[10, 20, 50, 100, -1]"
+          @rowclick="onRowClick"
+        />
+      </section>
+    </template>
   </v-container>
 </template>
 

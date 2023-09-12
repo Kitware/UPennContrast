@@ -425,10 +425,14 @@ export class Main extends VuexModule {
 
   @Action
   async fetchRecentDatasetViews() {
-    const recentDatasetViews = await this.api.getRecentDatasetViews(
-      MAX_NUMBER_OF_RECENT_DATASET_VIEWS
-    );
-    this.setRecentDatasetViewsImpl(recentDatasetViews);
+    try {
+      const recentDatasetViews = await this.api.getRecentDatasetViews(
+        MAX_NUMBER_OF_RECENT_DATASET_VIEWS
+      );
+      this.setRecentDatasetViewsImpl(recentDatasetViews);
+    } catch {
+      this.setRecentDatasetViewsImpl([]);
+    }
   }
 
   @Action
