@@ -93,11 +93,9 @@ export default class NewConfiguration extends Mapper {
           return;
         }
         if (this.store.dataset) {
-          this.store.api.createDatasetView({
-            datasetId: this.store.dataset.id,
+          this.store.createDatasetView({
             configurationId: config.id,
-            layerContrasts: {},
-            lastViewed: Date.now()
+            datasetId: this.store.dataset.id
           });
         }
         this.$router.push({

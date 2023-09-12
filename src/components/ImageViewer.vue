@@ -1,5 +1,19 @@
 <template>
   <div class="image" v-mousetrap="mousetrapAnnotations">
+    <v-dialog v-model="scaleDialog">
+      <v-card>
+        <v-card-title>
+          Scale settings
+        </v-card-title>
+        <v-card-text>
+          <scale-settings />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn class="ma-2" @click="scaleDialog = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <annotation-viewer
       v-for="(mapentry, index) in maps.filter(
         mapentry =>
@@ -120,7 +134,9 @@ import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
 import AnnotationViewer from "@/components/AnnotationViewer.vue";
 import ImageOverview from "@/components/ImageOverview.vue";
+import ScaleSettings from "@/components/ScaleSettings.vue";
 import { ITileHistogram } from "@/store/images";
+import { convertLength } from "@/utils/conversion";
 import jobs, { jobStates } from "@/store/jobs";
 
 function generateFilterURL(
@@ -176,7 +192,7 @@ function generateFilterURL(
   setSlopeIntercept(index, "func-b", whitePoint, blackPoint, blue);
 }
 
-@Component({ components: { AnnotationViewer, ImageOverview } })
+@Component({ components: { AnnotationViewer, ImageOverview, ScaleSettings } })
 export default class ImageViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
@@ -225,6 +241,8 @@ export default class ImageViewer extends Vue {
   private readyLayers: boolean[] = [];
 
   private resetMapsOnDraw = false;
+
+  scaleDialog = false;
 
   get maps() {
     return this.store.maps;
@@ -643,21 +661,35 @@ export default class ImageViewer extends Vue {
         mapentry.uiLayer = map.createLayer("ui");
         mapentry.uiLayer.node().css({ "mix-blend-mode": "unset" });
       }
+      const pixelSizeScale = this.store.scales.pixelSize;
+      const pixelSizeM = convertLength(
+        pixelSizeScale.value,
+        pixelSizeScale.unit,
+        "m"
+      );
       if (
         mapentry.scaleWidget &&
-        !(
-          someImage.mm_x ||
-          mapentry.scaleWidget.options("scale") !== someImage.mm_x / 1000
-        )
+        (mapentry.scaleWidget.options("scale") !== pixelSizeM ||
+          !this.store.showScalebar)
       ) {
         mapentry.uiLayer.deleteWidget(mapentry.scaleWidget);
         mapentry.scaleWidget = null;
       }
-      if (someImage.mm_x && !mapentry.scaleWidget) {
+      if (!mapentry.scaleWidget && this.store.showScalebar) {
         mapentry.scaleWidget = mapentry.uiLayer.createWidget("scale", {
-          scale: someImage.mm_x / 1000,
+          scale: pixelSizeM,
+          strokeWidth: 5,
+          tickLength: 0,
           position: { bottom: 20, right: 10 }
         });
+        const svgElement: SVGElement = mapentry.scaleWidget.parentCanvas()
+          .firstChild;
+        svgElement.classList.add("scale-widget");
+        svgElement.onclick = (event: MouseEvent) => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.scaleDialog = true;
+        };
       }
     }
   }
@@ -1020,6 +1052,26 @@ export default class ImageViewer extends Vue {
 .progress .v-progress-linear__content {
   position: relative;
 }
+
+.geojs-map .geojs-layer {
+  mix-blend-mode: lighten;
+}
+
+.geojs-scale-widget-bar {
+  stroke: white;
+}
+
+.geojs-scale-widget-text {
+  fill: white;
+}
+
+.scale-widget {
+  overflow: visible;
+}
+
+.scale-widget:hover {
+  cursor: pointer;
+}
 </style>
 
 <style lang="scss" scoped>
@@ -1090,10 +1142,5 @@ export default class ImageViewer extends Vue {
   width: 25%;
   height: 25%;
   display: inline-block;
-}
-</style>
-<style lang="scss">
-.geojs-map .geojs-layer {
-  mix-blend-mode: lighten;
 }
 </style>

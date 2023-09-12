@@ -546,14 +546,15 @@ export class Annotations extends VuexModule {
     const tile = { XY: main.xy, Z: main.z, Time: main.time };
     const response = await this.annotationsAPI.computeAnnotationWithWorker(
       tool,
-      datasetId,
+      main.dataset,
       {
         location,
         channel,
         tile
       },
       workerInterface,
-      main.layers
+      main.layers,
+      main.scales
     );
 
     // Keep track of running jobs

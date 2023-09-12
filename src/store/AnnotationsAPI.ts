@@ -3,13 +3,13 @@ import {
   IAnnotation,
   IAnnotationConnection,
   IAnnotationBase,
-  AnnotationShape,
-  IGeoJSPoint,
   IToolConfiguration,
   IAnnotationConnectionBase,
   IWorkerInterfaceValues,
   IAnnotationLocation,
-  IDisplayLayer
+  IDisplayLayer,
+  IScales,
+  IDataset
 } from "./model";
 
 import { logError } from "@/utils/log";
@@ -202,15 +202,17 @@ export default class AnnotationsAPI {
 
   async computeAnnotationWithWorker(
     tool: IToolConfiguration,
-    datasetId: string,
+    dataset: IDataset,
     metadata: {
       channel: Number;
       location: IAnnotationLocation;
       tile: IAnnotationLocation;
     },
     workerInterface: IWorkerInterfaceValues,
-    layers: IDisplayLayer[]
+    layers: IDisplayLayer[],
+    scales: IScales
   ) {
+    const datasetId = dataset.id;
     const { id, name, type, values } = tool;
     const image = values.image.image;
     const { annotation, connectTo, jobDateTag } = values;
@@ -243,7 +245,8 @@ export default class AnnotationsAPI {
       tags,
       tile: metadata.tile,
       connectTo: augmentedConnectTo,
-      workerInterface
+      workerInterface,
+      scales
     };
     return this.client.post(
       `upenn_annotation/compute?datasetId=${datasetId}`,

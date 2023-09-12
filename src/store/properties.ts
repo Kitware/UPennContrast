@@ -286,6 +286,7 @@ export class Properties extends VuexModule {
       return null;
     }
     const datasetId = main.dataset.id;
+    const scales = main.scales;
 
     if (!this.propertyStatuses[property.id]) {
       Vue.set(this.propertyStatuses, property.id, defaultStatus());
@@ -297,7 +298,8 @@ export class Properties extends VuexModule {
     const response = await this.propertiesAPI.computeProperty(
       property.id,
       datasetId,
-      property
+      property,
+      scales
     );
 
     // Keep track of running jobs

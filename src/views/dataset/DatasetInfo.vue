@@ -401,11 +401,9 @@ export default class DatasetInfo extends Vue {
       baseConfig,
       configurationFolder._id
     );
-    await this.store.api.createDatasetView({
-      datasetId: this.dataset.id,
+    await this.store.createDatasetView({
       configurationId: config.id,
-      layerContrasts: {},
-      lastViewed: Date.now()
+      datasetId: this.dataset.id
     });
 
     this.$router.push({
@@ -422,17 +420,17 @@ export default class DatasetInfo extends Vue {
     if (!datasetFolder?.parentId) {
       return;
     }
-    const config = await this.store.api.createConfigurationFromDataset(
-      this.defaultConfigurationName,
-      "",
-      datasetFolder.parentId,
-      this.dataset
-    );
-    const view = await this.store.api.createDatasetView({
-      datasetId: this.dataset.id,
+    const config = await this.store.createConfiguration({
+      name: this.defaultConfigurationName,
+      description: "",
+      folderId: datasetFolder.parentId
+    });
+    if (!config) {
+      return;
+    }
+    const view = await this.store.createDatasetView({
       configurationId: config.id,
-      layerContrasts: {},
-      lastViewed: Date.now()
+      datasetId: this.dataset.id
     });
     this.$router.push({
       name: "datasetview",

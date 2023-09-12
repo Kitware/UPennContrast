@@ -19,6 +19,7 @@ import {
   IFrameInfo,
   IHistoryEntry,
   IImage,
+  IScales,
   IPixel,
   newLayer,
   TJobType
@@ -425,7 +426,7 @@ export default class GirderAPI {
     return asConfigurationItem(item);
   }
 
-  async createConfigurationFromDataset(
+  createConfigurationFromDataset(
     name: string,
     description: string,
     folderId: string,
@@ -627,7 +628,19 @@ function getDatasetCompatibility(
   };
 }
 
-export function defaultConfigurationBase(
+export function getDatasetScales(dataset: IDataset): IScales {
+  const scales = exampleConfigurationBase().scales;
+  const tileInfo = dataset.anyImage()?.tileinfo;
+  if (tileInfo) {
+    scales.pixelSize = {
+      value: (tileInfo.mm_x + tileInfo.mm_y) / 2,
+      unit: "mm"
+    };
+  }
+  return scales;
+}
+
+function defaultConfigurationBase(
   dataset: IDataset
 ): IDatasetConfigurationBase {
   return {
@@ -635,7 +648,8 @@ export function defaultConfigurationBase(
     layers: getDefaultLayers(dataset),
     tools: [],
     propertyIds: [],
-    snapshots: []
+    snapshots: [],
+    scales: getDatasetScales(dataset)
   };
 }
 
@@ -665,7 +679,7 @@ export function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
   };
   for (const key of configurationBaseKeys) {
     config[key] =
-      key in item.meta ? item.meta[key] : exampleConfigurationBase[key];
+      key in item.meta ? item.meta[key] : exampleConfigurationBase()[key];
   }
   return config as IDatasetConfiguration;
 }
@@ -675,7 +689,8 @@ function asDatasetView(data: AxiosResponse["data"]): IDatasetView {
     id: data._id,
     configurationId: data.configurationId,
     datasetId: data.datasetId,
-    layerContrasts: data.layerContrasts,
+    layerContrasts: data.layerContrasts || {},
+    scales: data.scales || {},
     lastViewed: data.lastViewed
   };
 }

@@ -9,7 +9,8 @@ import {
   IWorkerInterfaceValues,
   IAnnotationLocation,
   IDisplayLayer,
-  TPropertyHistogram
+  TPropertyHistogram,
+  IScales
 } from "./model";
 
 import { fetchAllPages } from "@/utils/fetch";
@@ -60,8 +61,13 @@ export default class PropertiesAPI {
   async computeProperty(
     propertyId: string,
     datasetId: string,
-    params: IAnnotationProperty
+    property: IAnnotationProperty,
+    scales: IScales
   ) {
+    const params = {
+      ...property,
+      scales
+    };
     return this.client.post(
       `annotation_property/${propertyId}/compute?datasetId=${datasetId}`,
       params

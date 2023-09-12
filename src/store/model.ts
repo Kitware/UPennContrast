@@ -146,6 +146,22 @@ export interface ISnapshot {
 
 export type IDimensionCompatibility = "one" | "multiple";
 
+export type TUnitLength = "nm" | "µm" | "mm" | "m";
+export const unitLengthOptions: TUnitLength[] = ["nm", "µm", "mm", "m"];
+export type TUnitTime = "ms" | "s" | "m" | "h" | "d";
+export const unitTimeOptions: TUnitTime[] = ["ms", "s", "m", "h", "d"];
+
+export interface IScaleInformation<TUnit> {
+  value: number;
+  unit: TUnit;
+}
+
+export interface IScales {
+  pixelSize: IScaleInformation<TUnitLength>;
+  zStep: IScaleInformation<TUnitLength>;
+  tStep: IScaleInformation<TUnitTime>;
+}
+
 export interface IDatasetConfigurationBase {
   compatibility: {
     xyDimensions: IDimensionCompatibility;
@@ -157,6 +173,7 @@ export interface IDatasetConfigurationBase {
   tools: IToolConfiguration[];
   snapshots: ISnapshot[];
   propertyIds: string[];
+  scales: IScales;
 }
 
 export interface IDatasetConfiguration extends IDatasetConfigurationBase {
@@ -171,6 +188,7 @@ export interface IDatasetViewBase {
   layerContrasts: {
     [layerId: string]: IContrast;
   };
+  scales: Partial<IScales>;
   lastViewed: number;
 }
 
@@ -843,21 +861,27 @@ export function copyLayerWithoutPrivateAttributes(
 }
 
 // To get all the keys of IDatasetConfigurationBase without missing one
-export const exampleConfigurationBase: IDatasetConfigurationBase = {
-  compatibility: {
-    xyDimensions: "multiple",
-    zDimensions: "multiple",
-    tDimensions: "multiple",
-    channels: {}
-  },
-  layers: [],
-  tools: [],
-  snapshots: [],
-  propertyIds: []
-};
-
+export function exampleConfigurationBase(): IDatasetConfigurationBase {
+  return {
+    compatibility: {
+      xyDimensions: "multiple",
+      zDimensions: "multiple",
+      tDimensions: "multiple",
+      channels: {}
+    },
+    layers: [],
+    tools: [],
+    snapshots: [],
+    propertyIds: [],
+    scales: {
+      pixelSize: { value: 1, unit: "m" },
+      zStep: { value: 1, unit: "m" },
+      tStep: { value: 1, unit: "s" }
+    }
+  };
+}
 export const configurationBaseKeys = new Set(
-  Object.keys(exampleConfigurationBase)
+  Object.keys(exampleConfigurationBase())
 ) as Set<keyof IDatasetConfigurationBase>;
 
 export enum AnnotationSelectionTypes {
