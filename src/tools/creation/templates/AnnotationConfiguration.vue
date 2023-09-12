@@ -160,7 +160,7 @@ export default class AnnotationConfiguration extends Vue {
   label: string = "";
   shape: AnnotationShape = this.defaultShape;
   tagsInternal: string[] = [];
-  useAutoTags: boolean = true;
+  useAutoTags: boolean = false;
 
   get tags() {
     if (this.useAutoTags) {
