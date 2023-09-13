@@ -96,6 +96,10 @@ export class Main extends VuexModule {
 
   showScalebar: boolean = true;
 
+  scaleAnnotationsWithZoom: boolean = true;
+
+  annotationsRadius: number = 10;
+
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
   drawAnnotationConnections: boolean = true;
@@ -207,6 +211,16 @@ export class Main extends VuexModule {
   @Mutation
   public setShowScalebar(value: boolean) {
     this.showScalebar = value;
+  }
+
+  @Mutation
+  public setScaleAnnotationsWithZoom(value: boolean) {
+    this.scaleAnnotationsWithZoom = value;
+  }
+
+  @Mutation
+  public setAnnotationsRadius(value: number) {
+    this.annotationsRadius = value;
   }
 
   @Mutation
