@@ -424,43 +424,54 @@ export interface IGeoJSAnnotation {
   geojson: () => any;
 }
 
-export interface INumberWorkerInterfaceElement {
+export interface ICommonWorkerInterfaceElement {
+  vueAttrs?: { [vueAttr: string]: any };
+}
+
+export interface INumberWorkerInterfaceElement
+  extends ICommonWorkerInterfaceElement {
   type: "number";
   min?: number;
   max?: number;
   default?: number;
 }
 
-export interface ITextWorkerInterfaceElement {
+export interface ITextWorkerInterfaceElement
+  extends ICommonWorkerInterfaceElement {
   type: "text";
   default?: string;
 }
 
-export interface ITagsWorkerInterfaceElement {
+export interface ITagsWorkerInterfaceElement
+  extends ICommonWorkerInterfaceElement {
   type: "tags";
   default?: string[];
 }
 
-export interface ILayerWorkerInterfaceElement {
+export interface ILayerWorkerInterfaceElement
+  extends ICommonWorkerInterfaceElement {
   type: "layer";
   default?: string | null;
   required?: boolean;
 }
 
-export interface ISelectWorkerInterfaceElement {
+export interface ISelectWorkerInterfaceElement
+  extends ICommonWorkerInterfaceElement {
   type: "select";
   items: string[];
   default?: string;
   required?: boolean;
 }
 
-export interface IChannelWorkerInterfaceElement {
+export interface IChannelWorkerInterfaceElement
+  extends ICommonWorkerInterfaceElement {
   type: "channel";
   default?: number;
   required?: boolean;
 }
 
-export interface ICheckboxWorkerInterfaceElement {
+export interface ICheckboxWorkerInterfaceElement
+  extends ICommonWorkerInterfaceElement {
   type: "checkbox";
   default?: boolean;
 }
