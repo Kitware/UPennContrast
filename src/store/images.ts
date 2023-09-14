@@ -73,10 +73,12 @@ export interface ITileOptionsSimple {
   min: number | "auto" | "min" | "max";
   max: number | "auto" | "min" | "max";
   palette: string[]; // palette of hex colors, e.g. #000000
+  frame?: number;
 }
 
 export interface ITileOptionsBands {
   bands: { [key: string]: any }[];
+  frame?: number;
 }
 
 export type ITileOptions = ITileOptionsSimple | ITileOptionsBands;
@@ -154,7 +156,7 @@ export function toStyle(
 
 // Returns the style of the layer combined with the frame idx for the current dataset
 export async function getBandOption(layer: IDisplayLayer) {
-  const image = main.getImagesFromLayer(layer)[0];
+  const image = (main.getImagesFromLayer(layer)[0] || null) as IImage | null;
   const histogram = await main.getLayerHistogram(layer);
   const style = toStyle(
     layer.color,
@@ -164,7 +166,10 @@ export async function getBandOption(layer: IDisplayLayer) {
     main.dataset,
     image
   );
-  return { ...style, frame: image.frameIndex };
+  if (image) {
+    style.frame = image.frameIndex;
+  }
+  return style;
 }
 
 export interface ITileHistogram {

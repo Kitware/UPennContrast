@@ -51,7 +51,7 @@
       ></div>
     </div>
     <image-overview
-      v-if="overview"
+      v-if="overview && !unrolling"
       :parentPanInfo="panInfo"
       @centerChange="setCenter"
       @cornersChange="setCorners"
@@ -363,6 +363,10 @@ export default class ImageViewer extends Vue {
 
   get dataset() {
     return this.store.dataset;
+  }
+
+  get unrolling() {
+    return this.store.unroll;
   }
 
   get width() {
