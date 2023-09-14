@@ -364,9 +364,6 @@ export class Main extends VuexModule {
     id: string | null;
     data: IDataset | null;
   }) {
-    if (this.selectedDatasetId === id && this.dataset?.id === data?.id) {
-      return;
-    }
     this.selectedDatasetId = id;
     this.dataset = data;
   }
