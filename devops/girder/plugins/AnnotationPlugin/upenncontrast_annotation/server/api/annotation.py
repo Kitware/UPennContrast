@@ -1,5 +1,5 @@
 from girder.api import access
-from girder.api.describe import Description, describeRoute
+from girder.api.describe import Description, describeRoute, autoDescribeRoute
 from girder.api.rest import Resource, loadmodel
 from girder.constants import AccessType
 from girder.exceptions import AccessException, RestException
@@ -109,22 +109,25 @@ class Annotation(Resource):
         self._annotationModel.update(upenn_annotation)
 
     @access.user
-    @describeRoute(Description("Search for annotations")
+    @autoDescribeRoute(Description("Search for annotations")
                    .responseClass('upenn_annotation')
                    .param('datasetId', 'Get all annotations in this dataset', required=True)
                    .param('shape', 'Filter annotations by shape', required=False)
+                   .jsonParam('tags', 'Filter annotations by tags: get annotations which contain the given tags (and potentially other additional tags)', required=False, requireArray=True)
                    .pagingParams(defaultSort='_id')
                    .errorResponse()
                    )
     def find(self, params):
         limit, offset, sort = self.getPagingParameters(params, 'lowerName')
         query = {}
-        if 'datasetId' in params:
+        if params['datasetId'] is not None:
             query['datasetId'] = params['datasetId']
         else:
             return []
-        if 'shape' in params:
+        if params['shape'] is not None:
             query['shape'] = params['shape']
+        if params['tags'] is not None and len(params['tags']) > 0:
+            query['tags'] = { '$all': params['tags'] }
         return self._annotationModel.findWithPermissions(query, sort=sort, user=self.getCurrentUser(), level=AccessType.READ, limit=limit, offset=offset)
 
     @access.user
