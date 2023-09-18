@@ -202,7 +202,8 @@ export default class App extends Vue {
     this.lastModifiedRightPanel = panel;
   }
 
-  toggleHotkeyDialog() {
+  toggleHotkeyDialog(_elem: any, e: Event) {
+    e.preventDefault();
     this.helpPanelIsOpen = !this.helpPanelIsOpen;
   }
 
