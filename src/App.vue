@@ -1,5 +1,8 @@
 <template>
-  <v-app id="inspire">
+  <v-app id="inspire" v-mousetrap="appHotkeys">
+    <v-dialog v-model="hotkeyDialog" width="inherit">
+      <hotkey-description />
+    </v-dialog>
     <v-app-bar class="elevation-1" app clipped-right>
       <v-toolbar-title @click="goHome" class="logo" title="NimbusImage home">
         <img
@@ -112,14 +115,17 @@ import AnalyzeAnnotations from "./components/AnalyzePanel.vue";
 import AnnotationsSettings from "./components/SettingsPanel.vue";
 import Snapshots from "./components/Snapshots.vue";
 import AnnotationBrowser from "@/components/AnnotationBrowser/AnnotationBrowser.vue";
+import HotkeyDescription from "./components/HotkeyDescription.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
-import { logError } from "./utils/log";
+import { logError } from "@/utils/log";
+import { IHotkey } from "@/utils/v-mousetrap";
 
 @Component({
   components: {
+    HotkeyDescription,
     AnnotationBrowser,
     UserMenu,
     BreadCrumbs,
@@ -132,6 +138,17 @@ import { logError } from "./utils/log";
 export default class App extends Vue {
   readonly store = store;
   readonly propertyStore = propertyStore;
+
+  readonly appHotkeys: IHotkey = {
+    bind: "tab",
+    handler: this.toggleHotkeyDialog,
+    data: {
+      section: "Global",
+      description: "Toggle hotkey dialog"
+    }
+  };
+
+  hotkeyDialog = false;
 
   snapshotPanel = false;
   snapshotPanelFull = false;
@@ -183,6 +200,10 @@ export default class App extends Vue {
       this.$data[this.lastModifiedRightPanel] = false;
     }
     this.lastModifiedRightPanel = panel;
+  }
+
+  toggleHotkeyDialog() {
+    this.hotkeyDialog = !this.hotkeyDialog;
   }
 
   @Watch("annotationPanel")

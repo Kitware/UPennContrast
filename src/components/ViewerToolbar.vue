@@ -98,6 +98,7 @@ import SwitchToggle from "./SwitchToggle.vue";
 import Toolset from "@/tools/toolsets/Toolset.vue";
 import store from "@/store";
 import { TLayerMode } from "@/store/model";
+import { IHotkey } from "@/utils/v-mousetrap";
 
 @Component({
   components: {
@@ -220,12 +221,16 @@ export default class ViewerToolbar extends Vue {
   }
 
   // Mousetrap bindings
-  mousetrapSliders = [
+  mousetrapSliders: IHotkey[] = [
     {
       // XY left
       bind: "w",
       handler: () => {
         this.xy = Math.max(this.xy - 1, 0);
+      },
+      data: {
+        section: "Image",
+        description: "Decrease XY image location"
       }
     },
     {
@@ -233,6 +238,10 @@ export default class ViewerToolbar extends Vue {
       bind: "r",
       handler: () => {
         this.xy = Math.min(this.xy + 1, this.maxXY);
+      },
+      data: {
+        section: "Image",
+        description: "Increase XY image location"
       }
     },
     {
@@ -240,6 +249,10 @@ export default class ViewerToolbar extends Vue {
       bind: "d",
       handler: () => {
         this.z = Math.max(this.z - 1, 0);
+      },
+      data: {
+        section: "Image",
+        description: "Decrease Z image location"
       }
     },
     {
@@ -247,6 +260,10 @@ export default class ViewerToolbar extends Vue {
       bind: "e",
       handler: () => {
         this.z = Math.min(this.z + 1, this.maxZ);
+      },
+      data: {
+        section: "Image",
+        description: "Increase Z image location"
       }
     },
     {
@@ -254,6 +271,10 @@ export default class ViewerToolbar extends Vue {
       bind: "s",
       handler: () => {
         this.time = Math.max(this.time - 1, 0);
+      },
+      data: {
+        section: "Image",
+        description: "Decrease T image location"
       }
     },
     {
@@ -261,6 +282,10 @@ export default class ViewerToolbar extends Vue {
       bind: "f",
       handler: () => {
         this.time = Math.min(this.time + 1, this.maxTime);
+      },
+      data: {
+        section: "Image",
+        description: "Increase T image location"
       }
     }
   ];
