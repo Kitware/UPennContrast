@@ -46,7 +46,7 @@ import { boundKeys } from "@/utils/v-mousetrap";
 import { IFeatureDescription, descriptions } from "@/utils/v-description";
 
 @Component({})
-export default class HotkeyDescription extends Vue {
+export default class HelpPanel extends Vue {
   readonly boundKeys = boundKeys;
   readonly descriptions = descriptions;
 
@@ -93,6 +93,7 @@ export default class HotkeyDescription extends Vue {
   column-fill: balance;
   column-rule: inset;
   orphans: 4;
+  min-height: 200px;
 }
 
 .span-title {
