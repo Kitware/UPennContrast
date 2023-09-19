@@ -38,6 +38,7 @@
     ></annotation-viewer>
     <div
       class="map-layout"
+      ref="map-layout"
       :data-update="reactiveDraw"
       :map-count="mapLayerList.length"
     >
@@ -200,6 +201,7 @@ export default class ImageViewer extends Vue {
   readonly girderResources = girderResources;
 
   $refs!: {
+    "map-layout": HTMLElement;
     [mapRef: string]: HTMLElement | HTMLElement[]; // map-${idx}
   };
 
@@ -373,9 +375,18 @@ export default class ImageViewer extends Vue {
     return this.store.dataset ? this.store.dataset.height : 1;
   }
 
+  get compositionMode() {
+    return this.store.compositionMode;
+  }
+
+  get backgroundColor() {
+    return this.store.backgroundColor;
+  }
+
   mounted() {
     this.refsMounted = true;
     this.datasetReset();
+    this.updateBackgroundColor();
   }
 
   get reactiveDraw() {
@@ -568,6 +579,20 @@ export default class ImageViewer extends Vue {
         mapentry.map.center(this.panInfo.center, undefined, true, true);
       });
     } catch (err) {}
+  }
+
+  @Watch("compositionMode")
+  updateCompositionMode() {
+    for (const mapentry of this.maps) {
+      for (const imageLayer of mapentry.imageLayers) {
+        imageLayer.node().css({ "mix-blend-mode": this.compositionMode });
+      }
+    }
+  }
+
+  @Watch("backgroundColor")
+  updateBackgroundColor() {
+    this.$refs["map-layout"].style.background = this.backgroundColor;
   }
 
   @Watch("mapLayerList")
@@ -763,7 +788,9 @@ export default class ImageViewer extends Vue {
       if (mapentry.imageLayers.length) {
         mapentry.params.layer.queue = mapentry.imageLayers[0].queue;
       }
-      mapentry.imageLayers.push(map.createLayer("osm", mapentry.params.layer));
+      const newMap = map.createLayer("osm", mapentry.params.layer);
+      newMap.node().css({ "mix-blend-mode": this.compositionMode });
+      mapentry.imageLayers.push(newMap);
       let layer = mapentry.imageLayers[mapentry.imageLayers.length - 1];
       if (mapentry.imageLayers.length & 1) {
         const index = (mapentry.imageLayers.length - 1) / 2;
@@ -1074,10 +1101,6 @@ export default class ImageViewer extends Vue {
   position: relative;
 }
 
-.geojs-map .geojs-layer {
-  mix-blend-mode: lighten;
-}
-
 .geojs-scale-widget-bar {
   stroke: white;
 }
@@ -1118,7 +1141,6 @@ export default class ImageViewer extends Vue {
   top: 0;
   width: 100%;
   height: 100%;
-  background: black;
   line-height: 0;
 }
 .geojs-map {

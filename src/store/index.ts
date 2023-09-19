@@ -50,6 +50,7 @@ import Vue from "vue";
 export { default as store } from "./root";
 
 import { Debounce } from "@/utils/debounce";
+import { TCompositionMode } from "@/utils/compositionModes";
 
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
@@ -99,6 +100,9 @@ export class Main extends VuexModule {
   scaleAnnotationsWithZoom: boolean = true;
 
   annotationsRadius: number = 10;
+
+  compositionMode: TCompositionMode = "lighten";
+  backgroundColor: string = "black";
 
   restrictAnnotationsToFilters: boolean = true;
   restrictAnnotationsToActive: boolean = true;
@@ -211,6 +215,16 @@ export class Main extends VuexModule {
   @Mutation
   public setShowScalebar(value: boolean) {
     this.showScalebar = value;
+  }
+
+  @Mutation
+  public setCompositionMode(value: TCompositionMode) {
+    this.compositionMode = value;
+  }
+
+  @Mutation
+  public setBackgroundColor(value: string) {
+    this.backgroundColor = value;
   }
 
   @Mutation
