@@ -14,7 +14,7 @@
           <v-progress-linear
             :indeterminate="!progressInfo.progress"
             :value="100 * (progressInfo.progress || 0)"
-            style="height: 20px;"
+            class="text-progress"
           >
             <strong class="pr-4">
               {{ progressInfo.title }}

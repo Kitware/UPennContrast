@@ -31,7 +31,7 @@
       <v-progress-linear
         :indeterminate="!status.progressInfo.progress"
         :value="100 * (status.progressInfo.progress || 0)"
-        style="height: 20px;"
+        class="text-progress"
       >
         <strong class="pr-4">
           {{ status.progressInfo.title }}
@@ -81,3 +81,15 @@ export default class AnnotationProperty extends Vue {
   }
 }
 </script>
+
+<style lang="scss">
+.text-progress {
+  height: fit-content !important;
+  min-height: 10px;
+  padding: 4px;
+}
+
+.text-progress .v-progress-linear__content {
+  position: relative;
+}
+</style>
