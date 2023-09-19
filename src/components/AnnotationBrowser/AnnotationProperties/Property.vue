@@ -92,4 +92,17 @@ export default class AnnotationProperty extends Vue {
 .text-progress .v-progress-linear__content {
   position: relative;
 }
+
+.text-progress .v-progress-linear__background {
+  height: 100%;
+}
+
+.text-progress .v-progress-linear__buffer {
+  height: 100%;
+}
+
+.text-progress .v-progress-linear__determinate {
+  height: 100%;
+  top: 0;
+}
 </style>
