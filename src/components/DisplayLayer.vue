@@ -16,14 +16,11 @@
             @click.native.stop
             @mousedown.native.stop
             @mouseup.native.stop
-            v-mousetrap="{
-              bind: zMaxMergeBinding(index),
-              handler: () => (isZMaxMerge = !isZMaxMerge)
-            }"
+            v-mousetrap="zMaxMergeHotkey"
             class="toggleButton"
             v-model="isZMaxMerge"
             v-show="hasMultipleZ"
-            :title="`Toggle Z Max Merge (hotkey ${zMaxMergeBinding(index)})`"
+            :title="`Toggle Z Max Merge (hotkey ${zMaxMergeBinding})`"
             dense
             hide-details
           />
@@ -33,10 +30,7 @@
             @click.native.stop
             @mousedown.native.stop
             @mouseup.native.stop
-            v-mousetrap="{
-              bind: `${index + 1}`,
-              handler: () => store.toggleLayerVisibility(value.id)
-            }"
+            v-mousetrap="visibilityHotkey"
             class="toggleButton"
             v-model="visible"
             :title="`Toggle Visibility (hotkey ${index + 1})`"
@@ -149,6 +143,7 @@ import { IDisplayLayer, IContrast, IDisplaySlice } from "../store/model";
 import DisplaySlice from "./DisplaySlice.vue";
 import ContrastHistogram from "./ContrastHistogram.vue";
 import store from "../store";
+import { IHotkey } from "@/utils/v-mousetrap";
 
 @Component({
   components: {
@@ -212,8 +207,30 @@ export default class DisplayLayer extends Vue {
       ? { type: "current", value: null }
       : { ...this.value.z };
 
-  zMaxMergeBinding(index: number) {
-    return `shift+${index + 1}`;
+  get zMaxMergeBinding() {
+    return `shift+${this.index + 1}`;
+  }
+
+  get zMaxMergeHotkey(): IHotkey {
+    return {
+      bind: this.zMaxMergeBinding,
+      handler: () => (this.isZMaxMerge = !this.isZMaxMerge),
+      data: {
+        section: "Layers",
+        description: `Toggle Z max-merge on layer: ${this.value.name}`
+      }
+    };
+  }
+
+  get visibilityHotkey(): IHotkey {
+    return {
+      bind: `${this.index + 1}`,
+      handler: () => store.toggleLayerVisibility(this.value.id),
+      data: {
+        section: "Layers",
+        description: `Toggle visibility on layer: ${this.value.name}`
+      }
+    };
   }
 
   get isZMaxMerge() {

@@ -75,6 +75,7 @@ import { Vue, Component } from "vue-property-decorator";
 import DisplayLayerGroup from "./DisplayLayerGroup.vue";
 import draggable from "vuedraggable";
 import store from "@/store";
+import { IHotkey } from "@/utils/v-mousetrap";
 
 const singleLayerPrefix = "single-layer-group_";
 const spacerPrefix = "spacer_";
@@ -304,14 +305,22 @@ export default class DisplayLayers extends Vue {
   }
 
   // Mousetrap bindings
-  mousetrapGlobalToggles = [
+  mousetrapGlobalToggles: IHotkey[] = [
     {
       bind: "z",
-      handler: this.store.toggleGlobalZMaxMerge
+      handler: this.store.toggleGlobalZMaxMerge,
+      data: {
+        section: "Layers",
+        description: "Toggle Z max-merge on all layers"
+      }
     },
     {
       bind: "0",
-      handler: this.store.toggleGlobalLayerVisibility
+      handler: this.store.toggleGlobalLayerVisibility,
+      data: {
+        section: "Layers",
+        description: "Toggle visibility on all layers"
+      }
     }
   ];
 }

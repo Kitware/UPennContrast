@@ -7,7 +7,11 @@
       tool.hotkey
         ? {
             bind: tool.hotkey,
-            handler: toggleTool
+            handler: toggleTool,
+            data: {
+              section: 'Tools',
+              description: `Toggle tool:  ${tool.name}`
+            }
           }
         : []
     "

@@ -11,14 +11,36 @@
           v-model="valueOnHover"
           label="Show channel values on hover"
           title="Show pixel intensity values when hovering cursor over image"
+          v-description="{
+            section: 'Settings',
+            title: 'Show values on hover',
+            description:
+              'Hide or show values for each layer when hovering the image'
+          }"
         />
-        <v-switch hide-details dense v-model="overview" label="Show minimap" />
+        <v-switch
+          hide-details
+          dense
+          v-model="overview"
+          label="Show minimap"
+          v-description="{
+            section: 'Settings',
+            title: 'Show minimap',
+            description: 'Hide or show the overview panel'
+          }"
+        />
         <v-switch
           hide-details
           dense
           v-model="showScalebar"
           label="Show scalebar"
           title="Show the scalebarwidget on top of the image"
+          v-description="{
+            section: 'Settings',
+            title: 'Show scalebar',
+            description:
+              'Hide or show the scalebar widget at the bottom right of the image'
+          }"
         />
         <v-switch
           hide-details
@@ -26,6 +48,12 @@
           v-model="scaleAnnotationsWithZoom"
           label="Scale points with zoom"
           title="Make point annotations radius fixed in sceen size"
+          v-description="{
+            section: 'Settings',
+            title: 'Point annotations size',
+            description:
+              'Set size of the point annotations and their behavior when zooming'
+          }"
         />
         <v-slider
           v-model="annotationsRadius"

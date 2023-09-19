@@ -138,6 +138,7 @@ import ScaleSettings from "@/components/ScaleSettings.vue";
 import { ITileHistogram } from "@/store/images";
 import { convertLength } from "@/utils/conversion";
 import jobs, { jobStates } from "@/store/jobs";
+import { IHotkey } from "@/utils/v-mousetrap";
 
 function generateFilterURL(
   index: number,
@@ -203,35 +204,55 @@ export default class ImageViewer extends Vue {
   };
 
   // Mousetrap bindings
-  readonly mousetrapAnnotations = [
+  readonly mousetrapAnnotations: IHotkey[] = [
     {
       bind: "a",
       handler: () => {
         this.store.setDrawAnnotations(!this.store.drawAnnotations);
+      },
+      data: {
+        section: "Annotations",
+        description: "Toggle annotations visibility"
       }
     },
     {
       bind: "t",
       handler: () => {
         this.store.setShowTooltips(!this.store.showTooltips);
+      },
+      data: {
+        section: "Annotations",
+        description: "Toggle annotation tooltips visibility"
       }
     },
     {
       bind: "mod+backspace",
       handler: () => {
         annotationStore.deleteSelectedAnnotations();
+      },
+      data: {
+        section: "Annotations",
+        description: "Delete selected annotations"
       }
     },
     {
       bind: "mod+z",
       handler: () => {
         this.store.do(true);
+      },
+      data: {
+        section: "Annotations",
+        description: "Undo last action in the database"
       }
     },
     {
       bind: "mod+shift+z",
       handler: () => {
         this.store.do(false);
+      },
+      data: {
+        section: "Annotations",
+        description: "Redo last action in the database"
       }
     }
   ];
