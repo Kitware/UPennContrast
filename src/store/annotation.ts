@@ -361,7 +361,8 @@ export class Annotations extends VuexModule {
     this.annotationConnections.push(...value);
   }
 
-  public deleteMultipleConnections(connectionIds: string[]) {
+  @Mutation
+  private deleteMultipleConnections(connectionIds: string[]) {
     const idsSet = new Set(connectionIds);
     this.annotationConnections = this.annotationConnections.filter(
       connection => !idsSet.has(connection.id)
