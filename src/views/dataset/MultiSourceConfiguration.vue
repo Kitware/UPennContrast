@@ -739,7 +739,7 @@ export default class MultiSourceConfiguration extends Vue {
     try {
       const itemId = await this.store.addMultiSourceMetadata({
         parentId: datasetId,
-        metadata: JSON.stringify({ channels, sources }),
+        metadata: JSON.stringify({ channels, sources, uniformSources: true }),
         transcode: this.transcode,
         eventCallback
       });
