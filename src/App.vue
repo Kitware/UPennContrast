@@ -263,4 +263,8 @@ body > div {
 
   margin-top: 10px;
 }
+
+.v-menu__content {
+  z-index: 10000 !important;
+}
 </style>
