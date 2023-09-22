@@ -1,7 +1,16 @@
 <template>
   <v-dialog v-model="dialog">
     <template v-slot:activator="{ on, attrs }">
-      <v-btn v-bind="{ ...attrs, ...$attrs }" v-on="on">
+      <v-btn
+        v-bind="{ ...attrs, ...$attrs }"
+        v-on="on"
+        v-description="{
+          section: 'Object list actions',
+          title: 'Export CSV',
+          description:
+            'Export the current list of annotations and associated properties to a CSV file'
+        }"
+      >
         <v-icon>mdi-application-export</v-icon>
         EXPORT CSV
       </v-btn>

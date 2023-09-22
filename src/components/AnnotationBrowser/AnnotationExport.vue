@@ -1,7 +1,15 @@
 <template>
   <v-dialog v-model="dialog">
     <template v-slot:activator="{ on, attrs }">
-      <v-btn v-bind="{ ...attrs, ...$attrs }" v-on="on">
+      <v-btn
+        v-bind="{ ...attrs, ...$attrs }"
+        v-on="on"
+        v-description="{
+          section: 'Object list actions',
+          title: 'Export to JSON',
+          description: 'Export annotations and connections to a JSON file'
+        }"
+      >
         <v-icon>mdi-export</v-icon>
         Export to JSON
       </v-btn>
