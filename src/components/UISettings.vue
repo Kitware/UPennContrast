@@ -5,7 +5,17 @@
     </v-expansion-panel-header>
     <v-expansion-panel-content>
       <v-container>
-        <v-switch hide-details dense v-model="darkMode" label="Dark mode" />
+        <v-switch
+          hide-details
+          dense
+          v-model="darkMode"
+          label="Dark mode"
+          v-description="{
+            section: 'Interface settings',
+            title: 'Dark mode',
+            description: 'Enable dark mode'
+          }"
+        />
       </v-container>
     </v-expansion-panel-content>
   </v-expansion-panel>

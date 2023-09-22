@@ -144,7 +144,7 @@ export default class App extends Vue {
     handler: this.toggleHotkeyDialog,
     data: {
       section: "Global",
-      description: "Toggle hotkey dialog"
+      description: "Toggle hotkey and feature display"
     }
   };
 
