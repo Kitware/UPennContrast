@@ -2,9 +2,8 @@
   <div>
     <v-card v-if="store.configuration">
       <v-card-title class="headline">
-        Snapshot
+        Snapshots
       </v-card-title>
-
       <v-dialog v-model="imageTooBigDialog">
         <v-alert class="ma-0" type="error">
           <div class="title">
@@ -24,7 +23,67 @@
       </v-dialog>
 
       <v-card-text>
-        <v-row justify="center">
+        <v-row :currentArea="markCurrentArea()">
+          <v-col class="title body-1">
+            Coordinates and size:
+          </v-col>
+        </v-row>
+        <v-row v-if="store.dataset">
+          <v-col>
+            <v-text-field
+              label="Left"
+              v-model="bboxLeft"
+              type="number"
+              :max="store.dataset.width"
+              dense
+              hide-details
+            />
+          </v-col>
+          <v-col>
+            <v-text-field
+              label="Top"
+              v-model="bboxTop"
+              type="number"
+              :max="store.dataset.height"
+              dense
+              hide-details
+            />
+          </v-col>
+          <v-col>
+            <v-text-field
+              label="Width"
+              v-model="bboxWidth"
+              type="number"
+              :max="store.dataset.width"
+              dense
+              hide-details
+            />
+          </v-col>
+          <v-col>
+            <v-text-field
+              label="Height"
+              v-model="bboxHeight"
+              type="number"
+              :max="store.dataset.height"
+              dense
+              hide-details
+            />
+          </v-col>
+        </v-row>
+        <v-row justify="left" class="pl-3">
+          <v-btn
+            small
+            class="my-2"
+            @click="setArea('viewport')"
+            :disabled="isRotated()"
+          >
+            Set frame to current view
+          </v-btn>
+          <v-btn small class="my-2" @click="setArea('full')">
+            Set frame to maximum view size
+          </v-btn>
+        </v-row>
+        <v-row justify="left" class="pl-3">
           <v-dialog v-model="createDialog">
             <template v-slot:activator="{ on, attrs }">
               <v-btn color="primary" v-on="on" v-bind="attrs">
@@ -80,76 +139,19 @@
                     :disabled="!isSaveSnapshotValid"
                     type="submit"
                   >
-                    Create
+                    Create Snapshot
                   </v-btn>
                 </v-card-actions>
               </v-form>
             </v-card>
           </v-dialog>
         </v-row>
-        <v-row :currentArea="markCurrentArea()">
-          <v-col class="title">
-            Resolution and Area:
-          </v-col>
-        </v-row>
-        <v-row v-if="store.dataset">
-          <v-col>
-            <v-text-field
-              label="Left"
-              v-model="bboxLeft"
-              type="number"
-              :max="store.dataset.width"
-              dense
-              hide-details
-            />
-          </v-col>
-          <v-col>
-            <v-text-field
-              label="Top"
-              v-model="bboxTop"
-              type="number"
-              :max="store.dataset.height"
-              dense
-              hide-details
-            />
-          </v-col>
-          <v-col>
-            <v-text-field
-              label="Width"
-              v-model="bboxWidth"
-              type="number"
-              :max="store.dataset.width"
-              dense
-              hide-details
-            />
-          </v-col>
-          <v-col>
-            <v-text-field
-              label="Height"
-              v-model="bboxHeight"
-              type="number"
-              :max="store.dataset.height"
-              dense
-              hide-details
-            />
-          </v-col>
-        </v-row>
-        <v-row justify="center">
-          <v-btn
-            class="my-2"
-            @click="setArea('viewport')"
-            :disabled="isRotated()"
-          >
-            Set frame to current viewport
-          </v-btn>
-          <v-btn class="my-2" @click="setArea('full')">
-            Set frame to maximum
-          </v-btn>
-        </v-row>
       </v-card-text>
 
       <v-divider />
-
+      <v-card-title class="headline">
+        Snapshot list
+      </v-card-title>
       <v-card-text>
         <v-data-table
           :items="snapshotList()"
@@ -196,7 +198,7 @@
       <v-divider />
 
       <v-card-title class="headline">
-        Download
+        Download images
       </v-card-title>
       <v-card-text>
         <v-row>
@@ -260,20 +262,19 @@
         </v-row>
       </v-card-text>
       <v-card-actions>
-        <v-spacer />
         <v-btn
           color="primary"
           @click="getDownload()"
           :disabled="unroll || downloading"
         >
           <v-progress-circular v-if="downloading" indeterminate />
-          Download Snapshot images...
+          Download Snapshot images
         </v-btn>
       </v-card-actions>
 
       <v-divider />
 
-      <div class="d-flex pa-4 justify-center">
+      <div class="d-flex pa-2 justify-left">
         <v-btn color="primary" @click="screenshotViewport()">
           Download Screenshot of Current Viewport
         </v-btn>
