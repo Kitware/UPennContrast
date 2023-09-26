@@ -310,16 +310,16 @@ export default class DisplayLayers extends Vue {
       bind: "z",
       handler: this.store.toggleGlobalZMaxMerge,
       data: {
-        section: "Layers",
-        description: "Toggle Z max-merge on all layers"
+        section: "Layer control",
+        description: "Toggle Z max-merge for all layers"
       }
     },
     {
       bind: "0",
       handler: this.store.toggleGlobalLayerVisibility,
       data: {
-        section: "Layers",
-        description: "Toggle visibility on all layers"
+        section: "Layer control",
+        description: "Show/hide all layers"
       }
     }
   ];

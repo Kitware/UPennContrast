@@ -86,7 +86,16 @@
         <v-row justify="left" class="pl-3">
           <v-dialog v-model="createDialog">
             <template v-slot:activator="{ on, attrs }">
-              <v-btn color="primary" v-on="on" v-bind="attrs">
+              <v-btn
+                color="primary"
+                v-on="on"
+                v-bind="attrs"
+                v-description="{
+                  section: 'Snapshots',
+                  title: 'Save as Snapshot',
+                  description: 'Bookmark a location as a Snapshot'
+                }"
+              >
                 Save as Snapshot...
               </v-btn>
             </template>
@@ -197,8 +206,16 @@
 
       <v-divider />
 
-      <v-card-title class="headline">
-        Download images
+
+      <v-card-title
+        class="headline"
+        v-description="{
+          section: 'Snapshots',
+          title: 'Download Snapshot Images',
+          description: 'Download images of the snapshot'
+        }"
+      >
+        Download Snapshot Images
       </v-card-title>
       <v-card-text>
         <v-row>

@@ -12,10 +12,10 @@
           label="Show channel values on hover"
           title="Show pixel intensity values when hovering cursor over image"
           v-description="{
-            section: 'Settings',
-            title: 'Show values on hover',
+            section: 'Viewer settings',
+            title: 'Show channel values on hover',
             description:
-              'Hide or show values for each layer when hovering the image'
+              'Show pixel values for each layer when hovering over the image'
           }"
         />
         <v-switch
@@ -24,9 +24,9 @@
           v-model="overview"
           label="Show minimap"
           v-description="{
-            section: 'Settings',
+            section: 'Viewer settings',
             title: 'Show minimap',
-            description: 'Hide or show the overview panel'
+            description: 'Show the overview panel'
           }"
         />
         <v-switch
@@ -36,10 +36,10 @@
           label="Show scalebar"
           title="Show the scalebarwidget on top of the image"
           v-description="{
-            section: 'Settings',
+            section: 'Viewer settings',
             title: 'Show scalebar',
             description:
-              'Hide or show the scalebar widget at the bottom right of the image'
+              'Show the scalebar widget at the bottom right of the image; click scalebar to edit settings'
           }"
         />
         <v-switch
@@ -47,12 +47,12 @@
           dense
           v-model="scaleAnnotationsWithZoom"
           label="Scale points with zoom"
-          title="Make point annotations radius fixed in sceen size"
+          title="Make point annotations scale with zoom level or stay a fixed size"
           v-description="{
-            section: 'Settings',
-            title: 'Point annotations size',
+            section: 'Viewer settings',
+            title: 'Scale points with zoom',
             description:
-              'Set size of the point annotations and their behavior when zooming'
+              'Set size of the point annotations and allow to scale with zoom level or stay a fixed size'
           }"
         />
         <v-slider

@@ -216,8 +216,8 @@ export default class DisplayLayer extends Vue {
       bind: this.zMaxMergeBinding,
       handler: () => (this.isZMaxMerge = !this.isZMaxMerge),
       data: {
-        section: "Layers",
-        description: `Toggle Z max-merge on layer: ${this.value.name}`
+        section: "Layer control",
+        description: `Toggle Z max-merge for layer: ${this.value.name}`
       }
     };
   }
@@ -227,8 +227,8 @@ export default class DisplayLayer extends Vue {
       bind: `${this.index + 1}`,
       handler: () => store.toggleLayerVisibility(this.value.id),
       data: {
-        section: "Layers",
-        description: `Toggle visibility on layer: ${this.value.name}`
+        section: "Layer control",
+        description: `Show/hide layer: ${this.value.name}`
       }
     };
   }

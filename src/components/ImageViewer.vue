@@ -211,8 +211,8 @@ export default class ImageViewer extends Vue {
         this.store.setDrawAnnotations(!this.store.drawAnnotations);
       },
       data: {
-        section: "Annotations",
-        description: "Toggle annotations visibility"
+        section: "Objects",
+        description: "Show/hide objects"
       }
     },
     {
@@ -221,8 +221,8 @@ export default class ImageViewer extends Vue {
         this.store.setShowTooltips(!this.store.showTooltips);
       },
       data: {
-        section: "Annotations",
-        description: "Toggle annotation tooltips visibility"
+        section: "Objects",
+        description: "Show/hide object tooltips"
       }
     },
     {
@@ -231,8 +231,8 @@ export default class ImageViewer extends Vue {
         annotationStore.deleteSelectedAnnotations();
       },
       data: {
-        section: "Annotations",
-        description: "Delete selected annotations"
+        section: "Objects",
+        description: "Delete selected objects"
       }
     },
     {
@@ -241,8 +241,8 @@ export default class ImageViewer extends Vue {
         this.store.do(true);
       },
       data: {
-        section: "Annotations",
-        description: "Undo last action in the database"
+        section: "Objects",
+        description: "Undo last action"
       }
     },
     {
@@ -251,8 +251,8 @@ export default class ImageViewer extends Vue {
         this.store.do(false);
       },
       data: {
-        section: "Annotations",
-        description: "Redo last action in the database"
+        section: "Objects",
+        description: "Redo last action"
       }
     }
   ];

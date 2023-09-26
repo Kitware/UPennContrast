@@ -1,9 +1,18 @@
 <template>
   <v-dialog v-model="dialog">
     <template v-slot:activator="{ on, attrs }">
-      <v-btn v-bind="{ ...attrs, ...$attrs }" v-on="on">
+      <v-btn
+        v-bind="{ ...attrs, ...$attrs }"
+        v-on="on"
+        v-description="{
+          section: 'Object list actions',
+          title: 'Import from JSON',
+          description:
+            'Import a set of annotations and connections from a JSON file'
+        }"
+      >
         <v-icon>mdi-import</v-icon>
-        Import JSON
+        Import from JSON
       </v-btn>
     </template>
     <v-card class="pa-2" :disabled="!canImport">

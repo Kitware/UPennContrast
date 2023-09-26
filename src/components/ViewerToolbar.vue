@@ -229,8 +229,8 @@ export default class ViewerToolbar extends Vue {
         this.xy = Math.max(this.xy - 1, 0);
       },
       data: {
-        section: "Image",
-        description: "Decrease XY image location"
+        section: "Image Navigation",
+        description: "Decrease XY position"
       }
     },
     {
@@ -240,8 +240,8 @@ export default class ViewerToolbar extends Vue {
         this.xy = Math.min(this.xy + 1, this.maxXY);
       },
       data: {
-        section: "Image",
-        description: "Increase XY image location"
+        section: "Image Navigation",
+        description: "Increase XY position"
       }
     },
     {
@@ -251,8 +251,8 @@ export default class ViewerToolbar extends Vue {
         this.z = Math.max(this.z - 1, 0);
       },
       data: {
-        section: "Image",
-        description: "Decrease Z image location"
+        section: "Image Navigation",
+        description: "Decrease Z position"
       }
     },
     {
@@ -262,8 +262,8 @@ export default class ViewerToolbar extends Vue {
         this.z = Math.min(this.z + 1, this.maxZ);
       },
       data: {
-        section: "Image",
-        description: "Increase Z image location"
+        section: "Image Navigation",
+        description: "Increase Z position"
       }
     },
     {
@@ -273,8 +273,8 @@ export default class ViewerToolbar extends Vue {
         this.time = Math.max(this.time - 1, 0);
       },
       data: {
-        section: "Image",
-        description: "Decrease T image location"
+        section: "Image Navigation",
+        description: "Decrease T position"
       }
     },
     {
@@ -284,8 +284,8 @@ export default class ViewerToolbar extends Vue {
         this.time = Math.min(this.time + 1, this.maxTime);
       },
       data: {
-        section: "Image",
-        description: "Increase T image location"
+        section: "Image Navigation",
+        description: "Increase T position"
       }
     }
   ];
