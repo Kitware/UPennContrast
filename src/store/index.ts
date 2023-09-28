@@ -1026,7 +1026,14 @@ export class Main extends VuexModule {
     const newLayerZ: IDisplaySlice = currentZMaxMerge
       ? { type: "current", value: null }
       : { type: "max-merge", value: null };
-    layers.forEach(layer => (layer.z = newLayerZ));
+    layers.forEach(layer =>
+      this.changeLayer({
+        layerId: layer.id,
+        delta: {
+          z: { ...newLayerZ }
+        }
+      })
+    );
   }
 
   @Action
