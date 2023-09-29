@@ -70,7 +70,7 @@
             />
           </v-col>
         </v-row>
-        <v-row justify="left" class="pl-3">
+        <v-row class="pl-3">
           <v-btn
             small
             class="my-2"
@@ -83,7 +83,7 @@
             Set frame to maximum view size
           </v-btn>
         </v-row>
-        <v-row justify="left" class="pl-3">
+        <v-row class="pl-3">
           <v-dialog v-model="createDialog">
             <template v-slot:activator="{ on, attrs }">
               <v-btn
@@ -206,7 +206,6 @@
 
       <v-divider />
 
-
       <v-card-title
         class="headline"
         v-description="{
@@ -291,7 +290,7 @@
 
       <v-divider />
 
-      <div class="d-flex pa-2 justify-left">
+      <div class="d-flex pa-2">
         <v-btn color="primary" @click="screenshotViewport()">
           Download Screenshot of Current Viewport
         </v-btn>
