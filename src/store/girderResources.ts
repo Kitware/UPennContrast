@@ -18,6 +18,7 @@ import { asConfigurationItem, asDataset, parseTiles } from "./GirderAPI";
 @Module({ dynamic: true, store, name: "girderResources" })
 export class GirderResources extends VuexModule {
   resources: { [resourceId: string]: IGirderSelectAble | null } = {};
+  resourcesLocks: { [resourceId: string]: Promise<void> } = {};
 
   @Mutation
   public setResource({
@@ -42,6 +43,22 @@ export class GirderResources extends VuexModule {
   }
 
   @Action
+  private async requestAndSetResource({
+    id,
+    type
+  }: {
+    id: string;
+    type: IGirderSelectAble["_modelType"];
+  }) {
+    try {
+      const resource = await this.requestResource({ id, type });
+      this.setResource({ id, resource });
+    } catch (e) {
+      this.setResource({ id, resource: null });
+    }
+  }
+
+  @Action
   public async getResource({
     id,
     type
@@ -49,13 +66,12 @@ export class GirderResources extends VuexModule {
     id: string;
     type: IGirderSelectAble["_modelType"];
   }) {
+    if (id in this.resourcesLocks) {
+      await this.resourcesLocks[id];
+    }
     if (!(id in this.resources)) {
-      try {
-        const resource = await this.requestResource({ id, type });
-        this.setResource({ id, resource });
-      } catch (e) {
-        this.setResource({ id, resource: null });
-      }
+      this.resourcesLocks[id] = this.requestAndSetResource({ id, type });
+      await this.resourcesLocks[id];
     }
     const resource = this.resources[id];
     // This check ensures that get{Type} returns a resource of the right type (e.g. getFolder)
