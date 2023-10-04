@@ -152,7 +152,7 @@ export default class CustomFileManager extends Vue {
 
   async reloadItems() {
     const location = this.currentLocation;
-    this.currentLocation = null;
+    this.currentLocation = { type: "root" };
     await Vue.nextTick();
     this.currentLocation = location;
   }
