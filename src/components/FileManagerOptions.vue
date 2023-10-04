@@ -29,6 +29,7 @@
         </v-card-text>
         <v-card-actions class="d-flex">
           <v-spacer />
+          <v-progress-circular v-if="isLoading" indeterminate />
           <v-btn color="red" @click="deleteItems" :disabled="disableOptions">
             Delete
           </v-btn>
@@ -59,6 +60,7 @@
               <v-text-field v-model="newName" autofocus />
               <div class="d-flex">
                 <v-spacer />
+                <v-progress-circular v-if="isLoading" indeterminate />
                 <v-btn type="submit" color="primary" :disabled="disableOptions">
                   Submit
                 </v-btn>
@@ -121,12 +123,15 @@ export default class FileManagerOptions extends Vue {
 
   deleteDialog: boolean = false;
 
+  isLoading: boolean = false;
+
   mounted() {
     this.onItemsChanged();
   }
 
   beforeAction() {
     this.disableOptions = true;
+    this.isLoading = true;
   }
 
   afterAction() {
@@ -135,6 +140,7 @@ export default class FileManagerOptions extends Vue {
     }
     this.$emit("itemsChanged");
     this.disableOptions = false;
+    this.isLoading = false;
   }
 
   @Watch("items")
