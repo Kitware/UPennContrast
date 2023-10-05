@@ -1,69 +1,85 @@
 <template>
-  <v-container>
+  <div>
     <v-alert :value="!store.isLoggedIn" color="info">Login to start</v-alert>
     <template v-if="store.isLoggedIn">
-      <section class="mb-4">
-        <v-subheader class="headline">Recent Dataset</v-subheader>
-        <v-list two-line>
-          <div v-for="d in datasetViewItems" :key="d.datasetView.id">
-            <v-tooltip
-              top
-              :disabled="
-                !datasetInfo[d.datasetView.datasetId] &&
-                  !configInfo[d.datasetView.configurationId]
-              "
-            >
-              <template v-slot:activator="{ on, attrs }">
-                <v-list-item
-                  @click="
-                    $router.push({
-                      name: 'datasetview',
-                      params: {
-                        datasetViewId: d.datasetView.id
-                      }
-                    })
-                  "
-                >
-                  <v-list-item-content v-bind="attrs" v-on="on">
-                    <v-list-item-title>
-                      {{
-                        d.datasetInfo.name
-                          ? d.datasetInfo.name
-                          : "Unnamed dataset"
-                      }}
-                    </v-list-item-title>
-                    <v-list-item-subtitle>
-                      {{
-                        d.configInfo.name
-                          ? d.configInfo.name
-                          : "Unnamed configuration"
-                      }}
-                    </v-list-item-subtitle>
-                  </v-list-item-content>
-                </v-list-item>
-              </template>
-              <div v-if="d.datasetInfo.description">
-                {{ d.datasetInfo.description }}
-              </div>
-              <v-divider />
-              <div v-if="d.configInfo.description">
-                {{ d.configInfo.description }}
-              </div>
-            </v-tooltip>
-          </div>
-        </v-list>
-      </section>
-      <section class="mb-4">
-        <v-subheader class="headline">Browse</v-subheader>
-        <custom-file-manager
-          :location.sync="location"
-          :initial-items-per-page="100"
-          :items-per-page-options="[10, 20, 50, 100, -1]"
-          @rowclick="onRowClick"
-        />
-      </section>
+      <v-container class="home-container">
+        <v-row class="home-row">
+          <v-col class="fill-height">
+            <section class="mb-4 home-section">
+              <v-subheader class="headline mb-4">Upload Dataset</v-subheader>
+              <!-- ADD DROPZONE HERE -->
+            </section>
+          </v-col>
+          <v-col class="fill-height">
+            <section class="mb-4 home-section">
+              <v-subheader class="headline mb-4">Recent Dataset</v-subheader>
+              <v-list two-line class="scrollable">
+                <div v-for="d in datasetViewItems" :key="d.datasetView.id">
+                  <v-tooltip
+                    top
+                    :disabled="
+                      !datasetInfo[d.datasetView.datasetId] &&
+                        !configInfo[d.datasetView.configurationId]
+                    "
+                  >
+                    <template v-slot:activator="{ on, attrs }">
+                      <v-list-item
+                        @click="
+                          $router.push({
+                            name: 'datasetview',
+                            params: {
+                              datasetViewId: d.datasetView.id
+                            }
+                          })
+                        "
+                      >
+                        <v-list-item-content v-bind="attrs" v-on="on">
+                          <v-list-item-title>
+                            {{
+                              d.datasetInfo.name
+                                ? d.datasetInfo.name
+                                : "Unnamed dataset"
+                            }}
+                          </v-list-item-title>
+                          <v-list-item-subtitle>
+                            {{
+                              d.configInfo.name
+                                ? d.configInfo.name
+                                : "Unnamed configuration"
+                            }}
+                          </v-list-item-subtitle>
+                        </v-list-item-content>
+                      </v-list-item>
+                    </template>
+                    <div v-if="d.datasetInfo.description">
+                      {{ d.datasetInfo.description }}
+                    </div>
+                    <v-divider />
+                    <div v-if="d.configInfo.description">
+                      {{ d.configInfo.description }}
+                    </div>
+                  </v-tooltip>
+                </div>
+              </v-list>
+            </section>
+          </v-col>
+        </v-row>
+        <v-row class="home-row">
+          <v-col class="fill-height">
+            <section class="mb-4 home-section">
+              <v-subheader class="headline mb-4">Browse</v-subheader>
+              <custom-file-manager
+                :location.sync="location"
+                :initial-items-per-page="100"
+                :items-per-page-options="[10, 20, 50, 100, -1]"
+                @rowclick="onRowClick"
+              />
+            </section>
+          </v-col>
+        </v-row>
+      </v-container>
     </template>
-  </v-container>
+  </div>
 </template>
 
 <script lang="ts">
@@ -145,6 +161,10 @@ export default class Home extends Vue {
   @Watch("datasetViews")
   @Watch("girderResources.resources")
   fetchDatasetsAndConfigurations() {
+    if (Object.keys(girderResources.resourcesLocks).length > 0) {
+      // Some resources will be set later, don't spam getFolder and getItem
+      return;
+    }
     for (const d of this.datasetViews) {
       this.girderResources.getFolder(d.datasetId);
       this.girderResources.getItem(d.configurationId);
@@ -172,3 +192,26 @@ export default class Home extends Vue {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.home-row {
+  height: 50%;
+}
+
+.home-container {
+  height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+
+.home-section {
+  display: flex;
+  flex-direction: column;
+  height: inherit;
+}
+
+.scrollable {
+  overflow-y: auto;
+  min-height: 0;
+}
+</style>
