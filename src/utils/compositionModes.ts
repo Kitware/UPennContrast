@@ -3,6 +3,28 @@ export const compositionModes = {
     text: "Lighten",
     help: "Retains the lightest pixels of both layers."
   },
+  screen: {
+    text: "Screen",
+    help:
+      "The pixels are inverted, multiplied, and inverted again. A lighter picture is the result (opposite of multiply)"
+  },
+  luminosity: {
+    text: "Luminosity",
+    help:
+      "Preserves the hue and chroma of the bottom layer, while adopting the luma of the top layer."
+  },
+  difference: {
+    text: "Difference",
+    help:
+      "Subtracts the bottom layer from the top layer or the other way round to always get a positive value."
+  },
+  exclusion: {
+    text: "Exclusion",
+    help: "Like difference, but with lower contrast."
+  }
+};
+
+export const advancedCompositionModes = {
   darken: {
     text: "Darken",
     help: "Retains the darkest pixels of both layers."
@@ -10,11 +32,6 @@ export const compositionModes = {
   normal: {
     text: "Normal",
     help: "Draws new shapes on top of the existing canvas content."
-  },
-  luminosity: {
-    text: "Luminosity",
-    help:
-      "Preserves the hue and chroma of the bottom layer, while adopting the luma of the top layer."
   },
   color: {
     text: "Color",
@@ -30,15 +47,6 @@ export const compositionModes = {
     text: "Hue",
     help:
       "Preserves the luma and chroma of the bottom layer, while adopting the hue of the top layer."
-  },
-  difference: {
-    text: "Difference",
-    help:
-      "Subtracts the bottom layer from the top layer or the other way round to always get a positive value."
-  },
-  exclusion: {
-    text: "Exclusion",
-    help: "Like difference, but with lower contrast."
   },
   "soft-light": {
     text: "Soft light",
@@ -64,11 +72,6 @@ export const compositionModes = {
     help:
       "A combination of multiply and screen. Dark parts on the base layer become darker, and light parts become lighter."
   },
-  screen: {
-    text: "Screen",
-    help:
-      "The pixels are inverted, multiplied, and inverted again. A lighter picture is the result (opposite of multiply)"
-  },
   multiply: {
     text: "Multiply",
     help:
@@ -80,4 +83,10 @@ export const compositionItems = Object.entries(
   compositionModes
 ).map(([mode, data]) => ({ value: mode as TCompositionMode, ...data }));
 
-export type TCompositionMode = keyof typeof compositionModes;
+export const advancedCompositionItems = Object.entries(
+  advancedCompositionModes
+).map(([mode, data]) => ({ value: mode as TCompositionMode, ...data }));
+
+export type TCompositionMode =
+  | keyof typeof compositionModes
+  | keyof typeof advancedCompositionModes;

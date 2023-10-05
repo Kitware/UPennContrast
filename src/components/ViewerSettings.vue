@@ -93,12 +93,21 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store/index";
-import { TCompositionMode, compositionItems } from "@/utils/compositionModes";
+import {
+  TCompositionMode,
+  compositionItems,
+  advancedCompositionItems
+} from "@/utils/compositionModes";
 
 @Component
 export default class ViewerSettings extends Vue {
   readonly store = store;
-  readonly compositionItems = compositionItems;
+  readonly compositionItems = [
+    { header: "Base Composition Modes" },
+    ...compositionItems,
+    { header: "Advanced Composition Modes" },
+    ...advancedCompositionItems
+  ];
   readonly backgroundItems = [
     { value: "white", text: "White" },
     { value: "black", text: "Black" }
@@ -162,3 +171,11 @@ export default class ViewerSettings extends Vue {
   }
 }
 </script>
+
+<style lang="scss">
+.v-select-list .v-subheader {
+  justify-content: center;
+  font-weight: bold;
+  border-top: solid 2px;
+}
+</style>
