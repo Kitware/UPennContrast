@@ -62,6 +62,29 @@
           max="100"
           label="Point annotations radius"
         />
+        <v-select
+          hide-details
+          label="Compositing mode"
+          v-model="compositionMode"
+          :items="compositionItems"
+        >
+          <template #item="{ item }">
+            <div style="width: 100%;">
+              <strong>
+                {{ item.text }}
+              </strong>
+              <div class="body-2 text--secondary">
+                {{ item.help }}
+              </div>
+              <v-divider />
+            </div>
+          </template>
+        </v-select>
+        <v-select
+          label="Background color"
+          v-model="backgroundColor"
+          :items="backgroundItems"
+        />
       </v-container>
     </v-expansion-panel-content>
   </v-expansion-panel>
@@ -70,10 +93,25 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import store from "@/store/index";
+import {
+  TCompositionMode,
+  compositionItems,
+  advancedCompositionItems
+} from "@/utils/compositionModes";
 
 @Component
 export default class ViewerSettings extends Vue {
   readonly store = store;
+  readonly compositionItems = [
+    { header: "Base Composition Modes" },
+    ...compositionItems,
+    { header: "Advanced Composition Modes" },
+    ...advancedCompositionItems
+  ];
+  readonly backgroundItems = [
+    { value: "white", text: "White" },
+    { value: "black", text: "Black" }
+  ];
 
   get valueOnHover() {
     return this.store.valueOnHover;
@@ -115,5 +153,29 @@ export default class ViewerSettings extends Vue {
     const zoom = typeof value === "string" ? parseFloat(value) : value;
     this.store.setAnnotationsRadius(zoom);
   }
+
+  get compositionMode() {
+    return this.store.compositionMode;
+  }
+
+  set compositionMode(value: TCompositionMode) {
+    this.store.setCompositionMode(value);
+  }
+
+  get backgroundColor() {
+    return this.store.backgroundColor;
+  }
+
+  set backgroundColor(value: string) {
+    this.store.setBackgroundColor(value);
+  }
 }
 </script>
+
+<style lang="scss">
+.v-select-list .v-subheader {
+  justify-content: center;
+  font-weight: bold;
+  border-top: solid 2px;
+}
+</style>
