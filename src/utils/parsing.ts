@@ -24,7 +24,7 @@ export function processFilenames(filenames: string[]) {
 
 import { DataFrame } from "dataframe-js";
 
-export function processFilenamesDF(filenames: string[]): DataFrame<string> {
+export function processFilenamesDF(filenames: string[]): DataFrame {
   const delimiterPattern = /[_\.\/]/;
 
   // Tokenize each filename
@@ -51,9 +51,7 @@ export function processFilenamesDF(filenames: string[]): DataFrame<string> {
   return sortedDf;
 }
 
-export function getUniqueTokensPerColumn(
-  df: DataFrame<string>
-): Map<string, string[]> {
+export function getUniqueTokensPerColumn(df: DataFrame): Map<string, string[]> {
   const uniqueTokensMap: Map<string, string[]> = new Map();
 
   df.listColumns().forEach(column => {
@@ -64,9 +62,7 @@ export function getUniqueTokensPerColumn(
   return uniqueTokensMap;
 }
 
-export function countUniqueTokensPerColumn(
-  df: DataFrame<string>
-): Map<string, number> {
+export function countUniqueTokensPerColumn(df: DataFrame): Map<string, number> {
   const uniqueTokensCountMap: Map<string, number> = new Map();
 
   df.listColumns().forEach(column => {
@@ -77,7 +73,7 @@ export function countUniqueTokensPerColumn(
   return uniqueTokensCountMap;
 }
 
-export function findMinimalSpanningColumns(df: DataFrame<string>): string[] {
+export function findMinimalSpanningColumns(df: DataFrame): string[] {
   const allColumns = df.listColumns();
   // Exclude the "Filename" column
   const columns = allColumns.filter(column => column !== "Filename");
@@ -128,7 +124,7 @@ function getCombinations<T>(elements: T[], size: number): T[][] {
 }
 
 export function findColumnsWithMatchingDistinctCount(
-  df: DataFrame<string>,
+  df: DataFrame,
   specifiedColumn: string
 ): string[] {
   const specifiedColumnDistinctCount = df.distinct(specifiedColumn).count();
@@ -141,7 +137,8 @@ export function findColumnsWithMatchingDistinctCount(
     // Create a combined column and count distinct values
     const combined = df.withColumn(
       "combined",
-      row => row.get(specifiedColumn) + "_" + row.get(testColumn)
+      ((row: any) =>
+        row.get(specifiedColumn) + "_" + row.get(testColumn)) as any
     );
     const combinedDistinctCount = combined.distinct("combined").count();
 
@@ -154,7 +151,7 @@ export function findColumnsWithMatchingDistinctCount(
 }
 
 export function findComplementaryColumns(
-  df: DataFrame<string>,
+  df: DataFrame,
   specifiedColumn: string
 ): string[] {
   const specifiedColumnDistinctCount = df.distinct(specifiedColumn).count();
@@ -169,7 +166,8 @@ export function findComplementaryColumns(
     // Create a combined column and count distinct values
     const combined = df.withColumn(
       "combined",
-      row => row.get(specifiedColumn) + "_" + row.get(testColumn)
+      ((row: any) =>
+        row.get(specifiedColumn) + "_" + row.get(testColumn)) as any
     );
     const combinedDistinctCount = combined.distinct("combined").count();
 
@@ -185,7 +183,7 @@ export function findComplementaryColumns(
 }
 
 export function findAllComplementaryColumns(
-  df: DataFrame<string>,
+  df: DataFrame,
   specifiedColumns: string[]
 ): string[][] {
   const results: string[][] = [];
@@ -217,7 +215,7 @@ function findCommonSubstring(tokens: string[]): string {
 }
 
 export function findColumnCommonSubstring(
-  df: DataFrame<string>,
+  df: DataFrame,
   specifiedColumn: string
 ): string {
   // Ensure the column exists in the DataFrame
@@ -254,7 +252,11 @@ export function categorizeSubstring(substring: string): string {
   };
 
   for (const category in categories) {
-    if (categories[category].some(keyword => lowerSub.includes(keyword))) {
+    if (
+      categories[category as keyof typeof categories].some(keyword =>
+        lowerSub.includes(keyword)
+      )
+    ) {
       return category;
     }
   }
@@ -264,7 +266,7 @@ export function categorizeSubstring(substring: string): string {
 }
 
 export function categorizeColumns(
-  df: DataFrame<string>,
+  df: DataFrame,
   columnNames: string[]
 ): string {
   // Helper regex pattern to detect a single letter followed by a single digit
@@ -292,7 +294,7 @@ export function categorizeColumns(
 }
 
 export function assignUniqueCategorizations(
-  df: DataFrame<string>,
+  df: DataFrame,
   allComplementaryLists: string[][]
 ): string[] {
   // Base list of categorizations
@@ -332,10 +334,10 @@ export function assignUniqueCategorizations(
 }
 
 export function addAssignmentColumns(
-  df: DataFrame<string>,
+  df: DataFrame,
   allComplementaryLists: string[][],
   assignments: string[]
-): DataFrame<string> {
+): DataFrame {
   for (let i = 0; i < assignments.length; i++) {
     const assignment = assignments[i];
     const list = allComplementaryLists[i];
@@ -357,14 +359,17 @@ export function addAssignmentColumns(
     });
 
     // Add the assignment column to the DataFrame
-    df = df.withColumn(assignment, row => tokenToIntMap[row.get(list[0])]);
+    df = df.withColumn(
+      assignment,
+      ((row: any) => tokenToIntMap[row.get(list[0])]) as any
+    );
   }
 
   return df; // Return the updated DataFrame
 }
 
 export function structuredAssignments(
-  df: DataFrame<string>,
+  df: DataFrame,
   allComplementaryLists: string[][],
   assignments: string[]
 ): any[] {
@@ -444,4 +449,33 @@ export function collectFilenameMetadata2(
   const allComplementaryLists = findAllComplementaryColumns(df, minimalColumns);
   const assignments = assignUniqueCategorizations(df, allComplementaryLists);
   return structuredAssignments(df, allComplementaryLists, assignments);
+}
+
+// Below copied in from old version to make things compile. Probably doesn't work.
+
+interface FilenameMetadata {
+  t: string | null;
+  xy: string | null;
+  z: string | null;
+  chan: string | null;
+}
+
+interface NumericMetadata {
+  t: number | null;
+  xy: number | null;
+  z: number | null;
+  chan: string | null;
+}
+
+function stringToNumber(val: string | null): number | null {
+  return val === null ? null : +val;
+}
+
+export function getNumericMetadata(filename: string): NumericMetadata {
+  return {
+    t: stringToNumber(filename),
+    xy: stringToNumber("1"),
+    z: stringToNumber("1"),
+    chan: "GFP"
+  };
 }
