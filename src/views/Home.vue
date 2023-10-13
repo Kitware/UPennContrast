@@ -225,7 +225,12 @@ export default class Home extends Vue {
   }
 
   quickUpload(files: File[]) {
-    files; // TODO
+    // Use params to pass props to NewDataset component
+    // RouteConfig in src/view/dataset/index.ts has to support it
+    this.$router.push({
+      name: "newdataset",
+      params: { value: files, quickupload: true } as any
+    });
   }
 
   comprehensiveUpload(files: File[]) {

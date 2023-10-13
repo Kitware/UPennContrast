@@ -93,7 +93,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Watch } from "vue-property-decorator";
+import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 
 import {
@@ -187,6 +187,9 @@ interface ICompositingSource {
 })
 export default class MultiSourceConfiguration extends Vue {
   readonly store = store;
+
+  @Prop({ default: false })
+  readonly quickupload!: boolean;
 
   tilesInternalMetadata: { [key: string]: any }[] | null = null;
   tilesMetadata: ITileMeta[] | null = null;
@@ -494,6 +497,10 @@ export default class MultiSourceConfiguration extends Vue {
     }
 
     this.resetDimensionsToDefault();
+
+    if (this.quickupload) {
+      this.generateJson();
+    }
   }
 
   resetDimensionsToDefault() {
@@ -754,7 +761,7 @@ export default class MultiSourceConfiguration extends Vue {
 
       this.$router.push({
         name: "dataset",
-        params: { datasetId }
+        params: { datasetId, quickupload: this.quickupload } as any
       });
     } catch (error) {
       logError((error as Error).message);

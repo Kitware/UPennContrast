@@ -1,6 +1,6 @@
 <template>
   <v-container>
-    <v-form v-model="valid">
+    <v-form ref="form" v-model="valid">
       <girder-upload
         v-if="path && !hideUploader"
         ref="uploader"
@@ -66,7 +66,7 @@
   </v-container>
 </template>
 <script lang="ts">
-import { Vue, Component, VModel } from "vue-property-decorator";
+import { Vue, Component, VModel, Prop } from "vue-property-decorator";
 import store from "@/store";
 import girderResources from "@/store/girderResources";
 import { IGirderSelectAble } from "@/girder";
@@ -74,6 +74,7 @@ import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 import FileDropzone from "@/components/Files/FileDropzone.vue";
 import { IDataset } from "@/store/model";
 import { triggers, makeAlternation } from "@/utils/parsing";
+import { formatDate } from "@/utils/date";
 
 interface FileUpload {
   file: File;
@@ -141,6 +142,9 @@ export default class NewDataset extends Vue {
   @VModel({ type: Array, default: () => [] })
   files!: File[];
 
+  @Prop({ default: false })
+  readonly quickupload!: boolean;
+
   valid = false;
   failedDataset = "";
   uploading = false;
@@ -154,6 +158,7 @@ export default class NewDataset extends Vue {
 
   $refs!: {
     uploader?: GWCUpload;
+    form: HTMLFormElement;
   };
 
   get pageTwo() {
@@ -193,11 +198,25 @@ export default class NewDataset extends Vue {
   }
 
   async mounted() {
-    this.path = await this.store.api.getUserPublicFolder();
+    const publicFolder = await this.store.api.getUserPublicFolder();
+    if (!publicFolder) {
+      return;
+    }
+    if (this.quickupload) {
+      this.path = await this.store.api.getQuickUploadFolder(publicFolder._id);
+    } else {
+      this.path = publicFolder;
+    }
   }
 
-  uploadMounted() {
+  async uploadMounted() {
     this.$refs.uploader?.inputFilesChanged(this.files);
+    if (this.quickupload) {
+      this.name = formatDate(new Date()) + " - " + this.recommendedName;
+      await Vue.nextTick(); // "name" prop is set in the form
+      await Vue.nextTick(); // this.valid is updated
+      this.submit();
+    }
   }
 
   async submit() {
@@ -244,8 +263,9 @@ export default class NewDataset extends Vue {
     this.$router.push({
       name: "multi",
       params: {
-        datasetId: this.dataset!.id
-      }
+        datasetId: this.dataset!.id,
+        quickupload: this.quickupload
+      } as any
     });
   }
 }

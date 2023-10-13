@@ -219,7 +219,7 @@
   </v-container>
 </template>
 <script lang="ts">
-import { Vue, Component, Watch } from "vue-property-decorator";
+import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import girderResources from "@/store/girderResources";
 import { IDatasetView } from "@/store/model";
@@ -234,6 +234,9 @@ import { IGirderItem, IGirderSelectAble } from "@/girder";
 export default class DatasetInfo extends Vue {
   readonly store = store;
   readonly girderResources = girderResources;
+
+  @Prop({ default: false })
+  readonly quickupload!: boolean;
 
   removeDatasetConfirm = false;
 
@@ -326,6 +329,9 @@ export default class DatasetInfo extends Vue {
   mounted() {
     this.updateDatasetViews();
     this.updateDefaultConfigurationName();
+    if (this.quickupload) {
+      this.viewDefault();
+    }
   }
 
   @Watch("dataset")
