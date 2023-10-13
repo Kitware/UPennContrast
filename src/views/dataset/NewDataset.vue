@@ -10,7 +10,12 @@
         @filesChanged="filesChanged"
         @done="nextStep"
         @error="interruptedUpload"
-      />
+        @hook:mounted="uploadMounted"
+      >
+        <template #dropzone="{ inputFilesChanged }">
+          <file-dropzone @input="inputFilesChanged" style="height: 260px;" />
+        </template>
+      </girder-upload>
 
       <v-text-field
         v-model="name"
@@ -61,11 +66,12 @@
   </v-container>
 </template>
 <script lang="ts">
-import { Vue, Component } from "vue-property-decorator";
+import { Vue, Component, VModel } from "vue-property-decorator";
 import store from "@/store";
 import girderResources from "@/store/girderResources";
 import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
+import FileDropzone from "@/components/Files/FileDropzone.vue";
 import { IDataset } from "@/store/model";
 import { triggers, makeAlternation } from "@/utils/parsing";
 
@@ -74,6 +80,7 @@ interface FileUpload {
 }
 
 type GWCUpload = Vue & {
+  inputFilesChanged(files: File[]): void;
   startUpload(): any;
 };
 
@@ -123,6 +130,7 @@ function findCommonPrefix(strings: string[]): string {
 @Component({
   components: {
     GirderLocationChooser,
+    FileDropzone,
     GirderUpload: () => import("@/girder/components").then(mod => mod.Upload)
   }
 })
@@ -130,17 +138,23 @@ export default class NewDataset extends Vue {
   readonly store = store;
   readonly girderResources = girderResources;
 
+  @VModel({ type: Array, default: () => [] })
+  files!: File[];
+
   valid = false;
   failedDataset = "";
   uploading = false;
   hideUploader = false;
-  files = [] as FileUpload[];
   name = "";
   description = "";
 
   path: IGirderSelectAble | null = null;
 
   dataset: IDataset | null = null;
+
+  $refs!: {
+    uploader?: GWCUpload;
+  };
 
   get pageTwo() {
     return this.dataset != null;
@@ -164,22 +178,26 @@ export default class NewDataset extends Vue {
 
     // If there is only one file, return its name with the extension struck off.
     if (files.length === 1) {
-      return basename(files[0].file.name);
+      return basename(files[0].name);
     }
 
     // For more than one file, search for the longest prefix common to all, and
     // use that as the name if it's nonblank; otherwise use the name of the
     // first file.
-    const prefix = findCommonPrefix(files.map(d => d.file.name));
+    const prefix = findCommonPrefix(files.map(d => d.name));
     if (prefix.length > 0) {
       return prefix;
     } else {
-      return basename(files[0].file.name);
+      return basename(files[0].name);
     }
   }
 
   async mounted() {
     this.path = await this.store.api.getUserPublicFolder();
+  }
+
+  uploadMounted() {
+    this.$refs.uploader?.inputFilesChanged(this.files);
   }
 
   async submit() {
@@ -204,11 +222,11 @@ export default class NewDataset extends Vue {
     await Vue.nextTick();
 
     this.uploading = true;
-    (this.$refs.uploader as GWCUpload).startUpload();
+    this.$refs.uploader!.startUpload();
   }
 
   filesChanged(files: FileUpload[]) {
-    this.files = files;
+    this.files = files.map(({ file }) => file);
 
     if (this.name === "" && files.length > 0) {
       this.name = this.recommendedName;

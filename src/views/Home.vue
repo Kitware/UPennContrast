@@ -7,13 +7,40 @@
           <v-col class="fill-height">
             <section class="mb-4 home-section">
               <v-subheader class="headline mb-4">Upload Dataset</v-subheader>
-              <!-- ADD DROPZONE HERE -->
+              <v-card>
+                <v-tabs v-model="uploadTab">
+                  <v-tab>
+                    Quick Upload and View Dataset
+                  </v-tab>
+                  <v-tab>
+                    Comprehensive Upload
+                  </v-tab>
+                </v-tabs>
+              </v-card>
+              <v-tabs-items v-model="uploadTab" class="flex-window-items">
+                <v-tab-item>
+                  <file-dropzone @input="quickUpload">
+                    <template #afterMessage>
+                      <span class="caption">
+                        <v-icon size="14px" class="py-1">
+                          mdi-information
+                        </v-icon>
+                        Default collection will be created in same folder as
+                        dataset
+                      </span>
+                    </template>
+                  </file-dropzone>
+                </v-tab-item>
+                <v-tab-item>
+                  <file-dropzone @input="comprehensiveUpload" />
+                </v-tab-item>
+              </v-tabs-items>
             </section>
           </v-col>
           <v-col class="fill-height">
             <section class="mb-4 home-section">
               <v-subheader class="headline mb-4">Recent Dataset</v-subheader>
-              <v-list two-line class="scrollable">
+              <v-list two-line class="scrollable py-0">
                 <div v-for="d in datasetViewItems" :key="d.datasetView.id">
                   <v-tooltip
                     top
@@ -94,11 +121,15 @@ import {
 import girderResources from "@/store/girderResources";
 import { IDatasetView } from "@/store/model";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
+import { Upload as GirderUpload } from "@/girder/components";
+import FileDropzone from "@/components/Files/FileDropzone.vue";
 import CustomFileManager from "@/components/CustomFileManager.vue";
 import { isConfigurationItem, isDatasetFolder } from "@/utils/girderSelectable";
 
 @Component({
   components: {
+    GirderUpload,
+    FileDropzone,
     GirderLocationChooser,
     CustomFileManager
   }
@@ -108,6 +139,8 @@ export default class Home extends Vue {
   readonly girderResources = girderResources;
 
   location: IGirderLocation | null = null;
+
+  uploadTab: number = 0;
 
   get datasetViews() {
     const result: IDatasetView[] = [];
@@ -190,12 +223,29 @@ export default class Home extends Vue {
       });
     }
   }
+
+  quickUpload(files: File[]) {
+    files; // TODO
+  }
+
+  comprehensiveUpload(files: File[]) {
+    // Use params to pass props to NewDataset component
+    // RouteConfig in src/view/dataset/index.ts has to support it
+    this.$router.push({
+      name: "newdataset",
+      params: { value: files } as any
+    });
+  }
 }
 </script>
 
 <style lang="scss" scoped>
-.home-row {
-  height: 50%;
+.home-row:nth-of-type(1) {
+  height: 40%;
+}
+
+.home-row:nth-of-type(2) {
+  height: 60%;
 }
 
 .home-container {
@@ -213,5 +263,13 @@ export default class Home extends Vue {
 .scrollable {
   overflow-y: auto;
   min-height: 0;
+  height: inherit;
+}
+</style>
+
+<style lang="scss">
+.flex-window-items,
+.flex-window-items .v-window-item {
+  height: inherit;
 }
 </style>
