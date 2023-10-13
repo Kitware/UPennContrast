@@ -39,8 +39,6 @@ def runJobRequest(image, datasetId, params, request):
             'container_args': containerArgs,
             'remove_container': True,
             'name': '{}_{}_{}'.format(name, datasetId, datetime.datetime.now().timestamp()),
-            # TODO: figure out network configuration and api url discovery
-            'network_mode': 'host',
             # 'girder_result_hooks': [testHook]
         }
     ).job,
