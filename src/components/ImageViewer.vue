@@ -39,6 +39,11 @@
     <div
       class="map-layout"
       ref="map-layout"
+      v-description="{
+        section: 'Objects',
+        title: 'shift-click-drag',
+        description: 'Lasso to select objects'
+      }"
       :data-update="reactiveDraw"
       :map-count="mapLayerList.length"
     >
