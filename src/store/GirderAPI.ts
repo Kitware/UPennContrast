@@ -785,12 +785,15 @@ export function parseTiles(
   let unrollOrder: string[] = [];
   // const metadata = getNumericMetadata(item.name);
   interface NumericMetadata {
+    // define the type of the metadata object
     t: number | null;
     xy: number | null;
     z: number | null;
     chan: string | null;
   }
   const metadata: NumericMetadata = { t: null, xy: null, z: null, chan: null };
+  // Realized that metadata was actually not used at all, and all the parsing was done on the tile object.
+  // So I just made metadata have a bunch of null values and let the logic proceed as before.
   if (metadata.chan !== null && !channelInt.has(metadata.chan)) {
     channelInt.set(metadata.chan, channelInt.size);
   }
