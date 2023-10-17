@@ -783,7 +783,14 @@ export function parseTiles(
   let frameChannels: string[] | undefined;
   let unrollCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
   let unrollOrder: string[] = [];
-  const metadata = getNumericMetadata(item.name);
+  // const metadata = getNumericMetadata(item.name);
+  interface NumericMetadata {
+    t: number | null;
+    xy: number | null;
+    z: number | null;
+    chan: string | null;
+  }
+  const metadata: NumericMetadata = { t: null, xy: null, z: null, chan: null };
   if (metadata.chan !== null && !channelInt.has(metadata.chan)) {
     channelInt.set(metadata.chan, channelInt.size);
   }
