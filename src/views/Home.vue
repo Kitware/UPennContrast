@@ -37,7 +37,7 @@
               </v-tabs-items>
             </section>
           </v-col>
-          <v-col class="fill-height">
+          <v-col class="fill-height recent-dataset">
             <section class="mb-4 home-section">
               <v-subheader class="headline mb-4">Recent Dataset</v-subheader>
               <v-list two-line class="scrollable py-0">
@@ -245,12 +245,20 @@ export default class Home extends Vue {
 </script>
 
 <style lang="scss" scoped>
+.home-row {
+  flex-wrap: nowrap;
+}
+
 .home-row:nth-of-type(1) {
   height: 40%;
 }
 
 .home-row:nth-of-type(2) {
   height: 60%;
+}
+
+.recent-dataset {
+  max-width: 60%;
 }
 
 .home-container {
