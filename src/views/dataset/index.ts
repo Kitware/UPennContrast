@@ -41,8 +41,7 @@ const routes: RouteConfig[] = [
         component: DatasetInfo,
         meta: {
           hidden: true
-        },
-        props: route => ({ ...route.params })
+        }
       }
     ],
     meta: {

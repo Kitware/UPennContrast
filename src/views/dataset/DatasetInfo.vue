@@ -50,7 +50,7 @@
                         v-bind="attrs"
                         class="ma-1"
                         color="green"
-                        @click="viewDefault"
+                        @click="goToDefaultView"
                       >
                         View Dataset
                       </v-btn>
@@ -235,9 +235,6 @@ export default class DatasetInfo extends Vue {
   readonly store = store;
   readonly girderResources = girderResources;
 
-  @Prop({ default: false })
-  readonly quickupload!: boolean;
-
   removeDatasetConfirm = false;
 
   removeDatasetViewConfirm = false;
@@ -329,9 +326,6 @@ export default class DatasetInfo extends Vue {
   mounted() {
     this.updateDatasetViews();
     this.updateDefaultConfigurationName();
-    if (this.quickupload) {
-      this.viewDefault();
-    }
   }
 
   @Watch("dataset")
@@ -356,7 +350,9 @@ export default class DatasetInfo extends Vue {
     return {
       name: "datasetview",
       params: Object.assign({}, this.$route.params, {
-        datasetViewId: datasetView.id
+        datasetViewId: datasetView.id,
+        datasetId: datasetView.datasetId,
+        configurationId: datasetView.configurationId
       })
     };
   }
@@ -418,7 +414,14 @@ export default class DatasetInfo extends Vue {
     });
   }
 
-  async viewDefault() {
+  async goToDefaultView() {
+    const defaultView = await this.createDefaultView();
+    if (defaultView) {
+      this.$router.push(this.toRoute(defaultView));
+    }
+  }
+
+  async createDefaultView() {
     if (!this.dataset) {
       return;
     }
@@ -438,12 +441,7 @@ export default class DatasetInfo extends Vue {
       configurationId: config.id,
       datasetId: this.dataset.id
     });
-    this.$router.push({
-      name: "datasetview",
-      params: Object.assign({}, this.$route.params, {
-        datasetViewId: view.id
-      })
-    });
+    return view;
   }
 }
 </script>

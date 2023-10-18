@@ -63,6 +63,14 @@
       >. This might happen, for instance, if a dataset by that name already
       exists. Please update the dataset name field and try again.
     </v-alert>
+    <template v-if="quickupload">
+      <multi-source-configuration
+        v-if="configuring"
+        ref="configuration"
+        :datasetId="datasetId"
+      />
+      <dataset-info v-if="creatingView" ref="viewCreation" />
+    </template>
   </v-container>
 </template>
 <script lang="ts">
@@ -75,6 +83,9 @@ import FileDropzone from "@/components/Files/FileDropzone.vue";
 import { IDataset } from "@/store/model";
 import { triggers, makeAlternation } from "@/utils/parsing";
 import { formatDate } from "@/utils/date";
+import MultiSourceConfiguration from "./MultiSourceConfiguration.vue";
+import DatasetInfo from "./DatasetInfo.vue";
+import { logError } from "@/utils/log";
 
 interface FileUpload {
   file: File;
@@ -132,6 +143,8 @@ function findCommonPrefix(strings: string[]): string {
   components: {
     GirderLocationChooser,
     FileDropzone,
+    MultiSourceConfiguration,
+    DatasetInfo,
     GirderUpload: () => import("@/girder/components").then(mod => mod.Upload)
   }
 })
@@ -144,6 +157,9 @@ export default class NewDataset extends Vue {
 
   @Prop({ default: false })
   readonly quickupload!: boolean;
+
+  configuring = false;
+  creatingView = false;
 
   valid = false;
   failedDataset = "";
@@ -159,7 +175,13 @@ export default class NewDataset extends Vue {
   $refs!: {
     uploader?: GWCUpload;
     form: HTMLFormElement;
+    configuration?: MultiSourceConfiguration;
+    viewCreation?: DatasetInfo;
   };
+
+  get datasetId() {
+    return this.dataset?.id || null;
+  }
 
   get pageTwo() {
     return this.dataset != null;
@@ -260,13 +282,62 @@ export default class NewDataset extends Vue {
   nextStep() {
     this.hideUploader = true;
 
-    this.$router.push({
-      name: "multi",
-      params: {
-        datasetId: this.dataset!.id,
-        quickupload: this.quickupload
-      } as any
-    });
+    const datasetId = this.dataset!.id;
+    if (this.quickupload) {
+      this.traversePipeline(datasetId);
+    } else {
+      this.$router.push({
+        name: "multi",
+        params: { datasetId }
+      });
+    }
+  }
+
+  async traversePipeline(datasetId: string) {
+    // Don't set dataset yet because the only large image files are the upload files
+    // If dataset is set now, it will not use the multi-source file later
+
+    // Configure the dataset with default variables
+    this.configuring = true;
+    await Vue.nextTick();
+    const config = this.$refs.configuration;
+    if (!config) {
+      logError(
+        "MultiSourceConfiguration component not mounted during quickupload"
+      );
+      return;
+    }
+    // Ensure that the component is initialized
+    await (config.initialized || config.initialize());
+    // TODO: show transcoding if there is one
+    const jsonId = await config.generateJson();
+    if (!jsonId) {
+      logError("Failed to generate JSON during quick upload");
+      return;
+    }
+    // Set the dataset now that multi-source is available
+    await this.store.setSelectedDataset(datasetId);
+    this.configuring = false;
+
+    // Create a default dataset view for this dataset
+    this.creatingView = true;
+    await Vue.nextTick();
+    const viewCreation = this.$refs.viewCreation;
+    if (!viewCreation) {
+      logError("DatasetInfo component not mounted during quickupload");
+      return;
+    }
+    const defaultView = await viewCreation.createDefaultView();
+    if (!defaultView) {
+      logError("Failed to create default view during quick upload");
+      return;
+    }
+    this.store.setDatasetViewId(defaultView.id);
+    const route = viewCreation.toRoute(defaultView);
+    this.creatingView = false;
+
+    // Go to the viewer
+    this.$router.push(route);
   }
 }
 </script>

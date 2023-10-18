@@ -77,7 +77,7 @@
           label="Transcode into optimized TIFF file"
         />
         <v-btn
-          @click="generateJson"
+          @click="submit"
           color="green"
           :disabled="!submitEnabled() || isUploading"
         >
@@ -188,8 +188,8 @@ interface ICompositingSource {
 export default class MultiSourceConfiguration extends Vue {
   readonly store = store;
 
-  @Prop({ default: false })
-  readonly quickupload!: boolean;
+  @Prop({ required: true })
+  datasetId!: string;
 
   tilesInternalMetadata: { [key: string]: any }[] | null = null;
   tilesMetadata: ITileMeta[] | null = null;
@@ -200,10 +200,6 @@ export default class MultiSourceConfiguration extends Vue {
 
   isUploading: boolean = false;
   logs: string = "";
-
-  get datasetId() {
-    return this.$route.params.datasetId;
-  }
 
   // Call join on the array, cutting out elements or the first word if too long and adding hyphens
   // Output is always shorter than maxChars
@@ -429,8 +425,29 @@ export default class MultiSourceConfiguration extends Vue {
     }
   }
 
+  initialized: Promise<void> | null = null;
+  mounted() {
+    this.initialized = this.initialize();
+  }
+
+  initializing = false;
+  reinitialize = false;
   @Watch("datasetId")
-  async mounted() {
+  async initialize() {
+    if (this.initializing) {
+      this.reinitialize = true;
+      return;
+    }
+    this.reinitialize = false;
+    this.initializing = true;
+    await this.initializeImplementation();
+    this.initializing = false;
+    if (this.reinitialize) {
+      await this.initialize();
+    }
+  }
+
+  async initializeImplementation() {
     // Get tile information
     const items = await this.store.api.getItems(this.datasetId);
     this.girderItems = items;
@@ -497,10 +514,6 @@ export default class MultiSourceConfiguration extends Vue {
     }
 
     this.resetDimensionsToDefault();
-
-    if (this.quickupload) {
-      this.generateJson();
-    }
   }
 
   resetDimensionsToDefault() {
@@ -576,7 +589,18 @@ export default class MultiSourceConfiguration extends Vue {
     }
   }
 
-  async generateJson() {
+  async submit() {
+    const jsonId = await this.generateJson();
+    if (!jsonId) {
+      return;
+    }
+    this.$router.push({
+      name: "dataset",
+      params: { datasetId: this.datasetId }
+    });
+  }
+
+  async generateJson(): Promise<string | null> {
     // Find the channel names
     let channels: string[] | null = null;
     const channelAssignment = this.assignments.C?.value;
@@ -628,7 +652,7 @@ export default class MultiSourceConfiguration extends Vue {
       // Compositing
       const compositingSources: ICompositingSource[] = sources as ICompositingSource[];
       if (!this.tilesMetadata) {
-        return;
+        return null;
       }
       // For each frame, find (XY, Z, T, C)
       for (let itemIdx = 0; itemIdx < this.girderItems.length; ++itemIdx) {
@@ -758,13 +782,10 @@ export default class MultiSourceConfiguration extends Vue {
       if (!itemId) {
         throw new Error("Failed to add multi source");
       }
-
-      this.$router.push({
-        name: "dataset",
-        params: { datasetId, quickupload: this.quickupload } as any
-      });
+      return itemId;
     } catch (error) {
       logError((error as Error).message);
+      return null;
     }
   }
 }
