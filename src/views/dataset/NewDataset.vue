@@ -64,12 +64,26 @@
       exists. Please update the dataset name field and try again.
     </v-alert>
     <template v-if="quickupload">
-      <multi-source-configuration
-        v-if="configuring"
-        ref="configuration"
-        :datasetId="datasetId"
+      <template v-if="configuring">
+        <multi-source-configuration
+          ref="configuration"
+          :datasetId="datasetId"
+          @log="configurationLogs = $event"
+          :class="{ hide: !pipelineError }"
+        />
+        <div class="title">
+          Configuring the dataset
+        </div>
+        <div class="code-container" v-if="configurationLogs">
+          <code class="code-block">{{ configurationLogs }}</code>
+        </div>
+        <v-progress-circular indeterminate v-else />
+      </template>
+      <dataset-info
+        v-if="creatingView"
+        ref="viewCreation"
+        :class="{ hide: !pipelineError }"
       />
-      <dataset-info v-if="creatingView" ref="viewCreation" />
     </template>
   </v-container>
 </template>
@@ -178,6 +192,10 @@ export default class NewDataset extends Vue {
     configuration?: MultiSourceConfiguration;
     viewCreation?: DatasetInfo;
   };
+
+  configurationLogs = "";
+
+  pipelineError = false;
 
   get datasetId() {
     return this.dataset?.id || null;
@@ -305,6 +323,7 @@ export default class NewDataset extends Vue {
       logError(
         "MultiSourceConfiguration component not mounted during quickupload"
       );
+      this.pipelineError = true;
       return;
     }
     // Ensure that the component is initialized
@@ -313,6 +332,7 @@ export default class NewDataset extends Vue {
     const jsonId = await config.generateJson();
     if (!jsonId) {
       logError("Failed to generate JSON during quick upload");
+      this.pipelineError = true;
       return;
     }
     // Set the dataset now that multi-source is available
@@ -325,11 +345,13 @@ export default class NewDataset extends Vue {
     const viewCreation = this.$refs.viewCreation;
     if (!viewCreation) {
       logError("DatasetInfo component not mounted during quickupload");
+      this.pipelineError = true;
       return;
     }
     const defaultView = await viewCreation.createDefaultView();
     if (!defaultView) {
       logError("Failed to create default view during quick upload");
+      this.pipelineError = true;
       return;
     }
     this.store.setDatasetViewId(defaultView.id);
@@ -341,3 +363,9 @@ export default class NewDataset extends Vue {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.hide {
+  display: none;
+}
+</style>

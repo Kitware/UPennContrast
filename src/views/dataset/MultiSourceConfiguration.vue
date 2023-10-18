@@ -763,6 +763,7 @@ export default class MultiSourceConfiguration extends Vue {
     const eventCallback = (jobData: IJobEventData) => {
       if (jobData.text) {
         this.logs += jobData.text;
+        this.$emit("log", this.logs);
       }
     };
 
@@ -791,7 +792,7 @@ export default class MultiSourceConfiguration extends Vue {
 }
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .code-container {
   display: flex;
   flex-direction: column-reverse;
