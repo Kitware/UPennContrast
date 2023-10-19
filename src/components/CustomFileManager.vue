@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="custom-file-manager-wrapper">
     <div class="d-flex align-center ma-2">
       <v-icon class="mr-2">mdi-magnify</v-icon>
       <div class="flex-grow-1">
@@ -336,3 +336,26 @@ export default class CustomFileManager extends Vue {
   }
 }
 </script>
+
+<style lang="scss">
+.custom-file-manager-wrapper,
+.custom-file-manager-wrapper > .girder-data-browser-snippet,
+.custom-file-manager-wrapper
+  > .girder-data-browser-snippet
+  > .girder-file-browser,
+.custom-file-manager-wrapper
+  > .girder-data-browser-snippet
+  > .girder-file-browser
+  > .v-data-table__wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.custom-file-manager-wrapper
+  > .girder-data-browser-snippet
+  > .girder-file-browser
+  > .v-data-table__wrapper {
+  overflow-y: auto;
+}
+</style>

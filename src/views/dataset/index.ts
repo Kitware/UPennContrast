@@ -13,12 +13,14 @@ const routes: RouteConfig[] = [
     component: NewDataset,
     meta: {
       text: "Upload New Data"
-    }
+    },
+    props: route => ({ ...route.params })
   },
   {
     path: "multi/:datasetId",
     name: "multi",
-    component: MultiSourceConfiguration
+    component: MultiSourceConfiguration,
+    props: route => ({ ...route.params })
   },
   {
     path: "import",

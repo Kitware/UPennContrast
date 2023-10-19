@@ -388,6 +388,20 @@ export default class GirderAPI {
     return this.client.post("folder", data).then(r => asDataset(r.data));
   }
 
+  async getQuickUploadFolder(parentId: string) {
+    const data = new FormData();
+    data.set("parentType", "folder");
+    data.set("parentId", parentId);
+    data.set("name", "QuickUpload");
+    data.set(
+      "description",
+      "Contains all datasets uploaded using the QuickUpload feature."
+    );
+    data.set("reuseExisting", "true");
+    const resp = await this.client.post("folder", data);
+    return resp.data;
+  }
+
   importDataset(path: IGirderSelectAble): Promise<IDataset> {
     return this.client
       .put(`/folder/${path._id}/metadata`, {
