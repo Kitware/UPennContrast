@@ -23,6 +23,7 @@ export function processFilenames(filenames: string[]) {
 }
 
 import { DataFrame } from "dataframe-js";
+import { logError } from "@/utils/log";
 
 export function processFilenamesDF(filenames: string[]): DataFrame {
   const delimiterPattern = /[_\.\/]/;
@@ -221,9 +222,7 @@ export function findColumnCommonSubstring(
   // Ensure the column exists in the DataFrame
   const columns = df.listColumns();
   if (!columns.includes(specifiedColumn)) {
-    console.error(
-      `Column '${specifiedColumn}' does not exist in the DataFrame.`
-    );
+    logError(`Column '${specifiedColumn}' does not exist in the DataFrame.`);
     return "";
   }
 
@@ -231,9 +230,7 @@ export function findColumnCommonSubstring(
 
   // Check if tokens array is defined and non-empty
   if (!tokens || !tokens.length) {
-    console.error(
-      `Tokens for column '${specifiedColumn}' are undefined or empty.`
-    );
+    logError(`Tokens for column '${specifiedColumn}' are undefined or empty.`);
     return "";
   }
 
@@ -302,7 +299,7 @@ export function assignUniqueCategorizations(
 
   // Initial check
   if (allComplementaryLists.length > baseCategorizations.length) {
-    console.error(
+    logError(
       "Error: Too many lists in allComplementaryLists to assign unique categorizations."
     );
     return [];
@@ -324,7 +321,7 @@ export function assignUniqueCategorizations(
       if (nextAvailableCategory) {
         assignedCategorizations[i] = nextAvailableCategory;
       } else {
-        console.error("Error: Unable to find a unique categorization.");
+        logError("Error: Unable to find a unique categorization.");
         return [];
       }
     }
@@ -344,7 +341,7 @@ export function addAssignmentColumns(
 
     // Ensure the column from the list exists in the DataFrame
     if (!df.listColumns().includes(list[0])) {
-      console.error(`Column '${list[0]}' does not exist in the DataFrame.`);
+      logError(`Column '${list[0]}' does not exist in the DataFrame.`);
       continue;
     }
 
@@ -388,7 +385,7 @@ export function structuredAssignments(
 
     // Ensure the column from the list exists in the DataFrame
     if (!df.listColumns().includes(list[0])) {
-      console.error(`Column '${list[0]}' does not exist in the DataFrame.`);
+      logError(`Column '${list[0]}' does not exist in the DataFrame.`);
       continue;
     }
 
