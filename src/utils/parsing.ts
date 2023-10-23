@@ -267,7 +267,7 @@ export function categorizeColumns(
   columnNames: string[]
 ): string {
   // Helper regex pattern to detect a single letter followed by a single digit
-  const xyPattern = /^[A-Za-z]\d$/;
+  const xyPattern = /^[A-Za-z]\d{1,2}$/;
 
   const firstColumn = columnNames[0];
 
