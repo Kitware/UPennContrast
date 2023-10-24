@@ -14,8 +14,8 @@
 // The expected output for filenames3 is stored in a separate file as well: filenames3.json
 
 import { collectFilenameMetadata2 } from "./parsing";
-
-import * as fs from "fs";
+import { failTest, TEST_DATA_ROOT } from "@/test/scripts/utilities";
+import { readFileSync } from "fs";
 
 // Sample filenames can be moved outside individual tests since they are constants
 // Sample filenames
@@ -197,14 +197,14 @@ function parseTestFiles(filenamesPath: string, expectedOutputPath: string) {
   // Read the file and populate the test variable
   try {
     // Get filenames
-    const data = fs.readFileSync(filenamesPath, "utf8"); // Read the file as a string
+    const data = readFileSync(filenamesPath, "utf8"); // Read the file as a string
     const filenames = data
       .split("\n") // Split the string by newline
       .map(line => line.trim()) // Trim whitespace from each line
       .filter(line => line !== ""); // Filter out empty lines
 
     // Get expected output
-    const jsonData = fs.readFileSync(expectedOutputPath, "utf-8");
+    const jsonData = readFileSync(expectedOutputPath, "utf-8");
     const expectedOutput = JSON.parse(jsonData);
 
     return { filenames, expectedOutput };
@@ -231,13 +231,13 @@ describe("Parser Module", () => {
 
   test("Test with filenames3", () => {
     // Specify the path to your files here
-    const filenamesPath = "M_Mir_image_file_list.txt";
-    const expectedOutputPath = "filenames3.json";
+    const filenamesPath = TEST_DATA_ROOT + "/parsing/M_Mir_image_file_list.txt";
+    const expectedOutputPath = TEST_DATA_ROOT + "/parsing/filenames3.json";
 
     // Fetch and parse files
     const data = parseTestFiles(filenamesPath, expectedOutputPath);
     if (!data) {
-      fail(
+      failTest(
         `Unable to fetch test data for files: "${filenamesPath}" and "${expectedOutputPath}"`
       );
     }
