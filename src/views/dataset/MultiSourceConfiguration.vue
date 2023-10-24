@@ -798,7 +798,8 @@ export default class MultiSourceConfiguration extends Vue {
   flex-direction: column-reverse;
   margin: 20px 0;
   width: 100%;
-  height: 300px;
+  min-height: 0px;
+  max-height: 300px;
   overflow-y: scroll;
 }
 
