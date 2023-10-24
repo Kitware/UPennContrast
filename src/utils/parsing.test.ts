@@ -13,23 +13,7 @@
 // filenames3 is a large list of filenames that is stored in a separate file: M_Mir_image_file_list.txt
 // The expected output for filenames3 is stored in a separate file as well: filenames3.json
 
-import {
-  processFilenames,
-  processFilenamesDF,
-  getUniqueTokensPerColumn,
-  countUniqueTokensPerColumn,
-  findMinimalSpanningColumns,
-  findAllComplementaryColumns,
-  findColumnCommonSubstring,
-  categorizeSubstring,
-  categorizeColumns,
-  assignUniqueCategorizations,
-  addAssignmentColumns,
-  structuredAssignments,
-  collectFilenameMetadata2,
-  IVariableGuess,
-  TDimensions
-} from "./parsing";
+import { collectFilenameMetadata2 } from "./parsing";
 
 import * as fs from "fs";
 
@@ -209,23 +193,26 @@ const expectedOutput2 = [
   }
 ];
 
-// Specify the path to your file here for filenames3
-const filePath = "./M_Mir_image_file_list.txt";
+function parseTestFiles(filenamesPath: string, expectedOutputPath: string) {
+  // Read the file and populate the test variable
+  try {
+    // Get filenames
+    const data = fs.readFileSync(filenamesPath, "utf8"); // Read the file as a string
+    const filenames = data
+      .split("\n") // Split the string by newline
+      .map(line => line.trim()) // Trim whitespace from each line
+      .filter(line => line !== ""); // Filter out empty lines
 
-// Read the file and populate the test variable
-let filenames3: string[] = [];
-try {
-  const data = fs.readFileSync(filePath, "utf8"); // Read the file as a string
-  filenames3 = data
-    .split("\n") // Split the string by newline
-    .map(line => line.trim()) // Trim whitespace from each line
-    .filter(line => line !== ""); // Filter out empty lines
-} catch (err) {
-  console.error("Error reading the file:", err);
+    // Get expected output
+    const jsonData = fs.readFileSync(expectedOutputPath, "utf-8");
+    const expectedOutput = JSON.parse(jsonData);
+
+    return { filenames, expectedOutput };
+  } catch (err) {
+    console.error("Error reading the file:", err);
+    return null;
+  }
 }
-
-const jsonData = fs.readFileSync("filenames3.json", "utf-8");
-const expectedOutput3 = JSON.parse(jsonData);
 
 describe("Parser Module", () => {
   test("Test with filenames1", () => {
@@ -243,9 +230,21 @@ describe("Parser Module", () => {
   });
 
   test("Test with filenames3", () => {
-    const filenames = filenames3;
+    // Specify the path to your files here
+    const filenamesPath = "M_Mir_image_file_list.txt";
+    const expectedOutputPath = "filenames3.json";
+
+    // Fetch and parse files
+    const data = parseTestFiles(filenamesPath, expectedOutputPath);
+    if (!data) {
+      fail(
+        `Unable to fetch test data for files: "${filenamesPath}" and "${expectedOutputPath}"`
+      );
+    }
+    const { filenames, expectedOutput } = data;
+
     const result = collectFilenameMetadata2(filenames);
     // Assert your expectations here
-    expect(result).toEqual(expectedOutput3); // You should define expectedOutput2
+    expect(result).toEqual(expectedOutput);
   });
 });

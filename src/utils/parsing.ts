@@ -1,31 +1,7 @@
-export function processFilenames(filenames: string[]) {
-  // Create an array to hold tokens for each position across filenames
-  const allTokensByPosition: Set<string>[] = [];
-
-  filenames.forEach(filename => {
-    const tokens = filename.split(/[_\.\/]/);
-
-    tokens.forEach((token, index) => {
-      if (!allTokensByPosition[index]) {
-        allTokensByPosition[index] = new Set<string>();
-      }
-
-      allTokensByPosition[index].add(token);
-    });
-  });
-
-  // Count and return the number of distinct tokens for each position along with the tokens
-  return allTokensByPosition.map((tokenSet, index) => ({
-    tokenPosition: index + 1,
-    distinctValues: tokenSet.size,
-    tokens: tokenSet // Include the actual set of tokens in the result
-  }));
-}
-
 import { DataFrame } from "dataframe-js";
 import { logError } from "@/utils/log";
 
-export function processFilenamesDF(filenames: string[]): DataFrame {
+function processFilenamesDF(filenames: string[]): DataFrame {
   const delimiterPattern = /[_\.\/]/;
 
   // Tokenize each filename
@@ -52,53 +28,29 @@ export function processFilenamesDF(filenames: string[]): DataFrame {
   return sortedDf;
 }
 
-export function getUniqueTokensPerColumn(df: DataFrame): Map<string, string[]> {
-  const uniqueTokensMap: Map<string, string[]> = new Map();
-
-  df.listColumns().forEach(column => {
-    const uniqueValues = df.distinct(column).toArray(column);
-    uniqueTokensMap.set(column, uniqueValues);
-  });
-
-  return uniqueTokensMap;
-}
-
-export function countUniqueTokensPerColumn(df: DataFrame): Map<string, number> {
-  const uniqueTokensCountMap: Map<string, number> = new Map();
-
-  df.listColumns().forEach(column => {
-    const count = df.distinct(column).count();
-    uniqueTokensCountMap.set(column, count);
-  });
-
-  return uniqueTokensCountMap;
-}
-
-export function findMinimalSpanningColumns(df: DataFrame): string[] {
-  const allColumns = df.listColumns();
+function findMinimalSpanningColumns(df: DataFrame): string[] {
+  const allColumns: string[] = df.listColumns();
   // Exclude the "Filename" column
   const columns = allColumns.filter(column => column !== "Filename");
   const totalRows = df.count();
 
-  // Helper function to compute the Cartesian product of arrays
-  const cartesian = (...arrays: any[][]) =>
-    arrays.reduce((acc, curr) =>
-      acc.flatMap(d => curr.map(e => [d, e].flat()))
-    );
+  // Helper function to compute the number of elements in the Cartesian product of arrays
+  const cartesianProductSize = <T>(arrays: T[][]): number =>
+    arrays.reduce((size, elements) => size * elements.length, 1);
 
   // For increasing sizes of combinations...
   for (let i = 1; i <= columns.length; i++) {
     const columnCombinations = getCombinations(columns, i); // Get all i-sized combinations of columns
 
-    for (const combination of columnCombinations as string[][]) {
+    for (const combination of columnCombinations) {
       const uniqueValueArrays = combination.map(col =>
         df.distinct(col).toArray(col)
       );
 
-      // Compute the Cartesian product
-      const product = cartesian(...uniqueValueArrays);
+      // Compute the Cartesian product size
+      const size = cartesianProductSize(uniqueValueArrays);
 
-      if (product.length === totalRows) {
+      if (size === totalRows) {
         return combination;
       }
     }
@@ -114,44 +66,18 @@ function getCombinations<T>(elements: T[], size: number): T[][] {
   }
 
   let combinations: T[][] = [];
-  for (let i = 0; i < elements.length; i++) {
-    const head = elements.slice(i, i + 1);
+  for (let i = 0; i < elements.length - size + 1; i++) {
+    const head = elements[i];
     const tailCombinations = getCombinations(elements.slice(i + 1), size - 1);
-    combinations = combinations.concat(
-      tailCombinations.map(tc => head.concat(tc))
-    );
+    combinations = [
+      ...combinations,
+      ...tailCombinations.map(tc => [head, ...tc])
+    ];
   }
   return combinations;
 }
 
-export function findColumnsWithMatchingDistinctCount(
-  df: DataFrame,
-  specifiedColumn: string
-): string[] {
-  const specifiedColumnDistinctCount = df.distinct(specifiedColumn).count();
-  const allColumns = df.listColumns();
-  const matchingColumns: string[] = [];
-
-  for (const testColumn of allColumns) {
-    if (testColumn === specifiedColumn) continue; // Skip the column if it's the same as the specified column
-
-    // Create a combined column and count distinct values
-    const combined = df.withColumn(
-      "combined",
-      ((row: any) =>
-        row.get(specifiedColumn) + "_" + row.get(testColumn)) as any
-    );
-    const combinedDistinctCount = combined.distinct("combined").count();
-
-    if (combinedDistinctCount === specifiedColumnDistinctCount) {
-      matchingColumns.push(testColumn);
-    }
-  }
-
-  return matchingColumns;
-}
-
-export function findComplementaryColumns(
+function findComplementaryColumns(
   df: DataFrame,
   specifiedColumn: string
 ): string[] {
@@ -183,7 +109,7 @@ export function findComplementaryColumns(
   return complementaryColumns;
 }
 
-export function findAllComplementaryColumns(
+function findAllComplementaryColumns(
   df: DataFrame,
   specifiedColumns: string[]
 ): string[][] {
@@ -215,7 +141,7 @@ function findCommonSubstring(tokens: string[]): string {
   return commonSubstring;
 }
 
-export function findColumnCommonSubstring(
+function findColumnCommonSubstring(
   df: DataFrame,
   specifiedColumn: string
 ): string {
@@ -237,23 +163,19 @@ export function findColumnCommonSubstring(
   return findCommonSubstring(tokens);
 }
 
-export function categorizeSubstring(substring: string): string {
+export const triggersPerCategory = {
+  z: ["z", "slice"],
+  xy: ["well", "stage", "pos"],
+  chan: ["chan", "channel", "fp", "ch"],
+  t: ["t", "time", "sec", "msec", "ms", "d", "m", "hr", "h"]
+};
+
+function categorizeSubstring(substring: string): string {
   // Convert the substring to lowercase for case-insensitive matching
   const lowerSub = substring.toLowerCase();
 
-  const categories = {
-    z: ["z", "slice"],
-    xy: ["well", "stage", "pos"],
-    chan: ["chan", "channel", "fp", "ch"],
-    t: ["t", "time", "sec", "msec", "ms", "d", "m", "hr", "h"]
-  };
-
-  for (const category in categories) {
-    if (
-      categories[category as keyof typeof categories].some(keyword =>
-        lowerSub.includes(keyword)
-      )
-    ) {
+  for (const [category, triggers] of Object.entries(triggersPerCategory)) {
+    if (triggers.some(trigger => lowerSub.includes(trigger))) {
       return category;
     }
   }
@@ -262,10 +184,7 @@ export function categorizeSubstring(substring: string): string {
   return "chan";
 }
 
-export function categorizeColumns(
-  df: DataFrame,
-  columnNames: string[]
-): string {
+function categorizeColumns(df: DataFrame, columnNames: string[]): string {
   // Helper regex pattern to detect a single letter followed by a single digit
   const xyPattern = /^[A-Za-z]\d{1,2}$/;
 
@@ -290,7 +209,7 @@ export function categorizeColumns(
   return categorizeSubstring(commonStr);
 }
 
-export function assignUniqueCategorizations(
+function assignUniqueCategorizations(
   df: DataFrame,
   allComplementaryLists: string[][]
 ): string[] {
@@ -330,49 +249,14 @@ export function assignUniqueCategorizations(
   return assignedCategorizations; // Return the results
 }
 
-export function addAssignmentColumns(
+function structuredAssignments(
   df: DataFrame,
   allComplementaryLists: string[][],
   assignments: string[]
-): DataFrame {
-  for (let i = 0; i < assignments.length; i++) {
-    const assignment = assignments[i];
-    const list = allComplementaryLists[i];
+) {
+  const output: IVariableGuess[] = [];
 
-    // Ensure the column from the list exists in the DataFrame
-    if (!df.listColumns().includes(list[0])) {
-      logError(`Column '${list[0]}' does not exist in the DataFrame.`);
-      continue;
-    }
-
-    // Get the tokens for the column and sort them alphabetically
-    const tokens: string[] = df.distinct(list[0]).toArray(list[0]);
-    tokens.sort();
-
-    // Create a map for tokens to their respective integer values
-    const tokenToIntMap: { [key: string]: number } = {};
-    tokens.forEach((token, index) => {
-      tokenToIntMap[token] = index;
-    });
-
-    // Add the assignment column to the DataFrame
-    df = df.withColumn(
-      assignment,
-      ((row: any) => tokenToIntMap[row.get(list[0])]) as any
-    );
-  }
-
-  return df; // Return the updated DataFrame
-}
-
-export function structuredAssignments(
-  df: DataFrame,
-  allComplementaryLists: string[][],
-  assignments: string[]
-): any[] {
-  const output: any[] = [];
-
-  const assignmentToLetterMap: { [key: string]: string } = {
+  const assignmentToLetterMap: { [key: string]: TDimensions } = {
     chan: "C",
     t: "T",
     xy: "XY",
@@ -400,7 +284,7 @@ export function structuredAssignments(
     });
 
     // Structure the data
-    const structuredData = {
+    const structuredData: IVariableGuess = {
       guess: assignmentToLetterMap[assignment],
       valueIdxPerFilename: {},
       values: tokens
@@ -438,41 +322,10 @@ export interface IVariableGuess {
   };
 }
 
-export function collectFilenameMetadata2(
-  filenames: string[]
-): IVariableGuess[] {
+export function collectFilenameMetadata2(filenames: string[]) {
   const df = processFilenamesDF(filenames);
   const minimalColumns = findMinimalSpanningColumns(df);
   const allComplementaryLists = findAllComplementaryColumns(df, minimalColumns);
   const assignments = assignUniqueCategorizations(df, allComplementaryLists);
   return structuredAssignments(df, allComplementaryLists, assignments);
-}
-
-// Below copied in from old version to make things compile. Probably doesn't work.
-
-interface FilenameMetadata {
-  t: string | null;
-  xy: string | null;
-  z: string | null;
-  chan: string | null;
-}
-
-interface NumericMetadata {
-  t: number | null;
-  xy: number | null;
-  z: number | null;
-  chan: string | null;
-}
-
-function stringToNumber(val: string | null): number | null {
-  return val === null ? null : +val;
-}
-
-export function getNumericMetadata(filename: string): NumericMetadata {
-  return {
-    t: stringToNumber(filename),
-    xy: stringToNumber("1"),
-    z: stringToNumber("1"),
-    chan: "GFP"
-  };
 }

@@ -30,7 +30,6 @@ import {
   mergeHistograms,
   ITileHistogram
 } from "./images";
-import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { fetchAllPages } from "@/utils/fetch";
@@ -791,9 +790,9 @@ export function parseTiles(
   }
 
   tile.frames.forEach((frame, j) => {
-    let t = frame.IndexT || 0;
-    let xy = frame.IndexXY || 0;
-    let z = frame.IndexZ !== undefined ? frame.IndexZ : frame.PositionZ || 0;
+    let t = frame.IndexT ?? 0;
+    let xy = frame.IndexXY ?? 0;
+    let z = frame.IndexZ ?? frame.PositionZ ?? 0;
 
     if (unrollT) {
       unrollCount.t = Math.max(unrollCount.t, t + 1);
