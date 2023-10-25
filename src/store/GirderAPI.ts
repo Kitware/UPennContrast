@@ -279,14 +279,14 @@ export default class GirderAPI {
     return response.data;
   }
 
-  getItems(folderId: string): Promise<IGirderItem[]> {
-    return this.client
-      .get(`item`, {
-        params: {
-          folderId
-        }
-      })
-      .then(r => r.data);
+  async getItems(folderId: string): Promise<IGirderItem[]> {
+    const baseConfig: AxiosRequestConfig = {
+      params: {
+        folderId
+      }
+    };
+    const pages = await fetchAllPages(this.client, "item", baseConfig);
+    return pages.flat();
   }
 
   getImages(folderId: string): Promise<IGirderItem[]> {
