@@ -71,19 +71,21 @@
           @log="configurationLogs = $event"
           :class="{ hide: !pipelineError }"
         />
-        <div class="title">
+        <div class="title mb-2">
           Configuring the dataset
         </div>
+        <v-progress-circular indeterminate />
         <div class="code-container" v-if="configurationLogs">
           <code class="code-block">{{ configurationLogs }}</code>
         </div>
-        <v-progress-circular indeterminate v-else />
       </template>
-      <dataset-info
-        v-if="creatingView"
-        ref="viewCreation"
-        :class="{ hide: !pipelineError }"
-      />
+      <template v-if="creatingView">
+        <div class="title mb-2">
+          Configuring the dataset
+        </div>
+        <v-progress-circular indeterminate />
+        <dataset-info ref="viewCreation" :class="{ hide: !pipelineError }" />
+      </template>
     </template>
   </v-container>
 </template>
