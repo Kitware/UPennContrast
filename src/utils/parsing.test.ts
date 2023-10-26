@@ -1,313 +1,250 @@
-import {
-  convertDateToTime,
-  splitFilenames,
-  collectFilenameMetadata2,
-  getFields
-} from "./parsing";
+// Desc: Unit tests for parserModule.ts
+// Tests are written using Jest
+// To run the tests, run the following command in the terminal:
+// npm test
+// You need to run the following command to install Jest:
+// npm install --save-dev jest @types/jest ts-jest typescript
+// Also need to install dataframe-js
+// npm install dataframe-js
+// npm install @types/dataframe-js
+// This runs 3 different filename patterns: filenames1, filenames2, filenames3
+// The expected output for each pattern is stored in expectedOutput1, expectedOutput2, expectedOutput3
+// filenames1 and filenames2 are small enough to be stored in this file
+// filenames3 is a large list of filenames that is stored in a separate file: M_Mir_image_file_list.txt
+// The expected output for filenames3 is stored in a separate file as well: filenames3.json
 
-const filenames_directories: string[] = [
-  "red/VID1203_B1_1_27d18h32m.tif",
-  "red/VID1203_B1_1_15d23h31m.tif",
-  "red/VID1203_B1_1_14d01h55m.tif",
-  "phase/VID1203_B1_1_27d18h32m.tif",
-  "phase/VID1203_B1_1_15d23h31m.tif",
-  "phase/VID1203_B1_1_14d01h55m.tif"
-];
-const output_convert_directories: string[] = [
-  "red/VID1203_B1_1_time39992.tif",
-  "red/VID1203_B1_1_time23011.tif",
-  "red/VID1203_B1_1_time20275.tif",
-  "phase/VID1203_B1_1_time39992.tif",
-  "phase/VID1203_B1_1_time23011.tif",
-  "phase/VID1203_B1_1_time20275.tif"
-];
-const output_split_directories: string[][] = [
-  ["red", "", "VID", "1203", "B", "1", "1", "", "time", "39992"],
-  ["red", "", "VID", "1203", "B", "1", "1", "", "time", "23011"],
-  ["red", "", "VID", "1203", "B", "1", "1", "", "time", "20275"],
-  ["phase", "", "VID", "1203", "B", "1", "1", "", "time", "39992"],
-  ["phase", "", "VID", "1203", "B", "1", "1", "", "time", "23011"],
-  ["phase", "", "VID", "1203", "B", "1", "1", "", "time", "20275"]
+import { collectFilenameMetadata2 } from "./parsing";
+import { failTest, TEST_DATA_ROOT } from "@/test/scripts/utilities";
+import { readFileSync } from "fs";
+
+// Sample filenames can be moved outside individual tests since they are constants
+// Sample filenames
+const filenames1 = [
+  "img000_000_000004_0000000002.ome.tif",
+  "img000_000_000002_0000000000.ome.tif",
+  "img000_000_000001_0000000001.ome.tif",
+  "img000_000_000002_0000000001.ome.tif",
+  "img000_000_000001_0000000000.ome.tif",
+  "img000_000_000004_0000000003.ome.tif",
+  "img000_000_000002_0000000003.ome.tif",
+  "img000_000_000001_0000000002.ome.tif",
+  "img000_000_000004_0000000001.ome.tif",
+  "img000_000_000004_0000000000.ome.tif",
+  "img000_000_000002_0000000002.ome.tif",
+  "img000_000_000001_0000000003.ome.tif",
+  "img000_000_000000_0000000003.ome.tif",
+  "img000_000_000003_0000000002.ome.tif",
+  "img000_000_000000_0000000002.ome.tif",
+  "img000_000_000003_0000000003.ome.tif",
+  "img000_000_000000_0000000000.ome.tif",
+  "img000_000_000003_0000000001.ome.tif",
+  "img000_000_000000_0000000001.ome.tif",
+  "img000_000_000003_0000000000.ome.tif"
 ];
 
-const output_directories: {
-  metadata: {
-    [key: string]: string[];
-    t: string[];
-    xy: string[];
-    z: string[];
-    chan: string[];
-  };
-  filesInfo: {
-    [key: string]: { [key: string]: number[] };
-  };
-} = {
-  metadata: {
-    chan: ["red", "phase"],
-    t: ["39992", "23011", "20275"],
-    xy: [],
-    z: []
-  },
-  filesInfo: {
-    "phase/VID1203_B1_1_14d01h55m.tif": {
-      chan: [1],
-      t: [2],
-      xy: [],
-      z: []
-    },
-    "phase/VID1203_B1_1_15d23h31m.tif": {
-      chan: [1],
-      t: [1],
-      xy: [],
-      z: []
-    },
-    "phase/VID1203_B1_1_27d18h32m.tif": {
-      chan: [1],
-      t: [0],
-      xy: [],
-      z: []
-    },
-    "red/VID1203_B1_1_14d01h55m.tif": {
-      chan: [0],
-      t: [2],
-      xy: [],
-      z: []
-    },
-    "red/VID1203_B1_1_15d23h31m.tif": {
-      chan: [0],
-      t: [1],
-      xy: [],
-      z: []
-    },
-    "red/VID1203_B1_1_27d18h32m.tif": {
-      chan: [0],
-      t: [0],
-      xy: [],
-      z: []
-    }
-  }
-};
-
-const filenames_combined: string[] = [
-  "red_B1_1_t001.tif",
-  "red_B1_1_t002.tif",
-  "red_B1_1_t003.tif",
-  "red_B1_1_t004.tif",
-  "phase_B1_1_t001.tif",
-  "phase_B1_1_t002.tif",
-  "phase_B1_1_t003.tif",
-  "phase_B1_1_t004.tif"
-];
-const output_split_combined: string[][] = [
-  ["", "", "red_B", "1", "1", "", "t", "001"],
-  ["", "", "red_B", "1", "1", "", "t", "002"],
-  ["", "", "red_B", "1", "1", "", "t", "003"],
-  ["", "", "red_B", "1", "1", "", "t", "004"],
-  ["", "", "phase_B", "1", "1", "", "t", "001"],
-  ["", "", "phase_B", "1", "1", "", "t", "002"],
-  ["", "", "phase_B", "1", "1", "", "t", "003"],
-  ["", "", "phase_B", "1", "1", "", "t", "004"]
-];
-const output_getFields_combined: {
-  values: string[];
-  numberOfElement: number;
-  isNumeric: boolean;
-}[] = [
-  { values: [""], numberOfElement: 1, isNumeric: false },
-  { values: [""], numberOfElement: 1, isNumeric: false },
-  { values: ["red_B", "phase_B"], numberOfElement: 2, isNumeric: false },
-  { values: ["1"], numberOfElement: 1, isNumeric: true },
-  { values: ["1"], numberOfElement: 1, isNumeric: true },
-  { values: [""], numberOfElement: 1, isNumeric: false },
-  { values: ["t"], numberOfElement: 1, isNumeric: false },
+const expectedOutput1 = [
   {
-    values: ["001", "002", "003", "004"],
-    numberOfElement: 4,
-    isNumeric: true
+    guess: "C",
+    valueIdxPerFilename: {
+      "img000_000_000000_0000000000.ome.tif": 0,
+      "img000_000_000000_0000000001.ome.tif": 0,
+      "img000_000_000000_0000000002.ome.tif": 0,
+      "img000_000_000000_0000000003.ome.tif": 0,
+      "img000_000_000001_0000000000.ome.tif": 1,
+      "img000_000_000001_0000000001.ome.tif": 1,
+      "img000_000_000001_0000000002.ome.tif": 1,
+      "img000_000_000001_0000000003.ome.tif": 1,
+      "img000_000_000002_0000000000.ome.tif": 2,
+      "img000_000_000002_0000000001.ome.tif": 2,
+      "img000_000_000002_0000000002.ome.tif": 2,
+      "img000_000_000002_0000000003.ome.tif": 2,
+      "img000_000_000003_0000000000.ome.tif": 3,
+      "img000_000_000003_0000000001.ome.tif": 3,
+      "img000_000_000003_0000000002.ome.tif": 3,
+      "img000_000_000003_0000000003.ome.tif": 3,
+      "img000_000_000004_0000000000.ome.tif": 4,
+      "img000_000_000004_0000000001.ome.tif": 4,
+      "img000_000_000004_0000000002.ome.tif": 4,
+      "img000_000_000004_0000000003.ome.tif": 4
+    },
+    values: ["000000", "000001", "000002", "000003", "000004"]
+  },
+  {
+    guess: "XY",
+    valueIdxPerFilename: {
+      "img000_000_000000_0000000000.ome.tif": 0,
+      "img000_000_000000_0000000001.ome.tif": 1,
+      "img000_000_000000_0000000002.ome.tif": 2,
+      "img000_000_000000_0000000003.ome.tif": 3,
+      "img000_000_000001_0000000000.ome.tif": 0,
+      "img000_000_000001_0000000001.ome.tif": 1,
+      "img000_000_000001_0000000002.ome.tif": 2,
+      "img000_000_000001_0000000003.ome.tif": 3,
+      "img000_000_000002_0000000000.ome.tif": 0,
+      "img000_000_000002_0000000001.ome.tif": 1,
+      "img000_000_000002_0000000002.ome.tif": 2,
+      "img000_000_000002_0000000003.ome.tif": 3,
+      "img000_000_000003_0000000000.ome.tif": 0,
+      "img000_000_000003_0000000001.ome.tif": 1,
+      "img000_000_000003_0000000002.ome.tif": 2,
+      "img000_000_000003_0000000003.ome.tif": 3,
+      "img000_000_000004_0000000000.ome.tif": 0,
+      "img000_000_000004_0000000001.ome.tif": 1,
+      "img000_000_000004_0000000002.ome.tif": 2,
+      "img000_000_000004_0000000003.ome.tif": 3
+    },
+    values: ["0000000000", "0000000001", "0000000002", "0000000003"]
   }
 ];
-const output_combined: {
-  metadata: {
-    [key: string]: string[];
-    t: string[];
-    xy: string[];
-    z: string[];
-    chan: string[];
-  };
-  filesInfo: {
-    [key: string]: { [key: string]: number[] };
-  };
-} = {
-  metadata: {
-    chan: ["red", "phase"], // TODO: To fix. For now returns red_B and phase_B
-    t: ["001", "002", "003", "004"],
-    xy: [],
-    z: []
+
+const filenames2 = [
+  "phase/VID1630_A1_1_00d00h00m.tif",
+  "phase/VID1630_C4_1_00d00h00m.tif",
+  "phase/VID1630_A1_1_01d23h34m.tif",
+  "phase/VID1630_C4_1_00d23h56m.tif",
+  "phase/VID1630_A1_1_00d23h56m.tif",
+  "phase/VID1630_C4_1_01d23h34m.tif",
+  "red/VID1630_A1_1_00d00h00m.tif",
+  "red/VID1630_C4_1_00d00h00m.tif",
+  "red/VID1630_A1_1_01d23h34m.tif",
+  "red/VID1630_C4_1_00d23h56m.tif",
+  "red/VID1630_A1_1_00d23h56m.tif",
+  "red/VID1630_C4_1_01d23h34m.tif",
+  "gfp/VID1630_A1_1_00d00h00m.tif",
+  "gfp/VID1630_C4_1_00d00h00m.tif",
+  "gfp/VID1630_A1_1_01d23h34m.tif",
+  "gfp/VID1630_C4_1_00d23h56m.tif",
+  "gfp/VID1630_A1_1_00d23h56m.tif",
+  "gfp/VID1630_C4_1_01d23h34m.tif"
+];
+
+const expectedOutput2 = [
+  {
+    guess: "C",
+    valueIdxPerFilename: {
+      "gfp/VID1630_A1_1_00d00h00m.tif": 0,
+      "gfp/VID1630_A1_1_00d23h56m.tif": 0,
+      "gfp/VID1630_A1_1_01d23h34m.tif": 0,
+      "gfp/VID1630_C4_1_00d00h00m.tif": 0,
+      "gfp/VID1630_C4_1_00d23h56m.tif": 0,
+      "gfp/VID1630_C4_1_01d23h34m.tif": 0,
+      "phase/VID1630_A1_1_00d00h00m.tif": 1,
+      "phase/VID1630_A1_1_00d23h56m.tif": 1,
+      "phase/VID1630_A1_1_01d23h34m.tif": 1,
+      "phase/VID1630_C4_1_00d00h00m.tif": 1,
+      "phase/VID1630_C4_1_00d23h56m.tif": 1,
+      "phase/VID1630_C4_1_01d23h34m.tif": 1,
+      "red/VID1630_A1_1_00d00h00m.tif": 2,
+      "red/VID1630_A1_1_00d23h56m.tif": 2,
+      "red/VID1630_A1_1_01d23h34m.tif": 2,
+      "red/VID1630_C4_1_00d00h00m.tif": 2,
+      "red/VID1630_C4_1_00d23h56m.tif": 2,
+      "red/VID1630_C4_1_01d23h34m.tif": 2
+    },
+    values: ["gfp", "phase", "red"]
   },
-  filesInfo: {
-    "phase_B1_1_t001.tif": {
-      chan: [1],
-      t: [0],
-      xy: [],
-      z: []
+  {
+    guess: "XY",
+    valueIdxPerFilename: {
+      "gfp/VID1630_A1_1_00d00h00m.tif": 0,
+      "gfp/VID1630_A1_1_00d23h56m.tif": 0,
+      "gfp/VID1630_A1_1_01d23h34m.tif": 0,
+      "gfp/VID1630_C4_1_00d00h00m.tif": 1,
+      "gfp/VID1630_C4_1_00d23h56m.tif": 1,
+      "gfp/VID1630_C4_1_01d23h34m.tif": 1,
+      "phase/VID1630_A1_1_00d00h00m.tif": 0,
+      "phase/VID1630_A1_1_00d23h56m.tif": 0,
+      "phase/VID1630_A1_1_01d23h34m.tif": 0,
+      "phase/VID1630_C4_1_00d00h00m.tif": 1,
+      "phase/VID1630_C4_1_00d23h56m.tif": 1,
+      "phase/VID1630_C4_1_01d23h34m.tif": 1,
+      "red/VID1630_A1_1_00d00h00m.tif": 0,
+      "red/VID1630_A1_1_00d23h56m.tif": 0,
+      "red/VID1630_A1_1_01d23h34m.tif": 0,
+      "red/VID1630_C4_1_00d00h00m.tif": 1,
+      "red/VID1630_C4_1_00d23h56m.tif": 1,
+      "red/VID1630_C4_1_01d23h34m.tif": 1
     },
-    "phase_B1_1_t002.tif": {
-      chan: [1],
-      t: [1],
-      xy: [],
-      z: []
+    values: ["A1", "C4"]
+  },
+  {
+    guess: "T",
+    valueIdxPerFilename: {
+      "gfp/VID1630_A1_1_00d00h00m.tif": 0,
+      "gfp/VID1630_A1_1_00d23h56m.tif": 1,
+      "gfp/VID1630_A1_1_01d23h34m.tif": 2,
+      "gfp/VID1630_C4_1_00d00h00m.tif": 0,
+      "gfp/VID1630_C4_1_00d23h56m.tif": 1,
+      "gfp/VID1630_C4_1_01d23h34m.tif": 2,
+      "phase/VID1630_A1_1_00d00h00m.tif": 0,
+      "phase/VID1630_A1_1_00d23h56m.tif": 1,
+      "phase/VID1630_A1_1_01d23h34m.tif": 2,
+      "phase/VID1630_C4_1_00d00h00m.tif": 0,
+      "phase/VID1630_C4_1_00d23h56m.tif": 1,
+      "phase/VID1630_C4_1_01d23h34m.tif": 2,
+      "red/VID1630_A1_1_00d00h00m.tif": 0,
+      "red/VID1630_A1_1_00d23h56m.tif": 1,
+      "red/VID1630_A1_1_01d23h34m.tif": 2,
+      "red/VID1630_C4_1_00d00h00m.tif": 0,
+      "red/VID1630_C4_1_00d23h56m.tif": 1,
+      "red/VID1630_C4_1_01d23h34m.tif": 2
     },
-    "phase_B1_1_t003.tif": {
-      chan: [1],
-      t: [2],
-      xy: [],
-      z: []
-    },
-    "phase_B1_1_t004.tif": {
-      chan: [1],
-      t: [3],
-      xy: [],
-      z: []
-    },
-    "red_B1_1_t001.tif": {
-      chan: [0],
-      t: [0],
-      xy: [],
-      z: []
-    },
-    "red_B1_1_t002.tif": {
-      chan: [0],
-      t: [1],
-      xy: [],
-      z: []
-    },
-    "red_B1_1_t003.tif": {
-      chan: [0],
-      t: [2],
-      xy: [],
-      z: []
-    },
-    "red_B1_1_t004.tif": {
-      chan: [0],
-      t: [3],
-      xy: [],
-      z: []
+    values: ["00d00h00m", "00d23h56m", "01d23h34m"]
+  }
+];
+
+function parseTestFiles(filenamesPath: string, expectedOutputPath: string) {
+  // Read the file and populate the test variable
+  try {
+    // Get filenames
+    const data = readFileSync(filenamesPath, "utf8"); // Read the file as a string
+    const filenames = data
+      .split("\n") // Split the string by newline
+      .map(line => line.trim()) // Trim whitespace from each line
+      .filter(line => line !== ""); // Filter out empty lines
+
+    // Get expected output
+    const jsonData = readFileSync(expectedOutputPath, "utf-8");
+    const expectedOutput = JSON.parse(jsonData);
+
+    return { filenames, expectedOutput };
+  } catch (err) {
+    console.error("Error reading the file:", err);
+    return null;
+  }
+}
+
+describe("Parser Module", () => {
+  test("Test with filenames1", () => {
+    const filenames = filenames1;
+    const result = collectFilenameMetadata2(filenames);
+    // Assert your expectations here
+    expect(result).toEqual(expectedOutput1); // You should define expectedOutput1
+  });
+
+  test("Test with filenames2", () => {
+    const filenames = filenames2;
+    const result = collectFilenameMetadata2(filenames);
+    // Assert your expectations here
+    expect(result).toEqual(expectedOutput2); // You should define expectedOutput2
+  });
+
+  test("Test with filenames3", () => {
+    // Specify the path to your files here
+    const filenamesPath = TEST_DATA_ROOT + "/parsing/M_Mir_image_file_list.txt";
+    const expectedOutputPath = TEST_DATA_ROOT + "/parsing/filenames3.json";
+
+    // Fetch and parse files
+    const data = parseTestFiles(filenamesPath, expectedOutputPath);
+    if (!data) {
+      failTest(
+        `Unable to fetch test data for files: "${filenamesPath}" and "${expectedOutputPath}"`
+      );
     }
-  }
-};
+    const { filenames, expectedOutput } = data;
 
-const filenames_nikon: string[] = [
-  "FT_705_D1_72HR_wF7.nd2",
-  "FT_705_D1_72HR_wF6.nd2",
-  "FT_705_D1_72HR_wE8.nd2",
-  "FT_705_D1_72HR_wE7.nd2",
-  "FT_705_D1_72HR_wE6.nd2",
-  "FT_705_D1_72HR_wE5.nd2"
-];
-const output_nikon: {
-  metadata: {
-    [key: string]: string[];
-    t: string[];
-    xy: string[];
-    z: string[];
-    chan: string[];
-  };
-  filesInfo: {
-    [key: string]: { [key: string]: number[] };
-  };
-} = {
-  metadata: {
-    chan: [],
-    t: [],
-    xy: [],
-    z: []
-  },
-  filesInfo: {}
-};
-
-const filenames_legacy: string[] = [
-  "trans001.tif",
-  "trans002.tif",
-  "trans003.tif",
-  "gfp001.tif",
-  "gfp002.tif",
-  "gfp003.tif",
-  "alexa001.tif",
-  "alexa002.tif",
-  "alexa003.tif"
-];
-const output_split_legacy: string[][] = [
-  ["", "", "trans", "001"],
-  ["", "", "trans", "002"],
-  ["", "", "trans", "003"],
-  ["", "", "gfp", "001"],
-  ["", "", "gfp", "002"],
-  ["", "", "gfp", "003"],
-  ["", "", "alexa", "001"],
-  ["", "", "alexa", "002"],
-  ["", "", "alexa", "003"]
-];
-const output_legacy: {
-  metadata: {
-    [key: string]: string[];
-    t: string[];
-    xy: string[];
-    z: string[];
-    chan: string[];
-  };
-  filesInfo: {
-    [key: string]: { [key: string]: number[] };
-  };
-} = {
-  metadata: {
-    chan: ["trans", "gfp", "alexa"],
-    t: [],
-    xy: ["001", "002", "003"],
-    z: []
-  },
-  filesInfo: {
-    "trans001.tif": { t: [], xy: [0], z: [], chan: [0] },
-    "trans002.tif": { t: [], xy: [1], z: [], chan: [0] },
-    "trans003.tif": { t: [], xy: [2], z: [], chan: [0] },
-    "gfp001.tif": { t: [], xy: [0], z: [], chan: [1] },
-    "gfp002.tif": { t: [], xy: [1], z: [], chan: [1] },
-    "gfp003.tif": { t: [], xy: [2], z: [], chan: [1] },
-    "alexa001.tif": { t: [], xy: [0], z: [], chan: [2] },
-    "alexa002.tif": { t: [], xy: [1], z: [], chan: [2] },
-    "alexa003.tif": { t: [], xy: [2], z: [], chan: [2] }
-  }
-};
-
-test("Test convertDateToTime", () => {
-  expect(convertDateToTime(filenames_directories[0])).toBe(
-    output_convert_directories[0]
-  );
-});
-
-test("Test splitFileNames", () => {
-  expect(splitFilenames(output_convert_directories)).toStrictEqual(
-    output_split_directories
-  );
-  expect(splitFilenames(filenames_combined)).toStrictEqual(
-    output_split_combined
-  );
-  expect(splitFilenames(filenames_legacy)).toStrictEqual(output_split_legacy);
-});
-
-test("Test getFields", () => {
-  expect(getFields(output_split_combined)).toStrictEqual(
-    output_getFields_combined
-  );
-});
-
-test("Test collectFilenameMetadata2", () => {
-  expect(collectFilenameMetadata2(filenames_directories)).toStrictEqual(
-    output_directories
-  );
-  expect(collectFilenameMetadata2(filenames_combined)).toStrictEqual(
-    output_combined
-  );
-  expect(collectFilenameMetadata2(filenames_legacy)).toStrictEqual(
-    output_legacy
-  );
+    const result = collectFilenameMetadata2(filenames);
+    // Assert your expectations here
+    expect(result).toEqual(expectedOutput);
+  });
 });

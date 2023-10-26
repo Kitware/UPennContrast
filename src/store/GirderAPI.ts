@@ -30,7 +30,6 @@ import {
   mergeHistograms,
   ITileHistogram
 } from "./images";
-import { getNumericMetadata } from "@/utils/parsing";
 import { Promise } from "bluebird";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { fetchAllPages } from "@/utils/fetch";
@@ -783,10 +782,6 @@ export function parseTiles(
   let frameChannels: string[] | undefined;
   let unrollCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
   let unrollOrder: string[] = [];
-  const metadata = getNumericMetadata(item.name);
-  if (metadata.chan !== null && !channelInt.has(metadata.chan)) {
-    channelInt.set(metadata.chan, channelInt.size);
-  }
 
   frameChannels = tile.channels;
 
@@ -795,14 +790,10 @@ export function parseTiles(
   }
 
   tile.frames.forEach((frame, j) => {
-    let t = metadata.t !== null ? metadata.t : frame.IndexT || 0;
-    let xy = metadata.xy !== null ? metadata.xy : frame.IndexXY || 0;
-    let z =
-      metadata.z !== null
-        ? metadata.z
-        : frame.IndexZ !== undefined
-        ? frame.IndexZ
-        : frame.PositionZ || 0;
+    let t = frame.IndexT ?? 0;
+    let xy = frame.IndexXY ?? 0;
+    let z = frame.IndexZ ?? frame.PositionZ ?? 0;
+
     if (unrollT) {
       unrollCount.t = Math.max(unrollCount.t, t + 1);
       t = -1;
@@ -824,14 +815,9 @@ export function parseTiles(
         unrollOrder.push("z");
       }
     }
-    const metadataChannel =
-      channelInt.size > 1 ? channelInt.get(metadata.chan) : undefined;
-    const c =
-      metadataChannel !== undefined
-        ? metadataChannel
-        : frame.IndexC !== undefined
-        ? frame.IndexC
-        : 0;
+
+    const c = frame.IndexC !== undefined ? frame.IndexC : 0;
+
     if (zs.has(z)) {
       zs.get(z)!.add(t);
     } else {

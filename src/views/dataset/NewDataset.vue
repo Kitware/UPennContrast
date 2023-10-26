@@ -95,11 +95,13 @@ import { IGirderSelectAble } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 import FileDropzone from "@/components/Files/FileDropzone.vue";
 import { IDataset } from "@/store/model";
-import { triggers, makeAlternation } from "@/utils/parsing";
+import { triggersPerCategory } from "@/utils/parsing";
 import { formatDate } from "@/utils/date";
 import MultiSourceConfiguration from "./MultiSourceConfiguration.vue";
 import DatasetInfo from "./DatasetInfo.vue";
 import { logError } from "@/utils/log";
+
+const allTriggers = Object.values(triggersPerCategory).flat();
 
 interface FileUpload {
   file: File;
@@ -127,7 +129,7 @@ function findCommonPrefix(strings: string[]): string {
 
   // Extract the non-metadata prefix of each filename. Note that because of the
   // way the regex is constructed, the first match group will never be `null`.
-  const re = new RegExp(`(.*?)(?:_|-|${makeAlternation(triggers)})`);
+  const re = new RegExp(`(.*?)(?:_|-|${allTriggers.join("|")})`);
   const matches = strings.map(s => s.match(re)![1]);
 
   // Get the minimum length of all the strings; the common prefix cannot be
