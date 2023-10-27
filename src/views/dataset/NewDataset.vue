@@ -170,11 +170,13 @@ export default class NewDataset extends Vue {
   readonly store = store;
   readonly girderResources = girderResources;
 
-  @VModel({ type: Array, default: () => [] })
-  files!: File[];
+  @Prop({ type: Array, default: () => [] })
+  defaultFiles!: File[];
 
   @Prop({ default: false })
   readonly quickupload!: boolean;
+
+  uploadedFiles: File[] | null = null;
 
   configuring = false;
   creatingView = false;
@@ -211,6 +213,10 @@ export default class NewDataset extends Vue {
 
   get rules() {
     return [(v: string) => v.trim().length > 0 || `value is required`];
+  }
+
+  get files() {
+    return this.uploadedFiles || this.defaultFiles;
   }
 
   get filesSelected() {
@@ -289,7 +295,7 @@ export default class NewDataset extends Vue {
   }
 
   filesChanged(files: FileUpload[]) {
-    this.files = files.map(({ file }) => file);
+    this.uploadedFiles = files.map(({ file }) => file);
 
     if (this.name === "" && files.length > 0) {
       this.name = this.recommendedName;

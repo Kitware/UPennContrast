@@ -229,7 +229,7 @@ export default class Home extends Vue {
     // RouteConfig in src/view/dataset/index.ts has to support it
     this.$router.push({
       name: "newdataset",
-      params: { value: files, quickupload: true } as any
+      params: { defaultFiles: files, quickupload: true } as any
     });
   }
 
@@ -238,7 +238,7 @@ export default class Home extends Vue {
     // RouteConfig in src/view/dataset/index.ts has to support it
     this.$router.push({
       name: "newdataset",
-      params: { value: files } as any
+      params: { defaultFiles: files } as any
     });
   }
 }
