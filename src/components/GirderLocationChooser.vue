@@ -3,7 +3,7 @@
     <template #activator="{ on }" v-if="activatorDisabled === false">
       <div class="d-flex">
         <slot name="activator" v-bind="{ on }">
-          <v-btn v-on="on">
+          <v-btn v-on="on" :disabled="disabled">
             Choose...
           </v-btn>
         </slot>
@@ -12,6 +12,7 @@
           class="pl-4"
           root-location-disabled
           :location="selected"
+          readonly
         />
       </div>
     </template>
@@ -74,6 +75,11 @@ export default class GirderLocationChooser extends Vue {
     default: false
   })
   activatorDisabled!: boolean;
+
+  @Prop({
+    default: false
+  })
+  disabled!: boolean;
 
   // Use the computed dialogInternal instead of dialog or dialogInternalCache
   @Prop({

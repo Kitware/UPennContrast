@@ -1,9 +1,23 @@
 <template>
   <v-container>
-    <v-form ref="form" v-model="valid">
+    <v-card v-if="quickupload" class="mb-2">
+      <v-card-title>Quick Import in Progess</v-card-title>
+      <v-card-text>
+        <v-progress-linear
+          class="text-progress"
+          :value="totalProgressPercentage"
+        />
+      </v-card-text>
+    </v-card>
+    <v-form
+      ref="form"
+      v-model="valid"
+      :disabled="quickupload && !pipelineError"
+    >
       <girder-upload
         v-if="path && !hideUploader"
         ref="uploader"
+        class="mb-2"
         :dest="path"
         hideStartButton
         hideHeadline
@@ -14,6 +28,13 @@
       >
         <template #dropzone="{ inputFilesChanged }">
           <file-dropzone @input="inputFilesChanged" style="height: 260px;" />
+        </template>
+        <template #files="{ files }" v-if="quickupload && !pipelineError">
+          <v-card>
+            <v-card-text>
+              Uploading {{ files ? files.length : 0 }} file(s)...
+            </v-card-text>
+          </v-card>
         </template>
       </girder-upload>
 
@@ -32,7 +53,7 @@
         rows="2"
       />
 
-      <v-card>
+      <v-card class="mb-2">
         <v-card-title>Location:</v-card-title>
         <v-card-text>
           <v-container>
@@ -41,19 +62,21 @@
                 v-model="path"
                 :breadcrumb="true"
                 title="Select a Folder to Import the New Dataset"
+                :disabled="quickupload && !pipelineError"
               />
             </v-row>
           </v-container>
         </v-card-text>
       </v-card>
 
-      <div class="button-bar">
+      <div class="button-bar" v-if="!quickupload || pipelineError">
         <v-btn
           :disabled="!valid || !filesSelected || uploading"
           color="success"
           class="mr-4"
           @click="submit"
-          >Upload
+        >
+          Upload
         </v-btn>
       </div>
     </v-form>
@@ -112,6 +135,7 @@ interface FileUpload {
 type GWCUpload = Vue & {
   inputFilesChanged(files: File[]): void;
   startUpload(): any;
+  totalProgressPercent: number;
 };
 
 function basename(filename: string): string {
@@ -205,6 +229,54 @@ export default class NewDataset extends Vue {
 
   get datasetId() {
     return this.dataset?.id || null;
+  }
+
+  get totalProgressPercentage() {
+    const stepWeights = [3, 3, 1];
+    let iStep = 0;
+    const totalPercentage = (localPercentage: number): number => {
+      // Sum of the weight of the steps that are completed
+      let completedStepsWeight = 0;
+      for (let i = 0; i < iStep; ++i) {
+        completedStepsWeight += stepWeights[i];
+      }
+      // Total sum of the weight of all steps
+      let totalStepsWeight = completedStepsWeight;
+      for (let i = iStep; i < stepWeights.length; ++i) {
+        totalStepsWeight += stepWeights[i];
+      }
+      // Return the percentage of completion
+      return (
+        (100 * completedStepsWeight + localPercentage * stepWeights[iStep]) /
+        totalStepsWeight
+      );
+    };
+
+    // First step: uploading
+    if (this.uploading) {
+      const uploader = this.$refs.uploader;
+      if (!uploader) {
+        return totalPercentage(0);
+      }
+      return totalPercentage(uploader.totalProgressPercent);
+    }
+    iStep += 1;
+
+    // Second step: configuring
+    if (this.configuring) {
+      const nLines = this.configurationLogs.split("\n").length;
+      const exponent = -0.01 * nLines;
+      return totalPercentage(100 - 100 * Math.exp(exponent));
+    }
+    iStep += 1;
+
+    // Third step: create view
+    if (this.creatingView) {
+      return totalPercentage(50);
+    }
+    iStep += 1;
+
+    return totalPercentage(0);
   }
 
   get pageTwo() {
@@ -309,6 +381,7 @@ export default class NewDataset extends Vue {
 
   nextStep() {
     this.hideUploader = true;
+    this.uploading = false;
 
     const datasetId = this.dataset!.id;
     if (this.quickupload) {
