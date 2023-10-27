@@ -3,10 +3,17 @@
     <v-card v-if="quickupload" class="mb-2">
       <v-card-title>Quick Import in Progess</v-card-title>
       <v-card-text>
-        <v-progress-linear :value="totalProgressPercentage" />
+        <v-progress-linear
+          class="text-progress"
+          :value="totalProgressPercentage"
+        />
       </v-card-text>
     </v-card>
-    <v-form ref="form" v-model="valid">
+    <v-form
+      ref="form"
+      v-model="valid"
+      :disabled="quickupload && !pipelineError"
+    >
       <girder-upload
         v-if="path && !hideUploader"
         ref="uploader"
@@ -38,7 +45,7 @@
         rows="2"
       />
 
-      <v-card>
+      <v-card class="mb-2">
         <v-card-title>Location:</v-card-title>
         <v-card-text>
           <v-container>
@@ -47,19 +54,21 @@
                 v-model="path"
                 :breadcrumb="true"
                 title="Select a Folder to Import the New Dataset"
+                :disabled="quickupload && !pipelineError"
               />
             </v-row>
           </v-container>
         </v-card-text>
       </v-card>
 
-      <div class="button-bar">
+      <div class="button-bar" v-if="!quickupload || pipelineError">
         <v-btn
           :disabled="!valid || !filesSelected || uploading"
           color="success"
           class="mr-4"
           @click="submit"
-          >Upload
+        >
+          Upload
         </v-btn>
       </div>
     </v-form>
