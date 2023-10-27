@@ -17,6 +17,7 @@
       <girder-upload
         v-if="path && !hideUploader"
         ref="uploader"
+        class="mb-2"
         :dest="path"
         hideStartButton
         hideHeadline
@@ -27,6 +28,13 @@
       >
         <template #dropzone="{ inputFilesChanged }">
           <file-dropzone @input="inputFilesChanged" style="height: 260px;" />
+        </template>
+        <template #files="{ files }" v-if="quickupload && !pipelineError">
+          <v-card>
+            <v-card-text>
+              Uploading {{ files ? files.length : 0 }} file(s)...
+            </v-card-text>
+          </v-card>
         </template>
       </girder-upload>
 
