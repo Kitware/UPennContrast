@@ -116,12 +116,11 @@ def cacheMaxMerge(self, item):
                     'style': style,
                 }],
             }
-            folder = Folder().load(item['folderId'], user=user, level=AccessType.READ)
-            parent = Folder().load(folder['parentId'], user=user, level=AccessType.WRITE)
-            foldername = folder['name'] + '_maxmerge'
-            multi['sources'][0]['path'] = '../%s/%s' % (folder['name'], item['name'])
+            datasetFolder = Folder().load(item['folderId'], user=user, level=AccessType.WRITE)
+            foldername = 'maxmerge_cache'
+            multi['sources'][0]['path'] = '../%s' % item['name']
             destfolder = Folder().createFolder(
-                parent, foldername, public=folder['public'], creator=user, reuseExisting=True)
+                datasetFolder, foldername, public=datasetFolder['public'], creator=user, reuseExisting=True)
             dest = io.BytesIO()
             dest.write(yaml.dump(multi).encode())
             destsize = dest.tell()
