@@ -1,9 +1,11 @@
-FROM girder/girder:latest-py3
+FROM girder/tox-and-node:latest
 
-RUN apt-get update && \
-    apt-get install --yes --no-install-recommends fuse
+RUN virtualenv /venv --python=3.11
+ENV PATH=/venv/bin:$PATH
+
 RUN mkdir /mnt/fuse
 
+RUN mkdir /src
 WORKDIR /src
 
 RUN git clone https://github.com/girder/large_image.git
