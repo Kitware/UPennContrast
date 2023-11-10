@@ -117,25 +117,31 @@
               :autoMultiConfig="false"
             />
             <div class="d-flex justify-end mt-2">
-              <v-simple-checkbox v-model="addDatasetEditVariables" dense />
+              <v-simple-checkbox
+                v-model="addDatasetOption.editVariables"
+                dense
+              />
               Review variables
             </div>
-            <tempalte v-if="addDatasetConfiguring">
+            <tempalte v-if="addDatasetOption.configuring">
               <multi-source-configuration
                 ref="configuration"
-                :datasetId="addDatasetUploadedDatasetId"
+                :datasetId="addDatasetOption.uploadedDatasetId"
                 :autoDatasetRoute="false"
-                @log="addDatasetConfigurationLogs = $event"
+                @log="addDatasetOption.configurationLogs = $event"
                 @generatedJson="addDatasetConfigurationDone"
-                :class="{ 'd-none': !addDatasetEditVariables }"
+                :class="{ 'd-none': !addDatasetOption.editVariables }"
               />
               <div class="title mb-2">
                 Configuring the dataset
               </div>
               <v-progress-circular indeterminate />
-              <div class="code-container" v-if="addDatasetConfigurationLogs">
+              <div
+                class="code-container"
+                v-if="addDatasetOption.configurationLogs"
+              >
                 <code class="code-block">
-                  {{ addDatasetConfigurationLogs }}
+                  {{ addDatasetOption.configurationLogs }}
                 </code>
               </div>
             </tempalte>
@@ -173,12 +179,26 @@ interface IBreadCrumbItem {
 }
 
 type TAddDatasetOption =
-  | { type: "upload" }
-  | { type: "add"; datasets: IDataset[]; message: string };
+  | {
+      type: "upload";
+      editVariables: boolean;
+      configuring: boolean;
+      configurationLogs: string;
+      uploadedDatasetId: string | null;
+    }
+  | {
+      type: "add";
+      datasets: IDataset[];
+      message: string;
+    };
 
 function defaultDatasetUploadOption(): TAddDatasetOption {
   return {
-    type: "upload"
+    type: "upload",
+    editVariables: false,
+    configuring: false,
+    configurationLogs: "",
+    uploadedDatasetId: null
   };
 }
 
@@ -210,10 +230,7 @@ export default class BreadCrumbs extends Vue {
 
   addDatasetConfig: IDatasetConfiguration | null = null;
   addDatasetOption: TAddDatasetOption = defaultDatasetUploadOption();
-  addDatasetEditVariables: boolean = false;
-  addDatasetConfiguring: boolean = false;
-  addDatasetConfigurationLogs = "";
-  addDatasetUploadedDatasetId: string | null = null;
+
   $refs!: {
     configuration?: MultiSourceConfiguration;
   };
@@ -239,7 +256,6 @@ export default class BreadCrumbs extends Vue {
       configId
     );
     this.addDatasetOption = defaultDatasetUploadOption();
-    this.addDatasetEditVariables = false;
   }
 
   get addDatasetDialog() {
@@ -321,19 +337,22 @@ export default class BreadCrumbs extends Vue {
   }
 
   async addDatasetToCollectionUploaded(datasetId: string) {
-    this.addDatasetUploadedDatasetId = datasetId;
-    this.addDatasetConfigurationLogs = "";
-    this.addDatasetConfiguring = true;
+    if (this.addDatasetOption.type !== "upload") {
+      return;
+    }
+    this.addDatasetOption.uploadedDatasetId = datasetId;
+    this.addDatasetOption.configurationLogs = "";
+    this.addDatasetOption.configuring = true;
 
     // Automatic generation of the JSON
-    if (!this.addDatasetEditVariables) {
+    if (!this.addDatasetOption.editVariables) {
       await Vue.nextTick();
       const config = this.$refs.configuration;
       if (!config) {
         logError(
           "MultiSourceConfiguration component not mounted during configuration of new dataset"
         );
-        this.addDatasetEditVariables = true;
+        this.addDatasetOption.editVariables = true;
         return;
       }
       // Ensure that the component is initialized
@@ -343,11 +362,17 @@ export default class BreadCrumbs extends Vue {
   }
 
   async addDatasetConfigurationDone(jsonId: string | null) {
-    this.addDatasetConfiguring = false;
-    const datasetId = this.addDatasetUploadedDatasetId!;
+    if (
+      this.addDatasetOption.type !== "upload" ||
+      !this.addDatasetOption.uploadedDatasetId
+    ) {
+      return;
+    }
+    this.addDatasetOption.configuring = false;
+    const datasetId = this.addDatasetOption.uploadedDatasetId;
     if (!jsonId) {
       logError("Failed to generate JSON during configuration of new dataset");
-      this.addDatasetEditVariables = true;
+      this.addDatasetOption.editVariables = true;
       return;
     }
     // Check if dataset is compatible with configuration
@@ -385,7 +410,7 @@ export default class BreadCrumbs extends Vue {
         this.addDatasetOption.datasets.forEach(d => datasetIds.push(d.id));
         break;
       case "upload":
-        datasetIds.push(this.addDatasetUploadedDatasetId!);
+        datasetIds.push(this.addDatasetOption.uploadedDatasetId!);
         break;
     }
 
@@ -400,6 +425,7 @@ export default class BreadCrumbs extends Vue {
     this.refreshItems(true);
 
     this.addDatasetDialog = false;
+    this.addDatasetOption = defaultDatasetUploadOption();
   }
 
   get datasetView() {
