@@ -191,6 +191,9 @@ export default class MultiSourceConfiguration extends Vue {
   @Prop({ required: true })
   datasetId!: string;
 
+  @Prop({ default: true })
+  autoDatasetRoute!: boolean;
+
   tilesInternalMetadata: { [key: string]: any }[] | null = null;
   tilesMetadata: ITileMeta[] | null = null;
 
@@ -591,13 +594,18 @@ export default class MultiSourceConfiguration extends Vue {
 
   async submit() {
     const jsonId = await this.generateJson();
+
+    this.$emit("generatedJson", jsonId);
+
     if (!jsonId) {
       return;
     }
-    this.$router.push({
-      name: "dataset",
-      params: { datasetId: this.datasetId }
-    });
+    if (this.autoDatasetRoute) {
+      this.$router.push({
+        name: "dataset",
+        params: { datasetId: this.datasetId }
+      });
+    }
   }
 
   async generateJson(): Promise<string | null> {

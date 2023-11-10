@@ -22,7 +22,8 @@ import {
   IScales,
   IPixel,
   newLayer,
-  TJobType
+  TJobType,
+  IDatasetConfigurationCompatibility
 } from "./model";
 import {
   toStyle,
@@ -285,6 +286,20 @@ export default class GirderAPI {
       }
     };
     const pages = await fetchAllPages(this.client, "item", baseConfig);
+    return pages.flat();
+  }
+
+  async getFolders(
+    parentId: string,
+    parentType: string = "folder"
+  ): Promise<IGirderFolder[]> {
+    const baseConfig: AxiosRequestConfig = {
+      params: {
+        parentId,
+        parentType
+      }
+    };
+    const pages = await fetchAllPages(this.client, "folder", baseConfig);
     return pages.flat();
   }
 
@@ -625,10 +640,10 @@ function getDefaultLayers(dataset: IDataset) {
   return layers;
 }
 
-function getDatasetCompatibility(
+export function getDatasetCompatibility(
   dataset: IDataset
-): IDatasetConfigurationBase["compatibility"] {
-  const channelNames: IDatasetConfigurationBase["compatibility"]["channels"] = {};
+): IDatasetConfigurationCompatibility {
+  const channelNames: IDatasetConfigurationCompatibility["channels"] = {};
   for (const channel of dataset.channels) {
     channelNames[channel] =
       dataset.channelNames.get(channel) || "Unnamed channel";
