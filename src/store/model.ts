@@ -162,13 +162,15 @@ export interface IScales {
   tStep: IScaleInformation<TUnitTime>;
 }
 
+export interface IDatasetConfigurationCompatibility {
+  xyDimensions: IDimensionCompatibility;
+  zDimensions: IDimensionCompatibility;
+  tDimensions: IDimensionCompatibility;
+  channels: { [key: number]: string };
+}
+
 export interface IDatasetConfigurationBase {
-  compatibility: {
-    xyDimensions: IDimensionCompatibility;
-    zDimensions: IDimensionCompatibility;
-    tDimensions: IDimensionCompatibility;
-    channels: { [key: number]: string };
-  };
+  compatibility: IDatasetConfigurationCompatibility;
   layers: IDisplayLayer[];
   tools: IToolConfiguration[];
   snapshots: ISnapshot[];
@@ -807,6 +809,7 @@ const channelColors: { [key: string]: string } = {
 import { v4 as uuidv4 } from "uuid";
 import { ISetQuadStatus } from "@/utils/setFrameQuad";
 import { ITileMeta } from "./GirderAPI";
+import { isEqual } from "lodash-es";
 
 export function newLayer(
   dataset: IDataset,
@@ -891,6 +894,19 @@ export function exampleConfigurationBase(): IDatasetConfigurationBase {
     }
   };
 }
+
+export function areCompatibles(
+  a: IDatasetConfigurationCompatibility,
+  b: IDatasetConfigurationCompatibility
+) {
+  return (
+    a.tDimensions === b.tDimensions &&
+    a.xyDimensions === b.xyDimensions &&
+    a.zDimensions === b.zDimensions &&
+    isEqual(a.channels, b.channels)
+  );
+}
+
 export const configurationBaseKeys = new Set(
   Object.keys(exampleConfigurationBase())
 ) as Set<keyof IDatasetConfigurationBase>;

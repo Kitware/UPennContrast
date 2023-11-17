@@ -91,8 +91,10 @@
         <multi-source-configuration
           ref="configuration"
           :datasetId="datasetId"
+          :autoDatasetRoute="false"
           @log="configurationLogs = $event"
-          :class="{ hide: !pipelineError }"
+          @generatedJson="generationDone"
+          :class="{ 'd-none': !pipelineError }"
         />
         <div class="title mb-2">
           Configuring the dataset
@@ -107,7 +109,10 @@
           Configuring the dataset
         </div>
         <v-progress-circular indeterminate />
-        <dataset-info ref="viewCreation" :class="{ hide: !pipelineError }" />
+        <dataset-info
+          ref="viewCreation"
+          :class="{ 'd-none': !pipelineError }"
+        />
       </template>
     </template>
   </v-container>
@@ -199,6 +204,9 @@ export default class NewDataset extends Vue {
 
   @Prop({ default: false })
   readonly quickupload!: boolean;
+
+  @Prop({ default: true })
+  readonly autoMultiConfig!: boolean;
 
   uploadedFiles: File[] | null = null;
 
@@ -384,17 +392,20 @@ export default class NewDataset extends Vue {
     this.uploading = false;
 
     const datasetId = this.dataset!.id;
+
     if (this.quickupload) {
-      this.traversePipeline(datasetId);
-    } else {
+      this.configureDataset();
+    } else if (this.autoMultiConfig) {
       this.$router.push({
         name: "multi",
         params: { datasetId }
       });
     }
+
+    this.$emit("datasetUploaded", datasetId);
   }
 
-  async traversePipeline(datasetId: string) {
+  async configureDataset() {
     // Don't set dataset yet because the only large image files are the upload files
     // If dataset is set now, it will not use the multi-source file later
 
@@ -411,15 +422,23 @@ export default class NewDataset extends Vue {
     }
     // Ensure that the component is initialized
     await (config.initialized || config.initialize());
-    // TODO: show transcoding if there is one
-    const jsonId = await config.generateJson();
+    config.submit();
+  }
+
+  generationDone(jsonId: string | null) {
+    if (this.quickupload) {
+      this.createView(jsonId);
+    }
+  }
+
+  async createView(jsonId: string | null) {
     if (!jsonId) {
       logError("Failed to generate JSON during quick upload");
       this.pipelineError = true;
       return;
     }
     // Set the dataset now that multi-source is available
-    await this.store.setSelectedDataset(datasetId);
+    await this.store.setSelectedDataset(this.dataset!.id);
     this.configuring = false;
 
     // Create a default dataset view for this dataset
@@ -446,9 +465,3 @@ export default class NewDataset extends Vue {
   }
 }
 </script>
-
-<style lang="scss" scoped>
-.hide {
-  display: none;
-}
-</style>

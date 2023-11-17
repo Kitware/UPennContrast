@@ -146,14 +146,14 @@ export class GirderResources extends VuexModule {
   @Action
   async getDataset({
     id,
-    unrollXY,
-    unrollZ,
-    unrollT
+    unrollXY = false,
+    unrollZ = false,
+    unrollT = false
   }: {
     id: string;
-    unrollXY: boolean;
-    unrollZ: boolean;
-    unrollT: boolean;
+    unrollXY?: boolean;
+    unrollZ?: boolean;
+    unrollT?: boolean;
   }): Promise<IDataset | null> {
     const [folder, items] = await Promise.all([
       this.getFolder(id),
