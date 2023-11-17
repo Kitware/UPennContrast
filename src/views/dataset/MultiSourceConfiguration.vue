@@ -458,12 +458,19 @@ export default class MultiSourceConfiguration extends Vue {
     // Enbale transcoding by default except for ND2 files
     this.transcode = !names.every(name => name.toLowerCase().endsWith("nd2"));
 
-    collectFilenameMetadata2(names).forEach(filenameData =>
-      this.addSizeToDimension(filenameData.guess, filenameData.values.length, {
-        source: Sources.Filename,
-        data: filenameData
-      })
-    );
+    // Add variables from filenames if there is more than one file
+    if (names.length > 1) {
+      collectFilenameMetadata2(names).forEach(filenameData =>
+        this.addSizeToDimension(
+          filenameData.guess,
+          filenameData.values.length,
+          {
+            source: Sources.Filename,
+            data: filenameData
+          }
+        )
+      );
+    }
 
     // Get info from file
     this.tilesMetadata = await Promise.all(
