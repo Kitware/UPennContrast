@@ -71,18 +71,26 @@
             />
           </v-radio-group>
           <template v-if="addDatasetOption.type == 'add'">
-            <girder-location-chooser
-              @input="selectAddDatasetFolder"
-              :breadcrumb="true"
+            <custom-file-manager
               title="Choose a dataset or a folder of datasets to add in the current Configuration"
+              :breadcrumb="true"
+              :selectable="true"
+              @selected="selectAddDatasetFolder"
+              :location.sync="datasetSelectLocation"
+              :initial-items-per-page="-1"
+              :items-per-page-options="[-1]"
+              :menu-enabled="false"
+              :more-chips="false"
+              :clickable-chips="false"
             />
             <v-alert
-              v-if="addDatasetOption.message"
+              v-for="(warning, iWarning) in addDatasetOption.warnings"
+              :key="iWarning + '-warning'"
               type="warning"
               class="my-2"
               dense
             >
-              {{ addDatasetOption.message }}
+              {{ warning }}
             </v-alert>
             <v-alert
               v-if="addDatasetOption.datasets.length > 0"
@@ -159,7 +167,7 @@ import girderResources from "@/store/girderResources";
 import { Location } from "vue-router";
 import { Dictionary } from "vue-router/types/router";
 import { IDataset, IDatasetConfiguration, areCompatibles } from "@/store/model";
-import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
+import CustomFileManager from "@/components/CustomFileManager.vue";
 
 import NewDataset from "@/views/dataset/NewDataset.vue";
 import { IGirderSelectAble } from "@/girder";
@@ -189,7 +197,7 @@ type TAddDatasetOption =
   | {
       type: "add";
       datasets: IDataset[];
-      message: string;
+      warnings: string[];
     };
 
 function defaultDatasetUploadOption(): TAddDatasetOption {
@@ -206,12 +214,12 @@ function defaultDatasetAddOption(): TAddDatasetOption {
   return {
     type: "add",
     datasets: [],
-    message: ""
+    warnings: []
   };
 }
 
 @Component({
-  components: { GirderLocationChooser, MultiSourceConfiguration, NewDataset }
+  components: { CustomFileManager, MultiSourceConfiguration, NewDataset }
 })
 export default class BreadCrumbs extends Vue {
   readonly store = store;
@@ -230,6 +238,9 @@ export default class BreadCrumbs extends Vue {
 
   addDatasetConfig: IDatasetConfiguration | null = null;
   addDatasetOption: TAddDatasetOption = defaultDatasetUploadOption();
+
+  // Enable navigation in the component
+  datasetSelectLocation: IGirderSelectAble | null = null;
 
   $refs!: {
     configuration?: MultiSourceConfiguration;
@@ -268,39 +279,45 @@ export default class BreadCrumbs extends Vue {
     }
   }
 
-  async selectAddDatasetFolder(location: IGirderSelectAble | null) {
+  async selectAddDatasetFolder(selectedLocations: IGirderSelectAble[]) {
     const option = this.addDatasetOption;
-    if (option.type !== "add" || !this.addDatasetConfig) {
+    if (option.type !== "add") {
       return;
     }
-    const datasets: IDataset[] = [];
-    // User didn't select a valid folder
-    if (!location || location._modelType !== "folder") {
-      option.datasets = datasets;
-      option.message =
-        "Selected location is invalid. Select a dataset or a folder containing datasets.";
+    if (selectedLocations.length === 0 || !this.addDatasetConfig) {
+      option.datasets = [];
+      option.warnings = [];
       return;
     }
-    // User selected a folder
-    const foldersToCheck = [location];
-    if (!isDatasetFolder(location)) {
-      const childrenFolders = await this.store.api.getFolders(location._id);
-      foldersToCheck.push(...childrenFolders);
+
+    const currentWarnings: string[] = [];
+
+    // Find selected items that are datasets
+    const selectedDatasets: IDataset[] = [];
+    await Promise.all(
+      selectedLocations.map(async location => {
+        if (!isDatasetFolder(location)) {
+          return;
+        }
+        const dataset = await this.girderResources.getDataset({
+          id: location._id
+        });
+        if (!dataset) {
+          return;
+        }
+        selectedDatasets.push(dataset);
+      })
+    );
+
+    if (selectedDatasets.length !== selectedLocations.length) {
+      const nNotDataset = selectedLocations.length - selectedDatasets.length;
+      currentWarnings.push(nNotDataset + " selected items are not datasests");
     }
-    for (const folder of foldersToCheck) {
-      if (!isDatasetFolder(folder)) {
-        continue;
-      }
-      const dataset = await this.girderResources.getDataset({
-        id: folder._id
-      });
-      if (dataset) {
-        datasets.push(dataset);
-      }
-    }
-    if (datasets.length === 0) {
-      option.message =
-        "The selected folder is not a dataset and doesn't contain a dataset.";
+
+    // Early return if no selected dataset
+    if (selectedDatasets.length === 0) {
+      option.datasets = [];
+      option.warnings = currentWarnings;
       return;
     }
 
@@ -310,18 +327,24 @@ export default class BreadCrumbs extends Vue {
       configurationId: this.addDatasetConfig.id
     });
     const excludeDatasetIds = new Set(configViews.map(view => view.datasetId));
-    const compatibleDatasets = datasets.filter(
+    const compatibleDatasets = selectedDatasets.filter(
       dataset =>
         !excludeDatasetIds.has(dataset.id) &&
         areCompatibles(configCompat, getDatasetCompatibility(dataset))
     );
-    if (compatibleDatasets.length === 0) {
-      option.message =
-        "Selected datasets are not compatible with the current configuration";
-      return;
+
+    if (compatibleDatasets.length !== selectedDatasets.length) {
+      const nNotCompatible =
+        selectedDatasets.length - compatibleDatasets.length;
+      currentWarnings.push(
+        nNotCompatible +
+          " selected items are not compatible with the current configuration"
+      );
     }
+
+    // Return the dataset and warnings
     option.datasets = compatibleDatasets;
-    option.message = "";
+    option.warnings = currentWarnings;
   }
 
   get canAddDatasetToCollection(): boolean {

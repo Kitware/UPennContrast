@@ -28,7 +28,7 @@
       v-if="currentLocation"
       :location.sync="currentLocation"
       new-folder-enabled
-      :selectable="menuEnabled"
+      :selectable="menuEnabled || selectable"
       v-model="selected"
       v-bind="$attrs"
       v-on="$listeners"
@@ -120,6 +120,11 @@ export default class CustomFileManager extends Vue {
   menuEnabled!: boolean;
 
   @Prop({
+    default: false
+  })
+  selectable!: boolean;
+
+  @Prop({
     default: true
   })
   moreChips!: boolean;
@@ -181,6 +186,14 @@ export default class CustomFileManager extends Vue {
   async fetchLocation() {
     const publicFolder = await this.store.api.getUserPublicFolder();
     this.defaultLocation = publicFolder || this.store.girderUser;
+  }
+
+  @Watch("selected")
+  @Watch("selectable")
+  emitSelected() {
+    if (this.selectable) {
+      this.$emit("selected", this.selected);
+    }
   }
 
   searchInput(value: IGirderSelectAble) {
