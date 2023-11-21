@@ -21,12 +21,17 @@
                 <v-tab-item>
                   <file-dropzone @input="quickUpload">
                     <template #afterMessage>
-                      <span class="caption">
-                        <v-icon size="14px" class="py-1">
+                      <span class="caption d-flex">
+                        <v-icon size="20px" class="pa-1">
                           mdi-information
                         </v-icon>
-                        Default collection will be created in same folder as
-                        dataset
+                        <div>
+                          Dataset will be uploaded in:
+                          <strong>{{ locationName }}</strong>
+                          <br />
+                          Default collection will be created in same folder as
+                          dataset
+                        </div>
                       </span>
                     </template>
                   </file-dropzone>
@@ -142,6 +147,24 @@ export default class Home extends Vue {
 
   uploadTab: number = 0;
 
+  get locationName() {
+    if (!this.location) {
+      return "";
+    }
+    // @ts-ignore: name or login may be undefined, but this case is checked
+    const name: string = this.location.name || this.location.login;
+    if (name) {
+      return name;
+    }
+    // @ts-ignore: same reason as for name and login
+    const alternative: string = this.location.type || this.location._modelType;
+    if (alternative) {
+      // Capitalize first letter
+      return alternative[0].toUpperCase() + alternative.slice(1);
+    }
+    return "Unknown location name";
+  }
+
   get datasetViews() {
     const result: IDatasetView[] = [];
     const used: Set<string> = new Set();
@@ -229,7 +252,11 @@ export default class Home extends Vue {
     // RouteConfig in src/view/dataset/index.ts has to support it
     this.$router.push({
       name: "newdataset",
-      params: { defaultFiles: files, quickupload: true } as any
+      params: {
+        quickupload: true,
+        defaultFiles: files,
+        initialUploadLocation: this.location
+      } as any
     });
   }
 
@@ -238,7 +265,10 @@ export default class Home extends Vue {
     // RouteConfig in src/view/dataset/index.ts has to support it
     this.$router.push({
       name: "newdataset",
-      params: { defaultFiles: files } as any
+      params: {
+        defaultFiles: files,
+        initialUploadLocation: this.location
+      } as any
     });
   }
 }
