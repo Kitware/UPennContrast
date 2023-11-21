@@ -1,5 +1,6 @@
 <template>
   <div class="breadcrumbs">
+    <alert-dialog ref="alert" />
     <!-- The breadcrumbs (dataset and configuration) -->
     <v-breadcrumbs :items="items" divider="" class="py-0 mx-2">
       <template #item="{ item }">
@@ -53,11 +54,18 @@
     </v-breadcrumbs>
 
     <!-- Dialog to add a dataset to the current collection -->
-    <v-dialog v-model="addDatasetDialog" width="60%">
+    <v-dialog
+      content-class="smart-overflow"
+      v-model="addDatasetFlag"
+      width="60%"
+    >
       <add-dataset-to-collection
         v-if="addDatasetCollection"
         :collection="addDatasetCollection"
         @addedDatasets="addedDatasets"
+        @done="addDatasetFlag = false"
+        @warning="openAlert({ type: 'warning', message: $event })"
+        @error="openAlert({ type: 'error', message: $event })"
       />
     </v-dialog>
   </div>
@@ -71,7 +79,8 @@ import { Location } from "vue-router";
 import { Dictionary } from "vue-router/types/router";
 import AddDatasetToCollection from "@/components/AddDatasetToCollection.vue";
 
-import { IDatasetConfiguration } from "@/store/model";
+import { IDatasetConfiguration, IDatasetView } from "@/store/model";
+import AlertDialog, { IAlert } from "@/components/AlertDialog.vue";
 
 interface IBreadCrumbItem {
   title: string;
@@ -83,10 +92,14 @@ interface IBreadCrumbItem {
   }[];
 }
 
-@Component({ components: { AddDatasetToCollection } })
+@Component({ components: { AddDatasetToCollection, AlertDialog } })
 export default class BreadCrumbs extends Vue {
   readonly store = store;
   readonly girderResources = girderResources;
+
+  readonly $refs!: {
+    alert: AlertDialog;
+  };
 
   items: IBreadCrumbItem[] = [];
   previousRefreshInfo: {
@@ -100,6 +113,16 @@ export default class BreadCrumbs extends Vue {
   };
 
   addDatasetCollection: IDatasetConfiguration | null = null;
+
+  get addDatasetFlag() {
+    return this.addDatasetCollection !== null;
+  }
+
+  set addDatasetFlag(val: boolean) {
+    if (!val) {
+      this.addDatasetCollection = null;
+    }
+  }
 
   get datasetView() {
     const { datasetViewId } = this.$route.params;
@@ -143,6 +166,11 @@ export default class BreadCrumbs extends Vue {
     this.refreshItems();
   }
 
+  openAlert(alert: IAlert) {
+    this.addDatasetFlag = false;
+    this.$refs.alert.openAlert(alert);
+  }
+
   async setItemTextWithResourceName(
     item: { text: string },
     id: string,
@@ -160,21 +188,15 @@ export default class BreadCrumbs extends Vue {
     );
   }
 
-  get addDatasetDialog() {
-    return this.addDatasetCollection !== null;
-  }
-
-  set addDatasetDialog(value: boolean) {
-    if (!value) {
-      this.addDatasetCollection = null;
-    }
-  }
-
-  addedDatasets() {
+  addedDatasets(_datasetIds: string[], datasetViews: IDatasetView[]) {
     // New datasets have been added to current collection
     this.refreshItems(true);
     // Close the dialog
-    this.addDatasetCollection = null;
+    this.addDatasetFlag = false;
+    // Go to the first dataset view if there is one
+    if (datasetViews[0]) {
+      this.goToView(datasetViews[0].id);
+    }
   }
 
   @Watch("datasetId")

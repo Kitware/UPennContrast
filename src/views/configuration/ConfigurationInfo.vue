@@ -1,5 +1,6 @@
 <template>
   <v-container>
+    <alert-dialog ref="alert" />
     <v-container class="d-flex">
       <v-spacer />
       <v-dialog v-model="removeConfirm" max-width="33vw">
@@ -85,11 +86,18 @@
           <v-icon class="pr-2" color="primary">mdi-plus-circle</v-icon>
           Add dataset to current collection
         </div>
-        <v-dialog v-model="addDatasetDialog" width="60%">
+        <v-dialog
+          content-class="smart-overflow"
+          v-model="addDatasetDialog"
+          width="60%"
+        >
           <add-dataset-to-collection
             v-if="configuration"
             :collection="configuration"
             @addedDatasets="addedDatasets"
+            @done="addDatasetDialog = false"
+            @warning="openAlert({ type: 'warning', message: $event })"
+            @error="openAlert({ type: 'error', message: $event })"
           />
         </v-dialog>
       </v-card-actions>
@@ -136,11 +144,18 @@ import { IDatasetView, IDisplaySlice } from "@/store/model";
 import { IGirderFolder } from "@/girder";
 import ScaleSettings from "@/components/ScaleSettings.vue";
 import AddDatasetToCollection from "@/components/AddDatasetToCollection.vue";
+import AlertDialog, { IAlert } from "@/components/AlertDialog.vue";
 
-@Component({ components: { AddDatasetToCollection, ScaleSettings } })
+@Component({
+  components: { AddDatasetToCollection, AlertDialog, ScaleSettings }
+})
 export default class ConfigurationInfo extends Vue {
   readonly store = store;
   readonly girderResources = girderResources;
+
+  readonly $refs!: {
+    alert: AlertDialog;
+  };
 
   removeConfirm = false;
 
@@ -170,6 +185,11 @@ export default class ConfigurationInfo extends Vue {
 
   mounted() {
     this.updateConfigurationViews();
+  }
+
+  openAlert(alert: IAlert) {
+    this.addDatasetDialog = false;
+    this.$refs.alert.openAlert(alert);
   }
 
   addedDatasets() {

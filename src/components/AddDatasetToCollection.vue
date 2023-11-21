@@ -1,10 +1,10 @@
 <template>
-  <v-card>
+  <v-card class="smart-overflow">
     <v-card-title class="mb-4">
       <span class="text--secondary">Adding dataset to collection:</span>
       <span class="text--primary">{{ collection.name }}</span>
     </v-card-title>
-    <v-card-text>
+    <v-card-text class="smart-overflow">
       <v-radio-group v-model="addDatasetOptionType">
         <v-radio
           label="Add an existing dataset to the current collection"
@@ -18,6 +18,7 @@
       <template v-if="option.type == 'add'">
         <custom-file-manager
           title="Choose a dataset or a folder of datasets to add in the current Configuration"
+          class="smart-overflow"
           :breadcrumb="true"
           :selectable="true"
           @selected="selectAddDatasetFolder"
@@ -303,19 +304,26 @@ export default class AddDatasetToCollection extends Vue {
     // Check if dataset is compatible with configuration
     const configCompat = this.collection?.compatibility;
     if (!configCompat) {
-      logError(
+      this.$emit(
+        "error",
         "DatasetConfiguration missing after multi source configuration of dataset"
       );
+      this.$emit("done");
       return;
     }
     const dataset = await this.girderResources.getDataset({ id: datasetId });
     if (!dataset) {
-      logError("Dataset missing after multi source configuration of dataset");
+      this.$emit(
+        "error",
+        "Dataset missing after multi source configuration of dataset"
+      );
+      this.$emit("done");
       return;
     }
     const datasetCompat = getDatasetCompatibility(dataset);
     if (!areCompatibles(configCompat, datasetCompat)) {
-      logError("Incompatible dataset uploaded");
+      this.$emit("warning", "Incompatible dataset uploaded");
+      this.$emit("done");
       return;
     }
     // Set the dataset now that multi-source is available
@@ -345,11 +353,19 @@ export default class AddDatasetToCollection extends Vue {
         configurationId
       })
     );
-    await Promise.all(promises);
+    const datasetViews = await Promise.all(promises);
 
-    this.$emit("addedDatasets", datasetIds);
+    this.$emit("addedDatasets", datasetIds, datasetViews);
 
     this.option = defaultDatasetUploadOption();
   }
 }
 </script>
+
+<style lang="scss">
+.smart-overflow {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+</style>
