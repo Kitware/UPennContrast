@@ -1,14 +1,13 @@
 <template>
   <v-container>
-    <v-text-field :value="name" label="Name" readonly />
-    <v-textarea :value="description" label="Description" readonly />
+    <alert-dialog ref="alert" />
     <v-container class="d-flex">
       <v-spacer />
       <v-dialog v-model="removeConfirm" max-width="33vw">
         <template #activator="{ on }">
-          <v-btn color="warning" v-on="on" :disabled="!store.configuration">
+          <v-btn color="red" v-on="on" :disabled="!store.configuration">
             <v-icon left>mdi-close</v-icon>
-            Delete Configuration
+            Delete Collection
           </v-btn>
         </template>
         <v-card>
@@ -22,38 +21,8 @@
         </v-card>
       </v-dialog>
     </v-container>
-    <v-card class="mb-4">
-      <v-card-title>
-        Layers
-      </v-card-title>
-      <v-card-text>
-        <v-list two-line>
-          <v-list-item v-for="l in layers" :key="l.name">
-            <v-list-item-avatar>
-              <v-icon :color="l.color">mdi-circle</v-icon>
-            </v-list-item-avatar>
-            <v-list-item-content>
-              <v-list-item-title>
-                {{ l.name }}{{ !l.visible ? "(hidden)" : "" }}
-              </v-list-item-title>
-              <v-list-item-subtitle>
-                Channel: <code class="code">{{ l.channel }}</code> Z-Slice:
-                <code class="code">{{ toSlice(l.z) }}</code> Time-Slice:
-                <code class="code">{{ toSlice(l.time) }}</code>
-              </v-list-item-subtitle>
-            </v-list-item-content>
-          </v-list-item>
-        </v-list>
-      </v-card-text>
-    </v-card>
-    <v-card class="mb-4">
-      <v-card-title>
-        Scale
-      </v-card-title>
-      <v-card-text>
-        <scale-settings :configuration-only="true" />
-      </v-card-text>
-    </v-card>
+    <v-text-field :value="name" label="Name" readonly />
+    <v-textarea :value="description" label="Description" readonly />
     <v-card class="mb-4">
       <v-card-title>
         Datasets
@@ -111,6 +80,59 @@
           </v-list-item>
         </v-list>
       </v-card-text>
+      <v-card-actions class="d-block">
+        <v-divider />
+        <div class="clickable-flex pa-2 body" @click="addDatasetDialog = true">
+          <v-icon class="pr-2" color="primary">mdi-plus-circle</v-icon>
+          Add dataset to current collection
+        </div>
+        <v-dialog
+          content-class="smart-overflow"
+          v-model="addDatasetDialog"
+          width="60%"
+        >
+          <add-dataset-to-collection
+            v-if="configuration"
+            :collection="configuration"
+            @addedDatasets="addedDatasets"
+            @done="addDatasetDialog = false"
+            @warning="openAlert({ type: 'warning', message: $event })"
+            @error="openAlert({ type: 'error', message: $event })"
+          />
+        </v-dialog>
+      </v-card-actions>
+    </v-card>
+    <v-card class="mb-4">
+      <v-card-title>
+        Layers
+      </v-card-title>
+      <v-card-text>
+        <v-list two-line>
+          <v-list-item v-for="l in layers" :key="l.name">
+            <v-list-item-avatar>
+              <v-icon :color="l.color">mdi-circle</v-icon>
+            </v-list-item-avatar>
+            <v-list-item-content>
+              <v-list-item-title>
+                {{ l.name }}{{ !l.visible ? "(hidden)" : "" }}
+              </v-list-item-title>
+              <v-list-item-subtitle>
+                Channel: <code class="code">{{ l.channel }}</code> Z-Slice:
+                <code class="code">{{ toSlice(l.z) }}</code> Time-Slice:
+                <code class="code">{{ toSlice(l.time) }}</code>
+              </v-list-item-subtitle>
+            </v-list-item-content>
+          </v-list-item>
+        </v-list>
+      </v-card-text>
+    </v-card>
+    <v-card class="mb-4">
+      <v-card-title>
+        Scale
+      </v-card-title>
+      <v-card-text>
+        <scale-settings :configuration-only="true" />
+      </v-card-text>
     </v-card>
   </v-container>
 </template>
@@ -121,11 +143,19 @@ import girderResources from "@/store/girderResources";
 import { IDatasetView, IDisplaySlice } from "@/store/model";
 import { IGirderFolder } from "@/girder";
 import ScaleSettings from "@/components/ScaleSettings.vue";
+import AddDatasetToCollection from "@/components/AddDatasetToCollection.vue";
+import AlertDialog, { IAlert } from "@/components/AlertDialog.vue";
 
-@Component({ components: { ScaleSettings } })
+@Component({
+  components: { AddDatasetToCollection, AlertDialog, ScaleSettings }
+})
 export default class ConfigurationInfo extends Vue {
   readonly store = store;
   readonly girderResources = girderResources;
+
+  readonly $refs!: {
+    alert: AlertDialog;
+  };
 
   removeConfirm = false;
 
@@ -134,6 +164,8 @@ export default class ConfigurationInfo extends Vue {
 
   datasetViews: IDatasetView[] = [];
   datasetInfoCache: { [datasetId: string]: IGirderFolder } = {};
+
+  addDatasetDialog: boolean = false;
 
   get name() {
     return store.configuration ? store.configuration.name : "";
@@ -152,6 +184,16 @@ export default class ConfigurationInfo extends Vue {
   }
 
   mounted() {
+    this.updateConfigurationViews();
+  }
+
+  openAlert(alert: IAlert) {
+    this.addDatasetDialog = false;
+    this.$refs.alert.openAlert(alert);
+  }
+
+  addedDatasets() {
+    this.addDatasetDialog = false;
     this.updateConfigurationViews();
   }
 
@@ -238,8 +280,17 @@ export default class ConfigurationInfo extends Vue {
   }
 }
 </script>
+
 <style lang="scss" scoped>
 .code {
   margin: 0 1em 0 0.5em;
+}
+</style>
+
+<style lang="scss">
+.clickable-flex {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
 }
 </style>
