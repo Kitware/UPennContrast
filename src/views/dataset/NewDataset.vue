@@ -200,13 +200,16 @@ export default class NewDataset extends Vue {
   readonly girderResources = girderResources;
 
   @Prop({ type: Array, default: () => [] })
-  defaultFiles!: File[];
+  readonly defaultFiles!: File[];
 
   @Prop({ default: false })
   readonly quickupload!: boolean;
 
   @Prop({ default: true })
   readonly autoMultiConfig!: boolean;
+
+  @Prop()
+  readonly initialUploadLocation?: IGirderSelectAble;
 
   uploadedFiles: File[] | null = null;
 
@@ -328,14 +331,18 @@ export default class NewDataset extends Vue {
   }
 
   async mounted() {
-    const publicFolder = await this.store.api.getUserPublicFolder();
-    if (!publicFolder) {
-      return;
-    }
-    if (this.quickupload) {
-      this.path = await this.store.api.getQuickUploadFolder(publicFolder._id);
+    if (this.initialUploadLocation) {
+      this.path = this.initialUploadLocation;
     } else {
-      this.path = publicFolder;
+      const publicFolder = await this.store.api.getUserPublicFolder();
+      if (!publicFolder) {
+        return;
+      }
+      if (this.quickupload) {
+        this.path = await this.store.api.getQuickUploadFolder(publicFolder._id);
+      } else {
+        this.path = publicFolder;
+      }
     }
   }
 
