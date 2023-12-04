@@ -794,11 +794,9 @@ export function parseTiles(
 
   const channelInt = new Map<string | null, number>();
   const lookup = new Map<string, IImage[]>();
-  let frameChannels: string[] | undefined;
-  let unrollCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
-  let unrollOrder: string[] = [];
-
-  frameChannels = tile.channels;
+  const frameChannels: string[] | undefined = tile.channels;
+  const unrollCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
+  const unrollOrder: string[] = [];
 
   if (!tile.frames) {
     tile.frames = [({ Index: 0, Frame: 0 } as unknown) as IFrameInfo];

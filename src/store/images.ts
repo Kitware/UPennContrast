@@ -127,17 +127,17 @@ export function toStyle(
     };
   }
   if (layer && ds && image) {
-    let mmxy = layer.xy.type === "max-merge";
-    let mmt = layer.time.type === "max-merge";
-    let mmz = layer.z.type === "max-merge";
+    const mmxy = layer.xy.type === "max-merge";
+    const mmt = layer.time.type === "max-merge";
+    const mmz = layer.z.type === "max-merge";
     if (mmxy || mmt || mmz) {
-      var composite: { [key: string]: any }[] = [];
+      const composite: { [key: string]: any }[] = [];
       for (let xyi = 0; xyi < (mmxy ? ds.xy.length : 1); xyi += 1) {
-        let xy = mmxy ? ds.xy[xyi] : image.key.xy;
+        const xy = mmxy ? ds.xy[xyi] : image.key.xy;
         for (let ti = 0; ti < (mmt ? ds.time.length : 1); ti += 1) {
-          let t = mmt ? ds.time[ti] : image.key.t;
+          const t = mmt ? ds.time[ti] : image.key.t;
           for (let zi = 0; zi < (mmz ? ds.z.length : 1); zi += 1) {
-            let z = mmz ? ds.z[zi] : image.key.z;
+            const z = mmz ? ds.z[zi] : image.key.z;
             composite.push({
               frame: ds.images(z, t, xy, image.key.c)[image.keyOffset]
                 .frameIndex,

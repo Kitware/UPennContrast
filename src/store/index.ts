@@ -1216,7 +1216,7 @@ export class Main extends VuexModule {
 
   get getFullLayerImages() {
     return (time: number, xy: number, z: number) => {
-      let results: {
+      const results: {
         neededHistograms: IImage[][];
         urls: string[];
         fullUrls: string[];
@@ -1341,7 +1341,7 @@ export class Main extends VuexModule {
               "&cache=true"
           }
         };
-        let anyImage = this.dataset!.anyImage();
+        const anyImage = this.dataset!.anyImage();
         if (
           anyImage &&
           anyImage.tileinfo &&
@@ -1388,7 +1388,7 @@ export class Main extends VuexModule {
       }
 
       // debounce histogram calls
-      let nextHistogram = () => {
+      const nextHistogram = () => {
         if (
           layer._histogram &&
           !layer._histogram.lock &&
@@ -1484,7 +1484,7 @@ export class Main extends VuexModule {
     if (!this.configuration) {
       return;
     }
-    let snapshots = (this.configuration.snapshots || []).filter(
+    const snapshots = (this.configuration.snapshots || []).filter(
       d => d.name !== snapshot.name
     );
     snapshots.push(snapshot);
@@ -1497,7 +1497,7 @@ export class Main extends VuexModule {
     if (!this.configuration) {
       return;
     }
-    let snapshots = (this.configuration.snapshots || []).filter(
+    const snapshots = (this.configuration.snapshots || []).filter(
       d => d.name !== name
     );
     this.configuration.snapshots = snapshots;

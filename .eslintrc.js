@@ -8,7 +8,6 @@ module.exports = {
     "no-console": process.env.NODE_ENV === "production" ? "error" : "off",
     "no-debugger": process.env.NODE_ENV === "production" ? "error" : "off",
     // Required to access v-data-table scoped slots, see https://vuetifyjs.com/en/components/data-tables/#slots
-    "prefer-const": "off",
     "vue/valid-v-slot": "off"
   },
   parserOptions: {

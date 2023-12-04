@@ -225,7 +225,7 @@ function assignUniqueCategorizations(
   }
 
   // Step 2: Initial assignment
-  let assignedCategorizations: string[] = [];
+  const assignedCategorizations: string[] = [];
   for (const list of allComplementaryLists) {
     assignedCategorizations.push(categorizeColumns(df, list));
   }
