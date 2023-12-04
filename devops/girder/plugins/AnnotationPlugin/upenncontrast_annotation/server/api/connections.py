@@ -3,7 +3,7 @@ from girder.api.describe import Description, autoDescribeRoute, describeRoute
 from girder.api.rest import Resource, loadmodel
 from girder.constants import AccessType
 from girder.exceptions import AccessException
-from ..helpers.proxiedModel import recordable, cacheBodyJson
+from ..helpers.proxiedModel import recordable, memoizeBodyJson
 from ..models.connections import AnnotationConnection as ConnectionModel
 from ..models.annotation import Annotation as AnnotationModel
 
@@ -13,11 +13,11 @@ from bson.objectid import ObjectId
 # Helper functions to get dataset ID for recordable endpoints
 
 def getDatasetIdFromConnectionInBody(self: 'AnnotationConnection', *args, **kwargs):
-    connection = self.getBodyJson()
+    connection = kwargs["memoizedBodyJson"]
     return connection['datasetId']
 
 def getDatasetIdFromConnectionListInBody(self: 'AnnotationConnection', *args, **kwargs):
-    connections = self.getBodyJson()
+    connections = kwargs["memoizedBodyJson"]
     return None if len(connections) <= 0 else connections[0]['datasetId']
 
 def getDatasetIdFromLoadedConnection(self: 'AnnotationConnection', *args, **kwargs):
@@ -25,7 +25,7 @@ def getDatasetIdFromLoadedConnection(self: 'AnnotationConnection', *args, **kwar
     return connection['datasetId']
 
 def getDatasetIdFromConnectionIdListInBody(self: 'AnnotationConnection', *args, **kwargs):
-    connectionStringIds = self.getBodyJson()
+    connectionStringIds = kwargs["memoizedBodyJson"]
     query = {
       '_id': { '$in': [ObjectId(stringId) for stringId in connectionStringIds] },
     }
@@ -34,7 +34,7 @@ def getDatasetIdFromConnectionIdListInBody(self: 'AnnotationConnection', *args, 
     return None if connection is None else connection['datasetId']
     
 def getDatasetIdFromInfoInBody(self: 'AnnotationConnection', *args, **kwargs):
-    info = self.getBodyJson()
+    info = kwargs["memoizedBodyJson"]
     annotationsIdsToConnect = info['annotationsIds']
     annotationModel: AnnotationModel = AnnotationModel()
     for stringId in annotationsIdsToConnect:
@@ -67,25 +67,27 @@ class AnnotationConnection(Resource):
     # TODO: creation date, update date, creatorId
     # TODO: error handling and documentation
 
-    @cacheBodyJson
     @access.user
     @describeRoute(Description("Create a new connection").param('body', 'Connection Object', paramType='body'))
+    @memoizeBodyJson
     @recordable('Create a connection', getDatasetIdFromConnectionInBody)
-    def create(self, params):
+    def create(self, params, *args, **kwargs):
+        bodyJson = kwargs["memoizedBodyJson"]
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
-        return self._connectionModel.create(currentUser, self.getBodyJson())
+        return self._connectionModel.create(currentUser, bodyJson)
 
-    @cacheBodyJson
     @access.user
     @describeRoute(Description("Create multiple new connections").param('body', 'Connection Object List', paramType='body'))
+    @memoizeBodyJson
     @recordable('Create multiple connections', getDatasetIdFromConnectionListInBody)
-    def multipleCreate(self, params):
+    def multipleCreate(self, params, *args, **kwargs):
+        bodyJson = kwargs["memoizedBodyJson"]
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
-        return [self._connectionModel.create(currentUser, connection) for connection in self.getBodyJson()]
+        return [self._connectionModel.create(currentUser, connection) for connection in bodyJson]
 
     @describeRoute(Description("Delete an existing connection").param('id', 'The connection\'s Id', paramType='path').errorResponse('ID was invalid.')
                    .errorResponse('Write access was denied for the connection.', 403))
@@ -95,13 +97,14 @@ class AnnotationConnection(Resource):
     def delete(self, annotation_connection, params):
         self._connectionModel.remove(annotation_connection)
 
-    @cacheBodyJson
     @access.user
     @describeRoute(Description("Delete all annotation connections in the id list")
                    .param('body', 'A list of all annotation connection ids to delete.', paramType='body'))
+    @memoizeBodyJson
     @recordable('Delete multiple connections', getDatasetIdFromConnectionIdListInBody)
-    def deleteMultiple(self, params):
-        stringIds = [stringId for stringId in self.getBodyJson()]
+    def deleteMultiple(self, params, *args, **kwargs):
+        bodyJson = kwargs["memoizedBodyJson"]
+        stringIds = [stringId for stringId in bodyJson]
         self._connectionModel.deleteMultiple(stringIds)
 
     @describeRoute(Description("Update an existing connection")
@@ -113,9 +116,11 @@ class AnnotationConnection(Resource):
                    .errorResponse("Validation Error: JSON doesn't follow schema."))
     @access.user
     @loadmodel(model='annotation_connection', plugin='upenncontrast_annotation', level=AccessType.WRITE)
+    @memoizeBodyJson
     @recordable('Update a connection', getDatasetIdFromLoadedConnection)
-    def update(self, connection, params):
-        connection.update(self.getBodyJson())
+    def update(self, connection, params, *args, **kwargs):
+        bodyJson = kwargs["memoizedBodyJson"]
+        connection.update(bodyJson)
         self._connectionModel.update(connection)
 
     @access.user
@@ -156,12 +161,13 @@ class AnnotationConnection(Resource):
         return annotation_connection
 
 
-    @cacheBodyJson
     @access.user
     @describeRoute(Description("Create connections between annotations").param('body', 'Connection Object', paramType='body'))
+    @memoizeBodyJson
     @recordable('Create connections with nearest', getDatasetIdFromInfoInBody)
-    def connectToNearest(self, params):
+    def connectToNearest(self, params, *args, **kwargs):
+        bodyJson = kwargs["memoizedBodyJson"]
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
-        return self._connectionModel.connectToNearest(user=currentUser, info=self.getBodyJson())
+        return self._connectionModel.connectToNearest(user=currentUser, info=bodyJson)
