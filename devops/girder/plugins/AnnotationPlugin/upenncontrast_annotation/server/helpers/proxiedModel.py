@@ -10,51 +10,23 @@ from types import MethodType
 from functools import wraps
 from bson.objectid import ObjectId
 
-def cacheBodyJson(func):
+def memoizeBodyJson(func):
     '''
     A decorator on rest.Resource methods to cache the result of self.getBodyJson()
     This is usefull when some decorators and the decorated function use it
-    For example, when using @recordable
-    Use this decorator before any other decorator, for example:
+    For example, when using @recordable with a findDatasetIdFn that uses bodyJson
+    
+    Use this decorator before any other decorator using memoizedBodyJson:
     ```
-    @cacheBodyJson
+    @memoizeBodyJson
     @recordable('Foo', bar)
-    def f(self, *args, **kwargs):
-        pass
-    ```
-    instead of
-    ```
-    @recordable('Foo', bar)
-    @cacheBodyJson
     def f(self, *args, **kwargs):
         pass
     ```
     '''
     @wraps(func)
     def wrapped(self: rest.Resource, *args, **kwargs):
-        # Get the result of getBodyJson
-        error = None
-        bodyJson = None
-        try:
-            bodyJson = self.getBodyJson()
-        except rest.RestException as err:
-            error = err
-
-        # Create memoised version of the method
-        def getCachedBodyJson(self):
-            return deepcopy(bodyJson)
-        def raiseBodyJsonError(self):
-            raise error
-        newFunction = getCachedBodyJson if error is None else raiseBodyJsonError
-        newMethod = MethodType(newFunction, self)
-
-        # Wrap the function call
-        originalMethod = self.getBodyJson
-        try:
-            self.getBodyJson = newMethod
-            return func(self, *args, **kwargs)
-        finally:
-            self.getBodyJson = originalMethod
+        return func(self, *args, **kwargs, memoizedBodyJson=self.getBodyJson())
 
     return wrapped
 
