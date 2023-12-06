@@ -452,7 +452,7 @@ export default class AnnotationViewer extends Vue {
         });
       yOffset += 12;
       for (const propertyPath of this.displayedPropertyPaths) {
-        const fullName = this.propertyStore.getFullNameFromPath(propertyPath);
+        const fullName = this.propertyStore.getSubIdsNameFromPath(propertyPath);
         if (fullName) {
           const propertyValues = this.propertyValues;
           const propertyData: Map<string, string> = new Map();

@@ -190,6 +190,31 @@ export class Properties extends VuexModule {
       return fullName;
     };
   }
+  
+  get getSubIdsNameFromPath() {
+    return (propertyPath: string[]) => {
+      const propertyId = propertyPath[0];
+      if (!propertyId) {
+        return null;
+      }
+      const property = this.getPropertyById(propertyId);
+      if (!property) {
+        return null;
+      }
+      const propertyName = property.name;
+      const subIds = propertyPath.slice(1);
+  
+      // Check if subIds array is empty
+      if (subIds.length === 0) {
+        // Return only the propertyName if there are no subIds
+        return propertyName;
+      } else {
+        // Otherwise, return the subIds joined by " / "
+        return subIds.join(" / ");
+      }
+    };
+  }
+  
 
   get uncomputedAnnotationsPerProperty() {
     const uncomputed: { [propertyId: string]: IAnnotation[] } = {};
