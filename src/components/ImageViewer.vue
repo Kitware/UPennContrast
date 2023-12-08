@@ -125,6 +125,7 @@ import annotationStore from "@/store/annotation";
 import store from "@/store";
 import girderResources from "@/store/girderResources";
 import geojs from "geojs";
+import { markRaw } from "vue";
 
 import {
   IGeoJSMap,
@@ -662,8 +663,8 @@ export default class ImageViewer extends Vue {
       map.geoOn(geojs.event.pan, () => this._handlePan(mllidx));
       mapentry = {
         map: map,
-        imageLayers: [],
-        params: params,
+        imageLayers: markRaw([]),
+        params: markRaw(params),
         baseLayerIndex: mllidx ? undefined : 0
       };
       Vue.set(this.maps, mllidx, mapentry);
@@ -694,7 +695,7 @@ export default class ImageViewer extends Vue {
       mapentry.textLayer.node().css({ "mix-blend-mode": "unset" });
     } else {
       mapentry = this.maps[mllidx];
-      mapentry.params = params;
+      mapentry.params = markRaw(params);
       map = mapentry.map;
       const adjustLayers =
         Math.abs(map.maxBounds(undefined, null).right - mapWidth) >= 0.5 ||
