@@ -458,8 +458,11 @@ export default class MultiSourceConfiguration extends Vue {
     //  Get info from filename
     const names = items.map(item => item.name);
 
-    // Enbale transcoding by default except for ND2 files
-    this.transcode = !names.every(name => name.toLowerCase().endsWith("nd2"));
+    // Enbale transcoding by default except for ND2 (Nikon), czi (Zeiss), and lif (Leica)  files
+    this.transcode = !names.every(name =>
+      [".nd2", ".czi", ".lif"].some(ext => name.toLowerCase().endsWith(ext))
+    );
+
 
     // Add variables from filenames if there is more than one file
     if (names.length > 1) {
