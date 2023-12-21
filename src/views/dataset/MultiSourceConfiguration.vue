@@ -316,7 +316,7 @@ export default class MultiSourceConfiguration extends Vue {
 
   get assignmentItems() {
     const assignedDimensions = Object.entries(this.assignments).reduce(
-      (assignedDimensions, [_, assignment]) =>
+      (assignedDimensions, [, assignment]) =>
         assignment
           ? [...assignedDimensions, assignment.value.id]
           : assignedDimensions,

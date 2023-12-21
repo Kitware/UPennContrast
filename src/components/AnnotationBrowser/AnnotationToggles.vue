@@ -78,8 +78,7 @@ import store from "@/store";
 
 import {
   AnnotationSelectionTypes,
-  AnnotationSelectionTypesNames,
-  AnnotationSelectionTypesTooltips
+  AnnotationSelectionTypesNames
 } from "../../store/model";
 
 @Component({

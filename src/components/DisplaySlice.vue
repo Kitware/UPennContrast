@@ -54,7 +54,7 @@
 </style>
 
 <script lang="ts">
-import { Vue, Component, Prop, Watch } from "vue-property-decorator";
+import { Vue, Component, Prop } from "vue-property-decorator";
 import { IDisplaySlice, TDisplaySliceType } from "../store/model";
 import store from "@/store";
 

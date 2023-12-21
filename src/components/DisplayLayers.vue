@@ -165,7 +165,7 @@ export default class DisplayLayers extends Vue {
     this.isDragging = false;
     // Groups have changed position
     const newConfigurationLayers = [];
-    for (const [_, combinedLayers] of groups) {
+    for (const [, combinedLayers] of groups) {
       if (combinedLayers) {
         for (const { configurationLayer } of combinedLayers) {
           newConfigurationLayers.push(configurationLayer);

@@ -118,7 +118,7 @@
   </v-container>
 </template>
 <script lang="ts">
-import { Vue, Component, VModel, Prop } from "vue-property-decorator";
+import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
 import girderResources from "@/store/girderResources";
 import { IGirderSelectAble } from "@/girder";

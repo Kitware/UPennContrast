@@ -1172,7 +1172,6 @@ export default class AnnotationViewer extends Vue {
     if (!this.roiFilter) {
       return;
     }
-    const id = this.roiFilter.id;
     this.filterStore.validateNewROIFilter(geojsAnnotation.coordinates());
     this.annotationLayer.removeAnnotation(geojsAnnotation);
   }

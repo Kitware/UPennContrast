@@ -138,7 +138,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop, Emit, Watch } from "vue-property-decorator";
+import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import { IDisplayLayer, IContrast, IDisplaySlice } from "../store/model";
 import DisplaySlice from "./DisplaySlice.vue";
 import ContrastHistogram from "./ContrastHistogram.vue";

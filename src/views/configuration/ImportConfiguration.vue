@@ -32,7 +32,6 @@ export default class ImportConfiguration extends Vue {
     }
 
     // Create a view for each configuration
-    const now = Date.now();
     await Promise.all(
       configurations.map(configuration =>
         this.store.createDatasetView({

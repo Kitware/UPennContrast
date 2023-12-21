@@ -1,6 +1,5 @@
 import {
   IAnnotation,
-  IDisplayLayer,
   IImage,
   IGeoJSPoint,
   AnnotationShape,

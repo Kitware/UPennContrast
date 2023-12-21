@@ -63,7 +63,6 @@ import {
   IScales,
   TUnitLength,
   TUnitTime,
-  exampleConfigurationBase,
   unitLengthOptions,
   unitTimeOptions
 } from "@/store/model";

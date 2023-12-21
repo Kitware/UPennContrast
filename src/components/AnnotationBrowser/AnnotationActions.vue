@@ -101,7 +101,14 @@ export default class AnnotationActions extends Vue {
   }
 
   get redoEntry() {
-    return this.history.findLast(entry => entry.isUndone);
+    // Use findLast(entry => entry.isUndone) as in undoEntry() when typescript agrees
+    const history = this.history;
+    for (let i = history.length; i-- > 0; ) {
+      if (history[i].isUndone) {
+        return history[i];
+      }
+    }
+    return undefined;
   }
 
   get filteredAnnotations() {

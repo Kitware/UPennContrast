@@ -70,11 +70,7 @@
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import propertiesStore from "@/store/properties";
-import {
-  AnnotationNames,
-  AnnotationShape,
-  IToolConfiguration
-} from "@/store/model";
+import { IToolConfiguration } from "@/store/model";
 
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";

@@ -19,7 +19,7 @@ import "./style.scss";
 import VueRouter from "vue-router";
 
 // Mousetrap is configured for further imports (no need to import record plugin again)
-import _Mousetrap from "mousetrap";
+import "mousetrap";
 import "mousetrap/plugins/record/mousetrap-record.min.js";
 import vMousetrap from "@/utils/v-mousetrap";
 import vDescription from "@/utils/v-description";

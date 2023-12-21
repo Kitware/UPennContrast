@@ -164,7 +164,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   @Watch("unrollXY")
-  watchUnrollXY(_value: boolean) {
+  watchUnrollXY() {
     this.store.refreshDataset();
   }
 
@@ -179,7 +179,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   @Watch("unrollZ")
-  watchUnrollZ(_value: boolean) {
+  watchUnrollZ() {
     this.store.refreshDataset();
   }
 
@@ -194,7 +194,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   @Watch("unrollT")
-  watchUnrollT(_value: boolean) {
+  watchUnrollT() {
     this.store.refreshDataset();
   }
 

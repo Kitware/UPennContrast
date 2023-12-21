@@ -190,7 +190,7 @@ export class Properties extends VuexModule {
       return fullName;
     };
   }
-  
+
   get getSubIdsNameFromPath() {
     return (propertyPath: string[]) => {
       const propertyId = propertyPath[0];
@@ -203,7 +203,7 @@ export class Properties extends VuexModule {
       }
       const propertyName = property.name;
       const subIds = propertyPath.slice(1);
-  
+
       // Check if subIds array is empty
       if (subIds.length === 0) {
         // Return only the propertyName if there are no subIds
@@ -214,7 +214,6 @@ export class Properties extends VuexModule {
       }
     };
   }
-  
 
   get uncomputedAnnotationsPerProperty() {
     const uncomputed: { [propertyId: string]: IAnnotation[] } = {};

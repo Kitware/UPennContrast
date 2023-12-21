@@ -364,7 +364,7 @@ export default class Snapshots extends Vue {
   snapshotVisible!: boolean;
 
   @Watch("snapshotVisible")
-  watchSnapshotVisible(_value: boolean) {
+  watchSnapshotVisible() {
     this.showSnapshot(this.snapshotVisible);
     if (this.snapshotVisible) {
       this.markCurrentArea();
@@ -453,16 +453,24 @@ export default class Snapshots extends Vue {
     return (this.bboxRight || 0) - (this.bboxLeft || 0);
   }
 
-  set bboxWidth(value: string) {
-    this.bboxRight = (this.bboxLeft || 0) + intFromString(value);
+  set bboxWidth(value: string | number) {
+    if (typeof value == "string") {
+      this.bboxRight = (this.bboxLeft || 0) + intFromString(value);
+    } else {
+      this.bboxRight = value;
+    }
   }
 
   get bboxHeight(): number {
     return (this.bboxBottom || 0) - (this.bboxTop || 0);
   }
 
-  set bboxHeight(value: string) {
-    this.bboxBottom = (this.bboxTop || 0) + intFromString(value);
+  set bboxHeight(value: string | number) {
+    if (typeof value == "string") {
+      this.bboxBottom = (this.bboxTop || 0) + intFromString(value);
+    } else {
+      this.bboxBottom = value;
+    }
   }
 
   get unroll(): boolean {

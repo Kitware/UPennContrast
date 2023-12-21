@@ -58,7 +58,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Emit, Prop, Watch } from "vue-property-decorator";
+import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
