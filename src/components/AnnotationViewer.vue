@@ -11,7 +11,7 @@ import filterStore from "@/store/filters";
 import geojs from "geojs";
 import { snapCoordinates } from "@/utils/itk";
 
-import { throttle, debounce } from "lodash-es";
+import { throttle, debounce } from "lodash";
 const THROTTLE = 100;
 
 import {

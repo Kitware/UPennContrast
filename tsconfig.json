@@ -1,11 +1,11 @@
 {
   "compilerOptions": {
     "target": "es6",
-    "module": "esnext",
+    "module": "nodenext",
     "strict": true,
     "jsx": "preserve",
     "importHelpers": true,
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "experimentalDecorators": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -19,10 +19,13 @@
     "downlevelIteration": true,
     "sourceMap": true,
     "baseUrl": ".",
-    "types": ["webpack-env", "vuetify", "vue", "geojs", "jest", "node", "jquery"],
+    "types": ["webpack-env", "vue-router", "vuetify", "vue", "jest", "node", "jquery"],
     "paths": {
       "@/test/*": ["test/*"],
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "vue/*": ["node_modules/vue/*"],
+      "vuex": ["node_modules/vuex/types/index.d.ts"],
+      "vue-router/types/*": ["node_modules/vue-router/types/*"],
     },
     "lib": ["esnext", "dom", "dom.iterable", "scripthost"]
   },

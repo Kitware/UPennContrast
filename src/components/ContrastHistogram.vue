@@ -106,7 +106,7 @@ import { scaleLinear, scalePoint } from "d3-scale";
 import { area, curveStep } from "d3-shape";
 import { select, selectAll, event as d3Event } from "d3-selection";
 import { drag, D3DragEvent } from "d3-drag";
-import { throttle } from "lodash-es";
+import { throttle } from "lodash";
 import { zoom, D3ZoomEvent, ZoomBehavior } from "d3-zoom";
 
 function roundPer(v: number) {

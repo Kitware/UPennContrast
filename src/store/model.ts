@@ -810,7 +810,7 @@ const channelColors: { [key: string]: string } = {
 import { v4 as uuidv4 } from "uuid";
 import { ISetQuadStatus } from "@/utils/setFrameQuad";
 import { ITileMeta } from "./GirderAPI";
-import { isEqual } from "lodash-es";
+import { isEqual } from "lodash";
 
 export function newLayer(
   dataset: IDataset,
