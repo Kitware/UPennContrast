@@ -44,7 +44,6 @@
         title: 'shift-click-drag',
         description: 'Lasso to select objects'
       }"
-      :data-update="reactiveDraw"
       :map-count="mapLayerList.length"
     >
       <div
@@ -397,12 +396,6 @@ export default class ImageViewer extends Vue {
     this.refsMounted = true;
     this.datasetReset();
     this.updateBackgroundColor();
-  }
-
-  get reactiveDraw() {
-    if (!this.refsMounted) {
-      return;
-    }
     this.draw();
   }
 
