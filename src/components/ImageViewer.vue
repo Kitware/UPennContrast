@@ -57,7 +57,7 @@
     </div>
     <image-overview
       v-if="overview && !unrolling"
-      :parentPanInfo="panInfo"
+      :parentCameraInfo="cameraInfo"
       @centerChange="setCenter"
       @cornersChange="setCorners"
     />
@@ -133,7 +133,7 @@ import {
   IImage,
   ILayerStackImage,
   IMapEntry,
-  IPanInfo,
+  ICameraInfo,
   IXYPoint
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
@@ -291,7 +291,7 @@ export default class ImageViewer extends Vue {
   unrollH: number = 1;
 
   private _inPan: boolean = false;
-  panInfo: IPanInfo = {
+  cameraInfo: ICameraInfo = {
     center: { x: 0, y: 0 },
     zoom: 1,
     rotate: 0,
@@ -513,8 +513,8 @@ export default class ImageViewer extends Vue {
   }
 
   setCenter(center: IGeoJSPoint) {
-    this.panInfo.center = center;
-    this.applyPanInfo();
+    this.cameraInfo.center = center;
+    this.applyCameraInfo();
   }
 
   setCorners(evt: any) {
@@ -554,7 +554,7 @@ export default class ImageViewer extends Vue {
     this._inPan = true;
     const map = this.maps[mapidx].map;
     const size = map.size();
-    this.panInfo = {
+    this.cameraInfo = {
       zoom: map.zoom(),
       rotate: map.rotation(),
       center: map.center(),
@@ -566,20 +566,20 @@ export default class ImageViewer extends Vue {
       ]
     };
     if (this.maps.length >= 2) {
-      this.applyPanInfo(mapidx);
+      this.applyCameraInfo(mapidx);
     }
     this._inPan = false;
   }
 
-  applyPanInfo(excludeMapIdx?: number) {
+  applyCameraInfo(excludeMapIdx?: number) {
     try {
       this.maps.forEach((mapentry, idx) => {
         if (idx === excludeMapIdx) {
           return;
         }
-        mapentry.map.zoom(this.panInfo.zoom, undefined, true, true);
-        mapentry.map.rotation(this.panInfo.rotate, undefined, true);
-        mapentry.map.center(this.panInfo.center, undefined, true, true);
+        mapentry.map.zoom(this.cameraInfo.zoom, undefined, true, true);
+        mapentry.map.rotation(this.cameraInfo.rotate, undefined, true);
+        mapentry.map.center(this.cameraInfo.center, undefined, true, true);
       });
     } catch (err) {}
   }

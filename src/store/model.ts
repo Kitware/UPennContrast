@@ -644,7 +644,7 @@ export interface IProgressInfo {
   progress?: number;
 }
 
-export interface IPanInfo {
+export interface ICameraInfo {
   center: IGeoJSPoint;
   zoom: number;
   rotate: number;

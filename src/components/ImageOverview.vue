@@ -23,7 +23,7 @@ import {
   IGeoJSFeatureLayer,
   IGeoJSMap,
   IGeoJSOsmLayer,
-  IPanInfo
+  ICameraInfo
 } from "@/store/model";
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import { ITileOptionsBands, getBandOption } from "@/store/images";
@@ -38,7 +38,7 @@ export default class ImageViewer extends Vue {
   readonly store = store;
 
   @Prop()
-  parentPanInfo!: IPanInfo;
+  parentCameraInfo!: ICameraInfo;
 
   $refs!: {
     "overview-map": HTMLElement;
@@ -52,7 +52,7 @@ export default class ImageViewer extends Vue {
   outlineFeature: IGeoJSFeature | null = null;
 
   downState:
-    | (IPanInfo & {
+    | (ICameraInfo & {
         state: any; // geo.actionState
         mouse: any; // geo.mouseState
         distanceToOutline: number;
@@ -251,7 +251,7 @@ export default class ImageViewer extends Vue {
         return;
       }
       this.downState = {
-        ...this.parentPanInfo,
+        ...this.parentCameraInfo,
         state: evt.state,
         mouse: evt.mouse,
         distanceToOutline:
@@ -272,7 +272,7 @@ export default class ImageViewer extends Vue {
           x: evt.mouse.geo.x - this.downState.mouse.geo.x,
           y: evt.mouse.geo.y - this.downState.mouse.geo.y
         };
-        const center = this.parentPanInfo.center;
+        const center = this.parentCameraInfo.center;
         delta.x -= center.x - this.downState.center.x;
         delta.y -= center.y - this.downState.center.y;
         if (delta.x || delta.y) {
@@ -298,13 +298,13 @@ export default class ImageViewer extends Vue {
     this.map.draw();
   }
 
-  @Watch("parentPanInfo")
+  @Watch("parentCameraInfo")
   onParentPan() {
-    if (this.map && this.parentPanInfo.rotate !== this.map.rotation()) {
-      this.map.rotation(this.parentPanInfo.rotate);
+    if (this.map && this.parentCameraInfo.rotate !== this.map.rotation()) {
+      this.map.rotation(this.parentCameraInfo.rotate);
       this.map.zoom(this.map.zoom() - 1);
     }
-    this.outlineFeature?.data([this.parentPanInfo.gcsBounds]).draw();
+    this.outlineFeature?.data([this.parentCameraInfo.gcsBounds]).draw();
   }
 
   @Watch("urlPromise")
