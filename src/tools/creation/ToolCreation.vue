@@ -1,9 +1,7 @@
 <template>
   <div>
     <v-card class="pa-1">
-      <v-card-title>
-        Add a new tool
-      </v-card-title>
+      <v-card-title> Add a new tool </v-card-title>
       <v-card-text>
         <!-- Pick which template should be used for the tool configuration -->
         <tool-type-selection v-model="selectedTool" />
@@ -18,9 +16,7 @@
           <!-- Tool name with autofill -->
           <v-row dense>
             <v-col>
-              <div class="title white--text">
-                Tool Name
-              </div>
+              <div class="title white--text">Tool Name</div>
             </v-col>
           </v-row>
           <v-row dense class="px-4">
@@ -37,9 +33,7 @@
           <!-- Tool hotkey -->
           <v-row dense>
             <v-col>
-              <div class="title white--text">
-                Tool Hotkey
-              </div>
+              <div class="title white--text">Tool Hotkey</div>
             </v-col>
           </v-row>
           <v-row dense class="px-4">
@@ -79,7 +73,7 @@ import { v4 as uuidv4 } from "uuid";
 
 const defaultValues = {
   name: "New Tool",
-  description: ""
+  description: "",
 };
 
 // Popup for new tool configuration
@@ -87,8 +81,8 @@ const defaultValues = {
   components: {
     ToolConfiguration,
     ToolTypeSelection,
-    HotkeySelection
-  }
+    HotkeySelection,
+  },
 })
 export default class ToolCreation extends Vue {
   readonly store = store;
@@ -117,7 +111,7 @@ export default class ToolCreation extends Vue {
       template: this.selectedTemplate,
       values: this.toolValues,
       type: this.selectedTemplate.type,
-      hotkey: this.hotkey
+      hotkey: this.hotkey,
     };
 
     // Add this tool to the current toolset

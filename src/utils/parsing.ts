@@ -5,18 +5,18 @@ function processFilenamesDF(filenames: string[]): DataFrame {
   const delimiterPattern = /[_\.\/]/;
 
   // Tokenize each filename
-  const tokenizedData: string[][] = filenames.map(filename => {
+  const tokenizedData: string[][] = filenames.map((filename) => {
     const tokens = filename.split(delimiterPattern);
     return [filename, ...tokens];
   });
 
   // Find the maximum number of tokens for column naming
-  const maxTokens = Math.max(...tokenizedData.map(row => row.length));
+  const maxTokens = Math.max(...tokenizedData.map((row) => row.length));
 
   // Define column names
   const columns = [
     "Filename",
-    ...Array.from({ length: maxTokens - 1 }, (_, i) => `Token ${i + 1}`)
+    ...Array.from({ length: maxTokens - 1 }, (_, i) => `Token ${i + 1}`),
   ];
 
   // Create a DataFrame
@@ -31,7 +31,7 @@ function processFilenamesDF(filenames: string[]): DataFrame {
 function findMinimalSpanningColumns(df: DataFrame): string[] {
   const allColumns: string[] = df.listColumns();
   // Exclude the "Filename" column
-  const columns = allColumns.filter(column => column !== "Filename");
+  const columns = allColumns.filter((column) => column !== "Filename");
   const totalRows = df.count();
 
   // Helper function to compute the number of elements in the Cartesian product of arrays
@@ -43,8 +43,8 @@ function findMinimalSpanningColumns(df: DataFrame): string[] {
     const columnCombinations = getCombinations(columns, i); // Get all i-sized combinations of columns
 
     for (const combination of columnCombinations) {
-      const uniqueValueArrays = combination.map(col =>
-        df.distinct(col).toArray(col)
+      const uniqueValueArrays = combination.map((col) =>
+        df.distinct(col).toArray(col),
       );
 
       // Compute the Cartesian product size
@@ -62,7 +62,7 @@ function findMinimalSpanningColumns(df: DataFrame): string[] {
 // Helper function to get combinations of elements (columns in our case)
 function getCombinations<T>(elements: T[], size: number): T[][] {
   if (size === 1) {
-    return elements.map(e => [e]);
+    return elements.map((e) => [e]);
   }
 
   let combinations: T[][] = [];
@@ -71,7 +71,7 @@ function getCombinations<T>(elements: T[], size: number): T[][] {
     const tailCombinations = getCombinations(elements.slice(i + 1), size - 1);
     combinations = [
       ...combinations,
-      ...tailCombinations.map(tc => [head, ...tc])
+      ...tailCombinations.map((tc) => [head, ...tc]),
     ];
   }
   return combinations;
@@ -79,7 +79,7 @@ function getCombinations<T>(elements: T[], size: number): T[][] {
 
 function findComplementaryColumns(
   df: DataFrame,
-  specifiedColumn: string
+  specifiedColumn: string,
 ): string[] {
   const specifiedColumnDistinctCount = df.distinct(specifiedColumn).count();
   const allColumns = df.listColumns();
@@ -94,7 +94,7 @@ function findComplementaryColumns(
     const combined = df.withColumn(
       "combined",
       ((row: any) =>
-        row.get(specifiedColumn) + "_" + row.get(testColumn)) as any
+        row.get(specifiedColumn) + "_" + row.get(testColumn)) as any,
     );
     const combinedDistinctCount = combined.distinct("combined").count();
 
@@ -111,7 +111,7 @@ function findComplementaryColumns(
 
 function findAllComplementaryColumns(
   df: DataFrame,
-  specifiedColumns: string[]
+  specifiedColumns: string[],
 ): string[][] {
   const results: string[][] = [];
 
@@ -130,7 +130,7 @@ function findCommonSubstring(tokens: string[]): string {
 
   for (let i = 0; i < tokenLength; i++) {
     const currentChar = tokens[0][i];
-    if (tokens.every(token => token[i] === currentChar)) {
+    if (tokens.every((token) => token[i] === currentChar)) {
       commonSubstring += currentChar;
     } else {
       // TODO: have to decide whether to keep placeholders or just remove
@@ -143,7 +143,7 @@ function findCommonSubstring(tokens: string[]): string {
 
 function findColumnCommonSubstring(
   df: DataFrame,
-  specifiedColumn: string
+  specifiedColumn: string,
 ): string {
   // Ensure the column exists in the DataFrame
   const columns = df.listColumns();
@@ -167,7 +167,7 @@ export const triggersPerCategory = {
   z: ["z", "slice"],
   xy: ["well", "stage", "pos"],
   chan: ["chan", "channel", "fp", "ch"],
-  t: ["t", "time", "sec", "msec", "ms", "d", "m", "hr", "h"]
+  t: ["t", "time", "sec", "msec", "ms", "d", "m", "hr", "h"],
 };
 
 function categorizeSubstring(substring: string): string {
@@ -175,7 +175,7 @@ function categorizeSubstring(substring: string): string {
   const lowerSub = substring.toLowerCase();
 
   for (const [category, triggers] of Object.entries(triggersPerCategory)) {
-    if (triggers.some(trigger => lowerSub.includes(trigger))) {
+    if (triggers.some((trigger) => lowerSub.includes(trigger))) {
       return category;
     }
   }
@@ -193,12 +193,12 @@ function categorizeColumns(df: DataFrame, columnNames: string[]): string {
   const tokens: string[] = df.toArray(firstColumn);
 
   // If all tokens are of the pattern "A7", "C3", etc.
-  if (tokens.every(token => xyPattern.test(token))) {
+  if (tokens.every((token) => xyPattern.test(token))) {
     return "xy";
   }
 
   // If none of the tokens in the column contain numerals
-  if (tokens.every(token => !/\d/.test(token))) {
+  if (tokens.every((token) => !/\d/.test(token))) {
     return "chan";
   }
 
@@ -211,7 +211,7 @@ function categorizeColumns(df: DataFrame, columnNames: string[]): string {
 
 function assignUniqueCategorizations(
   df: DataFrame,
-  allComplementaryLists: string[][]
+  allComplementaryLists: string[][],
 ): string[] {
   // Base list of categorizations
   const baseCategorizations = ["chan", "xy", "z", "t"];
@@ -219,7 +219,7 @@ function assignUniqueCategorizations(
   // Initial check
   if (allComplementaryLists.length > baseCategorizations.length) {
     logError(
-      "Error: Too many lists in allComplementaryLists to assign unique categorizations."
+      "Error: Too many lists in allComplementaryLists to assign unique categorizations.",
     );
     return [];
   }
@@ -235,7 +235,7 @@ function assignUniqueCategorizations(
     while (assignedCategorizations.indexOf(assignedCategorizations[i]) !== i) {
       // If conflict exists
       const nextAvailableCategory = baseCategorizations.find(
-        cat => !assignedCategorizations.includes(cat)
+        (cat) => !assignedCategorizations.includes(cat),
       );
       if (nextAvailableCategory) {
         assignedCategorizations[i] = nextAvailableCategory;
@@ -252,7 +252,7 @@ function assignUniqueCategorizations(
 function structuredAssignments(
   df: DataFrame,
   allComplementaryLists: string[][],
-  assignments: string[]
+  assignments: string[],
 ) {
   const output: IVariableGuess[] = [];
 
@@ -260,7 +260,7 @@ function structuredAssignments(
     chan: "C",
     t: "T",
     xy: "XY",
-    z: "Z"
+    z: "Z",
   };
 
   for (let i = 0; i < assignments.length; i++) {
@@ -287,7 +287,7 @@ function structuredAssignments(
     const structuredData: IVariableGuess = {
       guess: assignmentToLetterMap[assignment],
       valueIdxPerFilename: {},
-      values: tokens
+      values: tokens,
     };
 
     const mappedRows = df.select("Filename", list[0]);

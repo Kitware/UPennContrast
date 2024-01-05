@@ -22,7 +22,7 @@ import { IToolConfiguration } from "@/store/model";
 import { Action } from "vuex-module-decorators";
 // Popup for new tool configuration
 @Component({
-  components: {}
+  components: {},
 })
 export default class circleToDotMenu extends Vue {
   readonly store = store;

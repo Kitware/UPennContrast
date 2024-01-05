@@ -64,12 +64,10 @@
         <template #activator="{ on }">
           <div
             v-on="on"
-            style="cursor: pointer;"
+            style="cursor: pointer"
             class="mb-4 d-flex align-center"
           >
-            <span class="subtitle-1">
-              Color
-            </span>
+            <span class="subtitle-1"> Color </span>
             <span
               :style="{ backgroundColor: value.color }"
               class="color-bar"
@@ -148,8 +146,8 @@ import { IHotkey } from "@/utils/v-mousetrap";
 @Component({
   components: {
     DisplaySlice,
-    ContrastHistogram
-  }
+    ContrastHistogram,
+  },
 })
 export default class DisplayLayer extends Vue {
   readonly store = store;
@@ -217,8 +215,8 @@ export default class DisplayLayer extends Vue {
       handler: () => (this.isZMaxMerge = !this.isZMaxMerge),
       data: {
         section: "Layer control",
-        description: `Toggle Z max-merge for layer: ${this.value.name}`
-      }
+        description: `Toggle Z max-merge for layer: ${this.value.name}`,
+      },
     };
   }
 
@@ -228,8 +226,8 @@ export default class DisplayLayer extends Vue {
       handler: () => store.toggleLayerVisibility(this.value.id),
       data: {
         section: "Layer control",
-        description: `Show/hide layer: ${this.value.name}`
-      }
+        description: `Show/hide layer: ${this.value.name}`,
+      },
     };
   }
 
@@ -244,7 +242,7 @@ export default class DisplayLayer extends Vue {
     const newZSlice = value
       ? {
           type: "max-merge",
-          value: null
+          value: null,
         }
       : this.alternativeZSlice;
     this.changeProp("z", newZSlice);
@@ -321,8 +319,8 @@ export default class DisplayLayer extends Vue {
     this.store.changeLayer({
       layerId: this.value.id,
       delta: {
-        [prop]: value
-      }
+        [prop]: value,
+      },
     });
   }
 
@@ -330,7 +328,7 @@ export default class DisplayLayer extends Vue {
     if (syncConfiguration) {
       this.store.saveContrastInConfiguration({
         layerId: this.value.id,
-        contrast
+        contrast,
       });
     } else {
       this.store.saveContrastInView({ layerId: this.value.id, contrast });

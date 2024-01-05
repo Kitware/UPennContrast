@@ -270,17 +270,17 @@ export interface IGeoJSMap {
     coordinates: IGeoJSPoint,
     gcs?: string | null,
     ignoreDiscreteZoom?: boolean,
-    ignoreClampBounds?: boolean | "limited"
+    ignoreClampBounds?: boolean | "limited",
   ) => IGeoJSMap) &
     (() => IGeoJSPoint);
   createLayer: <T extends string>(
     layerName: T,
-    arg: object
+    arg: object,
   ) => T extends "osm"
     ? IGeoJSOsmLayer
     : T extends "feature"
-    ? IGeoJSFeatureLayer
-    : IGeoJSLayer;
+      ? IGeoJSFeatureLayer
+      : IGeoJSLayer;
   deleteLayer: (layer: IGeoJSLayer | null) => IGeoJSLayer;
   displayToGcs: ((c: IGeoJSPoint, gcs?: string | null) => IGeoJSPoint) &
     ((c: IGeoJSPoint[], gcs?: string | null) => IGeoJSPoint[]);
@@ -292,7 +292,7 @@ export interface IGeoJSMap {
   geoOn: (event: string, handler: Function) => IGeoJSMap;
   geoOff: (
     event?: string | string[],
-    arg?: Function | Function[] | null
+    arg?: Function | Function[] | null,
   ) => IGeoJSMap;
   ingcs: ((arg: string) => IGeoJSMap) & (() => string);
   layers: () => IGeoJSLayer[];
@@ -300,14 +300,14 @@ export interface IGeoJSMap {
   rotation: ((
     rotation: number,
     origin?: object,
-    ignoreRotationFunc?: boolean
+    ignoreRotationFunc?: boolean,
   ) => IGeoJSMap) &
     (() => number);
   screenshot: (
     layers?: IGeoJSLayer | IGeoJSLayer[] | false | object,
     type?: string,
     encoderOptions?: number,
-    opts?: object
+    opts?: object,
   ) => Promise<string>;
   size: ((arg: IGeoScreenSize) => IGeoJSMap) & (() => IGeoScreenSize);
   unitsPerPixel: ((zoom: number, unit: number | null) => IGeoJSMap) &
@@ -316,7 +316,7 @@ export interface IGeoJSMap {
     val: number,
     origin?: object,
     ingoreDiscreteZoom?: boolean,
-    ignoreClampBounds?: boolean
+    ignoreClampBounds?: boolean,
   ) => IGeoJSMap) &
     (() => number);
 }
@@ -332,7 +332,7 @@ export interface IGeoJSLayer {
   draw: () => IGeoJSLayer;
   mode: (
     arg?: string | null,
-    editAnnotation?: IGeoJSAnnotation
+    editAnnotation?: IGeoJSAnnotation,
   ) => string | null | IGeoJSLayer;
   map: () => IGeoJSMap;
   modes: {
@@ -409,7 +409,7 @@ export interface IGeoJSFeatureLayer extends IGeoJSLayer {
   geoOn: (event: string, handler: Function) => IGeoJSFeatureLayer;
   geoOff: (
     event?: string | string[],
-    arg?: Function | Function[] | null
+    arg?: Function | Function[] | null,
   ) => IGeoJSFeatureLayer;
   renderer: () => IGeoJSRenderer | null;
 
@@ -523,13 +523,13 @@ export interface IWorkerImageList {
 export enum AnnotationShape {
   Point = "point",
   Line = "line",
-  Polygon = "polygon"
+  Polygon = "polygon",
 }
 
 export const AnnotationNames = {
   [AnnotationShape.Point]: "Point",
   [AnnotationShape.Line]: "Line",
-  [AnnotationShape.Polygon]: "Blob"
+  [AnnotationShape.Polygon]: "Blob",
 };
 
 export interface IAnnotationLocation {
@@ -792,7 +792,7 @@ const colors = [
   "#40FFC0",
   "#C0FF40",
   "#C040FF",
-  "#40C0FF"
+  "#40C0FF",
 ];
 
 // keys should be all uppercase.  Values should have the same case as the
@@ -804,7 +804,7 @@ const channelColors: { [key: string]: string } = {
   CY3: "#FF8000", // orange
   CY5: "#FF00FF",
   YFP: "#00FF00",
-  GFP: "#00FF00"
+  GFP: "#00FF00",
 };
 
 import { v4 as uuidv4 } from "uuid";
@@ -814,14 +814,14 @@ import { isEqual } from "lodash";
 
 export function newLayer(
   dataset: IDataset,
-  layers: IDisplayLayer[]
+  layers: IDisplayLayer[],
 ): IDisplayLayer {
-  const usedColors = new Set(layers.map(l => l.color));
-  const nextColor = colors.filter(c => !usedColors.has(c));
-  const usedChannels = new Set(layers.map(l => l.channel));
+  const usedColors = new Set(layers.map((l) => l.color));
+  const nextColor = colors.filter((c) => !usedColors.has(c));
+  const usedChannels = new Set(layers.map((l) => l.channel));
   const nextChannel = dataset.channels
     .map((_, i) => i)
-    .filter(c => !usedChannels.has(c));
+    .filter((c) => !usedChannels.has(c));
 
   const channelName =
     dataset.channelNames.get(nextChannel[0] || 0) ||
@@ -831,7 +831,7 @@ export function newLayer(
     channelColor = nextColor[0] || colors[layers.length % colors.length];
   }
   let layerName = channelName;
-  if (layerName === "" || layers.some(l => l.name === layerName)) {
+  if (layerName === "" || layers.some((l) => l.name === layerName)) {
     layerName = `Layer ${layers.length + 1}`;
   }
 
@@ -843,28 +843,28 @@ export function newLayer(
     channel: nextChannel[0] || 0,
     time: {
       type: "current",
-      value: null
+      value: null,
     },
     xy: {
       type: "current",
-      value: null
+      value: null,
     },
     z: {
       type: "current",
-      value: null
+      value: null,
     },
     color: channelColor,
     contrast: {
       mode: "percentile",
       blackPoint: 0,
-      whitePoint: 100
+      whitePoint: 100,
     },
-    layerGroup: null
+    layerGroup: null,
   };
 }
 
 export function copyLayerWithoutPrivateAttributes(
-  layer: IDisplayLayer
+  layer: IDisplayLayer,
 ): IDisplayLayer {
   const newLayer: IDisplayLayer = { ...layer };
   for (const key of Object.keys(newLayer)) {
@@ -882,7 +882,7 @@ export function exampleConfigurationBase(): IDatasetConfigurationBase {
       xyDimensions: "multiple",
       zDimensions: "multiple",
       tDimensions: "multiple",
-      channels: {}
+      channels: {},
     },
     layers: [],
     tools: [],
@@ -891,14 +891,14 @@ export function exampleConfigurationBase(): IDatasetConfigurationBase {
     scales: {
       pixelSize: { value: 1, unit: "m" },
       zStep: { value: 1, unit: "m" },
-      tStep: { value: 1, unit: "s" }
-    }
+      tStep: { value: 1, unit: "s" },
+    },
   };
 }
 
 export function areCompatibles(
   a: IDatasetConfigurationCompatibility,
-  b: IDatasetConfigurationCompatibility
+  b: IDatasetConfigurationCompatibility,
 ) {
   return (
     a.tDimensions === b.tDimensions &&
@@ -909,23 +909,23 @@ export function areCompatibles(
 }
 
 export const configurationBaseKeys = new Set(
-  Object.keys(exampleConfigurationBase())
+  Object.keys(exampleConfigurationBase()),
 ) as Set<keyof IDatasetConfigurationBase>;
 
 export enum AnnotationSelectionTypes {
   ADD = "ADD",
   TOGGLE = "TOGGLE",
-  REMOVE = "REMOVE"
+  REMOVE = "REMOVE",
 }
 
 export const AnnotationSelectionTypesNames = {
   [AnnotationSelectionTypes.ADD]: "Add",
   [AnnotationSelectionTypes.TOGGLE]: "Toggle",
-  [AnnotationSelectionTypes.REMOVE]: "Remove"
+  [AnnotationSelectionTypes.REMOVE]: "Remove",
 };
 
 export const AnnotationSelectionTypesTooltips = {
   [AnnotationSelectionTypes.ADD]: "Add annotations to selection",
   [AnnotationSelectionTypes.TOGGLE]: "Toggle annotations selection",
-  [AnnotationSelectionTypes.REMOVE]: "Remove annotation from selection"
+  [AnnotationSelectionTypes.REMOVE]: "Remove annotation from selection",
 };

@@ -6,5 +6,5 @@ module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
   modulePaths: [compilerOptions.baseUrl],
-  moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths)
+  moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths),
 };

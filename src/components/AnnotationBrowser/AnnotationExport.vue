@@ -7,7 +7,7 @@
         v-description="{
           section: 'Object list actions',
           title: 'Export to JSON',
-          description: 'Export annotations and connections to a JSON file'
+          description: 'Export annotations and connections to a JSON file',
         }"
       >
         <v-icon>mdi-export</v-icon>
@@ -15,9 +15,7 @@
       </v-btn>
     </template>
     <v-card class="pa-2" :disabled="!canExport">
-      <v-card-title>
-        Export
-      </v-card-title>
+      <v-card-title> Export </v-card-title>
       <v-card-text class="pt-5 pb-0">
         <v-checkbox v-model="exportAnnotations" label="Export annotations" />
         <v-checkbox
@@ -42,9 +40,7 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn @click="submit" color="primary">
-          Export selection
-        </v-btn>
+        <v-btn @click="submit" color="primary"> Export selection </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -60,7 +56,7 @@ import {
   IAnnotationConnection,
   IAnnotationProperty,
   IAnnotationPropertyValues,
-  ISerializedData
+  ISerializedData,
 } from "@/store/model";
 import { downloadToClient } from "@/utils/download";
 
@@ -99,16 +95,16 @@ export default class AnnotationImport extends Vue {
     let annotationPromise: Promise<IAnnotation[]> = Promise.resolve([]);
     if (this.exportAnnotations) {
       annotationPromise = this.store.annotationsAPI.getAnnotationsForDatasetId(
-        this.dataset!.id
+        this.dataset!.id,
       );
     }
 
     let connectionsPromise: Promise<IAnnotationConnection[]> = Promise.resolve(
-      []
+      [],
     );
     if (this.exportConnections && this.exportAnnotations) {
       connectionsPromise = this.store.annotationsAPI.getConnectionsForDatasetId(
-        this.dataset!.id
+        this.dataset!.id,
       );
     }
 
@@ -122,7 +118,7 @@ export default class AnnotationImport extends Vue {
     let valuesPromise: Promise<IAnnotationPropertyValues> = Promise.resolve({});
     if (this.exportValues) {
       valuesPromise = this.store.propertiesAPI.getPropertyValues(
-        this.dataset!.id
+        this.dataset!.id,
       );
     }
 
@@ -130,19 +126,19 @@ export default class AnnotationImport extends Vue {
       annotationPromise,
       connectionsPromise,
       propertiesPromise,
-      valuesPromise
+      valuesPromise,
     ]).then(
       ([
         annotations,
         annotationConnections,
         annotationProperties,
-        annotationPropertyValues
+        annotationPropertyValues,
       ]) => {
         const serializable: ISerializedData = {
           annotations,
           annotationConnections,
           annotationProperties,
-          annotationPropertyValues
+          annotationPropertyValues,
         };
         const href =
           "data:text/plain;charset=utf-8," +
@@ -150,10 +146,10 @@ export default class AnnotationImport extends Vue {
 
         downloadToClient({
           href,
-          download: this.filename || "upennExport.json"
+          download: this.filename || "upennExport.json",
         });
         this.dialog = false;
-      }
+      },
     );
   }
 }

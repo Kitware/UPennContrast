@@ -3,7 +3,7 @@ import {
   Action,
   Module,
   Mutation,
-  VuexModule
+  VuexModule,
 } from "vuex-module-decorators";
 import store from "./root";
 
@@ -23,7 +23,7 @@ import {
   IShapeAnnotationFilter,
   AnnotationShape,
   TPropertyHistogram,
-  IAnnotationLocation
+  IAnnotationLocation,
 } from "./model";
 
 import geo from "geojs";
@@ -31,7 +31,7 @@ import {
   arePathEquals,
   createPathStringFromPathArray,
   findIndexOfPath,
-  getValueFromObjectAndPath
+  getValueFromObjectAndPath,
 } from "@/utils/paths";
 
 type TFilterHistograms = {
@@ -45,14 +45,14 @@ export class Filters extends VuexModule {
     id: "tagFilter",
     exclusive: false,
     enabled: false,
-    tags: []
+    tags: [],
   };
 
   shapeFilter: IShapeAnnotationFilter = {
     id: "shapeFilter",
     enabled: false,
     exclusive: true,
-    shape: AnnotationShape.Point
+    shape: AnnotationShape.Point,
   };
 
   onlyCurrentFrame: boolean = false;
@@ -66,7 +66,7 @@ export class Filters extends VuexModule {
     enabled: false,
     exclusive: true,
     id: "selection",
-    annotationIds: []
+    annotationIds: [],
   };
 
   filterPaths: string[][] = [];
@@ -86,13 +86,13 @@ export class Filters extends VuexModule {
   @Mutation
   addSelectionAsFilter() {
     const selection = annotation.selectedAnnotations.map(
-      (value: IAnnotation) => value.id
+      (value: IAnnotation) => value.id,
     );
     this.selectionFilter = {
       enabled: true,
       exclusive: true,
       id: "selection",
-      annotationIds: selection
+      annotationIds: selection,
     };
   }
 
@@ -102,7 +102,7 @@ export class Filters extends VuexModule {
       enabled: false,
       exclusive: true,
       id: "selection",
-      annotationIds: []
+      annotationIds: [],
     };
   }
 
@@ -112,7 +112,7 @@ export class Filters extends VuexModule {
       id: `Region Filter ${this.roiFilters.length}`,
       exclusive: true,
       enabled: true,
-      roi: []
+      roi: [],
     };
   }
 
@@ -123,7 +123,7 @@ export class Filters extends VuexModule {
         .filter((filter: IROIAnnotationFilter) => filter.id !== id)
         .map((filter: IROIAnnotationFilter, index) => ({
           ...filter,
-          id: `Region Filter ${index}`
+          id: `Region Filter ${index}`,
         }));
     }
   }
@@ -145,14 +145,14 @@ export class Filters extends VuexModule {
   @Mutation
   toggleRoiFilterEnabled(id: string) {
     const filter = this.roiFilters.find(
-      (filter: IROIAnnotationFilter) => filter.id === id
+      (filter: IROIAnnotationFilter) => filter.id === id,
     );
     if (filter) {
       this.roiFilters = [
         ...this.roiFilters.filter(
-          (value: IROIAnnotationFilter) => value.id !== id
+          (value: IROIAnnotationFilter) => value.id !== id,
         ),
-        { ...filter, enabled: !filter.enabled }
+        { ...filter, enabled: !filter.enabled },
       ];
     }
   }
@@ -163,17 +163,17 @@ export class Filters extends VuexModule {
     const tagFilter = this.tagFilter;
     const propertyFilters = this.propertyFilters;
     const enabledPropertyFilters = propertyFilters.filter(
-      (filter: IPropertyAnnotationFilter) => filter.enabled
+      (filter: IPropertyAnnotationFilter) => filter.enabled,
     );
     const roiFilters = this.roiFilters;
     const enabledRoiFilters = roiFilters.filter(
-      (filter: IROIAnnotationFilter) => filter.enabled
+      (filter: IROIAnnotationFilter) => filter.enabled,
     );
     const onlyCurrentFrame = this.onlyCurrentFrame;
     const currentFrameLocation: IAnnotationLocation = {
       XY: main.xy,
       Z: main.z,
-      Time: main.time
+      Time: main.time,
     };
     return annotation.annotations.filter((annotation: IAnnotation) => {
       // Location filter
@@ -213,14 +213,14 @@ export class Filters extends VuexModule {
         (filter: IPropertyAnnotationFilter) => {
           const value = getValueFromObjectAndPath(
             propertyValues,
-            filter.propertyPath
+            filter.propertyPath,
           );
           return (
             typeof value === "number" &&
             value >= filter.range.min &&
             value <= filter.range.max
           );
-        }
+        },
       );
       if (!matchesProperties) {
         return false;
@@ -231,8 +231,8 @@ export class Filters extends VuexModule {
         enabledRoiFilters.length === 0 ||
         enabledRoiFilters.some((filter: IROIAnnotationFilter) =>
           annotation.coordinates.some((point: IGeoJSPoint) =>
-            geo.util.pointInPolygon(point, filter.roi)
-          )
+            geo.util.pointInPolygon(point, filter.roi),
+          ),
         );
       return isInROI;
     });
@@ -252,9 +252,9 @@ export class Filters extends VuexModule {
     this.propertyFilters = [
       ...this.propertyFilters.filter(
         (filter: IPropertyAnnotationFilter) =>
-          !arePathEquals(filter.propertyPath, value.propertyPath)
+          !arePathEquals(filter.propertyPath, value.propertyPath),
       ),
-      value
+      value,
     ];
   }
 
@@ -279,7 +279,7 @@ export class Filters extends VuexModule {
       return;
     }
     this.tagFilter = Object.assign({}, this.tagFilter, {
-      tags: [...this.tagFilter.tags, tag]
+      tags: [...this.tagFilter.tags, tag],
     });
   }
 
@@ -309,7 +309,7 @@ export class Filters extends VuexModule {
         .then((histogram: TPropertyHistogram) => {
           const key = createPathStringFromPathArray(path);
           histograms[key] = histogram;
-        })
+        }),
     );
     Promise.all(promises).then(() => this.setPropertyHistograms(histograms));
   }

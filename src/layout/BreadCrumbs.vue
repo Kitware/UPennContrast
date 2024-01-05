@@ -19,7 +19,7 @@
               :menu-props="{
                 offsetY: true,
                 closeOnClick: true,
-                closeOnContentClick: true
+                closeOnContentClick: true,
               }"
               class="body-2 ml-2 breadcrumb-select"
             >
@@ -109,7 +109,7 @@ export default class BreadCrumbs extends Vue {
   } = {
     datasetId: null,
     configurationId: null,
-    routeName: null
+    routeName: null,
   };
 
   addDatasetCollection: IDatasetConfiguration | null = null;
@@ -174,7 +174,7 @@ export default class BreadCrumbs extends Vue {
   async setItemTextWithResourceName(
     item: { text: string },
     id: string,
-    type: "item" | "folder"
+    type: "item" | "folder",
   ) {
     const resource = await this.girderResources.getResource({ id, type });
     if (resource) {
@@ -184,7 +184,7 @@ export default class BreadCrumbs extends Vue {
 
   async openAddDatasetDialog(configIdPromise: Promise<string>) {
     this.addDatasetCollection = await this.girderResources.getConfiguration(
-      await configIdPromise
+      await configIdPromise,
     );
   }
 
@@ -204,7 +204,7 @@ export default class BreadCrumbs extends Vue {
   async refreshItems(force = false) {
     const [configurationId, datasetId] = await Promise.all([
       this.configurationId,
-      this.datasetId
+      this.datasetId,
     ]);
 
     // Cache items if parameters are the same
@@ -237,9 +237,9 @@ export default class BreadCrumbs extends Vue {
         title: "Dataset:",
         to: {
           name: "dataset",
-          params
+          params,
         },
-        text: "Unknown dataset"
+        text: "Unknown dataset",
       };
       this.items.push(datasetItem);
       // Get name asynchronously
@@ -253,30 +253,30 @@ export default class BreadCrumbs extends Vue {
         title: "Configuration:",
         to: {
           name: "configuration",
-          params
+          params,
         },
-        text: "Unknown configuration"
+        text: "Unknown configuration",
       };
       this.items.push(configurationItem);
       // Get name asynchronously
       this.setItemTextWithResourceName(
         configurationItem,
         configurationId,
-        "item"
+        "item",
       );
     }
 
     // Drop-down if datasetItem and configurationId
     if (datasetItem && configurationId && this.$route.name === "datasetview") {
       const capturedDatasetItem = datasetItem;
-      this.store.api.findDatasetViews({ configurationId }).then(views => {
+      this.store.api.findDatasetViews({ configurationId }).then((views) => {
         if (!views.length) {
           return;
         }
-        const datasetItems: IBreadCrumbItem["subItems"] = views.map(view => {
+        const datasetItems: IBreadCrumbItem["subItems"] = views.map((view) => {
           const viewItem = {
             text: "Unknown dataset",
-            value: view.id
+            value: view.id,
           };
           // Get name asynchronously
           this.setItemTextWithResourceName(viewItem, view.datasetId, "folder");
@@ -295,7 +295,7 @@ export default class BreadCrumbs extends Vue {
     if (!datasetViewId) {
       return null;
     }
-    return subitems.find(subitem => subitem.value === datasetViewId) || null;
+    return subitems.find((subitem) => subitem.value === datasetViewId) || null;
   }
 
   goToView(datasetViewId: string) {
@@ -306,7 +306,7 @@ export default class BreadCrumbs extends Vue {
     this.$router.push({
       name: "datasetview",
       params: { datasetViewId },
-      query: { ...this.$route.query }
+      query: { ...this.$route.query },
     });
   }
 }

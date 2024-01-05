@@ -23,7 +23,7 @@ import {
   IGeoJSFeatureLayer,
   IGeoJSMap,
   IGeoJSOsmLayer,
-  ICameraInfo
+  ICameraInfo,
 } from "@/store/model";
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import { ITileOptionsBands, getBandOption } from "@/store/images";
@@ -65,7 +65,7 @@ export default class ImageViewer extends Vue {
     { top: true, left: true },
     { top: false, left: true },
     { top: true, left: false },
-    { top: false, left: false }
+    { top: false, left: false },
   ];
 
   cornerToIcon({ top, left }: ICorner) {
@@ -153,7 +153,7 @@ export default class ImageViewer extends Vue {
     const bands: ITileOptionsBands["bands"] = [];
     const promises: Promise<any>[] = [];
     const pushBand = bands.push.bind(bands);
-    layers.forEach(layer => {
+    layers.forEach((layer) => {
       if (layer.visible) {
         promises.push(getBandOption(layer).then(pushBand));
       }
@@ -183,7 +183,7 @@ export default class ImageViewer extends Vue {
       someImage.sizeX,
       someImage.sizeY,
       someImage.tileWidth,
-      someImage.tileHeight
+      someImage.tileHeight,
     );
     params.layer.useCredentials = true;
     params.layer.url = "";
@@ -197,7 +197,7 @@ export default class ImageViewer extends Vue {
           input: "left",
           modifiers: { shift: false, ctrl: false },
           owner: "nimbusimage.overview",
-          name: "button pan"
+          name: "button pan",
         },
         {
           action: "overview_zoomselect",
@@ -205,12 +205,12 @@ export default class ImageViewer extends Vue {
           modifiers: { shift: true, ctrl: false },
           selectionRectangle: geojs.event.zoomselect,
           owner: "nimbusimage.overview",
-          name: "drag zoom"
-        }
+          name: "drag zoom",
+        },
       ],
       keyboard: {
-        actions: {}
-      }
+        actions: {},
+      },
     });
     this.map = geojs.map(params.map) as IGeoJSMap;
 
@@ -232,15 +232,15 @@ export default class ImageViewer extends Vue {
     params.layer.autoshareRenderer = false;
     this.osmLayer = this.map.createLayer("osm", params.layer);
     this.featureLayer = this.map.createLayer("feature", {
-      features: ["polygon"]
+      features: ["polygon"],
     });
     this.outlineFeature = this.featureLayer.createFeature("polygon", {
       style: {
         stroke: true,
         strokeColor: "cyan",
         strokeWidth: 2,
-        fill: false
-      }
+        fill: false,
+      },
     });
     /* Clicking in the overview recenters to that spot */
     this.featureLayer.geoOn(geojs.event.mouseclick, (evt: any) => {
@@ -257,8 +257,8 @@ export default class ImageViewer extends Vue {
         distanceToOutline:
           geojs.util.distanceToPolygon2d(
             evt.mouse.geo,
-            this.outlineFeature.data()[0]
-          ) / this.map.unitsPerPixel(this.map.zoom())
+            this.outlineFeature.data()[0],
+          ) / this.map.unitsPerPixel(this.map.zoom()),
       };
     });
     const panOutlineDistance = 5;
@@ -270,7 +270,7 @@ export default class ImageViewer extends Vue {
       ) {
         const delta = {
           x: evt.mouse.geo.x - this.downState.mouse.geo.x,
-          y: evt.mouse.geo.y - this.downState.mouse.geo.y
+          y: evt.mouse.geo.y - this.downState.mouse.geo.y,
         };
         const center = this.parentCameraInfo.center;
         delta.x -= center.x - this.downState.center.x;
@@ -278,7 +278,7 @@ export default class ImageViewer extends Vue {
         if (delta.x || delta.y) {
           this.$emit("centerChange", {
             x: center.x + delta.x,
-            y: center.y + delta.y
+            y: center.y + delta.y,
           });
         }
       }

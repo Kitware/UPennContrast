@@ -32,9 +32,7 @@
         class="elevation-3 mt-4"
         v-if="filteringShape !== null && filteringTags.length > 0"
       >
-        <div class="pb-4 subtitle-1">
-          Using these parameters...
-        </div>
+        <div class="pb-4 subtitle-1">Using these parameters...</div>
         <v-row>
           <v-col>
             <docker-image-select
@@ -86,7 +84,7 @@ import {
   AnnotationShape,
   IWorkerLabels,
   AnnotationNames,
-  IWorkerInterfaceValues
+  IWorkerInterfaceValues,
 } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
@@ -102,8 +100,8 @@ import { tagFilterFunction } from "@/utils/annotation";
     TagFilterEditor,
     DockerImageSelect,
     TagPicker,
-    PropertyWorkerMenu
-  }
+    PropertyWorkerMenu,
+  },
 })
 export default class PropertyCreation extends Vue {
   readonly store = store;
@@ -127,7 +125,7 @@ export default class PropertyCreation extends Vue {
     let candidateName = this.originalName;
     while (
       this.propertyStore.properties.some(
-        property => property.name === candidateName
+        (property) => property.name === candidateName,
       )
     ) {
       candidateName = `${this.originalName} (${++count})`;
@@ -143,12 +141,11 @@ export default class PropertyCreation extends Vue {
       nameList.push("No tag");
     }
     nameList.push(
-      this.filteringShape ? AnnotationNames[this.filteringShape] : "No shape"
+      this.filteringShape ? AnnotationNames[this.filteringShape] : "No shape",
     );
     if (this.dockerImage) {
-      const imageInterfaceName = this.propertyStore.workerImageList[
-        this.dockerImage
-      ]?.interfaceName;
+      const imageInterfaceName =
+        this.propertyStore.workerImageList[this.dockerImage]?.interfaceName;
       if (imageInterfaceName) {
         nameList.push(imageInterfaceName);
       } else {
@@ -194,7 +191,7 @@ export default class PropertyCreation extends Vue {
         tagFilterFunction(
           annotation.tags,
           this.filteringTags,
-          this.areTagsExclusive
+          this.areTagsExclusive,
         )
       ) {
         if (counts[annotation.shape] === undefined) {
@@ -237,12 +234,12 @@ export default class PropertyCreation extends Vue {
         image: this.dockerImage,
         tags: {
           tags: this.filteringTags,
-          exclusive: this.areTagsExclusive
+          exclusive: this.areTagsExclusive,
         },
         shape: this.filteringShape,
-        workerInterface: this.interfaceValues
+        workerInterface: this.interfaceValues,
       })
-      .then(property => {
+      .then((property) => {
         this.propertyStore.togglePropertyPathVisibility([property.id]);
       });
     this.reset();

@@ -104,8 +104,8 @@ import { IHotkey } from "@/utils/v-mousetrap";
   components: {
     ValueSlider,
     SwitchToggle,
-    Toolset
-  }
+    Toolset,
+  },
 })
 export default class ViewerToolbar extends Vue {
   readonly store = store;
@@ -118,8 +118,8 @@ export default class ViewerToolbar extends Vue {
     this.$router.replace({
       query: {
         ...this.$route.query,
-        [param]: value
-      }
+        [param]: value,
+      },
     });
   }
 
@@ -230,8 +230,8 @@ export default class ViewerToolbar extends Vue {
       },
       data: {
         section: "Image Navigation",
-        description: "Decrease XY position"
-      }
+        description: "Decrease XY position",
+      },
     },
     {
       // XY right
@@ -241,8 +241,8 @@ export default class ViewerToolbar extends Vue {
       },
       data: {
         section: "Image Navigation",
-        description: "Increase XY position"
-      }
+        description: "Increase XY position",
+      },
     },
     {
       // Z down
@@ -252,8 +252,8 @@ export default class ViewerToolbar extends Vue {
       },
       data: {
         section: "Image Navigation",
-        description: "Decrease Z position"
-      }
+        description: "Decrease Z position",
+      },
     },
     {
       // Z up
@@ -263,8 +263,8 @@ export default class ViewerToolbar extends Vue {
       },
       data: {
         section: "Image Navigation",
-        description: "Increase Z position"
-      }
+        description: "Increase Z position",
+      },
     },
     {
       // previous T
@@ -274,8 +274,8 @@ export default class ViewerToolbar extends Vue {
       },
       data: {
         section: "Image Navigation",
-        description: "Decrease T position"
-      }
+        description: "Decrease T position",
+      },
     },
     {
       // next T
@@ -285,9 +285,9 @@ export default class ViewerToolbar extends Vue {
       },
       data: {
         section: "Image Navigation",
-        description: "Increase T position"
-      }
-    }
+        description: "Increase T position",
+      },
+    },
   ];
 }
 </script>

@@ -8,7 +8,7 @@
           section: 'Object list actions',
           title: 'Export CSV',
           description:
-            'Export the current list of annotations and associated properties to a CSV file'
+            'Export the current list of annotations and associated properties to a CSV file',
         }"
       >
         <v-icon>mdi-application-export</v-icon>
@@ -71,7 +71,7 @@ import { downloadToClient } from "@/utils/download";
 import { getValueFromObjectAndPath } from "@/utils/paths";
 
 @Component({
-  components: {}
+  components: {},
 })
 export default class AnnotationCsvDialog extends Vue {
   readonly store = store;
@@ -103,7 +103,7 @@ export default class AnnotationCsvDialog extends Vue {
       navigator.clipboard.writeText(this.text);
     } else {
       const fieldToCopy = (this.$refs.fieldToCopy as Vue)?.$el?.querySelector(
-        "input"
+        "input",
       );
       if (fieldToCopy) {
         fieldToCopy.select();
@@ -143,7 +143,7 @@ export default class AnnotationCsvDialog extends Vue {
       "Time",
       "Tags",
       "Shape",
-      "Name"
+      "Name",
     ];
     const quotes = [true, false, false, false, false, true, true, true];
     const usedPaths: string[][] = [];
@@ -175,7 +175,7 @@ export default class AnnotationCsvDialog extends Vue {
       for (let iProp = 0; iProp < usedPaths.length; ++iProp) {
         const value = getValueFromObjectAndPath(
           propValues[annotation.id],
-          usedPaths[iProp]
+          usedPaths[iProp],
         );
         row.push(typeof value === "number" ? value : "-");
       }
@@ -199,7 +199,7 @@ export default class AnnotationCsvDialog extends Vue {
   download() {
     const params = {
       href: "data:text/plain;charset=utf-8," + encodeURIComponent(this.text),
-      download: this.filename || "upenn_annotation_export.csv"
+      download: this.filename || "upenn_annotation_export.csv",
     };
     downloadToClient(params);
   }

@@ -1,8 +1,6 @@
 <template>
   <v-card>
-    <v-card-title>
-      Hotkeys
-    </v-card-title>
+    <v-card-title> Hotkeys </v-card-title>
     <v-card-text class="container">
       <p v-for="[sectionName, sectionItems] of hotkeyItems" :key="sectionName">
         <span class="title span-title">
@@ -19,9 +17,7 @@
       </p>
     </v-card-text>
     <v-divider />
-    <v-card-title>
-      Features
-    </v-card-title>
+    <v-card-title> Features </v-card-title>
     <v-card-text class="container">
       <p v-for="[sectionName, sectionItems] of featureItems" :key="sectionName">
         <span class="title span-title">
@@ -51,10 +47,8 @@ export default class HelpPanel extends Vue {
   readonly descriptions = descriptions;
 
   get hotkeyItems() {
-    const sections: Map<
-      string,
-      { key: string; description: string }[]
-    > = new Map();
+    const sections: Map<string, { key: string; description: string }[]> =
+      new Map();
     for (const [key, data] of Object.entries(this.boundKeys)) {
       if (!sections.has(data.section)) {
         sections.set(data.section, []);
@@ -62,7 +56,7 @@ export default class HelpPanel extends Vue {
       const section = sections.get(data.section);
       section!.push({
         key,
-        description: data.description
+        description: data.description,
       });
     }
     const items = [...sections.entries()];

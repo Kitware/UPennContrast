@@ -14,7 +14,7 @@ function geoJSCoordinatesTo2DITKMesh(coordinates: IGeoJSPoint[], map: any) {
   return {
     meshType: {
       dimension: 2,
-      pointComponentType: "float"
+      pointComponentType: "float",
     },
     dimension: 2,
     numberOfPoints: coordinates.length,
@@ -25,41 +25,41 @@ function geoJSCoordinatesTo2DITKMesh(coordinates: IGeoJSPoint[], map: any) {
     cells: new Uint32Array(),
     numberOfCellPixels: 0,
     cellData: new Uint32Array(),
-    cellBufferSize: 0
+    cellBufferSize: 0,
   };
 }
 
 function runItkPipelineWrapper(
   pipelineName: string,
   image: Uint8Array,
-  otherArgs: { path: string; data: any; type: any }[]
+  otherArgs: { path: string; data: any; type: any }[],
 ): Promise<any> {
   return new Promise((resolve, reject) => {
     const args: string[] = [
       "/inimage.png",
-      ...otherArgs.map(arg => arg.path),
-      "/out.json"
+      ...otherArgs.map((arg) => arg.path),
+      "/out.json",
     ];
     const pipelineInputs = [
       {
         path: "/inimage.png",
         data: image,
-        type: IOTypes.Binary
+        type: IOTypes.Binary,
       },
-      ...otherArgs
+      ...otherArgs,
     ];
     const pipelineOutputs = [
       {
         path: "out.json",
-        type: IOTypes.Text
-      }
+        type: IOTypes.Text,
+      },
     ];
     return runPipelineBrowser(
       null,
       pipelineName,
       args,
       pipelineOutputs,
-      pipelineInputs
+      pipelineInputs,
     )
       .then(({ outputs, webWorker }: { outputs: any; webWorker: Worker }) => {
         if (!outputs || outputs.length !== 1 || outputs[0].data === "") {
@@ -84,20 +84,20 @@ ${error.stack}`);
 function getThresholdBlobInContour(
   image: Uint8Array,
   contour: IGeoJSPoint[] = [],
-  geoJSMap: any
+  geoJSMap: any,
 ): Promise<IGeoJSPoint[]> {
   return new Promise((resolve, reject) => {
     runItkPipelineWrapper("BlobToBlobThreshold", image, [
       {
         path: "/inpoints.json",
         data: geoJSCoordinatesTo2DITKMesh(contour, geoJSMap),
-        type: IOTypes.Mesh
-      }
+        type: IOTypes.Mesh,
+      },
     ])
-      .then(result => {
+      .then((result) => {
         if (!result?.contour) {
           logError(
-            "Error getting data back from the pipeline. Could not find contour"
+            "Error getting data back from the pipeline. Could not find contour",
           );
           reject();
         } else {
@@ -105,7 +105,7 @@ function getThresholdBlobInContour(
           resolve(converted);
         }
       })
-      .catch(error => {
+      .catch((error) => {
         reject(error);
       });
   });
@@ -114,27 +114,27 @@ function getThresholdBlobInContour(
 function getMaximumPointInContour(
   image: Uint8Array,
   contour: IGeoJSPoint[] = [],
-  geoJSMap: any
+  geoJSMap: any,
 ): Promise<IGeoJSPoint> {
   return new Promise((resolve, reject) => {
     runItkPipelineWrapper("BlobToDotMax", image, [
       {
         path: "/inpoints.json",
         data: geoJSCoordinatesTo2DITKMesh(contour, geoJSMap),
-        type: IOTypes.Mesh
-      }
+        type: IOTypes.Mesh,
+      },
     ])
-      .then(result => {
+      .then((result) => {
         if (!result?.point) {
           reject(
-            "Error getting data back from the pipeline. Could not find max"
+            "Error getting data back from the pipeline. Could not find max",
           );
         } else {
           const converted = geoJSMap.displayToGcs(result.point);
           resolve(converted);
         }
       })
-      .catch(error => {
+      .catch((error) => {
         reject(error);
       });
   });
@@ -144,7 +144,7 @@ function getMaximumPointInCircle(
   image: Uint8Array,
   gcsCenter: IGeoJSPoint,
   radius: number,
-  geoJSMap: any
+  geoJSMap: any,
 ): Promise<IGeoJSPoint> {
   const displayCenter = geoJSMap.gcsToDisplay(gcsCenter);
   return new Promise((resolve, reject) => {
@@ -152,20 +152,20 @@ function getMaximumPointInCircle(
       {
         path: "/circle",
         data: `${displayCenter.x} ${displayCenter.y} ${radius}`,
-        type: IOTypes.Text
-      }
+        type: IOTypes.Text,
+      },
     ])
-      .then(result => {
+      .then((result) => {
         if (!result?.point) {
           reject(
-            "Error getting data back from the pipeline. Could not find max"
+            "Error getting data back from the pipeline. Could not find max",
           );
         } else {
           const converted = geoJSMap.displayToGcs(result.point);
           resolve(converted);
         }
       })
-      .catch(error => {
+      .catch((error) => {
         reject(error);
       });
   });
@@ -175,7 +175,7 @@ export async function snapCoordinates(
   coordinates: IGeoJSPoint[],
   imageArray: Uint8Array,
   tool: IToolConfiguration,
-  geoJSMap: any
+  geoJSMap: any,
 ) {
   const snapTo = tool.values.snapTo.value;
   switch (snapTo) {
@@ -186,8 +186,8 @@ export async function snapCoordinates(
             imageArray,
             coordinates[0],
             tool.values.radius,
-            geoJSMap
-          )
+            geoJSMap,
+          ),
         ];
       }
       return undefined;
@@ -195,14 +195,14 @@ export async function snapCoordinates(
       const point = await getMaximumPointInContour(
         imageArray,
         coordinates,
-        geoJSMap
+        geoJSMap,
       );
       return [point];
     case "blobToBlob":
       const contour = await getThresholdBlobInContour(
         imageArray,
         coordinates,
-        geoJSMap
+        geoJSMap,
       );
       return contour;
     case "edge":

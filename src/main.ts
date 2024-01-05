@@ -39,13 +39,13 @@ new Vue({
     girderRest: new Proxy(main, {
       get(obj: Main, prop: keyof RestClientInstance) {
         return obj.girderRest[prop];
-      }
-    })
+      },
+    }),
   },
   router: new VueRouter({
-    routes
+    routes,
   }),
   store,
   vuetify,
-  render: (h: any) => h(App)
+  render: (h: any) => h(App),
 }).$mount("#app");

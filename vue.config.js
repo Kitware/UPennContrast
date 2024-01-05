@@ -8,19 +8,19 @@ module.exports = {
         patterns: [
           {
             from: path.join(__dirname, "node_modules", "itk", "WebWorkers"),
-            to: path.join(__dirname, "dist", "itk", "WebWorkers")
+            to: path.join(__dirname, "dist", "itk", "WebWorkers"),
           },
           {
             from: path.join(__dirname, "node_modules", "itk", "ImageIOs"),
-            to: path.join(__dirname, "dist", "itk", "ImageIOs")
+            to: path.join(__dirname, "dist", "itk", "ImageIOs"),
           },
           {
             from: path.join(__dirname, "node_modules", "itk", "PolyDataIOs"),
-            to: path.join(__dirname, "dist", "itk", "PolyDataIOs")
+            to: path.join(__dirname, "dist", "itk", "PolyDataIOs"),
           },
           {
             from: path.join(__dirname, "node_modules", "itk", "MeshIOs"),
-            to: path.join(__dirname, "dist", "itk", "MeshIOs")
+            to: path.join(__dirname, "dist", "itk", "MeshIOs"),
           },
           {
             from: path.join(
@@ -28,15 +28,15 @@ module.exports = {
               "itk",
               "web-build",
               "BlobToDotMax",
-              "BlobToDotMax.js"
+              "BlobToDotMax.js",
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "BlobToDotMax.js"
-            )
+              "BlobToDotMax.js",
+            ),
           },
           {
             from: path.join(
@@ -44,15 +44,15 @@ module.exports = {
               "itk",
               "web-build",
               "BlobToDotMax",
-              "BlobToDotMaxWasm.js"
+              "BlobToDotMaxWasm.js",
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "BlobToDotMaxWasm.js"
-            )
+              "BlobToDotMaxWasm.js",
+            ),
           },
           {
             from: path.join(
@@ -60,15 +60,15 @@ module.exports = {
               "itk",
               "web-build",
               "BlobToDotMax",
-              "BlobToDotMaxWasm.wasm"
+              "BlobToDotMaxWasm.wasm",
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "BlobToDotMaxWasm.wasm"
-            )
+              "BlobToDotMaxWasm.wasm",
+            ),
           },
           {
             from: path.join(
@@ -76,15 +76,15 @@ module.exports = {
               "itk",
               "web-build",
               "BlobToBlobThreshold",
-              "BlobToBlobThreshold.js"
+              "BlobToBlobThreshold.js",
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "BlobToBlobThreshold.js"
-            )
+              "BlobToBlobThreshold.js",
+            ),
           },
           {
             from: path.join(
@@ -92,15 +92,15 @@ module.exports = {
               "itk",
               "web-build",
               "BlobToBlobThreshold",
-              "BlobToBlobThresholdWasm.js"
+              "BlobToBlobThresholdWasm.js",
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "BlobToBlobThresholdWasm.js"
-            )
+              "BlobToBlobThresholdWasm.js",
+            ),
           },
           {
             from: path.join(
@@ -108,15 +108,15 @@ module.exports = {
               "itk",
               "web-build",
               "BlobToBlobThreshold",
-              "BlobToBlobThresholdWasm.wasm"
+              "BlobToBlobThresholdWasm.wasm",
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "BlobToBlobThresholdWasm.wasm"
-            )
+              "BlobToBlobThresholdWasm.wasm",
+            ),
           },
           {
             from: path.join(
@@ -124,15 +124,15 @@ module.exports = {
               "itk",
               "web-build",
               "CircleToDotMax",
-              "CircleToDotMax.js"
+              "CircleToDotMax.js",
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "CircleToDotMax.js"
-            )
+              "CircleToDotMax.js",
+            ),
           },
           {
             from: path.join(
@@ -140,15 +140,15 @@ module.exports = {
               "itk",
               "web-build",
               "CircleToDotMax",
-              "CircleToDotMaxWasm.js"
+              "CircleToDotMaxWasm.js",
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "CircleToDotMaxWasm.js"
-            )
+              "CircleToDotMaxWasm.js",
+            ),
           },
           {
             from: path.join(
@@ -156,19 +156,19 @@ module.exports = {
               "itk",
               "web-build",
               "CircleToDotMax",
-              "CircleToDotMaxWasm.wasm"
+              "CircleToDotMaxWasm.wasm",
             ),
             to: path.join(
               __dirname,
               "dist",
               "itk",
               "Pipelines",
-              "CircleToDotMaxWasm.wasm"
-            )
-          }
-        ]
-      })
-    ]
+              "CircleToDotMaxWasm.wasm",
+            ),
+          },
+        ],
+      }),
+    ],
     // resolve: {
     //   alias: {
     //     moment: "moment/src/moment"
@@ -178,6 +178,6 @@ module.exports = {
   devServer: {
     host: "0.0.0.0",
     hot: true,
-    allowedHosts: "all"
-  }
+    allowedHosts: "all",
+  },
 };

@@ -78,11 +78,11 @@ import store from "@/store";
 
 import {
   AnnotationSelectionTypes,
-  AnnotationSelectionTypesNames
+  AnnotationSelectionTypesNames,
 } from "../../store/model";
 
 @Component({
-  components: {}
+  components: {},
 })
 export default class AnnotationToggles extends Vue {
   readonly store = store;
@@ -93,16 +93,16 @@ export default class AnnotationToggles extends Vue {
   }[] = [
     {
       text: AnnotationSelectionTypesNames[AnnotationSelectionTypes.ADD],
-      value: AnnotationSelectionTypes.ADD
+      value: AnnotationSelectionTypes.ADD,
     },
     {
       text: AnnotationSelectionTypesNames[AnnotationSelectionTypes.TOGGLE],
-      value: AnnotationSelectionTypes.TOGGLE
+      value: AnnotationSelectionTypes.TOGGLE,
     },
     {
       text: AnnotationSelectionTypesNames[AnnotationSelectionTypes.REMOVE],
-      value: AnnotationSelectionTypes.REMOVE
-    }
+      value: AnnotationSelectionTypes.REMOVE,
+    },
   ];
 
   get annotationSelectionType() {

@@ -1,8 +1,6 @@
 <template>
   <v-expansion-panel>
-    <v-expansion-panel-header>
-      Properties
-    </v-expansion-panel-header>
+    <v-expansion-panel-header> Properties </v-expansion-panel-header>
     <v-expansion-panel-content>
       <v-container>
         <v-row class="caption text-center text--secondary font-weight-bold">
@@ -10,12 +8,8 @@
             Name
             <v-chip small class="mx-1">tags</v-chip>
           </v-col>
-          <v-col cols="2" class="px-1">
-            List property value
-          </v-col>
-          <v-col cols="2" class="px-1">
-            Use property value as filter
-          </v-col>
+          <v-col cols="2" class="px-1"> List property value </v-col>
+          <v-col cols="2" class="px-1"> Use property value as filter </v-col>
         </v-row>
         <v-divider class="my-2" />
         <div
@@ -43,7 +37,7 @@
                   :value="
                     findIndexOfPath(
                       propertyPath,
-                      propertyStore.displayedPropertyPaths
+                      propertyStore.displayedPropertyPaths,
                     ) >= 0
                   "
                   @click.stop="() => toggleList(propertyPath)"

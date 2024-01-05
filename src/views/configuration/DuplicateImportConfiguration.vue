@@ -5,9 +5,7 @@
       {{ datasetName }}
     </div>
     <v-card>
-      <v-card-title>
-        Location of new collections
-      </v-card-title>
+      <v-card-title> Location of new collections </v-card-title>
       <v-card-text>
         <div class="d-flex">
           <girder-location-chooser
@@ -37,8 +35,8 @@ import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 @Component({
   components: {
     ConfigurationSelect,
-    GirderLocationChooser
-  }
+    GirderLocationChooser,
+  },
 })
 export default class DuplicateImportConfiguration extends Vue {
   readonly store = store;
@@ -81,16 +79,16 @@ export default class DuplicateImportConfiguration extends Vue {
 
     // Duplicate each configuration and create a view for it
     await Promise.all(
-      configurations.map(configuration =>
+      configurations.map((configuration) =>
         this.store.api
           .duplicateConfiguration(configuration, parentFolder?._id)
-          .then(newConfiguration =>
+          .then((newConfiguration) =>
             this.store.createDatasetView({
               configurationId: newConfiguration.id,
-              datasetId: dataset.id
-            })
-          )
-      )
+              datasetId: dataset.id,
+            }),
+          ),
+      ),
     );
 
     this.$router.back();

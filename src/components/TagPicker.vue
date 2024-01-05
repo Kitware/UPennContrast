@@ -35,7 +35,7 @@ import annotationStore from "@/store/annotation";
 
 // Interface element for the input of annotation tags
 @Component({
-  components: {}
+  components: {},
 })
 export default class TagPicker extends Vue {
   readonly store = store;

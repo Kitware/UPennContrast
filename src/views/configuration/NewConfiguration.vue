@@ -1,8 +1,6 @@
 <template>
   <v-container>
-    <div class="headline py-4">
-      Create a new collection from a dataset
-    </div>
+    <div class="headline py-4">Create a new collection from a dataset</div>
     <v-form v-model="valid">
       <v-text-field v-model="name" label="Name" :rules="rules" />
       <v-textarea v-model="description" label="Description" />
@@ -34,9 +32,9 @@ const Mapper = routeMapper(
     datasetId: {
       parse: String,
       get: () => store.selectedDatasetId,
-      set: (value: string) => store.setSelectedDataset(value)
-    }
-  }
+      set: (value: string) => store.setSelectedDataset(value),
+    },
+  },
 );
 
 @Component({ components: { GirderLocationChooser } })
@@ -86,26 +84,26 @@ export default class NewConfiguration extends Mapper {
       .createConfiguration({
         name: this.name,
         description: this.description,
-        folderId
+        folderId,
       })
-      .then(config => {
+      .then((config) => {
         if (!config) {
           return;
         }
         if (this.store.dataset) {
           this.store.createDatasetView({
             configurationId: config.id,
-            datasetId: this.store.dataset.id
+            datasetId: this.store.dataset.id,
           });
         }
         this.$router.push({
           name: "configuration",
           params: Object.assign(
             {
-              configurationId: config.id
+              configurationId: config.id,
             },
-            this.$route.params
-          )
+            this.$route.params,
+          ),
         });
       });
   }

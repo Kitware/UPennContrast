@@ -28,7 +28,7 @@ export default class AlertDialog extends Vue {
     } else {
       this.alert = {
         type: "info",
-        message: "Unknown alert"
+        message: "Unknown alert",
       };
     }
   }

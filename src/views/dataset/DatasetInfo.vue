@@ -31,9 +31,7 @@
               </v-card>
             </v-dialog>
             <v-card class="ma-3">
-              <v-card-title class="title">
-                Actions
-              </v-card-title>
+              <v-card-title class="title"> Actions </v-card-title>
               <v-card-text>
                 <div v-if="dataset && datasetViewItems.length <= 0">
                   <v-text-field
@@ -71,7 +69,7 @@
                         color="primary"
                         :to="{
                           name: 'importconfiguration',
-                          query: { datasetId }
+                          query: { datasetId },
                         }"
                       >
                         Add to existing collection…
@@ -92,7 +90,7 @@
                         color="primary"
                         :to="{
                           name: 'duplicateimportconfiguration',
-                          query: { datasetId }
+                          query: { datasetId },
                         }"
                       >
                         Import configuration from collection…
@@ -180,9 +178,7 @@
       <v-col cols="4">
         <v-card class="my-3">
           <v-toolbar>
-            <v-toolbar-title>
-              Dataset
-            </v-toolbar-title>
+            <v-toolbar-title> Dataset </v-toolbar-title>
             <v-spacer></v-spacer>
             <v-dialog v-model="removeDatasetConfirm" max-width="33vw">
               <template #activator="{ on }">
@@ -196,9 +192,7 @@
                   Are you sure to remove "{{ datasetName }}"?
                 </v-card-title>
                 <v-card-actions class="button-bar">
-                  <v-btn @click="removeDatasetConfirm = false">
-                    Cancel
-                  </v-btn>
+                  <v-btn @click="removeDatasetConfirm = false"> Cancel </v-btn>
                   <v-btn @click="removeDataset" color="warning">Remove</v-btn>
                 </v-card-actions>
               </v-card>
@@ -228,8 +222,8 @@ import { IGirderItem, IGirderSelectAble } from "@/girder";
 @Component({
   components: {
     GirderLocationChooser: () =>
-      import("@/components/GirderLocationChooser.vue").then(mod => mod)
-  }
+      import("@/components/GirderLocationChooser.vue").then((mod) => mod),
+  },
 })
 export default class DatasetInfo extends Vue {
   readonly store = store;
@@ -250,22 +244,22 @@ export default class DatasetInfo extends Vue {
       text: "Field",
       sortable: false,
       value: "name",
-      align: "right"
+      align: "right",
     },
     {
       text: "Value",
       sortable: false,
-      value: "value"
-    }
+      value: "value",
+    },
   ];
 
   get datasetViewItems(): {
     datasetView: IDatasetView;
     configInfo: IGirderItem | undefined;
   }[] {
-    return this.datasetViews.map(datasetView => ({
+    return this.datasetViews.map((datasetView) => ({
       datasetView,
-      configInfo: this.configInfo[datasetView.configurationId]
+      configInfo: this.configInfo[datasetView.configurationId],
     }));
   }
 
@@ -275,8 +269,8 @@ export default class DatasetInfo extends Vue {
       if (!(datasetView.configurationId in this.configInfo)) {
         this.girderResources
           .getItem(datasetView.configurationId)
-          .then(item =>
-            Vue.set(this.configInfo, datasetView.configurationId, item)
+          .then((item) =>
+            Vue.set(this.configInfo, datasetView.configurationId, item),
           );
       }
     }
@@ -298,28 +292,28 @@ export default class DatasetInfo extends Vue {
     return [
       {
         name: "Dataset Name",
-        value: this.datasetName
+        value: this.datasetName,
       },
       {
         name: "Dataset Description",
-        value: this.dataset?.description || ""
+        value: this.dataset?.description || "",
       },
       {
         name: "Timepoints",
-        value: this.dataset?.time.length || "?"
+        value: this.dataset?.time.length || "?",
       },
       {
         name: "XY Slices",
-        value: this.dataset?.xy.length || "?"
+        value: this.dataset?.xy.length || "?",
       },
       {
         name: "Z Slices",
-        value: this.dataset?.z.length || "?"
+        value: this.dataset?.z.length || "?",
       },
       {
         name: "Channels",
-        value: this.dataset?.channels.length || "?"
-      }
+        value: this.dataset?.channels.length || "?",
+      },
     ];
   }
 
@@ -332,7 +326,7 @@ export default class DatasetInfo extends Vue {
   async updateDatasetViews() {
     if (this.dataset) {
       this.datasetViews = await this.store.api.findDatasetViews({
-        datasetId: this.dataset.id
+        datasetId: this.dataset.id,
       });
     } else {
       this.datasetViews = [];
@@ -352,8 +346,8 @@ export default class DatasetInfo extends Vue {
       params: Object.assign({}, this.$route.params, {
         datasetViewId: datasetView.id,
         datasetId: datasetView.datasetId,
-        configurationId: datasetView.configurationId
-      })
+        configurationId: datasetView.configurationId,
+      }),
     };
   }
 
@@ -361,7 +355,7 @@ export default class DatasetInfo extends Vue {
     this.store.deleteDataset(this.dataset!).then(() => {
       this.removeDatasetConfirm = false;
       this.$router.push({
-        name: "root"
+        name: "root",
       });
     });
   }
@@ -388,29 +382,29 @@ export default class DatasetInfo extends Vue {
 
   async duplicateView(
     datasetView: IDatasetView,
-    configurationFolder: IGirderSelectAble | null
+    configurationFolder: IGirderSelectAble | null,
   ) {
     if (!this.dataset || configurationFolder?._modelType !== "folder") {
       return;
     }
     const baseConfig = await this.girderResources.getConfiguration(
-      datasetView.configurationId
+      datasetView.configurationId,
     );
     if (!baseConfig) {
       return;
     }
     const config = await store.api.duplicateConfiguration(
       baseConfig,
-      configurationFolder._id
+      configurationFolder._id,
     );
     await this.store.createDatasetView({
       configurationId: config.id,
-      datasetId: this.dataset.id
+      datasetId: this.dataset.id,
     });
 
     this.$router.push({
       name: "configuration",
-      params: Object.assign({ configurationId: config.id }, this.$route.params)
+      params: Object.assign({ configurationId: config.id }, this.$route.params),
     });
   }
 
@@ -432,14 +426,14 @@ export default class DatasetInfo extends Vue {
     const config = await this.store.createConfiguration({
       name: this.defaultConfigurationName,
       description: "",
-      folderId: datasetFolder.parentId
+      folderId: datasetFolder.parentId,
     });
     if (!config) {
       return;
     }
     const view = await this.store.createDatasetView({
       configurationId: config.id,
-      datasetId: this.dataset.id
+      datasetId: this.dataset.id,
     });
     return view;
   }

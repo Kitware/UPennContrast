@@ -31,8 +31,8 @@ import WorkerInterfaceValues from "@/components/WorkerInterfaceValues.vue";
   components: {
     LayerSelect,
     TagFilterEditor,
-    WorkerInterfaceValues
-  }
+    WorkerInterfaceValues,
+  },
 })
 export default class PropertyWorkerMenu extends Vue {
   readonly store = store;

@@ -38,8 +38,8 @@ import RoiFilters from "@/components/AnnotationBrowser/ROIFilters.vue";
     PropertyFilterHistogram,
     RoiFilters,
     ShapeFilterEditor,
-    TagFilterEditor
-  }
+    TagFilterEditor,
+  },
 })
 export default class AnnotationFilters extends Vue {
   readonly filterStore = filterStore;

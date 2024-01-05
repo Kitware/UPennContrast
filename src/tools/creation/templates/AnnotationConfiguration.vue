@@ -73,9 +73,9 @@
                     "
                     :style="{ width: 'min-content' }"
                     :rules="[
-                      val =>
+                      (val) =>
                         Number.parseInt(val) <
-                        coordinateAssignments[coordinate].max
+                        coordinateAssignments[coordinate].max,
                     ]"
                   />
                 </template>
@@ -120,15 +120,15 @@ interface IAnnotationSetup {
 const standardValueKeys = [
   "tags",
   "coordinateAssignments",
-  "shape"
+  "shape",
 ] as (keyof IAnnotationSetup)[];
 
 // Interface element for configuring an annotation creation tool
 @Component({
   components: {
     LayerSelect,
-    TagPicker
-  }
+    TagPicker,
+  },
 })
 export default class AnnotationConfiguration extends Vue {
   readonly store = store;
@@ -195,7 +195,7 @@ export default class AnnotationConfiguration extends Vue {
   get standardValue() {
     if (
       typeof this.value === "object" &&
-      standardValueKeys.every(key => this.value?.hasOwnProperty(key))
+      standardValueKeys.every((key) => this.value?.hasOwnProperty(key))
     ) {
       return this.value;
     } else {
@@ -216,7 +216,7 @@ export default class AnnotationConfiguration extends Vue {
   coordinateAssignments: IAnnotationSetup["coordinateAssignments"] = {
     layer: null,
     Z: { type: "layer", value: 1, max: this.maxZ },
-    Time: { type: "layer", value: 1, max: this.maxTime }
+    Time: { type: "layer", value: 1, max: this.maxTime },
   };
 
   mounted() {
@@ -240,7 +240,7 @@ export default class AnnotationConfiguration extends Vue {
     this.coordinateAssignments = {
       layer: undefined, // Setting layer to undefined will reset the layer in layer-select
       Z: { type: "layer", value: 1, max: this.maxZ },
-      Time: { type: "layer", value: 1, max: this.maxTime }
+      Time: { type: "layer", value: 1, max: this.maxTime },
     };
     this.useAutoTags = true;
     this.tagsInternal = [];
@@ -265,7 +265,7 @@ export default class AnnotationConfiguration extends Vue {
     this.$emit("input", {
       tags: this.tags,
       coordinateAssignments: this.coordinateAssignments,
-      shape: this.shape
+      shape: this.shape,
     });
     this.$emit("change");
   }

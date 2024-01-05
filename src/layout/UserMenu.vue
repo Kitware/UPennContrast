@@ -8,7 +8,7 @@
         :class="{
           loginDialog: true,
           'theme--light': !$vuetify.theme.dark,
-          'theme--dark': $vuetify.theme.dark
+          'theme--dark': $vuetify.theme.dark,
         }"
       >
         <v-form @submit.prevent="login">
@@ -34,9 +34,7 @@
             prepend-icon="mdi-lock"
           />
           <v-card-actions class="button-bar">
-            <v-btn type="submit" color="primary">
-              Login
-            </v-btn>
+            <v-btn type="submit" color="primary"> Login </v-btn>
           </v-card-actions>
         </v-form>
         <v-alert :value="Boolean(error)" color="error">{{ error }}</v-alert>
@@ -68,8 +66,8 @@ import UserProfileSettings from "@/components/UserProfileSettings.vue";
 
 @Component({
   components: {
-    UserProfileSettings
-  }
+    UserProfileSettings,
+  },
 })
 export default class UserMenu extends Vue {
   readonly store = store;
@@ -109,7 +107,7 @@ export default class UserMenu extends Vue {
     const result = await store.login({
       domain: this.domain,
       username: this.username,
-      password: this.password
+      password: this.password,
     });
     if (result) {
       this.password = "";

@@ -1,8 +1,6 @@
 <template>
   <v-card>
-    <v-card-title>
-      Annotation Properties
-    </v-card-title>
+    <v-card-title> Annotation Properties </v-card-title>
     <v-card-text>
       <v-btn
         outlined
@@ -17,9 +15,7 @@
           <v-progress-circular indeterminate />
         </template>
         <template v-else>
-          <v-icon right color="primary">
-            mdi-play
-          </v-icon>
+          <v-icon right color="primary"> mdi-play </v-icon>
         </template>
       </v-btn>
       <v-container class="pa-0">
@@ -67,8 +63,8 @@ import AnnotationPropertyBody from "@/components/AnnotationBrowser/AnnotationPro
     TagFilterEditor,
     AnnotationProperty,
     AnnotationPropertyHeader,
-    AnnotationPropertyBody
-  }
+    AnnotationPropertyBody,
+  },
 })
 export default class PropertyList extends Vue {
   readonly store = store;

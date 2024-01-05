@@ -10,7 +10,7 @@ import {
   IAnnotationLocation,
   IDisplayLayer,
   TPropertyHistogram,
-  IScales
+  IScales,
 } from "./model";
 
 import { fetchAllPages } from "@/utils/fetch";
@@ -25,11 +25,11 @@ export default class PropertiesAPI {
   histogramsLoaded = 0;
 
   async createProperty(
-    property: IAnnotationPropertyConfiguration
+    property: IAnnotationPropertyConfiguration,
   ): Promise<IAnnotationProperty> {
     return this.client
       .post("annotation_property", this.fromPropertyConfiguration(property))
-      .then(res => {
+      .then((res) => {
         return this.toProperty(res.data);
       });
   }
@@ -39,7 +39,7 @@ export default class PropertiesAPI {
     for (const id of propertyIds) {
       const propertyPromise = this.client
         .get(`annotation_property/${id}`)
-        .then(res => this.toProperty(res.data));
+        .then((res) => this.toProperty(res.data));
       promises.push(propertyPromise);
     }
     return Promise.all(promises);
@@ -48,34 +48,34 @@ export default class PropertiesAPI {
   async getPropertyHistogram(
     datasetId: string,
     propertyPath: string[],
-    buckets: number = 255
+    buckets: number = 255,
   ): Promise<TPropertyHistogram> {
     const joinedPath = propertyPath.join(".");
     return this.client
       .get(
-        `annotation_property_values/histogram?datasetId=${datasetId}&propertyPath=${joinedPath}&buckets=${buckets}`
+        `annotation_property_values/histogram?datasetId=${datasetId}&propertyPath=${joinedPath}&buckets=${buckets}`,
       )
-      .then(res => res.data);
+      .then((res) => res.data);
   }
 
   async computeProperty(
     propertyId: string,
     datasetId: string,
     property: IAnnotationProperty,
-    scales: IScales
+    scales: IScales,
   ) {
     const params = {
       ...property,
-      scales
+      scales,
     };
     return this.client.post(
       `annotation_property/${propertyId}/compute?datasetId=${datasetId}`,
-      params
+      params,
     );
   }
 
   async getPropertyValues(
-    datasetId: string
+    datasetId: string,
   ): Promise<IAnnotationPropertyValues> {
     const annotationMapping: IAnnotationPropertyValues = {};
 
@@ -83,14 +83,14 @@ export default class PropertiesAPI {
       this.client,
       "annotation_property_values",
       {
-        params: { datasetId, sort: "_id" }
-      }
+        params: { datasetId, sort: "_id" },
+      },
     );
     for (const page of pages) {
       for (const { annotationId, values } of page) {
         annotationMapping[annotationId] = {
           ...annotationMapping[annotationId],
-          ...values
+          ...values,
         };
       }
     }
@@ -103,7 +103,7 @@ export default class PropertiesAPI {
 
   async deletePropertyValues(propertyId: string, datasetId: string) {
     return this.client.delete(
-      `annotation_property_values?datasetId=${datasetId}&propertyId=${propertyId}`
+      `annotation_property_values?datasetId=${datasetId}&propertyId=${propertyId}`,
     );
   }
 
@@ -114,7 +114,7 @@ export default class PropertiesAPI {
       image,
       tags,
       shape,
-      workerInterface
+      workerInterface,
     };
   }
 
@@ -126,26 +126,26 @@ export default class PropertiesAPI {
       image,
       tags,
       shape,
-      workerInterface: workerInterface || {}
+      workerInterface: workerInterface || {},
     };
   }
 
   async getWorkerImages(): Promise<IWorkerImageList> {
-    return this.client.get("worker_interface/available").then(res => {
+    return this.client.get("worker_interface/available").then((res) => {
       return res.data;
     });
   }
 
   async requestWorkerInterface(image: string) {
     return this.client.post(
-      `worker_interface/request?image=${encodeURIComponent(image)}`
+      `worker_interface/request?image=${encodeURIComponent(image)}`,
     );
   }
 
   async getWorkerInterface(image: string): Promise<IWorkerInterface | null> {
     return this.client
       .get(`worker_interface?image=${encodeURIComponent(image)}`)
-      .then(res => res.data);
+      .then((res) => res.data);
   }
 
   async requestWorkerPreview(
@@ -158,12 +158,14 @@ export default class PropertiesAPI {
       location: IAnnotationLocation;
       tile: IAnnotationLocation;
     },
-    layers: IDisplayLayer[]
+    layers: IDisplayLayer[],
   ) {
     const { id, name, type, values } = tool;
     const { annotation, connectTo } = values;
     const connectToLayerId = connectTo.layer;
-    const connectToLayer = layers.find(layer => layer.id === connectToLayerId);
+    const connectToLayer = layers.find(
+      (layer) => layer.id === connectToLayerId,
+    );
     const connectToChannel = connectToLayer ? connectToLayer.channel : null;
     const augmentedConnectTo = { ...connectTo, channel: connectToChannel };
     const params = {
@@ -177,22 +179,22 @@ export default class PropertiesAPI {
       tags: annotation.tags,
       tile: metadata.tile,
       connectTo: augmentedConnectTo,
-      workerInterface
+      workerInterface,
     };
     return this.client.post(
       `worker_preview/request?datasetId=${datasetId}&image=${encodeURIComponent(
-        image
+        image,
       )}`,
-      params
+      params,
     );
   }
 
   async getWorkerPreview(
-    image: string
+    image: string,
   ): Promise<{ text: string; image: string }> {
     return this.client
       .get(`worker_preview?image=${encodeURIComponent(image)}`)
-      .then(res => {
+      .then((res) => {
         return res.data.preview || {};
       });
   }

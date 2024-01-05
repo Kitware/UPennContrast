@@ -25,8 +25,8 @@ import propertiesStore from "@/store/properties";
     ViewerToolbar,
     DisplayLayers,
     ImageViewer,
-    ContrastPanels
-  }
+    ContrastPanels,
+  },
 })
 export default class Viewer extends Vue {
   readonly store = store;

@@ -3,9 +3,7 @@
     <template #activator="{ on }" v-if="activatorDisabled === false">
       <div class="d-flex">
         <slot name="activator" v-bind="{ on }">
-          <v-btn v-on="on" :disabled="disabled">
-            Choose...
-          </v-btn>
+          <v-btn v-on="on" :disabled="disabled"> Choose... </v-btn>
         </slot>
         <girder-breadcrumb
           v-if="breadcrumb && selected"
@@ -16,9 +14,9 @@
         />
       </div>
     </template>
-    <v-card class="pa-2" style="min-width: 70vh;">
+    <v-card class="pa-2" style="min-width: 70vh">
       <v-card-title>{{ title }}</v-card-title>
-      <v-card-text style="height: 70vh;">
+      <v-card-text style="height: 70vh">
         <custom-file-manager
           :location.sync="selected"
           v-bind="$attrs"
@@ -52,8 +50,8 @@ import CustomFileManager from "@/components/CustomFileManager.vue";
   components: {
     CustomFileManager,
     GirderBreadcrumb: () =>
-      import("@/girder/components").then(mod => mod.Breadcrumb)
-  }
+      import("@/girder/components").then((mod) => mod.Breadcrumb),
+  },
 })
 export default class GirderLocationChooser extends Vue {
   readonly store = store;
@@ -62,28 +60,28 @@ export default class GirderLocationChooser extends Vue {
   value!: IGirderSelectAble | null;
 
   @Prop({
-    default: "Select a Folder"
+    default: "Select a Folder",
   })
   title!: string;
 
   @Prop({
-    default: false
+    default: false,
   })
   breadcrumb!: boolean;
 
   @Prop({
-    default: false
+    default: false,
   })
   activatorDisabled!: boolean;
 
   @Prop({
-    default: false
+    default: false,
   })
   disabled!: boolean;
 
   // Use the computed dialogInternal instead of dialog or dialogInternalCache
   @Prop({
-    default: null
+    default: null,
   })
   private dialog!: boolean | null;
   private dialogInternalCache: boolean = false;

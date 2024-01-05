@@ -38,7 +38,7 @@ export default class ChannelSelect extends Vue {
           text:
             this.store.dataset.channelNames.get(channel) ||
             `Channel ${channel}`,
-          value: channel
+          value: channel,
         });
       }
     }

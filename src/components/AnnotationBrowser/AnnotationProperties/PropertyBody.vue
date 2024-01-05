@@ -31,9 +31,7 @@
           </v-btn>
         </template>
         <v-card>
-          <v-card-title>
-            Delete property
-          </v-card-title>
+          <v-card-title> Delete property </v-card-title>
           <v-card-text>
             <v-container>
               <v-row>

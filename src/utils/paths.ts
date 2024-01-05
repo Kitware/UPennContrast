@@ -9,7 +9,7 @@ export function arePathEquals(path: string[], otherPath: string[]): boolean {
 }
 
 export function findIndexOfPath(path: string[], pathArray: string[][]): number {
-  return pathArray.findIndex(otherPath => arePathEquals(otherPath, path));
+  return pathArray.findIndex((otherPath) => arePathEquals(otherPath, path));
 }
 
 // Generate a unique string from a path
@@ -22,7 +22,7 @@ export function createPathStringFromPathArray(path: string[]): string {
 // Return the location where the path leads, and null if the path is unknown
 export function getValueFromObjectAndPath(
   values: TNestedValues<number>,
-  path: string[]
+  path: string[],
 ): TNestedValues<number> | null {
   let currentItem = values;
   for (const name of path) {
@@ -39,7 +39,7 @@ export function getValueFromObjectAndPath(
 // Get a string of the value rounded to to decimals or a dash if no value
 export function getStringFromPropertiesAndPath(
   properties: IAnnotationPropertyValues[0],
-  path: string[]
+  path: string[],
 ): string {
   const value = getValueFromObjectAndPath(properties, path);
   return typeof value === "number" ? "" + Math.round(value * 100) / 100 : "-";
@@ -50,5 +50,5 @@ export default {
   findIndexOfPath,
   createPathStringFromPathArray,
   getValueFromObjectAndPath,
-  getStringFromPropertiesAndPath
+  getStringFromPropertiesAndPath,
 };

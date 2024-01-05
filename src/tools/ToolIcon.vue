@@ -12,13 +12,13 @@ const toolTypeToIcon = {
   select: "mdi-select-drag",
   edit: "mdi-vector-polygon",
   segmentation: "mdi-shape-polygon-plus",
-  connection: "mdi-vector-line"
+  connection: "mdi-vector-line",
 } as const;
 
 const createShapeToIcon = {
   point: "mdi-dots-hexagon",
   polygon: "mdi-vector-polygon",
-  line: "mdi-chart-timeline-variant"
+  line: "mdi-chart-timeline-variant",
 } as const;
 
 type toolType = keyof typeof toolTypeToIcon;

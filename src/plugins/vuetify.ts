@@ -9,8 +9,8 @@ Vue.use(Vuetify);
 
 const custom = {
   theme: {
-    dark: Persister.get("theme", "dark") === "dark"
-  }
+    dark: Persister.get("theme", "dark") === "dark",
+  },
 };
 const config: Partial<VuetifyPreset> = merge({}, vuetifyConfig, custom);
 

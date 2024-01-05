@@ -7,7 +7,7 @@ export async function fetchAllPages(
   endpoint: string,
   baseFormData?: AxiosRequestConfig,
   firstPage?: number,
-  progressCallback?: (fetched: number, total: number) => void
+  progressCallback?: (fetched: number, total: number) => void,
 ) {
   const pages: any[] = [];
   let totalCount = -1;
@@ -15,7 +15,7 @@ export async function fetchAllPages(
     limit: 100000,
     sort: "_id",
     ...baseFormData?.params,
-    offset: 0
+    offset: 0,
   };
   const basePageSize = baseParams.limit;
   const firstPageSize = firstPage === undefined ? basePageSize : firstPage;
@@ -27,8 +27,8 @@ export async function fetchAllPages(
       params: {
         ...baseParams,
         offset,
-        limit
-      }
+        limit,
+      },
     };
     try {
       const res = await client.get(endpoint, formData);

@@ -9,12 +9,8 @@
               <v-subheader class="headline mb-4">Upload Dataset</v-subheader>
               <v-card>
                 <v-tabs v-model="uploadTab">
-                  <v-tab>
-                    Quick Upload and View Dataset
-                  </v-tab>
-                  <v-tab>
-                    Comprehensive Upload
-                  </v-tab>
+                  <v-tab> Quick Upload and View Dataset </v-tab>
+                  <v-tab> Comprehensive Upload </v-tab>
                 </v-tabs>
               </v-card>
               <v-tabs-items v-model="uploadTab" class="flex-window-items">
@@ -51,7 +47,7 @@
                     top
                     :disabled="
                       !datasetInfo[d.datasetView.datasetId] &&
-                        !configInfo[d.datasetView.configurationId]
+                      !configInfo[d.datasetView.configurationId]
                     "
                   >
                     <template v-slot:activator="{ on, attrs }">
@@ -60,8 +56,8 @@
                           $router.push({
                             name: 'datasetview',
                             params: {
-                              datasetViewId: d.datasetView.id
-                            }
+                              datasetViewId: d.datasetView.id,
+                            },
                           })
                         "
                       >
@@ -121,7 +117,7 @@ import {
   IGirderFolder,
   IGirderItem,
   IGirderLocation,
-  IGirderSelectAble
+  IGirderSelectAble,
 } from "@/girder";
 import girderResources from "@/store/girderResources";
 import { IDatasetView } from "@/store/model";
@@ -136,8 +132,8 @@ import { isConfigurationItem, isDatasetFolder } from "@/utils/girderSelectable";
     GirderUpload,
     FileDropzone,
     GirderLocationChooser,
-    CustomFileManager
-  }
+    CustomFileManager,
+  },
 })
 export default class Home extends Vue {
   readonly store = store;
@@ -168,7 +164,7 @@ export default class Home extends Vue {
   get datasetViews() {
     const result: IDatasetView[] = [];
     const used: Set<string> = new Set();
-    this.store.recentDatasetViews.forEach(datasetView => {
+    this.store.recentDatasetViews.forEach((datasetView) => {
       if (!used.has(datasetView.id)) {
         used.add(datasetView.id);
         result.push(datasetView);
@@ -236,13 +232,13 @@ export default class Home extends Vue {
     if (isDatasetFolder(selectable)) {
       this.$router.push({
         name: "dataset",
-        params: { datasetId: selectable._id }
+        params: { datasetId: selectable._id },
       });
     }
     if (isConfigurationItem(selectable)) {
       this.$router.push({
         name: "configuration",
-        params: { configurationId: selectable._id }
+        params: { configurationId: selectable._id },
       });
     }
   }
@@ -255,8 +251,8 @@ export default class Home extends Vue {
       params: {
         quickupload: true,
         defaultFiles: files,
-        initialUploadLocation: this.location
-      } as any
+        initialUploadLocation: this.location,
+      } as any,
     });
   }
 
@@ -267,8 +263,8 @@ export default class Home extends Vue {
       name: "newdataset",
       params: {
         defaultFiles: files,
-        initialUploadLocation: this.location
-      } as any
+        initialUploadLocation: this.location,
+      } as any,
     });
   }
 }

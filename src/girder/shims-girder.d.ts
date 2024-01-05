@@ -46,7 +46,7 @@ declare module "@girder/components/src/rest" {
       firstName: string,
       lastName: string,
       password: string,
-      admin?: boolean
+      admin?: boolean,
     ): Promise<any>;
 
     fetchUser(): Promise<Readonly<IGirderUser>>;
@@ -66,7 +66,7 @@ declare module "@/girder/components" {
   export {
     Upload,
     Breadcrumb,
-    Search
+    Search,
   } from "@girder/components/src/components";
   export { FileManager } from "@girder/components/src/components/Snippet";
 }

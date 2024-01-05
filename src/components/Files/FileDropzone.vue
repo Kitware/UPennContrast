@@ -12,16 +12,12 @@
       class="flex-column align-center justify-center fill-height dropzone-message"
     >
       <slot name="default">
-        <v-icon size="50px">
-          $vuetify.icons.fileUpload
-        </v-icon>
+        <v-icon size="50px"> $vuetify.icons.fileUpload </v-icon>
         <div class="title mt-3">
           <template v-if="multiple">
             Drag files here or click to select them
           </template>
-          <template v-else>
-            Drag a file here or click to select one
-          </template>
+          <template v-else> Drag a file here or click to select one </template>
         </div>
       </slot>
       <slot name="afterMessage"></slot>
@@ -140,19 +136,34 @@ $overlayLight: linear-gradient(
   right: 0;
   bottom: 0;
   border: 7px solid transparent;
-  background: $overlayLight top left, $overlayLight top left,
-    $overlayLight bottom left, $overlayLight bottom left,
-    $overlayLight top right, $overlayLight top right, $overlayLight bottom right,
+  background:
+    $overlayLight top left,
+    $overlayLight top left,
+    $overlayLight bottom left,
+    $overlayLight bottom left,
+    $overlayLight top right,
+    $overlayLight top right,
+    $overlayLight bottom right,
     $overlayLight bottom right;
-  background-size: 5px 24px, 24px 5px;
+  background-size:
+    5px 24px,
+    24px 5px;
   background-repeat: no-repeat;
 }
 
 .theme--dark .dropzone-overlay {
-  background: $overlayDark top left, $overlayDark top left,
-    $overlayDark bottom left, $overlayDark bottom left, $overlayDark top right,
-    $overlayDark top right, $overlayDark bottom right, $overlayDark bottom right;
-  background-size: 5px 24px, 24px 5px;
+  background:
+    $overlayDark top left,
+    $overlayDark top left,
+    $overlayDark bottom left,
+    $overlayDark bottom left,
+    $overlayDark top right,
+    $overlayDark top right,
+    $overlayDark bottom right,
+    $overlayDark bottom right;
+  background-size:
+    5px 24px,
+    24px 5px;
   background-repeat: no-repeat;
 }
 </style>

@@ -9,7 +9,7 @@ import {
   IAnnotationLocation,
   IDisplayLayer,
   IScales,
-  IDataset
+  IDataset,
 } from "./model";
 
 import { logError } from "@/utils/log";
@@ -26,30 +26,30 @@ export default class AnnotationsAPI {
   histogramsLoaded = 0;
 
   createAnnotation(
-    annotationBase: IAnnotationBase
+    annotationBase: IAnnotationBase,
   ): Promise<IAnnotation | null> {
     return this.client
       .post("upenn_annotation", annotationBase)
-      .then(r => this.toAnnotation(r.data))
-      .catch(err => {
+      .then((r) => this.toAnnotation(r.data))
+      .catch((err) => {
         logError(`Unable to send new annotation to server ${err}`);
         return null;
       });
   }
 
   createMultipleAnnotations(
-    annotationList: IAnnotationBase[]
+    annotationList: IAnnotationBase[],
   ): Promise<IAnnotation[] | null> {
     return this.client
       .post("upenn_annotation/multiple", annotationList)
-      .then(response => {
+      .then((response) => {
         const annotations: IAnnotation[] = [];
         for (const item of response.data) {
           annotations.push(this.toAnnotation(item));
         }
         return annotations;
       })
-      .catch(err => {
+      .catch((err) => {
         logError(`Unable to send multiple new annotations to server ${err}`);
         return null;
       });
@@ -58,32 +58,32 @@ export default class AnnotationsAPI {
   createConnections(
     annotationsIds: string[],
     tags: string[],
-    channelId: number | null
+    channelId: number | null,
   ): Promise<IAnnotationConnection[] | null> {
     return this.client
       .post("annotation_connection/connectTo", {
         annotationsIds,
         tags,
-        channelId
+        channelId,
       })
-      .then(res => {
+      .then((res) => {
         return res.data.map((connection: any) => this.toConnection(connection));
       });
   }
 
   async getAnnotationsForDatasetId(
     datasetId: string,
-    progressCallback?: (fetched: number, total: number) => void
+    progressCallback?: (fetched: number, total: number) => void,
   ): Promise<IAnnotation[]> {
     const annotations: IAnnotation[] = [];
     const pages = await fetchAllPages(
       this.client,
       "upenn_annotation",
       {
-        params: { datasetId, sort: "_id" }
+        params: { datasetId, sort: "_id" },
       },
       undefined,
-      progressCallback
+      progressCallback,
     );
     for (const page of pages) {
       const newAnnotations = page.map(this.toAnnotation);
@@ -98,7 +98,7 @@ export default class AnnotationsAPI {
 
   async deleteMultipleAnnotations(annotationIds: string[]) {
     return this.client.delete("upenn_annotation/multiple", {
-      data: annotationIds
+      data: annotationIds,
     });
   }
 
@@ -117,7 +117,7 @@ export default class AnnotationsAPI {
       location,
       coordinates,
       _id,
-      datasetId
+      datasetId,
     } = item;
     return markRaw({
       name,
@@ -127,37 +127,37 @@ export default class AnnotationsAPI {
       location,
       coordinates,
       id: _id,
-      datasetId
+      datasetId,
     });
   };
 
   createConnection(
-    annotationConnectionBase: IAnnotationConnectionBase
+    annotationConnectionBase: IAnnotationConnectionBase,
   ): Promise<IAnnotationConnection | null> {
     return this.client
       .post("annotation_connection", annotationConnectionBase)
-      .then(r => this.toConnection(r.data))
-      .catch(err => {
+      .then((r) => this.toConnection(r.data))
+      .catch((err) => {
         logError(`Unable to send new annotation connection to server ${err}`);
         return null;
       });
   }
 
   createMultipleConnections(
-    annotationConnectionBases: IAnnotationConnectionBase[]
+    annotationConnectionBases: IAnnotationConnectionBase[],
   ): Promise<IAnnotationConnection[] | null> {
     return this.client
       .post("annotation_connection/multiple", annotationConnectionBases)
-      .then(response => {
+      .then((response) => {
         const connections: IAnnotationConnection[] = [];
         for (const item of response.data) {
           connections.push(this.toConnection(item));
         }
         return connections;
       })
-      .catch(err => {
+      .catch((err) => {
         logError(
-          `Unable to send multiple new annotation connections to server ${err}`
+          `Unable to send multiple new annotation connections to server ${err}`,
         );
         return null;
       });
@@ -165,23 +165,23 @@ export default class AnnotationsAPI {
 
   deleteMultipleConnections(connectionIds: string[]) {
     return this.client.delete("annotation_connection/multiple", {
-      data: connectionIds
+      data: connectionIds,
     });
   }
 
   async getConnectionsForDatasetId(
     datasetId: string,
-    progressCallback?: (fetched: number, total: number) => void
+    progressCallback?: (fetched: number, total: number) => void,
   ): Promise<IAnnotationConnection[]> {
     const connections: IAnnotationConnection[] = [];
     const pages = await fetchAllPages(
       this.client,
       "annotation_connection",
       {
-        params: { datasetId, sort: "_id" }
+        params: { datasetId, sort: "_id" },
       },
       undefined,
-      progressCallback
+      progressCallback,
     );
     for (const page of pages) {
       const newConnections = page.map(this.toConnection);
@@ -210,7 +210,7 @@ export default class AnnotationsAPI {
     },
     workerInterface: IWorkerInterfaceValues,
     layers: IDisplayLayer[],
-    scales: IScales
+    scales: IScales,
   ) {
     const datasetId = dataset.id;
     const { id, name, type, values } = tool;
@@ -231,7 +231,9 @@ export default class AnnotationsAPI {
       tags = [...tags, computedTag];
     }
     const connectToLayerId = connectTo.layer;
-    const connectToLayer = layers.find(layer => layer.id === connectToLayerId);
+    const connectToLayer = layers.find(
+      (layer) => layer.id === connectToLayerId,
+    );
     const connectToChannel = connectToLayer ? connectToLayer.channel : null;
     const augmentedConnectTo = { ...connectTo, channel: connectToChannel };
     const params = {
@@ -246,11 +248,11 @@ export default class AnnotationsAPI {
       tile: metadata.tile,
       connectTo: augmentedConnectTo,
       workerInterface,
-      scales
+      scales,
     };
     return this.client.post(
       `upenn_annotation/compute?datasetId=${datasetId}`,
-      params
+      params,
     );
   }
 
@@ -262,7 +264,7 @@ export default class AnnotationsAPI {
       id: _id,
       parentId,
       childId,
-      datasetId
+      datasetId,
     };
   };
 }

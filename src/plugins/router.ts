@@ -6,5 +6,5 @@ Vue.use(VueRouter);
 
 Component.registerHooks([
   "beforeRouteEnter",
-  "beforeRouteUpdate" // for vue-router 2.2+
+  "beforeRouteUpdate", // for vue-router 2.2+
 ]);

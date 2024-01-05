@@ -9,7 +9,7 @@ export default routeMapper({
   datasetId: {
     parse: String,
     get: () => store.selectedDatasetId,
-    set: (value: string) => store.setSelectedDataset(value)
-  }
+    set: (value: string) => store.setSelectedDataset(value),
+  },
 });
 </script>

@@ -14,7 +14,7 @@ export interface IMapper<T> {
  */
 export default function routeMapper(
   params: { [key: string]: IMapper<any> },
-  query: { [key: string]: IMapper<any> } = {}
+  query: { [key: string]: IMapper<any> } = {},
 ) {
   const handle = (params: any, key: string, obj: IMapper<any>) => {
     if (params[key] && obj.get() !== obj.parse(params[key])) {
@@ -28,13 +28,13 @@ export default function routeMapper(
     async beforeRouteEnter(
       to: Route,
       _from: Route,
-      next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any
+      next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any,
     ) {
-      const ps = Object.keys(params).map(key =>
-        handle(to.params, key, params[key])
+      const ps = Object.keys(params).map((key) =>
+        handle(to.params, key, params[key]),
       );
-      const qs = Object.keys(query).map(key =>
-        handle(to.query, key, query[key])
+      const qs = Object.keys(query).map((key) =>
+        handle(to.query, key, query[key]),
       );
       await Promise.all([...ps, ...qs]);
 
@@ -45,16 +45,16 @@ export default function routeMapper(
     async beforeRouteUpdate(
       to: Route,
       _from: Route,
-      next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any
+      next: (to?: RawLocation | false | ((vm: Vue) => any) | void) => any,
     ) {
-      const ps = Object.keys(params).map(key =>
-        handle(to.params, key, params[key])
+      const ps = Object.keys(params).map((key) =>
+        handle(to.params, key, params[key]),
       );
-      const qs = Object.keys(query).map(key =>
-        handle(to.query, key, query[key])
+      const qs = Object.keys(query).map((key) =>
+        handle(to.query, key, query[key]),
       );
       await Promise.all([...ps, ...qs]);
       next();
-    }
+    },
   });
 }

@@ -9,7 +9,7 @@ export function isConfigurationItem(selectable: IGirderSelectAble): boolean {
 }
 
 export function toConfigurationItem(
-  selectable: IGirderSelectAble
+  selectable: IGirderSelectAble,
 ): IGirderItem | null {
   return isConfigurationItem(selectable) ? (selectable as IGirderItem) : null;
 }
@@ -21,7 +21,7 @@ export function isDatasetFolder(selectable: IGirderSelectAble): boolean {
   );
 }
 export function toDatasetFolder(
-  selectable: IGirderSelectAble
+  selectable: IGirderSelectAble,
 ): IGirderFolder | null {
   return isDatasetFolder(selectable) ? (selectable as IGirderFolder) : null;
 }

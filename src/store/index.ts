@@ -5,7 +5,7 @@ import {
   getModule,
   Module,
   Mutation,
-  VuexModule
+  VuexModule,
 } from "vuex-module-decorators";
 
 import AnnotationsAPI from "./AnnotationsAPI";
@@ -39,7 +39,7 @@ import {
   TUnitLength,
   TUnitTime,
   IScaleInformation,
-  exampleConfigurationBase
+  exampleConfigurationBase,
 } from "./model";
 
 import persister from "./Persister";
@@ -56,10 +56,10 @@ import { TCompositionMode } from "@/utils/compositionModes";
 export class Main extends VuexModule {
   girderUrl = persister.get(
     "girderUrl",
-    process.env.VUE_APP_GIRDER_URL || "http://localhost:8080"
+    process.env.VUE_APP_GIRDER_URL || "http://localhost:8080",
   );
   girderRest = new RestClient({
-    apiRoot: `${this.girderUrl}/api/v1`
+    apiRoot: `${this.girderUrl}/api/v1`,
   });
   api = new GirderAPI(this.girderRest);
   annotationsAPI = new AnnotationsAPI(this.girderRest);
@@ -123,16 +123,16 @@ export class Main extends VuexModule {
   readonly availableToolShapes: { value: string; text: string }[] = [
     {
       text: AnnotationNames[AnnotationShape.Point],
-      value: AnnotationShape.Point
+      value: AnnotationShape.Point,
     },
     {
       text: AnnotationNames[AnnotationShape.Polygon],
-      value: AnnotationShape.Polygon
+      value: AnnotationShape.Polygon,
     },
     {
       text: AnnotationNames[AnnotationShape.Line],
-      value: AnnotationShape.Line
-    }
+      value: AnnotationShape.Line,
+    },
   ];
 
   get tools() {
@@ -142,7 +142,7 @@ export class Main extends VuexModule {
   get layers(): IDisplayLayer[] {
     const configurationLayers = this.configuration?.layers || [];
     // Use contrast from dataset view
-    return configurationLayers.map(layer => {
+    return configurationLayers.map((layer) => {
       const contrast = this.datasetView?.layerContrasts[layer.id];
       return contrast ? { ...layer, contrast } : { ...layer };
     });
@@ -182,7 +182,7 @@ export class Main extends VuexModule {
         this.dataset,
         this.time,
         this.xy,
-        this.z
+        this.z,
       );
     };
   }
@@ -276,7 +276,7 @@ export class Main extends VuexModule {
   setSelectedToolId(id: string | null) {
     let tool: IToolConfiguration | null = null;
     if (id) {
-      tool = this.tools.find(t => t.id === id) || null;
+      tool = this.tools.find((t) => t.id === id) || null;
     }
     this.setSelectedToolImpl(tool);
   }
@@ -307,7 +307,7 @@ export class Main extends VuexModule {
       this.setSelectedToolId(null);
     }
     if (this.configuration) {
-      this.configuration.tools = this.tools.filter(t => t.id !== toolId);
+      this.configuration.tools = this.tools.filter((t) => t.id !== toolId);
       this.syncConfiguration("tools");
     }
   }
@@ -332,7 +332,7 @@ export class Main extends VuexModule {
   @Action
   protected async loggedIn({
     girderUrl,
-    girderRest
+    girderRest,
   }: {
     girderUrl: string;
     girderRest: RestClientInstance;
@@ -345,7 +345,7 @@ export class Main extends VuexModule {
   @Mutation
   protected loggedInImpl({
     girderUrl,
-    girderRest
+    girderRest,
   }: {
     girderUrl: string;
     girderRest: RestClientInstance;
@@ -373,7 +373,7 @@ export class Main extends VuexModule {
   @Mutation
   protected setDataset({
     id,
-    data
+    data,
   }: {
     id: string | null;
     data: IDataset | null;
@@ -385,7 +385,7 @@ export class Main extends VuexModule {
   @Action
   protected setConfiguration({
     id,
-    data
+    data,
   }: {
     id: string | null;
     data: IDatasetConfiguration | null;
@@ -397,7 +397,7 @@ export class Main extends VuexModule {
   @Mutation
   protected setConfigurationImpl({
     id,
-    data
+    data,
   }: {
     id: string | null;
     data: IDatasetConfiguration | null;
@@ -474,7 +474,7 @@ export class Main extends VuexModule {
   @Action
   createDatasetView({
     datasetId,
-    configurationId
+    configurationId,
   }: {
     datasetId: string;
     configurationId: string;
@@ -484,7 +484,7 @@ export class Main extends VuexModule {
       configurationId,
       layerContrasts: {},
       scales: {},
-      lastViewed: Date.now()
+      lastViewed: Date.now(),
     });
   }
 
@@ -492,7 +492,7 @@ export class Main extends VuexModule {
   async fetchRecentDatasetViews() {
     try {
       const recentDatasetViews = await this.api.getRecentDatasetViews(
-        MAX_NUMBER_OF_RECENT_DATASET_VIEWS
+        MAX_NUMBER_OF_RECENT_DATASET_VIEWS,
       );
       this.setRecentDatasetViewsImpl(recentDatasetViews);
     } catch {
@@ -511,7 +511,7 @@ export class Main extends VuexModule {
       if (user) {
         await this.loggedIn({
           girderUrl: this.girderUrl,
-          girderRest: this.girderRest
+          girderRest: this.girderRest,
         });
       }
       await this.initFromUrl();
@@ -526,15 +526,15 @@ export class Main extends VuexModule {
   setupWatchers() {
     store.watch(
       (state: any) => state.annotation.annotations,
-      this.fetchHistory
+      this.fetchHistory,
     );
     store.watch(
       (state: any) => state.annotation.annotationConnections,
-      this.fetchHistory
+      this.fetchHistory,
     );
     store.watch(
       (state: any) => state.properties.propertyValues,
-      () => this.context.dispatch("updateDisplayedFromComputedProperties")
+      () => this.context.dispatch("updateDisplayedFromComputedProperties"),
     );
   }
 
@@ -559,7 +559,7 @@ export class Main extends VuexModule {
   async login({
     domain,
     username,
-    password
+    password,
   }: {
     domain: string;
     username: string;
@@ -590,7 +590,7 @@ export class Main extends VuexModule {
 
     await this.loggedIn({
       girderUrl: domain,
-      girderRest: this.girderRest
+      girderRest: this.girderRest,
     });
 
     await this.initFromUrl();
@@ -610,7 +610,7 @@ export class Main extends VuexModule {
         id,
         unrollXY: this.unrollXY,
         unrollZ: this.unrollZ,
-        unrollT: this.unrollT
+        unrollT: this.unrollT,
       });
       this.setDataset({ id, data: r });
       sync.setLoading(false);
@@ -648,14 +648,14 @@ export class Main extends VuexModule {
       datasetView.lastViewed = Date.now();
       this.setDatasetViewImpl(datasetView);
       const promises: Promise<any>[] = [
-        this.api.updateDatasetView(datasetView)
+        this.api.updateDatasetView(datasetView),
       ];
       if (this.dataset?.id !== datasetView.datasetId) {
         promises.push(this.setSelectedDataset(datasetView.datasetId));
       }
       if (this.configuration?.id !== datasetView.configurationId) {
         promises.push(
-          this.setSelectedConfiguration(datasetView.configurationId)
+          this.setSelectedConfiguration(datasetView.configurationId),
         );
       }
       await Promise.all(promises);
@@ -676,7 +676,7 @@ export class Main extends VuexModule {
   async createDataset({
     name,
     description,
-    path
+    path,
   }: {
     name: string;
     description: string;
@@ -710,7 +710,7 @@ export class Main extends VuexModule {
   async createConfiguration({
     name,
     description,
-    folderId
+    folderId,
   }: {
     name: string;
     description: string;
@@ -725,7 +725,7 @@ export class Main extends VuexModule {
         name,
         description,
         folderId,
-        this.dataset
+        this.dataset,
       );
       sync.setSaving(false);
       return config;
@@ -750,7 +750,7 @@ export class Main extends VuexModule {
     parentId,
     metadata,
     transcode,
-    eventCallback
+    eventCallback,
   }: {
     parentId: string;
     metadata: string;
@@ -764,7 +764,7 @@ export class Main extends VuexModule {
           "multi-source2.json",
           metadata,
           parentId,
-          "folder"
+          "folder",
         )
       ).data;
       const itemId: string = newFile.itemId;
@@ -777,7 +777,7 @@ export class Main extends VuexModule {
         ? items
         : items.filter((item: any) => !!item.largeImage && item._id !== itemId);
       const removePromises = itemsToRemoveLargeImage.map((item: IGirderItem) =>
-        this.api.removeLargeImageForItem(item._id)
+        this.api.removeLargeImageForItem(item._id),
       );
       await Promise.all(removePromises);
 
@@ -787,16 +787,16 @@ export class Main extends VuexModule {
         const jobId = response.data?._id;
         if (!jobId) {
           throw new Error(
-            "Failed to transcode the large image: no job received"
+            "Failed to transcode the large image: no job received",
           );
         }
-        const success = await new Promise(resolve =>
+        const success = await new Promise((resolve) =>
           jobs.addJob({
             jobId,
             datasetId: parentId,
             callback: (success: boolean) => resolve(success),
-            eventCallback
-          })
+            eventCallback,
+          }),
         );
         if (!success) {
           throw new Error("Failed to transcode the large image: job failed");
@@ -816,7 +816,7 @@ export class Main extends VuexModule {
       const promises: Promise<any>[] = [];
       promises.push(this.api.deleteConfiguration(configuration));
       const views = await this.api.findDatasetViews({
-        configurationId: configuration.id
+        configurationId: configuration.id,
       });
       for (const { id } of views) {
         promises.push(this.api.deleteDatasetView(id));
@@ -849,7 +849,7 @@ export class Main extends VuexModule {
       const promises: Promise<any>[] = [];
       promises.push(this.api.deleteDataset(dataset));
       const views = await this.api.findDatasetViews({
-        datasetId: dataset.id
+        datasetId: dataset.id,
       });
       for (const { id } of views) {
         promises.push(this.api.deleteDatasetView(id));
@@ -939,11 +939,11 @@ export class Main extends VuexModule {
     const layers = this.configuration.layers;
     switch (this.layerMode) {
       case "single":
-        layers.forEach(l => (l.visible = l.id === layerId));
+        layers.forEach((l) => (l.visible = l.id === layerId));
         break;
       case "multiple":
       case "unroll":
-        const index = layers.findIndex(l => l.id === layerId);
+        const index = layers.findIndex((l) => l.id === layerId);
         if (index === null) {
           break;
         }
@@ -996,7 +996,7 @@ export class Main extends VuexModule {
       return;
     }
     let first = true;
-    this.configuration.layers.forEach(l => {
+    this.configuration.layers.forEach((l) => {
       if (l.visible) {
         if (!first) {
           l.visible = false;
@@ -1035,26 +1035,26 @@ export class Main extends VuexModule {
       return;
     }
     const currentZMaxMerge = layers.every(
-      layer => layer.z.type === "max-merge"
+      (layer) => layer.z.type === "max-merge",
     );
     const newLayerZ: IDisplaySlice = currentZMaxMerge
       ? { type: "current", value: null }
       : { type: "max-merge", value: null };
-    layers.forEach(layer =>
+    layers.forEach((layer) =>
       this.changeLayer({
         layerId: layer.id,
         delta: {
-          z: { ...newLayerZ }
-        }
-      })
+          z: { ...newLayerZ },
+        },
+      }),
     );
   }
 
   @Action
   async toggleGlobalLayerVisibility() {
     const layers = this.layers;
-    const currentVisibility = layers.every(layer => layer.visible);
-    layers.forEach(layer => {
+    const currentVisibility = layers.every((layer) => layer.visible);
+    layers.forEach((layer) => {
       if (layer.visible === currentVisibility) {
         this.toggleLayerVisibility(layer.id);
       }
@@ -1064,7 +1064,7 @@ export class Main extends VuexModule {
   @Action
   async saveContrastInConfiguration({
     layerId,
-    contrast
+    contrast,
   }: {
     layerId: string;
     contrast: IContrast;
@@ -1079,7 +1079,7 @@ export class Main extends VuexModule {
   @Action
   async saveContrastInView({
     layerId,
-    contrast
+    contrast,
   }: {
     layerId: string;
     contrast: IContrast;
@@ -1101,7 +1101,7 @@ export class Main extends VuexModule {
   @Action
   saveScaleInConfiguration({
     itemId,
-    scale
+    scale,
   }: {
     itemId: keyof IScales;
     scale: IScaleInformation<TUnitLength | TUnitTime>;
@@ -1115,7 +1115,7 @@ export class Main extends VuexModule {
   @Action
   saveScalesInView({
     itemId,
-    scale
+    scale,
   }: {
     itemId: keyof IScales;
     scale: IScaleInformation<TUnitLength | TUnitTime>;
@@ -1137,7 +1137,7 @@ export class Main extends VuexModule {
   @Mutation
   private changeLayerImpl({
     layerId,
-    delta
+    delta,
   }: {
     layerId: string;
     delta: Partial<IDisplayLayer>;
@@ -1146,7 +1146,7 @@ export class Main extends VuexModule {
       return;
     }
     const confLayers = this.configuration.layers;
-    const index = confLayers.findIndex(l => l.id === layerId);
+    const index = confLayers.findIndex((l) => l.id === layerId);
     if (index === null) {
       return;
     }
@@ -1172,7 +1172,7 @@ export class Main extends VuexModule {
       return;
     }
     const layers = this.configuration.layers;
-    const index = layers.findIndex(l => l.id === layerId);
+    const index = layers.findIndex((l) => l.id === layerId);
     if (index === null) {
       return;
     }
@@ -1208,7 +1208,7 @@ export class Main extends VuexModule {
           indexes.zIndex,
           indexes.tIndex,
           indexes.xyIndex,
-          layer.channel
+          layer.channel,
         ) || []
       );
     };
@@ -1223,18 +1223,18 @@ export class Main extends VuexModule {
       } = {
         neededHistograms: [],
         urls: [],
-        fullUrls: []
+        fullUrls: [],
       };
       if (!this.dataset || !this.configuration || !this.api.histogramsLoaded) {
         return results;
       }
-      this.layers.forEach(layer => {
+      this.layers.forEach((layer) => {
         const images = getLayerImages(layer, this.dataset!, time, xy, z);
         const hist = this.api.getResolvedLayerHistogram(images);
         if (!hist) {
           results.neededHistograms.push(images);
         } else {
-          images.forEach(image => {
+          images.forEach((image) => {
             results.urls.push(
               this.api.tileTemplateUrl(
                 image,
@@ -1242,8 +1242,8 @@ export class Main extends VuexModule {
                 layer.contrast,
                 hist,
                 layer,
-                this.dataset
-              )!
+                this.dataset,
+              )!,
             );
             results.fullUrls.push(
               this.api.tileTemplateUrl(
@@ -1252,12 +1252,12 @@ export class Main extends VuexModule {
                 {
                   mode: "percentile",
                   blackPoint: 0,
-                  whitePoint: 100
+                  whitePoint: 100,
                 },
                 hist,
                 layer,
-                this.dataset
-              )!
+                this.dataset,
+              )!,
             );
           });
         }
@@ -1271,13 +1271,13 @@ export class Main extends VuexModule {
       return [];
     }
 
-    return this.layers.map(layer => {
+    return this.layers.map((layer) => {
       const images = getLayerImages(
         layer,
         this.dataset!,
         this.time,
         this.xy,
-        this.z
+        this.z,
       );
       const hist = this.api.getResolvedLayerHistogram(images);
       const singleFrame =
@@ -1288,32 +1288,32 @@ export class Main extends VuexModule {
       const results: ILayerStackImage = {
         layer,
         images,
-        urls: images.map(image =>
+        urls: images.map((image) =>
           this.api.tileTemplateUrl(
             image,
             layer.color,
             layer.contrast,
             hist,
             layer,
-            this.dataset
-          )
+            this.dataset,
+          ),
         ),
-        fullUrls: images.map(image =>
+        fullUrls: images.map((image) =>
           this.api.tileTemplateUrl(
             image,
             "#ffffff",
             {
               mode: "percentile",
               blackPoint: 0,
-              whitePoint: 100
+              whitePoint: 100,
             },
             hist,
             layer,
-            this.dataset
-          )
+            this.dataset,
+          ),
         ),
         hist,
-        singleFrame: singleFrame ? images[0].frameIndex : null
+        singleFrame: singleFrame ? images[0].frameIndex : null,
       };
       if (results.fullUrls && results.fullUrls.length && results.fullUrls[0]) {
         results.baseQuadOptions = {
@@ -1321,7 +1321,7 @@ export class Main extends VuexModule {
           restRequest: (params: any) =>
             this.api.client
               .get(params.url, { params: params.data })
-              .then(data => data.data),
+              .then((data) => data.data),
           restUrl:
             "item/" +
             results.fullUrls[0].split("/tiles")[0].split("item/")[1] +
@@ -1335,11 +1335,11 @@ export class Main extends VuexModule {
                 JSON.stringify({
                   min: "min",
                   max: "max",
-                  palette: ["#000000", "#ffffff"]
-                })
+                  palette: ["#000000", "#ffffff"],
+                }),
               ) +
-              "&cache=true"
-          }
+              "&cache=true",
+          },
         };
         const anyImage = this.dataset!.anyImage();
         if (
@@ -1383,7 +1383,7 @@ export class Main extends VuexModule {
           lastHistogram: null,
           lastImages: null,
           nextImages: null,
-          lock: false
+          lock: false,
         };
       }
 
@@ -1399,7 +1399,7 @@ export class Main extends VuexModule {
           histogramObj.nextImages = null;
           histogramObj.lock = true;
           histogramObj.promise = this.api.getLayerHistogram(images);
-          histogramObj.promise.then(value => {
+          histogramObj.promise.then((value) => {
             histogramObj.lastHistogram = value;
           });
           histogramObj.promise.catch(() => {
@@ -1420,7 +1420,7 @@ export class Main extends VuexModule {
         this.dataset,
         this.time,
         this.xy,
-        this.z
+        this.z,
       );
 
       if (
@@ -1439,18 +1439,18 @@ export class Main extends VuexModule {
     return (layerId: string | undefined) =>
       layerId === undefined
         ? undefined
-        : this.layers.find(layer => layer.id === layerId);
+        : this.layers.find((layer) => layer.id === layerId);
   }
 
   get getConfigurationLayerFromId() {
     return (layerId: string) =>
-      this.configuration?.layers.find(layer => layer.id === layerId);
+      this.configuration?.layers.find((layer) => layer.id === layerId);
   }
 
   get getLayerIndexFromId() {
     return (layerId: string) => {
       const index = this.configuration?.layers.findIndex(
-        layer => layer.id === layerId
+        (layer) => layer.id === layerId,
       );
       if (index === undefined || index < 0) {
         return null;
@@ -1485,7 +1485,7 @@ export class Main extends VuexModule {
       return;
     }
     const snapshots = (this.configuration.snapshots || []).filter(
-      d => d.name !== snapshot.name
+      (d) => d.name !== snapshot.name,
     );
     snapshots.push(snapshot);
     this.configuration.snapshots = snapshots;
@@ -1498,7 +1498,7 @@ export class Main extends VuexModule {
       return;
     }
     const snapshots = (this.configuration.snapshots || []).filter(
-      d => d.name !== name
+      (d) => d.name !== name,
     );
     this.configuration.snapshots = snapshots;
     await this.syncSnapshots();
@@ -1545,7 +1545,7 @@ export class Main extends VuexModule {
       this.changeLayer({
         layerId: layer.id,
         delta: { visible: layer.visible },
-        sync: false
+        sync: false,
       });
     }
     await this.syncConfiguration("layers");

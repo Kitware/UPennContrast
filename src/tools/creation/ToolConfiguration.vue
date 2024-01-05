@@ -49,8 +49,8 @@ import DockerImage from "@/tools/creation/templates/DockerImage.vue";
 
 @Component({
   components: {
-    ToolConfigurationItem
-  }
+    ToolConfigurationItem,
+  },
 })
 // Creates a tool configuration interface based on the current selected template.
 export default class ToolConfiguration extends Vue {
@@ -74,19 +74,19 @@ export default class ToolConfiguration extends Vue {
         .map(([, value]: any[]) => value)
         .reduce((arr: any[], interfaceList: any[]) => {
           return [...arr, ...interfaceList];
-        }, [])
+        }, []),
     ];
   }
 
   get advancedInternalTemplate() {
     return this.internalTemplate.filter(
-      item => item.advanced || item.type === "annotation"
+      (item) => item.advanced || item.type === "annotation",
     );
   }
 
   get basicInternalTemplate() {
     return this.internalTemplate.filter(
-      item => !item.advanced || item.type === "annotation"
+      (item) => !item.advanced || item.type === "annotation",
     );
   }
 
@@ -134,7 +134,7 @@ export default class ToolConfiguration extends Vue {
   }
 
   setDefaultValues() {
-    this.internalTemplate.forEach(item => {
+    this.internalTemplate.forEach((item) => {
       if (this.toolValues[item.id] !== undefined) {
         return;
       }
@@ -179,16 +179,17 @@ export default class ToolConfiguration extends Vue {
             const innerComponents = (this.$refs[item.id] as Vue[]).reduce(
               (innerComponents, configItem) => [
                 ...innerComponents,
-                configItem.$refs["innerComponent"] as Vue
+                configItem.$refs["innerComponent"] as Vue,
               ],
-              [] as Vue[]
+              [] as Vue[],
             );
             switch (item.type) {
               case "annotation":
-                const annotations = innerComponents as AnnotationConfiguration[];
+                const annotations =
+                  innerComponents as AnnotationConfiguration[];
                 if (annotations.length) {
                   setItemValue({});
-                  annotations.forEach(annotation => annotation.reset());
+                  annotations.forEach((annotation) => annotation.reset());
                 }
                 break;
 
@@ -196,7 +197,7 @@ export default class ToolConfiguration extends Vue {
                 const restricts = innerComponents as TagAndLayerRestriction[];
                 if (restricts.length) {
                   setItemValue({});
-                  restricts.forEach(restrict => restrict.reset());
+                  restricts.forEach((restrict) => restrict.reset());
                 }
                 break;
 
@@ -204,7 +205,7 @@ export default class ToolConfiguration extends Vue {
                 const dockerImages = innerComponents as DockerImage[];
                 if (dockerImages.length) {
                   setItemValue(null);
-                  dockerImages.forEach(dockerImage => dockerImage.reset());
+                  dockerImages.forEach((dockerImage) => dockerImage.reset());
                 }
                 break;
 
@@ -223,7 +224,7 @@ export default class ToolConfiguration extends Vue {
       if (value?.meta?.interface) {
         this.valueTemplates = {
           ...this.valueTemplates,
-          [key]: value.meta.interface
+          [key]: value.meta.interface,
         };
       }
     });

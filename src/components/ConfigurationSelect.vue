@@ -53,9 +53,9 @@ const Mapper = routeMapper(
     datasetId: {
       parse: String,
       get: () => store.selectedDatasetId,
-      set: (value: string) => store.setSelectedDataset(value)
-    }
-  }
+      set: (value: string) => store.setSelectedDataset(value),
+    },
+  },
 );
 
 @Component
@@ -72,7 +72,7 @@ export default class ConfigurationSelect extends Mapper {
 
   readonly headers = [
     { text: "Collection Name", value: "name" },
-    { text: "Collection Description", value: "description" }
+    { text: "Collection Description", value: "description" },
   ];
 
   get dataset() {
@@ -89,14 +89,15 @@ export default class ConfigurationSelect extends Mapper {
     try {
       // Find all configurations that can be linked to the dataset but are not linked yet
       const views = await this.store.api.findDatasetViews({
-        datasetId: this.dataset.id
+        datasetId: this.dataset.id,
       });
-      const linkedConfigurationIds = new Set(views.map(v => v.configurationId));
-      const compatibleConfigurations = await this.store.api.getCompatibleConfigurations(
-        this.dataset
+      const linkedConfigurationIds = new Set(
+        views.map((v) => v.configurationId),
       );
+      const compatibleConfigurations =
+        await this.store.api.getCompatibleConfigurations(this.dataset);
       this.compatibleConfigurations = compatibleConfigurations.filter(
-        conf => !linkedConfigurationIds.has(conf.id)
+        (conf) => !linkedConfigurationIds.has(conf.id),
       );
     } finally {
       this.loading = false;

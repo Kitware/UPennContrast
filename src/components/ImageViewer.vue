@@ -2,9 +2,7 @@
   <div class="image" v-mousetrap="mousetrapAnnotations">
     <v-dialog v-model="scaleDialog">
       <v-card>
-        <v-card-title>
-          Scale settings
-        </v-card-title>
+        <v-card-title> Scale settings </v-card-title>
         <v-card-text>
           <scale-settings />
         </v-card-text>
@@ -16,11 +14,11 @@
     </v-dialog>
     <annotation-viewer
       v-for="(mapentry, index) in maps.filter(
-        mapentry =>
+        (mapentry) =>
           mapentry.annotationLayer &&
           mapentry.lowestLayer !== undefined &&
           mapentry.imageLayers &&
-          mapentry.imageLayers.length
+          mapentry.imageLayers.length,
       )"
       :map="mapentry.map"
       :selectionPath="mapentry.map === selectionMap ? selectionMousePath : []"
@@ -42,7 +40,7 @@
       v-description="{
         section: 'Objects',
         title: 'shift-click-drag',
-        description: 'Lasso to select objects'
+        description: 'Lasso to select objects',
       }"
       :map-count="mapLayerList.length"
     >
@@ -71,7 +69,7 @@
         :value="cacheObj.total ? (100 * cacheObj.progress) / cacheObj.total : 0"
         color="#CCC"
         background-color="blue-grey"
-        style="height: 100%; z-index: inherit;"
+        style="height: 100%; z-index: inherit"
       >
         <strong class="text-center ma-1">
           {{ cacheObj.title }}
@@ -134,7 +132,7 @@ import {
   ILayerStackImage,
   IMapEntry,
   ICameraInfo,
-  IXYPoint
+  IXYPoint,
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
@@ -150,7 +148,7 @@ function generateFilterURL(
   index: number,
   contrast: { whitePoint: number; blackPoint: number; mode: string },
   color: string,
-  hist: ITileHistogram | null
+  hist: ITileHistogram | null,
 ) {
   if (hist === null) {
     return;
@@ -167,7 +165,7 @@ function generateFilterURL(
     id: string,
     wp: number,
     bp: number,
-    level: number
+    level: number,
   ) => {
     const el = document.querySelector(`#recolor-${index} .${id}`);
     if (!el) {
@@ -219,8 +217,8 @@ export default class ImageViewer extends Vue {
       },
       data: {
         section: "Objects",
-        description: "Show/hide objects"
-      }
+        description: "Show/hide objects",
+      },
     },
     {
       bind: "t",
@@ -229,8 +227,8 @@ export default class ImageViewer extends Vue {
       },
       data: {
         section: "Objects",
-        description: "Show/hide object tooltips"
-      }
+        description: "Show/hide object tooltips",
+      },
     },
     {
       bind: "mod+backspace",
@@ -239,8 +237,8 @@ export default class ImageViewer extends Vue {
       },
       data: {
         section: "Objects",
-        description: "Delete selected objects"
-      }
+        description: "Delete selected objects",
+      },
     },
     {
       bind: "mod+z",
@@ -249,8 +247,8 @@ export default class ImageViewer extends Vue {
       },
       data: {
         section: "Objects",
-        description: "Undo last action"
-      }
+        description: "Undo last action",
+      },
     },
     {
       bind: "mod+shift+z",
@@ -259,9 +257,9 @@ export default class ImageViewer extends Vue {
       },
       data: {
         section: "Objects",
-        description: "Redo last action"
-      }
-    }
+        description: "Redo last action",
+      },
+    },
   ];
 
   private refsMounted = false;
@@ -299,8 +297,8 @@ export default class ImageViewer extends Vue {
       { x: 0, y: 0 },
       { x: 0, y: 0 },
       { x: 0, y: 0 },
-      { x: 0, y: 0 }
-    ]
+      { x: 0, y: 0 },
+    ],
   };
 
   histogramCaches: number = 0;
@@ -325,14 +323,14 @@ export default class ImageViewer extends Vue {
       progresses.push({
         progress: this.readyLayersCount,
         total: this.readyLayersTotal,
-        title: "Preparing layers"
+        title: "Preparing layers",
       });
     }
     if (this.histogramCaches > 0) {
       progresses.push({
         progress: 0,
         total: 0,
-        title: "Computing histograms"
+        title: "Computing histograms",
       });
     }
     for (const progress of this.cacheProgresses) {
@@ -343,14 +341,14 @@ export default class ImageViewer extends Vue {
         progresses.push({
           progress: progress.annotationProgress,
           total: progress.annotationTotal,
-          title: "Downloading annotations"
+          title: "Downloading annotations",
         });
       }
       if (!progress.connectionDone) {
         progresses.push({
           progress: progress.connectionProgress,
           total: progress.connectionTotal,
-          title: "Downloading connections"
+          title: "Downloading connections",
         });
       }
     }
@@ -360,7 +358,7 @@ export default class ImageViewer extends Vue {
   get readyLayersCount() {
     return this.readyLayers.reduce(
       (count, ready) => (ready ? count + 1 : count),
-      0
+      0,
     );
   }
 
@@ -409,7 +407,7 @@ export default class ImageViewer extends Vue {
       // Bind each group id (not nullish) to a llist index
       const layerGroups: Map<string, number> = new Map();
       llist = [];
-      this.layerStackImages.forEach(lsi => {
+      this.layerStackImages.forEach((lsi) => {
         if (lsi.layer.visible) {
           const group = lsi.layer.layerGroup;
           if (group) {
@@ -437,7 +435,7 @@ export default class ImageViewer extends Vue {
     }
     const girderJobs = await this.store.api.findJobs(
       "large_image_cache_histograms",
-      [jobStates.inactive, jobStates.queued, jobStates.running]
+      [jobStates.inactive, jobStates.queued, jobStates.running],
     );
     const validityPromises = girderJobs.map(async (girderJob: any) => {
       const largeImageId = girderJob?.kwargs?.itemId || null;
@@ -527,14 +525,14 @@ export default class ImageViewer extends Vue {
     const upperRight = map.gcsToDisplay(evt.upperRightGcs);
     const scaling = {
       x: Math.abs((upperRight.x - lowerLeft.x) / mapsize.width),
-      y: Math.abs((upperRight.y - lowerLeft.y) / mapsize.height)
+      y: Math.abs((upperRight.y - lowerLeft.y) / mapsize.height),
     };
     const center = map.displayToGcs(
       {
         x: (lowerLeft.x + upperRight.x) / 2,
-        y: (lowerLeft.y + upperRight.y) / 2
+        y: (lowerLeft.y + upperRight.y) / 2,
       },
-      null
+      null,
     );
     const zoom = map.zoom() - Math.log2(Math.max(scaling.x, scaling.y));
     map.zoom(zoom);
@@ -562,8 +560,8 @@ export default class ImageViewer extends Vue {
         map.displayToGcs({ x: 0, y: 0 }),
         map.displayToGcs({ x: size.width, y: 0 }),
         map.displayToGcs({ x: size.width, y: size.height }),
-        map.displayToGcs({ x: 0, y: size.height })
-      ]
+        map.displayToGcs({ x: 0, y: size.height }),
+      ],
     };
     if (this.maps.length >= 2) {
       this.applyCameraInfo(mapidx);
@@ -614,7 +612,7 @@ export default class ImageViewer extends Vue {
   private _setupMap(
     mllidx: number,
     someImage: IImage,
-    forceReset: boolean = false
+    forceReset: boolean = false,
   ) {
     const mapRefs = this.$refs[`map-${mllidx}`] as HTMLElement[] | undefined;
     const mapElement = mapRefs?.[0];
@@ -628,12 +626,12 @@ export default class ImageViewer extends Vue {
       someImage.sizeX,
       someImage.sizeY,
       this.tileWidth,
-      this.tileHeight
+      this.tileHeight,
     );
     params.map.maxBounds.right = mapWidth;
     params.map.maxBounds.bottom = mapHeight;
     params.map.min -= Math.ceil(
-      Math.log(Math.max(this.unrollW, this.unrollH)) / Math.log(2)
+      Math.log(Math.max(this.unrollW, this.unrollH)) / Math.log(2),
     );
     params.map.zoom = params.map.min;
     params.map.center = { x: mapWidth / 2, y: mapHeight / 2 };
@@ -658,7 +656,7 @@ export default class ImageViewer extends Vue {
         map: map,
         imageLayers: markRaw([]),
         params: markRaw(params),
-        baseLayerIndex: mllidx ? undefined : 0
+        baseLayerIndex: mllidx ? undefined : 0,
       };
       Vue.set(this.maps, mllidx, mapentry);
 
@@ -672,15 +670,14 @@ export default class ImageViewer extends Vue {
         annotations: geojs.listAnnotations(),
         autoshareRenderer: false,
         continuousCloseProximity: true,
-        showLabels: false
+        showLabels: false,
       });
       mapentry.workerPreviewLayer = map.createLayer("feature", {
         renderer: mllidx ? "canvas" : undefined,
-        features: ["quad", "quad.image"]
+        features: ["quad", "quad.image"],
       });
-      mapentry.workerPreviewFeature = mapentry.workerPreviewLayer.createFeature(
-        "quad"
-      );
+      mapentry.workerPreviewFeature =
+        mapentry.workerPreviewLayer.createFeature("quad");
 
       mapentry.annotationLayer.node().css({ "mix-blend-mode": "unset" });
       mapentry.workerPreviewLayer.node().css({ "mix-blend-mode": "unset" });
@@ -698,7 +695,7 @@ export default class ImageViewer extends Vue {
           left: 0,
           top: 0,
           right: params.map.maxBounds.right,
-          bottom: params.map.maxBounds.bottom
+          bottom: params.map.maxBounds.bottom,
         });
         map.zoomRange(params.map);
       }
@@ -714,7 +711,7 @@ export default class ImageViewer extends Vue {
       const pixelSizeM = convertLength(
         pixelSizeScale.value,
         pixelSizeScale.unit,
-        "m"
+        "m",
       );
       if (
         mapentry.scaleWidget &&
@@ -729,10 +726,10 @@ export default class ImageViewer extends Vue {
           scale: pixelSizeM,
           strokeWidth: 5,
           tickLength: 0,
-          position: { bottom: 20, right: 10 }
+          position: { bottom: 20, right: 10 },
         });
-        const svgElement: SVGElement = mapentry.scaleWidget.parentCanvas()
-          .firstChild;
+        const svgElement: SVGElement =
+          mapentry.scaleWidget.parentCanvas().firstChild;
         svgElement.classList.add("scale-widget");
         svgElement.onclick = (event: MouseEvent) => {
           event.preventDefault();
@@ -750,7 +747,7 @@ export default class ImageViewer extends Vue {
     mll: ILayerStackImage[],
     mllidx: number,
     someImage: IImage,
-    baseLayerIndex: number
+    baseLayerIndex: number,
   ) {
     const mapentry = this.maps[mllidx];
     const map = mapentry.map;
@@ -770,13 +767,14 @@ export default class ImageViewer extends Vue {
           x:
             Math.ceil(someImage.sizeX / s / someImage.tileWidth) * this.unrollW,
           y:
-            Math.ceil(someImage.sizeY / s / someImage.tileHeight) * this.unrollH
+            Math.ceil(someImage.sizeY / s / someImage.tileHeight) *
+            this.unrollH,
         };
         return result;
       };
       const currentImageLayers = this.maps.reduce(
         (acc, entry) => acc + (entry.imageLayers || []).length,
-        0
+        0,
       );
       /* I thought the number of webgl layesr would be
        *  imageLayers (mll * 2) + 1 + this.maps.length
@@ -803,7 +801,7 @@ export default class ImageViewer extends Vue {
         const s = Math.pow(2, someImage.levels - 1 - level);
         const txy = {
           x: Math.ceil(someImage.sizeX / s / someImage.tileWidth),
-          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight)
+          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight),
         };
         const imageNum =
           Math.floor(x / txy.x) + Math.floor(y / txy.y) * this.unrollW;
@@ -825,35 +823,35 @@ export default class ImageViewer extends Vue {
           h = Math.ceil(someImage.sizeY / s);
         const txy = {
           x: Math.ceil(someImage.sizeX / s / someImage.tileWidth),
-          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight)
+          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight),
         };
         const imagexy = {
           x: Math.floor(tile.index.x / txy.x),
-          y: Math.floor(tile.index.y / txy.y)
+          y: Math.floor(tile.index.y / txy.y),
         };
         const tilexy = {
           x: tile.index.x % txy.x,
-          y: tile.index.y % txy.y
+          y: tile.index.y % txy.y,
         };
         const result = {
           left: tilexy.x * tile.size.x + w * imagexy.x,
           top: tilexy.y * tile.size.y + h * imagexy.y,
           right: Math.min((tilexy.x + 1) * tile.size.x, w) + w * imagexy.x,
-          bottom: Math.min((tilexy.y + 1) * tile.size.y, h) + h * imagexy.y
+          bottom: Math.min((tilexy.y + 1) * tile.size.y, h) + h * imagexy.y,
         };
         return result;
       };
       layer.tileAtPoint = (point: IXYPoint, level: number) => {
         point = layer.displayToLevel(
           layer.map().gcsToDisplay(point, null),
-          someImage.levels - 1
+          someImage.levels - 1,
         );
         const s = Math.pow(2, someImage.levels - 1 - level);
         const x = point.x,
           y = point.y;
         const txy = {
           x: Math.ceil(someImage.sizeX / s / someImage.tileWidth),
-          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight)
+          y: Math.ceil(someImage.sizeY / s / someImage.tileHeight),
         };
         const result = {
           x:
@@ -861,15 +859,15 @@ export default class ImageViewer extends Vue {
             Math.floor(
               (x - Math.floor(x / someImage.sizeX) * someImage.sizeX) /
                 someImage.tileWidth /
-                s
+                s,
             ),
           y:
             Math.floor(y / someImage.sizeY) * txy.y +
             Math.floor(
               (y - Math.floor(y / someImage.sizeY) * someImage.sizeY) /
                 someImage.tileHeight /
-                s
-            )
+                s,
+            ),
         };
         return result;
       };
@@ -883,13 +881,13 @@ export default class ImageViewer extends Vue {
     mll: ILayerStackImage[],
     mllidx: number,
     someImage: IImage,
-    baseLayerIndex: number
+    baseLayerIndex: number,
   ) {
     const mapentry = this.maps[mllidx];
     mll.forEach(
       (
         { layer, urls, fullUrls, hist, singleFrame, baseQuadOptions },
-        layerIndex: number
+        layerIndex: number,
       ) => {
         const fullLayer = mapentry.imageLayers[layerIndex * 2];
         const adjLayer = mapentry.imageLayers[layerIndex * 2 + 1];
@@ -938,10 +936,10 @@ export default class ImageViewer extends Vue {
                   progessObject.total = status.totalToLoad;
                   if (progessObject.progress >= progessObject.total) {
                     this.cacheProgresses = this.cacheProgresses.filter(
-                      obj => obj !== progessObject
+                      (obj) => obj !== progessObject,
                     );
                   }
-                }
+                },
               });
             }
             fullLayer.setFrameQuad!(singleFrame);
@@ -959,7 +957,7 @@ export default class ImageViewer extends Vue {
           adjLayer.onIdle(() => {
             if (
               fullUrls.every(
-                (url, idx) => url === fullLayer._imageUrls?.[idx]
+                (url, idx) => url === fullLayer._imageUrls?.[idx],
               ) &&
               urls.every((url, idx) => url === adjLayer._imageUrls?.[idx])
             ) {
@@ -977,7 +975,7 @@ export default class ImageViewer extends Vue {
         adjLayer
           .node()
           .css("visibility", idle && layer.visible ? "visible" : "hidden");
-      }
+      },
     );
   }
 
@@ -994,7 +992,7 @@ export default class ImageViewer extends Vue {
     if (!this.layerStackImages.length) {
       return;
     }
-    const someImages = this.layerStackImages.find(lsi => lsi.images[0]);
+    const someImages = this.layerStackImages.find((lsi) => lsi.images[0]);
     if (!someImages) {
       return;
     }
@@ -1004,8 +1002,8 @@ export default class ImageViewer extends Vue {
       unrollCount,
       Math.ceil(
         Math.sqrt(someImage.sizeX * someImage.sizeY * unrollCount) /
-          someImage.sizeX
-      )
+          someImage.sizeX,
+      ),
     );
     this.unrollH = Math.ceil(unrollCount / this.unrollW);
     let tileWidth = someImage.tileWidth;
@@ -1092,7 +1090,7 @@ export default class ImageViewer extends Vue {
 
   beforeDestroy() {
     if (this.maps) {
-      this.maps.forEach(mapentry => mapentry.map.exit());
+      this.maps.forEach((mapentry) => mapentry.map.exit());
       this.maps = [];
     }
   }

@@ -39,7 +39,7 @@ const filenames1 = [
   "img000_000_000000_0000000000.ome.tif",
   "img000_000_000003_0000000001.ome.tif",
   "img000_000_000000_0000000001.ome.tif",
-  "img000_000_000003_0000000000.ome.tif"
+  "img000_000_000003_0000000000.ome.tif",
 ];
 
 const expectedOutput1 = [
@@ -65,9 +65,9 @@ const expectedOutput1 = [
       "img000_000_000004_0000000000.ome.tif": 4,
       "img000_000_000004_0000000001.ome.tif": 4,
       "img000_000_000004_0000000002.ome.tif": 4,
-      "img000_000_000004_0000000003.ome.tif": 4
+      "img000_000_000004_0000000003.ome.tif": 4,
     },
-    values: ["000000", "000001", "000002", "000003", "000004"]
+    values: ["000000", "000001", "000002", "000003", "000004"],
   },
   {
     guess: "XY",
@@ -91,10 +91,10 @@ const expectedOutput1 = [
       "img000_000_000004_0000000000.ome.tif": 0,
       "img000_000_000004_0000000001.ome.tif": 1,
       "img000_000_000004_0000000002.ome.tif": 2,
-      "img000_000_000004_0000000003.ome.tif": 3
+      "img000_000_000004_0000000003.ome.tif": 3,
     },
-    values: ["0000000000", "0000000001", "0000000002", "0000000003"]
-  }
+    values: ["0000000000", "0000000001", "0000000002", "0000000003"],
+  },
 ];
 
 const filenames2 = [
@@ -115,7 +115,7 @@ const filenames2 = [
   "gfp/VID1630_A1_1_01d23h34m.tif",
   "gfp/VID1630_C4_1_00d23h56m.tif",
   "gfp/VID1630_A1_1_00d23h56m.tif",
-  "gfp/VID1630_C4_1_01d23h34m.tif"
+  "gfp/VID1630_C4_1_01d23h34m.tif",
 ];
 
 const expectedOutput2 = [
@@ -139,9 +139,9 @@ const expectedOutput2 = [
       "red/VID1630_A1_1_01d23h34m.tif": 2,
       "red/VID1630_C4_1_00d00h00m.tif": 2,
       "red/VID1630_C4_1_00d23h56m.tif": 2,
-      "red/VID1630_C4_1_01d23h34m.tif": 2
+      "red/VID1630_C4_1_01d23h34m.tif": 2,
     },
-    values: ["gfp", "phase", "red"]
+    values: ["gfp", "phase", "red"],
   },
   {
     guess: "XY",
@@ -163,9 +163,9 @@ const expectedOutput2 = [
       "red/VID1630_A1_1_01d23h34m.tif": 0,
       "red/VID1630_C4_1_00d00h00m.tif": 1,
       "red/VID1630_C4_1_00d23h56m.tif": 1,
-      "red/VID1630_C4_1_01d23h34m.tif": 1
+      "red/VID1630_C4_1_01d23h34m.tif": 1,
     },
-    values: ["A1", "C4"]
+    values: ["A1", "C4"],
   },
   {
     guess: "T",
@@ -187,10 +187,10 @@ const expectedOutput2 = [
       "red/VID1630_A1_1_01d23h34m.tif": 2,
       "red/VID1630_C4_1_00d00h00m.tif": 0,
       "red/VID1630_C4_1_00d23h56m.tif": 1,
-      "red/VID1630_C4_1_01d23h34m.tif": 2
+      "red/VID1630_C4_1_01d23h34m.tif": 2,
     },
-    values: ["00d00h00m", "00d23h56m", "01d23h34m"]
-  }
+    values: ["00d00h00m", "00d23h56m", "01d23h34m"],
+  },
 ];
 
 function parseTestFiles(filenamesPath: string, expectedOutputPath: string) {
@@ -200,8 +200,8 @@ function parseTestFiles(filenamesPath: string, expectedOutputPath: string) {
     const data = readFileSync(filenamesPath, "utf8"); // Read the file as a string
     const filenames = data
       .split("\n") // Split the string by newline
-      .map(line => line.trim()) // Trim whitespace from each line
-      .filter(line => line !== ""); // Filter out empty lines
+      .map((line) => line.trim()) // Trim whitespace from each line
+      .filter((line) => line !== ""); // Filter out empty lines
 
     // Get expected output
     const jsonData = readFileSync(expectedOutputPath, "utf-8");
@@ -238,7 +238,7 @@ describe("Parser Module", () => {
     const data = parseTestFiles(filenamesPath, expectedOutputPath);
     if (!data) {
       failTest(
-        `Unable to fetch test data for files: "${filenamesPath}" and "${expectedOutputPath}"`
+        `Unable to fetch test data for files: "${filenamesPath}" and "${expectedOutputPath}"`,
       );
     }
     const { filenames, expectedOutput } = data;

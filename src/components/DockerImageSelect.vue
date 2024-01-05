@@ -11,7 +11,7 @@ import { IWorkerLabels } from "@/store/model";
 
 // Interface element selecting an image
 @Component({
-  components: {}
+  components: {},
 })
 export default class DockerImageSelect extends Vue {
   readonly store = store;
@@ -44,7 +44,7 @@ export default class DockerImageSelect extends Vue {
       for (const image of imagesPerCategory[category]) {
         items.push({
           text: this.images[image].interfaceName || image,
-          value: image
+          value: image,
         });
       }
     }

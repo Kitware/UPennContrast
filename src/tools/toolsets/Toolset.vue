@@ -49,8 +49,8 @@
                         :closeOnContentClick="false"
                         :value="
                           selectedTool &&
-                            selectedTool.id === tool.id &&
-                            selectedTool.type === 'segmentation'
+                          selectedTool.id === tool.id &&
+                          selectedTool.type === 'segmentation'
                         "
                         z-index="100"
                       >
@@ -66,10 +66,11 @@
                     </template>
                   </template>
                   <div class="d-flex flex-column">
-                    <div style="margin: 5px;">
+                    <div style="margin: 5px">
                       <div
-                        v-for="(propEntry,
-                        forKey) in getToolPropertiesDescription(tool)"
+                        v-for="(
+                          propEntry, forKey
+                        ) in getToolPropertiesDescription(tool)"
                         :key="forKey"
                       >
                         {{ propEntry[0] }}: {{ propEntry[1] }}
@@ -84,8 +85,8 @@
             :tool="selectedTool"
             v-if="
               selectedTool &&
-                selectedTool.type === 'snap' &&
-                selectedTool.values.snapTo.value === 'circleToDot'
+              selectedTool.type === 'snap' &&
+              selectedTool.values.snapTo.value === 'circleToDot'
             "
           />
         </v-list>
@@ -104,7 +105,7 @@ import store from "@/store";
 import {
   AnnotationNames,
   AnnotationShape,
-  IToolConfiguration
+  IToolConfiguration,
 } from "@/store/model";
 
 import AnnotationWorkerMenu from "@/components/AnnotationWorkerMenu.vue";
@@ -119,8 +120,8 @@ import ToolItem from "./ToolItem.vue";
     ToolItem,
     AnnotationWorkerMenu,
     CircleToDotMenu,
-    draggable
-  }
+    draggable,
+  },
 })
 export default class Toolset extends Vue {
   readonly store = store;
@@ -167,7 +168,7 @@ export default class Toolset extends Vue {
       if (values.annotation) {
         propDesc.push([
           "Shape",
-          AnnotationNames[values.annotation.shape as AnnotationShape]
+          AnnotationNames[values.annotation.shape as AnnotationShape],
         ]);
         if (values.annotation.tags && values.annotation.tags.length) {
           propDesc.push(["Tag(s)", values.annotation.tags.join(", ")]);

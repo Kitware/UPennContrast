@@ -5,7 +5,7 @@ import {
   IDataset,
   IDisplaySlice,
   IContrast,
-  IImage
+  IImage,
 } from "./model";
 import main from "./index";
 
@@ -29,7 +29,7 @@ export function getLayerSliceIndexes(
   ds: IDataset,
   time: number,
   xy: number,
-  z: number
+  z: number,
 ): { xyIndex: number; zIndex: number; tIndex: number } | null {
   const xyIndex = ds.xy.length > 1 ? resolveSlice(layer.xy, xy) : 0;
   // invalid slices
@@ -53,7 +53,7 @@ export function getLayerImages(
   ds: IDataset,
   time: number,
   xy: number,
-  z: number
+  z: number,
 ) {
   const indexes = getLayerSliceIndexes(layer, ds, time, xy, z);
   if (!indexes) {
@@ -65,7 +65,7 @@ export function getLayerImages(
     ds.z[zIndex],
     ds.time[tIndex],
     ds.xy[xyIndex],
-    ds.channels[layer.channel]
+    ds.channels[layer.channel],
   );
 }
 
@@ -100,7 +100,7 @@ export function toStyle(
   hist: ITileHistogram | null,
   layer: IDisplayLayer | null,
   ds: IDataset | null,
-  image: IImage | null
+  image: IImage | null,
 ): ITileOptions {
   // unless we add a gamma function, 2 steps are all that are necessary.
   const p = palette(color, 2);
@@ -108,13 +108,13 @@ export function toStyle(
     return {
       min: contrast.blackPoint,
       max: contrast.whitePoint,
-      palette: p
+      palette: p,
     };
   }
   let style: ITileOptions = {
     min: "min",
     max: "max",
-    palette: p
+    palette: p,
   };
   if (hist) {
     const scale = scaleLinear()
@@ -123,7 +123,7 @@ export function toStyle(
     style = {
       min: scale(contrast.blackPoint),
       max: scale(contrast.whitePoint),
-      palette: p
+      palette: p,
     };
   }
   if (layer && ds && image) {
@@ -143,7 +143,7 @@ export function toStyle(
                 .frameIndex,
               min: style.min,
               max: style.max,
-              palette: style.palette
+              palette: style.palette,
             });
           }
         }
@@ -164,7 +164,7 @@ export async function getBandOption(layer: IDisplayLayer) {
     histogram,
     layer,
     main.dataset,
-    image
+    image,
   );
   if (image) {
     style.frame = image.frameIndex;
@@ -187,7 +187,7 @@ export function mergeHistograms(histograms: ITileHistogram[]): ITileHistogram {
       bin_edges: [0, 0.5],
       min: 0,
       max: 1,
-      samples: 0
+      samples: 0,
     };
   }
   if (histograms.length === 1) {

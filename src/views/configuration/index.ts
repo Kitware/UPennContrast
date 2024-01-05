@@ -13,24 +13,24 @@ const routes: RouteConfig[] = [
     name: "newconfiguration",
     component: NewConfiguration,
     meta: {
-      text: "New Configuration"
-    }
+      text: "New Configuration",
+    },
   },
   {
     path: "import",
     name: "importconfiguration",
     component: ImportConfiguration,
     meta: {
-      text: "Import one or several existing configurations"
-    }
+      text: "Import one or several existing configurations",
+    },
   },
   {
     path: "duplicate-import",
     name: "duplicateimportconfiguration",
     component: DuplicateImportConfiguration,
     meta: {
-      text: "Duplicate and import one or several existing configurations"
-    }
+      text: "Duplicate and import one or several existing configurations",
+    },
   },
   {
     path: ":configurationId",
@@ -40,7 +40,7 @@ const routes: RouteConfig[] = [
       name: "configuration",
       text(store: Main) {
         return store.configuration?.name || store.selectedConfigurationId;
-      }
+      },
     },
     children: [
       {
@@ -48,11 +48,11 @@ const routes: RouteConfig[] = [
         name: "configuration",
         component: ConfigurationInfo,
         meta: {
-          hidden: true
-        }
-      }
-    ]
-  }
+          hidden: true,
+        },
+      },
+    ],
+  },
 ];
 
 export default routes;

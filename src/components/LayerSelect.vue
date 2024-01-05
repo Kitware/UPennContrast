@@ -16,7 +16,7 @@ import store from "@/store";
 
 // Interface element selecting a layer
 @Component({
-  components: {}
+  components: {},
 })
 export default class LayerSelect extends Vue {
   readonly store = store;
@@ -51,15 +51,15 @@ export default class LayerSelect extends Vue {
 
   get layerItems() {
     const layers: { label: string; value: string | null }[] = this.layers.map(
-      layer => ({
+      (layer) => ({
         label: layer.name,
-        value: layer.id
-      })
+        value: layer.id,
+      }),
     );
     if (this.any !== undefined) {
       Vue.set(layers, layers.length, {
         label: "Any",
-        value: null
+        value: null,
       });
     }
     return layers;
