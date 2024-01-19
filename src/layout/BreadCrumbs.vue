@@ -76,7 +76,6 @@ import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import girderResources from "@/store/girderResources";
 import { Location } from "vue-router";
-import { Dictionary } from "vue-router/types/router";
 import AddDatasetToCollection from "@/components/AddDatasetToCollection.vue";
 
 import { IDatasetConfiguration, IDatasetView } from "@/store/model";
@@ -225,7 +224,7 @@ export default class BreadCrumbs extends Vue {
 
     // Dataset Item
     let datasetItem: IBreadCrumbItem | undefined;
-    const params: Dictionary<string> = {};
+    const params: { [key: string]: string } = {};
     if (datasetId) {
       params.datasetId = datasetId;
     }

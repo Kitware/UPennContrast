@@ -24,14 +24,14 @@ import {
   newLayer,
   TJobType,
   IDatasetConfigurationCompatibility,
-} from "./model";
+} from "@/store/model";
 import {
   toStyle,
   ITileOptionsBands,
   mergeHistograms,
   ITileHistogram,
-} from "./images";
-import { Promise } from "bluebird";
+} from "@/store/images";
+import { Promise as BluebirdPromise } from "bluebird";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { fetchAllPages } from "@/utils/fetch";
 import { stringify } from "qs";
@@ -505,7 +505,9 @@ export default class GirderAPI {
       return this.histogramCache.get(key)!;
     }
 
-    const promise = Promise.map(
+    // From the Bluebird repo itself:
+    // > Please use native promises instead if at all possible.
+    const promise = BluebirdPromise.map(
       images,
       (image: IImage) =>
         this.getHistogram(image.item, {
@@ -607,7 +609,7 @@ export default class GirderAPI {
     };
     const response = await this.client.get("job", {
       params,
-      paramsSerializer: stringify,
+      paramsSerializer: stringify, // function from qs
     });
     return response.data;
   }

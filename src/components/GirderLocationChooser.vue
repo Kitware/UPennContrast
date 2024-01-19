@@ -44,11 +44,10 @@
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
 import { IGirderSelectAble } from "@/girder";
-import CustomFileManager from "@/components/CustomFileManager.vue";
 
 @Component({
   components: {
-    CustomFileManager,
+    CustomFileManager: () => import("@/components/CustomFileManager.vue"),
     GirderBreadcrumb: () =>
       import("@/girder/components").then((mod) => mod.Breadcrumb),
   },

@@ -151,8 +151,18 @@ import { IHotkey } from "@/utils/v-mousetrap";
 })
 export default class DisplayLayer extends Vue {
   readonly store = store;
-  @Prop()
+
+  @Prop({ required: true })
   readonly value!: IDisplayLayer;
+
+  alternativeZSlice: IDisplaySlice = { type: "current", value: null };
+
+  mounted() {
+    this.alternativeZSlice =
+      this.value.z.type === "max-merge"
+        ? { type: "current", value: null }
+        : { ...this.value.z };
+  }
 
   get index() {
     return this.store.getLayerIndexFromId(this.value.id)!;
@@ -199,11 +209,6 @@ export default class DisplayLayer extends Vue {
   get visible() {
     return this.value.visible;
   }
-
-  alternativeZSlice: IDisplaySlice =
-    this.value.z.type === "max-merge"
-      ? { type: "current", value: null }
-      : { ...this.value.z };
 
   get zMaxMergeBinding() {
     return `shift+${this.index + 1}`;

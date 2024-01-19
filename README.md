@@ -26,7 +26,7 @@ npm run build-workers-windows
 Start docker images and run the server:
 ```sh
 docker-compose up -d
-npm run serve
+npm run dev
 ```
 
 To setup an environment for native C++ development for ITK, see `itk/README.md`.
@@ -44,6 +44,12 @@ A default assetstore is also created.
 
 ```
 npm run build
+```
+
+If you want to preview the production build:
+
+```
+npm run serve
 ```
 
 ### Lints and fixes files

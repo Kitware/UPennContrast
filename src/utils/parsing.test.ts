@@ -1,20 +1,16 @@
 // Desc: Unit tests for parserModule.ts
-// Tests are written using Jest
-// To run the tests, run the following command in the terminal:
-// npm test
-// You need to run the following command to install Jest:
-// npm install --save-dev jest @types/jest ts-jest typescript
-// Also need to install dataframe-js
-// npm install dataframe-js
-// npm install @types/dataframe-js
+// Tests are written using vitest
+// To run the vitest tests, run the following command in the terminal:
+// npm vitest-test
 // This runs 3 different filename patterns: filenames1, filenames2, filenames3
 // The expected output for each pattern is stored in expectedOutput1, expectedOutput2, expectedOutput3
 // filenames1 and filenames2 are small enough to be stored in this file
 // filenames3 is a large list of filenames that is stored in a separate file: M_Mir_image_file_list.txt
 // The expected output for filenames3 is stored in a separate file as well: filenames3.json
 
-import { collectFilenameMetadata2 } from "./parsing";
-import { failTest, TEST_DATA_ROOT } from "@/test/scripts/utilities";
+import { describe, expect, it } from "vitest";
+import { collectFilenameMetadata2 } from "@/utils/parsing";
+import { TEST_DATA_ROOT } from "@/test/scripts/utilities";
 import { readFileSync } from "fs";
 
 // Sample filenames can be moved outside individual tests since they are constants
@@ -215,21 +211,21 @@ function parseTestFiles(filenamesPath: string, expectedOutputPath: string) {
 }
 
 describe("Parser Module", () => {
-  test("Test with filenames1", () => {
+  it("Test with filenames1", () => {
     const filenames = filenames1;
     const result = collectFilenameMetadata2(filenames);
     // Assert your expectations here
-    expect(result).toEqual(expectedOutput1); // You should define expectedOutput1
+    expect(result).toEqual(expectedOutput1);
   });
 
-  test("Test with filenames2", () => {
+  it("Test with filenames2", () => {
     const filenames = filenames2;
     const result = collectFilenameMetadata2(filenames);
     // Assert your expectations here
-    expect(result).toEqual(expectedOutput2); // You should define expectedOutput2
+    expect(result).toEqual(expectedOutput2);
   });
 
-  test("Test with filenames3", () => {
+  it("Test with filenames3", () => {
     // Specify the path to your files here
     const filenamesPath = TEST_DATA_ROOT + "/parsing/M_Mir_image_file_list.txt";
     const expectedOutputPath = TEST_DATA_ROOT + "/parsing/filenames3.json";
@@ -237,7 +233,7 @@ describe("Parser Module", () => {
     // Fetch and parse files
     const data = parseTestFiles(filenamesPath, expectedOutputPath);
     if (!data) {
-      failTest(
+      throw new Error(
         `Unable to fetch test data for files: "${filenamesPath}" and "${expectedOutputPath}"`,
       );
     }

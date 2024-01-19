@@ -75,8 +75,8 @@ export default class UserMenu extends Vue {
   userMenu: boolean | string = "auto";
 
   domain = store.girderUrl;
-  username = process.env.VUE_APP_DEFAULT_USER || "";
-  password = process.env.VUE_APP_DEFAULT_PASSWORD || "";
+  username = import.meta.env.VITE_DEFAULT_USER || "";
+  password = import.meta.env.VITE_DEFAULT_PASSWORD || "";
 
   error = "";
 
