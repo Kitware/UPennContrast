@@ -16,9 +16,10 @@ RUN pip install girder[mount] girder girder-user-quota
 
 COPY ./provision.py /src/provision.py
 COPY ./girder.cfg /etc/girder.cfg
-RUN girder build
 
 COPY plugins/AnnotationPlugin /src/AnnotationPlugin
 RUN pip install -e /src/AnnotationPlugin
+
+RUN girder build
 
 ENTRYPOINT ["bash"]
