@@ -1,5 +1,6 @@
 {
   "name": "upenncontrast",
+  "type": "module",
   "version": "0.1.0",
   "license": "Apache 2.0",
   "private": true,
@@ -10,7 +11,7 @@
     "postinstall": "patch-package",
     "build-workers-unix": "itk-js build itk -- -DCMAKE_CXX_FLAGS='-Os -s \"ASSERTIONS=1\" -s \"ALLOW_MEMORY_GROWTH=1\"'",
     "build-workers-windows": "itk-js build itk -- \"-DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS='-Os -s ASSERTIONS=1 -s ALLOW_MEMORY_GROWTH=1'\"",
-    "lint": "eslint --ext .js,.vue --ignore-path .gitignore --fix src",
+    "lint": "eslint --ext .js,.ts,.vue --ignore-path .gitignore --fix src",
     "test": "npm run lint && npm run build && npm run vitest-test",
     "vitest-test": "vitest"
   },
@@ -31,7 +32,6 @@
     "@types/sortablejs": "^1.15.1",
     "@types/uuid": "^8.3.1",
     "bluebird": "^3.7.2",
-    "copy-webpack-plugin": "^6.4.1",
     "d3": "3.5.17",
     "d3-array": "^2.12.1",
     "d3-color": "^3.1.0",
@@ -82,6 +82,7 @@
     "typescript": "^5.3.3",
     "unplugin-vue-components": "^0.26.0",
     "vite": "^5.0.11",
+    "vite-plugin-static-copy": "^1.0.1",
     "vitest": "^1.1.3",
     "vue-template-compiler": "^2.7.1",
     "vuetify-loader": "^1.4.2",
