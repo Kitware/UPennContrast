@@ -22,28 +22,32 @@ from .server.models.datasetView import DatasetView as DatasetViewModel
 from .server.models.history import History as HistoryModel
 from .server.models.documentChange import DocumentChange as DocumentChangeModel
 
-from .server.api.annotation import Annotation
-from .server.api.connections import AnnotationConnection
-from .server.api.propertyValues import PropertyValues
-from .server.api.property import AnnotationProperty
-from .server.api.workerInterfaces import WorkerInterfaces
-from .server.api.workerPreviews import WorkerPreviews
-from .server.api.datasetView import DatasetView
-from .server.api.history import History
-
-
 class UPennContrastAnnotationAPIPlugin(GirderPlugin):
     DISPLAY_NAME = 'UPennContrast Annotation Plugin'
     def load(self, info):
+        # Laziliy do these imports as they can connect to the database
+        from .server.api.annotation import Annotation
+        from .server.api.connections import AnnotationConnection
+        from .server.api.propertyValues import PropertyValues
+        from .server.api.property import AnnotationProperty
+        from .server.api.workerInterfaces import WorkerInterfaces
+        from .server.api.workerPreviews import WorkerPreviews
+        from .server.api.datasetView import DatasetView
+        from .server.api.history import History
+
         ModelImporter.registerModel('upenn_annotation', AnnotationModel, 'upenncontrast_annotation')
-        ModelImporter.registerModel('annotation_connection', ConnectionModel, 'upenncontrast_annotation')
-        ModelImporter.registerModel('annotation_property_values', PropertyValuesModel, 'upenncontrast_annotation')
-        ModelImporter.registerModel('annotation_property', PropertyModel, 'upenncontrast_annotation')
+        ModelImporter.registerModel(
+            'annotation_connection', ConnectionModel, 'upenncontrast_annotation')
+        ModelImporter.registerModel(
+            'annotation_property_values', PropertyValuesModel, 'upenncontrast_annotation')
+        ModelImporter.registerModel(
+            'annotation_property', PropertyModel, 'upenncontrast_annotation')
         ModelImporter.registerModel('worker_interface', InterfaceModel, 'upenncontrast_annotation')
         ModelImporter.registerModel('worker_preview', PreviewModel, 'upenncontrast_annotation')
         ModelImporter.registerModel('dataset_view', DatasetViewModel, 'upenncontrast_annotation')
         ModelImporter.registerModel('history', HistoryModel, 'upenncontrast_annotation')
-        ModelImporter.registerModel('document_change', DocumentChangeModel, 'upenncontrast_annotation')
+        ModelImporter.registerModel(
+            'document_change', DocumentChangeModel, 'upenncontrast_annotation')
 
         info['apiRoot'].upenn_annotation = Annotation()
         info['apiRoot'].annotation_connection = AnnotationConnection()
