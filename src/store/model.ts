@@ -241,20 +241,29 @@ export interface IPixel {
   value?: number[];
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.object.html
+export interface IGeoJsObject {}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.sceneObject.html
+export interface IGeoJsSceneObject extends IGeoJsObject {}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.mapInteractor.html#.spec
 export interface IGeoJSMapInteractorSpec {
   keyboard?: {
-    actions?: object;
+    actions?: { [actionKey: string]: string[] };
     meta?: object;
     metakeyMouseEvents?: string[];
     focusHighlight?: boolean;
   };
 }
 
-export interface IGeoJSMapInteractor {
+// https://opengeoscience.github.io/geojs/apidocs/geo.mapInteractor.html
+export interface IGeoJSMapInteractor extends IGeoJsObject {
   options: ((opt: IGeoJSMapInteractorSpec) => IGeoJSMapInteractor) &
     (() => IGeoJSMapInteractorSpec);
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.geoBounds
 export interface IGeoJSBounds {
   left: number;
   top: number;
@@ -262,7 +271,10 @@ export interface IGeoJSBounds {
   bottom: number;
 }
 
-export interface IGeoJSMap {
+type TGeoJSScreenShotTypes = "image/png" | "canvas";
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.map.html
+export interface IGeoJSMap extends IGeoJsSceneObject {
   interactor: ((arg: IGeoJSMapInteractor) => IGeoJSMap) &
     (() => IGeoJSMapInteractor);
   bounds: (bds?: IGeoJSBounds, gcs?: string | null) => IGeoJSBounds;
@@ -275,12 +287,16 @@ export interface IGeoJSMap {
     (() => IGeoJSPoint);
   createLayer: <T extends string>(
     layerName: T,
-    arg: object,
+    arg?: object,
   ) => T extends "osm"
     ? IGeoJSOsmLayer
-    : T extends "feature"
-      ? IGeoJSFeatureLayer
-      : IGeoJSLayer;
+    : T extends "annotation"
+      ? IGeoJSAnnotationLayer
+      : T extends "feature"
+        ? IGeoJSFeatureLayer
+        : T extends "ui"
+          ? IGeoJSUiLayer
+          : IGeoJSLayer;
   deleteLayer: (layer: IGeoJSLayer | null) => IGeoJSLayer;
   displayToGcs: ((c: IGeoJSPoint, gcs?: string | null) => IGeoJSPoint) &
     ((c: IGeoJSPoint[], gcs?: string | null) => IGeoJSPoint[]);
@@ -296,6 +312,8 @@ export interface IGeoJSMap {
   ) => IGeoJSMap;
   ingcs: ((arg: string) => IGeoJSMap) & (() => string);
   layers: () => IGeoJSLayer[];
+  maxBounds: ((bounds: IGeoJSBounds, gcs?: string | null) => IGeoJSMap) &
+    ((bounds: undefined, gcs?: string | null) => IGeoJSBounds);
   node: () => JQuery;
   rotation: ((
     rotation: number,
@@ -303,15 +321,15 @@ export interface IGeoJSMap {
     ignoreRotationFunc?: boolean,
   ) => IGeoJSMap) &
     (() => number);
-  screenshot: (
-    layers?: IGeoJSLayer | IGeoJSLayer[] | false | object,
-    type?: string,
+  screenshot: <Type extends TGeoJSScreenShotTypes = "image/png">(
+    layers: IGeoJSLayer | IGeoJSLayer[] | false | object | undefined,
+    type?: Type,
     encoderOptions?: number,
     opts?: object,
-  ) => Promise<string>;
+  ) => Promise<Type extends "canvas" ? HTMLCanvasElement : string>;
   size: ((arg: IGeoScreenSize) => IGeoJSMap) & (() => IGeoScreenSize);
-  unitsPerPixel: ((zoom: number, unit: number | null) => IGeoJSMap) &
-    ((zoom?: number) => number);
+  unitsPerPixel: ((zoom: number, unit: number) => IGeoJSMap) &
+    ((zoom?: number, unit?: null) => number);
   zoom: ((
     val: number,
     origin?: object,
@@ -319,21 +337,23 @@ export interface IGeoJSMap {
     ignoreClampBounds?: boolean,
   ) => IGeoJSMap) &
     (() => number);
+  zoomRange: ((
+    arg: { min?: number; max?: number },
+    noRefresh?: boolean,
+  ) => IGeoJSMap) &
+    (() => { min: number; max: number });
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.screenSize
 export interface IGeoScreenSize {
   width: number;
   height: number;
 }
 
-export interface IGeoJSLayer {
-  addAnnotation: (annotation: IGeoJSAnnotation) => IGeoJSLayer;
+// https://opengeoscience.github.io/geojs/apidocs/geo.layer.html
+export interface IGeoJSLayer extends IGeoJsObject {
   visible: (value?: boolean) => boolean | IGeoJSLayer;
   draw: () => IGeoJSLayer;
-  mode: (
-    arg?: string | null,
-    editAnnotation?: IGeoJSAnnotation,
-  ) => string | null | IGeoJSLayer;
   map: () => IGeoJSMap;
   modes: {
     edit: "edit";
@@ -345,17 +365,31 @@ export interface IGeoJSLayer {
   currentAnnotation: null | IGeoJSAnnotation;
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.annotationLayer.html
+export interface IGeoJSAnnotationLayer extends IGeoJSLayer {
+  addAnnotation: (annotation: IGeoJSAnnotation) => IGeoJSAnnotationLayer;
+  mode: (
+    arg?: string | null,
+    editAnnotation?: IGeoJSAnnotation,
+  ) => string | null | IGeoJSAnnotationLayer;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.point2D
 export interface IXYPoint {
   x: number;
   y: number;
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.worldPosition
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.geoPosition
 export interface IGeoJSPoint extends IXYPoint {
   z?: number; // Optional z coordinate
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.fetchQueue.html
 export interface IGeoJSFetchQueue {}
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.tile.html
 export interface IGeoJSTile {
   index: {
     x: number;
@@ -366,17 +400,20 @@ export interface IGeoJSTile {
   size: IXYPoint;
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.quadFeature.html#.position
 export interface IGeoJSQuad {
   crop: IGeoJSPoint & IGeoJSBounds;
   lr: IGeoJSPoint;
   ul: IGeoJSPoint;
 }
 
-export interface IGeoJSRenderer {
+// https://opengeoscience.github.io/geojs/apidocs/geo.renderer.html
+export interface IGeoJSRenderer extends IGeoJsObject {
   _maxTextureSize: number;
   constructor: Function & { _maxTextureSize: number };
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.osmLayer.html
 export interface IGeoJSOsmLayer extends IGeoJSLayer {
   readonly idle: boolean;
   queue: IGeoJSFetchQueue;
@@ -399,13 +436,15 @@ export interface IGeoJSOsmLayer extends IGeoJSLayer {
   setFrameQuad?: ((frame: number) => void) & { status?: ISetQuadStatus };
 }
 
-export interface IGeoJSFeature {
+// https://opengeoscience.github.io/geojs/apidocs/geo.feature.html
+export interface IGeoJSFeature extends IGeoJsSceneObject {
   data: ((arg: any[]) => IGeoJSFeatureLayer) & (() => any[]);
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.featureLayer.html
 export interface IGeoJSFeatureLayer extends IGeoJSLayer {
   readonly idle: boolean;
-  createFeature: (featureName: string, arg: object) => IGeoJSFeature;
+  createFeature: (featureName: string, arg?: object) => IGeoJSFeature;
   geoOn: (event: string, handler: Function) => IGeoJSFeatureLayer;
   geoOff: (
     event?: string | string[],
@@ -419,6 +458,39 @@ export interface IGeoJSFeatureLayer extends IGeoJSLayer {
   setFrameQuad?: ((frame: number) => void) & { status?: ISetQuadStatus };
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.gui.widget.html
+export interface IGeoJSWidget {}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.gui.scaleWidget.html
+export interface IGeoJSScaleWidget {
+  options: (() => object) &
+    (<Key extends IGeoJSScaleWidgetOptions>(
+      arg1: Key,
+    ) => IGeoJSScaleWidgetSpec[Key]) &
+    (<Key extends IGeoJSScaleWidgetOptions>(
+      arg1: Key,
+      arg2: IGeoJSScaleWidgetSpec[Key],
+    ) => IGeoJSScaleWidget);
+  parentCanvas: () => HTMLElement;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.gui.scaleWidget.html#.spec
+interface IGeoJSScaleWidgetSpec {
+  scale: number;
+}
+
+type IGeoJSScaleWidgetOptions = keyof IGeoJSScaleWidgetSpec;
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.gui.uiLayer.html
+export interface IGeoJSUiLayer extends IGeoJSLayer {
+  createWidget: <WidgetName extends string, ParentType extends IGeoJsObject>(
+    widgetName: WidgetName,
+    arg: { parent?: ParentType; [k: string]: any },
+  ) => WidgetName extends "scale" ? IGeoJSScaleWidget : IGeoJSWidget;
+  deleteWidget: (widget: IGeoJSWidget) => IGeoJSUiLayer;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.annotation.html
 export interface IGeoJSAnnotation {
   options: (key?: string, value?: any) => any;
   style: (value?: { [key: string]: any }) => any;
@@ -684,17 +756,49 @@ export interface IUISetting {
   activeLayer: IDisplayLayer;
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.util.html#.pixelCoordinateParams
+interface IGeoJSPixelCoordinateParams {
+  map: {
+    node: HTMLElement;
+    ingcs: string;
+    gcs: string;
+    maxBounds: IGeoJSBounds;
+    unitsPerPixel: number;
+    center: IXYPoint;
+    min: number;
+    max: number;
+    zoom: number;
+    clampBoundsX: boolean;
+    clampBoundsY: boolean;
+    clampZoom: boolean;
+  };
+  layer: {
+    maxLevel: number;
+    wrapX: boolean;
+    wrapY: boolean;
+    tileOffset: () => IXYPoint;
+    attribution: string;
+    tileWidth: number;
+    tileHeight: number;
+    tileRounding: (x: number) => number;
+    tilesAtZoom: (zoom: number) => IXYPoint | undefined;
+    tilesMaxBounds: (level: number) => IXYPoint | undefined;
+    renderer?: string;
+    queue?: IGeoJSFetchQueue;
+  };
+}
+
 export interface IMapEntry {
   map: IGeoJSMap;
   imageLayers: IGeoJSOsmLayer[];
-  params: any;
+  params: IGeoJSPixelCoordinateParams;
   baseLayerIndex: number | undefined;
-  annotationLayer?: any;
-  workerPreviewLayer?: any;
-  workerPreviewFeature?: any;
-  textLayer?: any;
-  uiLayer?: any;
-  scaleWidget?: any;
+  annotationLayer: IGeoJSAnnotationLayer;
+  workerPreviewLayer: IGeoJSFeatureLayer;
+  workerPreviewFeature: IGeoJSFeature;
+  textLayer: IGeoJSFeatureLayer;
+  uiLayer?: IGeoJSUiLayer;
+  scaleWidget?: IGeoJSScaleWidget | null;
   lowestLayer?: number;
 }
 

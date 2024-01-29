@@ -647,46 +647,55 @@ export default class ImageViewer extends Vue {
       this.maps[mllidx]?.map.exit();
     }
 
-    let map: any;
-    let mapentry: IMapEntry | undefined;
     if (this.maps.length <= mllidx || needReset) {
-      map = geojs.map(params.map);
+      const map: IGeoJSMap = geojs.map(params.map);
       map.geoOn(geojs.event.pan, () => this._handlePan(mllidx));
-      mapentry = {
-        map: map,
-        imageLayers: markRaw([]),
-        params: markRaw(params),
-        baseLayerIndex: mllidx ? undefined : 0,
-      };
-      Vue.set(this.maps, mllidx, mapentry);
 
-      /* remove default key bindings */
-      let interactorOpts = map.interactor().options();
-      const actions = interactorOpts.keyboard.actions;
-      /* We can keep some actions, if wanted */
-      interactorOpts.keyboard.actions = { "rotate.0": actions["rotate.0"] };
+      const interactorOpts = map.interactor().options();
+      const keyboardOpts = interactorOpts.keyboard;
+      if (keyboardOpts?.actions) {
+        /* remove default key bindings */
+        const oldActions = keyboardOpts.actions;
+        const newActions: typeof oldActions = {};
+        /* We can keep some actions, if wanted */
+        if ("rotate.0" in oldActions) {
+          newActions["rotate.0"] = oldActions["rotate.0"];
+        }
+        keyboardOpts.actions = newActions;
+      }
       map.interactor().options(interactorOpts);
-      mapentry.annotationLayer = map.createLayer("annotation", {
+      const annotationLayer = map.createLayer("annotation", {
         annotations: geojs.listAnnotations(),
         autoshareRenderer: false,
         continuousCloseProximity: true,
         showLabels: false,
       });
-      mapentry.workerPreviewLayer = map.createLayer("feature", {
+      const workerPreviewLayer = map.createLayer("feature", {
         renderer: mllidx ? "canvas" : undefined,
         features: ["quad", "quad.image"],
       });
-      mapentry.workerPreviewFeature =
-        mapentry.workerPreviewLayer.createFeature("quad");
+      const workerPreviewFeature = workerPreviewLayer.createFeature("quad");
+      const textLayer = map.createLayer("feature", { features: ["text"] });
 
-      mapentry.annotationLayer.node().css({ "mix-blend-mode": "unset" });
-      mapentry.workerPreviewLayer.node().css({ "mix-blend-mode": "unset" });
-      mapentry.textLayer = map.createLayer("feature", { features: ["text"] });
-      mapentry.textLayer.node().css({ "mix-blend-mode": "unset" });
+      annotationLayer.node().css({ "mix-blend-mode": "unset" });
+      workerPreviewLayer.node().css({ "mix-blend-mode": "unset" });
+      textLayer.node().css({ "mix-blend-mode": "unset" });
+
+      const mapentry: IMapEntry = {
+        map,
+        imageLayers: markRaw([]),
+        params: markRaw(params),
+        baseLayerIndex: mllidx ? undefined : 0,
+        annotationLayer,
+        workerPreviewLayer,
+        textLayer,
+        workerPreviewFeature,
+      };
+      Vue.set(this.maps, mllidx, mapentry);
     } else {
-      mapentry = this.maps[mllidx];
+      const mapentry = this.maps[mllidx];
       mapentry.params = markRaw(params);
-      map = mapentry.map;
+      const map = mapentry.map;
       const adjustLayers =
         Math.abs(map.maxBounds(undefined, null).right - mapWidth) >= 0.5 ||
         Math.abs(map.maxBounds(undefined, null).bottom - mapHeight) >= 0.5;
@@ -703,8 +712,9 @@ export default class ImageViewer extends Vue {
 
     // only have a scale widget on the first map
     if (!mllidx) {
+      const mapentry = this.maps[mllidx];
       if (!mapentry.uiLayer) {
-        mapentry.uiLayer = map.createLayer("ui");
+        mapentry.uiLayer = mapentry.map.createLayer("ui");
         mapentry.uiLayer.node().css({ "mix-blend-mode": "unset" });
       }
       const pixelSizeScale = this.store.scales.pixelSize;
@@ -728,8 +738,8 @@ export default class ImageViewer extends Vue {
           tickLength: 0,
           position: { bottom: 20, right: 10 },
         });
-        const svgElement: SVGElement =
-          mapentry.scaleWidget.parentCanvas().firstChild;
+        const svgElement = mapentry.scaleWidget.parentCanvas()
+          .firstChild as SVGElement;
         svgElement.classList.add("scale-widget");
         svgElement.onclick = (event: MouseEvent) => {
           event.preventDefault();

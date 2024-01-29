@@ -322,7 +322,7 @@ import { downloadToClient } from "@/utils/download";
 import {
   IDownloadParameters,
   IGeoJSAnnotation,
-  IGeoJSLayer,
+  IGeoJSAnnotationLayer,
   IGeoJSMap,
   IImage,
   ISnapshot,
@@ -404,7 +404,7 @@ export default class Snapshots extends Vue {
   bboxTop: number = 0;
   bboxRight: number = 0;
   bboxBottom: number = 0;
-  bboxLayer: IGeoJSLayer | null = null;
+  bboxLayer: IGeoJSAnnotationLayer | null = null;
   bboxAnnotation: IGeoJSAnnotation | null = null;
   downloadMode: "layers" | "channels" = "layers";
   exportLayer: "all" | "composite" | string = "all";
@@ -820,7 +820,7 @@ export default class Snapshots extends Vue {
       if (!this.bboxLayer) {
         this.bboxLayer = map.createLayer("annotation", {
           autoshareRenderer: false,
-        }) as IGeoJSLayer;
+        });
         this.bboxAnnotation = geojs.annotation.rectangleAnnotation({
           layer: this.bboxLayer,
           corners: [

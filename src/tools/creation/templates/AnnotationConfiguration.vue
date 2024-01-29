@@ -56,7 +56,12 @@
               <v-radio
                 value="layer"
                 label="From Layer"
-                v-if="!isMaxMerge(coordinate, coordinateAssignments.layer)"
+                v-if="
+                  !isMaxMerge(
+                    coordinate,
+                    coordinateAssignments.layer ?? undefined,
+                  )
+                "
               ></v-radio>
               <v-radio value="assign">
                 <template v-slot:label>
@@ -73,9 +78,7 @@
                     "
                     :style="{ width: 'min-content' }"
                     :rules="[
-                      (val) =>
-                        Number.parseInt(val) <
-                        coordinateAssignments[coordinate].max,
+                      isSmallerThanRule(coordinateAssignments[coordinate].max),
                     ]"
                   />
                 </template>
@@ -114,6 +117,10 @@ interface IAnnotationSetup {
     };
   };
   shape: AnnotationShape;
+}
+
+function isSmallerThanRule(max: number) {
+  return (val: string) => Number.parseInt(val) < max;
 }
 
 // Properties of AnnotationConfiguration that are emitted as input
@@ -155,7 +162,8 @@ export default class AnnotationConfiguration extends Vue {
   readonly advanced!: boolean;
 
   availableShapes = store.availableToolShapes;
-  private AnnotationNames = AnnotationNames;
+  AnnotationNames = AnnotationNames;
+  isSmallerThanRule = isSmallerThanRule;
 
   label: string = "";
   shape: AnnotationShape = this.defaultShape;
@@ -203,7 +211,7 @@ export default class AnnotationConfiguration extends Vue {
     }
   }
 
-  isMaxMerge(axis: string, layerId: string) {
+  isMaxMerge(axis: string, layerId?: string) {
     const layer = this.store.getLayerFromId(layerId);
     if (!layer) {
       return false;
@@ -212,7 +220,7 @@ export default class AnnotationConfiguration extends Vue {
     return layer[key].type === "max-merge";
   }
 
-  coordinates = ["Z", "Time"];
+  coordinates: ["Z", "Time"] = ["Z", "Time"];
   coordinateAssignments: IAnnotationSetup["coordinateAssignments"] = {
     layer: null,
     Z: { type: "layer", value: 1, max: this.maxZ },
