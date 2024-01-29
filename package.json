@@ -16,6 +16,12 @@
     "test": "npm run lint && npm run build && npm run vitest-test",
     "vitest-test": "vitest"
   },
+  "overrides": {
+    "@girder/components": {
+      "js-cookie": "^3.0.5",
+      "markdown-it": "^14.0.0"
+    }
+  },
   "dependencies": {
     "@girder/components": "^2.1.0",
     "@types/bluebird": "^3.5.42",

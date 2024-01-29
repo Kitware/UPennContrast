@@ -56,7 +56,7 @@ import { TCompositionMode } from "@/utils/compositionModes";
 export class Main extends VuexModule {
   girderUrl = persister.get(
     "girderUrl",
-    process.env.VUE_APP_GIRDER_URL || "http://localhost:8080",
+    import.meta.env.VUE_APP_GIRDER_URL || "http://localhost:8080",
   );
   girderRest = new RestClient({
     apiRoot: `${this.girderUrl}/api/v1`,
