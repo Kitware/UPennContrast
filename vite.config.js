@@ -74,7 +74,7 @@ export default defineConfig({
             "dist",
             "*.wasm",
           ),
-          dest: joinAndNormalizePath("js"),
+          dest: joinAndNormalizePath("onnx-wasm"),
         },
       ],
     }),
