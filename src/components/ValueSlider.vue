@@ -63,18 +63,18 @@ import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 
 @Component
 export default class ValueSlider extends Vue {
-  @Prop()
+  @Prop({ required: true })
   readonly value!: number;
-  @Prop()
+  @Prop({ required: true })
   readonly min!: number;
-  @Prop()
+  @Prop({ required: true })
   readonly max!: number;
-  @Prop()
+  @Prop({ required: true })
   readonly label!: string;
   @Prop({ default: 0 })
   readonly offset!: number;
 
-  private internalValue = this.value;
+  private internalValue = 0;
 
   get slider() {
     return this.internalValue;
