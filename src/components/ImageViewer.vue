@@ -133,6 +133,8 @@ import {
   IMapEntry,
   ICameraInfo,
   IXYPoint,
+  IActiveTool,
+  TToolState,
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
@@ -143,6 +145,7 @@ import { ITileHistogram } from "@/store/images";
 import { convertLength } from "@/utils/conversion";
 import jobs, { jobStates } from "@/store/jobs";
 import { IHotkey } from "@/utils/v-mousetrap";
+import { Debounce } from "@/utils/debounce";
 
 function generateFilterURL(
   index: number,
@@ -319,7 +322,7 @@ export default class ImageViewer extends Vue {
       total: number;
       title: string;
     }[] = [];
-    if (this.readyLayersCount < this.readyLayersTotal) {
+    if (!this.layersReady) {
       progresses.push({
         progress: this.readyLayersCount,
         total: this.readyLayersTotal,
@@ -364,6 +367,40 @@ export default class ImageViewer extends Vue {
 
   get readyLayersTotal() {
     return this.readyLayers.length;
+  }
+
+  get layersReady() {
+    return this.readyLayersCount >= this.readyLayersTotal;
+  }
+
+  @Watch("layersReady")
+  @Watch("cameraInfo")
+  @Watch("selectedTool")
+  imageOrToolChanged() {
+    const tool = this.selectedTool;
+    if (tool && tool.configuration.type === "samAnnotation") {
+      const samTool = tool as IActiveTool<"samAnnotation">;
+      const pipeline = samTool.state.pipeline;
+      this.resetSamMapInput(pipeline);
+    }
+  }
+
+  // TODO: debounce based on modelName
+  // Two simultaneous "recomputeSamEmbeddings" with different modelName should trigger two computations
+  @Debounce(500, { leading: false, trailing: true })
+  async resetSamMapInput(pipeline: TToolState<"samAnnotation">["pipeline"]) {
+    if (!this.layersReady) {
+      return;
+    }
+    const firstMap: IGeoJSMap | undefined = this.maps[0]?.map;
+    if (firstMap) {
+      console.log("Setting output of input pipeline node");
+      pipeline?.setOutput(firstMap);
+    }
+  }
+
+  get selectedTool() {
+    return this.store.selectedTool;
   }
 
   get dataset() {

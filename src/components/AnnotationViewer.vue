@@ -1233,21 +1233,36 @@ export default class AnnotationViewer extends Vue {
     this.updateCursorAnnotation();
   }
 
-  removeCursorAnnotation() {
-    if (!this.cursorAnnotation) {
-      return;
-    }
-    this.annotationLayer.removeAnnotation(this.cursorAnnotation);
-    this.annotationLayer.geoOff(
-      geojs.event.mousemove,
-      this.updateCursorAnnotation,
-    );
-    this.annotationLayer.geoOff(geojs.event.zoom, this.updateCursorAnnotation);
-    this.cursorAnnotation = null;
+  handleSamClick(mouseEvent: any) {
+    // TODO: Update prompt on image click
+    console.log(mouseEvent);
   }
 
   refreshAnnotationMode() {
-    this.removeCursorAnnotation();
+    this.clearAnnotationMode();
+    this.setNewAnnotationMode();
+  }
+
+  clearAnnotationMode() {
+    // Remove mouseclick listener for SAM tools
+    this.annotationLayer.geoOff(geojs.event.mouseclick, this.handleSamClick);
+
+    // Remove cursor annotation if there is one
+    if (this.cursorAnnotation) {
+      this.annotationLayer.removeAnnotation(this.cursorAnnotation);
+      this.annotationLayer.geoOff(
+        geojs.event.mousemove,
+        this.updateCursorAnnotation,
+      );
+      this.annotationLayer.geoOff(
+        geojs.event.zoom,
+        this.updateCursorAnnotation,
+      );
+      this.cursorAnnotation = null;
+    }
+  }
+
+  setNewAnnotationMode() {
     if (this.unrolling) {
       this.annotationLayer.mode(null);
       return;
@@ -1289,6 +1304,10 @@ export default class AnnotationViewer extends Vue {
             ? "point"
             : "polygon";
         this.annotationLayer.mode(selectionType);
+        break;
+      case "samAnnotation":
+        this.annotationLayer.geoOn(geojs.event.mouseclick, this.handleSamClick);
+        this.annotationLayer.mode(null);
         break;
       case null:
       case undefined:

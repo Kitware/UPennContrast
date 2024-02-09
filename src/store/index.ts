@@ -55,6 +55,7 @@ export { default as store } from "./root";
 
 import { Debounce } from "@/utils/debounce";
 import { TCompositionMode } from "@/utils/compositionModes";
+import { createSamToolStateFromToolConfiguration } from "@/pipelines/samPipeline";
 
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
@@ -281,7 +282,9 @@ export class Main extends VuexModule {
       let state;
       switch (configuration.type) {
         case "samAnnotation":
-          state = {} as ISamAnnotationToolState;
+          state = createSamToolStateFromToolConfiguration(
+            configuration as IToolConfiguration<"samAnnotation">,
+          ) as ISamAnnotationToolState;
           break;
         default:
           state = {} as IBaseToolState;

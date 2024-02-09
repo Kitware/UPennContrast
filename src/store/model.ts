@@ -79,7 +79,9 @@ export interface IToolConfiguration<Type extends TToolType = TToolType> {
 
 export interface IBaseToolState {}
 
-export interface ISamAnnotationToolState {}
+export interface ISamAnnotationToolState {
+  pipeline: ManualInputNode<IGeoJSMap> | null;
+}
 
 export type TToolState<T extends TToolType> = T extends 'samAnnotation' ? ISamAnnotationToolState : IBaseToolState
 
@@ -931,6 +933,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ISetQuadStatus } from "@/utils/setFrameQuad";
 import { ITileMeta } from "./GirderAPI";
 import { isEqual } from "lodash";
+import { ManualInputNode } from "@/pipelines/computePipeline";
 
 export function newLayer(
   dataset: IDataset,
