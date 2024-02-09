@@ -25,6 +25,7 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import propertiesStore from "@/store/properties";
 import store from "@/store";
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
+import { IToolTemplate } from "@/store/model";
 
 interface Item {
   text: string;
@@ -45,6 +46,12 @@ interface AugmentedItem extends Item {
   submenu: Submenu;
 }
 
+export interface TReturnType {
+  template: IToolTemplate | null;
+  defaultValues: any;
+  selectedItem: AugmentedItem | null;
+}
+
 @Component({
   components: {
     ToolConfiguration,
@@ -57,7 +64,7 @@ export default class ToolTypeSelection extends Vue {
   @Prop()
   private value: any;
 
-  computedTemplate: any = null;
+  computedTemplate: IToolTemplate | null = null;
   defaultToolValues: any = {};
 
   isMainMenuVisible = false;
@@ -190,11 +197,12 @@ export default class ToolTypeSelection extends Vue {
   @Watch("computedTemplate")
   @Watch("defaultToolValues")
   handleChange() {
-    this.$emit("input", {
+    const input: TReturnType = {
       template: this.computedTemplate,
       defaultValues: this.defaultToolValues,
       selectedItem: this.selectedItem,
-    });
+    };
+    this.$emit("input", input);
   }
 
   mounted() {

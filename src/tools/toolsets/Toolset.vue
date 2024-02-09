@@ -129,7 +129,7 @@ export default class Toolset extends Vue {
   panels: number = 0;
 
   get selectedToolId() {
-    return this.store.selectedTool?.id || null;
+    return this.store.selectedTool?.configuration.id || null;
   }
 
   set selectedToolId(id: string | null) {
@@ -149,7 +149,7 @@ export default class Toolset extends Vue {
   }
 
   get selectedTool(): IToolConfiguration | null {
-    return this.store.selectedTool;
+    return this.store.selectedTool?.configuration ?? null;
   }
 
   toolCreationDialogOpen: boolean = false;

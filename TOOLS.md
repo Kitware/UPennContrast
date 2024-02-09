@@ -24,6 +24,8 @@ An interface element has the following properties:
 
 To add a tool, first add its template in the `template.json` as described above. You can create a brand new tool to the list (which will appear as a section during tool creation), but you can also add an option to a `select` interface element which is a submenu (which will appear as a clickable line during tool creation).
 
+If you create a new tool type, add it to the typescript type `TToolType` in `model.ts`.
+
 You will then need to edit different parts of the code depending on the role of the tool.
 The most basic tools (for example the selection tool) change these parts of the code:
 - In `refreshAnnotationMode` in `AnnotationViewer.vue`, you can choose the annotation mode when the tool is selected.

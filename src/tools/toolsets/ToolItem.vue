@@ -64,7 +64,7 @@ export default class Toolset extends Vue {
   }
 
   isSelectedTool() {
-    return this.store.selectedTool?.id === this.tool.id;
+    return this.store.selectedTool?.configuration.id === this.tool.id;
   }
 }
 </script>

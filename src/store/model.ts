@@ -50,6 +50,9 @@ export interface IImageTile {
   fullImage: HTMLImageElement;
 }
 
+// see templates.json
+export type TToolType = "create" | "snap" | "select" | "connection" | "edit" | "segmentation" | "samAnnotation";
+
 export interface IToolTemplateInterface {
   id: string;
   name: string;
@@ -59,17 +62,30 @@ export interface IToolTemplateInterface {
 
 export interface IToolTemplate {
   name: string;
+  type: TToolType;
   description: string;
   interface: IToolTemplateInterface[];
+  shortName?: string;
 }
 
-export interface IToolConfiguration {
+export interface IToolConfiguration<Type extends TToolType = TToolType> {
   readonly id: string;
   name: string;
   hotkey: string | null;
-  type: string;
+  type: Type;
   values: any;
   template: IToolTemplate;
+}
+
+export interface IBaseToolState {}
+
+export interface ISamAnnotationToolState {}
+
+export type TToolState<T extends TToolType> = T extends 'samAnnotation' ? ISamAnnotationToolState : IBaseToolState
+
+export interface IActiveTool<T extends TToolType = TToolType> {
+  configuration: IToolConfiguration<T>;
+  state: TToolState<T>;
 }
 
 export interface IRestrictTagsAndLayer {

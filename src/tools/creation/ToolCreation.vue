@@ -64,10 +64,12 @@
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import propertiesStore from "@/store/properties";
-import { IToolConfiguration } from "@/store/model";
+import { IToolConfiguration, IToolTemplate } from "@/store/model";
 
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
-import ToolTypeSelection from "@/tools/creation/ToolTypeSelection.vue";
+import ToolTypeSelection, {
+  TReturnType as TToolTypeSelectionValue,
+} from "@/tools/creation/ToolTypeSelection.vue";
 import HotkeySelection from "@/components/HotkeySelection.vue";
 import { v4 as uuidv4 } from "uuid";
 
@@ -88,10 +90,10 @@ export default class ToolCreation extends Vue {
   readonly store = store;
   readonly propertyStore = propertiesStore;
 
-  toolValues: any = { ...defaultValues };
+  toolValues: Record<string, any> = { ...defaultValues };
 
-  selectedTemplate: any = null;
-  selectedDefaultValues: any = null;
+  selectedTemplate: IToolTemplate | null = null;
+  selectedDefaultValues: any | null = null;
 
   errorMessages: string[] = [];
   successMessages: string[] = [];
@@ -101,10 +103,14 @@ export default class ToolCreation extends Vue {
 
   hotkey: string | null = null;
 
-  @Prop()
-  readonly open: any;
+  @Prop({ default: false })
+  readonly open!: boolean;
 
   createTool() {
+    if (this.selectedTemplate === null) {
+      return;
+    }
+
     const tool: IToolConfiguration = {
       id: uuidv4(),
       name: this.toolName || "Unnamed Tool",
@@ -120,15 +126,15 @@ export default class ToolCreation extends Vue {
     this.close();
   }
 
-  private _selectedTool: any = null;
+  private _selectedTool: TToolTypeSelectionValue | null = null;
 
-  set selectedTool(value: any) {
+  set selectedTool(value) {
     this._selectedTool = value;
-    this.selectedTemplate = value.template;
-    this.selectedDefaultValues = value.defaultValues;
+    this.selectedTemplate = value?.template ?? null;
+    this.selectedDefaultValues = value?.defaultValues ?? null;
   }
 
-  get selectedTool() {
+  get selectedTool(): TToolTypeSelectionValue | null {
     return this.selectedTemplate ? this._selectedTool : null;
   }
 

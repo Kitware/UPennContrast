@@ -262,7 +262,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   get selectedTool(): IToolConfiguration | null {
-    return this.store.selectedTool;
+    return this.store.selectedTool?.configuration ?? null;
   }
 
   get hoveredAnnotationId() {

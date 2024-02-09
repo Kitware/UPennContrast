@@ -57,11 +57,11 @@ export default class ToolConfiguration extends Vue {
   readonly store = store;
 
   @Prop()
-  readonly value!: any;
+  readonly value!: Record<string, any>;
 
-  advancedPanel: any;
+  advancedPanel: number | undefined;
 
-  toolValues: any = null;
+  toolValues: Record<string, any> | null = null;
 
   // Dynamic interface elements that depend on various values being selected
   valueTemplates: any = {};
@@ -135,11 +135,12 @@ export default class ToolConfiguration extends Vue {
 
   setDefaultValues() {
     this.internalTemplate.forEach((item) => {
-      if (this.toolValues[item.id] !== undefined) {
+      if (this.toolValues === null || this.toolValues[item.id] !== undefined) {
         return;
       }
+      const capturedToolValues = this.toolValues;
       const setItemValue = (value: any) =>
-        Vue.set(this.toolValues, item.id, value);
+        Vue.set(capturedToolValues, item.id, value);
       switch (item.type) {
         case "select":
           if (item?.meta?.items.length) {
@@ -220,7 +221,7 @@ export default class ToolConfiguration extends Vue {
 
   updateInterface() {
     // Go through values to see if additional interface elements need to be added
-    Object.entries(this.toolValues).forEach(([key, value]: any[]) => {
+    Object.entries(this.toolValues ?? {}).forEach(([key, value]: any[]) => {
       if (value?.meta?.interface) {
         this.valueTemplates = {
           ...this.valueTemplates,

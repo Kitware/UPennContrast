@@ -40,6 +40,10 @@ import {
   TUnitTime,
   IScaleInformation,
   exampleConfigurationBase,
+  IActiveTool,
+  TToolType,
+  ISamAnnotationToolState,
+  IBaseToolState,
 } from "./model";
 
 import persister from "./Persister";
@@ -119,7 +123,7 @@ export class Main extends VuexModule {
   annotationPanelBadge: boolean = false;
 
   toolTemplateList: any[] = [];
-  selectedTool: IToolConfiguration | null = null;
+  selectedTool: IActiveTool | null = null;
   readonly availableToolShapes: { value: string; text: string }[] = [
     {
       text: AnnotationNames[AnnotationShape.Point],
@@ -268,8 +272,23 @@ export class Main extends VuexModule {
   }
 
   @Mutation
-  private setSelectedToolImpl(tool: IToolConfiguration | null) {
-    this.selectedTool = tool;
+  private setSelectedToolImpl<T extends TToolType>(
+    configuration: IToolConfiguration<T> | null,
+  ) {
+    if (configuration === null) {
+      this.selectedTool = null;
+    } else {
+      let state;
+      switch (configuration.type) {
+        case "samAnnotation":
+          state = {} as ISamAnnotationToolState;
+          break;
+        default:
+          state = {} as IBaseToolState;
+          break;
+      }
+      this.selectedTool = { configuration, state };
+    }
   }
 
   @Action
@@ -303,7 +322,7 @@ export class Main extends VuexModule {
 
   @Action
   removeToolFromConfiguration(toolId: string) {
-    if (this.selectedTool?.id === toolId) {
+    if (this.selectedTool?.configuration.id === toolId) {
       this.setSelectedToolId(null);
     }
     if (this.configuration) {
@@ -323,7 +342,7 @@ export class Main extends VuexModule {
       return;
     }
     Vue.set(configurationTools, toolIdx, tool);
-    if (this.selectedTool?.id === tool.id) {
+    if (this.selectedTool?.configuration.id === tool.id) {
       this.setSelectedToolImpl(tool);
     }
     this.syncConfiguration("tools");
