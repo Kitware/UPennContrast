@@ -22,7 +22,7 @@
             v-model="interfaceValues[id]"
             :max="item.max"
             :min="item.min"
-            :step="((item.max || 0) - (item.min || 0)) / 100.0"
+            :step="item.step || -1"
             class="align-center"
           >
             <template v-slot:append>
@@ -31,7 +31,7 @@
                 type="number"
                 :max="item.max"
                 :min="item.min"
-                :step="((item.max || 0) - (item.min || 0)) / 100.0"
+                :step="item.step || -1"
                 style="width: 60px"
                 class="mt-0 pt-0"
               >

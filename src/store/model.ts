@@ -435,6 +435,7 @@ export interface INumberWorkerInterfaceElement
   type: "number";
   min?: number;
   max?: number;
+  step?: number;
   default?: number;
 }
 
