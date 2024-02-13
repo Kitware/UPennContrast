@@ -86,19 +86,38 @@ export interface IToolConfiguration<Type extends TToolType = TToolType> {
 
 export interface IBaseToolState {}
 
-export interface ISamPrompt {
-  // All XY points are in GCS coordinates
-  foregroundPoints: IXYPoint[];
-  backgroundPoints: IXYPoint[];
-  boxes: [IXYPoint, IXYPoint][];
+export enum PromptType {
+  backgroundPoint,
+  foregroundPoint,
+  box,
 }
+
+export interface ISamForegroundPointPrompt {
+  type: PromptType.foregroundPoint;
+  point: IGeoJSPoint;
+}
+
+export interface ISamBackgroundPointPrompt {
+  type: PromptType.backgroundPoint;
+  point: IGeoJSPoint;
+}
+
+export interface ISamBoxPrompt {
+  type: PromptType.box;
+  topLeft: IGeoJSPoint;
+  bottomRight: IGeoJSPoint;
+}
+
+export type TSamPrompt =
+  | ISamForegroundPointPrompt
+  | ISamBackgroundPointPrompt
+  | ISamBoxPrompt;
 
 export interface ISamAnnotationToolState {
   pipeline: {
-    geoJsMapInputNode: ManualInputNode<IGeoJSMap>;
-    promptInputNode: ManualInputNode<ISamPrompt>;
-  } | null;
-  currentPrompt: ISamPrompt;
+    geoJsMapInputNode: ManualInputNode<IGeoJSMap | TNoOutput>;
+    promptInputNode: ManualInputNode<TSamPrompt[]>;
+  };
   mouseState: {
     path: IXYPoint[]; // In GCS coordinates
   };
@@ -111,9 +130,8 @@ export interface IMouseState {
   initialMouseEvent: MouseEvent;
 }
 
-export type TToolState<T extends TToolType> = T extends "samAnnotation"
-  ? ISamAnnotationToolState
-  : IBaseToolState;
+export type TToolState<T extends TToolType = TToolType> =
+  T extends "samAnnotation" ? ISamAnnotationToolState : IBaseToolState;
 
 export interface IActiveTool<T extends TToolType = TToolType> {
   configuration: IToolConfiguration<T>;
@@ -290,7 +308,11 @@ export interface IPixel {
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.object.html
-export interface IGeoJsObject {}
+export interface IGeoJsObject {
+  modified: () => IGeoJsObject;
+  geoOn: (event: string, handler: (event: any) => any) => IGeoJsObject;
+  geoOff: (event: string, handler: (event: any) => any) => IGeoJsObject;
+}
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.sceneObject.html
 export interface IGeoJsSceneObject extends IGeoJsObject {}
@@ -415,7 +437,13 @@ export interface IGeoJSLayer extends IGeoJsObject {
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.annotationLayer.html
 export interface IGeoJSAnnotationLayer extends IGeoJSLayer {
-  addAnnotation: (annotation: IGeoJSAnnotation) => IGeoJSAnnotationLayer;
+  addAnnotation: (
+    annotation: IGeoJSAnnotation,
+    gcs?: string | null,
+    update?: boolean,
+  ) => IGeoJSAnnotationLayer;
+  removeAnnotation: (annotation: IGeoJSAnnotation, update?: boolean) => boolean;
+  annotations: () => IGeoJSAnnotation[];
   mode: (
     arg?: string | null,
     editAnnotation?: IGeoJSAnnotation,
@@ -485,20 +513,41 @@ export interface IGeoJSOsmLayer extends IGeoJSLayer {
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.feature.html
-export interface IGeoJSFeature extends IGeoJsSceneObject {
-  data: ((arg: any[]) => IGeoJSFeatureLayer) & (() => any[]);
+export interface IGeoJSFeature extends IGeoJSFeatureBase<IGeoJSFeature> {}
+export interface IGeoJSFeatureBase<ThisType> extends IGeoJsSceneObject {
+  data: ((arg: any[]) => ThisType) & (() => any[]);
+  draw: (arg?: object) => ThisType;
+  style: (() => object) &
+    ((arg1: string) => object) &
+    ((arg1: string, arg2: object) => ThisType) &
+    ((arg1: object) => ThisType);
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.textFeature.html
+export interface IGeoJSTextFeature
+  extends IGeoJSFeatureBase<IGeoJSTextFeature> {
+  position: ((
+    val: IGeoJSPoint[] | ((dataPoint: any) => IGeoJSPoint),
+  ) => IGeoJSTextFeature) &
+    (() => IGeoJSPoint[] | ((dataPoint: any) => IGeoJSPoint));
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.featureLayer.html
 export interface IGeoJSFeatureLayer extends IGeoJSLayer {
   readonly idle: boolean;
-  createFeature: (featureName: string, arg?: object) => IGeoJSFeature;
+  createFeature: <T extends string>(
+    featureName: T,
+    arg?: object,
+  ) => T extends "text" ? IGeoJSTextFeature : IGeoJSFeature;
+  deleteFeature: (feature: IGeoJSFeature) => IGeoJSFeatureLayer;
   geoOn: (event: string, handler: Function) => IGeoJSFeatureLayer;
   geoOff: (
     event?: string | string[],
     arg?: Function | Function[] | null,
   ) => IGeoJSFeatureLayer;
   renderer: () => IGeoJSRenderer | null;
+  features: (() => IGeoJSFeature[]) &
+    ((val: IGeoJSFeature[]) => IGeoJSFeatureLayer);
 
   onIdle: (handler: () => void) => IGeoJSFeatureLayer;
 
@@ -566,6 +615,27 @@ export interface IGeoJSMouseState {
   time: number;
   deltaTime: number;
   velocity: IXYPoint;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.polygonFeature.html#.styleSpec
+export interface IGeoJSPolygonFeatureStyle {
+  fill?: boolean | (() => boolean);
+  fillColor?: string | (() => string);
+  fillOpacity?: number | (() => number);
+  stroke?: boolean | (() => boolean);
+  uniformPolygon?: boolean | (() => boolean);
+  closed?: boolean | (() => boolean);
+  origin?: Array<number> | (() => Array<number>);
+  strokeColor?: string | (() => string);
+  strokeOpacity?: number | (() => number);
+  strokeWidth?: number | (() => number);
+  strokeOffset?: number | (() => number);
+  lineCap?: string | (() => string);
+  lineJoin?: string | (() => string);
+  miterLimit?: number | (() => number);
+  uniformLine?: boolean | string | (() => boolean | string);
+  antialiasing?: number | (() => number);
+  debug?: string | (() => string);
 }
 
 export interface ICommonWorkerInterfaceElement {
@@ -985,7 +1055,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ISetQuadStatus } from "@/utils/setFrameQuad";
 import { ITileMeta } from "./GirderAPI";
 import { isEqual } from "lodash";
-import { ManualInputNode } from "@/pipelines/computePipeline";
+import { ManualInputNode, TNoOutput } from "@/pipelines/computePipeline";
 
 export function newLayer(
   dataset: IDataset,

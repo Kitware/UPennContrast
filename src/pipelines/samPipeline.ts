@@ -1,13 +1,22 @@
 import {
+  IGeoJSAnnotation,
   IGeoJSMap,
   IGeoJSPoint,
+  IGeoJSPolygonFeatureStyle,
+  IMouseState,
   ISamAnnotationToolState,
-  ISamPrompt,
   IToolConfiguration,
+  PromptType,
+  TSamPrompt,
 } from "@/store/model";
-import { ManualInputNode, createComputeNode } from "./computePipeline";
+import {
+  ManualInputNode,
+  TNoOutput,
+  createComputeNode,
+} from "./computePipeline";
 import { createOnnxInferenceSession } from "./onnxModels";
 import { InferenceSession, Tensor } from "onnxruntime-web/webgpu";
+import geojs from "geojs";
 
 interface ISamConfiguration {
   maxWidth: number;
@@ -41,7 +50,7 @@ const samModelsConfig = {
 
 export type TSamModel = keyof typeof samModelsConfig;
 
-function createEncoderContext(model: TSamModel): ISamEncoderContext | null {
+function createEncoderContext(model: TSamModel): ISamEncoderContext {
   console.log("createSamContext", model);
   const configuration = samModelsConfig[model];
   const { maxWidth, maxHeight } = configuration;
@@ -54,7 +63,7 @@ function createEncoderContext(model: TSamModel): ISamEncoderContext | null {
     willReadFrequently: true,
   });
   if (!context) {
-    return null;
+    throw new Error("Can't create encoder context");
   }
   const nPixels = maxWidth * maxHeight;
   const nChannels = 3;
@@ -179,21 +188,37 @@ interface IProcessPromptOutput {
 }
 
 function processPrompt(
-  prompt: ISamPrompt,
+  prompts: TSamPrompt[],
   canvasInfo: IProcessCanvasOutput,
   context: ISamDecoderContext,
   map: IGeoJSMap,
 ): IProcessPromptOutput {
-  console.log("processPrompt", prompt, canvasInfo, context);
-  const { foregroundPoints, backgroundPoints, boxes } = prompt;
+  console.log("processPrompt", prompts, canvasInfo, context);
+
+  // Count the number of each prompt type
+  let nForegroundPts = 0;
+  let nBackgroundPts = 0;
+  let nBoxes = 0;
+  for (let i = 0; i < prompts.length; ++i) {
+    switch (prompts[i].type) {
+      case PromptType.backgroundPoint:
+        nBackgroundPts++;
+        break;
+      case PromptType.foregroundPoint:
+        nForegroundPts++;
+        break;
+      case PromptType.box:
+        nBoxes++;
+        break;
+    }
+  }
 
   // Number of gcs points (to convert) + a padding point (not to convert)
-  const nPromptPoints =
-    foregroundPoints.length + backgroundPoints.length + (2 * boxes.length || 1);
-
+  const nPromptPoints = nForegroundPts + nBackgroundPts + (2 * nBoxes || 1);
   const pointCoords = new Float32Array(2 * nPromptPoints);
   const pointLabels = new Float32Array(nPromptPoints);
 
+  // Create a function to add a point to the array, along with its label
   let pointIdx = 0;
   const xScale = canvasInfo.scaledWidth / canvasInfo.srcWidth;
   const yScale = canvasInfo.scaledHeight / canvasInfo.srcHeight;
@@ -216,21 +241,25 @@ function processPrompt(
     pointIdx++;
   };
 
-  for (let i = 0; i < backgroundPoints.length; ++i) {
-    pushPointToPrompt(backgroundPoints[i], 0, true);
+  // Add all the prompts to the arrays
+  for (let i = 0; i < prompts.length; ++i) {
+    const prompt = prompts[i];
+    switch (prompt.type) {
+      case PromptType.backgroundPoint:
+        pushPointToPrompt(prompt.point, 0, true);
+        break;
+      case PromptType.foregroundPoint:
+        pushPointToPrompt(prompt.point, 1, true);
+        break;
+      case PromptType.box:
+        pushPointToPrompt(prompt.topLeft, 2, true);
+        pushPointToPrompt(prompt.bottomRight, 3, true);
+        break;
+    }
   }
-  for (let i = 0; i < foregroundPoints.length; ++i) {
-    pushPointToPrompt(foregroundPoints[i], 1, true);
-  }
-  for (let i = 0; i < boxes.length; ++i) {
-    const [{ x: x1, y: y1 }, { x: x2, y: y2 }] = boxes[i];
-    const [minX, maxX] = x1 < x2 ? [x1, x2] : [x2, x1];
-    const [minY, maxY] = y1 < y2 ? [y1, y2] : [y2, y1];
-    pushPointToPrompt({ x: minX, y: minY }, 2, true);
-    pushPointToPrompt({ x: maxX, y: maxY }, 3, true);
-  }
-  if (boxes.length === 0) {
-    // Padding point
+
+  // Padding point
+  if (nBoxes === 0) {
     pushPointToPrompt({ x: 0, y: 0 }, -1, false);
   }
 
@@ -263,14 +292,15 @@ function createSamPipeline(
 ): ISamAnnotationToolState["pipeline"] {
   // Create the encoder context
   const encoderContext = createEncoderContext(model);
-  if (encoderContext === null) {
-    return null;
-  }
 
   // Create the pipeline
 
   // Encoder nodes
-  const geoJsMapInputNode = new ManualInputNode<IGeoJSMap>(); // User input
+  const geoJsMapInputNode = new ManualInputNode<IGeoJSMap | TNoOutput>({
+    type: "debounce",
+    wait: 1000,
+    options: { leading: false, trailing: true },
+  }); // User input
   const encoderContextNode = new ManualInputNode<ISamEncoderContext>();
   const encoderSessionNode = new ManualInputNode<InferenceSession>();
   const screenshotNode = createComputeNode(screenshot, [geoJsMapInputNode]);
@@ -284,7 +314,7 @@ function createSamPipeline(
   ]);
 
   // Decoder nodes
-  const promptInputNode = new ManualInputNode<ISamPrompt>(); // User input
+  const promptInputNode = new ManualInputNode<TSamPrompt[]>(); // User input
   const decoderContextNode = new ManualInputNode<ISamDecoderContext>();
   const decoderSessionNode = new ManualInputNode<InferenceSession>();
   const processPromptNode = createComputeNode(processPrompt, [
@@ -384,14 +414,81 @@ export function createSamToolStateFromToolConfiguration(
   const model: TSamModel = configuration.values.model.value;
   const state: ISamAnnotationToolState = {
     pipeline: createSamPipeline(model),
-    currentPrompt: {
-      foregroundPoints: [],
-      backgroundPoints: [],
-      boxes: [],
-    },
     mouseState: {
       path: [],
     },
   };
   return state;
+}
+
+export function mouseStateToSamPrompt(
+  mouseState: IMouseState,
+): TSamPrompt | null {
+  const path = mouseState.path;
+  if (path.length === 0) {
+    return null;
+  }
+  const firstPoint = path[0];
+  const lastPoint = path[path.length - 1];
+  if (firstPoint.x === lastPoint.x && firstPoint.y === lastPoint.y) {
+    // Left button pressed: foreground prompt
+    // Any other button pressed: background prompt
+    const isForeground = mouseState.initialMouseEvent.button === 0;
+    if (isForeground) {
+      return {
+        type: PromptType.foregroundPoint,
+        point: firstPoint,
+      };
+    } else {
+      return {
+        type: PromptType.backgroundPoint,
+        point: firstPoint,
+      };
+    }
+  } else {
+    const [{ x: x1, y: y1 }, { x: x2, y: y2 }] = [firstPoint, lastPoint];
+    const [minX, maxX] = x1 < x2 ? [x1, x2] : [x2, x1];
+    const [minY, maxY] = y1 < y2 ? [y1, y2] : [y2, y1];
+    return {
+      type: PromptType.box,
+      topLeft: { x: minX, y: minY },
+      bottomRight: { x: maxX, y: maxY },
+    };
+  }
+}
+
+export function samPromptToAnnotation(
+  unitPrompt: TSamPrompt,
+  baseStyle: IGeoJSPolygonFeatureStyle,
+): IGeoJSAnnotation {
+  let strokeColor: string;
+  switch (unitPrompt.type) {
+    case PromptType.foregroundPoint:
+    case PromptType.box:
+      strokeColor = "green";
+      break;
+    case PromptType.backgroundPoint:
+      strokeColor = "red";
+      break;
+  }
+  const style = { ...baseStyle, strokeColor };
+  if (unitPrompt.type === PromptType.box) {
+    const { x: minX, y: minY } = unitPrompt.topLeft;
+    const { x: maxX, y: maxY } = unitPrompt.bottomRight;
+    const corners = [
+      { x: minX, y: minY },
+      { x: minX, y: maxY },
+      { x: maxX, y: maxY },
+      { x: maxX, y: minY },
+    ];
+    return geojs.annotation.rectangleAnnotation({
+      style,
+      corners,
+    });
+  }
+  const position = unitPrompt.point;
+  return geojs.annotation.pointAnnotation({
+    style,
+    position,
+  });
 }

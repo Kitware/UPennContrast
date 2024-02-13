@@ -30,6 +30,11 @@ import {
   IMapEntry,
   IGeoJSMap,
   IMouseState,
+  TToolState,
+  TSamPrompt,
+  IGeoJSAnnotationLayer,
+  IGeoJSFeatureLayer,
+  IGeoJSFeature,
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -42,6 +47,11 @@ import {
   tagFilterFunction,
 } from "@/utils/annotation";
 import { getValueFromObjectAndPath } from "@/utils/paths";
+import {
+  mouseStateToSamPrompt,
+  samPromptToAnnotation,
+} from "@/pipelines/samPipeline";
+import { NoOutput } from "@/pipelines/computePipeline";
 
 function filterAnnotations(
   annotations: IAnnotation[],
@@ -113,13 +123,13 @@ export default class AnnotationViewer extends Vue {
   readonly capturedMouseState!: IMouseState | null;
 
   @Prop()
-  readonly annotationLayer: any;
+  readonly annotationLayer!: IGeoJSAnnotationLayer;
 
   @Prop()
-  readonly textLayer: any;
+  readonly textLayer!: IGeoJSFeatureLayer;
 
   @Prop()
-  readonly workerPreviewFeature: any;
+  readonly workerPreviewFeature!: IGeoJSFeature;
 
   @Prop()
   readonly unrollH!: number;
@@ -183,7 +193,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   get workerImage() {
-    return this.selectedTool?.values?.image?.image;
+    return this.selectedToolConfiguration?.values?.image?.image;
   }
 
   get workerPreview() {
@@ -204,7 +214,33 @@ export default class AnnotationViewer extends Vue {
     return this.capturedMouseState?.path ?? [];
   }
 
+  get selectedToolConfiguration(): IToolConfiguration | null {
+    return this.store.selectedTool?.configuration ?? null;
+  }
+
+  get selectedToolState(): TToolState | null {
+    return this.store.selectedTool?.state ?? null;
+  }
+
+  get samToolState(): TToolState<"samAnnotation"> | null {
+    const state = this.selectedToolState;
+    if (!(state && "pipeline" in state)) {
+      return null;
+    }
+    const samMap = state.pipeline.geoJsMapInputNode.output;
+    if (samMap !== this.map) {
+      return null;
+    }
+    return state;
+  }
+
+  get samPrompts(): TSamPrompt[] {
+    const prompts = this.samToolState?.pipeline.promptInputNode.output;
+    return prompts === undefined || prompts === NoOutput ? [] : prompts;
+  }
+
   selectionAnnotation: IGeoJSAnnotation | null = null;
+  samPromptAnnotations: IGeoJSAnnotation[] = [];
 
   @Watch("capturedMouseState", { deep: true })
   onMousePathChanged(
@@ -213,16 +249,14 @@ export default class AnnotationViewer extends Vue {
   ) {
     if (newState === null) {
       if (oldState !== null) {
-        this.useMouseState(oldState);
-        this.annotationLayer.removeAnnotation(this.selectionAnnotation);
-        this.selectionAnnotation = null;
+        this.consumeMouseState(oldState);
       }
     } else {
-      this.updateSelectionAnnotation(newState);
+      this.previewMouseState(newState);
     }
   }
 
-  updateSelectionAnnotation(mouseState: IMouseState) {
+  previewMouseState(mouseState: IMouseState) {
     if (this.selectionAnnotation) {
       this.annotationLayer.removeAnnotation(this.selectionAnnotation);
     }
@@ -235,44 +269,23 @@ export default class AnnotationViewer extends Vue {
       closed: true,
     };
 
-    const toolState = this.store.selectedTool?.state;
-    const mousePath = mouseState.path;
-    if (mousePath.length === 0) {
-      this.selectionAnnotation = null;
-    } else if (toolState && "pipeline" in toolState) {
-      const strokeColor =
-        mouseState.initialMouseEvent.button === 0 ? "green" : "red";
-      if (mousePath.length >= 2) {
-        const firstPoint = mousePath[0];
-        const lastPoint = mousePath[mousePath.length - 1];
-        const x1 = firstPoint.x;
-        const x2 = lastPoint.x;
-        const y1 = firstPoint.y;
-        const y2 = lastPoint.y;
-        const [minX, maxX] = x1 < x2 ? [x1, x2] : [x2, x1];
-        const [minY, maxY] = y1 < y2 ? [y1, y2] : [y2, y1];
-        const corners = [
-          { x: minX, y: minY },
-          { x: minX, y: maxY },
-          { x: maxX, y: maxY },
-          { x: maxX, y: minY },
-        ];
-        this.selectionAnnotation = geojs.annotation.rectangleAnnotation({
-          style: { ...baseStyle, strokeColor },
-          corners,
-        });
-      } else if (mousePath.length === 1) {
-        const position = mousePath[0];
-        this.selectionAnnotation = geojs.annotation.pointAnnotation({
-          style: { ...baseStyle, strokeColor },
-          position,
-        });
+    if (this.samToolState) {
+      const unitPrompt = mouseStateToSamPrompt(mouseState);
+      if (unitPrompt) {
+        this.selectionAnnotation = samPromptToAnnotation(unitPrompt, baseStyle);
+      } else {
+        this.selectionAnnotation = null;
       }
     } else {
-      this.selectionAnnotation = geojs.annotation.lineAnnotation({
-        style: baseStyle,
-        vertices: mousePath,
-      });
+      const mousePath = mouseState.path;
+      if (mouseState.path.length !== 0) {
+        this.selectionAnnotation = geojs.annotation.lineAnnotation({
+          style: baseStyle,
+          vertices: mousePath,
+        });
+      } else {
+        this.selectionAnnotation = null;
+      }
     }
 
     if (this.selectionAnnotation) {
@@ -280,32 +293,27 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-  useMouseState(mouseState: IMouseState) {
+  consumeMouseState(mouseState: IMouseState) {
+    if (this.selectionAnnotation) {
+      this.annotationLayer.removeAnnotation(this.selectionAnnotation);
+      this.selectionAnnotation = null;
+    }
     const mousePath = mouseState.path;
     if (mousePath.length <= 0) {
       return;
     }
-    const toolState = this.store.selectedTool?.state;
-    if (toolState && "pipeline" in toolState) {
-      const prompt = toolState.currentPrompt;
-      const firstPoint = mousePath[0];
-      const lastPoint = mousePath[mousePath.length - 1];
-      if (firstPoint.x === lastPoint.x && firstPoint.y === lastPoint.y) {
-        // Left button pressed: foreground prompt
-        // Any other button pressed: background prompt
-        const isForeground = mouseState.initialMouseEvent.button === 0;
-        if (isForeground) {
-          console.log("Foreground point", mousePath[0]);
-          prompt.foregroundPoints.push(mousePath[0]);
-        } else {
-          console.log("Background point", mousePath[0]);
-          prompt.backgroundPoints.push(mousePath[0]);
-        }
-      } else {
-        console.log("Box", firstPoint, lastPoint);
-        prompt.boxes.push([firstPoint, lastPoint]);
+    if (this.samToolState) {
+      // Create a new SAM prompt from the mouse state
+      const newPrompt = mouseStateToSamPrompt(mouseState);
+      if (newPrompt) {
+        const promptNode = this.samToolState.pipeline.promptInputNode;
+        const currentPrompts = promptNode.output;
+        const newPrompts =
+          currentPrompts === NoOutput
+            ? [newPrompt]
+            : [...currentPrompts, newPrompt];
+        promptNode.setValue(newPrompts);
       }
-      toolState.pipeline?.promptInputNode.setValue(prompt);
     } else {
       // Select the annotations using a point or a polygon annotation
       let annotation;
@@ -341,8 +349,26 @@ export default class AnnotationViewer extends Vue {
     this.workerPreviewFeature.draw();
   }
 
-  get selectedTool(): IToolConfiguration | null {
-    return this.store.selectedTool?.configuration ?? null;
+  @Watch("samPrompts", { deep: true })
+  onSamPromptsChanged(prompts: TSamPrompt[]) {
+    // Update the annotations of the map
+    for (const annotation of this.samPromptAnnotations) {
+      this.annotationLayer.removeAnnotation(annotation);
+    }
+    const baseStyle = {
+      fillOpacity: 0,
+      strokeColor: "white",
+      strokeOpacity: 1,
+      strokeWidth: 2,
+      closed: true,
+    };
+    const newAnnotations = [];
+    for (const prompt of prompts) {
+      const newAnnotation = samPromptToAnnotation(prompt, baseStyle);
+      this.annotationLayer.addAnnotation(newAnnotation);
+      newAnnotations.push(newAnnotation);
+    }
+    this.samPromptAnnotations = newAnnotations;
   }
 
   get hoveredAnnotationId() {
@@ -1082,15 +1108,15 @@ export default class AnnotationViewer extends Vue {
 
   private async handleAnnotationConnections(selectAnnotation: any) {
     const datasetId = this.dataset?.id;
-    if (!selectAnnotation || !datasetId || !this.selectedTool) {
+    if (!selectAnnotation || !datasetId || !this.selectedToolConfiguration) {
       return;
     }
     const selectedAnnotations =
       this.getSelectedAnnotationsFromAnnotation(selectAnnotation);
 
-    const parentTemplate = this.selectedTool.values
+    const parentTemplate = this.selectedToolConfiguration.values
       ?.parentAnnotation as IRestrictTagsAndLayer;
-    const childTemplate = this.selectedTool.values
+    const childTemplate = this.selectedToolConfiguration.values
       ?.childAnnotation as IRestrictTagsAndLayer;
     if (!parentTemplate || !childTemplate) {
       return;
@@ -1101,12 +1127,12 @@ export default class AnnotationViewer extends Vue {
     const parentIds = parents.map((a) => a.id);
     const childIds = children.map((a) => a.id);
 
-    if (this.selectedTool.values.action.value === "add") {
+    if (this.selectedToolConfiguration.values.action.value === "add") {
       // Add all connections between a parent and a child
       await this.annotationStore.createAllConnections({
         parentIds,
         childIds,
-        label: this.selectedTool.name,
+        label: this.selectedToolConfiguration.name,
         tags: [...parentTemplate.tags, ...childTemplate.tags],
       });
     } else {
@@ -1122,7 +1148,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   private async addAnnotationFromGeoJsAnnotation(annotation: any) {
-    if (!annotation || !this.selectedTool) {
+    if (!annotation || !this.selectedToolConfiguration) {
       return;
     }
 
@@ -1130,14 +1156,15 @@ export default class AnnotationViewer extends Vue {
     const newAnnotation: IAnnotation | null =
       await this.createAnnotationFromTool(
         annotation.coordinates(),
-        this.selectedTool,
+        this.selectedToolConfiguration,
       );
 
     if (!newAnnotation) {
       return;
     }
     const layerId =
-      this.selectedTool?.values?.annotation?.coordinateAssignments?.layer;
+      this.selectedToolConfiguration?.values?.annotation?.coordinateAssignments
+        ?.layer;
 
     this.addAnnotation(newAnnotation, layerId);
     this.annotationLayer.removeAnnotation(annotation);
@@ -1146,10 +1173,10 @@ export default class AnnotationViewer extends Vue {
   private async addAnnotationConnections(
     annotation: IAnnotation,
   ): Promise<IAnnotationConnection[]> {
-    if (!this.selectedTool || !this.dataset) {
+    if (!this.selectedToolConfiguration || !this.dataset) {
       return [];
     }
-    const connectTo = this.selectedTool.values.connectTo;
+    const connectTo = this.selectedToolConfiguration.values.connectTo;
     // Look for connections
     if (connectTo && connectTo.tags && connectTo.tags.length) {
       // Find eligible annotations (matching tags and channel)
@@ -1157,7 +1184,7 @@ export default class AnnotationViewer extends Vue {
         this.store.getLayerFromId(connectTo.layer)?.channel ?? null;
       const connections = await this.annotationStore.createConnections({
         annotationsIds: [annotation.id],
-        tags: this.selectedTool.values.connectTo.tags,
+        tags: this.selectedToolConfiguration.values.connectTo.tags,
         channelId: connectToChannel,
       });
       if (connections) {
@@ -1182,7 +1209,9 @@ export default class AnnotationViewer extends Vue {
       newAnnotation,
       layerId,
     );
-    this.annotationLayer.addAnnotation(newGeoJSAnnotation);
+    if (newGeoJSAnnotation) {
+      this.annotationLayer.addAnnotation(newGeoJSAnnotation);
+    }
   }
 
   async addAnnotationFromSnapping(annotation: any) {
@@ -1192,10 +1221,11 @@ export default class AnnotationViewer extends Vue {
     const mapentry = this.maps[0];
     const coordinates = annotation.coordinates();
     this.annotationLayer.removeAnnotation(annotation);
-    if (!this.selectedTool) {
+    if (!this.selectedToolConfiguration) {
       return;
     }
-    const location = this.selectedTool.values.annotation.coordinateAssignments;
+    const location =
+      this.selectedToolConfiguration.values.annotation.coordinateAssignments;
     if (!location) {
       logError("Invalid snapping tool, annotation was not configured properly");
       return;
@@ -1219,7 +1249,7 @@ export default class AnnotationViewer extends Vue {
     const snappedCoordinates = await snapCoordinates(
       coordinates,
       array,
-      this.selectedTool,
+      this.selectedToolConfiguration,
       mapentry.map,
     );
     if (!snappedCoordinates || !snappedCoordinates.length) {
@@ -1230,7 +1260,7 @@ export default class AnnotationViewer extends Vue {
     const newAnnotation: IAnnotation | null =
       await this.createAnnotationFromTool(
         snappedCoordinates,
-        this.selectedTool,
+        this.selectedToolConfiguration,
       );
     if (!newAnnotation) {
       return;
@@ -1247,7 +1277,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   get selectedToolRadius(): number | undefined {
-    return this.selectedTool?.values?.radius;
+    return this.selectedToolConfiguration?.values?.radius;
   }
 
   cursorAnnotation: any = null;
@@ -1256,7 +1286,7 @@ export default class AnnotationViewer extends Vue {
   @Watch("selectedToolRadius")
   updateCursorAnnotation(evt?: any) {
     if (
-      !this.selectedTool ||
+      !this.selectedToolConfiguration ||
       !this.cursorAnnotation ||
       !this.selectedToolRadius ||
       !this.maps
@@ -1341,20 +1371,22 @@ export default class AnnotationViewer extends Vue {
     }
 
     if (this.roiFilter) {
-      if (this.selectedTool) {
+      if (this.selectedToolConfiguration) {
         this.store.setSelectedToolId(null);
       }
       this.annotationLayer.mode("polygon");
       return;
     }
 
-    switch (this.selectedTool?.type) {
+    switch (this.selectedToolConfiguration?.type) {
       case "create":
-        const annotation = this.selectedTool.values.annotation;
+        const annotation = this.selectedToolConfiguration.values.annotation;
         this.annotationLayer.mode(annotation?.shape);
         break;
       case "snap":
-        if (this.selectedTool.values.snapTo.value === "circleToDot") {
+        if (
+          this.selectedToolConfiguration.values.snapTo.value === "circleToDot"
+        ) {
           this.addCursorAnnotation();
           this.annotationLayer.mode("point");
         } else {
@@ -1372,7 +1404,8 @@ export default class AnnotationViewer extends Vue {
         break;
       case "select":
         const selectionType =
-          this.selectedTool.values.selectionType.value === "pointer"
+          this.selectedToolConfiguration.values.selectionType.value ===
+          "pointer"
             ? "point"
             : "polygon";
         this.annotationLayer.mode(selectionType);
@@ -1383,7 +1416,9 @@ export default class AnnotationViewer extends Vue {
         this.annotationLayer.mode(null);
         break;
       default:
-        logWarning(`${this.selectedTool?.type} tools are not supported yet`);
+        logWarning(
+          `${this.selectedToolConfiguration?.type} tools are not supported yet`,
+        );
         this.annotationLayer.mode(null);
     }
   }
@@ -1437,14 +1472,14 @@ export default class AnnotationViewer extends Vue {
   }
 
   handleAnnotationChange(evt: any) {
-    if (!this.selectedTool && !this.roiFilter) {
+    if (!this.selectedToolConfiguration && !this.roiFilter) {
       return;
     }
 
     switch (evt.event) {
       case "geo_annotation_state":
-        if (this.selectedTool) {
-          switch (this.selectedTool.type) {
+        if (this.selectedToolConfiguration) {
+          switch (this.selectedToolConfiguration.type) {
             case "create":
               this.addAnnotationFromGeoJsAnnotation(evt.annotation);
               break;
@@ -1507,7 +1542,7 @@ export default class AnnotationViewer extends Vue {
     this.drawAnnotationsAndTooltips();
   }
 
-  @Watch("selectedTool")
+  @Watch("selectedToolConfiguration")
   watchTool() {
     this.refreshAnnotationMode();
   }
@@ -1638,7 +1673,7 @@ export default class AnnotationViewer extends Vue {
   @Watch("annotationLayer")
   addHoverCallback() {
     this.annotationLayer.geoOn(geojs.event.mouseclick, (evt: any) => {
-      if (this.selectedTool === null && evt?.geo) {
+      if (this.selectedToolConfiguration === null && evt?.geo) {
         this.setHoveredAnnotationFromCoordinates(evt.geo);
       }
     });

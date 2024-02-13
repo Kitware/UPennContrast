@@ -6,6 +6,13 @@
  */
 
 import { logError } from "@/utils/log";
+import {
+  DebounceSettings,
+  DebouncedFunc,
+  ThrottleSettings,
+  debounce,
+  throttle,
+} from "lodash";
 
 /**
  * Convert a tuple into a tuple of Nodes with the types compatible for ComputeNode.
@@ -160,7 +167,7 @@ export class ComputeNode<
     this.computing = false;
   }
 
-  public get output() {
+  public get output(): Awaited<ReturnType<Fun>> | TNoOutput {
     return this._output;
   }
 
@@ -183,21 +190,50 @@ export class ComputeNode<
   }
 }
 
+export type TManualInputNodeAsyncOptions =
+  | {
+      type: "debounce";
+      wait?: number;
+      options?: DebounceSettings;
+    }
+  | {
+      type: "throttle";
+      wait?: number;
+      options?: ThrottleSettings;
+    };
+
 /**
  * Use this class to interface the ComputeNodes with the rest of the code
  * The generic type T can also include the special value NoOutput
  * Use NoOutput when you don't want the children nodes to compute
  */
 export class ManualInputNode<T> extends ComputeNode<[], () => T | TNoOutput> {
-  constructor() {
+  private readonly asyncSetValue?: DebouncedFunc<(value: T) => Promise<void>>;
+  private readonly syncSetValue: (value: T) => Promise<void>;
+
+  constructor(asyncOptions?: TManualInputNodeAsyncOptions) {
     super(() => NoOutput, []);
+    // Set the value immediately after the resolution of the value
+    this.syncSetValue = async (value: T) => {
+      this.output = await value;
+    };
+    if (asyncOptions) {
+      // Set the value using the given async options
+      this.asyncSetValue = (
+        asyncOptions.type === "debounce" ? debounce : throttle
+      )(this.syncSetValue, asyncOptions.wait, asyncOptions.options);
+    }
   }
 
   /**
    * Set the the output value of this node
    * If you want to be able to use NoOutput as a value, specify it explicitly in T
    */
-  async setValue(value: T) {
-    this.output = await value;
+  setValue(value: T, immediate: boolean = false) {
+    if (immediate || !this.asyncSetValue) {
+      return this.syncSetValue(value);
+    } else {
+      return this.asyncSetValue(value);
+    }
   }
 }

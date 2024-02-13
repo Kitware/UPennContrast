@@ -135,8 +135,6 @@ import {
   IMapEntry,
   ICameraInfo,
   IXYPoint,
-  IActiveTool,
-  TToolState,
   IMouseState,
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
@@ -148,7 +146,6 @@ import { ITileHistogram } from "@/store/images";
 import { convertLength } from "@/utils/conversion";
 import jobs, { jobStates } from "@/store/jobs";
 import { IHotkey } from "@/utils/v-mousetrap";
-import { Debounce } from "@/utils/debounce";
 
 function generateFilterURL(
   index: number,
@@ -376,30 +373,38 @@ export default class ImageViewer extends Vue {
     return this.readyLayersCount >= this.readyLayersTotal;
   }
 
+  get mouseMap(): IGeoJSMap | null {
+    return this.mouseState?.map || null;
+  }
+
+  samMap: IGeoJSMap | null = null;
+
+  @Watch("mouseMap")
+  mouseMapChanged() {
+    if (this.mouseMap) {
+      this.samMap = this.mouseMap;
+    }
+  }
+
+  @Watch("maps")
+  mapsChanged() {
+    this.samMap = this.maps[0]?.map || null;
+  }
+
+  @Watch("samMap")
   @Watch("layersReady")
   @Watch("cameraInfo")
   @Watch("selectedTool")
   imageOrToolChanged() {
-    const tool = this.selectedTool;
-    if (tool && tool.configuration.type === "samAnnotation") {
-      const samTool = tool as IActiveTool<"samAnnotation">;
-      const pipeline = samTool.state.pipeline;
-      this.resetSamMapInput(pipeline);
-    }
-  }
-
-  // TODO: debounce based on modelName
-  // Two simultaneous "recomputeSamEmbeddings" with different modelName should trigger two computations
-  @Debounce(500, { leading: false, trailing: true })
-  async resetSamMapInput(pipeline: TToolState<"samAnnotation">["pipeline"]) {
-    if (!this.layersReady) {
-      return;
-    }
-    const firstMap: IGeoJSMap | undefined =
-      this.mouseState?.map ?? this.maps[0]?.map;
-    if (firstMap) {
+    const toolState = this.selectedTool?.state;
+    if (
+      toolState &&
+      "pipeline" in toolState &&
+      this.layersReady &&
+      this.samMap
+    ) {
       console.log("Setting output of input pipeline node");
-      pipeline?.geoJsMapInputNode.setValue(firstMap);
+      toolState.pipeline.geoJsMapInputNode.setValue(this.samMap);
     }
   }
 
@@ -436,6 +441,7 @@ export default class ImageViewer extends Vue {
     this.datasetReset();
     this.updateBackgroundColor();
     this.draw();
+    this.mapsChanged();
   }
 
   get layerStackImages() {
