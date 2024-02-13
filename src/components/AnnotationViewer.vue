@@ -29,6 +29,7 @@ import {
   IRestrictTagsAndLayer,
   IMapEntry,
   IGeoJSMap,
+  IMouseState,
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -109,7 +110,7 @@ export default class AnnotationViewer extends Vue {
   readonly map!: IGeoJSMap;
 
   @Prop()
-  readonly selectionPath!: IGeoJSPoint[];
+  readonly capturedMouseState!: IMouseState | null;
 
   @Prop()
   readonly annotationLayer: any;
@@ -199,48 +200,127 @@ export default class AnnotationViewer extends Vue {
     return this.annotationStore.isAnnotationSelected;
   }
 
+  get capturedMousePath() {
+    return this.capturedMouseState?.path ?? [];
+  }
+
   selectionAnnotation: IGeoJSAnnotation | null = null;
 
-  @Watch("selectionPath")
-  updateSelection() {
-    if (this.selectionPath.length === 0) {
-      if (this.selectionAnnotation) {
-        // Selection ended
-        const coordinates = this.selectionAnnotation.coordinates();
+  @Watch("capturedMouseState", { deep: true })
+  onMousePathChanged(
+    newState: IMouseState | null,
+    oldState: IMouseState | null,
+  ) {
+    if (newState === null) {
+      if (oldState !== null) {
+        this.useMouseState(oldState);
         this.annotationLayer.removeAnnotation(this.selectionAnnotation);
         this.selectionAnnotation = null;
-        // Select the annotations using a point or a polygon annotation
-        let annotation;
-        if (
-          coordinates.length >= 1 &&
-          coordinates.every(
-            (point) =>
-              point.x === coordinates[0].x && point.y === coordinates[0].y,
-          )
-        ) {
-          annotation = geojs.annotation.pointAnnotation();
-          annotation!.options("position", coordinates[0]);
-        } else {
-          annotation = geojs.annotation.polygonAnnotation();
-          annotation!.options("vertices", coordinates);
-        }
-        this.selectAnnotations(annotation);
       }
     } else {
-      // Update the selection annotation
-      if (!this.selectionAnnotation) {
-        this.selectionAnnotation = geojs.annotation.lineAnnotation({
-          style: {
-            strokeColor: "white",
-            strokeOpacity: 0.5,
-            strokeWidth: 2,
-            closed: true,
-          },
+      this.updateSelectionAnnotation(newState);
+    }
+  }
+
+  updateSelectionAnnotation(mouseState: IMouseState) {
+    if (this.selectionAnnotation) {
+      this.annotationLayer.removeAnnotation(this.selectionAnnotation);
+    }
+
+    const baseStyle = {
+      fillOpacity: 0,
+      strokeColor: "white",
+      strokeOpacity: 0.5,
+      strokeWidth: 2,
+      closed: true,
+    };
+
+    const toolState = this.store.selectedTool?.state;
+    const mousePath = mouseState.path;
+    if (mousePath.length === 0) {
+      this.selectionAnnotation = null;
+    } else if (toolState && "pipeline" in toolState) {
+      const strokeColor =
+        mouseState.initialMouseEvent.button === 0 ? "green" : "red";
+      if (mousePath.length >= 2) {
+        const firstPoint = mousePath[0];
+        const lastPoint = mousePath[mousePath.length - 1];
+        const x1 = firstPoint.x;
+        const x2 = lastPoint.x;
+        const y1 = firstPoint.y;
+        const y2 = lastPoint.y;
+        const [minX, maxX] = x1 < x2 ? [x1, x2] : [x2, x1];
+        const [minY, maxY] = y1 < y2 ? [y1, y2] : [y2, y1];
+        const corners = [
+          { x: minX, y: minY },
+          { x: minX, y: maxY },
+          { x: maxX, y: maxY },
+          { x: maxX, y: minY },
+        ];
+        this.selectionAnnotation = geojs.annotation.rectangleAnnotation({
+          style: { ...baseStyle, strokeColor },
+          corners,
+        });
+      } else if (mousePath.length === 1) {
+        const position = mousePath[0];
+        this.selectionAnnotation = geojs.annotation.pointAnnotation({
+          style: { ...baseStyle, strokeColor },
+          position,
         });
       }
-      this.annotationLayer.removeAnnotation(this.selectionAnnotation);
-      this.selectionAnnotation!.options("vertices", this.selectionPath);
+    } else {
+      this.selectionAnnotation = geojs.annotation.lineAnnotation({
+        style: baseStyle,
+        vertices: mousePath,
+      });
+    }
+
+    if (this.selectionAnnotation) {
       this.annotationLayer.addAnnotation(this.selectionAnnotation);
+    }
+  }
+
+  useMouseState(mouseState: IMouseState) {
+    const mousePath = mouseState.path;
+    if (mousePath.length <= 0) {
+      return;
+    }
+    const toolState = this.store.selectedTool?.state;
+    if (toolState && "pipeline" in toolState) {
+      const prompt = toolState.currentPrompt;
+      const firstPoint = mousePath[0];
+      const lastPoint = mousePath[mousePath.length - 1];
+      if (firstPoint.x === lastPoint.x && firstPoint.y === lastPoint.y) {
+        // Left button pressed: foreground prompt
+        // Any other button pressed: background prompt
+        const isForeground = mouseState.initialMouseEvent.button === 0;
+        if (isForeground) {
+          console.log("Foreground point", mousePath[0]);
+          prompt.foregroundPoints.push(mousePath[0]);
+        } else {
+          console.log("Background point", mousePath[0]);
+          prompt.backgroundPoints.push(mousePath[0]);
+        }
+      } else {
+        console.log("Box", firstPoint, lastPoint);
+        prompt.boxes.push([firstPoint, lastPoint]);
+      }
+      toolState.pipeline?.promptInputNode.setValue(prompt);
+    } else {
+      // Select the annotations using a point or a polygon annotation
+      let annotation;
+      if (
+        mousePath.every(
+          (point) => point.x === mousePath[0].x && point.y === mousePath[0].y,
+        )
+      ) {
+        annotation = geojs.annotation.pointAnnotation();
+        annotation!.options("position", mousePath[0]);
+      } else {
+        annotation = geojs.annotation.polygonAnnotation();
+        annotation!.options("vertices", mousePath);
+      }
+      this.selectAnnotations(annotation);
     }
   }
 
@@ -1233,20 +1313,12 @@ export default class AnnotationViewer extends Vue {
     this.updateCursorAnnotation();
   }
 
-  handleSamClick(mouseEvent: any) {
-    // TODO: Update prompt on image click
-    console.log(mouseEvent);
-  }
-
   refreshAnnotationMode() {
     this.clearAnnotationMode();
     this.setNewAnnotationMode();
   }
 
   clearAnnotationMode() {
-    // Remove mouseclick listener for SAM tools
-    this.annotationLayer.geoOff(geojs.event.mouseclick, this.handleSamClick);
-
     // Remove cursor annotation if there is one
     if (this.cursorAnnotation) {
       this.annotationLayer.removeAnnotation(this.cursorAnnotation);
@@ -1306,9 +1378,6 @@ export default class AnnotationViewer extends Vue {
         this.annotationLayer.mode(selectionType);
         break;
       case "samAnnotation":
-        this.annotationLayer.geoOn(geojs.event.mouseclick, this.handleSamClick);
-        this.annotationLayer.mode(null);
-        break;
       case null:
       case undefined:
         this.annotationLayer.mode(null);

@@ -21,7 +21,9 @@
           mapentry.imageLayers.length,
       )"
       :map="mapentry.map"
-      :selectionPath="mapentry.map === selectionMap ? selectionMousePath : []"
+      :capturedMouseState="
+        mouseState && mouseState.map === mapentry.map ? mouseState : null
+      "
       :annotationLayer="mapentry.annotationLayer"
       :textLayer="mapentry.textLayer"
       :workerPreviewFeature="mapentry.workerPreviewFeature"
@@ -135,6 +137,7 @@ import {
   IXYPoint,
   IActiveTool,
   TToolState,
+  IMouseState,
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
@@ -392,10 +395,11 @@ export default class ImageViewer extends Vue {
     if (!this.layersReady) {
       return;
     }
-    const firstMap: IGeoJSMap | undefined = this.maps[0]?.map;
+    const firstMap: IGeoJSMap | undefined =
+      this.mouseState?.map ?? this.maps[0]?.map;
     if (firstMap) {
       console.log("Setting output of input pipeline node");
-      pipeline?.setOutput(firstMap);
+      pipeline?.geoJsMapInputNode.setValue(firstMap);
     }
   }
 
@@ -507,44 +511,45 @@ export default class ImageViewer extends Vue {
     });
   }
 
-  selectionMap: IGeoJSMap | null = null;
-  selectionTarget: HTMLElement | null = null;
-  selectionMousePath: IGeoJSPoint[] = [];
+  mouseState: IMouseState | null = null;
 
-  mouseDown(evt: any, mapIdx: number) {
-    if (evt.shiftKey) {
-      const mapEntry = this.maps?.[mapIdx];
-      if (!mapEntry) {
-        return;
-      }
-
-      // Setup selection variables
-      this.selectionMap = mapEntry.map;
-      this.selectionTarget = evt.target;
-      this.selectionMousePath = [];
-
-      // Will add the current point and stop propagation
-      this.mouseMove(evt);
+  mouseDown(evt: MouseEvent, mapIdx: number) {
+    // Start selection on shift + mouseDown
+    const mapEntry = this.maps?.[mapIdx];
+    if (!mapEntry || !evt.shiftKey || !(evt.target instanceof HTMLElement)) {
+      return;
     }
+
+    // Setup initial mouse state
+    this.mouseState = {
+      map: mapEntry.map,
+      target: evt.target,
+      path: [],
+      initialMouseEvent: evt,
+    };
+
+    // Will add the current point and capture mouse if needed
+    this.mouseMove(evt);
   }
 
-  mouseMove(evt: any) {
-    if (this.selectionMap) {
-      evt.stopPropagation();
-      const rect = this.selectionTarget!.getBoundingClientRect();
-      const displayPoint = { x: evt.x - rect.x, y: evt.y - rect.y };
-      const gcsPoint = this.selectionMap.displayToGcs(displayPoint);
-      this.selectionMousePath.push(gcsPoint);
+  mouseMove(evt: MouseEvent) {
+    if (!this.mouseState) {
+      return;
     }
+    evt.stopPropagation();
+    const { target, map, path: mousePath } = this.mouseState;
+    const rect = target.getBoundingClientRect();
+    const displayPoint = { x: evt.x - rect.x, y: evt.y - rect.y };
+    const gcsPoint = map.displayToGcs(displayPoint);
+    mousePath.push(gcsPoint);
   }
 
-  mouseUp(evt: any) {
-    if (this.selectionMap) {
-      evt.stopPropagation();
-      this.selectionMap = null;
-      this.selectionTarget = null;
-      this.selectionMousePath = [];
+  mouseUp(evt: MouseEvent) {
+    if (!this.mouseState) {
+      return;
     }
+    evt.stopPropagation();
+    this.mouseState = null;
   }
 
   setCenter(center: IGeoJSPoint) {

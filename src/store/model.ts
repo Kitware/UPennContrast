@@ -51,7 +51,14 @@ export interface IImageTile {
 }
 
 // see templates.json
-export type TToolType = "create" | "snap" | "select" | "connection" | "edit" | "segmentation" | "samAnnotation";
+export type TToolType =
+  | "create"
+  | "snap"
+  | "select"
+  | "connection"
+  | "edit"
+  | "segmentation"
+  | "samAnnotation";
 
 export interface IToolTemplateInterface {
   id: string;
@@ -79,11 +86,34 @@ export interface IToolConfiguration<Type extends TToolType = TToolType> {
 
 export interface IBaseToolState {}
 
-export interface ISamAnnotationToolState {
-  pipeline: ManualInputNode<IGeoJSMap> | null;
+export interface ISamPrompt {
+  // All XY points are in GCS coordinates
+  foregroundPoints: IXYPoint[];
+  backgroundPoints: IXYPoint[];
+  boxes: [IXYPoint, IXYPoint][];
 }
 
-export type TToolState<T extends TToolType> = T extends 'samAnnotation' ? ISamAnnotationToolState : IBaseToolState
+export interface ISamAnnotationToolState {
+  pipeline: {
+    geoJsMapInputNode: ManualInputNode<IGeoJSMap>;
+    promptInputNode: ManualInputNode<ISamPrompt>;
+  } | null;
+  currentPrompt: ISamPrompt;
+  mouseState: {
+    path: IXYPoint[]; // In GCS coordinates
+  };
+}
+
+export interface IMouseState {
+  map: IGeoJSMap;
+  target: HTMLElement;
+  path: IGeoJSPoint[];
+  initialMouseEvent: MouseEvent;
+}
+
+export type TToolState<T extends TToolType> = T extends "samAnnotation"
+  ? ISamAnnotationToolState
+  : IBaseToolState;
 
 export interface IActiveTool<T extends TToolType = TToolType> {
   configuration: IToolConfiguration<T>;
@@ -514,6 +544,28 @@ export interface IGeoJSAnnotation {
   style: (value?: { [key: string]: any }) => any;
   coordinates: () => IGeoJSPoint[];
   geojson: () => any;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.mouseState
+export interface IGeoJSMouseState {
+  page: IXYPoint;
+  map: IGeoJSPoint;
+  geo: IGeoJSPoint;
+  mapgcs: IGeoJSPoint;
+  buttons: {
+    left: boolean;
+    right: boolean;
+    middle: boolean;
+  };
+  modifiers: {
+    alt: boolean;
+    ctrl: boolean;
+    shift: boolean;
+    meta: boolean;
+  };
+  time: number;
+  deltaTime: number;
+  velocity: IXYPoint;
 }
 
 export interface ICommonWorkerInterfaceElement {
