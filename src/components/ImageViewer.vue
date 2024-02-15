@@ -146,6 +146,7 @@ import { ITileHistogram } from "@/store/images";
 import { convertLength } from "@/utils/conversion";
 import jobs, { jobStates } from "@/store/jobs";
 import { IHotkey } from "@/utils/v-mousetrap";
+import { NoOutput } from "@/pipelines/computePipeline";
 
 function generateFilterURL(
   index: number,
@@ -397,15 +398,10 @@ export default class ImageViewer extends Vue {
   @Watch("selectedTool")
   imageOrToolChanged() {
     const toolState = this.selectedTool?.state;
-    if (
-      toolState &&
-      "pipeline" in toolState &&
-      this.layersReady &&
-      this.samMap
-    ) {
+    if (toolState && "pipeline" in toolState && this.layersReady) {
       // TODO: remove console.log
       console.log("Setting output of input pipeline node");
-      toolState.pipeline.geoJsMapInputNode.setValue(this.samMap);
+      toolState.pipeline.geoJsMapInputNode.setValue(this.samMap ?? NoOutput);
     }
   }
 

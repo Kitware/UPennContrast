@@ -115,8 +115,8 @@ export type TSamPrompt =
 
 export interface ISamAnnotationToolState {
   pipeline: {
-    geoJsMapInputNode: ManualInputNode<IGeoJSMap>;
-    promptInputNode: ManualInputNode<TSamPrompt[]>;
+    geoJsMapInputNode: ManualInputNode<IGeoJSMap | TNoOutput>;
+    promptInputNode: ManualInputNode<TSamPrompt[] | TNoOutput>;
   };
   mouseState: {
     path: IXYPoint[]; // In GCS coordinates
@@ -1055,7 +1055,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ISetQuadStatus } from "@/utils/setFrameQuad";
 import { ITileMeta } from "./GirderAPI";
 import { isEqual } from "lodash";
-import { ManualInputNode } from "@/pipelines/computePipeline";
+import { ManualInputNode, TNoOutput } from "@/pipelines/computePipeline";
 
 export function newLayer(
   dataset: IDataset,

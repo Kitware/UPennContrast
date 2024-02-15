@@ -47,11 +47,7 @@
                         offset-x
                         :closeOnClick="false"
                         :closeOnContentClick="false"
-                        :value="
-                          selectedTool &&
-                          selectedTool.id === tool.id &&
-                          selectedTool.type === 'segmentation'
-                        "
+                        :value="selectedTool && selectedTool.id === tool.id"
                         z-index="100"
                       >
                         <template #activator="{}">
@@ -59,6 +55,17 @@
                         </template>
                         <annotation-worker-menu :tool="tool" />
                       </v-menu>
+                    </template>
+                    <!-- When the tool is a SAM tool, show options in an expansion panel -->
+                    <template v-else-if="tool.type === 'samAnnotation'">
+                      <div>
+                        <tool-item :tool="tool" v-bind="attrs" v-on="on" />
+                        <template
+                          v-if="selectedTool && selectedTool.id === tool.id"
+                        >
+                          <sam-tool-menu :tool="tool"></sam-tool-menu>
+                        </template>
+                      </div>
                     </template>
                     <!-- Otherwiser, only tool item -->
                     <template v-else>
@@ -109,6 +116,7 @@ import {
 } from "@/store/model";
 
 import AnnotationWorkerMenu from "@/components/AnnotationWorkerMenu.vue";
+import SamToolMenu from "@/components/SamToolMenu.vue";
 import CircleToDotMenu from "@/components/CircleToDotMenu.vue";
 import ToolCreation from "@/tools/creation/ToolCreation.vue";
 import ToolItem from "./ToolItem.vue";
@@ -119,6 +127,7 @@ import ToolItem from "./ToolItem.vue";
     ToolCreation,
     ToolItem,
     AnnotationWorkerMenu,
+    SamToolMenu,
     CircleToDotMenu,
     draggable,
   },

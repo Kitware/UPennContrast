@@ -187,8 +187,80 @@ export class Annotations extends VuexModule {
     return newAnnotation;
   }
 
+  @Action
+  private async addConnectionsForNewAnnotation({
+    annotation,
+    toolConfiguration,
+  }: {
+    annotation: IAnnotation;
+    toolConfiguration: IToolConfiguration;
+  }): Promise<IAnnotationConnection[]> {
+    // Find eligible annotations (matching tags and channel)
+    const connectTo = toolConfiguration.values.connectTo;
+    if (!connectTo?.tags?.length) {
+      return [];
+    }
+    const connectToTags = connectTo.tags;
+    const connectToLayer = main.getLayerFromId(connectTo.layer);
+    const connectToChannel = connectToLayer?.channel ?? null;
+
+    // API call, the server creates the annotation itself
+    const connections =
+      (await this.createConnections({
+        annotationsIds: [annotation.id],
+        tags: connectToTags,
+        channelId: connectToChannel,
+      })) ?? [];
+
+    // Add the annotations to the store
+    connections.forEach((connection: any) => {
+      this.addConnectionImpl(connection);
+    });
+
+    return connections;
+  }
+
+  @Action
+  public async addAnnotationFromTool({
+    coordinates,
+    toolConfiguration,
+    datasetId,
+  }: {
+    coordinates: IGeoJSPoint[];
+    toolConfiguration: IToolConfiguration;
+    datasetId: string;
+  }): Promise<IAnnotation | null> {
+    // Create the new annotation on the server
+    const { location, channel } =
+      await this.getAnnotationLocationFromTool(toolConfiguration);
+    const { tags, shape } = toolConfiguration.values.annotation;
+    const annotationBase: IAnnotationBase = {
+      tags,
+      shape,
+      location,
+      channel,
+      coordinates,
+      datasetId,
+    };
+    const annotation = await this.createAnnotation(annotationBase);
+    if (!annotation) {
+      return null;
+    }
+
+    // Add to the store
+    this.addAnnotationImpl(annotation);
+
+    // Create the connections
+    await this.addConnectionsForNewAnnotation({
+      annotation,
+      toolConfiguration,
+    });
+
+    return annotation;
+  }
+
   @Mutation
-  public addAnnotation(value: IAnnotation) {
+  private addAnnotationImpl(value: IAnnotation) {
     this.annotations.push(value);
     Vue.set(
       this.annotationCentroids,
@@ -367,7 +439,7 @@ export class Annotations extends VuexModule {
   }
 
   @Mutation
-  public addConnection(value: IAnnotationConnection) {
+  private addConnectionImpl(value: IAnnotationConnection) {
     this.annotationConnections.push(value);
   }
 

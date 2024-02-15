@@ -50,6 +50,7 @@ declare module 'vue' {
     ROIFilters: typeof import('./src/components/AnnotationBrowser/ROIFilters.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SamToolMenu: typeof import('./src/components/SamToolMenu.vue')['default']
     ScaleSettings: typeof import('./src/components/ScaleSettings.vue')['default']
     ServerStatus: typeof import('./src/components/ServerStatus.vue')['default']
     SettingsPanel: typeof import('./src/components/SettingsPanel.vue')['default']

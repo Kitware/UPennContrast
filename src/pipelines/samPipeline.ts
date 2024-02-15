@@ -9,7 +9,11 @@ import {
   PromptType,
   TSamPrompt,
 } from "@/store/model";
-import { ManualInputNode, createComputeNode } from "./computePipeline";
+import {
+  ManualInputNode,
+  TNoOutput,
+  createComputeNode,
+} from "./computePipeline";
 import { createOnnxInferenceSession } from "./onnxModels";
 import { InferenceSession, Tensor } from "onnxruntime-web/webgpu";
 import geojs from "geojs";
@@ -298,7 +302,7 @@ function createSamPipeline(
   // Create the pipeline
 
   // Encoder nodes
-  const geoJsMapInputNode = new ManualInputNode<IGeoJSMap>({
+  const geoJsMapInputNode = new ManualInputNode<IGeoJSMap | TNoOutput>({
     type: "debounce",
     wait: 1000,
     options: { leading: false, trailing: true },
@@ -316,7 +320,7 @@ function createSamPipeline(
   ]);
 
   // Decoder nodes
-  const promptInputNode = new ManualInputNode<TSamPrompt[]>(); // User input
+  const promptInputNode = new ManualInputNode<TSamPrompt[] | TNoOutput>(); // User input
   const decoderContextNode = new ManualInputNode<ISamDecoderContext>();
   const decoderSessionNode = new ManualInputNode<InferenceSession>();
   const processPromptNode = createComputeNode(processPrompt, [

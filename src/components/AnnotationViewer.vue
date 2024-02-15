@@ -349,7 +349,7 @@ export default class AnnotationViewer extends Vue {
     this.workerPreviewFeature.draw();
   }
 
-  @Watch("samPrompts", { deep: true })
+  @Watch("samPrompts")
   onSamPromptsChanged(prompts: TSamPrompt[]) {
     // Update the annotations of the map
     for (const annotation of this.samPromptAnnotations) {
@@ -930,10 +930,6 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.addAnnotation(line, undefined, false);
   }
 
-  private getAnnotationLocationFromTool(tool: IToolConfiguration) {
-    return this.annotationStore.getAnnotationLocationFromTool(tool);
-  }
-
   private async createAnnotationFromTool(
     coordinates: IGeoJSPoint[],
     tool: IToolConfiguration,
@@ -941,22 +937,13 @@ export default class AnnotationViewer extends Vue {
     if (!coordinates || !coordinates.length || !this.dataset) {
       return null;
     }
-
-    const { location, channel } =
-      await this.getAnnotationLocationFromTool(tool);
-
-    // Create the new annotation
-    const toolAnnotation = tool.values.annotation;
-    const newAnnotation: IAnnotation | null =
-      await this.annotationStore.createAnnotation({
-        tags: toolAnnotation.tags,
-        shape: toolAnnotation.shape,
-        channel,
-        location,
-        coordinates,
-        datasetId: this.dataset.id,
-      });
-    return newAnnotation;
+    const annotation = await this.annotationStore.addAnnotationFromTool({
+      coordinates,
+      toolConfiguration: tool,
+      datasetId: this.dataset.id,
+    });
+    this.drawAnnotationsAndTooltips();
+    return annotation;
   }
 
   private restyleAnnotations() {
@@ -1152,66 +1139,14 @@ export default class AnnotationViewer extends Vue {
       return;
     }
 
-    // Create the new annotation
-    const newAnnotation: IAnnotation | null =
-      await this.createAnnotationFromTool(
-        annotation.coordinates(),
-        this.selectedToolConfiguration,
-      );
-
-    if (!newAnnotation) {
-      return;
-    }
-    const layerId =
-      this.selectedToolConfiguration?.values?.annotation?.coordinateAssignments
-        ?.layer;
-
-    this.addAnnotation(newAnnotation, layerId);
+    const coordinates = annotation.coordinates();
     this.annotationLayer.removeAnnotation(annotation);
-  }
 
-  private async addAnnotationConnections(
-    annotation: IAnnotation,
-  ): Promise<IAnnotationConnection[]> {
-    if (!this.selectedToolConfiguration || !this.dataset) {
-      return [];
-    }
-    const connectTo = this.selectedToolConfiguration.values.connectTo;
-    // Look for connections
-    if (connectTo && connectTo.tags && connectTo.tags.length) {
-      // Find eligible annotations (matching tags and channel)
-      const connectToChannel =
-        this.store.getLayerFromId(connectTo.layer)?.channel ?? null;
-      const connections = await this.annotationStore.createConnections({
-        annotationsIds: [annotation.id],
-        tags: this.selectedToolConfiguration.values.connectTo.tags,
-        channelId: connectToChannel,
-      });
-      if (connections) {
-        connections.forEach((connection: any) => {
-          this.annotationStore.addConnection(connection);
-        });
-
-        return connections;
-      }
-    }
-    return [];
-  }
-
-  addAnnotation(newAnnotation: IAnnotation, layerId: string | undefined) {
-    // Save the new annotation
-    this.annotationStore.addAnnotation(newAnnotation);
-
-    this.addAnnotationConnections(newAnnotation);
-
-    // Display the new annotation
-    const newGeoJSAnnotation = this.createGeoJSAnnotation(
-      newAnnotation,
-      layerId,
+    // Create the new annotation
+    await this.createAnnotationFromTool(
+      coordinates,
+      this.selectedToolConfiguration,
     );
-    if (newGeoJSAnnotation) {
-      this.annotationLayer.addAnnotation(newGeoJSAnnotation);
-    }
   }
 
   async addAnnotationFromSnapping(annotation: any) {
@@ -1257,15 +1192,10 @@ export default class AnnotationViewer extends Vue {
       return;
     }
     // Create the new annotation
-    const newAnnotation: IAnnotation | null =
-      await this.createAnnotationFromTool(
-        snappedCoordinates,
-        this.selectedToolConfiguration,
-      );
-    if (!newAnnotation) {
-      return;
-    }
-    this.addAnnotation(newAnnotation, location.layer);
+    await this.createAnnotationFromTool(
+      snappedCoordinates,
+      this.selectedToolConfiguration,
+    );
   }
 
   handleNewROIFilter(geojsAnnotation: any) {
