@@ -2,18 +2,27 @@ import { fileURLToPath } from "node:url";
 import { mergeConfig, defineConfig, configDefaults } from "vitest/config";
 import viteConfig from "./vite.config";
 
-export default mergeConfig(
+// We have to put the "@/test" alias BEFORE the "@" alias from viteConfig
+// Otherwise, "@/test" is resolved to the folder "test" in the alias "@", instead of the alias "@/test"
+const tweakedViteConfig = mergeConfig(
+  {
+    resolve: {
+      alias: {
+        "@/test": fileURLToPath(new URL("./test", import.meta.url)),
+      },
+    },
+  },
   viteConfig,
+);
+
+export default mergeConfig(
+  tweakedViteConfig,
   defineConfig({
     test: {
       globals: true,
       environment: "jsdom",
       exclude: [...configDefaults.exclude, "e2e/*"],
       root: fileURLToPath(new URL("./", import.meta.url)),
-      alias: {
-        // TODO: this doesn't work but moving this line as the first alias in vite.config.js works
-        "@/test": fileURLToPath(new URL("./test", import.meta.url)),
-      },
     },
   }),
 );
