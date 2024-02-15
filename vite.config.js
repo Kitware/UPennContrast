@@ -2,10 +2,12 @@ import { fileURLToPath, URL } from "node:url";
 
 import { defineConfig, normalizePath } from "vite";
 import vue from "@vitejs/plugin-vue2";
-import { VuetifyResolver } from "unplugin-vue-components/resolvers";
-import Components from "unplugin-vue-components/vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import path from "node:path";
+
+// Shouldn't be needed after moving to Vue 3
+import { VuetifyResolver } from "unplugin-vue-components/resolvers";
+import Components from "unplugin-vue-components/vite";
 
 function joinAndNormalizePath(...paths) {
   return normalizePath(path.join(...paths));
@@ -17,6 +19,12 @@ export default defineConfig({
     vue(),
     Components({
       resolvers: [VuetifyResolver()],
+      // Don't exclude grider web components
+      exclude: [
+        /[\\/]node_modules[\\/](?!@girder[\\/]components[\\/])/,
+        /[\\/]\.git[\\/]/,
+        /[\\/]\.nuxt[\\/]/,
+      ],
     }),
     viteStaticCopy({
       targets: [
