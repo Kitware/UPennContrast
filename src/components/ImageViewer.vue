@@ -403,6 +403,7 @@ export default class ImageViewer extends Vue {
       this.layersReady &&
       this.samMap
     ) {
+      // TODO: remove console.log
       console.log("Setting output of input pipeline node");
       toolState.pipeline.geoJsMapInputNode.setValue(this.samMap);
     }

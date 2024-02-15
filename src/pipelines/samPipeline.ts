@@ -9,11 +9,7 @@ import {
   PromptType,
   TSamPrompt,
 } from "@/store/model";
-import {
-  ManualInputNode,
-  TNoOutput,
-  createComputeNode,
-} from "./computePipeline";
+import { ManualInputNode, createComputeNode } from "./computePipeline";
 import { createOnnxInferenceSession } from "./onnxModels";
 import { InferenceSession, Tensor } from "onnxruntime-web/webgpu";
 import geojs from "geojs";
@@ -51,6 +47,7 @@ const samModelsConfig = {
 export type TSamModel = keyof typeof samModelsConfig;
 
 function createEncoderContext(model: TSamModel): ISamEncoderContext {
+  // TODO: remove console.log
   console.log("createSamContext", model);
   const configuration = samModelsConfig[model];
   const { maxWidth, maxHeight } = configuration;
@@ -90,6 +87,7 @@ function createDecoderContext(): ISamDecoderContext {
 }
 
 async function screenshot(map: IGeoJSMap) {
+  // TODO: remove console.log
   console.log("screenshot", map);
   // TODO: only screenshot needed layers (no annotation, no text)
   const layers = map
@@ -111,6 +109,7 @@ function processCanvas(
   srcCanvas: HTMLCanvasElement,
   samContext: ISamEncoderContext,
 ): IProcessCanvasOutput {
+  // TODO: remove console.log
   console.log("processCanvas", srcCanvas, samContext);
   // Extract all values from the samContext
   // The context comes from a canvas of size: width * height
@@ -174,6 +173,7 @@ async function runEncoder(
   encoderSession: InferenceSession,
   input: IProcessCanvasOutput,
 ) {
+  // TODO: remove console.log
   console.log("runEncoder", encoderSession, input);
   const encoderOutput = await encoderSession.run(input.encoderFeed);
   return encoderOutput as unknown as IDecoderOutput;
@@ -193,6 +193,7 @@ function processPrompt(
   context: ISamDecoderContext,
   map: IGeoJSMap,
 ): IProcessPromptOutput {
+  // TODO: remove console.log
   console.log("processPrompt", prompts, canvasInfo, context);
 
   // Count the number of each prompt type
@@ -279,6 +280,7 @@ async function runDecoder(
   prompt: IProcessPromptOutput,
   encoderOutput: IDecoderOutput,
 ) {
+  // TODO: remove console.log
   console.log("runDecoder", decoderSession, prompt, encoderOutput);
   const decoderOutput = await decoderSession.run({
     ...encoderOutput,
@@ -296,7 +298,7 @@ function createSamPipeline(
   // Create the pipeline
 
   // Encoder nodes
-  const geoJsMapInputNode = new ManualInputNode<IGeoJSMap | TNoOutput>({
+  const geoJsMapInputNode = new ManualInputNode<IGeoJSMap>({
     type: "debounce",
     wait: 1000,
     options: { leading: false, trailing: true },
@@ -372,6 +374,7 @@ function createSamPipeline(
   }
 
   function printDataString(decoderOutput: any) {
+    // TODO: remove console.log
     console.log(
       "printDataString",
       onnxMaskToImage(
@@ -394,6 +397,7 @@ function createSamPipeline(
   const encoderOptions = { executionProviders: ["webgpu"] };
   createOnnxInferenceSession(encoderPath, encoderOptions).then((session) => {
     encoderSessionNode.setValue(session);
+    // TODO: remove console.log
     console.log("Encoder session node set");
   });
 
@@ -402,6 +406,7 @@ function createSamPipeline(
   const decoderOptions = {};
   createOnnxInferenceSession(decoderPath, decoderOptions).then((session) => {
     decoderSessionNode.setValue(session);
+    // TODO: remove console.log
     console.log("Decoder session node set");
   });
 
