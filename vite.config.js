@@ -87,13 +87,6 @@ export default defineConfig({
       ],
     }),
   ],
-  // css: {
-  //   preprocessorOptions: {
-  //     sass: {
-  //       additionalData: '@import "@/style.scss"\n',
-  //     },
-  //   },
-  // },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
