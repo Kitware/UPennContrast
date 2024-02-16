@@ -19,7 +19,6 @@ import store from "@/store";
 import annotationsStore from "@/store/annotation";
 import propertiesStore from "@/store/properties";
 import { IToolConfiguration } from "@/store/model";
-import { Action } from "vuex-module-decorators";
 // Popup for new tool configuration
 @Component({
   components: {},
@@ -33,14 +32,13 @@ export default class circleToDotMenu extends Vue {
   readonly tool!: IToolConfiguration;
 
   show: boolean = true;
-  radius: number = this.tool.values.radius;
+  radius: number = 0;
 
   @Watch("tool")
   toolChanged() {
     this.radius = this.tool.values.radius;
   }
 
-  @Action
   @Watch("radius")
   updateRadius() {
     this.tool.values.radius = this.radius;
