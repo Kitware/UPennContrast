@@ -17,11 +17,13 @@ cd UPennContrast
 npm install
 ```
 
-Depending on your operating system, run one of the following to compile C++ to wasm:
+Compile C++ code to wasm with this command:
 ```sh
-npm run build-workers-unix
-npm run build-workers-windows
+npm run emscripten-build
 ```
+
+This will run the command `npm run emscripten-build:release`.
+You can also run `npm run emscripten-build:debug` to build with debug symbols.
 
 Start docker images and run the server:
 ```sh

@@ -8,9 +8,7 @@ multi_data
 *.local
 
 # Itk build folders
-/itk/web-build
-/itk/out
-/itk/build
+/itk/emscripten-build
 
 # Log files
 npm-debug.log*

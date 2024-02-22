@@ -34,6 +34,10 @@ export default class circleToDotMenu extends Vue {
   show: boolean = true;
   radius: number = 0;
 
+  mounted() {
+    this.toolChanged();
+  }
+
   @Watch("tool")
   toolChanged() {
     this.radius = this.tool.values.radius;

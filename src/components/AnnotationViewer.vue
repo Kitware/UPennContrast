@@ -1174,11 +1174,12 @@ export default class AnnotationViewer extends Vue {
     if (!layerImage) {
       return;
     }
-    // Capture a screenshot of the layer
-    const imageUrl: string = await mapentry.map.screenshot(layerImage);
-    // Convert the screenshot data-uri to an array
-    const response: Response = await fetch(imageUrl);
-    const blob: Blob = await response.blob();
+    // Capture a screenshot of the layer and convert to png binary
+    const canvas = await mapentry.map.screenshot(layerImage, "canvas");
+    const blob: Blob | null = await new Promise((r) => canvas.toBlob(r));
+    if (!blob) {
+      return;
+    }
     const array = new Uint8Array(await blob.arrayBuffer());
     // Compute snapped coordinates
     const snappedCoordinates = await snapCoordinates(

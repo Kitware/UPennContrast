@@ -31,48 +31,12 @@ export default defineConfig({
         {
           src: joinAndNormalizePath(
             __dirname,
-            "node_modules",
             "itk",
-            "WebWorkers",
-          ),
-          dest: joinAndNormalizePath("itk"),
-        },
-        {
-          src: joinAndNormalizePath(
-            __dirname,
-            "node_modules",
-            "itk",
-            "ImageIOs",
-          ),
-          dest: joinAndNormalizePath("itk"),
-        },
-        {
-          src: joinAndNormalizePath(
-            __dirname,
-            "node_modules",
-            "itk",
-            "PolyDataIOs",
-          ),
-          dest: joinAndNormalizePath("itk"),
-        },
-        {
-          src: joinAndNormalizePath(
-            __dirname,
-            "node_modules",
-            "itk",
-            "MeshIOs",
-          ),
-          dest: joinAndNormalizePath("itk"),
-        },
-        {
-          src: joinAndNormalizePath(
-            __dirname,
-            "itk",
-            "web-build",
+            "emscripten-build",
             "**",
-            "*.{js,wasm}",
+            "*.{js,wasm.zst}",
           ),
-          dest: joinAndNormalizePath("itk", "Pipelines"),
+          dest: joinAndNormalizePath("pipelines"),
         },
         {
           src: joinAndNormalizePath(
@@ -91,5 +55,8 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
+  },
+  optimizeDeps: {
+    exclude: ["itk-wasm"],
   },
 });
