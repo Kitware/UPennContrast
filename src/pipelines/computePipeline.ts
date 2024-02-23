@@ -89,12 +89,24 @@ export class ComputeNode<
   }
 
   /**
-   * Register an other node to this node output updates
-   * When the output of this node changes, it will call "subscribedOutputChanged()" on all subscribers
-   * @param otherNode The node that registers for this node's output updates
+   * Register a callback to call when the output of this node changes
+   * @param callback The callback to call
    */
-  private onOutputUpdate(callback: () => void) {
+  public onOutputUpdate(callback: () => void) {
     this.outputUpdateCallbacks.push(callback);
+  }
+
+  /**
+   * Unregister a callback registered using `onOutputUpdate`
+   * @param callback The callback to call
+   */
+  public offOutputUpdate(callback: () => void) {
+    const callbackIndex = this.outputUpdateCallbacks.findLastIndex(
+      (x) => x === callback,
+    );
+    if (callbackIndex >= 0) {
+      this.outputUpdateCallbacks.splice(callbackIndex, 1);
+    }
   }
 
   /**
@@ -172,6 +184,9 @@ export class ComputeNode<
   }
 
   protected set output(newOutput) {
+    if (newOutput === NoOutput && this._output === NoOutput) {
+      return;
+    }
     this._output = newOutput;
 
     // Trigger all callbacks for the pipeline nodes that have subscribed to output changes
@@ -237,3 +252,11 @@ export class ManualInputNode<T> extends ComputeNode<[], () => T | TNoOutput> {
     }
   }
 }
+
+/**
+ * Convenient type for a compute node for which the output type only is important
+ */
+export type OutputNode<T> = ComputeNode<
+  any[],
+  (...args: any[]) => T | Promise<T>
+>;

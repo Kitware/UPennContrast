@@ -11,12 +11,25 @@ import {
 } from "@/store/model";
 import {
   ManualInputNode,
+  NoOutput,
   TNoOutput,
   createComputeNode,
 } from "./computePipeline";
 import { createOnnxInferenceSession } from "./onnxModels";
-import { InferenceSession, Tensor } from "onnxruntime-web/webgpu";
+import { InferenceSession, Tensor, TypedTensor } from "onnxruntime-web/webgpu";
 import geojs from "geojs";
+import {
+  BinaryFile,
+  InterfaceTypes,
+  PipelineInput,
+  PipelineOutput,
+  TextFile,
+  runPipeline,
+} from "itk-wasm";
+// Import Vue to set reactively the output of the state
+import { Vue } from "vue-property-decorator";
+
+type TensorF32 = TypedTensor<"float32">;
 
 interface ISamConfiguration {
   maxWidth: number;
@@ -34,8 +47,8 @@ interface ISamEncoderContext {
 
 interface ISamDecoderContext {
   feedConstant: {
-    mask_input: Tensor;
-    has_mask_input: Tensor;
+    mask_input: TensorF32;
+    has_mask_input: TensorF32;
   };
 }
 
@@ -102,7 +115,7 @@ async function screenshot(map: IGeoJSMap) {
 }
 
 interface IProcessCanvasOutput {
-  encoderFeed: { input_image: Tensor };
+  encoderFeed: { input_image: TensorF32 };
   scaledWidth: number;
   scaledHeight: number;
   srcWidth: number;
@@ -169,8 +182,8 @@ function processCanvas(
   };
 }
 
-interface IDecoderOutput {
-  image_embeddings: Tensor;
+interface IEncoderOutput {
+  image_embeddings: TensorF32;
 }
 
 async function runEncoder(
@@ -180,15 +193,15 @@ async function runEncoder(
   // TODO: remove console.log
   console.log("runEncoder", encoderSession, input);
   const encoderOutput = await encoderSession.run(input.encoderFeed);
-  return encoderOutput as unknown as IDecoderOutput;
+  return encoderOutput as unknown as IEncoderOutput;
 }
 
 interface IProcessPromptOutput {
-  point_coords: Tensor;
-  point_labels: Tensor;
-  orig_im_size: Tensor;
-  mask_input: Tensor;
-  has_mask_input: Tensor;
+  point_coords: TensorF32;
+  point_labels: TensorF32;
+  orig_im_size: TensorF32;
+  mask_input: TensorF32;
+  has_mask_input: TensorF32;
 }
 
 function processPrompt(
@@ -279,10 +292,16 @@ function processPrompt(
   };
 }
 
+interface IDecoderOutput {
+  masks: TensorF32;
+  low_res_masks: TensorF32;
+  iou_predictions: TensorF32;
+}
+
 async function runDecoder(
   decoderSession: InferenceSession,
   prompt: IProcessPromptOutput,
-  encoderOutput: IDecoderOutput,
+  encoderOutput: IEncoderOutput,
 ) {
   // TODO: remove console.log
   console.log("runDecoder", decoderSession, prompt, encoderOutput);
@@ -290,7 +309,73 @@ async function runDecoder(
     ...encoderOutput,
     ...prompt,
   });
-  return decoderOutput;
+  return decoderOutput as unknown as IDecoderOutput;
+}
+
+interface IItkOutput {
+  contour: IGeoJSPoint[];
+}
+
+async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
+  const array = masks.data;
+  const width = masks.dims[3];
+  const height = masks.dims[2];
+  // TODO: remove console.log
+  console.log("printDataString", array, width, height);
+
+  // Setup input image
+  const imagePath = "./inimage.bin";
+  const imageFile: BinaryFile = {
+    data: new Uint8Array(array.buffer),
+    path: imagePath,
+  };
+  const imageInput: PipelineInput = {
+    data: imageFile,
+    type: InterfaceTypes.BinaryFile,
+  };
+
+  // Setup output json
+  const outPath = "./out.json";
+  const jsonOutput: PipelineOutput = {
+    data: { path: outPath },
+    type: InterfaceTypes.TextFile,
+  };
+
+  // Run the pipeline
+  const pipelineName = "MaskToBlob";
+  const pipelineArgs: string[] = [
+    imagePath,
+    width.toString(),
+    height.toString(),
+    outPath,
+  ];
+  const pipelineInputs: PipelineInput[] = [imageInput];
+  const pipelineOutputs: PipelineOutput[] = [jsonOutput];
+  const { outputs, webWorker } = await runPipeline(
+    pipelineName,
+    pipelineArgs,
+    pipelineOutputs,
+    pipelineInputs,
+  );
+
+  // Parse the output
+  try {
+    const textFile = outputs[0]?.data as TextFile | undefined;
+    if (!textFile?.data) {
+      throw new Error("Pipeline didn't return a value");
+    }
+    return JSON.parse(textFile.data);
+  } finally {
+    webWorker?.terminate();
+  }
+}
+
+function itkContourToAnnotationCoordinates(
+  { contour }: IItkOutput,
+  map: IGeoJSMap,
+): IGeoJSPoint[] {
+  // Remove the first point (it is the same as the last point)
+  return map.displayToGcs(contour.slice(1));
 }
 
 function createSamPipeline(
@@ -335,61 +420,12 @@ function createSamPipeline(
     encoderNode,
   ]);
 
-  // TODO: currently prints the output
-  // ----------------------------------------------------------------
-  function arrayToImageData(input: any, width: number, height: number) {
-    const [r, g, b, a] = [0, 114, 189, 255]; // the masks's blue color
-    const arr = new Uint8ClampedArray(4 * width * height).fill(0);
-    for (let i = 0; i < input.length; i++) {
-      // Threshold the onnx model mask prediction at 0.0
-      // This is equivalent to thresholding the mask using predictor.model.mask_threshold
-      // in python
-      if (input[i] > 0.0) {
-        arr[4 * i + 0] = r;
-        arr[4 * i + 1] = g;
-        arr[4 * i + 2] = b;
-        arr[4 * i + 3] = a;
-      }
-    }
-    return new ImageData(arr, height, width);
-  }
-
-  // Use a Canvas element to produce an image from ImageData
-  function imageDataToImage(imageData: ImageData) {
-    const canvas = imageDataToCanvas(imageData);
-    const image = new Image();
-    image.src = canvas.toDataURL();
-    return image;
-  }
-
-  // Canvas elements can be created from ImageData
-  function imageDataToCanvas(imageData: ImageData) {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = imageData.width;
-    canvas.height = imageData.height;
-    ctx?.putImageData(imageData, 0, 0);
-    return canvas;
-  }
-
-  // Convert the onnx model mask output to an HTMLImageElement
-  function onnxMaskToImage(input: any, width: number, height: number) {
-    return imageDataToImage(arrayToImageData(input, width, height));
-  }
-
-  function printDataString(decoderOutput: any) {
-    // TODO: remove console.log
-    console.log(
-      "printDataString",
-      onnxMaskToImage(
-        decoderOutput.masks.data,
-        decoderOutput.masks.dims[2],
-        decoderOutput.masks.dims[3],
-      ).src,
-    );
-  }
-  createComputeNode(printDataString, [decoderNode]);
-  // ----------------------------------------------------------------
+  // Conversion to contour
+  const itkOutputNode = createComputeNode(runItkPipeline, [decoderNode]);
+  const pipelineOutput = createComputeNode(itkContourToAnnotationCoordinates, [
+    itkOutputNode,
+    geoJsMapInputNode,
+  ]);
 
   // Set the constant context
   encoderContextNode.setValue(encoderContext);
@@ -414,7 +450,7 @@ function createSamPipeline(
     console.log("Decoder session node set");
   });
 
-  return { geoJsMapInputNode, promptInputNode };
+  return { geoJsMapInputNode, promptInputNode, pipelineOutput };
 }
 
 export function createSamToolStateFromToolConfiguration(
@@ -426,7 +462,19 @@ export function createSamToolStateFromToolConfiguration(
     mouseState: {
       path: [],
     },
+    output: null,
   };
+  const outputNode = state.pipeline.pipelineOutput;
+  outputNode.onOutputUpdate(() => {
+    const rawOutput = outputNode.output;
+    const newOutput =
+      !rawOutput || rawOutput === NoOutput || rawOutput.length <= 0
+        ? null
+        : rawOutput;
+    // State is meant to be reactive
+    console.log(newOutput);
+    Vue.set(state, "output", newOutput);
+  });
   return state;
 }
 

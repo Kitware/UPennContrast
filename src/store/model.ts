@@ -117,10 +117,12 @@ export interface ISamAnnotationToolState {
   pipeline: {
     geoJsMapInputNode: ManualInputNode<IGeoJSMap | TNoOutput>;
     promptInputNode: ManualInputNode<TSamPrompt[] | TNoOutput>;
+    pipelineOutput: OutputNode<IGeoJSPoint[]>;
   };
   mouseState: {
     path: IXYPoint[]; // In GCS coordinates
   };
+  output: IGeoJSPoint[] | null;
 }
 
 export interface IMouseState {
@@ -1055,7 +1057,11 @@ import { v4 as uuidv4 } from "uuid";
 import { ISetQuadStatus } from "@/utils/setFrameQuad";
 import { ITileMeta } from "./GirderAPI";
 import { isEqual } from "lodash";
-import { ManualInputNode, TNoOutput } from "@/pipelines/computePipeline";
+import {
+  ManualInputNode,
+  OutputNode,
+  TNoOutput,
+} from "@/pipelines/computePipeline";
 
 export function newLayer(
   dataset: IDataset,

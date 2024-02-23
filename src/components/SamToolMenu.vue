@@ -1,6 +1,6 @@
 <template>
-  <v-expansion-panels>
-    <v-expansion-panel v-if="samState">
+  <v-expansion-panels :value="0">
+    <v-expansion-panel v-if="samState && datasetId">
       <v-expansion-panel-header> Options </v-expansion-panel-header>
       <v-expansion-panel-content>
         <v-btn @click="undo" :disabled="prompts.length === 0">
@@ -12,7 +12,7 @@
         <v-btn @click="reset" :disabled="prompts.length === 0">
           Reset prompts
         </v-btn>
-        <v-btn @click="submit" :disabled="!currentAnnotation">
+        <v-btn @click="submit" :disabled="!outputCoordinates">
           Submit annotation
         </v-btn>
       </v-expansion-panel-content>
@@ -23,12 +23,14 @@
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
+import annotationStore from "@/store/annotation";
 import { IToolConfiguration, TSamPrompt } from "@/store/model";
 import { NoOutput } from "@/pipelines/computePipeline";
 
 @Component({ components: {} })
 export default class SamToolMenu extends Vue {
   readonly store = store;
+  readonly annotationStore = annotationStore;
 
   @Prop({ required: true })
   readonly tool!: IToolConfiguration;
@@ -54,15 +56,8 @@ export default class SamToolMenu extends Vue {
     this.promptNode?.setValue(prompts.length === 0 ? NoOutput : prompts);
   }
 
-  get annotationNode() {
-    // TODO: add the itk node and the annotation output to the pipeline
-    // return this.samState?.pipeline.annotationOutputNode;
-    return null;
-  }
-
-  get currentAnnotation() {
-    // TODO: use annotationNode and do the same thing as for the prompts
-    return null;
+  get outputCoordinates() {
+    return this.samState?.output ?? null;
   }
 
   undo() {
@@ -92,12 +87,21 @@ export default class SamToolMenu extends Vue {
     this.prompts = [];
   }
 
-  submit() {
-    // TODO: upload annotation
-    this.reset();
+  get datasetId() {
+    return this.store.dataset?.id ?? null;
   }
 
-  mounted() {
+  submit() {
+    const coordinates = this.outputCoordinates;
+    const datasetId = this.datasetId;
+    const toolConfiguration = this.tool;
+    if (coordinates && datasetId) {
+      this.annotationStore.addAnnotationFromTool({
+        coordinates,
+        datasetId,
+        toolConfiguration,
+      });
+    }
     this.reset();
   }
 }

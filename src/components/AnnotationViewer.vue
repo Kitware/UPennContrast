@@ -242,6 +242,40 @@ export default class AnnotationViewer extends Vue {
   selectionAnnotation: IGeoJSAnnotation | null = null;
   samPromptAnnotations: IGeoJSAnnotation[] = [];
 
+  samPreviewAnnotation: IGeoJSAnnotation | null = null;
+
+  get samAnnotationCoordinates() {
+    return this.samToolState?.output ?? null;
+  }
+
+  @Watch("samAnnotationCoordinates")
+  onSamAnnotationCoordinatesChanged() {
+    // Remove previous annotation
+    if (this.samPreviewAnnotation) {
+      this.annotationLayer.removeAnnotation(this.samPreviewAnnotation);
+      this.samPreviewAnnotation = null;
+    }
+
+    // Create the new annotation
+    const vertices = this.samAnnotationCoordinates;
+    if (!vertices) {
+      return;
+    }
+    const style = {
+      fillOpacity: 0.2,
+      fillColor: "blue",
+      strokeColor: "white",
+      strokeOpacity: 1,
+      strokeWidth: 1,
+    };
+    const geoJsAnnotation: IGeoJSAnnotation =
+      geojs.annotation.polygonAnnotation({ style, vertices });
+
+    // Add it to the layer
+    this.samPreviewAnnotation = geoJsAnnotation;
+    this.annotationLayer.addAnnotation(this.samPreviewAnnotation);
+  }
+
   @Watch("capturedMouseState", { deep: true })
   onMousePathChanged(
     newState: IMouseState | null,

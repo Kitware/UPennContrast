@@ -322,6 +322,15 @@
             }
           ]
         }
+      },
+      {
+        "name": "Annotation Configuration",
+        "id": "annotation",
+        "type": "annotation",
+        "meta": {
+          "hideShape": true,
+          "defaultShape": "polygon"
+        }
       }
     ]
   }
