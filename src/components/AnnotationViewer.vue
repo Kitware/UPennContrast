@@ -227,8 +227,8 @@ export default class AnnotationViewer extends Vue {
     if (!(state && "pipeline" in state)) {
       return null;
     }
-    const samMap = state.pipeline.geoJsMapInputNode.output;
-    if (samMap !== this.map) {
+    const samMapEntry = state.pipeline.geoJsMapInputNode.output;
+    if (samMapEntry === NoOutput || samMapEntry.map !== this.map) {
       return null;
     }
     return state;

@@ -115,7 +115,7 @@ export type TSamPrompt =
 
 export interface ISamAnnotationToolState {
   pipeline: {
-    geoJsMapInputNode: ManualInputNode<IGeoJSMap | TNoOutput>;
+    geoJsMapInputNode: ManualInputNode<IMapEntry | TNoOutput>;
     promptInputNode: ManualInputNode<TSamPrompt[] | TNoOutput>;
     pipelineOutput: OutputNode<IGeoJSPoint[]>;
   };
@@ -126,7 +126,7 @@ export interface ISamAnnotationToolState {
 }
 
 export interface IMouseState {
-  map: IGeoJSMap;
+  mapEntry: IMapEntry;
   target: HTMLElement;
   path: IGeoJSPoint[];
   initialMouseEvent: MouseEvent;

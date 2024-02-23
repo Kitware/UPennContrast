@@ -1,8 +1,8 @@
 import {
   IGeoJSAnnotation,
-  IGeoJSMap,
   IGeoJSPoint,
   IGeoJSPolygonFeatureStyle,
+  IMapEntry,
   IMouseState,
   ISamAnnotationToolState,
   IToolConfiguration,
@@ -103,13 +103,12 @@ function createDecoderContext(): ISamDecoderContext {
   };
 }
 
-async function screenshot(map: IGeoJSMap) {
+async function screenshot({ map, imageLayers }: IMapEntry) {
   // TODO: remove console.log
   console.log("screenshot", map);
-  // TODO: only screenshot needed layers (no annotation, no text)
-  const layers = map
-    .layers()
-    .filter((layer) => layer.node().css("visibility") !== "hidden");
+  const layers = imageLayers.filter(
+    (layer) => layer.node().css("visibility") !== "hidden",
+  );
   const imageCanvas = await map.screenshot(layers, "canvas");
   return imageCanvas;
 }
@@ -208,7 +207,7 @@ function processPrompt(
   prompts: TSamPrompt[],
   canvasInfo: IProcessCanvasOutput,
   context: ISamDecoderContext,
-  map: IGeoJSMap,
+  { map }: IMapEntry,
 ): IProcessPromptOutput {
   // TODO: remove console.log
   console.log("processPrompt", prompts, canvasInfo, context);
@@ -372,7 +371,7 @@ async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
 
 function itkContourToAnnotationCoordinates(
   { contour }: IItkOutput,
-  map: IGeoJSMap,
+  { map }: IMapEntry,
 ): IGeoJSPoint[] {
   // Remove the first point (it is the same as the last point)
   return map.displayToGcs(contour.slice(1));
@@ -387,7 +386,7 @@ function createSamPipeline(
   // Create the pipeline
 
   // Encoder nodes
-  const geoJsMapInputNode = new ManualInputNode<IGeoJSMap | TNoOutput>({
+  const geoJsMapInputNode = new ManualInputNode<IMapEntry | TNoOutput>({
     type: "debounce",
     wait: 1000,
     options: { leading: false, trailing: true },

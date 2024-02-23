@@ -22,7 +22,7 @@
       )"
       :map="mapentry.map"
       :capturedMouseState="
-        mouseState && mouseState.map === mapentry.map ? mouseState : null
+        mouseState && mouseState.mapEntry === mapentry ? mouseState : null
       "
       :annotationLayer="mapentry.annotationLayer"
       :textLayer="mapentry.textLayer"
@@ -374,25 +374,25 @@ export default class ImageViewer extends Vue {
     return this.readyLayersCount >= this.readyLayersTotal;
   }
 
-  get mouseMap(): IGeoJSMap | null {
-    return this.mouseState?.map || null;
+  get mouseMap(): IMapEntry | null {
+    return this.mouseState?.mapEntry ?? null;
   }
 
-  samMap: IGeoJSMap | null = null;
+  samMapEntry: IMapEntry | null = null;
 
   @Watch("mouseMap")
   mouseMapChanged() {
     if (this.mouseMap) {
-      this.samMap = this.mouseMap;
+      this.samMapEntry = this.mouseMap;
     }
   }
 
   @Watch("maps")
   mapsChanged() {
-    this.samMap = this.maps[0]?.map || null;
+    this.samMapEntry = this.maps[0] ?? null;
   }
 
-  @Watch("samMap")
+  @Watch("samMapEntry")
   @Watch("layersReady")
   @Watch("cameraInfo")
   @Watch("selectedTool")
@@ -401,7 +401,9 @@ export default class ImageViewer extends Vue {
     if (toolState && "pipeline" in toolState && this.layersReady) {
       // TODO: remove console.log
       console.log("Setting output of input pipeline node");
-      toolState.pipeline.geoJsMapInputNode.setValue(this.samMap ?? NoOutput);
+      toolState.pipeline.geoJsMapInputNode.setValue(
+        this.samMapEntry ?? NoOutput,
+      );
     }
   }
 
@@ -525,7 +527,7 @@ export default class ImageViewer extends Vue {
 
     // Setup initial mouse state
     this.mouseState = {
-      map: mapEntry.map,
+      mapEntry,
       target: evt.target,
       path: [],
       initialMouseEvent: evt,
@@ -540,11 +542,11 @@ export default class ImageViewer extends Vue {
       return;
     }
     evt.stopPropagation();
-    const { target, map, path: mousePath } = this.mouseState;
+    const { target, mapEntry, path } = this.mouseState;
     const rect = target.getBoundingClientRect();
     const displayPoint = { x: evt.x - rect.x, y: evt.y - rect.y };
-    const gcsPoint = map.displayToGcs(displayPoint);
-    mousePath.push(gcsPoint);
+    const gcsPoint = mapEntry.map.displayToGcs(displayPoint);
+    path.push(gcsPoint);
   }
 
   mouseUp(evt: MouseEvent) {
