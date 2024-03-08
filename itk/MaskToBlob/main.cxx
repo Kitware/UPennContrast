@@ -3,12 +3,9 @@
 #include <vector>
 
 #include <itkImage.h>
-#include <itkImageFileReader.h>
-#include <itkImageFileWriter.h>
+#include <itkImageLinearConstIteratorWithIndex.h>
 #include <itkMinimumMaximumImageCalculator.h>
 #include <itkConnectedThresholdImageFilter.h>
-#include <itkContourExtractor2DImageFilter.h>
-#include "itkPolyLineParametricPath.h"
 
 #ifdef __EMSCRIPTEN__
     #include <emscripten/bind.h>
@@ -23,8 +20,80 @@ using ImageType = itk::Image<PixelType, Dimension>;
 
 using ImageCalculatorFilterType = itk::MinimumMaximumImageCalculator<ImageType>;
 using ConnectedFilterType = itk::ConnectedThresholdImageFilter<ImageType, ImageType>;
-using ContourFilterType = itk::ContourExtractor2DImageFilter<ImageType>;
-using ContourPolylineType = itk::PolyLineParametricPath<Dimension>;
+using ConstLineIteratorType = itk::ImageLinearConstIteratorWithIndex<ImageType>;
+
+struct ImageLineOrientation {
+    unsigned int direction;
+    bool isForwardPositive;
+};
+
+// Rotate the orientation by 90 degrees
+// Turn left <=> positive rotation <=> counter-clockwise rotation
+// Turn right <=> negative rotation <=> clockwise rotation
+static void rotateImageLineOrientation(ImageLineOrientation &baseOrientation, bool rotateLeft)
+{
+    unsigned int newDirection = baseOrientation.direction == 0 ? 1 : 0;
+    bool isNewForward = (baseOrientation.direction == 0) == baseOrientation.isForwardPositive == rotateLeft;
+    baseOrientation = { newDirection, isNewForward };
+}
+
+// Move the iterator forward or backward by applying the orientation
+static void moveIteratorUsingOrientation(ConstLineIteratorType &lineIt, const ImageLineOrientation &orientation, bool moveForward)
+{
+    lineIt.SetDirection(orientation.direction);
+    if (orientation.isForwardPositive == moveForward)
+    {
+        ++lineIt;
+    }
+    else
+    {
+        --lineIt;
+    }
+}
+
+static bool isIteratorOutsideAnnotation(const ConstLineIteratorType& lineIt, PixelType annotationValue)
+{
+    return lineIt.IsAtEndOfLine() || lineIt.IsAtReverseEndOfLine() || lineIt.Value() != annotationValue;
+}
+
+static void moveIteratorAndOrientationToNextAnnotationPoint(ConstLineIteratorType& lineIt, ImageLineOrientation& orientation, PixelType annotationValue)
+{
+    // Rotate left and go forward
+    rotateImageLineOrientation(orientation, true);
+    moveIteratorUsingOrientation(lineIt, orientation, true);
+
+    // Check if out of annotation
+    if (isIteratorOutsideAnnotation(lineIt, annotationValue))
+    {
+        // Go backward
+        moveIteratorUsingOrientation(lineIt, orientation, false);
+        return;
+    }
+
+    // Rotate right and go forward
+    rotateImageLineOrientation(orientation, false);
+    moveIteratorUsingOrientation(lineIt, orientation, true);
+
+    // Check if out of annotation
+    if (isIteratorOutsideAnnotation(lineIt, annotationValue))
+    {
+        // Go backward
+        moveIteratorUsingOrientation(lineIt, orientation, false);
+        return;
+    }
+
+    // Rotate right
+    rotateImageLineOrientation(orientation, false);
+}
+
+// Outputs the point that is to the forward left of the frame defined by lineIt and orientation
+static ImageType::IndexType getOutputPointFromIteratorAndOrientation(const ConstLineIteratorType& lineIt, const ImageLineOrientation &orientation)
+{
+    const auto& idx = lineIt.GetIndex();
+    const auto& isPositive = orientation.isForwardPositive;
+    const auto& isXAxis = orientation.direction == 0;
+    return { idx[0] + (isPositive == isXAxis ? 1 : 0), idx[1] + (isPositive ? 1 : 0) };
+}
 
 int main(int argc, char* argv[])
 {
@@ -34,7 +103,7 @@ int main(int argc, char* argv[])
             << argv[0]
             << " <inputImagePath> <inputImageWidth> <inputImageHeight> <outputPath>"
             << std::endl;
-        return -1;
+        return EXIT_FAILURE;
     }
 
     const std::string inputPath(argv[1]);
@@ -54,7 +123,7 @@ int main(int argc, char* argv[])
 
     if (!inputImage) {
         std::cerr << "Could not read the image" << std::endl;
-        return -1;
+        return EXIT_FAILURE;
     }
 
     // find the maximum value and its location
@@ -68,51 +137,60 @@ int main(int argc, char* argv[])
     if (maxValue < thresholdValue)
     {
         std::cerr << "No contour found, maximum value of " << maxValue << " is below the threshold value of " << thresholdValue << std::endl;
-        return -1;
+        return EXIT_FAILURE;
     }
 
-    ImageType::IndexType maxIndex = imageCalculatorFilter->GetIndexOfMaximum();
+    const ImageType::IndexType maxIndex = imageCalculatorFilter->GetIndexOfMaximum();
 
     // extract only one ROI by thresholding around the maximum of confidence
+    const PixelType annotationValue = maxValue + 1;
     ConnectedFilterType::Pointer connectedThresholdFilter = ConnectedFilterType::New();
     connectedThresholdFilter->SetLower(thresholdValue);
     connectedThresholdFilter->SetUpper(maxValue);
-    connectedThresholdFilter->SetReplaceValue(1.0);
+    connectedThresholdFilter->SetReplaceValue(annotationValue);
     connectedThresholdFilter->SetSeed(maxIndex);
     connectedThresholdFilter->SetInput(inputImage);
     connectedThresholdFilter->Update();
 
-    // compute the contour of the ROI
-    ContourFilterType::Pointer contourFilter = ContourFilterType::New();
-    contourFilter->SetInput(connectedThresholdFilter->GetOutput());
-    contourFilter->Update();
-
-    auto contour = contourFilter->GetOutput(0);
-
-    if (!contour)
+    // Find the last edge of the annotation
+    auto singleAnnotationImage = connectedThresholdFilter->GetOutput();
+    ConstLineIteratorType lineIt(singleAnnotationImage, singleAnnotationImage->GetRequestedRegion());
+    lineIt.SetIndex(maxIndex);
+    lineIt.SetDirection(0);
+    ImageType::IndexType lastAnnotationIndex = maxIndex;
+    while(!lineIt.IsAtEndOfLine())
     {
-        std::cerr << "Could not generate contour" << std::endl;
-        return -1;
+        if (lineIt.Value() == annotationValue)
+        {
+            lastAnnotationIndex = lineIt.GetIndex();
+        }
+        ++lineIt;
     }
-
-    // export to json
-    auto vertexIterator = contour->GetVertexList()->Begin();
-    auto outputContourEnd = contour->GetVertexList()->End();
 
     std::fstream outFile;
     outFile.open(outputPath, std::fstream::out);
     outFile << "{ \"contour\": [\n";
-    while (vertexIterator != outputContourEnd) {
-        auto value = vertexIterator->Value();
-        outFile << "{ \"x\": " << value[0] << ", \"y\": " << value[1] << ", \"z\": 0 }";
-        ++vertexIterator;
-        if (vertexIterator != outputContourEnd) {
-            outFile << ",\n";
-        }
-    }
-    outFile << "\n]}" << std::endl;
 
-    return 0;
+    // Collect the contour by using the iterator as a robot that can move forward, backward, turn left or turn right
+    // Loop invariants:
+    // - iterator is at a position where an annotation lies
+    // - moving the iterator forward using "orientation" put it out of the image or out of the annotation
+    lineIt.SetIndex(lastAnnotationIndex);
+    ImageLineOrientation orientation{ 0, true };
+    const auto firstPoint = getOutputPointFromIteratorAndOrientation(lineIt, orientation);
+    while (true)
+    {
+        moveIteratorAndOrientationToNextAnnotationPoint(lineIt, orientation, annotationValue);
+        const auto currentPoint = getOutputPointFromIteratorAndOrientation(lineIt, orientation);
+        outFile << "{ \"x\": " << currentPoint[0] << ", \"y\": " << currentPoint[1] << " }";
+
+        if (currentPoint == firstPoint)
+        {
+            outFile << "\n]}" << std::endl;
+            return EXIT_SUCCESS;
+        }
+        outFile << ",\n";
+    }
 }
 
 template <typename TImage>

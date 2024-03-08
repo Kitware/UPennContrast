@@ -49,6 +49,9 @@ export default defineConfig({
           dest: joinAndNormalizePath("onnx-wasm"),
         },
       ],
+      watch: {
+        reloadPageOnChange: true,
+      },
     }),
   ],
   resolve: {

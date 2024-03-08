@@ -399,8 +399,6 @@ export default class ImageViewer extends Vue {
   imageOrToolChanged() {
     const toolState = this.selectedTool?.state;
     if (toolState && "pipeline" in toolState && this.layersReady) {
-      // TODO: remove console.log
-      console.log("Setting output of input pipeline node");
       toolState.pipeline.geoJsMapInputNode.setValue(
         this.samMapEntry ?? NoOutput,
       );

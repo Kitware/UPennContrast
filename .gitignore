@@ -9,6 +9,7 @@ multi_data
 
 # Itk build folders
 /itk/emscripten-build
+/itk/build
 
 # Log files
 npm-debug.log*

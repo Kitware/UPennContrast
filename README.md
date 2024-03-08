@@ -31,9 +31,9 @@ docker-compose up -d
 npm run dev
 ```
 
-To setup an environment for native C++ development for ITK, see `itk/README.md`.
+To setup an environment for native C++ development for ITK, see [`itk/README.md`](./itk/README.md).
 
-For technical documentation about tools, see `TOOLS.md`.
+For technical documentation about tools, see [`TOOLS.md`](./TOOLS.md).
 
 
 ### Girder Defaults

@@ -6,10 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(itk_components
     WebAssemblyInterface
     ITKCommon
-    ITKIOImageBase
-    ITKPath
     ITKRegionGrowing
-    ITKImageIO
     )
 
 find_package(ITK REQUIRED
