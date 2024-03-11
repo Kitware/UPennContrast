@@ -7,6 +7,9 @@ multi_data
 # local env files
 *.local
 
+#unplugin-vue-components plugin
+components.d.ts
+
 # Itk build folders
 /itk/emscripten-build
 /itk/build
