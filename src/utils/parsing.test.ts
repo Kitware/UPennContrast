@@ -1,7 +1,7 @@
 // Desc: Unit tests for parserModule.ts
 // Tests are written using vitest
-// To run the vitest tests, run the following command in the terminal:
-// npm vitest-test
+// To run the vitest tests, run the following commands in the terminal:
+// npm run build && npm run test
 // This runs 3 different filename patterns: filenames1, filenames2, filenames3
 // The expected output for each pattern is stored in expectedOutput1, expectedOutput2, expectedOutput3
 // filenames1 and filenames2 are small enough to be stored in this file
@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import { collectFilenameMetadata2 } from "@/utils/parsing";
+import { logError } from "@/utils/log";
 import { TEST_DATA_ROOT } from "@/test/scripts/utilities";
 import { readFileSync } from "fs";
 
@@ -205,7 +206,7 @@ function parseTestFiles(filenamesPath: string, expectedOutputPath: string) {
 
     return { filenames, expectedOutput };
   } catch (err) {
-    console.error("Error reading the file:", err);
+    logError("Error reading the file:", err);
     return null;
   }
 }

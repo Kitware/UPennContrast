@@ -57,7 +57,13 @@ npm run serve
 ### Lints and fixes files
 
 ```
-npm run lint
+npm run lint:fix
+```
+
+### Run typescript compiler
+
+```
+npm run tsc
 ```
 
 ### Customize configuration

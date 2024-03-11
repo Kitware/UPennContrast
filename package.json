@@ -13,9 +13,10 @@
     "emscripten-build": "npm run emscripten-build:release",
     "emscripten-build:release": "itk-wasm --source-dir itk build",
     "emscripten-build:debug": "itk-wasm --source-dir itk build -- -DCMAKE_BUILD_TYPE=Debug",
-    "lint": "eslint --ext .js,.ts,.vue --ignore-path .gitignore --fix src",
-    "test": "npm run lint && npm run build && npm run vitest-test",
-    "vitest-test": "vitest"
+    "lint": "eslint --ext .js,.ts,.vue --ignore-path .gitignore src",
+    "lint:fix": "npm run lint -- --fix",
+    "lint:ci": "npm run lint -- --max-warnings=0",
+    "test": "vitest"
   },
   "overrides": {
     "@girder/components": {
