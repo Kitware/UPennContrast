@@ -35,6 +35,7 @@ import {
   IGeoJSAnnotationLayer,
   IGeoJSFeatureLayer,
   IGeoJSFeature,
+  ISamAnnotationToolState,
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -222,7 +223,7 @@ export default class AnnotationViewer extends Vue {
     return this.store.selectedTool?.state ?? null;
   }
 
-  get samToolState(): TToolState<"samAnnotation"> | null {
+  get samToolState(): ISamAnnotationToolState | null {
     const state = this.selectedToolState;
     if (!(state && "pipeline" in state)) {
       return null;

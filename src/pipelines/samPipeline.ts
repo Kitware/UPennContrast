@@ -1,4 +1,5 @@
 import {
+  IErrorToolState,
   IGeoJSAnnotation,
   IGeoJSPoint,
   IGeoJSPolygonFeatureStyle,
@@ -384,6 +385,9 @@ function itkContourToAnnotationCoordinates(
 function createSamPipeline(
   model: TSamModel,
 ): ISamAnnotationToolState["pipeline"] {
+  if (!("gpu" in navigator)) {
+    throw new Error("Can't initialize SAM tool: WebGPU not available");
+  }
   // Create the encoder context
   const encoderContext = createEncoderContext(model);
 
@@ -456,10 +460,16 @@ function createSamPipeline(
 
 export function createSamToolStateFromToolConfiguration(
   configuration: IToolConfiguration<"samAnnotation">,
-) {
+): ISamAnnotationToolState | IErrorToolState {
   const model: TSamModel = configuration.values.model.value;
+  let pipeline: ISamAnnotationToolState["pipeline"];
+  try {
+    pipeline = createSamPipeline(model);
+  } catch (error) {
+    return { error: error as Error };
+  }
   const state: ISamAnnotationToolState = {
-    pipeline: createSamPipeline(model),
+    pipeline,
     mouseState: {
       path: [],
     },

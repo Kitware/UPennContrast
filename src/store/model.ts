@@ -132,8 +132,21 @@ export interface IMouseState {
   initialMouseEvent: MouseEvent;
 }
 
-export type TToolState<T extends TToolType = TToolType> =
-  T extends "samAnnotation" ? ISamAnnotationToolState : IBaseToolState;
+export interface IErrorToolState {
+  error?: Error;
+}
+
+interface IExplicitToolStateMap {
+  samAnnotation: ISamAnnotationToolState | IErrorToolState;
+}
+
+type TFullToolStateMap = {
+  [toolType in TToolType]: toolType extends keyof IExplicitToolStateMap
+    ? IExplicitToolStateMap[toolType]
+    : IBaseToolState;
+};
+
+export type TToolState<T extends TToolType = TToolType> = TFullToolStateMap[T];
 
 export interface IActiveTool<T extends TToolType = TToolType> {
   configuration: IToolConfiguration<T>;

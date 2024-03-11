@@ -42,7 +42,6 @@ import {
   exampleConfigurationBase,
   IActiveTool,
   TToolType,
-  ISamAnnotationToolState,
   IBaseToolState,
 } from "./model";
 
@@ -284,7 +283,7 @@ export class Main extends VuexModule {
         case "samAnnotation":
           state = createSamToolStateFromToolConfiguration(
             configuration as IToolConfiguration<"samAnnotation">,
-          ) as ISamAnnotationToolState;
+          );
           break;
         default:
           state = {} as IBaseToolState;

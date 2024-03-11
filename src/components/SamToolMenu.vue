@@ -17,6 +17,12 @@
         </v-btn>
       </v-expansion-panel-content>
     </v-expansion-panel>
+    <v-expansion-panel v-else-if="errorState">
+      <v-expansion-panel-header> Options </v-expansion-panel-header>
+      <v-expansion-panel-content>
+        {{ errorState.error ? errorState.error.message : "Unknown error" }}
+      </v-expansion-panel-content>
+    </v-expansion-panel>
   </v-expansion-panels>
 </template>
 
@@ -38,8 +44,17 @@ export default class SamToolMenu extends Vue {
   // The first element is the oldest
   promptHistory: TSamPrompt[] = [];
 
+  get toolState() {
+    return this.store.selectedTool?.state;
+  }
+
+  get errorState() {
+    const state = this.toolState;
+    return state && "error" in state ? state : null;
+  }
+
   get samState() {
-    const state = this.store.selectedTool?.state;
+    const state = this.toolState;
     return state && "pipeline" in state ? state : null;
   }
 
