@@ -12,7 +12,7 @@ set(itk_components
     ITKMesh
     ITKPath
     ITKThresholding
-    ITKImageIO
+    ITKIOPNG
     ITKMeshIO
     )
 

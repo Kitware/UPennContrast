@@ -11,7 +11,7 @@ set(itk_components
     ITKImageIntensity
     ITKMesh
     ITKPath
-    ITKImageIO
+    ITKIOPNG
     ITKMeshIO
     )
 

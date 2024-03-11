@@ -9,7 +9,7 @@ set(itk_components
     ITKIOImageBase
     ITKImageIntensity
     ITKSpatialObjects
-    ITKImageIO
+    ITKIOPNG
     )
 
 find_package(ITK REQUIRED
