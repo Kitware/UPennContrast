@@ -64,17 +64,7 @@ const samModelsConfig = {
 
 export type TSamModel = keyof typeof samModelsConfig;
 
-let debugPrintTime = Date.now();
-const debugPrint = (...args: any[]) => {
-  const newTime = Date.now();
-  const deltaTime = newTime - debugPrintTime;
-  debugPrintTime = newTime;
-  console.log(`Previous action took ${deltaTime}ms`);
-  console.log(...args);
-};
-
 function createEncoderContext(model: TSamModel): ISamEncoderContext {
-  debugPrint("createSamContext", model);
   const configuration = samModelsConfig[model];
   const { maxWidth, maxHeight } = configuration;
   const canvas = document.createElement("canvas");
@@ -113,7 +103,6 @@ function createDecoderContext(): ISamDecoderContext {
 }
 
 async function screenshot({ map, imageLayers }: IMapEntry) {
-  debugPrint("screenshot", map);
   const layers = imageLayers.filter(
     (layer) => layer.node().css("visibility") !== "hidden",
   );
@@ -133,7 +122,6 @@ function processCanvas(
   srcCanvas: HTMLCanvasElement,
   samContext: ISamEncoderContext,
 ): IProcessCanvasOutput {
-  debugPrint("processCanvas", srcCanvas, samContext);
   // Extract all values from the samContext
   // The context comes from a canvas of size: width * height
   // The buffer is of size: width * height * 3
@@ -196,9 +184,7 @@ async function runEncoder(
   encoderSession: InferenceSession,
   input: IProcessCanvasOutput,
 ) {
-  debugPrint("runEncoder", encoderSession, input);
   const encoderOutput = await encoderSession.run(input.encoderFeed);
-  debugPrint("embeddings ready");
   return encoderOutput as unknown as IEncoderOutput;
 }
 
@@ -216,8 +202,6 @@ function processPrompt(
   context: ISamDecoderContext,
   { map }: IMapEntry,
 ): IProcessPromptOutput {
-  debugPrint("processPrompt", prompts, canvasInfo, context);
-
   // Count the number of each prompt type
   let nForegroundPts = 0;
   let nBackgroundPts = 0;
@@ -308,7 +292,6 @@ async function runDecoder(
   prompt: IProcessPromptOutput,
   encoderOutput: IEncoderOutput,
 ) {
-  debugPrint("runDecoder", decoderSession, prompt, encoderOutput);
   const decoderOutput = await decoderSession.run({
     ...encoderOutput,
     ...prompt,
@@ -324,7 +307,6 @@ async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
   const array = masks.data;
   const width = masks.dims[3];
   const height = masks.dims[2];
-  debugPrint("runItkPipeline", array, width, height);
 
   // Setup input image
   const imagePath = "./inimage.bin";
@@ -367,7 +349,6 @@ async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
     if (!textFile?.data) {
       throw new Error("Pipeline didn't return a value");
     }
-    debugPrint("ranItkPipeline");
     return JSON.parse(textFile.data);
   } finally {
     webWorker?.terminate();
@@ -378,7 +359,6 @@ function itkContourToAnnotationCoordinates(
   { contour }: IItkOutput,
   { map }: IMapEntry,
 ): IGeoJSPoint[] {
-  debugPrint("itkContourToAnnotationCoordinates");
   return map.displayToGcs(contour);
 }
 
@@ -444,7 +424,6 @@ function createSamPipeline(
   const encoderOptions = { executionProviders: ["webgpu"] };
   createOnnxInferenceSession(encoderPath, encoderOptions).then((session) => {
     encoderSessionNode.setValue(session);
-    debugPrint("Encoder session node set");
   });
 
   // Set the decoder
@@ -452,7 +431,6 @@ function createSamPipeline(
   const decoderOptions = {};
   createOnnxInferenceSession(decoderPath, decoderOptions).then((session) => {
     decoderSessionNode.setValue(session);
-    debugPrint("Decoder session node set");
   });
 
   return { geoJsMapInputNode, promptInputNode, pipelineOutput };
@@ -483,7 +461,6 @@ export function createSamToolStateFromToolConfiguration(
         ? null
         : rawOutput;
     // State is meant to be reactive
-    debugPrint(newOutput);
     Vue.set(state, "output", newOutput);
   });
   return state;
