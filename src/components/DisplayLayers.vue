@@ -42,7 +42,7 @@
         <template v-for="[groupId, combinedLayers] in groupsArrayWithSpacers">
           <display-layer-group
             v-if="combinedLayers"
-            :key="groupId"
+            :key="groupId + '_layers'"
             group="layerZoneElement"
             :single-layer="groupId.startsWith(singleLayerPrefix)"
             :combined-layers="combinedLayers"
@@ -53,7 +53,7 @@
           <draggable
             v-else
             :value="[]"
-            :key="groupId"
+            :key="groupId + '_spacer'"
             @input="spacerUpdate($event, groupId)"
             group="layerZoneElement"
             class="group-spacer"

@@ -14,12 +14,11 @@
       hide-details
     />
     <roi-filters class="filter-element" />
-    <template v-for="(propertyPath, idx) in propertyPaths">
-      <property-filter-histogram
-        :key="'property ' + idx"
-        :propertyPath="propertyPath"
-      />
-    </template>
+    <property-filter-histogram
+      v-for="(propertyPath, idx) in propertyPaths"
+      :key="'property ' + idx"
+      :propertyPath="propertyPath"
+    />
   </v-container>
 </template>
 
