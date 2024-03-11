@@ -35,9 +35,9 @@ cd samexporter
 python -m samexporter.export_encoder --checkpoint ../checkpoint.pth --output ../encoder.onnx --model-type vit_b
 python -m samexporter.export_decoder --checkpoint ../checkpoint.pth --output ../decoder.onnx --model-type vit_b --return-single-mask
 ```
-- Copy the encoder and decoder at the right location
+- Copy the encoder and decoder at the right location in the project (for now, the only model available is `vit_b`)
 ```sh
-cd ..
-cp encoder.onnx $PATH_TO_THIS_FOLDER/$MODEL_NAME
-cp decoder.onnx $PATH_TO_THIS_FOLDER/$MODEL_NAME
+cd $NIMUS_IMAGE_DIR
+cp encoder.onnx public/onnx-models/sam/$MODEL_NAME
+cp decoder.onnx public/onnx-models/sam/$MODEL_NAME
 ```
