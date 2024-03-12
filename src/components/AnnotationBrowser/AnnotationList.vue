@@ -42,6 +42,27 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
+      <v-row>
+        <v-col cols="12" md="6">
+          <v-select
+            v-model="selectedColumns"
+            :items="columnOptions"
+            attach
+            chips
+            label="Select columns"
+            multiple
+            small-chips
+          ></v-select>
+        </v-col>
+        <v-col cols="12" md="6">
+          <v-text-field
+            v-model="filterQuery"
+            label="Filter by annotation ID"
+            single-line
+            clearable
+          ></v-text-field>
+        </v-col>
+      </v-row>
       <v-data-table
         :items="filteredItems"
         :headers="headers"
@@ -83,15 +104,25 @@
                   @click.stop="() => toggleAnnotationSelection(item.annotation)"
                 />
               </td>
-              <td :class="tableItemClass">
+              <td :class="tableItemClass" v-if="selectedColumns.includes('id')">
+                <span>{{ item.annotation.id }}</span>
+              </td>
+              <td
+                :class="tableItemClass"
+                v-if="selectedColumns.includes('index')"
+              >
                 <span>{{ annotationIdToIndex[item.annotation.id] }}</span>
               </td>
-              <td :class="tableItemClass">
-                <span>
-                  {{ item.shapeName }}
-                </span>
+              <td
+                :class="tableItemClass"
+                v-if="selectedColumns.includes('shape')"
+              >
+                <span>{{ item.shapeName }}</span>
               </td>
-              <td :class="tableItemClass">
+              <td
+                :class="tableItemClass"
+                v-if="selectedColumns.includes('tags')"
+              >
                 <span>
                   <v-chip
                     v-for="tag in item.annotation.tags"
@@ -102,16 +133,19 @@
                   >
                 </span>
               </td>
-              <td>
+              <td v-if="selectedColumns.includes('xy')">
                 {{ item.annotation.location.XY + 1 }}
               </td>
-              <td>
+              <td v-if="selectedColumns.includes('z')">
                 {{ item.annotation.location.Z + 1 }}
               </td>
-              <td>
+              <td v-if="selectedColumns.includes('time')">
                 {{ item.annotation.location.Time + 1 }}
               </td>
-              <td :class="tableItemClass">
+              <td
+                :class="tableItemClass"
+                v-if="selectedColumns.includes('name')"
+              >
                 <v-text-field
                   hide-details
                   :value="item.annotation.name || ''"
@@ -121,8 +155,7 @@
                   @change="updateAnnotationName($event, item.annotation.id)"
                   @click.capture.stop
                   title
-                >
-                </v-text-field>
+                ></v-text-field>
               </td>
               <td
                 v-for="(propertyPath, idx) in displayedPropertyPaths"
@@ -174,9 +207,23 @@ export default class AnnotationList extends Vue {
   readonly filterStore = filterStore;
   readonly getStringFromPropertiesAndPath = getStringFromPropertiesAndPath;
 
+  columnOptions = [
+    { text: "Annotation ID", value: "id" },
+    { text: "Index", value: "index" },
+    { text: "Shape", value: "shape" },
+    { text: "Tags", value: "tags" },
+    { text: "XY", value: "xy" },
+    { text: "Z", value: "z" },
+    { text: "Time", value: "time" },
+    { text: "Name", value: "name" },
+  ];
+
+  selectedColumns = ["id", "index", "shape", "tags", "xy", "z", "time", "name"];
+
   tableItemClass = "px-1"; // To enable dividers, use v-data-table__divider
 
   annotationFilteredDialog: boolean = false;
+  filterQuery: string = "";
 
   // These are "from" or "to" v-data-table
   page: number = 0; // one-way binding :page
@@ -210,7 +257,16 @@ export default class AnnotationList extends Vue {
   }
 
   get filteredItems() {
-    return this.filterStore.filteredAnnotations.map(this.annotationToItem);
+    const query = this.filterQuery || ""; // Ensure that filterQuery is always treated as a string
+    return this.filterStore.filteredAnnotations
+      .filter((annotation) => {
+        // If there is no query, return all annotations
+        if (!query.trim()) return true;
+
+        // Otherwise, filter by the id
+        return annotation.id.toString().includes(query.trim());
+      })
+      .map(this.annotationToItem);
   }
 
   get annotationToItem() {
@@ -262,37 +318,25 @@ export default class AnnotationList extends Vue {
   }
 
   get headers() {
-    return [
-      {
-        text: "Index",
-        value: "id",
-      },
-      {
-        text: "Shape",
-        value: "shape",
-      },
-      {
-        text: "Tags",
-        value: "tags",
-      },
-      {
-        text: "XY",
-        value: "xy",
-      },
-      {
-        text: "Z",
-        value: "z",
-      },
-      {
-        text: "Time",
-        value: "time",
-      },
-      {
-        text: "Name",
-        value: "name",
-      },
-      ...this.propertyHeaders,
+    const allHeaders = [
+      { text: "Annotation ID", value: "id" },
+      { text: "Index", value: "index" },
+      { text: "Shape", value: "shape" },
+      { text: "Tags", value: "tags" },
+      { text: "XY", value: "xy" },
+      { text: "Z", value: "z" },
+      { text: "Time", value: "time" },
+      { text: "Name", value: "name" },
+      // Add more headers if necessary
     ];
+
+    // Filter headers based on selectedColumns while preserving the order defined above
+    const filteredHeaders = allHeaders.filter((header) =>
+      this.selectedColumns.includes(header.value),
+    );
+
+    // Return the filtered headers with propertyHeaders appended at the end
+    return [...filteredHeaders, ...this.propertyHeaders];
   }
 
   get propertyHeaders() {
