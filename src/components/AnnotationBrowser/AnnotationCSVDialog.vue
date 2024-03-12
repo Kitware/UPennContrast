@@ -166,9 +166,9 @@ export default class AnnotationCsvDialog extends Vue {
       const row: (string | number)[] = [];
       row.push(annotation.id);
       row.push(annotation.channel);
-      row.push(annotation.location.XY+1);
-      row.push(annotation.location.Z+1);
-      row.push(annotation.location.Time+1);
+      row.push(annotation.location.XY + 1);
+      row.push(annotation.location.Z + 1);
+      row.push(annotation.location.Time + 1);
       row.push(annotation.tags.join(", "));
       row.push(annotation.shape);
       row.push(annotation.name ?? "");
