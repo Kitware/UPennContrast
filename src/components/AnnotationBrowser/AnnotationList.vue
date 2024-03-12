@@ -56,7 +56,7 @@
         </v-col>
         <v-col cols="12" md="6">
           <v-text-field
-            v-model="filterQuery"
+            v-model="localIdFilter"
             label="Filter by annotation ID"
             single-line
             clearable
@@ -223,7 +223,7 @@ export default class AnnotationList extends Vue {
   tableItemClass = "px-1"; // To enable dividers, use v-data-table__divider
 
   annotationFilteredDialog: boolean = false;
-  filterQuery: string = "";
+  localIdFilter?: string = "";
 
   // These are "from" or "to" v-data-table
   page: number = 0; // one-way binding :page
@@ -256,17 +256,19 @@ export default class AnnotationList extends Vue {
     return this.filterStore.filteredAnnotationIdToIdx;
   }
 
-  get filteredItems() {
-    const query = this.filterQuery || ""; // Ensure that filterQuery is always treated as a string
-    return this.filterStore.filteredAnnotations
-      .filter((annotation) => {
-        // If there is no query, return all annotations
-        if (!query.trim()) return true;
+  get listedAnnotations() {
+    let annotations = this.filterStore.filteredAnnotations;
+    const idFilter = this.localIdFilter?.trim();
+    if (idFilter) {
+      annotations = annotations.filter((annotation) =>
+        annotation.id.includes(idFilter),
+      );
+    }
+    return annotations;
+  }
 
-        // Otherwise, filter by the id
-        return annotation.id.toString().includes(query.trim());
-      })
-      .map(this.annotationToItem);
+  get filteredItems() {
+    return this.listedAnnotations.map(this.annotationToItem);
   }
 
   get annotationToItem() {
