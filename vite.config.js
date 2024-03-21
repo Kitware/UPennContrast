@@ -19,7 +19,7 @@ export default defineConfig({
     vue(),
     Components({
       resolvers: [VuetifyResolver()],
-      // Don't exclude grider web components
+      // Don't exclude girder web components
       exclude: [
         /[\\/]node_modules[\\/](?!@girder[\\/]components[\\/])/,
         /[\\/]\.git[\\/]/,

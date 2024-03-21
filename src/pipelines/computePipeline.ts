@@ -22,7 +22,7 @@ import {
  * convert `[number, string]`
  * into ```[
  *   ComputeNode<(...args: any) => Promise<number> | number | TNoOutput | Promise<TNoOutput>>,
- *   ComputeNode<(...args: any) => Promise<string> | string | TNoOutput | Promise<TNoOutput>>
+ *   ComputeNode<(...args: any) => Promise<string> | string | TNoOutput | Promise<TNoOutput>>,
  * ]```
  */
 type WrapInComputeNode<T extends any[]> = {
@@ -112,7 +112,7 @@ export class ComputeNode<
   /**
    * Check that none of the parent nodes have the ComputeNode.noOutput symbol as output
    */
-  public getAreAllParametersReady() {
+  public areAllParametersReady() {
     const nParents = this.parentNodes.length;
     for (let parentIndex = 0; parentIndex < nParents; ++parentIndex) {
       const parentNode = this.parentNodes[parentIndex];
@@ -127,7 +127,7 @@ export class ComputeNode<
    * Returns a valid parameter list of the wrapped function or null if one of the node has no output
    */
   public getAllParameters(): Params | null {
-    if (!this.getAreAllParametersReady()) {
+    if (!this.areAllParametersReady()) {
       return null;
     }
     const nParents = this.parentNodes.length;

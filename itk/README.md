@@ -21,7 +21,7 @@ Debugging with DWARF in Chrome often fails with an error which says that the deb
 
 ## Developping natively with ITK wasm
 
-### CMake
+### CMake modules
 
 Go in the directory with the ITK sources and run a command that looks like this (change the last path):
 ```

@@ -1,7 +1,7 @@
 # Segment Anything Tool
 
 The segment anything tool is uses the [Segment Anything Model](https://github.com/facebookresearch/segment-anything) (SAM).
-This folder contains the ONNX files that represent the SAM and are used by the browsers to compute segmentations.
+This folder contains the ONNX files that represent the SAM and are used by the browser to compute segmentations.
 
 ## Get model checkpoint
 
