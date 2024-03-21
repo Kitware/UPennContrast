@@ -25,6 +25,7 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import propertiesStore from "@/store/properties";
 import store from "@/store";
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
+import { IToolTemplate } from "@/store/model";
 
 interface Item {
   text: string;
@@ -45,10 +46,16 @@ interface AugmentedItem extends Item {
   submenu: Submenu;
 }
 
+export interface TReturnType {
+  template: IToolTemplate | null;
+  defaultValues: any;
+  selectedItem: AugmentedItem | null;
+}
+
 @Component({
   components: {
-    ToolConfiguration
-  }
+    ToolConfiguration,
+  },
 })
 export default class ToolTypeSelection extends Vue {
   readonly propertyStore = propertiesStore;
@@ -57,7 +64,7 @@ export default class ToolTypeSelection extends Vue {
   @Prop()
   private value: any;
 
-  computedTemplate: any = null;
+  computedTemplate: IToolTemplate | null = null;
   defaultToolValues: any = {};
 
   isMainMenuVisible = false;
@@ -71,17 +78,17 @@ export default class ToolTypeSelection extends Vue {
         ...items,
         { divider: true },
         { header: submenu.template.name },
-        ...submenu.items.map(item => ({ ...item, submenu } as AugmentedItem))
+        ...submenu.items.map((item) => ({ ...item, submenu }) as AugmentedItem),
       ],
-      [] as (AugmentedItem | { divider: boolean } | { header: string })[]
+      [] as (AugmentedItem | { divider: boolean } | { header: string })[],
     );
   }
 
   get submenus(): Submenu[] {
-    return this.templates.map(template => {
+    return this.templates.map((template) => {
       // For each template, an interface element is used as submenu
       const submenuInterfaceIdx = template.interface.findIndex(
-        (elem: any) => elem.isSubmenu
+        (elem: any) => elem.isSubmenu,
       );
       const submenuInterface = template.interface[submenuInterfaceIdx] || {};
       let items: any[] = [];
@@ -89,7 +96,7 @@ export default class ToolTypeSelection extends Vue {
         case "select":
           items = submenuInterface.meta.items.map((item: any) => ({
             ...item,
-            value: item
+            value: item,
           }));
           break;
         case "annotation":
@@ -102,7 +109,7 @@ export default class ToolTypeSelection extends Vue {
               items.push({
                 text: labels.interfaceName || image,
                 description: labels.description || "",
-                value: { image }
+                value: { image },
               });
             }
           }
@@ -110,19 +117,19 @@ export default class ToolTypeSelection extends Vue {
         default:
           items.push({
             text: template.name || "No Submenu",
-            value: "defaultSubmenu"
+            value: "defaultSubmenu",
           });
           break;
       }
       const keydItems: Item[] = items.map((item, itemIdx) => ({
         ...item,
-        key: template.type + "#" + itemIdx
+        key: template.type + "#" + itemIdx,
       }));
       return {
         template,
         submenuInterface,
         submenuInterfaceIdx,
-        items: keydItems
+        items: keydItems,
       };
     });
   }
@@ -153,8 +160,8 @@ export default class ToolTypeSelection extends Vue {
           ...template,
           interface: [
             ...template.interface.slice(0, submenuInterfaceIdx),
-            ...template.interface.slice(submenuInterfaceIdx + 1)
-          ]
+            ...template.interface.slice(submenuInterfaceIdx + 1),
+          ],
         };
         // Set default value from item value
         defaultToolValues[submenuInterface.id] = item.value;
@@ -163,19 +170,18 @@ export default class ToolTypeSelection extends Vue {
         // Keep the annotation interface but hide shape and define default shape
         computedTemplate = {
           ...template,
-          interface: template.interface.slice()
+          interface: template.interface.slice(),
         };
         const computedAnnotationInterface = {
-          ...template.interface[submenuInterfaceIdx]
+          ...template.interface[submenuInterfaceIdx],
         };
         if (!computedAnnotationInterface.meta) {
           computedAnnotationInterface.meta = {};
         }
         computedAnnotationInterface.meta.hideShape = true;
         computedAnnotationInterface.meta.defaultShape = item.value;
-        computedTemplate.interface[
-          submenuInterfaceIdx
-        ] = computedAnnotationInterface;
+        computedTemplate.interface[submenuInterfaceIdx] =
+          computedAnnotationInterface;
         break;
       default:
         break;
@@ -191,11 +197,12 @@ export default class ToolTypeSelection extends Vue {
   @Watch("computedTemplate")
   @Watch("defaultToolValues")
   handleChange() {
-    this.$emit("input", {
+    const input: TReturnType = {
       template: this.computedTemplate,
       defaultValues: this.defaultToolValues,
-      selectedItem: this.selectedItem
-    });
+      selectedItem: this.selectedItem,
+    };
+    this.$emit("input", input);
   }
 
   mounted() {

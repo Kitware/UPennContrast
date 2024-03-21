@@ -19,9 +19,7 @@
               <v-progress-circular indeterminate />
             </template>
             <template v-else>
-              <v-icon color="primary">
-                mdi-play
-              </v-icon>
+              <v-icon color="primary"> mdi-play </v-icon>
             </template>
           </v-badge>
         </v-btn>
@@ -55,8 +53,8 @@ import { IAnnotationProperty } from "@/store/model";
 @Component({
   components: {
     TagFilterEditor,
-    LayerSelect
-  }
+    LayerSelect,
+  },
 })
 export default class AnnotationProperty extends Vue {
   readonly propertyStore = propertyStore;

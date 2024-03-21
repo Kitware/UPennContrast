@@ -1,11 +1,10 @@
 import {
   IAnnotation,
-  IDisplayLayer,
   IImage,
   IGeoJSPoint,
   AnnotationShape,
   IAnnotationProperty,
-  IGeoJSAnnotation
+  IGeoJSAnnotation,
 } from "@/store/model";
 import geojs from "geojs";
 import { logError } from "@/utils/log";
@@ -15,7 +14,7 @@ export function getAnnotationStyleFromLayer(
   layerColor: string | undefined,
   isHovered: boolean = false,
   isSelected: boolean = false,
-  baseStyle?: any
+  baseStyle?: any,
 ) {
   const style = {
     stroke: true,
@@ -25,7 +24,7 @@ export function getAnnotationStyleFromLayer(
     fillColor: "white",
     fillOpacity: 0.5,
     fill: true,
-    ...baseStyle
+    ...baseStyle,
   };
 
   if (layerColor) {
@@ -54,9 +53,9 @@ export function unrollIndexFromImages(
   XY: number,
   Z: number,
   Time: number,
-  images: IImage[]
+  images: IImage[],
 ) {
-  const matchingImage = images.find(image => {
+  const matchingImage = images.find((image) => {
     return (
       (image.frame.IndexZ === undefined || image.frame.IndexZ === Z) &&
       (image.frame.IndexT === undefined || image.frame.IndexT === Time) &&
@@ -71,7 +70,7 @@ export function unrollIndexFromImages(
 export function geojsAnnotationFactory(
   shape: string,
   coordinates: IGeoJSPoint[],
-  options: any
+  options: any,
 ) {
   let newGeoJSAnnotation: IGeoJSAnnotation | null = null;
   switch (shape) {
@@ -98,7 +97,7 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
     return coordinates[0];
   }
   const sums = { x: 0, y: 0, z: 0 };
-  const hasZ = coordinates.every(coord => coord.z !== undefined);
+  const hasZ = coordinates.every((coord) => coord.z !== undefined);
   coordinates.forEach(({ x, y, z }) => {
     sums.x += x;
     sums.y += y;
@@ -110,7 +109,7 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
   });
   const centroid: IGeoJSPoint = {
     x: sums.x / coordinates.length,
-    y: sums.y / coordinates.length
+    y: sums.y / coordinates.length,
   };
   if (hasZ) {
     centroid.z = sums.z / coordinates.length;
@@ -144,7 +143,7 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
 
     // Go through all vertices to find the closest
     const shortestDistance = poly.coordinates
-      .map(val => pointDistance(val, point.coordinates[0]))
+      .map((val) => pointDistance(val, point.coordinates[0]))
       .sort()[0];
     return shortestDistance;
   }
@@ -167,14 +166,14 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
 
 export function canComputeAnnotationProperty(
   property: IAnnotationProperty,
-  annotation: IAnnotation
+  annotation: IAnnotation,
 ) {
   return (
     property.shape === annotation.shape &&
     tagFilterFunction(
       annotation.tags,
       property.tags.tags,
-      property.tags.exclusive
+      property.tags.exclusive,
     )
   );
 }
@@ -185,10 +184,10 @@ export function canComputeAnnotationProperty(
 export function tagFilterFunction(
   inputTags: string[],
   filterTags: string[],
-  exclusive: boolean
+  exclusive: boolean,
 ) {
   if (exclusive && inputTags.length !== filterTags.length) {
     return false;
   }
-  return filterTags.every(filterTag => inputTags.includes(filterTag));
+  return filterTags.every((filterTag) => inputTags.includes(filterTag));
 }

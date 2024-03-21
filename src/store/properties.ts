@@ -3,7 +3,7 @@ import {
   Action,
   Module,
   Mutation,
-  VuexModule
+  VuexModule,
 } from "vuex-module-decorators";
 import store from "./root";
 
@@ -18,7 +18,7 @@ import {
   IWorkerInterfaceValues,
   IComputeJob,
   TNestedValues,
-  IProgressInfo
+  IProgressInfo,
 } from "./model";
 
 import Vue from "vue";
@@ -43,7 +43,7 @@ export interface IPropertyStatus {
 const defaultStatus: () => IPropertyStatus = () => ({
   running: false,
   previousRun: null,
-  progressInfo: {}
+  progressInfo: {},
 });
 
 @Module({ dynamic: true, store, name: "properties" })
@@ -72,7 +72,7 @@ export class Properties extends VuexModule {
   }
 
   get getWorkerInterface(): (
-    image: string
+    image: string,
   ) => IWorkerInterface | null | undefined {
     return (image: string) => this.workerInterfaces[image];
   }
@@ -84,14 +84,14 @@ export class Properties extends VuexModule {
   @Mutation
   setWorkerPreview({
     image,
-    workerPreview
+    workerPreview,
   }: {
     image: string;
     workerPreview: { text: string; image: string };
   }) {
     this.workerPreviews = {
       ...this.workerPreviews,
-      [image]: workerPreview
+      [image]: workerPreview,
     };
   }
   @Action
@@ -102,14 +102,14 @@ export class Properties extends VuexModule {
   @Mutation
   setWorkerInterface({
     image,
-    workerInterface
+    workerInterface,
   }: {
     image: string;
     workerInterface: IWorkerInterface | null;
   }) {
     this.workerInterfaces = {
       ...this.workerInterfaces,
-      [image]: workerInterface
+      [image]: workerInterface,
     };
   }
 
@@ -121,7 +121,7 @@ export class Properties extends VuexModule {
   @Action
   async fetchWorkerInterface({
     image,
-    force
+    force,
   }: {
     image: string;
     force?: boolean;
@@ -190,7 +190,7 @@ export class Properties extends VuexModule {
       return fullName;
     };
   }
-  
+
   get getSubIdsNameFromPath() {
     return (propertyPath: string[]) => {
       const propertyId = propertyPath[0];
@@ -203,7 +203,7 @@ export class Properties extends VuexModule {
       }
       const propertyName = property.name;
       const subIds = propertyPath.slice(1);
-  
+
       // Check if subIds array is empty
       if (subIds.length === 0) {
         // Return only the propertyName if there are no subIds
@@ -214,7 +214,6 @@ export class Properties extends VuexModule {
       }
     };
   }
-  
 
   get uncomputedAnnotationsPerProperty() {
     const uncomputed: { [propertyId: string]: IAnnotation[] } = {};
@@ -261,7 +260,7 @@ export class Properties extends VuexModule {
     // ["myPropertyId", "mySubId"] and ["anotherPropertyId"]
     const collectedPaths: string[][] = [];
     const collectionStack: [string[], TNestedObject][] = [
-      [[], nestedAggregationObject]
+      [[], nestedAggregationObject],
     ];
     while (collectionStack.length > 0) {
       const [currentPath, nestedObject] = collectionStack.pop()!;
@@ -270,14 +269,14 @@ export class Properties extends VuexModule {
         isNestedObjectEmpty = false;
         collectionStack.push([
           [...currentPath, pathName],
-          nestedObject[pathName]
+          nestedObject[pathName],
         ]);
       }
       if (isNestedObjectEmpty) {
         collectedPaths.push(currentPath);
       }
     }
-    return collectedPaths.filter(path => {
+    return collectedPaths.filter((path) => {
       // Check that the values have a corresponding path
       if (path.length < 1) {
         return false;
@@ -297,10 +296,10 @@ export class Properties extends VuexModule {
     // This action is called in a global watcher (see "setupWatchers" in main store)
     // When propertyValues changes, some paths may be removed
     const availablePaths = this.computedPropertyPaths;
-    const newPaths = this.displayedPropertyPaths.filter(displayedPath =>
-      availablePaths.some(availablePath =>
-        arePathEquals(displayedPath, availablePath)
-      )
+    const newPaths = this.displayedPropertyPaths.filter((displayedPath) =>
+      availablePaths.some((availablePath) =>
+        arePathEquals(displayedPath, availablePath),
+      ),
     );
     this.setDisplayedPropertyPaths(newPaths);
   }
@@ -324,7 +323,7 @@ export class Properties extends VuexModule {
       property.id,
       datasetId,
       property,
-      scales
+      scales,
     );
 
     // Keep track of running jobs
@@ -342,7 +341,7 @@ export class Properties extends VuexModule {
         Vue.set(status, "previousRun", success);
         Vue.set(status, "progressInfo", {});
       },
-      eventCallback: createProgressEventCallback(status.progressInfo)
+      eventCallback: createProgressEventCallback(status.progressInfo),
     };
     jobs.addJob(computeJob);
     return computeJob;
@@ -356,7 +355,7 @@ export class Properties extends VuexModule {
   @Action
   protected setProperties(properties: IAnnotationProperty[]) {
     this.setPropertiesImpl(properties);
-    const propertyIds = this.properties.map(p => p.id);
+    const propertyIds = this.properties.map((p) => p.id);
     this.context.dispatch("updateConfigurationProperties", propertyIds);
   }
 
@@ -371,7 +370,7 @@ export class Properties extends VuexModule {
   async fetchProperties() {
     if (main.configuration) {
       const properties = await this.propertiesAPI.getProperties(
-        main.configuration.propertyIds
+        main.configuration.propertyIds,
       );
       this.setPropertiesImpl(properties);
     }
@@ -399,7 +398,7 @@ export class Properties extends VuexModule {
   async deleteProperty(propertyId: string) {
     // TODO: temp another configuration could be using this property!
     // await this.propertiesAPI.deleteProperty(propertyId);
-    this.setProperties(this.properties.filter(p => p.id !== propertyId));
+    this.setProperties(this.properties.filter((p) => p.id !== propertyId));
   }
 
   @Action
@@ -424,11 +423,11 @@ export class Properties extends VuexModule {
     if (!jobId) {
       return;
     }
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       jobs.addJob({
         jobId: jobId,
         datasetId: main.dataset?.id || null,
-        callback: resolve
+        callback: resolve,
       });
     });
   }
@@ -437,7 +436,7 @@ export class Properties extends VuexModule {
   async requestWorkerPreview({
     image,
     tool,
-    workerInterface
+    workerInterface,
   }: {
     image: string;
     tool: IToolConfiguration;
@@ -449,7 +448,7 @@ export class Properties extends VuexModule {
     const datasetId = main.dataset.id;
     const { location, channel } = await annotations.context.dispatch(
       "getAnnotationLocationFromTool",
-      tool
+      tool,
     );
     const tile = { XY: main.xy, Z: main.z, Time: main.time };
     this.propertiesAPI
@@ -461,9 +460,9 @@ export class Properties extends VuexModule {
         {
           location,
           channel,
-          tile
+          tile,
         },
-        main.layers
+        main.layers,
       )
       .then((response: any) => {
         // Keep track of running jobs
@@ -479,7 +478,7 @@ export class Properties extends VuexModule {
               if (success) {
                 this.fetchWorkerPreview(image);
               }
-            }
+            },
           });
           setTimeout(() => {
             this.fetchWorkerPreview(image);

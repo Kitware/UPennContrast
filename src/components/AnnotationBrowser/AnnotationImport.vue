@@ -8,7 +8,7 @@
           section: 'Object list actions',
           title: 'Import from JSON',
           description:
-            'Import a set of annotations and connections from a JSON file'
+            'Import a set of annotations and connections from a JSON file',
         }"
       >
         <v-icon>mdi-import</v-icon>
@@ -16,9 +16,7 @@
       </v-btn>
     </template>
     <v-card class="pa-2" :disabled="!canImport">
-      <v-card-title>
-        Import
-      </v-card-title>
+      <v-card-title> Import </v-card-title>
       <v-card-text class="pt-5 pb-0">
         <v-file-input
           accept="application/JSON"
@@ -45,26 +43,20 @@
             <v-checkbox
               v-model="importValues"
               :disabled="!importProperties || !importAnnotations"
-              :label="
-                `Import property values of ${
-                  Object.keys(values).length
-                } annotations`
-              "
+              :label="`Import property values of ${
+                Object.keys(values).length
+              } annotations`"
             />
           </div>
           <div class="pa-2">
             <v-checkbox
               v-model="overwriteAnnotations"
-              :label="
-                `Overwrite ${annotationStore.annotations.length} annotations (delete current annotations)`
-              "
+              :label="`Overwrite ${annotationStore.annotations.length} annotations (delete current annotations)`"
               @change="overwriteChanged"
             />
             <v-dialog v-model="overwriteDialog" persistent>
               <v-card class="pa-2">
-                <v-card-title>
-                  Overwrite annotations?
-                </v-card-title>
+                <v-card-title> Overwrite annotations? </v-card-title>
                 <v-card-text>
                   This will remove
                   {{ annotationStore.annotations.length }} annotations forever
@@ -98,9 +90,7 @@
       <v-card-actions v-if="isJsonLoaded">
         <v-spacer />
         <v-progress-circular v-if="isImporting" indeterminate />
-        <v-btn @click="submit" color="primary">
-          Import selection
-        </v-btn>
+        <v-btn @click="submit" color="primary"> Import selection </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -119,7 +109,7 @@ import {
   IAnnotationConnectionBase,
   IAnnotationProperty,
   IAnnotationPropertyValues,
-  ISerializedData
+  ISerializedData,
 } from "@/store/model";
 
 @Component({})
@@ -164,12 +154,12 @@ export default class AnnotationImport extends Vue {
     this.isLoadingFile = true;
     this.jsonFile
       .text()
-      .then(jsonText => {
+      .then((jsonText) => {
         ({
           annotations: this.annotations,
           annotationConnections: this.connections,
           annotationProperties: this.properties,
-          annotationPropertyValues: this.values
+          annotationPropertyValues: this.values,
         } = JSON.parse(jsonText) as ISerializedData);
         this.isJsonLoaded = true;
       })
@@ -216,10 +206,8 @@ export default class AnnotationImport extends Vue {
 
     // Import annotations
     // promise of: old annotation id -> new annotation
-    let allAnnotationsPromise: Promise<Map<
-      string,
-      IAnnotation
-    >> = Promise.resolve(new Map());
+    let allAnnotationsPromise: Promise<Map<string, IAnnotation>> =
+      Promise.resolve(new Map());
     if (this.importAnnotations) {
       const annotationBaseList: IAnnotationBase[] = [];
       for (let arrayIdx = 0; arrayIdx < this.annotations.length; arrayIdx++) {
@@ -230,12 +218,12 @@ export default class AnnotationImport extends Vue {
           channel: oldAnnotation.channel,
           location: oldAnnotation.location,
           coordinates: oldAnnotation.coordinates,
-          datasetId: this.store.dataset!.id
+          datasetId: this.store.dataset!.id,
         });
       }
       allAnnotationsPromise = this.store.annotationsAPI
         .createMultipleAnnotations(annotationBaseList)
-        .then(newAnnotations => {
+        .then((newAnnotations) => {
           const oldIdToNewAnnotation: Map<string, IAnnotation> = new Map();
           if (newAnnotations === null) {
             return oldIdToNewAnnotation;
@@ -254,12 +242,11 @@ export default class AnnotationImport extends Vue {
     }
 
     // Import annotation connections
-    let allConnectionsPromise: Promise<
-      IAnnotationConnection[] | null
-    > = Promise.resolve(null);
+    let allConnectionsPromise: Promise<IAnnotationConnection[] | null> =
+      Promise.resolve(null);
     if (this.importAnnotations && this.importConnections) {
       // Need all annotations to be sent before sending connections
-      allAnnotationsPromise.then(oldIdToNewAnnotation => {
+      allAnnotationsPromise.then((oldIdToNewAnnotation) => {
         const annotationConnectionBaseList: IAnnotationConnectionBase[] = [];
         for (const connection of this.connections) {
           const parent = oldIdToNewAnnotation.get(connection.parentId);
@@ -270,15 +257,16 @@ export default class AnnotationImport extends Vue {
               childId: child.id,
               label: connection.label,
               tags: connection.tags,
-              datasetId: this.store.dataset!.id
+              datasetId: this.store.dataset!.id,
             });
           } else {
             throw "Can't find the parent or the child of the connection to create";
           }
         }
-        allConnectionsPromise = this.store.annotationsAPI.createMultipleConnections(
-          annotationConnectionBaseList
-        );
+        allConnectionsPromise =
+          this.store.annotationsAPI.createMultipleConnections(
+            annotationConnectionBaseList,
+          );
       });
     }
 
@@ -287,9 +275,8 @@ export default class AnnotationImport extends Vue {
     const propertyOldIdToIdx: { [oldId: string]: number } = {};
     if (this.importProperties) {
       for (const oldProperty of this.properties) {
-        const newPropertyPromise = this.store.propertiesAPI.createProperty(
-          oldProperty
-        );
+        const newPropertyPromise =
+          this.store.propertiesAPI.createProperty(oldProperty);
         const idx = propertyPromises.push(newPropertyPromise) - 1;
         propertyOldIdToIdx[oldProperty.id] = idx;
       }
@@ -319,11 +306,11 @@ export default class AnnotationImport extends Vue {
               `annotation_property_values?datasetId=${
                 this.store.dataset!.id
               }&annotationId=${newAnnotation.id}`,
-              newAnnotationValues
+              newAnnotationValues,
             );
             newValueDonePromises.push(newValueDonePromise);
           }
-        }
+        },
       );
     }
     const allValuesDonePromise = Promise.all(newValueDonePromises);
@@ -333,14 +320,14 @@ export default class AnnotationImport extends Vue {
       allAnnotationsPromise,
       allPropertiesPromise,
       allConnectionsPromise,
-      allValuesDonePromise
+      allValuesDonePromise,
     ])
       .catch(() => {
         // Don't remove annotations
         annotationIdsToRemove.length = 0;
         // Remove imported annotations if possible
         allAnnotationsPromise
-          .then(oldIdToNewAnnotation => {
+          .then((oldIdToNewAnnotation) => {
             for (const { id } of oldIdToNewAnnotation.values()) {
               annotationIdsToRemove.push(id);
             }
@@ -350,7 +337,7 @@ export default class AnnotationImport extends Vue {
       .then(() => {
         if (annotationIdsToRemove.length > 0) {
           return this.store.annotationsAPI.deleteMultipleAnnotations(
-            annotationIdsToRemove
+            annotationIdsToRemove,
           );
         }
         return null;

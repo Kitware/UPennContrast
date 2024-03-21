@@ -3,7 +3,7 @@
     <v-expansion-panel-header class="py-1">
       Annotation List
       <v-spacer />
-      <v-container style="width: auto;">
+      <v-container style="width: auto">
         <v-row>
           <v-col class="pa-1">
             <v-btn block @click.stop="deleteSelected">Delete Selected</v-btn>
@@ -16,19 +16,13 @@
                 </v-btn>
               </template>
               <v-card>
-                <v-card-title>
-                  Add tags to selected annotations
-                </v-card-title>
+                <v-card-title> Add tags to selected annotations </v-card-title>
                 <tag-picker class="ma-4 pa-4" v-model="tagsToAdd"></tag-picker>
                 <v-divider></v-divider>
                 <v-card-actions>
                   <v-spacer></v-spacer>
-                  <v-btn color="warning" @click="tagsToAdd = []">
-                    Clear
-                  </v-btn>
-                  <v-btn color="primary" @click="tagSelected">
-                    Submit
-                  </v-btn>
+                  <v-btn color="warning" @click="tagsToAdd = []"> Clear </v-btn>
+                  <v-btn color="primary" @click="tagSelected"> Submit </v-btn>
                 </v-card-actions>
               </v-card>
             </v-dialog>
@@ -56,7 +50,7 @@
         v-model="selectedItems"
         :page="page"
         :footer-props="{
-          'items-per-page-options': [10, 50, 200]
+          'items-per-page-options': [10, 50, 200],
         }"
         @update:items-per-page="itemsPerPage = $event"
         @update:group-by="groupBy = $event"
@@ -160,7 +154,7 @@ import TagPicker from "@/components/TagPicker.vue";
 import {
   AnnotationNames,
   IAnnotation,
-  IAnnotationPropertyValues
+  IAnnotationPropertyValues,
 } from "@/store/model";
 
 interface IAnnotationListItem {
@@ -171,7 +165,7 @@ interface IAnnotationListItem {
 }
 
 @Component({
-  components: { TagPicker }
+  components: { TagPicker },
 })
 export default class AnnotationList extends Vue {
   readonly store = store;
@@ -190,8 +184,8 @@ export default class AnnotationList extends Vue {
   groupBy: string | string[] = []; // one-way binding @update:group-by
 
   get selected() {
-    return this.annotationStore.selectedAnnotations.filter(annotation =>
-      this.filteredAnnotationIdToIdx.has(annotation.id)
+    return this.annotationStore.selectedAnnotations.filter((annotation) =>
+      this.filteredAnnotationIdToIdx.has(annotation.id),
     );
   }
 
@@ -200,11 +194,11 @@ export default class AnnotationList extends Vue {
   }
 
   get selectedItems() {
-    return this.filteredItems.filter(item => item.isSelected);
+    return this.filteredItems.filter((item) => item.isSelected);
   }
 
   set selectedItems(items) {
-    this.selected = items.map(item => item.annotation);
+    this.selected = items.map((item) => item.annotation);
   }
 
   toggleAnnotationSelection(annotation: IAnnotation) {
@@ -224,7 +218,7 @@ export default class AnnotationList extends Vue {
       annotation,
       shapeName: AnnotationNames[annotation.shape],
       isSelected: this.annotationStore.isAnnotationSelected(annotation.id),
-      properties: this.propertyStore.propertyValues[annotation.id] || {}
+      properties: this.propertyStore.propertyValues[annotation.id] || {},
     });
   }
 
@@ -271,33 +265,33 @@ export default class AnnotationList extends Vue {
     return [
       {
         text: "Index",
-        value: "id"
+        value: "id",
       },
       {
         text: "Shape",
-        value: "shape"
+        value: "shape",
       },
       {
         text: "Tags",
-        value: "tags"
+        value: "tags",
       },
       {
         text: "XY",
-        value: "xy"
+        value: "xy",
       },
       {
         text: "Z",
-        value: "z"
+        value: "z",
       },
       {
         text: "Time",
-        value: "time"
+        value: "time",
       },
       {
         text: "Name",
-        value: "name"
+        value: "name",
       },
-      ...this.propertyHeaders
+      ...this.propertyHeaders,
     ];
   }
 
@@ -308,7 +302,7 @@ export default class AnnotationList extends Vue {
       const fullName = this.propertyStore.getFullNameFromPath(path);
       propertyHeaders.push({
         text: fullName,
-        value: "" // Not optional but not used because the slot "body" is used
+        value: "", // Not optional but not used because the slot "body" is used
       });
     }
     return propertyHeaders;
@@ -354,7 +348,7 @@ export default class AnnotationList extends Vue {
   get getPageFromItemId() {
     return (itemId: string) => {
       const entryIndex = this.dataTableItems.findIndex(
-        ({ annotation }) => annotation.id === itemId
+        ({ annotation }) => annotation.id === itemId,
       );
       if (entryIndex <= 0) {
         return 0;
@@ -390,7 +384,7 @@ export default class AnnotationList extends Vue {
     // Scroll to the element
     (annotationRef as Element).scrollIntoView({
       behavior: "smooth",
-      block: "nearest"
+      block: "nearest",
     });
   }
 

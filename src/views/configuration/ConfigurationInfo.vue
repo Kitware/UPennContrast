@@ -24,9 +24,7 @@
     <v-text-field :value="name" label="Name" readonly />
     <v-textarea :value="description" label="Description" readonly />
     <v-card class="mb-4">
-      <v-card-title>
-        Datasets
-      </v-card-title>
+      <v-card-title> Datasets </v-card-title>
       <v-card-text>
         <v-dialog
           v-model="removeDatasetViewConfirm"
@@ -42,9 +40,7 @@
               }}"?
             </v-card-title>
             <v-card-actions class="button-bar">
-              <v-btn @click="closeRemoveDatasetDialog()">
-                Cancel
-              </v-btn>
+              <v-btn @click="closeRemoveDatasetDialog()"> Cancel </v-btn>
               <v-btn @click="removeDatasetView()" color="warning">
                 Remove
               </v-btn>
@@ -103,9 +99,7 @@
       </v-card-actions>
     </v-card>
     <v-card class="mb-4">
-      <v-card-title>
-        Layers
-      </v-card-title>
+      <v-card-title> Layers </v-card-title>
       <v-card-text>
         <v-list two-line>
           <v-list-item v-for="l in layers" :key="l.name">
@@ -127,9 +121,7 @@
       </v-card-text>
     </v-card>
     <v-card class="mb-4">
-      <v-card-title>
-        Scale
-      </v-card-title>
+      <v-card-title> Scale </v-card-title>
       <v-card-text>
         <scale-settings :configuration-only="true" />
       </v-card-text>
@@ -147,7 +139,7 @@ import AddDatasetToCollection from "@/components/AddDatasetToCollection.vue";
 import AlertDialog, { IAlert } from "@/components/AlertDialog.vue";
 
 @Component({
-  components: { AddDatasetToCollection, AlertDialog, ScaleSettings }
+  components: { AddDatasetToCollection, AlertDialog, ScaleSettings },
 })
 export default class ConfigurationInfo extends Vue {
   readonly store = store;
@@ -201,7 +193,7 @@ export default class ConfigurationInfo extends Vue {
   async updateConfigurationViews() {
     if (this.configuration) {
       this.datasetViews = await this.store.api.findDatasetViews({
-        configurationId: this.configuration.id
+        configurationId: this.configuration.id,
       });
     } else {
       this.datasetViews = [];
@@ -213,9 +205,9 @@ export default class ConfigurationInfo extends Vue {
     datasetView: IDatasetView;
     datasetInfo: IGirderFolder | undefined;
   }[] {
-    return this.datasetViews.map(datasetView => ({
+    return this.datasetViews.map((datasetView) => ({
       datasetView,
-      datasetInfo: this.datasetInfoCache[datasetView.datasetId]
+      datasetInfo: this.datasetInfoCache[datasetView.datasetId],
     }));
   }
 
@@ -224,8 +216,8 @@ export default class ConfigurationInfo extends Vue {
     for (const datasetView of this.datasetViews) {
       this.girderResources
         .getFolder(datasetView.datasetId)
-        .then(folder =>
-          Vue.set(this.datasetInfoCache, datasetView.datasetId, folder)
+        .then((folder) =>
+          Vue.set(this.datasetInfoCache, datasetView.datasetId, folder),
         );
     }
   }
@@ -234,8 +226,8 @@ export default class ConfigurationInfo extends Vue {
     return {
       name: "datasetview",
       params: Object.assign({}, this.$route.params, {
-        datasetViewId: datasetView.id
-      })
+        datasetViewId: datasetView.id,
+      }),
     };
   }
 

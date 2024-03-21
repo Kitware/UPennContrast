@@ -3,7 +3,7 @@ import {
   IGirderItem,
   IGirderFolder,
   IGirderSelectAble,
-  IGirderUser
+  IGirderUser,
 } from "@/girder";
 import {
   configurationBaseKeys,
@@ -23,15 +23,15 @@ import {
   IPixel,
   newLayer,
   TJobType,
-  IDatasetConfigurationCompatibility
-} from "./model";
+  IDatasetConfigurationCompatibility,
+} from "@/store/model";
 import {
   toStyle,
   ITileOptionsBands,
   mergeHistograms,
-  ITileHistogram
-} from "./images";
-import { Promise } from "bluebird";
+  ITileHistogram,
+} from "@/store/images";
+import { Promise as BluebirdPromise } from "bluebird";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { fetchAllPages } from "@/utils/fetch";
 import { stringify } from "qs";
@@ -51,7 +51,7 @@ function toId(item: string | { _id: string }) {
 function itemsToResourceObject(items: IGirderSelectAble[]) {
   const resourceObj: { folder: string[]; item: string[] } = {
     folder: [],
-    item: []
+    item: [],
   };
   for (const resource of items) {
     const type = resource._modelType;
@@ -81,12 +81,12 @@ export default class GirderAPI {
     width: 2048,
     height: 2048,
     resample: false,
-    cache: "none"
+    cache: "none",
   };
 
   async getResource(
     id: string,
-    type: IGirderSelectAble["_modelType"]
+    type: IGirderSelectAble["_modelType"],
   ): Promise<IGirderSelectAble> {
     const config = { params: { type } };
     const response = await this.client.get(`resource/${id}`, config);
@@ -102,7 +102,7 @@ export default class GirderAPI {
 
     if (result.status !== 200) {
       throw new Error(
-        `Could not get a list of all users: ${result.status} ${result.statusText}`
+        `Could not get a list of all users: ${result.status} ${result.statusText}`,
       );
     }
     const users = result.data;
@@ -122,7 +122,7 @@ export default class GirderAPI {
     }
 
     const result = await this.client.get(
-      `folder?parentType=user&parentId=${parentId}&name=Public`
+      `folder?parentType=user&parentId=${parentId}&name=Public`,
     );
     return result.data.length > 0 ? result.data[0] : null;
   }
@@ -133,8 +133,8 @@ export default class GirderAPI {
       params: {
         resources: JSON.stringify(resourceObj),
         parentType: "folder",
-        parentId: folderId
-      }
+        parentId: folderId,
+      },
     });
   }
 
@@ -151,20 +151,20 @@ export default class GirderAPI {
     const resourceObj = itemsToResourceObject(items);
     return this.client.delete("resource", {
       params: {
-        resources: JSON.stringify(resourceObj)
-      }
+        resources: JSON.stringify(resourceObj),
+      },
     });
   }
 
   undo(datasetId: string) {
     return this.client.put("history/undo", undefined, {
-      params: { datasetId }
+      params: { datasetId },
     });
   }
 
   redo(datasetId: string) {
     return this.client.put("history/redo", undefined, {
-      params: { datasetId }
+      params: { datasetId },
     });
   }
 
@@ -180,7 +180,7 @@ export default class GirderAPI {
 
   generateTiles(itemId: string, force: boolean, localJob: boolean) {
     return this.client.post(`item/${itemId}/tiles`, undefined, {
-      params: { force, localJob }
+      params: { force, localJob },
     });
   }
 
@@ -192,7 +192,7 @@ export default class GirderAPI {
     name: string,
     content: string,
     parentId: string,
-    parentType: "folder" | "item" = "folder"
+    parentType: "folder" | "item" = "folder",
   ) {
     const blob = new Blob([content], { type: "application/json" });
     return this.client.post(
@@ -200,9 +200,9 @@ export default class GirderAPI {
       blob,
       {
         headers: {
-          "Content-Type": "text/plain"
-        }
-      }
+          "Content-Type": "text/plain",
+        },
+      },
     );
   }
 
@@ -212,13 +212,13 @@ export default class GirderAPI {
     contrast: IContrast,
     hist: any,
     layer: IDisplayLayer | null,
-    ds: IDataset | null
+    ds: IDataset | null,
   ): string | undefined {
     if (hist === null) {
       return;
     }
     const url = new URL(
-      `${this.client.apiRoot}/item/${toId(image.item)}/tiles/zxy`
+      `${this.client.apiRoot}/item/${toId(image.item)}/tiles/zxy`,
     );
     url.searchParams.set("encoding", "PNG");
     const style = <ITileOptionsBands>(
@@ -237,33 +237,33 @@ export default class GirderAPI {
   }
 
   getTiles(item: string | IGirderItem): Promise<ITileMeta> {
-    return this.client.get(`item/${toId(item)}/tiles`).then(r => r.data);
+    return this.client.get(`item/${toId(item)}/tiles`).then((r) => r.data);
   }
 
   getTilesInternalMetadata(item: string | IGirderItem): Promise<any> {
     return this.client
       .get(`item/${toId(item)}/tiles/internal_metadata`)
-      .then(r => r.data);
+      .then((r) => r.data);
   }
 
   private getHistogram(
     item: string | IGirderItem,
-    options: Partial<IHistogramOptions> = {}
+    options: Partial<IHistogramOptions> = {},
   ): Promise<ITileHistogram> {
     const params: Readonly<IHistogramOptions> = {
       ...this.baseHistogramOptions,
-      ...options
+      ...options,
     };
 
     return this.client
       .get(`item/${toId(item)}/tiles/histogram`, { params })
-      .then(r => r.data[0]); // TODO deal with multiple channel data
+      .then((r) => r.data[0]); // TODO deal with multiple channel data
   }
 
   async getPixelValue(
     image: IImage,
     geoX: number,
-    geoY: number
+    geoY: number,
   ): Promise<IPixel> {
     if (geoX < 0 || geoY < 0) {
       return {};
@@ -274,7 +274,7 @@ export default class GirderAPI {
     const params = { left, top, frame };
     const itemId = toId(image.item);
     const response = await this.client.get(`item/${itemId}/tiles/pixel`, {
-      params
+      params,
     });
     return response.data;
   }
@@ -282,8 +282,8 @@ export default class GirderAPI {
   async getItems(folderId: string): Promise<IGirderItem[]> {
     const baseConfig: AxiosRequestConfig = {
       params: {
-        folderId
-      }
+        folderId,
+      },
     };
     const pages = await fetchAllPages(this.client, "item", baseConfig);
     return pages.flat();
@@ -291,34 +291,34 @@ export default class GirderAPI {
 
   async getFolders(
     parentId: string,
-    parentType: string = "folder"
+    parentType: string = "folder",
   ): Promise<IGirderFolder[]> {
     const baseConfig: AxiosRequestConfig = {
       params: {
         parentId,
-        parentType
-      }
+        parentType,
+      },
     };
     const pages = await fetchAllPages(this.client, "folder", baseConfig);
     return pages.flat();
   }
 
   getImages(folderId: string): Promise<IGirderItem[]> {
-    return this.getItems(folderId).then(items =>
-      items.filter(d => d.largeImage)
+    return this.getItems(folderId).then((items) =>
+      items.filter((d) => d.largeImage),
     );
   }
 
   createDatasetView(datasetViewBase: IDatasetViewBase) {
     return this.client
       .post("dataset_view", datasetViewBase)
-      .then(r => asDatasetView(r.data));
+      .then((r) => asDatasetView(r.data));
   }
 
   getDatasetView(id: string) {
     return this.client
       .get(`dataset_view/${id}`)
-      .then(r => asDatasetView(r.data));
+      .then((r) => asDatasetView(r.data));
   }
 
   deleteDatasetView(id: string) {
@@ -336,8 +336,8 @@ export default class GirderAPI {
     const pages = await fetchAllPages(this.client, "dataset_view", {
       params: {
         sort: "lastViewed",
-        ...options
-      }
+        ...options,
+      },
     });
     const datasetViews: IDatasetView[] = [];
     for (const page of pages) {
@@ -354,8 +354,8 @@ export default class GirderAPI {
         limit,
         offset,
         sort: "lastViewed",
-        sortdir: -1
-      }
+        sortdir: -1,
+      },
     };
     const response = await this.client.get("dataset_view", formData);
     return (response.data as any[]).map(asDatasetView);
@@ -367,11 +367,11 @@ export default class GirderAPI {
       params: {
         query: JSON.stringify({
           "meta.subtype": "contrastConfiguration",
-          "meta.compatibility": compatibility
+          "meta.compatibility": compatibility,
         }),
         sort: "updated",
-        sortdir: -1
-      }
+        sortdir: -1,
+      },
     });
     const configurations: IDatasetConfiguration[] = [];
     for (const page of pages) {
@@ -385,7 +385,7 @@ export default class GirderAPI {
   createDataset(
     name: string,
     description: string,
-    path: IGirderSelectAble
+    path: IGirderSelectAble,
   ): Promise<IDataset> {
     const data = new FormData();
     data.set("parentType", path._modelType);
@@ -396,10 +396,10 @@ export default class GirderAPI {
     data.set(
       "metadata",
       JSON.stringify({
-        subtype: "contrastDataset"
-      })
+        subtype: "contrastDataset",
+      }),
     );
-    return this.client.post("folder", data).then(r => asDataset(r.data));
+    return this.client.post("folder", data).then((r) => asDataset(r.data));
   }
 
   async getQuickUploadFolder(parentId: string) {
@@ -409,7 +409,7 @@ export default class GirderAPI {
     data.set("name", "QuickUpload");
     data.set(
       "description",
-      "Contains all datasets uploaded using the QuickUpload feature."
+      "Contains all datasets uploaded using the QuickUpload feature.",
     );
     data.set("reuseExisting", "true");
     const resp = await this.client.post("folder", data);
@@ -419,9 +419,9 @@ export default class GirderAPI {
   importDataset(path: IGirderSelectAble): Promise<IDataset> {
     return this.client
       .put(`/folder/${path._id}/metadata`, {
-        subtype: "contrastDataset"
+        subtype: "contrastDataset",
       })
-      .then(r => asDataset(r.data));
+      .then((r) => asDataset(r.data));
   }
 
   deleteDataset(dataset: IDataset): Promise<IDataset> {
@@ -432,13 +432,13 @@ export default class GirderAPI {
     name: string,
     description: string,
     folderId: string,
-    base: IDatasetConfigurationBase
+    base: IDatasetConfigurationBase,
   ): Promise<IDatasetConfiguration> {
     // Create metadata for the configuration item
     const metadata: { [key: string]: any } = {
       subtype: "contrastConfiguration",
       compatibility: {},
-      ...toConfiguationMetadata(base)
+      ...toConfiguationMetadata(base),
     };
 
     // Create the item
@@ -458,31 +458,31 @@ export default class GirderAPI {
     name: string,
     description: string,
     folderId: string,
-    dataset: IDataset
+    dataset: IDataset,
   ) {
     return this.createConfigurationFromBase(
       name,
       description,
       folderId,
-      defaultConfigurationBase(dataset)
+      defaultConfigurationBase(dataset),
     );
   }
 
   duplicateConfiguration(
     configuration: IDatasetConfiguration,
-    folderId: string
+    folderId: string,
   ) {
     return this.createConfigurationFromBase(
       configuration.name,
       configuration.description,
       folderId,
-      configuration
+      configuration,
     );
   }
 
   async updateConfigurationKey(
     config: IDatasetConfiguration,
-    key: keyof IDatasetConfigurationBase
+    key: keyof IDatasetConfigurationBase,
   ): Promise<any> {
     const metadata = toConfiguationMetadata({ [key]: config[key] });
     const data = new FormData();
@@ -494,24 +494,26 @@ export default class GirderAPI {
   }
 
   deleteConfiguration(
-    config: IDatasetConfiguration
+    config: IDatasetConfiguration,
   ): Promise<IDatasetConfiguration> {
     return this.client.delete(`/item/${config.id}`).then(() => config);
   }
 
   getLayerHistogram(images: IImage[]) {
-    const key = images.map(i => `${i.item._id}#${i.frameIndex}`).join(",");
+    const key = images.map((i) => `${i.item._id}#${i.frameIndex}`).join(",");
     if (this.histogramCache.has(key)) {
       return this.histogramCache.get(key)!;
     }
 
-    const promise = Promise.map(
+    // From the Bluebird repo itself:
+    // > Please use native promises instead if at all possible.
+    const promise = BluebirdPromise.map(
       images,
       (image: IImage) =>
         this.getHistogram(image.item, {
-          frame: image.frameIndex
+          frame: image.frameIndex,
         }),
-      { concurrency: HistogramConcurrency }
+      { concurrency: HistogramConcurrency },
     ).then((histograms: ITileHistogram[]) => mergeHistograms(histograms));
     this.histogramCache.set(key, promise);
     promise.then((hist: ITileHistogram) => {
@@ -523,7 +525,7 @@ export default class GirderAPI {
   }
 
   getResolvedLayerHistogram(images: IImage[]) {
-    const key = images.map(i => `${i.item._id}#${i.frameIndex}`).join(",");
+    const key = images.map((i) => `${i.item._id}#${i.frameIndex}`).join(",");
     if (this.resolvedHistogramCache.has(key)) {
       return this.resolvedHistogramCache.get(key)!;
     }
@@ -531,7 +533,7 @@ export default class GirderAPI {
   }
 
   flushCaches() {
-    this.imageCache.forEach(value => {
+    this.imageCache.forEach((value) => {
       if (value.src) {
         // clean up blobs
         URL.revokeObjectURL(value.src);
@@ -555,8 +557,8 @@ export default class GirderAPI {
                   JSON.stringify({
                     min: "min",
                     max: "max",
-                    palette: ["#000000", "#ffffff"]
-                  })
+                    palette: ["#000000", "#ffffff"],
+                  }),
                 ) +
                 "&cache=true",
               maxTextureSize: 4096,
@@ -565,9 +567,9 @@ export default class GirderAPI {
               frameStride: "c",
               frameGroup: "z",
               frameGroupStride: "auto",
-              cache: "schedule"
-            }
-          }
+              cache: "schedule",
+            },
+          },
         );
       });
     });
@@ -589,11 +591,11 @@ export default class GirderAPI {
     for (const imageItem of largeImageItems) {
       const params: IHistogramOptions = {
         ...this.baseHistogramOptions,
-        cache: "schedule"
+        cache: "schedule",
       };
       const response = await this.client.get(
         `item/${imageItem._id}/tiles/histogram`,
-        { params }
+        { params },
       );
       responses.push(response);
     }
@@ -603,11 +605,11 @@ export default class GirderAPI {
   async findJobs(type: TJobType, statuses: number[]): Promise<any[]> {
     const params = {
       types: JSON.stringify([type]),
-      statuses: JSON.stringify(statuses)
+      statuses: JSON.stringify(statuses),
     };
     const response = await this.client.get("job", {
       params,
-      paramsSerializer: stringify
+      paramsSerializer: stringify, // function from qs
     });
     return response.data;
   }
@@ -627,7 +629,7 @@ export function asDataset(folder: IGirderFolder): IDataset {
     channelNames: new Map<number, string>(),
     images: () => [],
     anyImage: () => null,
-    allImages: []
+    allImages: [],
   };
 }
 
@@ -641,7 +643,7 @@ function getDefaultLayers(dataset: IDataset) {
 }
 
 export function getDatasetCompatibility(
-  dataset: IDataset
+  dataset: IDataset,
 ): IDatasetConfigurationCompatibility {
   const channelNames: IDatasetConfigurationCompatibility["channels"] = {};
   for (const channel of dataset.channels) {
@@ -652,7 +654,7 @@ export function getDatasetCompatibility(
     xyDimensions: dataset.xy.length > 1 ? "multiple" : "one",
     zDimensions: dataset.z.length > 1 ? "multiple" : "one",
     tDimensions: dataset.time.length > 1 ? "multiple" : "one",
-    channels: channelNames
+    channels: channelNames,
   };
 }
 
@@ -662,14 +664,14 @@ export function getDatasetScales(dataset: IDataset): IScales {
   if (tileInfo) {
     scales.pixelSize = {
       value: (tileInfo.mm_x + tileInfo.mm_y) / 2,
-      unit: "mm"
+      unit: "mm",
     };
   }
   return scales;
 }
 
 function defaultConfigurationBase(
-  dataset: IDataset
+  dataset: IDataset,
 ): IDatasetConfigurationBase {
   return {
     compatibility: getDatasetCompatibility(dataset),
@@ -677,7 +679,7 @@ function defaultConfigurationBase(
     tools: [],
     propertyIds: [],
     snapshots: [],
-    scales: getDatasetScales(dataset)
+    scales: getDatasetScales(dataset),
   };
 }
 
@@ -703,7 +705,7 @@ export function asConfigurationItem(item: IGirderItem): IDatasetConfiguration {
   const config: Partial<IDatasetConfiguration> = {
     id: item._id,
     name: item.name,
-    description: item.description
+    description: item.description,
   };
   for (const key of configurationBaseKeys) {
     config[key] =
@@ -719,7 +721,7 @@ function asDatasetView(data: AxiosResponse["data"]): IDatasetView {
     datasetId: data.datasetId,
     layerContrasts: data.layerContrasts || {},
     scales: data.scales || {},
-    lastViewed: data.lastViewed
+    lastViewed: data.lastViewed,
   };
 }
 
@@ -727,7 +729,7 @@ function toHistoryEntry(data: any): IHistoryEntry {
   return {
     actionName: data.actionName,
     isUndone: data.isUndone,
-    actionDate: new Date(data.actionDate)
+    actionDate: new Date(data.actionDate),
   };
 }
 
@@ -776,7 +778,7 @@ function toKey(
   z: number | string,
   time: number | string,
   xy: number | string,
-  c: number | string
+  c: number | string,
 ) {
   return `z${z}:t${time}:xy${xy}:c${c}`;
 }
@@ -786,7 +788,7 @@ export function parseTiles(
   tile: ITileMeta,
   unrollXY: boolean,
   unrollZ: boolean,
-  unrollT: boolean
+  unrollT: boolean,
 ) {
   const xys = new Set<number>();
   const zs = new Map<number, Set<number>>();
@@ -794,14 +796,12 @@ export function parseTiles(
 
   const channelInt = new Map<string | null, number>();
   const lookup = new Map<string, IImage[]>();
-  let frameChannels: string[] | undefined;
-  let unrollCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
-  let unrollOrder: string[] = [];
-
-  frameChannels = tile.channels;
+  const frameChannels: string[] | undefined = tile.channels;
+  const unrollCount: { [key: string]: number } = { t: 1, xy: 1, z: 1 };
+  const unrollOrder: string[] = [];
 
   if (!tile.frames) {
-    tile.frames = [({ Index: 0, Frame: 0 } as unknown) as IFrameInfo];
+    tile.frames = [{ Index: 0, Frame: 0 } as unknown as IFrameInfo];
   }
 
   tile.frames.forEach((frame, j) => {
@@ -854,7 +854,7 @@ export function parseTiles(
       tileHeight: tile.tileHeight,
       tileinfo: tile,
       mm_x: tile.mm_x,
-      mm_y: tile.mm_y
+      mm_y: tile.mm_y,
     };
     if (!lookup.has(key)) {
       lookup.set(key, [info]);
@@ -869,7 +869,7 @@ export function parseTiles(
   // Lay out images in a grid that is as roughly square as possible.
   //
   // TODO: this approach assumes all images have the same size.
-  lookup.forEach(images => {
+  lookup.forEach((images) => {
     let rowLength = Math.ceil(Math.sqrt(images.length));
     if (unrollOrder.length > 1) {
       rowLength = unrollCount[unrollOrder[0]];
@@ -890,7 +890,7 @@ export function parseTiles(
   const zValues: number[] = entries.map(() => NaN);
   const numberOfTimeSlots = entries.reduce(
     (acc, v) => Math.max(acc, v[1].size),
-    0
+    0,
   );
   const timeValues: number[] = Array.from({ length: numberOfTimeSlots });
 
@@ -931,6 +931,6 @@ export function parseTiles(
     channels,
     channelNames,
     width,
-    height
+    height,
   };
 }

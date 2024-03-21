@@ -3,7 +3,7 @@
     <v-list-item v-for="(item, i) in scaleItems" :key="`item-${i}`">
       <v-list-item-content>
         <span class="d-flex align-center">
-          <div style="min-width: 10em;">
+          <div style="min-width: 10em">
             {{ item.text }}
           </div>
           <v-text-field
@@ -63,9 +63,8 @@ import {
   IScales,
   TUnitLength,
   TUnitTime,
-  exampleConfigurationBase,
   unitLengthOptions,
-  unitTimeOptions
+  unitTimeOptions,
 } from "@/store/model";
 
 import { convertLength, convertTime } from "@/utils/conversion";
@@ -106,24 +105,24 @@ export default class ScaleSettings extends Vue {
     items.push({
       text: "Pixel size",
       key: "pixelSize",
-      unit: "length"
+      unit: "length",
     });
     items.push({
       text: "Z step",
       key: "zStep",
-      unit: "length"
+      unit: "length",
     });
     items.push({
       text: "Time step",
       key: "tStep",
-      unit: "time"
+      unit: "time",
     });
     return items;
   }
 
   defaultSaveScale(
     key: keyof IScales,
-    scale: IScaleInformation<TUnitLength | TUnitTime>
+    scale: IScaleInformation<TUnitLength | TUnitTime>,
   ) {
     if (this.configurationOnly) {
       this.store.saveScaleInConfiguration({ itemId: key, scale });
@@ -135,7 +134,7 @@ export default class ScaleSettings extends Vue {
   saveInCollection(key: keyof IScales) {
     this.store.saveScaleInConfiguration({
       itemId: key,
-      scale: this.scales[key]
+      scale: this.scales[key],
     });
     this.revertToCollection(key);
   }
@@ -160,7 +159,7 @@ export default class ScaleSettings extends Vue {
     }
     this.defaultSaveScale(item.key, {
       value: newValue,
-      unit: this.scales[item.key].unit
+      unit: this.scales[item.key].unit,
     });
   }
 
@@ -177,20 +176,20 @@ export default class ScaleSettings extends Vue {
         newValue = convertLength(
           oldValue,
           oldUnit as TUnitLength,
-          newUnit as TUnitLength
+          newUnit as TUnitLength,
         );
         break;
       case "time":
         newValue = convertTime(
           oldValue,
           oldUnit as TUnitTime,
-          newUnit as TUnitTime
+          newUnit as TUnitTime,
         );
         break;
     }
     this.defaultSaveScale(item.key, {
       value: newValue,
-      unit: newUnit as any
+      unit: newUnit as any,
     });
   }
 

@@ -3,7 +3,7 @@
     :class="{
       histogram: true,
       'theme--light': !$vuetify.theme.dark,
-      'theme--dark': $vuetify.theme.dark
+      'theme--dark': $vuetify.theme.dark,
     }"
   >
     <switch-toggle
@@ -106,7 +106,7 @@ import { scaleLinear, scalePoint } from "d3-scale";
 import { area, curveStep } from "d3-shape";
 import { select, selectAll, event as d3Event } from "d3-selection";
 import { drag, D3DragEvent } from "d3-drag";
-import { throttle } from "lodash-es";
+import { throttle } from "lodash";
 import { zoom, D3ZoomEvent, ZoomBehavior } from "d3-zoom";
 
 function roundPer(v: number) {
@@ -122,8 +122,8 @@ const THROTTLE = 1; // ms
 
 @Component({
   components: {
-    SwitchToggle
-  }
+    SwitchToggle,
+  },
 })
 export default class ContrastHistogram extends Vue {
   @Prop()
@@ -190,9 +190,7 @@ export default class ContrastHistogram extends Vue {
   }
 
   get histToPixel() {
-    const scale = scaleLinear()
-      .domain([0, 100])
-      .range(this.pixelRange);
+    const scale = scaleLinear().domain([0, 100]).range(this.pixelRange);
     if (this.histData) {
       scale.domain([this.histData.min, this.histData.max]);
     }
@@ -200,9 +198,7 @@ export default class ContrastHistogram extends Vue {
   }
 
   get percentageToPixel() {
-    return scaleLinear()
-      .domain([0, 100])
-      .range(this.pixelRange);
+    return scaleLinear().domain([0, 100]).range(this.pixelRange);
   }
 
   get toValue() {
@@ -233,11 +229,11 @@ export default class ContrastHistogram extends Vue {
   @Watch("histogram")
   onValueChange(hist: Promise<ITileHistogram>) {
     this.histData = null;
-    hist.then(data => (this.histData = data));
+    hist.then((data) => (this.histData = data));
   }
 
   created() {
-    this.histogram.then(data => (this.histData = data));
+    this.histogram.then((data) => (this.histData = data));
   }
 
   mounted() {
@@ -251,8 +247,8 @@ export default class ContrastHistogram extends Vue {
           (which: "blackPoint" | "whitePoint") => {
             const evt = d3Event as D3DragEvent<HTMLElement, any, any>;
             this.updatePoint(which, Math.max(0, Math.min(evt.x, this.width)));
-          }
-        )
+          },
+        ),
       );
 
     select(this.$refs.svg).call(this.getZoomBehavior());
@@ -267,7 +263,7 @@ export default class ContrastHistogram extends Vue {
     }
     return this._zoomBehavior.translateExtent([
       [0, 0],
-      [this.width, 0]
+      [this.width, 0],
     ]);
   }
 
@@ -302,13 +298,12 @@ export default class ContrastHistogram extends Vue {
     this.emitChange.call(this, copy);
   }
 
-  private readonly emitChange = throttle(function(
+  private readonly emitChange = throttle(function (
     this: ContrastHistogram,
-    value: IContrast
+    value: IContrast,
   ) {
     this.$emit("change", value);
-  },
-  THROTTLE);
+  }, THROTTLE);
 
   set mode(value: "percentile" | "absolute") {
     const copy = Object.assign({}, this.currentContrast);
@@ -407,12 +402,10 @@ export default class ContrastHistogram extends Vue {
     let maxValue = bins.reduce((acc, v) => Math.max(acc, v), 0);
     const secondMax = bins.reduce(
       (acc, v) => Math.max(acc, v !== maxValue ? v : 0),
-      0
+      0,
     );
     maxValue = Math.min(maxValue, secondMax * 1.5);
-    const scaleY = scaleLinear()
-      .domain([0, maxValue])
-      .range([this.height, 0]);
+    const scaleY = scaleLinear().domain([0, maxValue]).range([this.height, 0]);
     const scaleX = scalePoint<number>()
       .domain(bins.map((_, i) => i))
       .range([0, this.width]);
@@ -420,7 +413,7 @@ export default class ContrastHistogram extends Vue {
     const gen = area<number>()
       .curve(curveStep)
       .x((_, i) => scaleX(i)!)
-      .y0(d => scaleY(d)!)
+      .y0((d) => scaleY(d)!)
       .y1(scaleY(0));
     return gen(bins) || undefined;
   }

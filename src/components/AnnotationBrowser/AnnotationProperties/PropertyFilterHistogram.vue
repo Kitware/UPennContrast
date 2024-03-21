@@ -65,8 +65,8 @@ import { scaleLinear, scaleSymlog } from "d3-scale";
 
 @Component({
   components: {
-    TagFilterEditor
-  }
+    TagFilterEditor,
+  },
 })
 export default class PropertyFilterHistogram extends Vue {
   readonly store = store;
@@ -117,7 +117,7 @@ export default class PropertyFilterHistogram extends Vue {
     }
     this.filterStore.updatePropertyFilter({
       ...this.propertyFilter,
-      range: { min, max: this.maxValue }
+      range: { min, max: this.maxValue },
     });
   }
 
@@ -131,7 +131,7 @@ export default class PropertyFilterHistogram extends Vue {
     }
     this.filterStore.updatePropertyFilter({
       ...this.propertyFilter,
-      range: { min: this.minValue, max }
+      range: { min: this.minValue, max },
     });
   }
 
@@ -150,7 +150,7 @@ export default class PropertyFilterHistogram extends Vue {
   get propertyFilter() {
     const filter = this.propertyFilters.find(
       (value: IPropertyAnnotationFilter) =>
-        arePathEquals(value.propertyPath, this.propertyPath)
+        arePathEquals(value.propertyPath, this.propertyPath),
     );
     if (!filter) {
       const newFilter: IPropertyAnnotationFilter = {
@@ -159,7 +159,7 @@ export default class PropertyFilterHistogram extends Vue {
         id: uuidv4(),
         propertyPath: this.propertyPath,
         exclusive: false,
-        enabled: true
+        enabled: true,
       };
       this.filterStore.updatePropertyFilter(newFilter);
       return newFilter;
@@ -178,7 +178,7 @@ export default class PropertyFilterHistogram extends Vue {
       const valuesPerProperty = propertyValues[annotationId];
       const value = getValueFromObjectAndPath(
         valuesPerProperty,
-        this.propertyPath
+        this.propertyPath,
       );
       if (typeof value === "number") {
         valuesForThisProperty.push(value);
@@ -202,14 +202,14 @@ export default class PropertyFilterHistogram extends Vue {
     const dummyFirstPoint = {
       count: 0,
       min: minIntensity,
-      max: minIntensity
+      max: minIntensity,
     };
     const hist = [dummyFirstPoint, ...this.hist];
 
     // We need to show densities instead of counts on the Y axis
     // Density of the dummyFirstPoint is 0 and won't cause problems
     const densities = hist.map(({ count, min, max }) =>
-      max <= min ? 0 : count / (max - min)
+      max <= min ? 0 : count / (max - min),
     );
     if (this.useCDF) {
       for (let i = 1; i < densities.length; ++i) {
@@ -232,7 +232,7 @@ export default class PropertyFilterHistogram extends Vue {
       .curve(curveStepBefore)
       .x((_, i) => scaleX(intensities[i])!)
       .y0(scaleY(0))
-      .y1(d => scaleY(d)!);
+      .y1((d) => scaleY(d)!);
     return gen(densities) ?? undefined;
   }
 
@@ -240,7 +240,7 @@ export default class PropertyFilterHistogram extends Vue {
     if (this.propertyFilter.enabled) {
       this.filterStore.updatePropertyFilter({
         ...this.propertyFilter,
-        enabled: false
+        enabled: false,
       });
     }
   }
@@ -267,9 +267,7 @@ export default class PropertyFilterHistogram extends Vue {
 
       const dragBehavior = drag<HTMLElement, any>().on("drag", onDrag);
 
-      selectAll([min, max])
-        .data(["min", "max"])
-        .call(dragBehavior);
+      selectAll([min, max]).data(["min", "max"]).call(dragBehavior);
     }
   }
 
@@ -279,7 +277,7 @@ export default class PropertyFilterHistogram extends Vue {
     if (!this.propertyFilter.enabled) {
       this.filterStore.updatePropertyFilter({
         ...this.propertyFilter,
-        enabled: true
+        enabled: true,
       });
     }
     this.initializeHandles();

@@ -12,7 +12,7 @@
         :class="{
           'v-label': true,
           'theme--light': !$vuetify.theme.dark,
-          'theme--dark': $vuetify.theme.dark
+          'theme--dark': $vuetify.theme.dark,
         }"
         :for="id"
       >

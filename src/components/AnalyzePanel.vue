@@ -1,8 +1,6 @@
 <template>
   <v-card class="ma-1">
-    <v-card-title>
-      Analyze
-    </v-card-title>
+    <v-card-title> Analyze </v-card-title>
     <v-card-text>
       <property-creation />
       <property-list />
@@ -18,8 +16,8 @@ import PropertyCreation from "@/components/AnnotationBrowser/AnnotationPropertie
 @Component({
   components: {
     PropertyCreation,
-    PropertyList
-  }
+    PropertyList,
+  },
 })
 export default class AnalyzeAnnotations extends Vue {}
 </script>

@@ -7,11 +7,9 @@
         <v-btn
           v-if="inclusiveToggle"
           class="mx-2"
-          :title="
-            `Current tags selection mode: ${
-              areTagsInclusive ? 'inclusive' : 'exclusive'
-            }`
-          "
+          :title="`Current tags selection mode: ${
+            areTagsInclusive ? 'inclusive' : 'exclusive'
+          }`"
           x-small
           fab
           @click="areTagsInclusive = !areTagsInclusive"
@@ -50,8 +48,8 @@ interface IRestrictionSetup {
 @Component({
   components: {
     LayerSelect,
-    TagPicker
-  }
+    TagPicker,
+  },
 })
 export default class TagAndLayerRestriction extends Vue {
   readonly store = store;
@@ -98,7 +96,7 @@ export default class TagAndLayerRestriction extends Vue {
       .filter(
         (tool: IToolConfiguration) =>
           (tool.type === "create" || tool.type === "snap") &&
-          tool.values.annotation
+          tool.values.annotation,
       )
       .map((tool: IToolConfiguration) => tool.values.annotation.tags)
       .flat();
@@ -126,7 +124,7 @@ export default class TagAndLayerRestriction extends Vue {
     this.tagSearchInput = "";
     const result: IRestrictionSetup = {
       tags: this.newTags,
-      layer: this.selectedLayer
+      layer: this.selectedLayer,
     };
     if (this.inclusiveToggle) {
       result.tagsInclusive = this.areTagsInclusive;

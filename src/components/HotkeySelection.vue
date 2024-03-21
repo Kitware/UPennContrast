@@ -8,9 +8,7 @@
         <v-progress-circular size="20" indeterminate v-if="isRecordingHotkey" />
         {{ isRecordingHotkey ? "Recording..." : "Record hotkey" }}
       </v-btn>
-      <v-btn class="mr-2" @click="hotkey = null">
-        Clear hotkey
-      </v-btn>
+      <v-btn class="mr-2" @click="hotkey = null"> Clear hotkey </v-btn>
     </div>
   </div>
 </template>

@@ -132,8 +132,8 @@ import { IHotkey } from "@/utils/v-mousetrap";
     ServerStatus,
     AnalyzeAnnotations,
     AnnotationsSettings,
-    Snapshots
-  }
+    Snapshots,
+  },
 })
 export default class App extends Vue {
   readonly store = store;
@@ -144,8 +144,8 @@ export default class App extends Vue {
     handler: this.toggleHotkeyDialog,
     data: {
       section: "Global",
-      description: "Toggle hotkey and feature display"
-    }
+      description: "Toggle hotkey and feature display",
+    },
   };
 
   helpPanelIsOpen = false;
@@ -171,10 +171,10 @@ export default class App extends Vue {
     // Interface elements have a name, an id, a type (see ToolConfiguration) and a type-dependent meta field
     axios
       .get("config/templates.json")
-      .then(resp => {
+      .then((resp) => {
         this.store.setToolTemplateList(resp.data);
       })
-      .catch(err => {
+      .catch((err) => {
         logError(err);
         throw err;
       });

@@ -304,5 +304,34 @@
         "advanced": true
       }
     ]
+  },
+  {
+    "name": "Segment Anything Annotation (experimental, WebGPU only)",
+    "type": "samAnnotation",
+    "shortName": "SAM",
+    "interface": [
+      {
+        "id": "model",
+        "type": "select",
+        "isSubmenu": true,
+        "meta": {
+          "items": [
+            {
+              "text": "ViT-B",
+              "value": "vit_b"
+            }
+          ]
+        }
+      },
+      {
+        "name": "Annotation Configuration",
+        "id": "annotation",
+        "type": "annotation",
+        "meta": {
+          "hideShape": true,
+          "defaultShape": "polygon"
+        }
+      }
+    ]
   }
 ]

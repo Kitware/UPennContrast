@@ -53,7 +53,7 @@ export default function setFrameQuad(
   tileinfo: ITileMeta,
   layer: IGeoJSOsmLayer,
   quadInformation: IQuadInformation,
-  partialOptions: Partial<ISetQuadStatusOptions>
+  partialOptions: Partial<ISetQuadStatusOptions>,
 ) {
   if (!tileinfo || !tileinfo.sizeX || !tileinfo.sizeY) {
     return;
@@ -65,12 +65,12 @@ export default function setFrameQuad(
       16384,
       quadInformation.queryParameters.maxTextureSize,
       renderer?._maxTextureSize,
-      renderer?.constructor._maxTextureSize
-    ].filter(x => x !== undefined) as number[])
+      renderer?.constructor._maxTextureSize,
+    ].filter((x) => x !== undefined) as number[]),
   );
   const maxTexQuadInformation: IQuadInformation = {
     ...quadInformation,
-    queryParameters: { ...quadInformation.queryParameters, maxTextureSize }
+    queryParameters: { ...quadInformation.queryParameters, maxTextureSize },
   };
   // Default options
   const options: ISetQuadStatusOptions = {
@@ -78,7 +78,7 @@ export default function setFrameQuad(
     adjustMinLevel: true,
     crossOrigin: "anonymous",
     redrawOnFirstLoad: true,
-    ...partialOptions
+    ...partialOptions,
   };
   const status: ISetQuadStatus = {
     tileinfo,
@@ -90,9 +90,9 @@ export default function setFrameQuad(
     framesToIdx: {},
     loadedCount: 0,
     totalToLoad: 0,
-    loaded: false
+    loaded: false,
   };
-  layer.setFrameQuad = function(frame) {
+  layer.setFrameQuad = function (frame) {
     const idx = status.framesToIdx[frame];
     if (idx !== undefined && status.loaded) {
       layer.baseQuad = { ...status.quads[idx] };
@@ -107,7 +107,7 @@ async function loadImages(
   options: ISetQuadStatusOptions,
   quadInformation: IQuadInformation,
   status: ISetQuadStatus,
-  layer: IGeoJSOsmLayer
+  layer: IGeoJSOsmLayer,
 ) {
   // Helper arrow function to call the progress callback
   const safeProgress = () => {
@@ -120,7 +120,7 @@ async function loadImages(
   const data = await quadInformation.restRequest({
     type: "GET",
     url: `${quadInformation.restUrl}/tile_frames/quad_info`,
-    data: quadInformation.queryParameters
+    data: quadInformation.queryParameters,
   });
   status.quads = data.quads;
   status.frames = data.frames;
@@ -160,7 +160,7 @@ async function loadImages(
     img.src = src;
 
     // Wait for the image to load
-    await new Promise<void>(resolve => {
+    await new Promise<void>((resolve) => {
       const voidResolve = () => resolve();
       img.onload = voidResolve;
       img.onerror = voidResolve;

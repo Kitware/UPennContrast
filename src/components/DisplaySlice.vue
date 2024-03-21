@@ -54,7 +54,7 @@
 </style>
 
 <script lang="ts">
-import { Vue, Component, Prop, Watch } from "vue-property-decorator";
+import { Vue, Component, Prop } from "vue-property-decorator";
 import { IDisplaySlice, TDisplaySliceType } from "../store/model";
 import store from "@/store";
 
@@ -116,7 +116,7 @@ export default class DisplaySlice extends Vue {
             ? 0
             : Math.max(
                 Math.min(inputValue, this.maxOffsetValue),
-                this.minOffsetValue
+                this.minOffsetValue,
               );
         break;
       default:
@@ -125,7 +125,7 @@ export default class DisplaySlice extends Vue {
     }
     this.$emit("change", {
       type,
-      value: validated
+      value: validated,
     });
   }
 }

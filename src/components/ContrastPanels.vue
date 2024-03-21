@@ -15,13 +15,13 @@ import store from "@/store";
 export default {
   name: "ContrastPanels",
   components: {
-    DisplayLayer
+    DisplayLayer,
   },
   computed: {
     layers() {
       return store.layers;
-    }
-  }
+    },
+  },
 };
 </script>
 

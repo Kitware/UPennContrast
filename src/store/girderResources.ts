@@ -3,7 +3,7 @@ import {
   Action,
   Module,
   VuexModule,
-  Mutation
+  Mutation,
 } from "vuex-module-decorators";
 import store from "./root";
 import main from "./index";
@@ -23,7 +23,7 @@ export class GirderResources extends VuexModule {
   @Mutation
   public setResource({
     id,
-    resource
+    resource,
   }: {
     id: string;
     resource: IGirderSelectAble | null;
@@ -34,7 +34,7 @@ export class GirderResources extends VuexModule {
   @Action
   private requestResource({
     id,
-    type
+    type,
   }: {
     id: string;
     type: IGirderSelectAble["_modelType"];
@@ -45,7 +45,7 @@ export class GirderResources extends VuexModule {
   @Action
   private async requestAndSetResource({
     id,
-    type
+    type,
   }: {
     id: string;
     type: IGirderSelectAble["_modelType"];
@@ -61,7 +61,7 @@ export class GirderResources extends VuexModule {
   @Action
   public async getResource({
     id,
-    type
+    type,
   }: {
     id: string;
     type: IGirderSelectAble["_modelType"];
@@ -118,7 +118,7 @@ export class GirderResources extends VuexModule {
   @Action
   public async forceFetchResource({
     id,
-    type
+    type,
   }: {
     id: string;
     type: IGirderSelectAble["_modelType"];
@@ -148,7 +148,7 @@ export class GirderResources extends VuexModule {
     id,
     unrollXY = false,
     unrollZ = false,
-    unrollT = false
+    unrollT = false,
   }: {
     id: string;
     unrollXY?: boolean;
@@ -157,21 +157,21 @@ export class GirderResources extends VuexModule {
   }): Promise<IDataset | null> {
     const [folder, items] = await Promise.all([
       this.getFolder(id),
-      main.api.getItems(id)
+      main.api.getItems(id),
     ]);
     if (!folder) {
       return null;
     }
     const baseDataset = asDataset(folder);
     // Just use the first image if it exists
-    const imageItem = items!.find(d => d.largeImage);
+    const imageItem = items!.find((d) => d.largeImage);
     if (imageItem === undefined) {
       return baseDataset;
     }
     const tiles = await main.api.getTiles(imageItem);
     return {
       ...baseDataset,
-      ...parseTiles(imageItem, tiles, unrollXY, unrollZ, unrollT)
+      ...parseTiles(imageItem, tiles, unrollXY, unrollZ, unrollT),
     };
   }
 }

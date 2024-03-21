@@ -1,8 +1,6 @@
 <template>
   <v-expansion-panel>
-    <v-expansion-panel-header>
-      Viewer settings
-    </v-expansion-panel-header>
+    <v-expansion-panel-header> Viewer settings </v-expansion-panel-header>
     <v-expansion-panel-content>
       <v-container>
         <v-switch
@@ -15,7 +13,7 @@
             section: 'Viewer settings',
             title: 'Show channel values on hover',
             description:
-              'Show pixel values for each layer when hovering over the image'
+              'Show pixel values for each layer when hovering over the image',
           }"
         />
         <v-switch
@@ -26,7 +24,7 @@
           v-description="{
             section: 'Viewer settings',
             title: 'Show minimap',
-            description: 'Show the overview panel'
+            description: 'Show the overview panel',
           }"
         />
         <v-switch
@@ -39,7 +37,7 @@
             section: 'Viewer settings',
             title: 'Show scalebar',
             description:
-              'Show the scalebar widget at the bottom right of the image; click scalebar to edit settings'
+              'Show the scalebar widget at the bottom right of the image; click scalebar to edit settings',
           }"
         />
         <v-switch
@@ -52,7 +50,7 @@
             section: 'Viewer settings',
             title: 'Scale points with zoom',
             description:
-              'Set size of the point annotations and allow to scale with zoom level or stay a fixed size'
+              'Set size of the point annotations and allow to scale with zoom level or stay a fixed size',
           }"
         />
         <v-slider
@@ -69,7 +67,7 @@
           :items="compositionItems"
         >
           <template #item="{ item }">
-            <div style="width: 100%;">
+            <div style="width: 100%">
               <strong>
                 {{ item.text }}
               </strong>
@@ -96,7 +94,7 @@ import store from "@/store/index";
 import {
   TCompositionMode,
   compositionItems,
-  advancedCompositionItems
+  advancedCompositionItems,
 } from "@/utils/compositionModes";
 
 @Component
@@ -106,11 +104,11 @@ export default class ViewerSettings extends Vue {
     { header: "Base Composition Modes" },
     ...compositionItems,
     { header: "Advanced Composition Modes" },
-    ...advancedCompositionItems
+    ...advancedCompositionItems,
   ];
   readonly backgroundItems = [
     { value: "white", text: "White" },
-    { value: "black", text: "Black" }
+    { value: "black", text: "Black" },
   ];
 
   get valueOnHover() {

@@ -1,8 +1,6 @@
 <template>
   <v-card class="ma-1">
-    <v-card-title>
-      NimbusImage settings
-    </v-card-title>
+    <v-card-title> NimbusImage settings </v-card-title>
     <v-card-text class="pa-1">
       <v-expansion-panels hover multiple v-model="panels">
         <annotation-toggles />
@@ -23,8 +21,8 @@ import UiSettings from "@/components/UISettings.vue";
   components: {
     AnnotationToggles,
     ViewerSettings,
-    UiSettings
-  }
+    UiSettings,
+  },
 })
 export default class AnnotationsSettings extends Vue {
   panels: number[] = [0, 1, 2];

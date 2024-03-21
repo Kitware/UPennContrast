@@ -28,7 +28,7 @@ function bind(el: any, value: IHotkey | IHotkey[], bindElement: any) {
     if (disabled) {
       return;
     }
-    mousetrap.bind(_bind, function(this: any, ...args) {
+    mousetrap.bind(_bind, function (this: any, ...args) {
       handler.apply(this, [el, ...args]);
     });
     if (data) {
@@ -50,19 +50,19 @@ export default function install(Vue: any) {
   Vue.directive("mousetrap", {
     inserted(
       el: any,
-      { value, modifiers }: { value: IHotkey | IHotkey[]; modifiers: any }
+      { value, modifiers }: { value: IHotkey | IHotkey[]; modifiers: any },
     ) {
       bind(el, value, modifiers.element);
     },
     update(
       el: any,
-      { value, modifiers }: { value: IHotkey | IHotkey[]; modifiers: any }
+      { value, modifiers }: { value: IHotkey | IHotkey[]; modifiers: any },
     ) {
       unbind(el);
       bind(el, value, modifiers.element);
     },
     unbind(el: any) {
       unbind(el);
-    }
+    },
   });
 }

@@ -24,7 +24,7 @@
         <!-- layer location -->
         <v-row class="my-0">
           <v-col class="py-0">
-            <layer-select v-model="coordinateAssignments.layer" label="Layer" />
+            <layer-select v-model="layer" label="Layer" />
           </v-col>
         </v-row>
         <!-- tags -->
@@ -56,7 +56,7 @@
               <v-radio
                 value="layer"
                 label="From Layer"
-                v-if="!isMaxMerge(coordinate, coordinateAssignments.layer)"
+                v-if="!isMaxMerge(coordinate, layer ?? undefined)"
               ></v-radio>
               <v-radio value="assign">
                 <template v-slot:label>
@@ -73,9 +73,7 @@
                     "
                     :style="{ width: 'min-content' }"
                     :rules="[
-                      val =>
-                        Number.parseInt(val) <
-                        coordinateAssignments[coordinate].max
+                      isSmallerThanRule(coordinateAssignments[coordinate].max),
                     ]"
                   />
                 </template>
@@ -116,51 +114,55 @@ interface IAnnotationSetup {
   shape: AnnotationShape;
 }
 
-// Properties of AnnotationConfiguration that are emitted as input
-const standardValueKeys = [
-  "tags",
-  "coordinateAssignments",
-  "shape"
-] as (keyof IAnnotationSetup)[];
+function isSmallerThanRule(max: number) {
+  return (val: string) => Number.parseInt(val) < max;
+}
 
 // Interface element for configuring an annotation creation tool
 @Component({
   components: {
     LayerSelect,
-    TagPicker
-  }
+    TagPicker,
+  },
 })
 export default class AnnotationConfiguration extends Vue {
   readonly store = store;
 
-  get dataset() {
-    return this.store.dataset;
-  }
-
-  tagSearchInput: string = "";
-
-  @Prop()
-  readonly template!: any;
-
-  @Prop()
+  @Prop({ default: false })
   readonly hideShape!: string;
 
   @Prop({ default: AnnotationShape.Point })
   readonly defaultShape!: AnnotationShape;
 
+  @Prop({ default: false })
+  readonly advanced!: boolean;
+
   @Prop()
   readonly value?: IAnnotationSetup;
 
-  @Prop()
-  readonly advanced!: boolean;
-
   availableShapes = store.availableToolShapes;
-  private AnnotationNames = AnnotationNames;
+  AnnotationNames = AnnotationNames;
+  isSmallerThanRule = isSmallerThanRule;
 
-  label: string = "";
-  shape: AnnotationShape = this.defaultShape;
+  readonly coordinates: ["Z", "Time"] = ["Z", "Time"];
+
+  // These could also be set in the updateFromValue() method called in the mounted() hook
+  coordinateAssignments: IAnnotationSetup["coordinateAssignments"] = {
+    layer: undefined, // Setting layer to undefined will reset the layer in layer-select
+    Z: { type: "layer", value: 1, max: this.maxZ },
+    Time: { type: "layer", value: 1, max: this.maxTime },
+  };
+  shape: AnnotationShape = AnnotationShape.Point;
   tagsInternal: string[] = [];
-  useAutoTags: boolean = false;
+  useAutoTags: boolean = true;
+
+  get layer() {
+    return this.coordinateAssignments.layer;
+  }
+
+  set layer(value) {
+    Vue.set(this.coordinateAssignments, "layer", value);
+  }
 
   get tags() {
     if (this.useAutoTags) {
@@ -174,14 +176,10 @@ export default class AnnotationConfiguration extends Vue {
   }
 
   get autoTags() {
-    const layerId = this.coordinateAssignments.layer;
+    const layerId = this.layer;
     const layerName = layerId ? store.getLayerFromId(layerId)?.name || "" : "";
     const shapeName = AnnotationNames[this.shape].toLowerCase();
     return [`${layerName} ${shapeName}`];
-  }
-
-  get layers() {
-    return this.store.layers;
   }
 
   get maxZ() {
@@ -192,18 +190,7 @@ export default class AnnotationConfiguration extends Vue {
     return this.store.dataset?.time.length || 0;
   }
 
-  get standardValue() {
-    if (
-      typeof this.value === "object" &&
-      standardValueKeys.every(key => this.value?.hasOwnProperty(key))
-    ) {
-      return this.value;
-    } else {
-      return null;
-    }
-  }
-
-  isMaxMerge(axis: string, layerId: string) {
+  isMaxMerge(axis: string, layerId?: string) {
     const layer = this.store.getLayerFromId(layerId);
     if (!layer) {
       return false;
@@ -211,13 +198,6 @@ export default class AnnotationConfiguration extends Vue {
     const key = axis === "Z" ? "z" : "time";
     return layer[key].type === "max-merge";
   }
-
-  coordinates = ["Z", "Time"];
-  coordinateAssignments: IAnnotationSetup["coordinateAssignments"] = {
-    layer: null,
-    Z: { type: "layer", value: 1, max: this.maxZ },
-    Time: { type: "layer", value: 1, max: this.maxTime }
-  };
 
   mounted() {
     this.updateFromValue();
@@ -229,7 +209,7 @@ export default class AnnotationConfiguration extends Vue {
       this.reset();
       return;
     }
-    this.coordinateAssignments = this.value.coordinateAssignments;
+    this.updateCoordinateAssignement(this.value.coordinateAssignments);
     this.shape = this.value.shape;
     this.tagsInternal = this.value.tags;
   }
@@ -237,18 +217,35 @@ export default class AnnotationConfiguration extends Vue {
   @Watch("defaultShape")
   reset() {
     // Set internal values to the current input, or defaults
-    this.coordinateAssignments = {
-      layer: undefined, // Setting layer to undefined will reset the layer in layer-select
-      Z: { type: "layer", value: 1, max: this.maxZ },
-      Time: { type: "layer", value: 1, max: this.maxTime }
-    };
+    this.updateCoordinateAssignement();
     this.useAutoTags = true;
     this.tagsInternal = [];
     this.shape = this.defaultShape;
     this.changed();
   }
 
+  // Update or reset the coordinateAssignments
+  // Don't update the layer if the new layer is falsy
+  updateCoordinateAssignement(val?: IAnnotationSetup["coordinateAssignments"]) {
+    const oldLayer = this.layer;
+
+    this.coordinateAssignments = val ?? {
+      layer: undefined, // Setting layer to undefined will reset the layer in layer-select
+      Z: { type: "layer", value: 1, max: this.maxZ },
+      Time: { type: "layer", value: 1, max: this.maxTime },
+    };
+
+    const newLayer = this.layer;
+    if (!newLayer && newLayer !== oldLayer) {
+      // Wait for next tick before setting the layer
+      // Otherwise, the layer-select component may not register the change
+      this.layer = oldLayer;
+      this.$nextTick().then(() => (this.layer = newLayer));
+    }
+  }
+
   @Watch("coordinateAssignments", { deep: true })
+  @Watch("layer")
   @Watch("tags")
   @Watch("shape")
   changed() {
@@ -261,11 +258,10 @@ export default class AnnotationConfiguration extends Vue {
         this.coordinateAssignments.Time.value = this.maxTime;
       }
     }
-    this.tagSearchInput = "";
     this.$emit("input", {
       tags: this.tags,
       coordinateAssignments: this.coordinateAssignments,
-      shape: this.shape
+      shape: this.shape,
     });
     this.$emit("change");
   }

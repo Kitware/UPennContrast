@@ -9,7 +9,6 @@
 #include <itkMinimumMaximumImageCalculator.h>
 #include "itkPolyLineParametricPath.h"
 #include <itkMesh.h>
-#include <itkMeshFileReader.h>
 #include <itkOtsuThresholdImageFilter.h>
 #include <itkContourExtractor2DImageFilter.h>
 
@@ -84,6 +83,7 @@ int main(int argc, char **argv)
 
     // Check if the polyline mask worked
     if (!maskedImage) {
+        std::cerr << "Could not mask the image with the mesh" << std::endl;
         return -1;
     }
     ImageCalculatorFilterType::Pointer imageCalculatorFilter = ImageCalculatorFilterType::New();
@@ -91,6 +91,7 @@ int main(int argc, char **argv)
     imageCalculatorFilter->ComputeMaximum();
     // The masked image is all black: polyline didn't work
     if (imageCalculatorFilter->GetMaximum() == 0) {
+        std::cerr << "Maximum intensity is 0: masked image is all black" << std::endl;
         return -1;
     }
 
@@ -152,17 +153,19 @@ typename TImage::Pointer ReadImageFile(const std::string filePath)
 template <typename TMesh>
 typename TMesh::Pointer ReadMeshFile(const std::string filePath)
 {
-    using FileReaderType = itk::MeshFileReader<TMesh>;
-    typename FileReaderType::Pointer reader = FileReaderType::New();
-    reader->SetFileName(filePath);
-    try
-    {
-        reader->Update();
-    }
-    catch (itk::ExceptionObject &excep)
-    {
-        std::cerr << "Exception caught: " << excep << std::endl;
-    }
-    typename TMesh::Pointer inputMesh = reader->GetOutput();
-    return inputMesh;
+    auto mesh = TMesh::New();
+    auto* container = mesh->GetPoints();
+    auto& vec = container->CastToSTLContainer();
+
+    std::ifstream fin(filePath, std::ios::binary | std::ios_base::ate);
+    const auto filesize = static_cast<std::size_t>(fin.tellg());
+    fin.seekg(0, std::ios_base::beg);
+
+    constexpr auto pointSize = sizeof(typename TMesh::PointType);
+    vec.resize(filesize / pointSize);
+    fin.read(reinterpret_cast<char*>(vec.data()), pointSize * vec.size());
+
+    container->Modified();
+
+    return mesh;
 }

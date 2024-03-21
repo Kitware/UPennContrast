@@ -50,6 +50,16 @@ export interface IImageTile {
   fullImage: HTMLImageElement;
 }
 
+// see templates.json
+export type TToolType =
+  | "create"
+  | "snap"
+  | "select"
+  | "connection"
+  | "edit"
+  | "segmentation"
+  | "samAnnotation";
+
 export interface IToolTemplateInterface {
   id: string;
   name: string;
@@ -59,17 +69,88 @@ export interface IToolTemplateInterface {
 
 export interface IToolTemplate {
   name: string;
+  type: TToolType;
   description: string;
   interface: IToolTemplateInterface[];
+  shortName?: string;
 }
 
-export interface IToolConfiguration {
+export interface IToolConfiguration<Type extends TToolType = TToolType> {
   readonly id: string;
   name: string;
   hotkey: string | null;
-  type: string;
+  type: Type;
   values: any;
   template: IToolTemplate;
+}
+
+export interface IBaseToolState {}
+
+export enum PromptType {
+  backgroundPoint,
+  foregroundPoint,
+  box,
+}
+
+export interface ISamForegroundPointPrompt {
+  type: PromptType.foregroundPoint;
+  point: IGeoJSPoint;
+}
+
+export interface ISamBackgroundPointPrompt {
+  type: PromptType.backgroundPoint;
+  point: IGeoJSPoint;
+}
+
+export interface ISamBoxPrompt {
+  type: PromptType.box;
+  topLeft: IGeoJSPoint;
+  bottomRight: IGeoJSPoint;
+}
+
+export type TSamPrompt =
+  | ISamForegroundPointPrompt
+  | ISamBackgroundPointPrompt
+  | ISamBoxPrompt;
+
+export interface ISamAnnotationToolState {
+  pipeline: {
+    geoJsMapInputNode: ManualInputNode<IMapEntry | TNoOutput>;
+    promptInputNode: ManualInputNode<TSamPrompt[] | TNoOutput>;
+    pipelineOutput: OutputNode<IGeoJSPoint[]>;
+  };
+  mouseState: {
+    path: IXYPoint[]; // In GCS coordinates
+  };
+  output: IGeoJSPoint[] | null;
+}
+
+export interface IMouseState {
+  mapEntry: IMapEntry;
+  target: HTMLElement;
+  path: IGeoJSPoint[];
+  initialMouseEvent: MouseEvent;
+}
+
+export interface IErrorToolState {
+  error?: Error;
+}
+
+interface IExplicitToolStateMap {
+  samAnnotation: ISamAnnotationToolState | IErrorToolState;
+}
+
+type TFullToolStateMap = {
+  [toolType in TToolType]: toolType extends keyof IExplicitToolStateMap
+    ? IExplicitToolStateMap[toolType]
+    : IBaseToolState;
+};
+
+export type TToolState<T extends TToolType = TToolType> = TFullToolStateMap[T];
+
+export interface IActiveTool<T extends TToolType = TToolType> {
+  configuration: IToolConfiguration<T>;
+  state: TToolState<T>;
 }
 
 export interface IRestrictTagsAndLayer {
@@ -241,20 +322,33 @@ export interface IPixel {
   value?: number[];
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.object.html
+export interface IGeoJsObject {
+  modified: () => IGeoJsObject;
+  geoOn: (event: string, handler: (event: any) => any) => IGeoJsObject;
+  geoOff: (event: string, handler: (event: any) => any) => IGeoJsObject;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.sceneObject.html
+export interface IGeoJsSceneObject extends IGeoJsObject {}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.mapInteractor.html#.spec
 export interface IGeoJSMapInteractorSpec {
   keyboard?: {
-    actions?: object;
+    actions?: { [actionKey: string]: string[] };
     meta?: object;
     metakeyMouseEvents?: string[];
     focusHighlight?: boolean;
   };
 }
 
-export interface IGeoJSMapInteractor {
+// https://opengeoscience.github.io/geojs/apidocs/geo.mapInteractor.html
+export interface IGeoJSMapInteractor extends IGeoJsObject {
   options: ((opt: IGeoJSMapInteractorSpec) => IGeoJSMapInteractor) &
     (() => IGeoJSMapInteractorSpec);
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.geoBounds
 export interface IGeoJSBounds {
   left: number;
   top: number;
@@ -262,7 +356,10 @@ export interface IGeoJSBounds {
   bottom: number;
 }
 
-export interface IGeoJSMap {
+type TGeoJSScreenShotTypes = "image/png" | "canvas";
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.map.html
+export interface IGeoJSMap extends IGeoJsSceneObject {
   interactor: ((arg: IGeoJSMapInteractor) => IGeoJSMap) &
     (() => IGeoJSMapInteractor);
   bounds: (bds?: IGeoJSBounds, gcs?: string | null) => IGeoJSBounds;
@@ -270,17 +367,21 @@ export interface IGeoJSMap {
     coordinates: IGeoJSPoint,
     gcs?: string | null,
     ignoreDiscreteZoom?: boolean,
-    ignoreClampBounds?: boolean | "limited"
+    ignoreClampBounds?: boolean | "limited",
   ) => IGeoJSMap) &
     (() => IGeoJSPoint);
   createLayer: <T extends string>(
     layerName: T,
-    arg: object
+    arg?: object,
   ) => T extends "osm"
     ? IGeoJSOsmLayer
-    : T extends "feature"
-    ? IGeoJSFeatureLayer
-    : IGeoJSLayer;
+    : T extends "annotation"
+      ? IGeoJSAnnotationLayer
+      : T extends "feature"
+        ? IGeoJSFeatureLayer
+        : T extends "ui"
+          ? IGeoJSUiLayer
+          : IGeoJSLayer;
   deleteLayer: (layer: IGeoJSLayer | null) => IGeoJSLayer;
   displayToGcs: ((c: IGeoJSPoint, gcs?: string | null) => IGeoJSPoint) &
     ((c: IGeoJSPoint[], gcs?: string | null) => IGeoJSPoint[]);
@@ -292,48 +393,52 @@ export interface IGeoJSMap {
   geoOn: (event: string, handler: Function) => IGeoJSMap;
   geoOff: (
     event?: string | string[],
-    arg?: Function | Function[] | null
+    arg?: Function | Function[] | null,
   ) => IGeoJSMap;
   ingcs: ((arg: string) => IGeoJSMap) & (() => string);
   layers: () => IGeoJSLayer[];
+  maxBounds: ((bounds: IGeoJSBounds, gcs?: string | null) => IGeoJSMap) &
+    ((bounds: undefined, gcs?: string | null) => IGeoJSBounds);
   node: () => JQuery;
   rotation: ((
     rotation: number,
     origin?: object,
-    ignoreRotationFunc?: boolean
+    ignoreRotationFunc?: boolean,
   ) => IGeoJSMap) &
     (() => number);
-  screenshot: (
-    layers?: IGeoJSLayer | IGeoJSLayer[] | false | object,
-    type?: string,
+  screenshot: <Type extends TGeoJSScreenShotTypes = "image/png">(
+    layers: IGeoJSLayer | IGeoJSLayer[] | false | object | undefined,
+    type?: Type,
     encoderOptions?: number,
-    opts?: object
-  ) => Promise<string>;
+    opts?: object,
+  ) => Promise<Type extends "canvas" ? HTMLCanvasElement : string>;
   size: ((arg: IGeoScreenSize) => IGeoJSMap) & (() => IGeoScreenSize);
-  unitsPerPixel: ((zoom: number, unit: number | null) => IGeoJSMap) &
-    ((zoom?: number) => number);
+  unitsPerPixel: ((zoom: number, unit: number) => IGeoJSMap) &
+    ((zoom?: number, unit?: null) => number);
   zoom: ((
     val: number,
     origin?: object,
     ingoreDiscreteZoom?: boolean,
-    ignoreClampBounds?: boolean
+    ignoreClampBounds?: boolean,
   ) => IGeoJSMap) &
     (() => number);
+  zoomRange: ((
+    arg: { min?: number; max?: number },
+    noRefresh?: boolean,
+  ) => IGeoJSMap) &
+    (() => { min: number; max: number });
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.screenSize
 export interface IGeoScreenSize {
   width: number;
   height: number;
 }
 
-export interface IGeoJSLayer {
-  addAnnotation: (annotation: IGeoJSAnnotation) => IGeoJSLayer;
+// https://opengeoscience.github.io/geojs/apidocs/geo.layer.html
+export interface IGeoJSLayer extends IGeoJsObject {
   visible: (value?: boolean) => boolean | IGeoJSLayer;
   draw: () => IGeoJSLayer;
-  mode: (
-    arg?: string | null,
-    editAnnotation?: IGeoJSAnnotation
-  ) => string | null | IGeoJSLayer;
   map: () => IGeoJSMap;
   modes: {
     edit: "edit";
@@ -345,17 +450,37 @@ export interface IGeoJSLayer {
   currentAnnotation: null | IGeoJSAnnotation;
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.annotationLayer.html
+export interface IGeoJSAnnotationLayer extends IGeoJSLayer {
+  addAnnotation: (
+    annotation: IGeoJSAnnotation,
+    gcs?: string | null,
+    update?: boolean,
+  ) => IGeoJSAnnotationLayer;
+  removeAnnotation: (annotation: IGeoJSAnnotation, update?: boolean) => boolean;
+  annotations: () => IGeoJSAnnotation[];
+  mode: (
+    arg?: string | null,
+    editAnnotation?: IGeoJSAnnotation,
+  ) => string | null | IGeoJSAnnotationLayer;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.point2D
 export interface IXYPoint {
   x: number;
   y: number;
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.worldPosition
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.geoPosition
 export interface IGeoJSPoint extends IXYPoint {
   z?: number; // Optional z coordinate
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.fetchQueue.html
 export interface IGeoJSFetchQueue {}
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.tile.html
 export interface IGeoJSTile {
   index: {
     x: number;
@@ -366,17 +491,20 @@ export interface IGeoJSTile {
   size: IXYPoint;
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.quadFeature.html#.position
 export interface IGeoJSQuad {
   crop: IGeoJSPoint & IGeoJSBounds;
   lr: IGeoJSPoint;
   ul: IGeoJSPoint;
 }
 
-export interface IGeoJSRenderer {
+// https://opengeoscience.github.io/geojs/apidocs/geo.renderer.html
+export interface IGeoJSRenderer extends IGeoJsObject {
   _maxTextureSize: number;
   constructor: Function & { _maxTextureSize: number };
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.osmLayer.html
 export interface IGeoJSOsmLayer extends IGeoJSLayer {
   readonly idle: boolean;
   queue: IGeoJSFetchQueue;
@@ -399,19 +527,42 @@ export interface IGeoJSOsmLayer extends IGeoJSLayer {
   setFrameQuad?: ((frame: number) => void) & { status?: ISetQuadStatus };
 }
 
-export interface IGeoJSFeature {
-  data: ((arg: any[]) => IGeoJSFeatureLayer) & (() => any[]);
+// https://opengeoscience.github.io/geojs/apidocs/geo.feature.html
+export interface IGeoJSFeature extends IGeoJSFeatureBase<IGeoJSFeature> {}
+export interface IGeoJSFeatureBase<ThisType> extends IGeoJsSceneObject {
+  data: ((arg: any[]) => ThisType) & (() => any[]);
+  draw: (arg?: object) => ThisType;
+  style: (() => object) &
+    ((arg1: string) => object) &
+    ((arg1: string, arg2: object) => ThisType) &
+    ((arg1: object) => ThisType);
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.textFeature.html
+export interface IGeoJSTextFeature
+  extends IGeoJSFeatureBase<IGeoJSTextFeature> {
+  position: ((
+    val: IGeoJSPoint[] | ((dataPoint: any) => IGeoJSPoint),
+  ) => IGeoJSTextFeature) &
+    (() => IGeoJSPoint[] | ((dataPoint: any) => IGeoJSPoint));
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.featureLayer.html
 export interface IGeoJSFeatureLayer extends IGeoJSLayer {
   readonly idle: boolean;
-  createFeature: (featureName: string, arg: object) => IGeoJSFeature;
+  createFeature: <T extends string>(
+    featureName: T,
+    arg?: object,
+  ) => T extends "text" ? IGeoJSTextFeature : IGeoJSFeature;
+  deleteFeature: (feature: IGeoJSFeature) => IGeoJSFeatureLayer;
   geoOn: (event: string, handler: Function) => IGeoJSFeatureLayer;
   geoOff: (
     event?: string | string[],
-    arg?: Function | Function[] | null
+    arg?: Function | Function[] | null,
   ) => IGeoJSFeatureLayer;
   renderer: () => IGeoJSRenderer | null;
+  features: (() => IGeoJSFeature[]) &
+    ((val: IGeoJSFeature[]) => IGeoJSFeatureLayer);
 
   onIdle: (handler: () => void) => IGeoJSFeatureLayer;
 
@@ -419,11 +570,87 @@ export interface IGeoJSFeatureLayer extends IGeoJSLayer {
   setFrameQuad?: ((frame: number) => void) & { status?: ISetQuadStatus };
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.gui.widget.html
+export interface IGeoJSWidget {}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.gui.scaleWidget.html
+export interface IGeoJSScaleWidget {
+  options: (() => object) &
+    (<Key extends IGeoJSScaleWidgetOptions>(
+      arg1: Key,
+    ) => IGeoJSScaleWidgetSpec[Key]) &
+    (<Key extends IGeoJSScaleWidgetOptions>(
+      arg1: Key,
+      arg2: IGeoJSScaleWidgetSpec[Key],
+    ) => IGeoJSScaleWidget);
+  parentCanvas: () => HTMLElement;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.gui.scaleWidget.html#.spec
+interface IGeoJSScaleWidgetSpec {
+  scale: number;
+}
+
+type IGeoJSScaleWidgetOptions = keyof IGeoJSScaleWidgetSpec;
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.gui.uiLayer.html
+export interface IGeoJSUiLayer extends IGeoJSLayer {
+  createWidget: <WidgetName extends string, ParentType extends IGeoJsObject>(
+    widgetName: WidgetName,
+    arg: { parent?: ParentType; [k: string]: any },
+  ) => WidgetName extends "scale" ? IGeoJSScaleWidget : IGeoJSWidget;
+  deleteWidget: (widget: IGeoJSWidget) => IGeoJSUiLayer;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.annotation.html
 export interface IGeoJSAnnotation {
   options: (key?: string, value?: any) => any;
   style: (value?: { [key: string]: any }) => any;
   coordinates: () => IGeoJSPoint[];
   geojson: () => any;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.mouseState
+export interface IGeoJSMouseState {
+  page: IXYPoint;
+  map: IGeoJSPoint;
+  geo: IGeoJSPoint;
+  mapgcs: IGeoJSPoint;
+  buttons: {
+    left: boolean;
+    right: boolean;
+    middle: boolean;
+  };
+  modifiers: {
+    alt: boolean;
+    ctrl: boolean;
+    shift: boolean;
+    meta: boolean;
+  };
+  time: number;
+  deltaTime: number;
+  velocity: IXYPoint;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.polygonFeature.html#.styleSpec
+export interface IGeoJSPolygonFeatureStyle {
+  fill?: boolean | (() => boolean);
+  fillColor?: string | (() => string);
+  fillOpacity?: number | (() => number);
+  stroke?: boolean | (() => boolean);
+  uniformPolygon?: boolean | (() => boolean);
+  closed?: boolean | (() => boolean);
+  origin?: Array<number> | (() => Array<number>);
+  strokeColor?: string | (() => string);
+  strokeOpacity?: number | (() => number);
+  strokeWidth?: number | (() => number);
+  strokeOffset?: number | (() => number);
+  lineCap?: string | (() => string);
+  lineJoin?: string | (() => string);
+  miterLimit?: number | (() => number);
+  uniformLine?: boolean | string | (() => boolean | string);
+  antialiasing?: number | (() => number);
+  debug?: string | (() => string);
 }
 
 export interface ICommonWorkerInterfaceElement {
@@ -523,13 +750,13 @@ export interface IWorkerImageList {
 export enum AnnotationShape {
   Point = "point",
   Line = "line",
-  Polygon = "polygon"
+  Polygon = "polygon",
 }
 
 export const AnnotationNames = {
   [AnnotationShape.Point]: "Point",
   [AnnotationShape.Line]: "Line",
-  [AnnotationShape.Polygon]: "Blob"
+  [AnnotationShape.Polygon]: "Blob",
 };
 
 export interface IAnnotationLocation {
@@ -644,7 +871,7 @@ export interface IProgressInfo {
   progress?: number;
 }
 
-export interface IPanInfo {
+export interface ICameraInfo {
   center: IGeoJSPoint;
   zoom: number;
   rotate: number;
@@ -684,17 +911,49 @@ export interface IUISetting {
   activeLayer: IDisplayLayer;
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.util.html#.pixelCoordinateParams
+interface IGeoJSPixelCoordinateParams {
+  map: {
+    node: HTMLElement;
+    ingcs: string;
+    gcs: string;
+    maxBounds: IGeoJSBounds;
+    unitsPerPixel: number;
+    center: IXYPoint;
+    min: number;
+    max: number;
+    zoom: number;
+    clampBoundsX: boolean;
+    clampBoundsY: boolean;
+    clampZoom: boolean;
+  };
+  layer: {
+    maxLevel: number;
+    wrapX: boolean;
+    wrapY: boolean;
+    tileOffset: () => IXYPoint;
+    attribution: string;
+    tileWidth: number;
+    tileHeight: number;
+    tileRounding: (x: number) => number;
+    tilesAtZoom: (zoom: number) => IXYPoint | undefined;
+    tilesMaxBounds: (level: number) => IXYPoint | undefined;
+    renderer?: string;
+    queue?: IGeoJSFetchQueue;
+  };
+}
+
 export interface IMapEntry {
   map: IGeoJSMap;
   imageLayers: IGeoJSOsmLayer[];
-  params: any;
+  params: IGeoJSPixelCoordinateParams;
   baseLayerIndex: number | undefined;
-  annotationLayer?: any;
-  workerPreviewLayer?: any;
-  workerPreviewFeature?: any;
-  textLayer?: any;
-  uiLayer?: any;
-  scaleWidget?: any;
+  annotationLayer: IGeoJSAnnotationLayer;
+  workerPreviewLayer: IGeoJSFeatureLayer;
+  workerPreviewFeature: IGeoJSFeature;
+  textLayer: IGeoJSFeatureLayer;
+  uiLayer?: IGeoJSUiLayer;
+  scaleWidget?: IGeoJSScaleWidget | null;
   lowestLayer?: number;
 }
 
@@ -792,7 +1051,7 @@ const colors = [
   "#40FFC0",
   "#C0FF40",
   "#C040FF",
-  "#40C0FF"
+  "#40C0FF",
 ];
 
 // keys should be all uppercase.  Values should have the same case as the
@@ -804,24 +1063,29 @@ const channelColors: { [key: string]: string } = {
   CY3: "#FF8000", // orange
   CY5: "#FF00FF",
   YFP: "#00FF00",
-  GFP: "#00FF00"
+  GFP: "#00FF00",
 };
 
 import { v4 as uuidv4 } from "uuid";
 import { ISetQuadStatus } from "@/utils/setFrameQuad";
 import { ITileMeta } from "./GirderAPI";
-import { isEqual } from "lodash-es";
+import { isEqual } from "lodash";
+import {
+  ManualInputNode,
+  OutputNode,
+  TNoOutput,
+} from "@/pipelines/computePipeline";
 
 export function newLayer(
   dataset: IDataset,
-  layers: IDisplayLayer[]
+  layers: IDisplayLayer[],
 ): IDisplayLayer {
-  const usedColors = new Set(layers.map(l => l.color));
-  const nextColor = colors.filter(c => !usedColors.has(c));
-  const usedChannels = new Set(layers.map(l => l.channel));
+  const usedColors = new Set(layers.map((l) => l.color));
+  const nextColor = colors.filter((c) => !usedColors.has(c));
+  const usedChannels = new Set(layers.map((l) => l.channel));
   const nextChannel = dataset.channels
     .map((_, i) => i)
-    .filter(c => !usedChannels.has(c));
+    .filter((c) => !usedChannels.has(c));
 
   const channelName =
     dataset.channelNames.get(nextChannel[0] || 0) ||
@@ -831,7 +1095,7 @@ export function newLayer(
     channelColor = nextColor[0] || colors[layers.length % colors.length];
   }
   let layerName = channelName;
-  if (layerName === "" || layers.some(l => l.name === layerName)) {
+  if (layerName === "" || layers.some((l) => l.name === layerName)) {
     layerName = `Layer ${layers.length + 1}`;
   }
 
@@ -843,28 +1107,28 @@ export function newLayer(
     channel: nextChannel[0] || 0,
     time: {
       type: "current",
-      value: null
+      value: null,
     },
     xy: {
       type: "current",
-      value: null
+      value: null,
     },
     z: {
       type: "current",
-      value: null
+      value: null,
     },
     color: channelColor,
     contrast: {
       mode: "percentile",
       blackPoint: 0,
-      whitePoint: 100
+      whitePoint: 100,
     },
-    layerGroup: null
+    layerGroup: null,
   };
 }
 
 export function copyLayerWithoutPrivateAttributes(
-  layer: IDisplayLayer
+  layer: IDisplayLayer,
 ): IDisplayLayer {
   const newLayer: IDisplayLayer = { ...layer };
   for (const key of Object.keys(newLayer)) {
@@ -882,7 +1146,7 @@ export function exampleConfigurationBase(): IDatasetConfigurationBase {
       xyDimensions: "multiple",
       zDimensions: "multiple",
       tDimensions: "multiple",
-      channels: {}
+      channels: {},
     },
     layers: [],
     tools: [],
@@ -891,14 +1155,14 @@ export function exampleConfigurationBase(): IDatasetConfigurationBase {
     scales: {
       pixelSize: { value: 1, unit: "m" },
       zStep: { value: 1, unit: "m" },
-      tStep: { value: 1, unit: "s" }
-    }
+      tStep: { value: 1, unit: "s" },
+    },
   };
 }
 
 export function areCompatibles(
   a: IDatasetConfigurationCompatibility,
-  b: IDatasetConfigurationCompatibility
+  b: IDatasetConfigurationCompatibility,
 ) {
   return (
     a.tDimensions === b.tDimensions &&
@@ -909,23 +1173,23 @@ export function areCompatibles(
 }
 
 export const configurationBaseKeys = new Set(
-  Object.keys(exampleConfigurationBase())
+  Object.keys(exampleConfigurationBase()),
 ) as Set<keyof IDatasetConfigurationBase>;
 
 export enum AnnotationSelectionTypes {
   ADD = "ADD",
   TOGGLE = "TOGGLE",
-  REMOVE = "REMOVE"
+  REMOVE = "REMOVE",
 }
 
 export const AnnotationSelectionTypesNames = {
   [AnnotationSelectionTypes.ADD]: "Add",
   [AnnotationSelectionTypes.TOGGLE]: "Toggle",
-  [AnnotationSelectionTypes.REMOVE]: "Remove"
+  [AnnotationSelectionTypes.REMOVE]: "Remove",
 };
 
 export const AnnotationSelectionTypesTooltips = {
   [AnnotationSelectionTypes.ADD]: "Add annotations to selection",
   [AnnotationSelectionTypes.TOGGLE]: "Toggle annotations selection",
-  [AnnotationSelectionTypes.REMOVE]: "Remove annotation from selection"
+  [AnnotationSelectionTypes.REMOVE]: "Remove annotation from selection",
 };

@@ -38,6 +38,6 @@ export default function install(Vue: any) {
     },
     unbind(el: any) {
       unbind(el);
-    }
+    },
   });
 }

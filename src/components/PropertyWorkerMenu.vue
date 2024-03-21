@@ -18,7 +18,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Watch, Prop, VModel } from "vue-property-decorator";
+import { Vue, Component, Prop, VModel } from "vue-property-decorator";
 import store from "@/store";
 import annotationsStore from "@/store/annotation";
 import { IWorkerInterfaceValues } from "@/store/model";
@@ -31,8 +31,8 @@ import WorkerInterfaceValues from "@/components/WorkerInterfaceValues.vue";
   components: {
     LayerSelect,
     TagFilterEditor,
-    WorkerInterfaceValues
-  }
+    WorkerInterfaceValues,
+  },
 })
 export default class PropertyWorkerMenu extends Vue {
   readonly store = store;

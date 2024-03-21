@@ -99,7 +99,7 @@ import store from "@/store";
 import {
   collectFilenameMetadata2,
   IVariableGuess,
-  TDimensions
+  TDimensions,
 } from "@/utils/parsing";
 import { IGirderItem } from "@/girder";
 import { ITileMeta } from "@/store/GirderAPI";
@@ -110,7 +110,7 @@ import { logError } from "@/utils/log";
 enum Sources {
   File = "file", // File metadata
   Filename = "filename", // Filenames parsing
-  Images = "images" // All images from the items
+  Images = "images", // All images from the items
 }
 
 interface IFileSourceData {
@@ -183,7 +183,7 @@ interface ICompositingSource {
 }
 
 @Component({
-  components: {}
+  components: {},
 })
 export default class MultiSourceConfiguration extends Vue {
   readonly store = store;
@@ -249,13 +249,13 @@ export default class MultiSourceConfiguration extends Vue {
 
   get items() {
     return this.dimensions
-      .filter(dim => dim.size > 0)
+      .filter((dim) => dim.size > 0)
       .map((dim: TAssignmentOption) => {
         let values = "";
         switch (dim.source) {
           case Sources.Filename:
             values = this.sliceAndJoin(
-              (dim.data as IFilenameSourceData).values
+              (dim.data as IFilenameSourceData).values,
             );
             break;
           case Sources.File:
@@ -265,7 +265,7 @@ export default class MultiSourceConfiguration extends Vue {
         return {
           ...dim,
           values,
-          key: `${dim.id}_${dim.guess}_${dim.source}`
+          key: `${dim.id}_${dim.guess}_${dim.source}`,
         };
       });
   }
@@ -275,52 +275,52 @@ export default class MultiSourceConfiguration extends Vue {
   headers = [
     {
       text: "Variable",
-      value: "name"
+      value: "name",
     },
     {
       text: "Values",
-      value: "values"
+      value: "values",
     },
     {
       text: "Guess",
-      value: "guess"
+      value: "guess",
     },
     {
       text: "Source",
-      value: "source"
+      value: "source",
     },
     {
       text: "Size",
-      value: "size"
-    }
+      value: "size",
+    },
   ];
 
   readonly dimensionNames: { [dim in TUpDim]: string } = {
     XY: "Positions",
     Z: "Z",
     T: "Time",
-    C: "Channels"
+    C: "Channels",
   };
 
   readonly dimesionNamesEntries = Object.entries(this.dimensionNames) as [
     TUpDim,
-    string
+    string,
   ][];
 
   assignmentOptionToAssignmentItem(dimension: TAssignmentOption): IAssignment {
     return {
       text: dimension.name,
-      value: dimension
+      value: dimension,
     };
   }
 
   get assignmentItems() {
     const assignedDimensions = Object.entries(this.assignments).reduce(
-      (assignedDimensions, [_, assignment]) =>
+      (assignedDimensions, [, assignment]) =>
         assignment
           ? [...assignedDimensions, assignment.value.id]
           : assignedDimensions,
-      [] as number[]
+      [] as number[],
     );
 
     const isNotAssigned = (dimension: TAssignmentOption) =>
@@ -334,7 +334,7 @@ export default class MultiSourceConfiguration extends Vue {
     XY: null,
     Z: null,
     T: null,
-    C: null
+    C: null,
   };
 
   searchInput: string = "";
@@ -359,7 +359,7 @@ export default class MultiSourceConfiguration extends Vue {
           source: Sources.Images;
           data: null;
         },
-    name: string | null = null
+    name: string | null = null,
   ): void {
     if (size === 0) {
       return;
@@ -370,12 +370,12 @@ export default class MultiSourceConfiguration extends Vue {
     const dim =
       source === Sources.File &&
       this.dimensions.find(
-        dimension => dimension.source === source && dimension.guess === guess
+        (dimension) => dimension.source === source && dimension.guess === guess,
       );
     if (dim) {
       dim.data = {
         ...(dim.data as IFileSourceData),
-        ...(data as IFileSourceData)
+        ...(data as IFileSourceData),
       };
       dim.size = Math.max(dim.size, size);
       return;
@@ -404,7 +404,7 @@ export default class MultiSourceConfiguration extends Vue {
       guess,
       size,
       name: computedName,
-      ...sourceData
+      ...sourceData,
     };
     this.dimensions = [...this.dimensions, newDimension];
   }
@@ -415,10 +415,10 @@ export default class MultiSourceConfiguration extends Vue {
     const assignmentOption =
       this.dimensions.find(
         ({ guess, source, size }) =>
-          source === Sources.File && size > 0 && guess === assignment
+          source === Sources.File && size > 0 && guess === assignment,
       ) ||
       this.dimensions.find(
-        ({ guess, size }) => size > 0 && guess === assignment
+        ({ guess, size }) => size > 0 && guess === assignment,
       ) ||
       null;
     if (assignmentOption) {
@@ -456,31 +456,31 @@ export default class MultiSourceConfiguration extends Vue {
     this.girderItems = items;
 
     //  Get info from filename
-    const names = items.map(item => item.name);
+    const names = items.map((item) => item.name);
 
     // Enbale transcoding by default except for ND2 files
-    this.transcode = !names.every(name => name.toLowerCase().endsWith("nd2"));
+    this.transcode = !names.every((name) => name.toLowerCase().endsWith("nd2"));
 
     // Add variables from filenames if there is more than one file
     if (names.length > 1) {
-      collectFilenameMetadata2(names).forEach(filenameData =>
+      collectFilenameMetadata2(names).forEach((filenameData) =>
         this.addSizeToDimension(
           filenameData.guess,
           filenameData.values.length,
           {
             source: Sources.Filename,
-            data: filenameData
-          }
-        )
+            data: filenameData,
+          },
+        ),
       );
     }
 
     // Get info from file
     this.tilesMetadata = await Promise.all(
-      items.map(item => this.store.api.getTiles(item))
+      items.map((item) => this.store.api.getTiles(item)),
     );
     this.tilesInternalMetadata = await Promise.all(
-      items.map(item => this.store.api.getTilesInternalMetadata(item))
+      items.map((item) => this.store.api.getTilesInternalMetadata(item)),
     );
 
     let maxFramesPerItem = 0;
@@ -502,10 +502,10 @@ export default class MultiSourceConfiguration extends Vue {
                 [tileIdx]: {
                   range: tile.IndexRange[indexDim],
                   stride: tile.IndexStride[indexDim],
-                  values: dim === "C" ? tile.channels : null
-                }
-              }
-            }
+                  values: dim === "C" ? tile.channels : null,
+                },
+              },
+            },
           );
         }
       }
@@ -517,9 +517,9 @@ export default class MultiSourceConfiguration extends Vue {
         maxFramesPerItem,
         {
           source: Sources.Images,
-          data: null
+          data: null,
         },
-        "All frames per item"
+        "All frames per item",
       );
     }
 
@@ -534,9 +534,9 @@ export default class MultiSourceConfiguration extends Vue {
 
   areDimensionsSetToDefault() {
     return Object.keys(this.dimensionNames).every(
-      dim =>
+      (dim) =>
         this.getDefaultAssignmentItem(dim)?.value ===
-        this.assignments[dim as TUpDim]?.value
+        this.assignments[dim as TUpDim]?.value,
     );
   }
 
@@ -547,8 +547,8 @@ export default class MultiSourceConfiguration extends Vue {
       return false;
     }
     const itemIndices = Object.keys(value.data).map(Number);
-    const allItemsAreNd2 = itemIndices.every(idx =>
-      this.girderItems[idx].name.toLowerCase().endsWith(".nd2")
+    const allItemsAreNd2 = itemIndices.every((idx) =>
+      this.girderItems[idx].name.toLowerCase().endsWith(".nd2"),
     );
     return allItemsAreNd2;
   }
@@ -569,7 +569,7 @@ export default class MultiSourceConfiguration extends Vue {
   submitEnabled() {
     const filledAssignments = Object.values(this.assignments).reduce(
       (count, assignment) => (assignment ? ++count : count),
-      0
+      0,
     );
     return filledAssignments >= this.items.length || filledAssignments >= 4;
   }
@@ -577,7 +577,7 @@ export default class MultiSourceConfiguration extends Vue {
   getCompositingValueFromAssignments(
     dim: TDimensions,
     itemIdx: number,
-    frameIdx: number
+    frameIdx: number,
   ): number {
     const assignmentValue = this.assignments[dim]?.value;
     if (!assignmentValue) {
@@ -610,7 +610,7 @@ export default class MultiSourceConfiguration extends Vue {
     if (this.autoDatasetRoute) {
       this.$router.push({
         name: "dataset",
-        params: { datasetId: this.datasetId }
+        params: { datasetId: this.datasetId },
       });
     }
   }
@@ -649,7 +649,7 @@ export default class MultiSourceConfiguration extends Vue {
           break;
         case Sources.Images:
           channels = [...Array(channelAssignment.size).keys()].map(
-            id => `Default ${id}`
+            (id) => `Default ${id}`,
           );
           break;
       }
@@ -665,7 +665,8 @@ export default class MultiSourceConfiguration extends Vue {
 
     if (this.shouldDoCompositing) {
       // Compositing
-      const compositingSources: ICompositingSource[] = sources as ICompositingSource[];
+      const compositingSources: ICompositingSource[] =
+        sources as ICompositingSource[];
       if (!this.tilesMetadata) {
         return null;
       }
@@ -679,24 +680,24 @@ export default class MultiSourceConfiguration extends Vue {
             xySet: this.getCompositingValueFromAssignments(
               "XY",
               itemIdx,
-              frameIdx
+              frameIdx,
             ),
             zSet: this.getCompositingValueFromAssignments(
               "Z",
               itemIdx,
-              frameIdx
+              frameIdx,
             ),
             tSet: this.getCompositingValueFromAssignments(
               "T",
               itemIdx,
-              frameIdx
+              frameIdx,
             ),
             cSet: this.getCompositingValueFromAssignments(
               "C",
               itemIdx,
-              frameIdx
+              frameIdx,
             ),
-            frames: [frameIdx]
+            frames: [frameIdx],
           });
         }
       }
@@ -706,20 +707,20 @@ export default class MultiSourceConfiguration extends Vue {
         const framePos = f.position.stagePositionUm;
         return {
           x: framePos[0] / (mm_x * 1000),
-          y: framePos[1] / (mm_y * 1000)
+          y: framePos[1] / (mm_y * 1000),
         };
       });
       const minCoordinate = {
-        x: Math.min(...coordinates.map(coordinate => coordinate.x)),
-        y: Math.min(...coordinates.map(coordinate => coordinate.y))
+        x: Math.min(...coordinates.map((coordinate) => coordinate.x)),
+        y: Math.min(...coordinates.map((coordinate) => coordinate.y)),
       };
       const maxCoordinate = {
-        x: Math.max(...coordinates.map(coordinate => coordinate.x)),
-        y: Math.max(...coordinates.map(coordinate => coordinate.y))
+        x: Math.max(...coordinates.map((coordinate) => coordinate.x)),
+        y: Math.max(...coordinates.map((coordinate) => coordinate.y)),
       };
-      const intCoordinates = coordinates.map(coordinate => ({
+      const intCoordinates = coordinates.map((coordinate) => ({
         x: Math.round(coordinate.x - minCoordinate.x),
-        y: Math.round(maxCoordinate.y - coordinate.y)
+        y: Math.round(maxCoordinate.y - coordinate.y),
       }));
 
       compositingSources.forEach((source, sourceIdx) => {
@@ -763,7 +764,7 @@ export default class MultiSourceConfiguration extends Vue {
         }
         const newSource: IBasicSource = {
           path: item.name,
-          framesAsAxes
+          framesAsAxes,
         };
         for (const dim in dimValues) {
           const lowDim = dim as TLowDim;
@@ -788,7 +789,7 @@ export default class MultiSourceConfiguration extends Vue {
         parentId: datasetId,
         metadata: JSON.stringify({ channels, sources, uniformSources: true }),
         transcode: this.transcode,
-        eventCallback
+        eventCallback,
       });
       // Schedule caches after adding multisource (and transcoding)
       this.store.scheduleTileFramesComputation(datasetId);

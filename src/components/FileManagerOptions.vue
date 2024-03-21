@@ -2,9 +2,7 @@
   <v-list class="pa-0" :disabled="disableOptions">
     <!-- Moving -->
     <v-list-item @click.stop="moveDialog = true">
-      <v-list-item-title>
-        Move
-      </v-list-item-title>
+      <v-list-item-title> Move </v-list-item-title>
     </v-list-item>
     <girder-location-chooser
       :dialog.sync="moveDialog"
@@ -14,15 +12,11 @@
     />
     <!-- Deleting -->
     <v-list-item @click.stop="deleteDialog = true">
-      <v-list-item-title>
-        Delete
-      </v-list-item-title>
+      <v-list-item-title> Delete </v-list-item-title>
     </v-list-item>
     <v-dialog v-model="deleteDialog">
       <v-card>
-        <v-card-title>
-          Delete items
-        </v-card-title>
+        <v-card-title> Delete items </v-card-title>
         <v-card-text>
           You are about to delete these items:<br />
           {{ items.map(({ name }) => name).join(", ") }}
@@ -46,15 +40,11 @@
     <!-- Renaming -->
     <template v-if="items.length === 1">
       <v-list-item @click.stop="renameDialog = true">
-        <v-list-item-title>
-          Rename
-        </v-list-item-title>
+        <v-list-item-title> Rename </v-list-item-title>
       </v-list-item>
       <v-dialog v-model="renameDialog">
         <v-card>
-          <v-card-title>
-            New name
-          </v-card-title>
+          <v-card-title> New name </v-card-title>
           <v-card-text>
             <v-form @submit="rename">
               <v-text-field v-model="newName" autofocus />
@@ -104,8 +94,8 @@ const OptionAction = createDecorator((options, key) => {
 @Component({
   components: {
     GirderLocationChooser: () =>
-      import("@/components/GirderLocationChooser.vue").then(mod => mod)
-  }
+      import("@/components/GirderLocationChooser.vue").then((mod) => mod),
+  },
 })
 export default class FileManagerOptions extends Vue {
   readonly store = store;
@@ -155,7 +145,7 @@ export default class FileManagerOptions extends Vue {
   }
 
   get isADialogOpen() {
-    return this.openedDialogs.some(dialog => dialog);
+    return this.openedDialogs.some((dialog) => dialog);
   }
 
   @Watch("isADialogOpen")

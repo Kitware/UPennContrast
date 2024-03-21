@@ -27,7 +27,7 @@
         @hook:mounted="uploadMounted"
       >
         <template #dropzone="{ inputFilesChanged }">
-          <file-dropzone @input="inputFilesChanged" style="height: 260px;" />
+          <file-dropzone @input="inputFilesChanged" style="height: 260px" />
         </template>
         <template #files="{ files }" v-if="quickupload && !pipelineError">
           <v-card>
@@ -96,18 +96,14 @@
           @generatedJson="generationDone"
           :class="{ 'd-none': !pipelineError }"
         />
-        <div class="title mb-2">
-          Configuring the dataset
-        </div>
+        <div class="title mb-2">Configuring the dataset</div>
         <v-progress-circular indeterminate />
         <div class="code-container" v-if="configurationLogs">
           <code class="code-block">{{ configurationLogs }}</code>
         </div>
       </template>
       <template v-if="creatingView">
-        <div class="title mb-2">
-          Configuring the dataset
-        </div>
+        <div class="title mb-2">Configuring the dataset</div>
         <v-progress-circular indeterminate />
         <dataset-info
           ref="viewCreation"
@@ -118,7 +114,7 @@
   </v-container>
 </template>
 <script lang="ts">
-import { Vue, Component, VModel, Prop } from "vue-property-decorator";
+import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
 import girderResources from "@/store/girderResources";
 import { IGirderSelectAble } from "@/girder";
@@ -161,13 +157,13 @@ function findCommonPrefix(strings: string[]): string {
   // Extract the non-metadata prefix of each filename. Note that because of the
   // way the regex is constructed, the first match group will never be `null`.
   const re = new RegExp(`(.*?)(?:_|-|${allTriggers.join("|")})`);
-  const matches = strings.map(s => s.match(re)![1]);
+  const matches = strings.map((s) => s.match(re)![1]);
 
   // Get the minimum length of all the strings; the common prefix cannot be
   // longer than this.
   const minLength = matches.reduce(
     (acc, cur) => Math.min(acc, cur.length),
-    Infinity
+    Infinity,
   );
 
   // Sweep through the first string, and compare the letter found in each
@@ -177,7 +173,7 @@ function findCommonPrefix(strings: string[]): string {
   for (let i = 0; i < minLength; i++) {
     const ch = matches[0].charAt(i);
 
-    if (!matches.map(s => s.charAt(i)).every(c => c === ch)) {
+    if (!matches.map((s) => s.charAt(i)).every((c) => c === ch)) {
       break;
     }
     result.push(ch);
@@ -192,8 +188,8 @@ function findCommonPrefix(strings: string[]): string {
     FileDropzone,
     MultiSourceConfiguration,
     DatasetInfo,
-    GirderUpload: () => import("@/girder/components").then(mod => mod.Upload)
-  }
+    GirderUpload: () => import("@/girder/components").then((mod) => mod.Upload),
+  },
 })
 export default class NewDataset extends Vue {
   readonly store = store;
@@ -322,7 +318,7 @@ export default class NewDataset extends Vue {
     // For more than one file, search for the longest prefix common to all, and
     // use that as the name if it's nonblank; otherwise use the name of the
     // first file.
-    const prefix = findCommonPrefix(files.map(d => d.name));
+    const prefix = findCommonPrefix(files.map((d) => d.name));
     if (prefix.length > 0) {
       return prefix;
     } else {
@@ -364,7 +360,7 @@ export default class NewDataset extends Vue {
     this.dataset = await this.store.createDataset({
       name: this.name,
       description: this.description,
-      path: this.path
+      path: this.path,
     });
 
     if (this.dataset === null) {
@@ -405,7 +401,7 @@ export default class NewDataset extends Vue {
     } else if (this.autoMultiConfig) {
       this.$router.push({
         name: "multi",
-        params: { datasetId }
+        params: { datasetId },
       });
     }
 
@@ -422,7 +418,7 @@ export default class NewDataset extends Vue {
     const config = this.$refs.configuration;
     if (!config) {
       logError(
-        "MultiSourceConfiguration component not mounted during quickupload"
+        "MultiSourceConfiguration component not mounted during quickupload",
       );
       this.pipelineError = true;
       return;

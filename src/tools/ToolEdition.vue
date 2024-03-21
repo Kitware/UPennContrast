@@ -17,9 +17,7 @@
         ref="toolConfiguration"
       />
       <div class="ma-6 mb-0">
-        <div class="title white--text">
-          Tool Hotkey
-        </div>
+        <div class="title white--text">Tool Hotkey</div>
         <hotkey-selection v-model="toolHotkey" />
       </div>
     </v-card-text>
@@ -50,7 +48,7 @@ import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
 import HotkeySelection from "@/components/HotkeySelection.vue";
 
 @Component({
-  components: { ToolConfiguration, HotkeySelection }
+  components: { ToolConfiguration, HotkeySelection },
 })
 export default class ToolEdition extends Vue {
   readonly store = store;
@@ -86,7 +84,7 @@ export default class ToolEdition extends Vue {
       ...this.tool,
       name: this.toolName,
       hotkey: this.toolHotkey,
-      values: this.toolValues
+      values: this.toolValues,
     };
     this.store.editToolInConfiguration(newTool);
     this.$emit("close");

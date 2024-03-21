@@ -85,7 +85,7 @@ import {
   IWorkerInterface,
   IWorkerInterfaceValues,
   TWorkerInterfaceType,
-  TWorkerInterfaceValue
+  TWorkerInterfaceValue,
 } from "@/store/model";
 import LayerSelect from "@/components/LayerSelect.vue";
 import ChannelSelect from "@/components/ChannelSelect.vue";
@@ -137,7 +137,7 @@ export default class WorkerInterfaceValues extends Vue {
       const interfaceTemplate = this.workerInterface[id];
       interfaceValues[id] = this.getDefault(
         interfaceTemplate.type,
-        interfaceTemplate.default
+        interfaceTemplate.default,
       );
     }
     this.interfaceValues = interfaceValues;

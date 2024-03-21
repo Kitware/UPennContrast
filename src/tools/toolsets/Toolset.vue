@@ -47,11 +47,7 @@
                         offset-x
                         :closeOnClick="false"
                         :closeOnContentClick="false"
-                        :value="
-                          selectedTool &&
-                            selectedTool.id === tool.id &&
-                            selectedTool.type === 'segmentation'
-                        "
+                        :value="selectedTool && selectedTool.id === tool.id"
                         z-index="100"
                       >
                         <template #activator="{}">
@@ -60,16 +56,28 @@
                         <annotation-worker-menu :tool="tool" />
                       </v-menu>
                     </template>
+                    <!-- When the tool is a SAM tool, show options in an expansion panel -->
+                    <template v-else-if="tool.type === 'samAnnotation'">
+                      <div>
+                        <tool-item :tool="tool" v-bind="attrs" v-on="on" />
+                        <template
+                          v-if="selectedTool && selectedTool.id === tool.id"
+                        >
+                          <sam-tool-menu :tool="tool"></sam-tool-menu>
+                        </template>
+                      </div>
+                    </template>
                     <!-- Otherwiser, only tool item -->
                     <template v-else>
                       <tool-item :tool="tool" v-bind="attrs" v-on="on" />
                     </template>
                   </template>
                   <div class="d-flex flex-column">
-                    <div style="margin: 5px;">
+                    <div style="margin: 5px">
                       <div
-                        v-for="(propEntry,
-                        forKey) in getToolPropertiesDescription(tool)"
+                        v-for="(
+                          propEntry, forKey
+                        ) in getToolPropertiesDescription(tool)"
                         :key="forKey"
                       >
                         {{ propEntry[0] }}: {{ propEntry[1] }}
@@ -84,8 +92,8 @@
             :tool="selectedTool"
             v-if="
               selectedTool &&
-                selectedTool.type === 'snap' &&
-                selectedTool.values.snapTo.value === 'circleToDot'
+              selectedTool.type === 'snap' &&
+              selectedTool.values.snapTo.value === 'circleToDot'
             "
           />
         </v-list>
@@ -104,10 +112,11 @@ import store from "@/store";
 import {
   AnnotationNames,
   AnnotationShape,
-  IToolConfiguration
+  IToolConfiguration,
 } from "@/store/model";
 
 import AnnotationWorkerMenu from "@/components/AnnotationWorkerMenu.vue";
+import SamToolMenu from "@/components/SamToolMenu.vue";
 import CircleToDotMenu from "@/components/CircleToDotMenu.vue";
 import ToolCreation from "@/tools/creation/ToolCreation.vue";
 import ToolItem from "./ToolItem.vue";
@@ -118,9 +127,10 @@ import ToolItem from "./ToolItem.vue";
     ToolCreation,
     ToolItem,
     AnnotationWorkerMenu,
+    SamToolMenu,
     CircleToDotMenu,
-    draggable
-  }
+    draggable,
+  },
 })
 export default class Toolset extends Vue {
   readonly store = store;
@@ -128,7 +138,7 @@ export default class Toolset extends Vue {
   panels: number = 0;
 
   get selectedToolId() {
-    return this.store.selectedTool?.id || null;
+    return this.store.selectedTool?.configuration.id || null;
   }
 
   set selectedToolId(id: string | null) {
@@ -148,7 +158,7 @@ export default class Toolset extends Vue {
   }
 
   get selectedTool(): IToolConfiguration | null {
-    return this.store.selectedTool;
+    return this.store.selectedTool?.configuration ?? null;
   }
 
   toolCreationDialogOpen: boolean = false;
@@ -167,7 +177,7 @@ export default class Toolset extends Vue {
       if (values.annotation) {
         propDesc.push([
           "Shape",
-          AnnotationNames[values.annotation.shape as AnnotationShape]
+          AnnotationNames[values.annotation.shape as AnnotationShape],
         ]);
         if (values.annotation.tags && values.annotation.tags.length) {
           propDesc.push(["Tag(s)", values.annotation.tags.join(", ")]);

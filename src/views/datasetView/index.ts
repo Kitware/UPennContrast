@@ -12,11 +12,11 @@ const routes: RouteConfig[] = [
         name: "datasetview",
         component: Viewer,
         meta: {
-          text: "Explore"
-        }
-      }
-    ]
-  }
+          text: "Explore",
+        },
+      },
+    ],
+  },
 ];
 
 export default routes;

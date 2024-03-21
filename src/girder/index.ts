@@ -1,6 +1,6 @@
 export { vuetifyConfig } from "@girder/components/src/utils";
 export {
-  default as RestClient //,
+  default as RestClient, //,
 } from "@girder/components/src/rest";
 import { RestClientInstance as RCInterface } from "@girder/components/src/rest";
 export interface RestClientInstance extends RCInterface {}

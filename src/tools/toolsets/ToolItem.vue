@@ -10,8 +10,8 @@
             handler: toggleTool,
             data: {
               section: 'Tools',
-              description: `Toggle tool:  ${tool.name}`
-            }
+              description: `Toggle tool:  ${tool.name}`,
+            },
           }
         : []
     "
@@ -45,7 +45,7 @@ import ToolIcon from "@/tools/ToolIcon.vue";
 import ToolEdition from "@/tools/ToolEdition.vue";
 
 @Component({
-  components: { ToolIcon, ToolEdition }
+  components: { ToolIcon, ToolEdition },
 })
 export default class Toolset extends Vue {
   readonly store = store;
@@ -64,7 +64,7 @@ export default class Toolset extends Vue {
   }
 
   isSelectedTool() {
-    return this.store.selectedTool?.id === this.tool.id;
+    return this.store.selectedTool?.configuration.id === this.tool.id;
   }
 }
 </script>

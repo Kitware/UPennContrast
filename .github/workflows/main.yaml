@@ -1,0 +1,30 @@
+name: Build and test
+
+on: [pull_request, push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      - uses: actions/checkout@v1
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Typescript check
+        run: npm run tsc
+      - name: Vue linter
+        run: npm run lint:ci
+        env:
+          NODE_ENV: production
+      - name: Build project
+        run: npm run build
+      - name: Run tests
+        run: npm test

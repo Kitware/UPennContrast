@@ -7,10 +7,15 @@ multi_data
 # local env files
 *.local
 
+#unplugin-vue-components plugin
+components.d.ts
+
 # Itk build folders
-/itk/web-build
-/itk/out
+/itk/emscripten-build
 /itk/build
+
+# ONNX files
+public/onnx-models
 
 # Log files
 npm-debug.log*

@@ -9,7 +9,7 @@ export default routeMapper({
   configurationId: {
     parse: String,
     get: () => store.selectedConfigurationId,
-    set: (value: string) => store.setSelectedConfiguration(value)
-  }
+    set: (value: string) => store.setSelectedConfiguration(value),
+  },
 });
 </script>

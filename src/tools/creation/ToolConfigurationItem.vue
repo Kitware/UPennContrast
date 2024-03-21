@@ -50,8 +50,8 @@ import DockerImage from "@/tools/creation/templates/DockerImage.vue";
     VCheckbox,
     VTextField,
     VRadioGroup,
-    DockerImage
-  }
+    DockerImage,
+  },
 })
 // Creates a tool configuration interface based on the current selected template.
 export default class ToolConfigurationItem extends Vue {
@@ -83,7 +83,7 @@ export default class ToolConfigurationItem extends Vue {
     checkbox: "v-checkbox",
     radio: "v-radio-group",
     text: "v-text-field",
-    dockerImage: "docker-image"
+    dockerImage: "docker-image",
   };
 
   changed() {

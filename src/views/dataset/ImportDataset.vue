@@ -58,20 +58,20 @@ export default class ImportDataset extends Vue {
     if (value) {
       this.store.api
         .getImages(value._id)
-        .then(images => {
+        .then((images) => {
           if (images.length > 0) {
             this.successMessages.push(
               `Detected ${images.length} ${
                 images.length > 1 ? "images" : "image"
-              }`
+              }`,
             );
           } else {
             this.errorMessages.push(`No contained images detected`);
           }
         })
-        .catch(error => {
+        .catch((error) => {
           this.errorMessages.push(
-            `Cannot resolve number of contained images: ${error}`
+            `Cannot resolve number of contained images: ${error}`,
           );
         });
     }
@@ -82,11 +82,11 @@ export default class ImportDataset extends Vue {
       return;
     }
 
-    this.store.importDataset(this.path!).then(ds => {
+    this.store.importDataset(this.path!).then((ds) => {
       if (ds) {
         this.$router.push({
           name: "dataset",
-          params: { datasetId: ds.id }
+          params: { datasetId: ds.id },
         });
       }
     });

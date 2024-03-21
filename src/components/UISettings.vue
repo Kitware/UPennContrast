@@ -1,8 +1,6 @@
 <template>
   <v-expansion-panel>
-    <v-expansion-panel-header>
-      Interface settings
-    </v-expansion-panel-header>
+    <v-expansion-panel-header> Interface settings </v-expansion-panel-header>
     <v-expansion-panel-content>
       <v-container>
         <v-switch
@@ -13,7 +11,7 @@
           v-description="{
             section: 'Interface settings',
             title: 'Dark mode',
-            description: 'Enable dark mode'
+            description: 'Enable dark mode',
           }"
         />
       </v-container>

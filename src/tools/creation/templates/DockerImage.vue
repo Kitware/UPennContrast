@@ -24,8 +24,8 @@ interface IImageSetup {
 // Tool creation interface element for choosing a docker image among available ones
 @Component({
   components: {
-    DockerImageSelect
-  }
+    DockerImageSelect,
+  },
 })
 export default class DockerImage extends Vue {
   readonly store = store;

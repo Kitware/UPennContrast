@@ -12,30 +12,30 @@ const routes: RouteConfig[] = [
     name: "root",
     component: Home,
     meta: {
-      hidden: true
-    }
+      hidden: true,
+    },
   },
   {
     path: "/dataset",
     children: datasetRoutes,
-    component: DefaultRouterView
+    component: DefaultRouterView,
   },
   {
     path: "/configuration",
     children: configurationRoutes,
-    component: DefaultRouterView
+    component: DefaultRouterView,
   },
   {
     path: "/datasetView",
     children: datasetViewRoutes,
-    component: DefaultRouterView
+    component: DefaultRouterView,
   },
   {
     path: "*",
     redirect: {
-      name: "root"
-    }
-  }
+      name: "root",
+    },
+  },
 ];
 
 export default routes;

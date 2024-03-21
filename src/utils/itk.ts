@@ -1,181 +1,154 @@
 import { logError } from "@/utils/log";
-import { IGeoJSPoint, IToolConfiguration } from "@/store/model";
-import IOTypes from "itk/IOTypes";
-import runPipelineBrowser from "itk/runPipelineBrowser";
+import { IGeoJSMap, IGeoJSPoint, IToolConfiguration } from "@/store/model";
+import {
+  InterfaceTypes,
+  runPipeline,
+  BinaryFile,
+  TextFile,
+  PipelineInput,
+} from "itk-wasm";
 
-function geoJSCoordinatesTo2DITKMesh(coordinates: IGeoJSPoint[], map: any) {
-  const pointsArray = new Float32Array(coordinates.length * 2);
-  for (let i = 0; i < coordinates.length; ++i) {
+function geoJSCoordinatesToBinaryFileData(
+  coordinates: IGeoJSPoint[],
+  map: IGeoJSMap,
+): Uint8Array {
+  const numberOfPoints = coordinates.length;
+  const points = new Float32Array(2 * numberOfPoints);
+  for (let i = 0; i < numberOfPoints; ++i) {
     const displayCoordinates = map.gcsToDisplay(coordinates[i]);
-    pointsArray[2 * i] = displayCoordinates.x;
-    pointsArray[2 * i + 1] = displayCoordinates.y;
+    points[2 * i] = displayCoordinates.x;
+    points[2 * i + 1] = displayCoordinates.y;
   }
-
-  return {
-    meshType: {
-      dimension: 2,
-      pointComponentType: "float"
-    },
-    dimension: 2,
-    numberOfPoints: coordinates.length,
-    points: pointsArray,
-    numberOfPointPixels: 0,
-    pointData: new Uint32Array(),
-    numberOfCells: 0,
-    cells: new Uint32Array(),
-    numberOfCellPixels: 0,
-    cellData: new Uint32Array(),
-    cellBufferSize: 0
-  };
+  return new Uint8Array(points.buffer);
 }
 
-function runItkPipelineWrapper(
+async function runItkPipelineWrapper(
   pipelineName: string,
   image: Uint8Array,
-  otherArgs: { path: string; data: any; type: any }[]
+  otherInputs: PipelineInput[],
+  otherArgs: string[],
 ): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const args: string[] = [
-      "/inimage.png",
-      ...otherArgs.map(arg => arg.path),
-      "/out.json"
-    ];
-    const pipelineInputs = [
-      {
-        path: "/inimage.png",
-        data: image,
-        type: IOTypes.Binary
-      },
-      ...otherArgs
-    ];
-    const pipelineOutputs = [
-      {
-        path: "out.json",
-        type: IOTypes.Text
-      }
-    ];
-    return runPipelineBrowser(
-      null,
+  const imageFilePath = "./inimage.png";
+  const inputImage: BinaryFile = { data: image, path: imageFilePath };
+  const pipelineInputs: PipelineInput[] = [
+    {
+      data: inputImage,
+      type: InterfaceTypes.BinaryFile,
+    },
+    ...otherInputs,
+  ];
+  const outPath = "./out.json";
+  const pipelineOutputs = [
+    {
+      data: { path: outPath },
+      type: InterfaceTypes.TextFile,
+    },
+  ];
+  const pipelineArgs: string[] = [imageFilePath, ...otherArgs, outPath];
+  try {
+    const { outputs, webWorker } = await runPipeline(
       pipelineName,
-      args,
+      pipelineArgs,
       pipelineOutputs,
-      pipelineInputs
-    )
-      .then(({ outputs, webWorker }: { outputs: any; webWorker: Worker }) => {
-        if (!outputs || outputs.length !== 1 || outputs[0].data === "") {
-          webWorker.terminate();
-          logError(`Pipeline didn't return a value`);
-          reject();
-        } else {
-          const result = JSON.parse(outputs[0].data);
-          webWorker.terminate();
-          resolve(result);
-        }
-      })
-      .catch((error: any) => {
-        logError(`Failed to run ITK pipeline:
-${error.message}
-${error.stack}`);
-        reject();
-      });
-  });
+      pipelineInputs,
+    );
+    const textFile = outputs[0]?.data as TextFile | undefined;
+    if (!textFile) {
+      webWorker?.terminate();
+      throw new Error("Pipeline didn't return a value");
+    } else {
+      const result = JSON.parse(textFile.data);
+      webWorker?.terminate();
+      return result;
+    }
+  } catch (error: any) {
+    logError(`Failed to run ITK pipeline`);
+    logError(error);
+  }
 }
 
-function getThresholdBlobInContour(
+async function getThresholdBlobInContour(
   image: Uint8Array,
   contour: IGeoJSPoint[] = [],
-  geoJSMap: any
+  geoJSMap: IGeoJSMap,
 ): Promise<IGeoJSPoint[]> {
-  return new Promise((resolve, reject) => {
-    runItkPipelineWrapper("BlobToBlobThreshold", image, [
-      {
-        path: "/inpoints.json",
-        data: geoJSCoordinatesTo2DITKMesh(contour, geoJSMap),
-        type: IOTypes.Mesh
-      }
-    ])
-      .then(result => {
-        if (!result?.contour) {
-          logError(
-            "Error getting data back from the pipeline. Could not find contour"
-          );
-          reject();
-        } else {
-          const converted = geoJSMap.displayToGcs(result.contour);
-          resolve(converted);
-        }
-      })
-      .catch(error => {
-        reject(error);
-      });
-  });
+  const meshFilePath = "./inpoints.obj";
+  const meshFileData = geoJSCoordinatesToBinaryFileData(contour, geoJSMap);
+  const meshFile: BinaryFile = { path: meshFilePath, data: meshFileData };
+  const result = await runItkPipelineWrapper(
+    "BlobToBlobThreshold",
+    image,
+    [{ data: meshFile, type: InterfaceTypes.BinaryFile }],
+    [meshFilePath],
+  );
+  const outputContour = result?.contour;
+  if (!outputContour) {
+    throw new Error(
+      "Error getting data back from the pipeline. Could not find contour",
+    );
+  }
+  return geoJSMap.displayToGcs(outputContour as IGeoJSPoint[]);
 }
 
-function getMaximumPointInContour(
+async function getMaximumPointInContour(
   image: Uint8Array,
   contour: IGeoJSPoint[] = [],
-  geoJSMap: any
+  geoJSMap: IGeoJSMap,
 ): Promise<IGeoJSPoint> {
-  return new Promise((resolve, reject) => {
-    runItkPipelineWrapper("BlobToDotMax", image, [
-      {
-        path: "/inpoints.json",
-        data: geoJSCoordinatesTo2DITKMesh(contour, geoJSMap),
-        type: IOTypes.Mesh
-      }
-    ])
-      .then(result => {
-        if (!result?.point) {
-          reject(
-            "Error getting data back from the pipeline. Could not find max"
-          );
-        } else {
-          const converted = geoJSMap.displayToGcs(result.point);
-          resolve(converted);
-        }
-      })
-      .catch(error => {
-        reject(error);
-      });
-  });
+  const meshFilePath = "./inpoints.obj";
+  const meshFileData = geoJSCoordinatesToBinaryFileData(contour, geoJSMap);
+  const meshFile: BinaryFile = { path: meshFilePath, data: meshFileData };
+  const result = await runItkPipelineWrapper(
+    "BlobToDotMax",
+    image,
+    [{ data: meshFile, type: InterfaceTypes.BinaryFile }],
+    [meshFilePath],
+  );
+  const outputPoint = result?.point;
+  if (!outputPoint) {
+    throw new Error(
+      "Error getting data back from the pipeline. Could not find max",
+    );
+  }
+  return geoJSMap.displayToGcs(outputPoint);
 }
 
-function getMaximumPointInCircle(
+async function getMaximumPointInCircle(
   image: Uint8Array,
   gcsCenter: IGeoJSPoint,
   radius: number,
-  geoJSMap: any
+  geoJSMap: IGeoJSMap,
 ): Promise<IGeoJSPoint> {
   const displayCenter = geoJSMap.gcsToDisplay(gcsCenter);
-  return new Promise((resolve, reject) => {
-    runItkPipelineWrapper("CircleToDotMax", image, [
-      {
-        path: "/circle",
-        data: `${displayCenter.x} ${displayCenter.y} ${radius}`,
-        type: IOTypes.Text
-      }
-    ])
-      .then(result => {
-        if (!result?.point) {
-          reject(
-            "Error getting data back from the pipeline. Could not find max"
-          );
-        } else {
-          const converted = geoJSMap.displayToGcs(result.point);
-          resolve(converted);
-        }
-      })
-      .catch(error => {
-        reject(error);
-      });
-  });
+  const circleFileName = "./circle.txt";
+  const textFile: TextFile = {
+    path: circleFileName,
+    data: `${displayCenter.x} ${displayCenter.y} ${radius}`,
+  };
+  const textInput: PipelineInput = {
+    data: textFile,
+    type: InterfaceTypes.TextFile,
+  };
+  const result = await runItkPipelineWrapper(
+    "CircleToDotMax",
+    image,
+    [textInput],
+    [circleFileName],
+  );
+  const outputPoint = result?.point;
+  if (!outputPoint) {
+    throw new Error(
+      "Error getting data back from the pipeline. Could not find max",
+    );
+  }
+  return geoJSMap.displayToGcs(outputPoint);
 }
 
 export async function snapCoordinates(
   coordinates: IGeoJSPoint[],
   imageArray: Uint8Array,
   tool: IToolConfiguration,
-  geoJSMap: any
+  geoJSMap: IGeoJSMap,
 ) {
   const snapTo = tool.values.snapTo.value;
   switch (snapTo) {
@@ -186,8 +159,8 @@ export async function snapCoordinates(
             imageArray,
             coordinates[0],
             tool.values.radius,
-            geoJSMap
-          )
+            geoJSMap,
+          ),
         ];
       }
       return undefined;
@@ -195,14 +168,14 @@ export async function snapCoordinates(
       const point = await getMaximumPointInContour(
         imageArray,
         coordinates,
-        geoJSMap
+        geoJSMap,
       );
       return [point];
     case "blobToBlob":
       const contour = await getThresholdBlobInContour(
         imageArray,
         coordinates,
-        geoJSMap
+        geoJSMap,
       );
       return contour;
     case "edge":

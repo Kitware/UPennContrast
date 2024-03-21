@@ -3,7 +3,7 @@ import {
   Action,
   Module,
   Mutation,
-  VuexModule
+  VuexModule,
 } from "vuex-module-decorators";
 import store from "./root";
 import Vue from "vue";
@@ -21,7 +21,7 @@ export const jobStates = {
   success: 3,
   error: 4,
   cancelled: 5,
-  cancelling: 824
+  cancelling: 824,
 };
 
 // Create a function that can be used as eventCallback of a job
@@ -74,7 +74,7 @@ export class Jobs extends VuexModule {
   @Mutation
   rawRemoveJob(jobId: string) {
     this.runningJobs = this.runningJobs.filter(
-      (job: IComputeJob) => job.jobId !== jobId
+      (job: IComputeJob) => job.jobId !== jobId,
     );
   }
 
@@ -121,14 +121,16 @@ export class Jobs extends VuexModule {
     this.setLatestNotificationTime(notificationTime);
 
     const jobData = data.data;
-    const jobTasks = this.runningJobs.filter(job => job.jobId === jobData._id);
+    const jobTasks = this.runningJobs.filter(
+      (job) => job.jobId === jobData._id,
+    );
     for (const task of jobTasks) {
       task.eventCallback?.(jobData);
     }
     const status = jobData.status;
     if (
       ![jobStates.cancelled, jobStates.success, jobStates.error].includes(
-        status
+        status,
       )
     ) {
       return;
@@ -139,7 +141,7 @@ export class Jobs extends VuexModule {
       logError(
         `Compute job with id ${jobData._id} ${
           status === jobStates.cancelled ? "cancelled" : "failed"
-        }`
+        }`,
       );
     }
     this.removeJob(jobData._id);
@@ -169,7 +171,7 @@ export class Jobs extends VuexModule {
   async initializeNotificationSubscription() {
     await this.closeNotificationSubscription();
     const notificationSource = new EventSource(
-      `${main.girderRest.apiRoot}/notification/stream?token=${main.girderRest.token}`
+      `${main.girderRest.apiRoot}/notification/stream?token=${main.girderRest.token}`,
     );
     notificationSource.onmessage = this.handleJobEvent;
     notificationSource.onerror = this.handleError;

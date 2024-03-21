@@ -1,14 +1,10 @@
 <template>
   <div>
     <v-card v-if="store.configuration">
-      <v-card-title class="headline">
-        Snapshots
-      </v-card-title>
+      <v-card-title class="headline"> Snapshots </v-card-title>
       <v-dialog v-model="imageTooBigDialog">
         <v-alert class="ma-0" type="error">
-          <div class="title">
-            Image can't be downloaded
-          </div>
+          <div class="title">Image can't be downloaded</div>
           <div class="ma-2">
             Image size can't exceed {{ maxPixels }} pixels.<br />
             When downloading raw channels, subsampling is not allowed.<br />
@@ -24,9 +20,7 @@
 
       <v-card-text>
         <v-row :currentArea="markCurrentArea()">
-          <v-col class="title body-1">
-            Coordinates and size:
-          </v-col>
+          <v-col class="title body-1"> Coordinates and size: </v-col>
         </v-row>
         <v-row v-if="store.dataset">
           <v-col>
@@ -93,16 +87,14 @@
                 v-description="{
                   section: 'Snapshots',
                   title: 'Save as Snapshot',
-                  description: 'Bookmark a location as a Snapshot'
+                  description: 'Bookmark a location as a Snapshot',
                 }"
               >
                 Save as Snapshot...
               </v-btn>
             </template>
             <v-card>
-              <v-card-title>
-                Create New Snapshot
-              </v-card-title>
+              <v-card-title> Create New Snapshot </v-card-title>
               <v-form
                 lazy-validation
                 ref="saveSnapshotForm"
@@ -158,9 +150,7 @@
       </v-card-text>
 
       <v-divider />
-      <v-card-title class="headline">
-        Snapshot list
-      </v-card-title>
+      <v-card-title class="headline"> Snapshot list </v-card-title>
       <v-card-text>
         <v-data-table
           :items="snapshotList()"
@@ -211,7 +201,7 @@
         v-description="{
           section: 'Snapshots',
           title: 'Download Snapshot Images',
-          description: 'Download images of the snapshot'
+          description: 'Download images of the snapshot',
         }"
       >
         Download Snapshot Images
@@ -299,9 +289,7 @@
     <v-dialog width="min-content" v-model="layersOverwritePanel" persistent>
       <v-alert prominent type="warning" class="ma-0">
         <div>
-          <v-card-title>
-            Snapshot layers incompatibility
-          </v-card-title>
+          <v-card-title> Snapshot layers incompatibility </v-card-title>
           <v-card-text>
             The selected snapshot layers are not compatible with the current
             configuration layers. It can be because some layers have been
@@ -334,11 +322,11 @@ import { downloadToClient } from "@/utils/download";
 import {
   IDownloadParameters,
   IGeoJSAnnotation,
-  IGeoJSLayer,
+  IGeoJSAnnotationLayer,
   IGeoJSMap,
   IImage,
   ISnapshot,
-  copyLayerWithoutPrivateAttributes
+  copyLayerWithoutPrivateAttributes,
 } from "@/store/model";
 import { ITileOptionsBands, getBandOption } from "@/store/images";
 import axios from "axios";
@@ -364,7 +352,7 @@ export default class Snapshots extends Vue {
   snapshotVisible!: boolean;
 
   @Watch("snapshotVisible")
-  watchSnapshotVisible(_value: boolean) {
+  watchSnapshotVisible() {
     this.showSnapshot(this.snapshotVisible);
     if (this.snapshotVisible) {
       this.markCurrentArea();
@@ -385,10 +373,10 @@ export default class Snapshots extends Vue {
       value: "modified",
       sortable: true,
       sort: (a: any, b: any) => Date.parse(a) - Date.parse(b),
-      class: "text-no-wrap"
+      class: "text-no-wrap",
     },
     { text: "Tags", value: "tags", sortable: false, class: "text-no-wrap" },
-    { text: "Delete", value: "delete", sortable: false }
+    { text: "Delete", value: "delete", sortable: false },
   ];
 
   jpegQuality: number | string = 95;
@@ -416,7 +404,7 @@ export default class Snapshots extends Vue {
   bboxTop: number = 0;
   bboxRight: number = 0;
   bboxBottom: number = 0;
-  bboxLayer: IGeoJSLayer | null = null;
+  bboxLayer: IGeoJSAnnotationLayer | null = null;
   bboxAnnotation: IGeoJSAnnotation | null = null;
   downloadMode: "layers" | "channels" = "layers";
   exportLayer: "all" | "composite" | string = "all";
@@ -432,13 +420,13 @@ export default class Snapshots extends Vue {
         { text: "PNG", value: "png" },
         { text: "JPEG", value: "jpeg" },
         { text: "TIFF", value: "tiff" },
-        { text: "TIFF - Tiled (for huge images)", value: "tiled" }
+        { text: "TIFF - Tiled (for huge images)", value: "tiled" },
       ];
     }
     if (this.downloadMode === "channels") {
       return [
         { text: "TIFF", value: "tiff" },
-        { text: "TIFF - Tiled (for huge images)", value: "tiled" }
+        { text: "TIFF - Tiled (for huge images)", value: "tiled" },
       ];
     }
     return [{ text: "Unknown download mode", value: "" }];
@@ -453,16 +441,24 @@ export default class Snapshots extends Vue {
     return (this.bboxRight || 0) - (this.bboxLeft || 0);
   }
 
-  set bboxWidth(value: string) {
-    this.bboxRight = (this.bboxLeft || 0) + intFromString(value);
+  set bboxWidth(value: string | number) {
+    if (typeof value == "string") {
+      this.bboxRight = (this.bboxLeft || 0) + intFromString(value);
+    } else {
+      this.bboxRight = value;
+    }
   }
 
   get bboxHeight(): number {
     return (this.bboxBottom || 0) - (this.bboxTop || 0);
   }
 
-  set bboxHeight(value: string) {
-    this.bboxBottom = (this.bboxTop || 0) + intFromString(value);
+  set bboxHeight(value: string | number) {
+    if (typeof value == "string") {
+      this.bboxBottom = (this.bboxTop || 0) + intFromString(value);
+    } else {
+      this.bboxBottom = value;
+    }
   }
 
   get unroll(): boolean {
@@ -470,7 +466,7 @@ export default class Snapshots extends Vue {
   }
 
   get geoJSMaps() {
-    return this.store.maps.map(map => map.map);
+    return this.store.maps.map((map) => map.map);
   }
 
   get firstMap(): IGeoJSMap | undefined {
@@ -478,7 +474,7 @@ export default class Snapshots extends Vue {
   }
 
   isRotated(): boolean {
-    return this.geoJSMaps.some(map => !!map.rotation());
+    return this.geoJSMaps.some((map) => !!map.rotation());
   }
 
   get layerItems() {
@@ -487,9 +483,9 @@ export default class Snapshots extends Vue {
       value: string;
     }[] = [
       { text: "All layers", value: "all" },
-      { text: "Composite layers", value: "composite" }
+      { text: "Composite layers", value: "composite" },
     ];
-    store.layers.forEach(layer => {
+    store.layers.forEach((layer) => {
       if (layer.visible) {
         results.push({ text: layer.name, value: layer.id });
       }
@@ -503,12 +499,12 @@ export default class Snapshots extends Vue {
       value: string | number;
     }[] = [{ text: "All channels", value: "all" }];
     if (this.store.dataset) {
-      this.store.dataset.channels.forEach(channel => {
+      this.store.dataset.channels.forEach((channel) => {
         results.push({
           text:
             this.store.dataset!.channelNames.get(channel) ||
             "Channel " + channel,
-          value: channel
+          value: channel,
         });
       });
     }
@@ -534,7 +530,7 @@ export default class Snapshots extends Vue {
       right: this.bboxRight,
       bottom: this.bboxBottom,
       width: 0,
-      height: 0
+      height: 0,
     };
     if (this.format === "jpeg") {
       if (typeof this.jpegQuality === "string") {
@@ -574,14 +570,14 @@ export default class Snapshots extends Vue {
     const layers = map
       .layers()
       .filter(
-        layer =>
+        (layer) =>
           layer !== this.bboxLayer &&
-          layer.node().css("visibility") !== "hidden"
+          layer.node().css("visibility") !== "hidden",
       );
     map.screenshot(layers).then((image: string) => {
       const params = {
         href: image,
-        download: "viewport_screenshot.png"
+        download: "viewport_screenshot.png",
       };
       downloadToClient(params);
     });
@@ -620,7 +616,7 @@ export default class Snapshots extends Vue {
       });
       // Get all the files and add them to the zip
       const deflateOptions: DeflateOptions = {
-        level: ["jpeg", "png"].includes(this.format) ? 0 : 9
+        level: ["jpeg", "png"].includes(this.format) ? 0 : 9,
       };
       const filenames = new Set();
       const filesPushed: Promise<void>[] = [];
@@ -649,18 +645,18 @@ export default class Snapshots extends Vue {
         zip.add(zipFile);
         filesPushed.push(
           getPromise.then(({ data }) =>
-            zipFile.push(new Uint8Array(data), true)
-          )
+            zipFile.push(new Uint8Array(data), true),
+          ),
         );
       }
       // Wait for all files to be pushed to end the zip
       Promise.all(filesPushed).then(zip.end.bind(zip));
       zipDone
-        .then(blob => {
+        .then((blob) => {
           const dataURL = URL.createObjectURL(blob);
           const params = {
             href: dataURL,
-            download: "snapshot.zip"
+            download: "snapshot.zip",
           };
           downloadToClient(params);
         })
@@ -712,7 +708,7 @@ export default class Snapshots extends Vue {
     const promises: Promise<any>[] = [];
     const pushBand = bands.push.bind(bands);
     if (this.exportLayer === "composite" || this.exportLayer === "all") {
-      layers.forEach(layer => {
+      layers.forEach((layer) => {
         if (layer.visible || this.exportLayer === "all") {
           promises.push(getBandOption(layer).then(pushBand));
         }
@@ -766,12 +762,12 @@ export default class Snapshots extends Vue {
     this.bboxLeft = Math.min(w - 1, Math.max(0, Math.round(left)));
     this.bboxRight = Math.max(
       this.bboxLeft + 1,
-      Math.min(w, Math.round(right))
+      Math.min(w, Math.round(right)),
     );
     this.bboxTop = Math.min(h - 1, Math.max(0, Math.round(top)));
     this.bboxBottom = Math.max(
       this.bboxTop + 1,
-      Math.min(h, Math.round(bottom))
+      Math.min(h, Math.round(bottom)),
     );
   }
 
@@ -795,7 +791,7 @@ export default class Snapshots extends Vue {
       const topLeft = map.displayToGcs({ x: inset, y: inset });
       const bottomRight = map.displayToGcs({
         x: map.size().width - inset,
-        y: map.size().height - inset
+        y: map.size().height - inset,
       });
       this.bboxLeft = topLeft.x;
       this.bboxTop = topLeft.y;
@@ -807,46 +803,46 @@ export default class Snapshots extends Vue {
       if (this.bboxLeft === null) {
         const screenBounds = map.gcsToDisplay([
           { x: bounds.left, y: bounds.top },
-          { x: bounds.right, y: bounds.bottom }
+          { x: bounds.right, y: bounds.bottom },
         ]);
         const shrinkIn = 20;
         const innerBounds = map.displayToGcs([
           { x: screenBounds[0].x + shrinkIn, y: screenBounds[0].y + shrinkIn },
-          { x: screenBounds[1].x - shrinkIn, y: screenBounds[1].y - shrinkIn }
+          { x: screenBounds[1].x - shrinkIn, y: screenBounds[1].y - shrinkIn },
         ]);
         this.setBoundingBox(
           innerBounds[0].x,
           innerBounds[0].y,
           innerBounds[1].x,
-          innerBounds[1].y
+          innerBounds[1].y,
         );
       }
       if (!this.bboxLayer) {
         this.bboxLayer = map.createLayer("annotation", {
-          autoshareRenderer: false
-        }) as IGeoJSLayer;
+          autoshareRenderer: false,
+        });
         this.bboxAnnotation = geojs.annotation.rectangleAnnotation({
           layer: this.bboxLayer,
           corners: [
             { x: this.bboxLeft, y: this.bboxTop },
             { x: this.bboxRight, y: this.bboxTop },
             { x: this.bboxRight, y: this.bboxBottom },
-            { x: this.bboxLeft, y: this.bboxBottom }
+            { x: this.bboxLeft, y: this.bboxBottom },
           ],
           editHandleStyle: {
             strokeColor: { r: 1, g: 0, b: 0 },
-            handles: { rotate: false }
+            handles: { rotate: false },
           },
           editStyle: {
             fillOpacity: 0,
             strokeColor: { r: 1, g: 0, b: 0 },
-            strokeWidth: 2
+            strokeWidth: 2,
           },
           style: {
             fillOpacity: 0,
             strokeColor: { r: 1, g: 0, b: 0 },
-            strokeWidth: 2
-          }
+            strokeWidth: 2,
+          },
         }) as IGeoJSAnnotation;
         this.bboxLayer.addAnnotation(this.bboxAnnotation);
         map.draw();
@@ -874,13 +870,13 @@ export default class Snapshots extends Vue {
       { x: 0, y: 0 },
       { x: w, y: 0 },
       { x: w, y: h },
-      { x: 0, y: h }
+      { x: 0, y: h },
     ];
     coordinates = [
       { x: this.bboxLeft, y: this.bboxTop },
       { x: this.bboxRight, y: this.bboxTop },
       { x: this.bboxRight, y: this.bboxBottom },
-      { x: this.bboxLeft, y: this.bboxBottom }
+      { x: this.bboxLeft, y: this.bboxBottom },
     ];
     const map = this.firstMap;
     if (this.bboxLayer && this.bboxAnnotation && map) {
@@ -888,7 +884,7 @@ export default class Snapshots extends Vue {
       coordinates = geojs.transform.transformCoordinates(
         map.ingcs(),
         map.gcs(),
-        coordinates
+        coordinates,
       );
       this.bboxAnnotation.options("corners", coordinates);
       if (this.bboxLayer.currentAnnotation) {
@@ -937,7 +933,7 @@ export default class Snapshots extends Vue {
         Math.min(coord[0].x, coord[2].x),
         Math.min(coord[0].y, coord[2].y),
         Math.max(coord[0].x, coord[2].x),
-        Math.max(coord[0].y, coord[2].y)
+        Math.max(coord[0].y, coord[2].y),
       );
     }
   }
@@ -955,7 +951,7 @@ export default class Snapshots extends Vue {
         Math.min(coord[0].x, coord[2].x),
         Math.min(coord[0].y, coord[2].y),
         Math.max(coord[0].x, coord[2].x),
-        Math.max(coord[0].y, coord[2].y)
+        Math.max(coord[0].y, coord[2].y),
       );
     }
     if (this.bboxLayer) {
@@ -976,10 +972,10 @@ export default class Snapshots extends Vue {
       const snapshots = store.configuration.snapshots.slice();
       if (!sortMode) {
         snapshots.sort(
-          (a, b) => (b.modified || b.created) - (a.modified || a.created)
+          (a, b) => (b.modified || b.created) - (a.modified || a.created),
         );
       }
-      snapshots.forEach(s => {
+      snapshots.forEach((s) => {
         if (
           sre.exec(s.name) ||
           sre.exec(s.description) ||
@@ -990,7 +986,7 @@ export default class Snapshots extends Vue {
             key: s.name,
             record: s,
             // format the date to string
-            modified: formatDate(new Date(s.modified || s.created))
+            modified: formatDate(new Date(s.modified || s.created)),
           });
         }
       });
@@ -1001,9 +997,9 @@ export default class Snapshots extends Vue {
   areCurrentLayersCompatible(snapshot: ISnapshot) {
     // Returns true if all layers of the snapshot also exist in the store and have the same channel
     const currentLayers = this.store.layers;
-    return snapshot.layers.every(snapshotLayer => {
+    return snapshot.layers.every((snapshotLayer) => {
       const storeLayer = currentLayers.find(
-        layer => layer.id === snapshotLayer.id
+        (layer) => layer.id === snapshotLayer.id,
       );
       return !!storeLayer && storeLayer.channel === snapshotLayer.channel;
     });
@@ -1058,8 +1054,8 @@ export default class Snapshots extends Vue {
           xy: snapshot.xy.toString(),
           z: snapshot.z.toString(),
           time: snapshot.time.toString(),
-          layer: snapshot.layerMode
-        }
+          layer: snapshot.layerMode,
+        },
       })
       .catch(() => {}); /* catch redundant navigation warnings */
 
@@ -1072,26 +1068,26 @@ export default class Snapshots extends Vue {
         snapshot.viewport.tl.x,
         snapshot.viewport.tr.x,
         snapshot.viewport.bl.x,
-        snapshot.viewport.tr.x
+        snapshot.viewport.tr.x,
       ),
       right: Math.max(
         snapshot.viewport.tl.x,
         snapshot.viewport.tr.x,
         snapshot.viewport.bl.x,
-        snapshot.viewport.tr.x
+        snapshot.viewport.tr.x,
       ),
       top: Math.min(
         snapshot.viewport.tl.y,
         snapshot.viewport.tr.y,
         snapshot.viewport.bl.y,
-        snapshot.viewport.tr.y
+        snapshot.viewport.tr.y,
       ),
       bottom: Math.max(
         snapshot.viewport.tl.y,
         snapshot.viewport.tr.y,
         snapshot.viewport.bl.y,
-        snapshot.viewport.tr.y
-      )
+        snapshot.viewport.tr.y,
+      ),
     });
     map.rotation(snapshot.rotation || 0);
     this.markCurrentArea();
@@ -1127,7 +1123,7 @@ export default class Snapshots extends Vue {
         tl: map.displayToGcs({ x: 0, y: 0 }),
         tr: map.displayToGcs({ x: map.size().width, y: 0 }),
         bl: map.displayToGcs({ x: 0, y: map.size().height }),
-        br: map.displayToGcs({ x: map.size().width, y: map.size().height })
+        br: map.displayToGcs({ x: map.size().width, y: map.size().height }),
       },
       rotation: map.rotation(),
       unrollXY: store.unrollXY,
@@ -1144,9 +1140,9 @@ export default class Snapshots extends Vue {
           left: this.bboxLeft,
           top: this.bboxTop,
           right: this.bboxRight,
-          bottom: this.bboxBottom
-        }
-      }
+          bottom: this.bboxBottom,
+        },
+      },
     };
     this.resetAndCloseForm();
     this.store.addSnapshot(snapshot);
@@ -1168,7 +1164,7 @@ export default class Snapshots extends Vue {
     if (store.configuration && store.configuration.snapshots) {
       return store.configuration.snapshots
         .slice()
-        .filter(s => s.name === this.newName)[0];
+        .filter((s) => s.name === this.newName)[0];
     }
     return;
   }

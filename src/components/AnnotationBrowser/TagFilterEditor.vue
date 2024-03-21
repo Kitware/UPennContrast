@@ -21,8 +21,8 @@ import TagPicker from "@/components/TagPicker.vue";
 
 @Component({
   components: {
-    TagPicker
-  }
+    TagPicker,
+  },
 })
 export default class TagFilterEditor extends Vue {
   @VModel({ type: Object }) filter!: ITagAnnotationFilter;
@@ -30,12 +30,12 @@ export default class TagFilterEditor extends Vue {
   readonly exclusiveItems = [
     {
       text: "Any",
-      value: false
+      value: false,
     },
     {
       text: "Only",
-      value: true
-    }
+      value: true,
+    },
   ];
 
   get tags() {

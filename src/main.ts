@@ -19,7 +19,7 @@ import "./style.scss";
 import VueRouter from "vue-router";
 
 // Mousetrap is configured for further imports (no need to import record plugin again)
-import _Mousetrap from "mousetrap";
+import "mousetrap";
 import "mousetrap/plugins/record/mousetrap-record.min.js";
 import vMousetrap from "@/utils/v-mousetrap";
 import vDescription from "@/utils/v-description";
@@ -39,13 +39,13 @@ new Vue({
     girderRest: new Proxy(main, {
       get(obj: Main, prop: keyof RestClientInstance) {
         return obj.girderRest[prop];
-      }
-    })
+      },
+    }),
   },
   router: new VueRouter({
-    routes
+    routes,
   }),
   store,
   vuetify,
-  render: (h: any) => h(App)
+  render: (h: any) => h(App),
 }).$mount("#app");

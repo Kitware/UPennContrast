@@ -1,8 +1,6 @@
 <template>
   <v-expansion-panel>
-    <v-expansion-panel-header>
-      Actions
-    </v-expansion-panel-header>
+    <v-expansion-panel-header> Actions </v-expansion-panel-header>
     <v-expansion-panel-content>
       <v-container>
         <v-row>
@@ -11,9 +9,7 @@
               <template v-if="undoEntry">
                 Undo {{ undoEntry.actionName }}
               </template>
-              <template v-else>
-                No Undo Available
-              </template>
+              <template v-else> No Undo Available </template>
             </v-btn>
           </v-col>
           <v-col class="pa-1">
@@ -21,9 +17,7 @@
               <template v-if="redoEntry">
                 Redo {{ redoEntry.actionName }}
               </template>
-              <template v-else>
-                No Redo Available
-              </template>
+              <template v-else> No Redo Available </template>
             </v-btn>
           </v-col>
         </v-row>
@@ -81,8 +75,8 @@ import AnnotationImport from "@/components/AnnotationBrowser/AnnotationImport.vu
   components: {
     AnnotationCsvDialog,
     AnnotationExport,
-    AnnotationImport
-  }
+    AnnotationImport,
+  },
 })
 export default class AnnotationActions extends Vue {
   readonly store = store;
@@ -97,11 +91,18 @@ export default class AnnotationActions extends Vue {
   }
 
   get undoEntry() {
-    return this.history.find(entry => !entry.isUndone);
+    return this.history.find((entry) => !entry.isUndone);
   }
 
   get redoEntry() {
-    return this.history.findLast(entry => entry.isUndone);
+    // Use findLast(entry => entry.isUndone) as in undoEntry() when typescript agrees
+    const history = this.history;
+    for (let i = history.length; i-- > 0; ) {
+      if (history[i].isUndone) {
+        return history[i];
+      }
+    }
+    return undefined;
   }
 
   get filteredAnnotations() {
@@ -113,7 +114,7 @@ export default class AnnotationActions extends Vue {
   }
 
   get propertyIds() {
-    return this.propertyStore.properties.map(p => p.id);
+    return this.propertyStore.properties.map((p) => p.id);
   }
 
   get history() {

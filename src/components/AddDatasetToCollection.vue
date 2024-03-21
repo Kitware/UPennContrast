@@ -83,9 +83,7 @@
             @generatedJson="addDatasetConfigurationDone"
             :class="{ 'd-none': !option.editVariables }"
           />
-          <div class="title mb-2">
-            Configuring the dataset
-          </div>
+          <div class="title mb-2">Configuring the dataset</div>
           <v-progress-circular indeterminate />
           <div class="code-container" v-if="option.configurationLogs">
             <code class="code-block">
@@ -136,7 +134,7 @@ function defaultDatasetUploadOption(): TAddDatasetOption {
     editVariables: false,
     configuring: false,
     configurationLogs: "",
-    uploadedDatasetId: null
+    uploadedDatasetId: null,
   };
 }
 
@@ -145,12 +143,12 @@ function defaultDatasetAddOption(): TAddDatasetOption {
     type: "add",
     datasets: [],
     warnings: [],
-    datasetSelectLocation: null
+    datasetSelectLocation: null,
   };
 }
 
 @Component({
-  components: { CustomFileManager, MultiSourceConfiguration, NewDataset }
+  components: { CustomFileManager, MultiSourceConfiguration, NewDataset },
 })
 export default class AddDatasetToCollection extends Vue {
   readonly girderResources = girderResources;
@@ -201,18 +199,18 @@ export default class AddDatasetToCollection extends Vue {
     // Find selected items that are datasets
     const selectedDatasets: IDataset[] = [];
     await Promise.all(
-      selectedLocations.map(async location => {
+      selectedLocations.map(async (location) => {
         if (!isDatasetFolder(location)) {
           return;
         }
         const dataset = await this.girderResources.getDataset({
-          id: location._id
+          id: location._id,
         });
         if (!dataset) {
           return;
         }
         selectedDatasets.push(dataset);
-      })
+      }),
     );
 
     if (selectedDatasets.length !== selectedLocations.length) {
@@ -230,13 +228,15 @@ export default class AddDatasetToCollection extends Vue {
     // Filter compatible datasets
     const configCompat = this.collection.compatibility;
     const configViews = await this.store.api.findDatasetViews({
-      configurationId: this.collection.id
+      configurationId: this.collection.id,
     });
-    const excludeDatasetIds = new Set(configViews.map(view => view.datasetId));
+    const excludeDatasetIds = new Set(
+      configViews.map((view) => view.datasetId),
+    );
     const compatibleDatasets = selectedDatasets.filter(
-      dataset =>
+      (dataset) =>
         !excludeDatasetIds.has(dataset.id) &&
-        areCompatibles(configCompat, getDatasetCompatibility(dataset))
+        areCompatibles(configCompat, getDatasetCompatibility(dataset)),
     );
 
     if (compatibleDatasets.length !== selectedDatasets.length) {
@@ -244,7 +244,7 @@ export default class AddDatasetToCollection extends Vue {
         selectedDatasets.length - compatibleDatasets.length;
       currentWarnings.push(
         nNotCompatible +
-          " selected items are not compatible with the current configuration"
+          " selected items are not compatible with the current configuration",
       );
     }
 
@@ -279,7 +279,7 @@ export default class AddDatasetToCollection extends Vue {
       const config = this.$refs.configuration;
       if (!config) {
         logError(
-          "MultiSourceConfiguration component not mounted during configuration of new dataset"
+          "MultiSourceConfiguration component not mounted during configuration of new dataset",
         );
         this.option.editVariables = true;
         return;
@@ -306,7 +306,7 @@ export default class AddDatasetToCollection extends Vue {
     if (!configCompat) {
       this.$emit(
         "error",
-        "DatasetConfiguration missing after multi source configuration of dataset"
+        "DatasetConfiguration missing after multi source configuration of dataset",
       );
       this.$emit("done");
       return;
@@ -315,7 +315,7 @@ export default class AddDatasetToCollection extends Vue {
     if (!dataset) {
       this.$emit(
         "error",
-        "Dataset missing after multi source configuration of dataset"
+        "Dataset missing after multi source configuration of dataset",
       );
       this.$emit("done");
       return;
@@ -340,18 +340,18 @@ export default class AddDatasetToCollection extends Vue {
 
     switch (this.option.type) {
       case "add":
-        this.option.datasets.forEach(d => datasetIds.push(d.id));
+        this.option.datasets.forEach((d) => datasetIds.push(d.id));
         break;
       case "upload":
         datasetIds.push(this.option.uploadedDatasetId!);
         break;
     }
 
-    const promises = datasetIds.map(datasetId =>
+    const promises = datasetIds.map((datasetId) =>
       this.store.createDatasetView({
         datasetId,
-        configurationId
-      })
+        configurationId,
+      }),
     );
     const datasetViews = await Promise.all(promises);
 

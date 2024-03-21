@@ -2,9 +2,7 @@
   <div :class="{ background: !singleLayer }">
     <v-row dense v-if="!singleLayer" class="pl-4 py-1 pr-8">
       <v-col class="textCol">
-        <div class="subtitle-1">
-          Group
-        </div>
+        <div class="subtitle-1">Group</div>
       </v-col>
       <v-col class="denseCol">
         <v-switch
@@ -67,8 +65,8 @@ import store from "@/store";
 @Component({
   components: {
     DisplayLayer,
-    draggable
-  }
+    draggable,
+  },
 })
 export default class DisplayLayerGroup extends Vue {
   readonly store = store;
@@ -93,21 +91,23 @@ export default class DisplayLayerGroup extends Vue {
   }
 
   get isZMaxMerge() {
-    return this.displayLayers.every(displayLayer => displayLayer.isZMaxMerge);
+    return this.displayLayers.every((displayLayer) => displayLayer.isZMaxMerge);
   }
 
   set isZMaxMerge(value: boolean) {
     this.displayLayers.forEach(
-      displayLayer => (displayLayer.isZMaxMerge = value)
+      (displayLayer) => (displayLayer.isZMaxMerge = value),
     );
   }
 
   get visible() {
-    return this.displayLayers.every(displayLayer => displayLayer.visible);
+    return this.displayLayers.every((displayLayer) => displayLayer.visible);
   }
 
   set visible(value: boolean) {
-    this.displayLayers.forEach(displayLayer => (displayLayer.visible = value));
+    this.displayLayers.forEach(
+      (displayLayer) => (displayLayer.visible = value),
+    );
   }
 
   update(value: ICombinedLayer[]) {

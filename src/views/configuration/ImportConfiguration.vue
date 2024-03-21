@@ -3,9 +3,7 @@
     <configuration-select
       @submit="submit"
       @cancel="cancel"
-      :title="
-        `Add dataset ${datasetName} to one or several existing collections`
-      "
+      :title="`Add dataset ${datasetName} to one or several existing collections`"
     />
   </v-container>
 </template>
@@ -16,7 +14,7 @@ import ConfigurationSelect from "@/components/ConfigurationSelect.vue";
 import { IDatasetConfiguration } from "@/store/model";
 
 @Component({
-  components: { ConfigurationSelect }
+  components: { ConfigurationSelect },
 })
 export default class ImportConfiguration extends Vue {
   readonly store = store;
@@ -32,14 +30,13 @@ export default class ImportConfiguration extends Vue {
     }
 
     // Create a view for each configuration
-    const now = Date.now();
     await Promise.all(
-      configurations.map(configuration =>
+      configurations.map((configuration) =>
         this.store.createDatasetView({
           configurationId: configuration.id,
-          datasetId: dataset.id
-        })
-      )
+          datasetId: dataset.id,
+        }),
+      ),
     );
 
     this.$router.back();

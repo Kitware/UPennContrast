@@ -12,23 +12,23 @@ const routes: RouteConfig[] = [
     name: "newdataset",
     component: NewDataset,
     meta: {
-      text: "Upload New Data"
+      text: "Upload New Data",
     },
-    props: route => ({ ...route.params })
+    props: (route) => ({ ...route.params }),
   },
   {
     path: "multi/:datasetId",
     name: "multi",
     component: MultiSourceConfiguration,
-    props: route => ({ ...route.params })
+    props: (route) => ({ ...route.params }),
   },
   {
     path: "import",
     name: "importdataset",
     component: ImportDataset,
     meta: {
-      text: "Use Existing Data"
-    }
+      text: "Use Existing Data",
+    },
   },
   {
     path: ":datasetId",
@@ -40,17 +40,17 @@ const routes: RouteConfig[] = [
         name: "dataset",
         component: DatasetInfo,
         meta: {
-          hidden: true
-        }
-      }
+          hidden: true,
+        },
+      },
     ],
     meta: {
       name: "dataset",
       text(store: Main) {
         return store.dataset?.name || store.selectedDatasetId;
-      }
-    }
-  }
+      },
+    },
+  },
 ];
 
 export default routes;

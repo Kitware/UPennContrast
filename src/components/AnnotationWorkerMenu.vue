@@ -62,7 +62,7 @@ import annotationsStore from "@/store/annotation";
 import {
   IProgressInfo,
   IToolConfiguration,
-  IWorkerInterfaceValues
+  IWorkerInterfaceValues,
 } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
@@ -73,10 +73,10 @@ import WorkerInterfaceValues from "@/components/WorkerInterfaceValues.vue";
   components: {
     LayerSelect,
     TagFilterEditor,
-    WorkerInterfaceValues
-  }
+    WorkerInterfaceValues,
+  },
 })
-export default class annotationWorkerMenu extends Vue {
+export default class AnnotationWorkerMenu extends Vue {
   readonly store = store;
   readonly annotationsStore = annotationsStore;
   readonly propertyStore = propertiesStore;
@@ -103,7 +103,7 @@ export default class annotationWorkerMenu extends Vue {
     return (
       this.propertyStore.getWorkerPreview(this.image) || {
         text: "null",
-        image: ""
+        image: "",
       }
     );
   }
@@ -126,11 +126,11 @@ export default class annotationWorkerMenu extends Vue {
       tool: this.tool,
       workerInterface: this.interfaceValues,
       progress: this.progressInfo,
-      callback: success => {
+      callback: (success) => {
         this.running = false;
         this.previousRunStatus = success;
         this.progressInfo = {};
-      }
+      },
     });
   }
 
@@ -138,7 +138,7 @@ export default class annotationWorkerMenu extends Vue {
     this.propertyStore.requestWorkerPreview({
       image: this.image,
       tool: this.tool,
-      workerInterface: this.interfaceValues
+      workerInterface: this.interfaceValues,
     });
   }
 

@@ -46,7 +46,7 @@ declare module "@girder/components/src/rest" {
       firstName: string,
       lastName: string,
       password: string,
-      admin?: boolean
+      admin?: boolean,
     ): Promise<any>;
 
     fetchUser(): Promise<Readonly<IGirderUser>>;
@@ -59,4 +59,14 @@ declare module "@girder/components/src/rest" {
   const RestClient: RestClientStatic;
 
   export default RestClient;
+}
+
+declare module "@/girder/components" {
+  // note: will also import the vuetify.min.css even tho in the lib version the SASS one will be generated directly
+  export {
+    Upload,
+    Breadcrumb,
+    Search,
+  } from "@girder/components/src/components";
+  export { FileManager } from "@girder/components/src/components/Snippet";
 }

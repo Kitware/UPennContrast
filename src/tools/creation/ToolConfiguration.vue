@@ -49,19 +49,19 @@ import DockerImage from "@/tools/creation/templates/DockerImage.vue";
 
 @Component({
   components: {
-    ToolConfigurationItem
-  }
+    ToolConfigurationItem,
+  },
 })
 // Creates a tool configuration interface based on the current selected template.
 export default class ToolConfiguration extends Vue {
   readonly store = store;
 
   @Prop()
-  readonly value!: any;
+  readonly value!: Record<string, any>;
 
-  advancedPanel: any;
+  advancedPanel: number | undefined;
 
-  toolValues: any = null;
+  toolValues: Record<string, any> | null = null;
 
   // Dynamic interface elements that depend on various values being selected
   valueTemplates: any = {};
@@ -74,19 +74,19 @@ export default class ToolConfiguration extends Vue {
         .map(([, value]: any[]) => value)
         .reduce((arr: any[], interfaceList: any[]) => {
           return [...arr, ...interfaceList];
-        }, [])
+        }, []),
     ];
   }
 
   get advancedInternalTemplate() {
     return this.internalTemplate.filter(
-      item => item.advanced || item.type === "annotation"
+      (item) => item.advanced || item.type === "annotation",
     );
   }
 
   get basicInternalTemplate() {
     return this.internalTemplate.filter(
-      item => !item.advanced || item.type === "annotation"
+      (item) => !item.advanced || item.type === "annotation",
     );
   }
 
@@ -134,12 +134,13 @@ export default class ToolConfiguration extends Vue {
   }
 
   setDefaultValues() {
-    this.internalTemplate.forEach(item => {
-      if (this.toolValues[item.id] !== undefined) {
+    this.internalTemplate.forEach((item) => {
+      if (this.toolValues === null || this.toolValues[item.id] !== undefined) {
         return;
       }
+      const capturedToolValues = this.toolValues;
       const setItemValue = (value: any) =>
-        Vue.set(this.toolValues, item.id, value);
+        Vue.set(capturedToolValues, item.id, value);
       switch (item.type) {
         case "select":
           if (item?.meta?.items.length) {
@@ -179,16 +180,17 @@ export default class ToolConfiguration extends Vue {
             const innerComponents = (this.$refs[item.id] as Vue[]).reduce(
               (innerComponents, configItem) => [
                 ...innerComponents,
-                configItem.$refs["innerComponent"] as Vue
+                configItem.$refs["innerComponent"] as Vue,
               ],
-              [] as Vue[]
+              [] as Vue[],
             );
             switch (item.type) {
               case "annotation":
-                const annotations = innerComponents as AnnotationConfiguration[];
+                const annotations =
+                  innerComponents as AnnotationConfiguration[];
                 if (annotations.length) {
                   setItemValue({});
-                  annotations.forEach(annotation => annotation.reset());
+                  annotations.forEach((annotation) => annotation.reset());
                 }
                 break;
 
@@ -196,7 +198,7 @@ export default class ToolConfiguration extends Vue {
                 const restricts = innerComponents as TagAndLayerRestriction[];
                 if (restricts.length) {
                   setItemValue({});
-                  restricts.forEach(restrict => restrict.reset());
+                  restricts.forEach((restrict) => restrict.reset());
                 }
                 break;
 
@@ -204,7 +206,7 @@ export default class ToolConfiguration extends Vue {
                 const dockerImages = innerComponents as DockerImage[];
                 if (dockerImages.length) {
                   setItemValue(null);
-                  dockerImages.forEach(dockerImage => dockerImage.reset());
+                  dockerImages.forEach((dockerImage) => dockerImage.reset());
                 }
                 break;
 
@@ -219,11 +221,11 @@ export default class ToolConfiguration extends Vue {
 
   updateInterface() {
     // Go through values to see if additional interface elements need to be added
-    Object.entries(this.toolValues).forEach(([key, value]: any[]) => {
+    Object.entries(this.toolValues ?? {}).forEach(([key, value]: any[]) => {
       if (value?.meta?.interface) {
         this.valueTemplates = {
           ...this.valueTemplates,
-          [key]: value.meta.interface
+          [key]: value.meta.interface,
         };
       }
     });

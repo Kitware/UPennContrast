@@ -5,7 +5,7 @@ import {
   IDataset,
   IDisplaySlice,
   IContrast,
-  IImage
+  IImage,
 } from "./model";
 import main from "./index";
 
@@ -29,7 +29,7 @@ export function getLayerSliceIndexes(
   ds: IDataset,
   time: number,
   xy: number,
-  z: number
+  z: number,
 ): { xyIndex: number; zIndex: number; tIndex: number } | null {
   const xyIndex = ds.xy.length > 1 ? resolveSlice(layer.xy, xy) : 0;
   // invalid slices
@@ -53,7 +53,7 @@ export function getLayerImages(
   ds: IDataset,
   time: number,
   xy: number,
-  z: number
+  z: number,
 ) {
   const indexes = getLayerSliceIndexes(layer, ds, time, xy, z);
   if (!indexes) {
@@ -65,7 +65,7 @@ export function getLayerImages(
     ds.z[zIndex],
     ds.time[tIndex],
     ds.xy[xyIndex],
-    ds.channels[layer.channel]
+    ds.channels[layer.channel],
   );
 }
 
@@ -100,7 +100,7 @@ export function toStyle(
   hist: ITileHistogram | null,
   layer: IDisplayLayer | null,
   ds: IDataset | null,
-  image: IImage | null
+  image: IImage | null,
 ): ITileOptions {
   // unless we add a gamma function, 2 steps are all that are necessary.
   const p = palette(color, 2);
@@ -108,13 +108,13 @@ export function toStyle(
     return {
       min: contrast.blackPoint,
       max: contrast.whitePoint,
-      palette: p
+      palette: p,
     };
   }
   let style: ITileOptions = {
     min: "min",
     max: "max",
-    palette: p
+    palette: p,
   };
   if (hist) {
     const scale = scaleLinear()
@@ -123,27 +123,27 @@ export function toStyle(
     style = {
       min: scale(contrast.blackPoint),
       max: scale(contrast.whitePoint),
-      palette: p
+      palette: p,
     };
   }
   if (layer && ds && image) {
-    let mmxy = layer.xy.type === "max-merge";
-    let mmt = layer.time.type === "max-merge";
-    let mmz = layer.z.type === "max-merge";
+    const mmxy = layer.xy.type === "max-merge";
+    const mmt = layer.time.type === "max-merge";
+    const mmz = layer.z.type === "max-merge";
     if (mmxy || mmt || mmz) {
-      var composite: { [key: string]: any }[] = [];
+      const composite: { [key: string]: any }[] = [];
       for (let xyi = 0; xyi < (mmxy ? ds.xy.length : 1); xyi += 1) {
-        let xy = mmxy ? ds.xy[xyi] : image.key.xy;
+        const xy = mmxy ? ds.xy[xyi] : image.key.xy;
         for (let ti = 0; ti < (mmt ? ds.time.length : 1); ti += 1) {
-          let t = mmt ? ds.time[ti] : image.key.t;
+          const t = mmt ? ds.time[ti] : image.key.t;
           for (let zi = 0; zi < (mmz ? ds.z.length : 1); zi += 1) {
-            let z = mmz ? ds.z[zi] : image.key.z;
+            const z = mmz ? ds.z[zi] : image.key.z;
             composite.push({
               frame: ds.images(z, t, xy, image.key.c)[image.keyOffset]
                 .frameIndex,
               min: style.min,
               max: style.max,
-              palette: style.palette
+              palette: style.palette,
             });
           }
         }
@@ -164,7 +164,7 @@ export async function getBandOption(layer: IDisplayLayer) {
     histogram,
     layer,
     main.dataset,
-    image
+    image,
   );
   if (image) {
     style.frame = image.frameIndex;
@@ -187,7 +187,7 @@ export function mergeHistograms(histograms: ITileHistogram[]): ITileHistogram {
       bin_edges: [0, 0.5],
       min: 0,
       max: 1,
-      samples: 0
+      samples: 0,
     };
   }
   if (histograms.length === 1) {

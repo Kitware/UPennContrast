@@ -42,7 +42,7 @@
         <template v-for="[groupId, combinedLayers] in groupsArrayWithSpacers">
           <display-layer-group
             v-if="combinedLayers"
-            :key="groupId"
+            :key="groupId + '_layers'"
             group="layerZoneElement"
             :single-layer="groupId.startsWith(singleLayerPrefix)"
             :combined-layers="combinedLayers"
@@ -53,7 +53,7 @@
           <draggable
             v-else
             :value="[]"
-            :key="groupId"
+            :key="groupId + '_spacer'"
             @input="spacerUpdate($event, groupId)"
             group="layerZoneElement"
             class="group-spacer"
@@ -98,8 +98,8 @@ function groupIdAfterSpacer(spacerId: string) {
 @Component({
   components: {
     DisplayLayerGroup,
-    draggable
-  }
+    draggable,
+  },
 })
 export default class DisplayLayers extends Vue {
   readonly store = store;
@@ -136,8 +136,8 @@ export default class DisplayLayers extends Vue {
   get groupsArrayWithSpacers() {
     const groupsArray = Array.from(this.groupsMap.entries());
     const withSpacers: [string, ICombinedLayer[] | null][] = [];
-    groupsArray.forEach(e =>
-      withSpacers.push([spacerIdBeforeGroup(e[0]), null], e)
+    groupsArray.forEach((e) =>
+      withSpacers.push([spacerIdBeforeGroup(e[0]), null], e),
     );
     withSpacers.push([spacerIdBeforeGroup(), null]);
     return withSpacers;
@@ -165,7 +165,7 @@ export default class DisplayLayers extends Vue {
     this.isDragging = false;
     // Groups have changed position
     const newConfigurationLayers = [];
-    for (const [_, combinedLayers] of groups) {
+    for (const [, combinedLayers] of groups) {
       if (combinedLayers) {
         for (const { configurationLayer } of combinedLayers) {
           newConfigurationLayers.push(configurationLayer);
@@ -194,7 +194,7 @@ export default class DisplayLayers extends Vue {
     // Find position of insertion
     let insertPosition = groupId
       ? configurationLayers.findIndex(
-          layer => groupIdFromLayer(layer) === groupId
+          (layer) => groupIdFromLayer(layer) === groupId,
         )
       : configurationLayers.length;
     if (insertPosition < 0) {
@@ -286,7 +286,7 @@ export default class DisplayLayers extends Vue {
     this.store.setConfigurationLayers([
       ...layersBeforeGroup,
       ...orderedLayersInGroup,
-      ...layersAfterGroup
+      ...layersAfterGroup,
     ]);
   }
 
@@ -295,8 +295,8 @@ export default class DisplayLayers extends Vue {
     this.store.changeLayer({
       layerId: combinedLayer.layer.id,
       delta: {
-        layerGroup: newGroupId
-      }
+        layerGroup: newGroupId,
+      },
     });
   }
 
@@ -311,17 +311,17 @@ export default class DisplayLayers extends Vue {
       handler: this.store.toggleGlobalZMaxMerge,
       data: {
         section: "Layer control",
-        description: "Toggle Z max-merge for all layers"
-      }
+        description: "Toggle Z max-merge for all layers",
+      },
     },
     {
       bind: "0",
       handler: this.store.toggleGlobalLayerVisibility,
       data: {
         section: "Layer control",
-        description: "Show/hide all layers"
-      }
-    }
+        description: "Show/hide all layers",
+      },
+    },
   ];
 }
 </script>

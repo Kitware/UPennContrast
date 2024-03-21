@@ -20,11 +20,11 @@ import { Vue, Component, VModel } from "vue-property-decorator";
 import {
   IShapeAnnotationFilter,
   AnnotationNames,
-  AnnotationShape
+  AnnotationShape,
 } from "@/store/model";
 
 @Component({
-  components: {}
+  components: {},
 })
 export default class TagFilterEditor extends Vue {
   @VModel({ type: Object }) filter!: IShapeAnnotationFilter;
@@ -32,20 +32,20 @@ export default class TagFilterEditor extends Vue {
   readonly shapeItems: { text: string; value: AnnotationShape | null }[] = [
     {
       text: AnnotationNames[AnnotationShape.Point],
-      value: AnnotationShape.Point
+      value: AnnotationShape.Point,
     },
     {
       text: AnnotationNames[AnnotationShape.Polygon],
-      value: AnnotationShape.Polygon
+      value: AnnotationShape.Polygon,
     },
     {
       text: AnnotationNames[AnnotationShape.Line],
-      value: AnnotationShape.Line
+      value: AnnotationShape.Line,
     },
     {
       text: "Any",
-      value: null
-    }
+      value: null,
+    },
   ];
 
   get shape() {
