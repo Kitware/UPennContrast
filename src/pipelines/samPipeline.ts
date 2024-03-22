@@ -355,11 +355,118 @@ async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
   }
 }
 
-function itkContourToAnnotationCoordinates(
+function displayToWorld(
   { contour }: IItkOutput,
   { map }: IMapEntry,
 ): IGeoJSPoint[] {
   return map.displayToGcs(contour);
+}
+
+function createSamPipelineEncoderNodes(model: TSamModel) {
+  // The map that need to be screenshot and that we use for coordinate conversions
+  // It is set by the user
+  const geoJsMapInputNode = new ManualInputNode<IMapEntry | TNoOutput>({
+    type: "debounce",
+    wait: 1000,
+    options: { leading: false, trailing: true },
+  });
+
+  // The context is used as a cache for canvas, 2D context, tensors...
+  // It is set here
+  const contextNode = new ManualInputNode<ISamEncoderContext>();
+  const encoderContext = createEncoderContext(model);
+  contextNode.setValue(encoderContext);
+
+  // The session node is an input that contains the model
+  // It is set here (models are cached)
+  const sessionNode = new ManualInputNode<InferenceSession>();
+  const encoderPath = `/onnx-models/sam/${model}/encoder.onnx`;
+  const encoderOptions = { executionProviders: ["webgpu"] };
+  createOnnxInferenceSession(encoderPath, encoderOptions).then((session) => {
+    sessionNode.setValue(session);
+  });
+
+  // Take a screenshot of the map
+  const screenshotNode = createComputeNode(screenshot, [geoJsMapInputNode]);
+
+  // Preprocess the image: resize, normalize and convert to tensor
+  const preprocessNode = createComputeNode(processCanvas, [
+    screenshotNode,
+    contextNode,
+  ]);
+
+  // Do the encoding
+  const inferenceNode = createComputeNode(runEncoder, [
+    sessionNode,
+    preprocessNode,
+  ]);
+
+  return {
+    geoJsMapInputNode,
+    contextNode,
+    sessionNode,
+    screenshotNode,
+    preprocessNode,
+    inferenceNode,
+  };
+}
+
+function createSamPipelineDecoderNodes(
+  model: TSamModel,
+  encoderNodes: ReturnType<typeof createSamPipelineEncoderNodes>,
+) {
+  // Input for the prompt
+  // It is set by the user
+  const promptInputNode = new ManualInputNode<TSamPrompt[] | TNoOutput>();
+
+  // The context is used as a cache for canvas, 2D context, tensors...
+  // It is set here
+  const contextNode = new ManualInputNode<ISamDecoderContext>();
+  const decoderContext = createDecoderContext();
+  contextNode.setValue(decoderContext);
+
+  // The session node is an input that contains the model
+  // It is set here (models are cached)
+  const sessionNode = new ManualInputNode<InferenceSession>();
+  const decoderPath = `/onnx-models/sam/${model}/decoder.onnx`;
+  const decoderOptions = {};
+  createOnnxInferenceSession(decoderPath, decoderOptions).then((session) => {
+    sessionNode.setValue(session);
+  });
+
+  // Preprocess the prompt to match SAM API
+  const processPromptNode = createComputeNode(processPrompt, [
+    promptInputNode,
+    encoderNodes.preprocessNode,
+    contextNode,
+    encoderNodes.geoJsMapInputNode,
+  ]);
+
+  // Run the inference
+  const inferenceNode = createComputeNode(runDecoder, [
+    sessionNode,
+    processPromptNode,
+    encoderNodes.inferenceNode,
+  ]);
+
+  // Convert the mask into a polygon
+  const maskToPolygonNode = createComputeNode(runItkPipeline, [inferenceNode]);
+
+  // Convert coordinates from display to world
+  const coordinatesConversionNode = createComputeNode(displayToWorld, [
+    maskToPolygonNode,
+    encoderNodes.geoJsMapInputNode,
+  ]);
+
+  return {
+    promptInputNode,
+    contextNode,
+    sessionNode,
+    processPromptNode,
+    inferenceNode,
+    maskToPolygonNode,
+    coordinatesConversionNode,
+  };
 }
 
 function createSamPipeline(
@@ -368,72 +475,16 @@ function createSamPipeline(
   if (!("gpu" in navigator)) {
     throw new Error("Can't initialize SAM tool: WebGPU not available");
   }
-  // Create the encoder context
-  const encoderContext = createEncoderContext(model);
 
   // Create the pipeline
+  const encoderNodes = createSamPipelineEncoderNodes(model);
+  const decoderNodes = createSamPipelineDecoderNodes(model, encoderNodes);
 
-  // Encoder nodes
-  const geoJsMapInputNode = new ManualInputNode<IMapEntry | TNoOutput>({
-    type: "debounce",
-    wait: 1000,
-    options: { leading: false, trailing: true },
-  }); // User input
-  const encoderContextNode = new ManualInputNode<ISamEncoderContext>();
-  const encoderSessionNode = new ManualInputNode<InferenceSession>();
-  const screenshotNode = createComputeNode(screenshot, [geoJsMapInputNode]);
-  const encoderPreprocessNode = createComputeNode(processCanvas, [
-    screenshotNode,
-    encoderContextNode,
-  ]);
-  const encoderNode = createComputeNode(runEncoder, [
-    encoderSessionNode,
-    encoderPreprocessNode,
-  ]);
-
-  // Decoder nodes
-  const promptInputNode = new ManualInputNode<TSamPrompt[] | TNoOutput>(); // User input
-  const decoderContextNode = new ManualInputNode<ISamDecoderContext>();
-  const decoderSessionNode = new ManualInputNode<InferenceSession>();
-  const processPromptNode = createComputeNode(processPrompt, [
-    promptInputNode,
-    encoderPreprocessNode,
-    decoderContextNode,
-    geoJsMapInputNode,
-  ]);
-  const decoderNode = createComputeNode(runDecoder, [
-    decoderSessionNode,
-    processPromptNode,
-    encoderNode,
-  ]);
-
-  // Conversion to contour
-  const itkOutputNode = createComputeNode(runItkPipeline, [decoderNode]);
-  const pipelineOutput = createComputeNode(itkContourToAnnotationCoordinates, [
-    itkOutputNode,
-    geoJsMapInputNode,
-  ]);
-
-  // Set the constant context
-  encoderContextNode.setValue(encoderContext);
-  const decoderContext = createDecoderContext();
-  decoderContextNode.setValue(decoderContext);
-
-  // Set the encoder
-  const encoderPath = `/onnx-models/sam/${model}/encoder.onnx`;
-  const encoderOptions = { executionProviders: ["webgpu"] };
-  createOnnxInferenceSession(encoderPath, encoderOptions).then((session) => {
-    encoderSessionNode.setValue(session);
-  });
-
-  // Set the decoder
-  const decoderPath = `/onnx-models/sam/${model}/decoder.onnx`;
-  const decoderOptions = {};
-  createOnnxInferenceSession(decoderPath, decoderOptions).then((session) => {
-    decoderSessionNode.setValue(session);
-  });
-
-  return { geoJsMapInputNode, promptInputNode, pipelineOutput };
+  return {
+    geoJsMapInputNode: encoderNodes.geoJsMapInputNode,
+    promptInputNode: decoderNodes.promptInputNode,
+    pipelineOutput: decoderNodes.coordinatesConversionNode,
+  };
 }
 
 export function createSamToolStateFromToolConfiguration(
