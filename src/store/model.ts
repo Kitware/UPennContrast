@@ -583,7 +583,10 @@ export interface IGeoJSScaleWidget {
       arg1: Key,
       arg2: IGeoJSScaleWidgetSpec[Key],
     ) => IGeoJSScaleWidget);
+  parent: (() => IGeoJsSceneObject) &
+    ((arg: IGeoJsSceneObject) => IGeoJSScaleWidget);
   parentCanvas: () => HTMLElement;
+  layer: () => IGeoJSUiLayer;
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.gui.scaleWidget.html#.spec
@@ -984,7 +987,6 @@ export interface IMapEntry {
   workerPreviewFeature: IGeoJSFeature;
   textLayer: IGeoJSFeatureLayer;
   uiLayer?: IGeoJSUiLayer;
-  scaleWidget?: IGeoJSScaleWidget | null;
   lowestLayer?: number;
 }
 
