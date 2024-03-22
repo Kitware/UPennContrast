@@ -37,6 +37,7 @@ import {
   IROIAnnotationFilter,
   ISamAnnotationToolState,
   IToolConfiguration,
+  SamAnnotationToolStateSymbol,
   TSamPrompt,
   TToolState,
 } from "../store/model";
@@ -228,10 +229,10 @@ export default class AnnotationViewer extends Vue {
 
   get samToolState(): ISamAnnotationToolState | null {
     const state = this.selectedToolState;
-    if (!(state && "pipeline" in state)) {
+    if (!(state?.type === SamAnnotationToolStateSymbol)) {
       return null;
     }
-    const samMapEntry = state.pipeline.geoJsMapInputNode.output;
+    const samMapEntry = state.nodes.input.geoJSMap.output;
     if (samMapEntry === NoOutput || samMapEntry.map !== this.map) {
       return null;
     }
@@ -239,7 +240,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   get samPrompts(): TSamPrompt[] {
-    const prompts = this.samToolState?.pipeline.promptInputNode.output;
+    const prompts = this.samToolState?.nodes.input.mainPrompt.output;
     return prompts === undefined || prompts === NoOutput ? [] : prompts;
   }
 
@@ -344,7 +345,7 @@ export default class AnnotationViewer extends Vue {
       // Create a new SAM prompt from the mouse state
       const newPrompt = mouseStateToSamPrompt(mouseState);
       if (newPrompt) {
-        const promptNode = this.samToolState.pipeline.promptInputNode;
+        const promptNode = this.samToolState.nodes.input.mainPrompt;
         const currentPrompts = promptNode.output;
         const newPrompts =
           currentPrompts === NoOutput

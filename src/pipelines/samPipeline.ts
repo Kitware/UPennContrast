@@ -1,4 +1,5 @@
 import {
+  ErrorToolStateSymbol,
   IErrorToolState,
   IGeoJSAnnotation,
   IGeoJSPoint,
@@ -8,6 +9,7 @@ import {
   ISamAnnotationToolState,
   IToolConfiguration,
   PromptType,
+  SamAnnotationToolStateSymbol,
   TSamPrompt,
 } from "@/store/model";
 import {
@@ -469,9 +471,7 @@ function createSamPipelineDecoderNodes(
   };
 }
 
-function createSamPipeline(
-  model: TSamModel,
-): ISamAnnotationToolState["pipeline"] {
+function createSamPipeline(model: TSamModel): ISamAnnotationToolState["nodes"] {
   if (!("gpu" in navigator)) {
     throw new Error("Can't initialize SAM tool: WebGPU not available");
   }
@@ -481,9 +481,13 @@ function createSamPipeline(
   const decoderNodes = createSamPipelineDecoderNodes(model, encoderNodes);
 
   return {
-    geoJsMapInputNode: encoderNodes.geoJsMapInputNode,
-    promptInputNode: decoderNodes.promptInputNode,
-    pipelineOutput: decoderNodes.coordinatesConversionNode,
+    input: {
+      geoJSMap: encoderNodes.geoJsMapInputNode,
+      mainPrompt: decoderNodes.promptInputNode,
+    },
+    output: {
+      mainOuput: decoderNodes.coordinatesConversionNode,
+    },
   };
 }
 
@@ -491,20 +495,21 @@ export function createSamToolStateFromToolConfiguration(
   configuration: IToolConfiguration<"samAnnotation">,
 ): ISamAnnotationToolState | IErrorToolState {
   const model: TSamModel = configuration.values.model.value;
-  let pipeline: ISamAnnotationToolState["pipeline"];
+  let nodes: ISamAnnotationToolState["nodes"];
   try {
-    pipeline = createSamPipeline(model);
+    nodes = createSamPipeline(model);
   } catch (error) {
-    return { error: error as Error };
+    return { type: ErrorToolStateSymbol, error: error as Error };
   }
   const state: ISamAnnotationToolState = {
-    pipeline,
+    type: SamAnnotationToolStateSymbol,
+    nodes,
     mouseState: {
       path: [],
     },
     output: null,
   };
-  const outputNode = state.pipeline.pipelineOutput;
+  const outputNode = state.nodes.output.mainOuput;
   outputNode.onOutputUpdate(() => {
     const rawOutput = outputNode.output;
     const newOutput =

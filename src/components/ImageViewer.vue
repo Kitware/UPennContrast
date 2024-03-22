@@ -137,6 +137,7 @@ import {
   ICameraInfo,
   IXYPoint,
   IMouseState,
+  SamAnnotationToolStateSymbol,
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
@@ -400,10 +401,8 @@ export default class ImageViewer extends Vue {
   @Watch("selectedTool")
   imageOrToolChanged() {
     const toolState = this.selectedTool?.state;
-    if (toolState && "pipeline" in toolState && this.layersReady) {
-      toolState.pipeline.geoJsMapInputNode.setValue(
-        this.samMapEntry ?? NoOutput,
-      );
+    if (toolState?.type === SamAnnotationToolStateSymbol && this.layersReady) {
+      toolState.nodes.input.geoJSMap.setValue(this.samMapEntry ?? NoOutput);
     }
   }
 

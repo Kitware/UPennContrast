@@ -30,7 +30,11 @@
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
-import { IToolConfiguration, TSamPrompt } from "@/store/model";
+import {
+  IToolConfiguration,
+  SamAnnotationToolStateSymbol,
+  TSamPrompt,
+} from "@/store/model";
 import { NoOutput } from "@/pipelines/computePipeline";
 
 @Component({ components: {} })
@@ -55,11 +59,11 @@ export default class SamToolMenu extends Vue {
 
   get samState() {
     const state = this.toolState;
-    return state && "pipeline" in state ? state : null;
+    return state?.type === SamAnnotationToolStateSymbol ? state : null;
   }
 
   get promptNode() {
-    return this.samState?.pipeline.promptInputNode ?? null;
+    return this.samState?.nodes.input.mainPrompt ?? null;
   }
 
   get prompts() {

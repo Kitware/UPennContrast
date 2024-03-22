@@ -84,7 +84,13 @@ export interface IToolConfiguration<Type extends TToolType = TToolType> {
   template: IToolTemplate;
 }
 
-export interface IBaseToolState {}
+export const BaseToolStateSymbol: unique symbol = Symbol("BaseToolState");
+
+export type TBaseToolStateSymbol = typeof BaseToolStateSymbol;
+
+export interface IBaseToolState {
+  type: TBaseToolStateSymbol;
+}
 
 export enum PromptType {
   backgroundPoint,
@@ -113,11 +119,22 @@ export type TSamPrompt =
   | ISamBackgroundPointPrompt
   | ISamBoxPrompt;
 
+export const SamAnnotationToolStateSymbol: unique symbol = Symbol(
+  "SamAnnotationToolState",
+);
+
+export type TSamAnnotationToolStateSymbol = typeof SamAnnotationToolStateSymbol;
+
 export interface ISamAnnotationToolState {
-  pipeline: {
-    geoJsMapInputNode: ManualInputNode<IMapEntry | TNoOutput>;
-    promptInputNode: ManualInputNode<TSamPrompt[] | TNoOutput>;
-    pipelineOutput: OutputNode<IGeoJSPoint[]>;
+  type: TSamAnnotationToolStateSymbol;
+  nodes: {
+    input: {
+      geoJSMap: ManualInputNode<IMapEntry | TNoOutput>;
+      mainPrompt: ManualInputNode<TSamPrompt[] | TNoOutput>;
+    };
+    output: {
+      mainOuput: OutputNode<IGeoJSPoint[]>;
+    };
   };
   mouseState: {
     path: IXYPoint[]; // In GCS coordinates
@@ -132,7 +149,12 @@ export interface IMouseState {
   initialMouseEvent: MouseEvent;
 }
 
+export const ErrorToolStateSymbol: unique symbol = Symbol("ErrorToolState");
+
+export type TErrorToolStateSymbol = typeof ErrorToolStateSymbol;
+
 export interface IErrorToolState {
+  type: TErrorToolStateSymbol;
   error?: Error;
 }
 

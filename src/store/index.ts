@@ -42,7 +42,8 @@ import {
   exampleConfigurationBase,
   IActiveTool,
   TToolType,
-  IBaseToolState,
+  BaseToolStateSymbol,
+  TToolState,
 } from "./model";
 
 import persister from "./Persister";
@@ -278,7 +279,7 @@ export class Main extends VuexModule {
     if (configuration === null) {
       this.selectedTool = null;
     } else {
-      let state;
+      let state: TToolState;
       switch (configuration.type) {
         case "samAnnotation":
           state = createSamToolStateFromToolConfiguration(
@@ -286,7 +287,7 @@ export class Main extends VuexModule {
           );
           break;
         default:
-          state = {} as IBaseToolState;
+          state = { type: BaseToolStateSymbol };
           break;
       }
       this.selectedTool = { configuration, state };
