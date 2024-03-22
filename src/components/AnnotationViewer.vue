@@ -1508,6 +1508,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   @Watch("baseStyle")
+  @Watch("layers")
   onRestyleNeeded() {
     this.restyleAnnotations();
   }
