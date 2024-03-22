@@ -10,11 +10,11 @@ import geojs from "geojs";
 import { logError } from "@/utils/log";
 
 // Which style an annotation should have, depending on its layer (color change)
-export function getAnnotationStyleFromLayer(
-  layerColor: string | undefined,
+export function getAnnotationStyleFromBaseStyle(
+  baseStyle: { [key: string]: any; color?: string },
+  annotationColor?: string,
   isHovered: boolean = false,
   isSelected: boolean = false,
-  baseStyle?: any,
 ) {
   const style = {
     stroke: true,
@@ -27,19 +27,19 @@ export function getAnnotationStyleFromLayer(
     ...baseStyle,
   };
 
-  if (layerColor) {
-    const geoColor = { ...geojs.util.convertColor(layerColor) };
+  if (annotationColor) {
+    const geoColor = { ...geojs.util.convertColor(annotationColor) };
     geoColor.r *= 0.75;
     geoColor.g *= 0.75;
     geoColor.b *= 0.75;
-    style.fillColor = layerColor;
+    style.fillColor = annotationColor;
     style.strokeColor = geoColor;
   }
   if (isHovered) {
     style.fillOpacity = 0;
     style.strokeWidth = 4;
-    if (layerColor) {
-      style.strokeColor = layerColor;
+    if (annotationColor) {
+      style.strokeColor = annotationColor;
     }
   }
   if (isSelected) {

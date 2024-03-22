@@ -67,7 +67,11 @@ class AnnotationSchema:
             'location': locationSchema,
             'shape': shapeSchema,
             'datasetId': {'type': 'string', 'minLength': 1},
+            'color': {
+              'type': 'string',
+            },
         },
+        # color is optional
         'required': ['coordinates', 'tags', 'channel', 'location', 'shape', 'datasetId']
     }
 

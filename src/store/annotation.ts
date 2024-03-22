@@ -233,7 +233,7 @@ export class Annotations extends VuexModule {
     // Create the new annotation on the server
     const { location, channel } =
       await this.getAnnotationLocationFromTool(toolConfiguration);
-    const { tags, shape } = toolConfiguration.values.annotation;
+    const { tags, shape, color } = toolConfiguration.values.annotation;
     const annotationBase: IAnnotationBase = {
       tags,
       shape,
@@ -242,6 +242,10 @@ export class Annotations extends VuexModule {
       coordinates,
       datasetId,
     };
+    // Optional color
+    if (color) {
+      annotationBase.color = color;
+    }
     const annotation = await this.createAnnotation(annotationBase);
     if (!annotation) {
       return null;
