@@ -81,6 +81,20 @@
             </v-radio-group>
           </v-col>
         </v-row>
+        <v-row>
+          <v-col>
+            <v-checkbox
+              v-model="customColorEnabled"
+              label="Override layer color with a custom color"
+            />
+          </v-col>
+          <v-col v-if="customColorEnabled">
+            <v-color-picker
+              label="Custom color picker"
+              v-model="customColorValue"
+            />
+          </v-col>
+        </v-row>
       </template>
     </v-container>
   </v-form>
@@ -112,6 +126,7 @@ interface IAnnotationSetup {
     };
   };
   shape: AnnotationShape;
+  color: string | undefined;
 }
 
 function isSmallerThanRule(max: number) {
@@ -155,6 +170,21 @@ export default class AnnotationConfiguration extends Vue {
   shape: AnnotationShape = AnnotationShape.Point;
   tagsInternal: string[] = [];
   useAutoTags: boolean = true;
+  customColorEnabled: boolean = false;
+  customColorValue: string = "#FFFFFF";
+
+  get color() {
+    return this.customColorEnabled ? this.customColorValue : undefined;
+  }
+
+  set color(color: string | undefined) {
+    if (color === undefined) {
+      this.customColorEnabled = false;
+    } else {
+      this.customColorEnabled = true;
+      this.customColorValue = color;
+    }
+  }
 
   get layer() {
     return this.coordinateAssignments.layer;
@@ -212,6 +242,7 @@ export default class AnnotationConfiguration extends Vue {
     this.updateCoordinateAssignement(this.value.coordinateAssignments);
     this.shape = this.value.shape;
     this.tagsInternal = this.value.tags;
+    this.color = this.value.color;
   }
 
   @Watch("defaultShape")
@@ -221,6 +252,7 @@ export default class AnnotationConfiguration extends Vue {
     this.useAutoTags = true;
     this.tagsInternal = [];
     this.shape = this.defaultShape;
+    this.color = undefined;
     this.changed();
   }
 
@@ -248,6 +280,7 @@ export default class AnnotationConfiguration extends Vue {
   @Watch("layer")
   @Watch("tags")
   @Watch("shape")
+  @Watch("color")
   changed() {
     const form = this.$refs.form as VForm;
     if (!form?.validate()) {
@@ -258,11 +291,13 @@ export default class AnnotationConfiguration extends Vue {
         this.coordinateAssignments.Time.value = this.maxTime;
       }
     }
-    this.$emit("input", {
+    const result: IAnnotationSetup = {
       tags: this.tags,
       coordinateAssignments: this.coordinateAssignments,
       shape: this.shape,
-    });
+      color: this.color,
+    };
+    this.$emit("input", result);
     this.$emit("change");
   }
 }

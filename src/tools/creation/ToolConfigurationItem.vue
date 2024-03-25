@@ -42,6 +42,26 @@ import AnnotationConfiguration from "@/tools/creation/templates/AnnotationConfig
 import TagAndLayerRestriction from "@/tools/creation/templates/TagAndLayerRestriction.vue";
 import DockerImage from "@/tools/creation/templates/DockerImage.vue";
 
+// Used to determine :is="" value from template interface type
+const typeToComponentName = {
+  select: "v-select",
+  annotation: "annotation-configuration",
+  restrictTagsAndLayer: "tag-and-layer-restriction",
+  checkbox: "v-checkbox",
+  radio: "v-radio-group",
+  text: "v-text-field",
+  dockerImage: "docker-image",
+};
+
+type TComponentType = keyof typeof typeToComponentName;
+
+interface IItem {
+  type: TComponentType;
+  name?: string;
+  meta?: any;
+  values?: any;
+}
+
 @Component({
   components: {
     AnnotationConfiguration,
@@ -56,9 +76,10 @@ import DockerImage from "@/tools/creation/templates/DockerImage.vue";
 // Creates a tool configuration interface based on the current selected template.
 export default class ToolConfigurationItem extends Vue {
   readonly store = store;
+  readonly typeToComponentName = typeToComponentName;
 
   @Prop()
-  readonly item!: any;
+  readonly item!: IItem;
 
   // Pass from custom component to ToolConfiguration
   @Prop()
@@ -74,17 +95,6 @@ export default class ToolConfigurationItem extends Vue {
   set componentValue(newValue) {
     this.$emit("input", newValue);
   }
-
-  // Used to determine :is="" value from template interface type
-  typeToComponentName: any = {
-    select: "v-select",
-    annotation: "annotation-configuration",
-    restrictTagsAndLayer: "tag-and-layer-restriction",
-    checkbox: "v-checkbox",
-    radio: "v-radio-group",
-    text: "v-text-field",
-    dockerImage: "docker-image",
-  };
 
   changed() {
     this.$emit("change");

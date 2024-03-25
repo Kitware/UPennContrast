@@ -118,8 +118,9 @@ export default class AnnotationsAPI {
       coordinates,
       _id,
       datasetId,
+      color,
     } = item;
-    return markRaw({
+    const annotation: IAnnotation = markRaw({
       name,
       tags,
       shape,
@@ -128,7 +129,12 @@ export default class AnnotationsAPI {
       coordinates,
       id: _id,
       datasetId,
+      color,
     });
+    if (color) {
+      annotation.color = color;
+    }
+    return annotation;
   };
 
   createConnection(

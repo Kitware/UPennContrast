@@ -129,6 +129,7 @@ import { markRaw } from "vue";
 import {
   IGeoJSMap,
   IGeoJSPoint,
+  IGeoJSScaleWidget,
   IGeoJSTile,
   IImage,
   ILayerStackImage,
@@ -307,6 +308,7 @@ export default class ImageViewer extends Vue {
 
   histogramCaches: number = 0;
   cacheProgresses: { progress: number; total: number }[] = [];
+  scaleWidget: IGeoJSScaleWidget | null = null;
 
   get loadedAndOptimized() {
     return (
@@ -431,6 +433,10 @@ export default class ImageViewer extends Vue {
 
   get backgroundColor() {
     return this.store.backgroundColor;
+  }
+
+  get showScalebar() {
+    return this.store.showScalebar;
   }
 
   mounted() {
@@ -756,42 +762,54 @@ export default class ImageViewer extends Vue {
     }
 
     // only have a scale widget on the first map
-    if (!mllidx) {
+    if (mllidx === 0) {
       const mapentry = this.maps[mllidx];
       if (!mapentry.uiLayer) {
         mapentry.uiLayer = mapentry.map.createLayer("ui");
         mapentry.uiLayer.node().css({ "mix-blend-mode": "unset" });
       }
-      const pixelSizeScale = this.store.scales.pixelSize;
-      const pixelSizeM = convertLength(
-        pixelSizeScale.value,
-        pixelSizeScale.unit,
-        "m",
-      );
-      if (
-        mapentry.scaleWidget &&
-        (mapentry.scaleWidget.options("scale") !== pixelSizeM ||
-          !this.store.showScalebar)
-      ) {
-        mapentry.uiLayer.deleteWidget(mapentry.scaleWidget);
-        mapentry.scaleWidget = null;
-      }
-      if (!mapentry.scaleWidget && this.store.showScalebar) {
-        mapentry.scaleWidget = mapentry.uiLayer.createWidget("scale", {
-          scale: pixelSizeM,
-          strokeWidth: 5,
-          tickLength: 0,
-          position: { bottom: 20, right: 10 },
-        });
-        const svgElement = mapentry.scaleWidget.parentCanvas()
-          .firstChild as SVGElement;
-        svgElement.classList.add("scale-widget");
-        svgElement.onclick = (event: MouseEvent) => {
-          event.preventDefault();
-          event.stopPropagation();
-          this.scaleDialog = true;
-        };
-      }
+      this.updateScaleWidget();
+    }
+  }
+
+  @Watch("showScalebar")
+  updateScaleWidget() {
+    const uiLayer = this.maps[0]?.uiLayer;
+    if (!uiLayer) {
+      return;
+    }
+    const pixelSizeScale = this.store.scales.pixelSize;
+    const pixelSizeM = convertLength(
+      pixelSizeScale.value,
+      pixelSizeScale.unit,
+      "m",
+    );
+    const oldWidgetLayer = this.scaleWidget?.layer();
+    if (
+      this.scaleWidget &&
+      oldWidgetLayer &&
+      (this.scaleWidget.options("scale") !== pixelSizeM ||
+        !this.showScalebar ||
+        oldWidgetLayer !== uiLayer)
+    ) {
+      oldWidgetLayer.deleteWidget(this.scaleWidget);
+      this.scaleWidget = null;
+    }
+    if (!this.scaleWidget && this.showScalebar) {
+      this.scaleWidget = uiLayer.createWidget("scale", {
+        scale: pixelSizeM,
+        strokeWidth: 5,
+        tickLength: 0,
+        position: { bottom: 20, right: 10 },
+      });
+      const svgElement = this.scaleWidget.parentCanvas()
+        .firstChild as SVGElement;
+      svgElement.classList.add("scale-widget");
+      svgElement.onclick = (event: MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.scaleDialog = true;
+      };
     }
   }
 

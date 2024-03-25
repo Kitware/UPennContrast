@@ -583,7 +583,10 @@ export interface IGeoJSScaleWidget {
       arg1: Key,
       arg2: IGeoJSScaleWidgetSpec[Key],
     ) => IGeoJSScaleWidget);
+  parent: (() => IGeoJsSceneObject) &
+    ((arg: IGeoJsSceneObject) => IGeoJSScaleWidget);
   parentCanvas: () => HTMLElement;
+  layer: () => IGeoJSUiLayer;
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.gui.scaleWidget.html#.spec
@@ -651,6 +654,36 @@ export interface IGeoJSPolygonFeatureStyle {
   uniformLine?: boolean | string | (() => boolean | string);
   antialiasing?: number | (() => number);
   debug?: string | (() => string);
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.pointFeature.html#.styleSpec
+export interface IGeoJSPointFeatureStyle {
+  radius?: number | (() => number);
+  stroke?: boolean | (() => boolean);
+  strokeColor?: string | (() => string);
+  strokeOpacity?: number | (() => number);
+  strokeWidth?: number | (() => number);
+  fill?: boolean | (() => boolean);
+  fillColor?: string | (() => string);
+  fillOpacity?: number | (() => number);
+  origin?: Array<number> | (() => Array<number>);
+  scaled?: boolean | number | (() => boolean | number); // missing from the documentation
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.lineFeature.html#.styleSpec
+export interface IGeoJSLineFeatureStyle {
+  strokeColor?: string | (() => string);
+  strokeOpacity?: number | (() => number);
+  strokeWidth?: number | (() => number);
+  strokeOffset?: number | (() => number);
+  lineCap?: string | (() => string);
+  lineJoin?: string | (() => string);
+  closed?: boolean | (() => boolean);
+  miterLimit?: number | (() => number);
+  uniformLine?: boolean | string | (() => boolean | string);
+  antialiasing?: number | (() => number);
+  debug?: string | (() => string);
+  origin?: Array<number> | (() => Array<number>);
 }
 
 export interface ICommonWorkerInterfaceElement {
@@ -772,6 +805,7 @@ export interface IAnnotationBase {
   location: IAnnotationLocation;
   coordinates: IGeoJSPoint[];
   datasetId: string;
+  color?: string;
 }
 
 export interface IAnnotation extends IAnnotationBase {
@@ -953,7 +987,6 @@ export interface IMapEntry {
   workerPreviewFeature: IGeoJSFeature;
   textLayer: IGeoJSFeatureLayer;
   uiLayer?: IGeoJSUiLayer;
-  scaleWidget?: IGeoJSScaleWidget | null;
   lowestLayer?: number;
 }
 

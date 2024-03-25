@@ -15,34 +15,37 @@ import { throttle, debounce } from "lodash";
 const THROTTLE = 100;
 
 import {
+  AnnotationSelectionTypes,
+  AnnotationShape,
   IAnnotation,
   IAnnotationConnection,
-  IDisplayLayer,
-  IGeoJSPoint,
-  IImage,
-  IToolConfiguration,
-  IROIAnnotationFilter,
-  AnnotationShape,
-  AnnotationSelectionTypes,
   IAnnotationLocation,
+  IDisplayLayer,
   IGeoJSAnnotation,
-  IRestrictTagsAndLayer,
-  IMapEntry,
-  IGeoJSMap,
-  IMouseState,
-  TToolState,
-  TSamPrompt,
   IGeoJSAnnotationLayer,
-  IGeoJSFeatureLayer,
   IGeoJSFeature,
+  IGeoJSFeatureLayer,
+  IGeoJSLineFeatureStyle,
+  IGeoJSMap,
+  IGeoJSPoint,
+  IGeoJSPointFeatureStyle,
+  IGeoJSPolygonFeatureStyle,
+  IImage,
+  IMapEntry,
+  IMouseState,
+  IRestrictTagsAndLayer,
+  IROIAnnotationFilter,
   ISamAnnotationToolState,
+  IToolConfiguration,
+  TSamPrompt,
+  TToolState,
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
 
 import {
   pointDistance,
-  getAnnotationStyleFromLayer,
+  getAnnotationStyleFromBaseStyle,
   unrollIndexFromImages,
   geojsAnnotationFactory,
   tagFilterFunction,
@@ -440,22 +443,27 @@ export default class AnnotationViewer extends Vue {
     return this.annotationStore.getAnnotationFromId;
   }
 
-  get baseStyle() {
+  get baseStyle(): IGeoJSPointFeatureStyle &
+    IGeoJSPolygonFeatureStyle &
+    IGeoJSLineFeatureStyle {
     return {
       scaled: this.store.scaleAnnotationsWithZoom ? false : 1,
       radius: this.store.annotationsRadius,
     };
   }
 
-  getAnnotationStyle(annotationId: string, layerColor: string | undefined) {
+  getAnnotationStyle(
+    annotationId: string,
+    layerColor?: string,
+    annotationColor?: string,
+  ) {
     const hovered = annotationId === this.hoveredAnnotationId;
     const selected = this.isAnnotationSelected(annotationId);
-    const baseStyle = this.baseStyle;
-    return getAnnotationStyleFromLayer(
-      layerColor,
+    return getAnnotationStyleFromBaseStyle(
+      this.baseStyle,
+      annotationColor || layerColor,
       hovered,
       selected,
-      baseStyle,
     );
   }
 
@@ -844,12 +852,16 @@ export default class AnnotationViewer extends Vue {
       const isHoveredGT = annotationId === this.hoveredAnnotationId;
       const isSelectedGT = this.isAnnotationSelected(annotationId);
       for (const geoJSAnnotation of geoJSAnnotationList) {
-        const { layerId, isHovered, isSelected, style } =
+        const { layerId, isHovered, isSelected, style, customColor } =
           geoJSAnnotation.options();
         // If hover or select changed, update style
         if (isHovered != isHoveredGT || isSelected != isSelectedGT) {
           const layer = this.store.getLayerFromId(layerId);
-          const newStyle = this.getAnnotationStyle(annotationId, layer?.color);
+          const newStyle = this.getAnnotationStyle(
+            annotationId,
+            layer?.color,
+            customColor,
+          );
           geoJSAnnotation.options("style", { ...style, ...newStyle });
           geoJSAnnotation.options("isHovered", isHoveredGT);
           geoJSAnnotation.options("isSelected", isSelectedGT);
@@ -932,9 +944,18 @@ export default class AnnotationViewer extends Vue {
       newGeoJSAnnotation.options("isSelected", true);
     }
 
+    const customColor = annotation.color;
+    if (customColor) {
+      newGeoJSAnnotation.options("customColor", customColor);
+    }
+
     const style = newGeoJSAnnotation.options("style");
     const layer = this.store.getLayerFromId(layerId);
-    const newStyle = this.getAnnotationStyle(annotation.id, layer?.color);
+    const newStyle = this.getAnnotationStyle(
+      annotation.id,
+      layer?.color,
+      customColor,
+    );
     newGeoJSAnnotation.options("style", Object.assign({}, style, newStyle));
 
     return newGeoJSAnnotation;
@@ -983,10 +1004,15 @@ export default class AnnotationViewer extends Vue {
 
   private restyleAnnotations() {
     for (const geoJSAnnotation of this.annotationLayer.annotations()) {
-      const { girderId, layerId, style } = geoJSAnnotation.options();
+      const { girderId, layerId, style, customColor } =
+        geoJSAnnotation.options();
       if (girderId) {
         const layer = this.store.getLayerFromId(layerId);
-        const newStyle = this.getAnnotationStyle(girderId, layer?.color);
+        const newStyle = this.getAnnotationStyle(
+          girderId,
+          layer?.color,
+          customColor,
+        );
         geoJSAnnotation.options("style", Object.assign({}, style, newStyle));
       }
     }
@@ -1482,6 +1508,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   @Watch("baseStyle")
+  @Watch("layers")
   onRestyleNeeded() {
     this.restyleAnnotations();
   }
