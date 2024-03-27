@@ -15,6 +15,7 @@ import {
 import {
   ManualInputNode,
   NoOutput,
+  TManualInputNodeAsyncOptions,
   TNoOutput,
   createComputeNode,
 } from "./computePipeline";
@@ -305,6 +306,7 @@ interface IItkOutput {
   contour: IGeoJSPoint[];
 }
 
+let cachedWebWorker: Worker | null = null;
 async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
   const array = masks.data;
   const width = masks.dims[3];
@@ -343,18 +345,16 @@ async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
     pipelineArgs,
     pipelineOutputs,
     pipelineInputs,
+    { webWorker: cachedWebWorker },
   );
+  cachedWebWorker = webWorker ?? null;
 
   // Parse the output
-  try {
-    const textFile = outputs[0]?.data as TextFile | undefined;
-    if (!textFile?.data) {
-      throw new Error("Pipeline didn't return a value");
-    }
-    return JSON.parse(textFile.data);
-  } finally {
-    webWorker?.terminate();
+  const textFile = outputs[0]?.data as TextFile | undefined;
+  if (!textFile?.data) {
+    throw new Error("Pipeline didn't return a value");
   }
+  return JSON.parse(textFile.data);
 }
 
 function displayToWorld(
@@ -416,10 +416,13 @@ function createSamPipelineEncoderNodes(model: TSamModel) {
 function createSamPipelineDecoderNodes(
   model: TSamModel,
   encoderNodes: ReturnType<typeof createSamPipelineEncoderNodes>,
+  promptAsyncOptions?: TManualInputNodeAsyncOptions,
 ) {
   // Input for the prompt
   // It is set by the user
-  const promptInputNode = new ManualInputNode<TSamPrompt[] | TNoOutput>();
+  const promptInputNode = new ManualInputNode<TSamPrompt[] | TNoOutput>(
+    promptAsyncOptions,
+  );
 
   // The context is used as a cache for canvas, 2D context, tensors...
   // It is set here
@@ -479,14 +482,20 @@ function createSamPipeline(model: TSamModel): ISamAnnotationToolState["nodes"] {
   // Create the pipeline
   const encoderNodes = createSamPipelineEncoderNodes(model);
   const decoderNodes = createSamPipelineDecoderNodes(model, encoderNodes);
+  const previewNodes = createSamPipelineDecoderNodes(model, encoderNodes, {
+    type: "debounce",
+    wait: 100,
+  });
 
   return {
     input: {
       geoJSMap: encoderNodes.geoJsMapInputNode,
       mainPrompt: decoderNodes.promptInputNode,
+      previewPrompt: previewNodes.promptInputNode,
     },
     output: {
       mainOuput: decoderNodes.coordinatesConversionNode,
+      previewOuput: previewNodes.coordinatesConversionNode,
     },
   };
 }
@@ -508,16 +517,31 @@ export function createSamToolStateFromToolConfiguration(
       path: [],
     },
     output: null,
+    livePreview: null,
   };
+
+  // State is reactive
+  // Main output is reactive
   const outputNode = state.nodes.output.mainOuput;
   outputNode.onOutputUpdate(() => {
-    const rawOutput = outputNode.output;
-    const newOutput =
-      !rawOutput || rawOutput === NoOutput || rawOutput.length <= 0
+    const rawNodeOutput = outputNode.output;
+    const stateOutput =
+      !rawNodeOutput || rawNodeOutput === NoOutput || rawNodeOutput.length <= 0
         ? null
-        : rawOutput;
-    // State is meant to be reactive
-    Vue.set(state, "output", newOutput);
+        : rawNodeOutput;
+    Vue.set(state, "output", stateOutput);
+  });
+  // Preview output is reactive too
+  const previewNode = state.nodes.output.previewOuput;
+  previewNode.onOutputUpdate(() => {
+    const rawNodePreview = previewNode.output;
+    const statePreview =
+      !rawNodePreview ||
+      rawNodePreview === NoOutput ||
+      rawNodePreview.length <= 0
+        ? null
+        : rawNodePreview;
+    Vue.set(state, "livePreview", statePreview);
   });
   return state;
 }

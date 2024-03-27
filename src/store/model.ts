@@ -131,15 +131,18 @@ export interface ISamAnnotationToolState {
     input: {
       geoJSMap: ManualInputNode<IMapEntry | TNoOutput>;
       mainPrompt: ManualInputNode<TSamPrompt[] | TNoOutput>;
+      previewPrompt: ManualInputNode<TSamPrompt[] | TNoOutput>;
     };
     output: {
       mainOuput: OutputNode<IGeoJSPoint[]>;
+      previewOuput: OutputNode<IGeoJSPoint[]>;
     };
   };
   mouseState: {
     path: IXYPoint[]; // In GCS coordinates
   };
   output: IGeoJSPoint[] | null;
+  livePreview: IGeoJSPoint[] | null;
 }
 
 export interface IMouseState {

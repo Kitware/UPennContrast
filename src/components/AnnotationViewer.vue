@@ -215,10 +215,6 @@ export default class AnnotationViewer extends Vue {
     return this.annotationStore.isAnnotationSelected;
   }
 
-  get capturedMousePath() {
-    return this.capturedMouseState?.path ?? [];
-  }
-
   get selectedToolConfiguration(): IToolConfiguration | null {
     return this.store.selectedTool?.configuration ?? null;
   }
@@ -247,22 +243,23 @@ export default class AnnotationViewer extends Vue {
   selectionAnnotation: IGeoJSAnnotation | null = null;
   samPromptAnnotations: IGeoJSAnnotation[] = [];
 
-  samPreviewAnnotation: IGeoJSAnnotation | null = null;
+  // User clicked to get this annotation
+  samUnsubmittedAnnotation: IGeoJSAnnotation | null = null;
 
-  get samAnnotationCoordinates() {
+  get samMainOutput() {
     return this.samToolState?.output ?? null;
   }
 
-  @Watch("samAnnotationCoordinates")
-  onSamAnnotationCoordinatesChanged() {
+  @Watch("samMainOutput")
+  onSamMainOutputChanged() {
     // Remove previous annotation
-    if (this.samPreviewAnnotation) {
-      this.annotationLayer.removeAnnotation(this.samPreviewAnnotation);
-      this.samPreviewAnnotation = null;
+    if (this.samUnsubmittedAnnotation) {
+      this.annotationLayer.removeAnnotation(this.samUnsubmittedAnnotation);
+      this.samUnsubmittedAnnotation = null;
     }
 
     // Create the new annotation
-    const vertices = this.samAnnotationCoordinates;
+    const vertices = this.samMainOutput;
     if (!vertices) {
       return;
     }
@@ -277,8 +274,43 @@ export default class AnnotationViewer extends Vue {
       geojs.annotation.polygonAnnotation({ style, vertices });
 
     // Add it to the layer
-    this.samPreviewAnnotation = geoJsAnnotation;
-    this.annotationLayer.addAnnotation(this.samPreviewAnnotation);
+    this.samUnsubmittedAnnotation = geoJsAnnotation;
+    this.annotationLayer.addAnnotation(this.samUnsubmittedAnnotation);
+  }
+
+  // This is the annotation that is shown as a "what if the user clicks here"
+  samLivePreviewAnnotation: IGeoJSAnnotation | null = null;
+
+  get samLivePreviewOutput() {
+    return this.samToolState?.livePreview ?? null;
+  }
+
+  @Watch("samLivePreviewOutput")
+  onSamLivePreviewOutputChanged() {
+    // Remove previous annotation
+    if (this.samLivePreviewAnnotation) {
+      this.annotationLayer.removeAnnotation(this.samLivePreviewAnnotation);
+      this.samLivePreviewAnnotation = null;
+    }
+
+    // Create the new annotation
+    const vertices = this.samLivePreviewOutput;
+    if (!vertices) {
+      return;
+    }
+    const style = {
+      fillOpacity: 0.1,
+      fillColor: "blue",
+      strokeColor: "white",
+      strokeOpacity: 0.5,
+      strokeWidth: 1,
+    };
+    const geoJsAnnotation: IGeoJSAnnotation =
+      geojs.annotation.polygonAnnotation({ style, vertices });
+
+    // Add it to the layer
+    this.samLivePreviewAnnotation = geoJsAnnotation;
+    this.annotationLayer.addAnnotation(this.samLivePreviewAnnotation);
   }
 
   @Watch("capturedMouseState", { deep: true })
@@ -309,15 +341,22 @@ export default class AnnotationViewer extends Vue {
     };
 
     if (this.samToolState) {
-      const unitPrompt = mouseStateToSamPrompt(mouseState);
-      if (unitPrompt) {
-        this.selectionAnnotation = samPromptToAnnotation(unitPrompt, baseStyle);
+      const previewPrompt = mouseStateToSamPrompt(mouseState);
+      if (previewPrompt) {
+        this.selectionAnnotation = samPromptToAnnotation(
+          previewPrompt,
+          baseStyle,
+        );
+        const currentPrompts = this.samPrompts;
+        const previewPrompts = [...currentPrompts, previewPrompt];
+        const previewPromptNode = this.samToolState.nodes.input.previewPrompt;
+        previewPromptNode.setValue(previewPrompts);
       } else {
         this.selectionAnnotation = null;
       }
     } else {
       const mousePath = mouseState.path;
-      if (mouseState.path.length !== 0) {
+      if (mouseState.path.length > 0) {
         this.selectionAnnotation = geojs.annotation.lineAnnotation({
           style: baseStyle,
           vertices: mousePath,
