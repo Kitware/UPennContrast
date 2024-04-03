@@ -15,6 +15,12 @@
         <v-btn @click="submit" :disabled="!outputCoordinates">
           Submit annotation
         </v-btn>
+        <v-card
+          v-for="(message, i) in loadingMessages"
+          :key="`loading-message-${i}`"
+        >
+          {{ message }}
+        </v-card>
       </v-expansion-panel-content>
     </v-expansion-panel>
     <v-expansion-panel v-else-if="errorState">
@@ -60,6 +66,10 @@ export default class SamToolMenu extends Vue {
   get samState() {
     const state = this.toolState;
     return state?.type === SamAnnotationToolStateSymbol ? state : null;
+  }
+
+  get loadingMessages() {
+    return this.samState?.loadingMessages ?? [];
   }
 
   get promptNode() {

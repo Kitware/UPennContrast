@@ -127,17 +127,8 @@ export type TSamAnnotationToolStateSymbol = typeof SamAnnotationToolStateSymbol;
 
 export interface ISamAnnotationToolState {
   type: TSamAnnotationToolStateSymbol;
-  nodes: {
-    input: {
-      geoJSMap: ManualInputNode<IMapEntry | TNoOutput>;
-      mainPrompt: ManualInputNode<TSamPrompt[] | TNoOutput>;
-      previewPrompt: ManualInputNode<TSamPrompt[] | TNoOutput>;
-    };
-    output: {
-      mainOuput: OutputNode<IGeoJSPoint[]>;
-      previewOuput: OutputNode<IGeoJSPoint[]>;
-    };
-  };
+  nodes: TSamNodes;
+  loadingMessages: string[];
   mouseState: {
     path: IXYPoint[]; // In GCS coordinates
   };
@@ -1128,11 +1119,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ISetQuadStatus } from "@/utils/setFrameQuad";
 import { ITileMeta } from "./GirderAPI";
 import { isEqual } from "lodash";
-import {
-  ManualInputNode,
-  OutputNode,
-  TNoOutput,
-} from "@/pipelines/computePipeline";
+import { TSamNodes } from "@/pipelines/samPipeline";
 
 export function newLayer(
   dataset: IDataset,
