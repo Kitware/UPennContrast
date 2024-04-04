@@ -53,6 +53,7 @@
         @mousedown.capture="mouseDown($event, index)"
         @mousemove.capture="mouseMove($event, index)"
         @mouseup.capture="mouseUp"
+        @mouseleave.capture="mouseLeave"
       ></div>
     </div>
     <image-overview
@@ -202,7 +203,7 @@ function generateFilterURL(
   setSlopeIntercept(index, "func-b", whitePoint, blackPoint, blue);
 }
 
-function isMouseEventAStartEvent(evt: MouseEvent): boolean {
+function isMouseStartEvent(evt: MouseEvent): boolean {
   return evt.shiftKey && evt.buttons !== 0;
 }
 
@@ -529,7 +530,7 @@ export default class ImageViewer extends Vue {
     const mapEntry = this.maps?.[mapIdx];
     if (
       !mapEntry ||
-      !isMouseEventAStartEvent(evt) ||
+      !isMouseStartEvent(evt) ||
       !(evt.target instanceof HTMLElement)
     ) {
       return;
@@ -537,6 +538,7 @@ export default class ImageViewer extends Vue {
 
     // Setup initial mouse state
     this.mouseState = {
+      isMouseMovePreviewState: false,
       mapEntry,
       target: evt.target,
       path: [],
@@ -547,22 +549,26 @@ export default class ImageViewer extends Vue {
     this.mouseMove(evt, mapIdx);
   }
 
+  mouseLeave() {
+    if (!this.mouseState || this.mouseState.isMouseMovePreviewState) {
+      this.mouseState = null;
+    }
+  }
+
   mouseMove(evt: MouseEvent, mapIdx: number) {
-    if (
-      !this.mouseState ||
-      (!isMouseEventAStartEvent(this.mouseState.initialMouseEvent) &&
-        !isMouseEventAStartEvent(evt))
-    ) {
+    if (!this.mouseState || this.mouseState.isMouseMovePreviewState) {
       // Create a preview mouse state
       const mapEntry = this.maps?.[mapIdx];
       const target = evt.target;
       if (!mapEntry || !(target instanceof HTMLElement)) {
+        this.mouseState = null;
         return;
       }
       const rect = target.getBoundingClientRect();
       const displayPoint = { x: evt.x - rect.x, y: evt.y - rect.y };
       const gcsPoint = mapEntry.map.displayToGcs(displayPoint);
       this.mouseState = {
+        isMouseMovePreviewState: true,
         mapEntry,
         target,
         path: [gcsPoint],
@@ -579,10 +585,7 @@ export default class ImageViewer extends Vue {
   }
 
   mouseUp(evt: MouseEvent) {
-    if (
-      !this.mouseState ||
-      !isMouseEventAStartEvent(this.mouseState.initialMouseEvent)
-    ) {
+    if (!this.mouseState || this.mouseState.isMouseMovePreviewState) {
       return;
     }
     evt.stopPropagation();

@@ -137,6 +137,7 @@ export interface ISamAnnotationToolState {
 }
 
 export interface IMouseState {
+  isMouseMovePreviewState: boolean;
   mapEntry: IMapEntry;
   target: HTMLElement;
   path: IGeoJSPosition[];

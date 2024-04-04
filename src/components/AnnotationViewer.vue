@@ -318,16 +318,18 @@ export default class AnnotationViewer extends Vue {
     newState: IMouseState | null,
     oldState: IMouseState | null,
   ) {
-    if (newState === null) {
-      if (oldState !== null) {
-        this.consumeMouseState(oldState);
-      }
+    if (
+      newState === null &&
+      oldState !== null &&
+      !oldState.isMouseMovePreviewState
+    ) {
+      this.consumeMouseState(oldState);
     } else {
       this.previewMouseState(newState);
     }
   }
 
-  previewMouseState(mouseState: IMouseState) {
+  previewMouseState(mouseState: IMouseState | null) {
     if (this.selectionAnnotation) {
       this.annotationLayer.removeAnnotation(this.selectionAnnotation);
     }
@@ -341,7 +343,9 @@ export default class AnnotationViewer extends Vue {
     };
 
     if (this.samToolState) {
-      const previewPrompt = mouseStateToSamPrompt(mouseState);
+      // Preview SAM prompt
+      const previewPrompt = mouseState && mouseStateToSamPrompt(mouseState);
+      const previewPromptNode = this.samToolState.nodes.input.previewPrompt;
       if (previewPrompt) {
         this.selectionAnnotation = samPromptToAnnotation(
           previewPrompt,
@@ -349,17 +353,18 @@ export default class AnnotationViewer extends Vue {
         );
         const currentPrompts = this.samPrompts;
         const previewPrompts = [...currentPrompts, previewPrompt];
-        const previewPromptNode = this.samToolState.nodes.input.previewPrompt;
         previewPromptNode.setValue(previewPrompts);
       } else {
         this.selectionAnnotation = null;
+        previewPromptNode.setValue(NoOutput);
       }
     } else {
-      const mousePath = mouseState.path;
-      if (mouseState.path.length > 0) {
+      // Preview shift drag select
+      const vertices = mouseState?.path ?? [];
+      if (vertices.length > 0) {
         this.selectionAnnotation = geojs.annotation.lineAnnotation({
           style: baseStyle,
-          vertices: mousePath,
+          vertices,
         });
       } else {
         this.selectionAnnotation = null;
