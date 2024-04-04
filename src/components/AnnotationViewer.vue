@@ -27,7 +27,7 @@ import {
   IGeoJSFeatureLayer,
   IGeoJSLineFeatureStyle,
   IGeoJSMap,
-  IGeoJSPoint,
+  IGeoJSPosition,
   IGeoJSPointFeatureStyle,
   IGeoJSPolygonFeatureStyle,
   IImage,
@@ -88,7 +88,7 @@ export default class AnnotationViewer extends Vue {
 
   // Compute the centroid of each annotation, taking unrolling into account
   get unrolledCentroidCoordinates() {
-    const centroidMap: { [annotationId: string]: IGeoJSPoint } = {};
+    const centroidMap: { [annotationId: string]: IGeoJSPosition } = {};
     const annotationCentroids = this.annotationStore.annotationCentroids;
 
     const anyImage = this.store.dataset?.anyImage();
@@ -530,7 +530,7 @@ export default class AnnotationViewer extends Vue {
 
   // Transform a list of coordinates, taking unrolling into account.
   unrolledCoordinates(
-    coordinates: IGeoJSPoint[],
+    coordinates: IGeoJSPosition[],
     location: IAnnotationLocation,
     image: IImage,
   ) {
@@ -549,7 +549,7 @@ export default class AnnotationViewer extends Vue {
       const tileX = Math.floor(locationIdx % this.unrollW);
       const tileY = Math.floor(locationIdx / this.unrollW);
 
-      return coordinates.map((point: IGeoJSPoint) => ({
+      return coordinates.map((point: IGeoJSPosition) => ({
         x: tileW * tileX + point.x,
         y: tileH * tileY + point.y,
         z: point.z,
@@ -1027,7 +1027,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   private async createAnnotationFromTool(
-    coordinates: IGeoJSPoint[],
+    coordinates: IGeoJSPosition[],
     tool: IToolConfiguration,
   ) {
     if (!coordinates || !coordinates.length || !this.dataset) {
@@ -1461,7 +1461,7 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-  setHoveredAnnotationFromCoordinates(gcsCoordinates: IGeoJSPoint) {
+  setHoveredAnnotationFromCoordinates(gcsCoordinates: IGeoJSPosition) {
     const geoAnnotations: IGeoJSAnnotation[] =
       this.annotationLayer.annotations();
     let annotationToToggle: IAnnotation | null = null;

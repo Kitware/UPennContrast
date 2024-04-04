@@ -100,18 +100,18 @@ export enum PromptType {
 
 export interface ISamForegroundPointPrompt {
   type: PromptType.foregroundPoint;
-  point: IGeoJSPoint;
+  point: IGeoJSPosition;
 }
 
 export interface ISamBackgroundPointPrompt {
   type: PromptType.backgroundPoint;
-  point: IGeoJSPoint;
+  point: IGeoJSPosition;
 }
 
 export interface ISamBoxPrompt {
   type: PromptType.box;
-  topLeft: IGeoJSPoint;
-  bottomRight: IGeoJSPoint;
+  topLeft: IGeoJSPosition;
+  bottomRight: IGeoJSPosition;
 }
 
 export type TSamPrompt =
@@ -130,16 +130,16 @@ export interface ISamAnnotationToolState {
   nodes: TSamNodes;
   loadingMessages: string[];
   mouseState: {
-    path: IXYPoint[]; // In GCS coordinates
+    path: IGeoJSPoint2D[]; // In GCS coordinates
   };
-  output: IGeoJSPoint[] | null;
-  livePreview: IGeoJSPoint[] | null;
+  output: IGeoJSPosition[] | null;
+  livePreview: IGeoJSPosition[] | null;
 }
 
 export interface IMouseState {
   mapEntry: IMapEntry;
   target: HTMLElement;
-  path: IGeoJSPoint[];
+  path: IGeoJSPosition[];
   initialMouseEvent: MouseEvent;
 }
 
@@ -348,13 +348,99 @@ export interface IGeoJsObject {
 // https://opengeoscience.github.io/geojs/apidocs/geo.sceneObject.html
 export interface IGeoJsSceneObject extends IGeoJsObject {}
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.transform.html
+export interface IGeoJSTransform {}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.camera.html
+export interface IGeoJSCamera {}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.actionRecord
+export interface IGeoJSActionRecord {
+  action: string;
+  owner?: string;
+  name?: string;
+  input: string | object;
+  modifiers?: string | object;
+  selectionRectangle?: string | object;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.map.html#.spec
+export interface IGeoJSMapSpec {
+  node: string;
+  gcs?: string | IGeoJSTransform;
+  ingcs?: string | IGeoJSTransform;
+  unitsPerPixel?: number;
+  maxBounds?: {
+    left?: number;
+    right?: number;
+    bottom?: number;
+    top?: number;
+    gcs?: string | IGeoJSTransform;
+  };
+  zoom?: number;
+  center?: {
+    x: number;
+    y: number;
+  };
+  rotation?: number;
+  width?: number;
+  height?: number;
+  min?: number;
+  max?: number;
+  discreteZoom?: boolean;
+  allowRotation?: boolean | (() => boolean);
+  camera?: IGeoJSCamera;
+  interactor?: IGeoJSMapInteractor;
+  animationQueue?: any[];
+  clampBoundsX?: boolean;
+  clampBoundsY?: boolean;
+  clampZoom?: boolean;
+  autoshareRenderer?: boolean | string;
+}
+
 // https://opengeoscience.github.io/geojs/apidocs/geo.mapInteractor.html#.spec
 export interface IGeoJSMapInteractorSpec {
+  throttle?: number;
+  discreteZoom?: boolean | number;
+  actions?: IGeoJSActionRecord[];
+  click?: {
+    enabled?: boolean;
+    buttons?: object;
+    duration?: number;
+    cancelOnMove?: boolean | number;
+  };
   keyboard?: {
     actions?: { [actionKey: string]: string[] };
     meta?: object;
     metakeyMouseEvents?: string[];
     focusHighlight?: boolean;
+  };
+  alwaysTouch?: boolean;
+  wheelScaleX?: number;
+  wheelScaleY?: number;
+  zoomScale?: number;
+  rotateWheelScale?: number;
+  zoomrotateMinimumRotation?: number;
+  zoomrotateReverseRotation?: number;
+  zoomrotateMinimumZoom?: number;
+  zoomrotateMinimumPan?: number;
+  touchPanDelay?: number;
+  momentum?: {
+    enabled?: boolean;
+    maxSpeed?: number;
+    minSpeed?: number;
+    stopTime?: number;
+    drag?: number;
+    actions?: string[];
+  };
+  spring?: {
+    enabled?: boolean;
+    springConstant?: number;
+  };
+  zoomAnimation?: {
+    enabled?: boolean;
+    duration?: number;
+    ease?: (t: number) => number;
   };
 }
 
@@ -380,12 +466,12 @@ export interface IGeoJSMap extends IGeoJsSceneObject {
     (() => IGeoJSMapInteractor);
   bounds: (bds?: IGeoJSBounds, gcs?: string | null) => IGeoJSBounds;
   center: ((
-    coordinates: IGeoJSPoint,
+    coordinates: IGeoJSPosition,
     gcs?: string | null,
     ignoreDiscreteZoom?: boolean,
     ignoreClampBounds?: boolean | "limited",
   ) => IGeoJSMap) &
-    (() => IGeoJSPoint);
+    (() => IGeoJSPosition);
   createLayer: <T extends string>(
     layerName: T,
     arg?: object,
@@ -399,13 +485,13 @@ export interface IGeoJSMap extends IGeoJsSceneObject {
           ? IGeoJSUiLayer
           : IGeoJSLayer;
   deleteLayer: (layer: IGeoJSLayer | null) => IGeoJSLayer;
-  displayToGcs: ((c: IGeoJSPoint, gcs?: string | null) => IGeoJSPoint) &
-    ((c: IGeoJSPoint[], gcs?: string | null) => IGeoJSPoint[]);
+  displayToGcs: ((c: IGeoJSPosition, gcs?: string | null) => IGeoJSPosition) &
+    ((c: IGeoJSPosition[], gcs?: string | null) => IGeoJSPosition[]);
   draw: () => IGeoJSMap;
   exit: () => void;
   gcs: ((arg: string) => IGeoJSMap) & (() => string);
-  gcsToDisplay: ((c: IGeoJSPoint, gcs?: string | null) => IGeoJSPoint) &
-    ((c: IGeoJSPoint[], gcs?: string | null) => IGeoJSPoint[]);
+  gcsToDisplay: ((c: IGeoJSPosition, gcs?: string | null) => IGeoJSPosition) &
+    ((c: IGeoJSPosition[], gcs?: string | null) => IGeoJSPosition[]);
   geoOn: (event: string, handler: Function) => IGeoJSMap;
   geoOff: (
     event?: string | string[],
@@ -451,6 +537,39 @@ export interface IGeoScreenSize {
   height: number;
 }
 
+// https://opengeoscience.github.io/geojs/apidocs/geo.layer.html#.spec
+export interface IGeoJSLayerSpec {
+  id?: number;
+  map?: IGeoJSMap | null;
+  renderer?: string | IGeoJSRenderer;
+  autoshareRenderer?: boolean | string;
+  canvas?: HTMLCanvasElement;
+  annotations?: string[] | object;
+  features?: string[];
+  active?: boolean;
+  attribution?: string;
+  opacity?: number;
+  name?: string;
+  selectionAPI?: boolean;
+  sticky?: boolean;
+  visible?: boolean;
+  zIndex?: number;
+
+  maxLevel?: number;
+  nearestPixel?: boolean | number;
+  queue?: IGeoJSFetchQueue;
+  tileHeight: number;
+  tileOffset: () => IGeoJSPoint2D;
+  tileRounding: (x: number) => number;
+  tilesAtZoom: (zoom: number) => IGeoJSPoint2D | undefined;
+  tilesMaxBounds?: ((zoom: number) => IGeoJSPoint2D) | null;
+  tileWidth: number;
+  url?: string | (() => string);
+  useCredentials?: boolean;
+  wrapX: boolean;
+  wrapY: boolean;
+}
+
 // https://opengeoscience.github.io/geojs/apidocs/geo.layer.html
 export interface IGeoJSLayer extends IGeoJsObject {
   visible: (value?: boolean) => boolean | IGeoJSLayer;
@@ -482,14 +601,14 @@ export interface IGeoJSAnnotationLayer extends IGeoJSLayer {
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.html#.point2D
-export interface IXYPoint {
+export interface IGeoJSPoint2D {
   x: number;
   y: number;
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.html#.worldPosition
 // https://opengeoscience.github.io/geojs/apidocs/geo.html#.geoPosition
-export interface IGeoJSPoint extends IXYPoint {
+export interface IGeoJSPosition extends IGeoJSPoint2D {
   z?: number; // Optional z coordinate
 }
 
@@ -504,14 +623,14 @@ export interface IGeoJSTile {
     level?: number;
     reference?: number;
   };
-  size: IXYPoint;
+  size: IGeoJSPoint2D;
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.quadFeature.html#.position
 export interface IGeoJSQuad {
-  crop: IGeoJSPoint & IGeoJSBounds;
-  lr: IGeoJSPoint;
-  ul: IGeoJSPoint;
+  crop: IGeoJSPosition & IGeoJSBounds;
+  lr: IGeoJSPosition;
+  ul: IGeoJSPosition;
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.renderer.html
@@ -524,10 +643,10 @@ export interface IGeoJSRenderer extends IGeoJsObject {
 export interface IGeoJSOsmLayer extends IGeoJSLayer {
   readonly idle: boolean;
   queue: IGeoJSFetchQueue;
-  displayToLevel: (pt?: IXYPoint, zoom?: number) => IXYPoint;
+  displayToLevel: (pt?: IGeoJSPoint2D, zoom?: number) => IGeoJSPoint2D;
   renderer: () => IGeoJSRenderer | null;
   reset: () => IGeoJSOsmLayer;
-  tileAtPoint: (point: IXYPoint, level: number) => IXYPoint;
+  tileAtPoint: (point: IGeoJSPoint2D, level: number) => IGeoJSPoint2D;
   url: (url?: string | ((...args: any[]) => string)) => string;
 
   onIdle: (handler: () => void) => IGeoJSOsmLayer;
@@ -558,9 +677,9 @@ export interface IGeoJSFeatureBase<ThisType> extends IGeoJsSceneObject {
 export interface IGeoJSTextFeature
   extends IGeoJSFeatureBase<IGeoJSTextFeature> {
   position: ((
-    val: IGeoJSPoint[] | ((dataPoint: any) => IGeoJSPoint),
+    val: IGeoJSPosition[] | ((dataPoint: any) => IGeoJSPosition),
   ) => IGeoJSTextFeature) &
-    (() => IGeoJSPoint[] | ((dataPoint: any) => IGeoJSPoint));
+    (() => IGeoJSPosition[] | ((dataPoint: any) => IGeoJSPosition));
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.featureLayer.html
@@ -625,16 +744,16 @@ export interface IGeoJSUiLayer extends IGeoJSLayer {
 export interface IGeoJSAnnotation {
   options: (key?: string, value?: any) => any;
   style: (value?: { [key: string]: any }) => any;
-  coordinates: () => IGeoJSPoint[];
+  coordinates: () => IGeoJSPosition[];
   geojson: () => any;
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.html#.mouseState
 export interface IGeoJSMouseState {
-  page: IXYPoint;
-  map: IGeoJSPoint;
-  geo: IGeoJSPoint;
-  mapgcs: IGeoJSPoint;
+  page: IGeoJSPoint2D;
+  map: IGeoJSPosition;
+  geo: IGeoJSPosition;
+  mapgcs: IGeoJSPosition;
   buttons: {
     left: boolean;
     right: boolean;
@@ -648,19 +767,19 @@ export interface IGeoJSMouseState {
   };
   time: number;
   deltaTime: number;
-  velocity: IXYPoint;
+  velocity: IGeoJSPoint2D;
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.polygonFeature.html#.styleSpec
 export interface IGeoJSPolygonFeatureStyle {
   fill?: boolean | (() => boolean);
-  fillColor?: string | (() => string);
+  fillColor?: TGeoJSColor | (() => TGeoJSColor);
   fillOpacity?: number | (() => number);
   stroke?: boolean | (() => boolean);
   uniformPolygon?: boolean | (() => boolean);
   closed?: boolean | (() => boolean);
   origin?: Array<number> | (() => Array<number>);
-  strokeColor?: string | (() => string);
+  strokeColor?: TGeoJSColor | (() => TGeoJSColor);
   strokeOpacity?: number | (() => number);
   strokeWidth?: number | (() => number);
   strokeOffset?: number | (() => number);
@@ -676,11 +795,11 @@ export interface IGeoJSPolygonFeatureStyle {
 export interface IGeoJSPointFeatureStyle {
   radius?: number | (() => number);
   stroke?: boolean | (() => boolean);
-  strokeColor?: string | (() => string);
+  strokeColor?: TGeoJSColor | (() => TGeoJSColor);
   strokeOpacity?: number | (() => number);
   strokeWidth?: number | (() => number);
   fill?: boolean | (() => boolean);
-  fillColor?: string | (() => string);
+  fillColor?: TGeoJSColor | (() => TGeoJSColor);
   fillOpacity?: number | (() => number);
   origin?: Array<number> | (() => Array<number>);
   scaled?: boolean | number | (() => boolean | number); // missing from the documentation
@@ -688,7 +807,7 @@ export interface IGeoJSPointFeatureStyle {
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.lineFeature.html#.styleSpec
 export interface IGeoJSLineFeatureStyle {
-  strokeColor?: string | (() => string);
+  strokeColor?: TGeoJSColor | (() => TGeoJSColor);
   strokeOpacity?: number | (() => number);
   strokeWidth?: number | (() => number);
   strokeOffset?: number | (() => number);
@@ -701,6 +820,84 @@ export interface IGeoJSLineFeatureStyle {
   debug?: string | (() => string);
   origin?: Array<number> | (() => Array<number>);
 }
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.pointAnnotation.html#.spec
+export interface IGeoJSPointAnnotationSpec {
+  position?: IGeoJSPosition;
+  coordinates?: IGeoJSPosition[];
+  style?: IGeoJSPointFeatureStyle;
+  editStyle?: IGeoJSPointFeatureStyle;
+  name?: string;
+  layer?: IGeoJSAnnotationLayer;
+  state?: string;
+  showLabel?: boolean | string[];
+  allowBooleanOperations?: boolean;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.lineAnnotation.html#.spec
+export interface IGeoJSLineAnnotationSpec {
+  vertices?: IGeoJSPosition[];
+  coordinates?: IGeoJSPosition[];
+  style?: IGeoJSLineFeatureStyle;
+  editStyle?: IGeoJSLineFeatureStyle;
+  name?: string;
+  layer?: IGeoJSAnnotationLayer;
+  state?: string;
+  showLabel?: boolean | string[];
+  allowBooleanOperations?: boolean;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.rectangleAnnotation.html#.spec
+export interface IGeoJSRectangleAnnotationSpec {
+  corners?: IGeoJSPosition[];
+  coordinates?: IGeoJSPosition[];
+  style?: IGeoJSPolygonFeatureStyle;
+  editStyle?: IGeoJSPolygonFeatureStyle;
+  constraint?: number | number[] | (() => number);
+  name?: string;
+  layer?: IGeoJSAnnotationLayer;
+  state?: string;
+  showLabel?: boolean | string[];
+  allowBooleanOperations?: boolean;
+
+  editHandleStyle?: {
+    strokeColor?: TGeoJSColor;
+    handles?: {
+      rotate?: boolean;
+    };
+  };
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.polygonAnnotation.html#.spec
+export interface IGeoJSPolygonAnnotationSpec {
+  vertices?: IGeoJSPosition[];
+  coordinates?: IGeoJSPosition[];
+  style?: IGeoJSPolygonFeatureStyle;
+  editStyle?: IGeoJSPolygonFeatureStyle;
+  constraint?: number | number[] | (() => number);
+  name?: string;
+  layer?: IGeoJSAnnotationLayer;
+  state?: string;
+  showLabel?: boolean | string[];
+  allowBooleanOperations?: boolean;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.polygonObject
+export interface IGeoJSPolygonObject {
+  outer: IGeoJSPosition[];
+  inner?: IGeoJSPosition[][];
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.geoColorObject
+export interface IGeoJSColorObject {
+  r: number;
+  g: number;
+  b: number;
+  a?: number;
+}
+
+// https://opengeoscience.github.io/geojs/apidocs/geo.html#.geoColor
+export type TGeoJSColor = string | number | IGeoJSColorObject;
 
 export interface ICommonWorkerInterfaceElement {
   vueAttrs?: { [vueAttr: string]: any };
@@ -819,7 +1016,7 @@ export interface IAnnotationBase {
   shape: AnnotationShape;
   channel: number;
   location: IAnnotationLocation;
-  coordinates: IGeoJSPoint[];
+  coordinates: IGeoJSPosition[];
   datasetId: string;
   color?: string;
 }
@@ -869,7 +1066,7 @@ export interface IIdAnnotationFilter extends IAnnotationFilter {
 }
 
 export interface IROIAnnotationFilter extends IAnnotationFilter {
-  roi: IGeoJSPoint[];
+  roi: IGeoJSPosition[];
 }
 
 export interface IAnnotationPropertyConfiguration {
@@ -922,10 +1119,10 @@ export interface IProgressInfo {
 }
 
 export interface ICameraInfo {
-  center: IGeoJSPoint;
+  center: IGeoJSPosition;
   zoom: number;
   rotate: number;
-  gcsBounds: IGeoJSPoint[];
+  gcsBounds: IGeoJSPosition[];
 }
 
 export type TJobType =
@@ -962,35 +1159,9 @@ export interface IUISetting {
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.util.html#.pixelCoordinateParams
-interface IGeoJSPixelCoordinateParams {
-  map: {
-    node: HTMLElement;
-    ingcs: string;
-    gcs: string;
-    maxBounds: IGeoJSBounds;
-    unitsPerPixel: number;
-    center: IXYPoint;
-    min: number;
-    max: number;
-    zoom: number;
-    clampBoundsX: boolean;
-    clampBoundsY: boolean;
-    clampZoom: boolean;
-  };
-  layer: {
-    maxLevel: number;
-    wrapX: boolean;
-    wrapY: boolean;
-    tileOffset: () => IXYPoint;
-    attribution: string;
-    tileWidth: number;
-    tileHeight: number;
-    tileRounding: (x: number) => number;
-    tilesAtZoom: (zoom: number) => IXYPoint | undefined;
-    tilesMaxBounds: (level: number) => IXYPoint | undefined;
-    renderer?: string;
-    queue?: IGeoJSFetchQueue;
-  };
+export interface IGeoJSPixelCoordinateParams {
+  map: IGeoJSMapSpec;
+  layer: IGeoJSLayerSpec;
 }
 
 export interface IMapEntry {

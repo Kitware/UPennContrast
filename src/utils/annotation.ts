@@ -1,22 +1,30 @@
 import {
   IAnnotation,
   IImage,
-  IGeoJSPoint,
+  IGeoJSPosition,
   AnnotationShape,
   IAnnotationProperty,
   IGeoJSAnnotation,
+  TGeoJSColor,
+  IGeoJSLineFeatureStyle,
+  IGeoJSPointFeatureStyle,
+  IGeoJSPolygonFeatureStyle,
 } from "@/store/model";
 import geojs from "geojs";
 import { logError } from "@/utils/log";
 
+type TAnnotationStyle = IGeoJSLineFeatureStyle &
+  IGeoJSPointFeatureStyle &
+  IGeoJSPolygonFeatureStyle;
+
 // Which style an annotation should have, depending on its layer (color change)
 export function getAnnotationStyleFromBaseStyle(
-  baseStyle: { [key: string]: any; color?: string },
+  baseStyle: { [key: string]: any; color?: TGeoJSColor },
   annotationColor?: string,
   isHovered: boolean = false,
   isSelected: boolean = false,
-) {
-  const style = {
+): TAnnotationStyle {
+  const style: TAnnotationStyle = {
     stroke: true,
     strokeColor: "black",
     strokeOpacity: 1,
@@ -69,7 +77,7 @@ export function unrollIndexFromImages(
 // Create a geojs annotation depending on its shape
 export function geojsAnnotationFactory(
   shape: string,
-  coordinates: IGeoJSPoint[],
+  coordinates: IGeoJSPosition[],
   options: any,
 ) {
   let newGeoJSAnnotation: IGeoJSAnnotation | null = null;
@@ -92,7 +100,7 @@ export function geojsAnnotationFactory(
   return newGeoJSAnnotation;
 }
 
-export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
+export function simpleCentroid(coordinates: IGeoJSPosition[]): IGeoJSPosition {
   if (coordinates.length === 1) {
     return coordinates[0];
   }
@@ -107,7 +115,7 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
       sums.z += z;
     }
   });
-  const centroid: IGeoJSPoint = {
+  const centroid: IGeoJSPosition = {
     x: sums.x / coordinates.length,
     y: sums.y / coordinates.length,
   };
@@ -117,7 +125,7 @@ export function simpleCentroid(coordinates: IGeoJSPoint[]): IGeoJSPoint {
   return centroid;
 }
 
-export function pointDistance(a: IGeoJSPoint, b: IGeoJSPoint) {
+export function pointDistance(a: IGeoJSPosition, b: IGeoJSPosition) {
   return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
 }
 

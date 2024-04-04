@@ -14,7 +14,7 @@ import jobs, { createProgressEventCallback } from "./jobs";
 import {
   IAnnotation,
   IAnnotationConnection,
-  IGeoJSPoint,
+  IGeoJSPosition,
   IToolConfiguration,
   IAnnotationBase,
   IAnnotationConnectionBase,
@@ -45,7 +45,7 @@ export class Annotations extends VuexModule {
   // Connections from the current dataset and configuration
   annotationConnections: IAnnotationConnection[] = [];
 
-  annotationCentroids: { [annotationId: string]: IGeoJSPoint } = {};
+  annotationCentroids: { [annotationId: string]: IGeoJSPosition } = {};
   annotationIdToIdx: { [annotationId: string]: number } = {};
 
   selectedAnnotations: IAnnotation[] = [];
@@ -226,7 +226,7 @@ export class Annotations extends VuexModule {
     toolConfiguration,
     datasetId,
   }: {
-    coordinates: IGeoJSPoint[];
+    coordinates: IGeoJSPosition[];
     toolConfiguration: IToolConfiguration;
     datasetId: string;
   }): Promise<IAnnotation | null> {

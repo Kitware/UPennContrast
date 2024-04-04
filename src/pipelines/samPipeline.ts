@@ -2,7 +2,7 @@ import {
   ErrorToolStateSymbol,
   IErrorToolState,
   IGeoJSAnnotation,
-  IGeoJSPoint,
+  IGeoJSPosition,
   IGeoJSPolygonFeatureStyle,
   IMapEntry,
   IMouseState,
@@ -246,7 +246,7 @@ function processPrompt(
   const xScale = canvasInfo.scaledWidth / canvasInfo.srcWidth;
   const yScale = canvasInfo.scaledHeight / canvasInfo.srcHeight;
   const pushPointToPrompt = (
-    point: IGeoJSPoint,
+    point: IGeoJSPosition,
     label: number,
     convertFromGcs: boolean,
   ) => {
@@ -316,7 +316,7 @@ async function runDecoder(
 }
 
 interface IItkOutput {
-  contour: IGeoJSPoint[];
+  contour: IGeoJSPosition[];
 }
 
 let cachedWebWorker: Worker | null = null;
@@ -373,7 +373,7 @@ async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
 function displayToWorld(
   { contour }: IItkOutput,
   { map }: IMapEntry,
-): IGeoJSPoint[] {
+): IGeoJSPosition[] {
   return map.displayToGcs(contour);
 }
 

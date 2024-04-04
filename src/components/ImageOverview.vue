@@ -212,7 +212,7 @@ export default class ImageViewer extends Vue {
         actions: {},
       },
     });
-    this.map = geojs.map(params.map) as IGeoJSMap;
+    this.map = geojs.map(params.map);
 
     if (window.ResizeObserver) {
       this.observer = new window.ResizeObserver(() => {

@@ -127,15 +127,14 @@ import geojs from "geojs";
 import { markRaw } from "vue";
 
 import {
-  IGeoJSMap,
-  IGeoJSPoint,
+  IGeoJSPosition,
   IGeoJSScaleWidget,
   IGeoJSTile,
   IImage,
   ILayerStackImage,
   IMapEntry,
   ICameraInfo,
-  IXYPoint,
+  IGeoJSPoint2D,
   IMouseState,
   SamAnnotationToolStateSymbol,
 } from "../store/model";
@@ -590,7 +589,7 @@ export default class ImageViewer extends Vue {
     this.mouseState = null;
   }
 
-  setCenter(center: IGeoJSPoint) {
+  setCenter(center: IGeoJSPosition) {
     this.cameraInfo.center = center;
     this.applyCameraInfo();
   }
@@ -708,9 +707,9 @@ export default class ImageViewer extends Vue {
       this.tileWidth,
       this.tileHeight,
     );
-    params.map.maxBounds.right = mapWidth;
-    params.map.maxBounds.bottom = mapHeight;
-    params.map.min -= Math.ceil(
+    params.map.maxBounds!.right = mapWidth;
+    params.map.maxBounds!.bottom = mapHeight;
+    params.map.min! -= Math.ceil(
       Math.log(Math.max(this.unrollW, this.unrollH)) / Math.log(2),
     );
     params.map.zoom = params.map.min;
@@ -720,7 +719,7 @@ export default class ImageViewer extends Vue {
     params.layer.nearestPixel = params.layer.maxLevel;
     delete params.layer.tilesMaxBounds;
     params.layer.url = this.blankUrl;
-    params.map.max += 5;
+    params.map.max! += 5;
 
     let needReset = forceReset || (this.maps[mllidx] && !mapElement.firstChild);
     if (needReset) {
@@ -728,7 +727,7 @@ export default class ImageViewer extends Vue {
     }
 
     if (this.maps.length <= mllidx || needReset) {
-      const map: IGeoJSMap = geojs.map(params.map);
+      const map = geojs.map(params.map);
       map.geoOn(geojs.event.pan, () => this._handlePan(mllidx));
 
       const interactorOpts = map.interactor().options();
@@ -783,8 +782,8 @@ export default class ImageViewer extends Vue {
         map.maxBounds({
           left: 0,
           top: 0,
-          right: params.map.maxBounds.right,
-          bottom: params.map.maxBounds.bottom,
+          right: params.map.maxBounds!.right,
+          bottom: params.map.maxBounds!.bottom,
         });
         map.zoomRange(params.map);
       }
@@ -943,7 +942,7 @@ export default class ImageViewer extends Vue {
         };
         return result;
       };
-      layer.tileAtPoint = (point: IXYPoint, level: number) => {
+      layer.tileAtPoint = (point: IGeoJSPoint2D, level: number) => {
         point = layer.displayToLevel(
           layer.map().gcsToDisplay(point, null),
           someImage.levels - 1,
