@@ -377,6 +377,16 @@ function displayToWorld(
   return map.displayToGcs(contour);
 }
 
+function simplifyCoordinates(
+  coords: IGeoJSPosition[],
+  tolerance: number,
+): IGeoJSPosition[] {
+  if (tolerance < 0) {
+    return coords;
+  }
+  return geojs.util.rdpLineSimplify(coords, tolerance, true);
+}
+
 function createSamPipelineEncoderNodes(
   modelNameNode: ManualInputNode<TSamModel>,
 ) {
@@ -424,6 +434,7 @@ function createSamPipelineEncoderNodes(
 
 function createSamPipelineDecoderNodes(
   modelNameNode: ManualInputNode<TSamModel>,
+  simplificationToleranceNode: ManualInputNode<number>,
   encoderNodes: ReturnType<typeof createSamPipelineEncoderNodes>,
   promptAsyncOptions?: TManualInputNodeAsyncOptions,
 ) {
@@ -464,6 +475,12 @@ function createSamPipelineDecoderNodes(
     encoderNodes.geoJsMapInputNode,
   ]);
 
+  // Simplify the polygon
+  const simplificationNode = createComputeNode(simplifyCoordinates, [
+    coordinatesConversionNode,
+    simplificationToleranceNode,
+  ]);
+
   return {
     promptInputNode,
     contextNode,
@@ -472,6 +489,7 @@ function createSamPipelineDecoderNodes(
     inferenceNode,
     maskToPolygonNode,
     coordinatesConversionNode,
+    simplificationNode,
   };
 }
 
@@ -482,13 +500,16 @@ function createSamPipeline(model: TSamModel) {
 
   // Create the pipeline
   const modelNameNode = new ManualInputNode(model);
+  const simplificationToleranceNode = new ManualInputNode(0);
   const encoderNodes = createSamPipelineEncoderNodes(modelNameNode);
   const decoderNodes = createSamPipelineDecoderNodes(
     modelNameNode,
+    simplificationToleranceNode,
     encoderNodes,
   );
   const previewNodes = createSamPipelineDecoderNodes(
     modelNameNode,
+    simplificationToleranceNode,
     encoderNodes,
     {
       type: "debounce",
@@ -499,18 +520,21 @@ function createSamPipeline(model: TSamModel) {
   return {
     allNodes: {
       modelNameNode,
+      simplificationToleranceNode,
       encoderNodes,
       decoderNodes,
       previewNodes,
     },
     input: {
+      model: modelNameNode,
+      simplificationTolerance: simplificationToleranceNode,
       geoJSMap: encoderNodes.geoJsMapInputNode,
       mainPrompt: decoderNodes.promptInputNode,
       previewPrompt: previewNodes.promptInputNode,
     },
     output: {
-      mainOuput: decoderNodes.coordinatesConversionNode,
-      previewOuput: previewNodes.coordinatesConversionNode,
+      mainOuput: decoderNodes.simplificationNode,
+      previewOuput: previewNodes.simplificationNode,
     },
   };
 }

@@ -15,6 +15,26 @@
         <v-btn @click="submit" :disabled="!outputCoordinates">
           Submit annotation
         </v-btn>
+        <v-slider
+          v-model="simplificationTolerance"
+          min="0"
+          max="10"
+          step="0.01"
+          label="Simplification"
+        >
+          <template v-slot:append>
+            <v-text-field
+              v-model="simplificationTolerance"
+              type="number"
+              min="0"
+              max="10"
+              step="0.01"
+              style="width: 60px"
+              class="mt-0 pt-0"
+            >
+            </v-text-field>
+          </template>
+        </v-slider>
         <v-card
           v-for="(message, i) in loadingMessages"
           :key="`loading-message-${i}`"
@@ -70,6 +90,19 @@ export default class SamToolMenu extends Vue {
 
   get loadingMessages() {
     return this.samState?.loadingMessages ?? [];
+  }
+
+  get simplificationToleranceNode() {
+    return this.samState?.nodes.input.simplificationTolerance ?? null;
+  }
+
+  get simplificationTolerance() {
+    const value = this.simplificationToleranceNode?.output;
+    return value == null || value === NoOutput ? -1 : value;
+  }
+
+  set simplificationTolerance(tolerance: number) {
+    this.simplificationToleranceNode?.setValue(tolerance);
   }
 
   get promptNode() {
