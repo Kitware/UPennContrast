@@ -900,25 +900,6 @@ export class Main extends VuexModule {
   }
 
   @Action
-  async do(undo: boolean) {
-    const datasetId = this.dataset?.id;
-    if (datasetId !== undefined) {
-      try {
-        sync.setSaving(true);
-        if (undo) {
-          await this.api.undo(datasetId);
-        } else {
-          await this.api.redo(datasetId);
-        }
-        this.context.dispatch("fetchAnnotations");
-        sync.setSaving(false);
-      } catch (error) {
-        sync.setSaving(error as Error);
-      }
-    }
-  }
-
-  @Action
   async setXY(value: number) {
     this.setXYImpl(value);
   }

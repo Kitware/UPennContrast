@@ -114,9 +114,9 @@
       v-if="submitPendingAnnotation"
       @click.capture.stop="submitPendingAnnotation(false)"
       class="cancel-button"
-      dense
+      small
     >
-      Cancel pending annotation
+      Cancel (ctrl-Z)
     </v-btn>
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -277,7 +277,7 @@ export default class ImageViewer extends Vue {
     {
       bind: "mod+z",
       handler: () => {
-        this.store.do(true);
+        this.annotationStore.undoOrRedo(true);
       },
       data: {
         section: "Objects",
@@ -287,7 +287,7 @@ export default class ImageViewer extends Vue {
     {
       bind: "mod+shift+z",
       handler: () => {
-        this.store.do(false);
+        this.annotationStore.undoOrRedo(false);
       },
       data: {
         section: "Objects",

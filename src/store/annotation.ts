@@ -83,6 +83,33 @@ export class Annotations extends VuexModule {
 
   hoveredAnnotationId: string | null = null;
 
+  @Action
+  async undoOrRedo(undo: boolean) {
+    // Undo the pending annotation if there is one
+    if (undo && this.submitPendingAnnotation) {
+      this.submitPendingAnnotation(false);
+      return;
+    }
+
+    // Otherwise, call the undo/redo endpoint of the API and refetch annotations
+    const datasetId = main.dataset?.id;
+    if (!datasetId) {
+      return;
+    }
+    try {
+      sync.setSaving(true);
+      if (undo) {
+        await this.annotationsAPI.undo(datasetId);
+      } else {
+        await this.annotationsAPI.redo(datasetId);
+      }
+      this.context.dispatch("fetchAnnotations");
+      sync.setSaving(false);
+    } catch (error) {
+      sync.setSaving(error as Error);
+    }
+  }
+
   @Mutation
   public setHoveredAnnotationId(id: string | null) {
     this.hoveredAnnotationId = id;
