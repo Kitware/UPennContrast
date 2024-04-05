@@ -278,6 +278,9 @@ export class Main extends VuexModule {
   ) {
     if (configuration === null) {
       this.selectedTool = null;
+    } else if (this.selectedTool?.configuration.id === configuration.id) {
+      // Update the configuration but not the state
+      Vue.set(this.selectedTool, "configuration", configuration);
     } else {
       let state: TToolState;
       switch (configuration.type) {

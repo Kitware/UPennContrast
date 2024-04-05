@@ -821,5 +821,6 @@ export default class MultiSourceConfiguration extends Vue {
 
 .code-block {
   white-space: pre-wrap;
+  width: 100%;
 }
 </style>
