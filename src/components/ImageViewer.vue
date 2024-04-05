@@ -89,14 +89,26 @@
       </div>
     </div>
     <v-alert
-      class="progress-done"
-      :value="loadedAndOptimized"
+      v-model="showOptimizedAlert"
+      class="viewer-alert"
       type="success"
       dense
       dismissible
       transition="slide-x-transition"
     >
       Dataset fully loaded and optimized
+    </v-alert>
+    <v-alert
+      v-model="showSamToolHelpAlert"
+      class="viewer-alert"
+      type="info"
+      dense
+      dismissible
+      transition="slide-x-transition"
+    >
+      Shift + left click to add a positive point<br />
+      Shift + right click to add a negative point<br />
+      Shift + click + drag to add box
     </v-alert>
     <v-btn
       v-if="submitPendingAnnotation"
@@ -327,6 +339,27 @@ export default class ImageViewer extends Vue {
   cacheProgresses: { progress: number; total: number }[] = [];
   scaleWidget: IGeoJSScaleWidget | null = null;
 
+  // Logic to show help for the SAM tool
+
+  showSamToolHelpAlert = false;
+
+  get selectedToolType() {
+    return this.selectedTool?.state.type ?? null;
+  }
+
+  @Watch("selectedToolType")
+  onSelectedToolTypeChanged() {
+    this.showSamToolHelpAlert =
+      this.selectedToolType === SamAnnotationToolStateSymbol;
+    if (this.showSamToolHelpAlert) {
+      setTimeout(() => (this.showSamToolHelpAlert = false), 10000);
+    }
+  }
+
+  // Logic to show an alert when the dataset is optimized
+
+  showOptimizedAlert = false;
+
   get loadedAndOptimized() {
     return (
       this.cacheProgresses.length === 0 &&
@@ -334,6 +367,16 @@ export default class ImageViewer extends Vue {
       this.histogramCaches <= 0
     );
   }
+
+  @Watch("loadedAndOptimized")
+  onOptimizedChanged() {
+    this.showOptimizedAlert = this.loadedAndOptimized;
+    if (this.showOptimizedAlert) {
+      setTimeout(() => (this.showOptimizedAlert = false), 3000);
+    }
+  }
+
+  // Logic to show the progress bars
 
   get progresses() {
     // Merge caching and downloading of annotations and connections
@@ -1251,7 +1294,7 @@ export default class ImageViewer extends Vue {
   width: 200px;
   z-index: 200;
 }
-.progress-done {
+.viewer-alert {
   width: fit-content;
   z-index: 200;
   margin: 4px;
