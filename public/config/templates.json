@@ -337,7 +337,7 @@
         "id": "simplificationTolerance",
         "type": "text",
         "meta": {
-          "value": "0",
+          "value": "2",
           "type": "number"
         }
       },
