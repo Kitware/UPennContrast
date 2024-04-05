@@ -169,7 +169,7 @@ int main(int argc, char* argv[])
 
     std::fstream outFile;
     outFile.open(outputPath, std::fstream::out);
-    outFile << "{ \"contour\": [\n";
+    outFile << "[";
 
     // Collect the contour by using the iterator as a robot that can move forward, backward, turn left or turn right
     // Loop invariants:
@@ -182,14 +182,14 @@ int main(int argc, char* argv[])
     {
         moveIteratorAndOrientationToNextAnnotationPoint(lineIt, orientation, annotationValue);
         const auto currentPoint = getOutputPointFromIteratorAndOrientation(lineIt, orientation);
-        outFile << "{ \"x\": " << currentPoint[0] << ", \"y\": " << currentPoint[1] << " }";
+        outFile << "{\"x\":" << currentPoint[0] << ",\"y\":" << currentPoint[1] << "}";
 
         if (currentPoint == firstPoint)
         {
-            outFile << "\n]}" << std::endl;
+            outFile << "]" << std::endl;
             return EXIT_SUCCESS;
         }
-        outFile << ",\n";
+        outFile << ",";
     }
 }
 

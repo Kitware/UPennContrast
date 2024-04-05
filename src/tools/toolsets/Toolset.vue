@@ -63,7 +63,7 @@
                         <template
                           v-if="selectedTool && selectedTool.id === tool.id"
                         >
-                          <sam-tool-menu :tool="tool"></sam-tool-menu>
+                          <sam-tool-menu :toolConfiguration="tool" />
                         </template>
                       </div>
                     </template>

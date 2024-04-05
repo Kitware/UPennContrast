@@ -315,12 +315,10 @@ async function runDecoder(
   return decoderOutput as unknown as IDecoderOutput;
 }
 
-interface IItkOutput {
-  contour: IGeoJSPosition[];
-}
-
 let cachedWebWorker: Worker | null = null;
-async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
+async function runItkPipeline({
+  masks,
+}: IDecoderOutput): Promise<IGeoJSPosition[]> {
   const array = masks.data;
   const width = masks.dims[3];
   const height = masks.dims[2];
@@ -371,10 +369,10 @@ async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
 }
 
 function displayToWorld(
-  { contour }: IItkOutput,
+  coords: IGeoJSPosition[],
   { map }: IMapEntry,
 ): IGeoJSPosition[] {
-  return map.displayToGcs(contour);
+  return map.displayToGcs(coords);
 }
 
 function simplifyCoordinates(
@@ -469,16 +467,16 @@ function createSamPipelineDecoderNodes(
   // Convert the mask into a polygon
   const maskToPolygonNode = createComputeNode(runItkPipeline, [inferenceNode]);
 
-  // Convert coordinates from display to world
-  const coordinatesConversionNode = createComputeNode(displayToWorld, [
-    maskToPolygonNode,
-    encoderNodes.geoJsMapInputNode,
-  ]);
-
   // Simplify the polygon
   const simplificationNode = createComputeNode(simplifyCoordinates, [
-    coordinatesConversionNode,
+    maskToPolygonNode,
     simplificationToleranceNode,
+  ]);
+
+  // Convert coordinates from display to world
+  const coordinatesConversionNode = createComputeNode(displayToWorld, [
+    simplificationNode,
+    encoderNodes.geoJsMapInputNode,
   ]);
 
   return {
@@ -488,8 +486,8 @@ function createSamPipelineDecoderNodes(
     processPromptNode,
     inferenceNode,
     maskToPolygonNode,
-    coordinatesConversionNode,
     simplificationNode,
+    coordinatesConversionNode,
   };
 }
 
@@ -533,8 +531,8 @@ function createSamPipeline(model: TSamModel) {
       previewPrompt: previewNodes.promptInputNode,
     },
     output: {
-      mainOuput: decoderNodes.simplificationNode,
-      previewOuput: previewNodes.simplificationNode,
+      mainOuput: decoderNodes.coordinatesConversionNode,
+      previewOuput: previewNodes.coordinatesConversionNode,
     },
   };
 }

@@ -34,7 +34,11 @@
           >
             Redo last prompt
           </v-btn>
-          <v-btn class="my-1" @click="reset" :disabled="prompts.length === 0">
+          <v-btn
+            class="my-1"
+            @click="resetPrompts"
+            :disabled="prompts.length === 0"
+          >
             Reset prompts
           </v-btn>
           <v-btn class="my-1" @click="submit" :disabled="!outputCoordinates">
@@ -96,7 +100,7 @@ export default class SamToolMenu extends Vue {
   readonly annotationStore = annotationStore;
 
   @Prop({ required: true })
-  readonly tool!: IToolConfiguration;
+  readonly toolConfiguration!: IToolConfiguration;
 
   // The first element is the oldest
   promptHistory: TSamPrompt[] = [];
@@ -104,10 +108,16 @@ export default class SamToolMenu extends Vue {
   turboMode: boolean = true;
 
   mounted() {
-    this.turboMode = this.tool.values.turboMode;
+    this.turboMode = this.toolConfiguration.values.turboMode;
     this.simplificationTolerance = Number(
-      this.tool.values.simplificationTolerance,
+      this.toolConfiguration.values.simplificationTolerance,
     );
+  }
+
+  @Watch("turboMode")
+  turboModeChanged() {
+    // When the turbo mode changes, reset the prompts
+    this.resetPrompts();
   }
 
   @Watch("turboMode")
@@ -118,7 +128,7 @@ export default class SamToolMenu extends Vue {
       turboMode: this.turboMode,
       simplificationTolerance: this.simplificationTolerance,
     };
-    const originalValues = this.tool.values;
+    const originalValues = this.toolConfiguration.values;
     let modified = false;
     for (const [key, value] of Object.entries(changedValues)) {
       if (originalValues[key] !== value) {
@@ -129,11 +139,9 @@ export default class SamToolMenu extends Vue {
     if (!modified) {
       return;
     }
-    console.log("modified");
-    console.log(changedValues, originalValues);
     const newToolValues = { ...originalValues, ...changedValues };
     const newTool = {
-      ...this.tool,
+      ...this.toolConfiguration,
       values: newToolValues,
     };
     this.store.editToolInConfiguration(newTool);
@@ -208,8 +216,18 @@ export default class SamToolMenu extends Vue {
     this.prompts = this.prompts;
   }
 
-  @Watch("tool")
-  reset() {
+  @Watch("toolConfiguration")
+  toolChanged(
+    newToolConfig: IToolConfiguration,
+    oldToolConfig: IToolConfiguration,
+  ) {
+    // Reset when the configuration changes but not when the configuration settings change
+    if (newToolConfig.id !== oldToolConfig.id) {
+      this.resetPrompts();
+    }
+  }
+
+  resetPrompts() {
     this.promptHistory = [];
     this.prompts = [];
   }
@@ -228,7 +246,7 @@ export default class SamToolMenu extends Vue {
   submit() {
     const coordinates = this.outputCoordinates;
     const datasetId = this.datasetId;
-    const toolConfiguration = this.tool;
+    const toolConfiguration = this.toolConfiguration;
     if (coordinates && datasetId) {
       this.annotationStore.addAnnotationFromTool({
         coordinates,
@@ -236,7 +254,7 @@ export default class SamToolMenu extends Vue {
         toolConfiguration,
       });
     }
-    this.reset();
+    this.resetPrompts();
   }
 }
 </script>
