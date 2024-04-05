@@ -129,7 +129,6 @@ export default class AnnotationsAPI {
       coordinates,
       id: _id,
       datasetId,
-      color,
     });
     if (color) {
       annotation.color = color;

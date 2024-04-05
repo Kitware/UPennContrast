@@ -240,6 +240,26 @@ export default class AnnotationViewer extends Vue {
     return prompts === undefined || prompts === NoOutput ? [] : prompts;
   }
 
+  get pendingStoreAnnotation(): IAnnotation | null {
+    return this.annotationStore.pendingAnnotation;
+  }
+
+  @Watch("pendingStoreAnnotation")
+  pendingAnnotationChanged() {
+    if (this.pendingAnnotation) {
+      this.annotationLayer.removeAnnotation(this.pendingAnnotation);
+    }
+    if (this.pendingStoreAnnotation) {
+      this.pendingAnnotation = this.createGeoJSAnnotation(
+        this.pendingStoreAnnotation,
+      );
+    }
+    if (this.pendingAnnotation) {
+      this.annotationLayer.addAnnotation(this.pendingAnnotation);
+    }
+  }
+
+  pendingAnnotation: IGeoJSAnnotation | null = null;
   selectionAnnotation: IGeoJSAnnotation | null = null;
   samPromptAnnotations: IGeoJSAnnotation[] = [];
 
@@ -946,7 +966,7 @@ export default class AnnotationViewer extends Vue {
       });
   }
 
-  createGeoJSAnnotation(annotation: IAnnotation, layerId: string | undefined) {
+  createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
     if (!this.store.dataset) {
       return null;
     }

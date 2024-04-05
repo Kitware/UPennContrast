@@ -35,7 +35,7 @@
       :lowestLayer="mapentry.lowestLayer || 0"
       :layerCount="(mapentry.imageLayers || []).length / 2"
       :key="'annotation-viewer-' + index"
-    ></annotation-viewer>
+    />
     <div
       class="map-layout"
       ref="map-layout"
@@ -62,27 +62,31 @@
       @centerChange="setCenter"
       @cornersChange="setCorners"
     />
-    <div
-      class="progress"
-      v-for="(cacheObj, cacheIdx) in progresses"
-      :key="'cache-' + cacheIdx"
-    >
-      <v-progress-linear
-        :indeterminate="cacheObj.total === 0"
-        :value="cacheObj.total ? (100 * cacheObj.progress) / cacheObj.total : 0"
-        color="#CCC"
-        background-color="blue-grey"
-        style="height: 100%; z-index: inherit"
+    <div>
+      <div
+        class="progress"
+        v-for="(cacheObj, cacheIdx) in progresses"
+        :key="'cache-' + cacheIdx"
       >
-        <strong class="text-center ma-1">
-          {{ cacheObj.title }}
-          <template v-if="cacheObj.total !== 0">
-            {{ ((100 * cacheObj.progress) / cacheObj.total).toFixed(1) }}% ({{
-              cacheObj.progress
-            }}&nbsp;/&nbsp;{{ cacheObj.total }})
-          </template>
-        </strong>
-      </v-progress-linear>
+        <v-progress-linear
+          :indeterminate="cacheObj.total === 0"
+          :value="
+            cacheObj.total ? (100 * cacheObj.progress) / cacheObj.total : 0
+          "
+          color="#CCC"
+          background-color="blue-grey"
+          style="height: 100%; z-index: inherit"
+        >
+          <strong class="text-center ma-1">
+            {{ cacheObj.title }}
+            <template v-if="cacheObj.total !== 0">
+              {{ ((100 * cacheObj.progress) / cacheObj.total).toFixed(1) }}% ({{
+                cacheObj.progress
+              }}&nbsp;/&nbsp;{{ cacheObj.total }})
+            </template>
+          </strong>
+        </v-progress-linear>
+      </div>
     </div>
     <v-alert
       class="progress-done"
@@ -94,6 +98,14 @@
     >
       Dataset fully loaded and optimized
     </v-alert>
+    <v-btn
+      v-if="submitPendingAnnotation"
+      @click.capture.stop="submitPendingAnnotation(false)"
+      class="cancel-button"
+      dense
+    >
+      Cancel pending annotation
+    </v-btn>
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="0"
@@ -383,6 +395,10 @@ export default class ImageViewer extends Vue {
 
   get mouseMap(): IMapEntry | null {
     return this.mouseState?.mapEntry ?? null;
+  }
+
+  get submitPendingAnnotation() {
+    return this.annotationStore.submitPendingAnnotation;
   }
 
   samMapEntry: IMapEntry | null = null;
@@ -1239,6 +1255,12 @@ export default class ImageViewer extends Vue {
   width: fit-content;
   z-index: 200;
   margin: 4px;
+}
+.cancel-button {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 200;
 }
 .map-layout {
   position: absolute;

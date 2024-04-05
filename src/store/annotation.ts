@@ -53,6 +53,10 @@ export class Annotations extends VuexModule {
 
   progresses: IFetchingProgress[] = [];
 
+  pendingAnnotation: IAnnotation | null = null;
+  submitPendingAnnotationTimeout: number = 3;
+  submitPendingAnnotation: ((submit: boolean) => void) | null = null;
+
   get selectedAnnotationIds() {
     return this.selectedAnnotations.map(
       (annotation: IAnnotation) => annotation.id,
@@ -176,12 +180,69 @@ export class Annotations extends VuexModule {
     });
   }
 
+  @Mutation
+  setPendingAnnotation(annotationBase: IAnnotationBase | null) {
+    if (!annotationBase) {
+      this.pendingAnnotation = null;
+    } else {
+      this.pendingAnnotation = {
+        ...annotationBase,
+        id: "pendingAnnotation",
+        name: null,
+      };
+    }
+  }
+
+  @Mutation
+  setSubmitPendingAnnotationFunction(
+    newSubmitFunction: ((x: boolean) => void) | null,
+  ) {
+    this.submitPendingAnnotation = newSubmitFunction;
+  }
+
+  @Action
+  private getAnnotationSubmition(annotationBase: IAnnotationBase) {
+    // If there is a pending annotation, submit it
+    this.submitPendingAnnotation?.(true);
+
+    // Set pending annotation for preview
+    this.setPendingAnnotation(annotationBase);
+
+    // Start a new timer to submit the annotation
+    const timeoutId = setTimeout(() => {
+      this.submitPendingAnnotation?.(true);
+    }, 1000 * this.submitPendingAnnotationTimeout);
+
+    // Create a new promise and get its "resolve" function
+    let promiseResolve: (submit: boolean) => void;
+    const outputPromise = new Promise<boolean>(
+      (resolve) => (promiseResolve = resolve),
+    );
+
+    // This function will submit or cancel the annotation
+    const newSubmitFunction = (x: boolean) => {
+      this.setSubmitPendingAnnotationFunction(null);
+      this.setPendingAnnotation(null);
+      clearTimeout(timeoutId);
+      promiseResolve(x);
+    };
+
+    this.setSubmitPendingAnnotationFunction(newSubmitFunction);
+
+    return outputPromise;
+  }
+
   @Action
   public async createAnnotation(
     annotationBase: IAnnotationBase,
   ): Promise<IAnnotation | null> {
+    const submited = await this.getAnnotationSubmition(annotationBase);
+    if (!submited) {
+      return null;
+    }
+
     sync.setSaving(true);
-    const newAnnotation: IAnnotation | null =
+    const newAnnotation =
       await this.annotationsAPI.createAnnotation(annotationBase);
     sync.setSaving(false);
     return newAnnotation;
