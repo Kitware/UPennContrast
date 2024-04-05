@@ -1,6 +1,10 @@
 import { IGirderItem } from "@/girder";
 import { ITileHistogram } from "./images";
 
+interface IObject<Values = any> {
+  [key: string]: Values;
+}
+
 export interface IHistoryEntry {
   actionName: string;
   isUndone: boolean;
@@ -360,9 +364,9 @@ export interface IGeoJSActionRecord {
   action: string;
   owner?: string;
   name?: string;
-  input: string | object;
-  modifiers?: string | object;
-  selectionRectangle?: string | object;
+  input: string | IObject;
+  modifiers?: string | IObject;
+  selectionRectangle?: string | IObject;
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.map.html#.spec
@@ -406,13 +410,13 @@ export interface IGeoJSMapInteractorSpec {
   actions?: IGeoJSActionRecord[];
   click?: {
     enabled?: boolean;
-    buttons?: object;
+    buttons?: IObject;
     duration?: number;
     cancelOnMove?: boolean | number;
   };
   keyboard?: {
     actions?: { [actionKey: string]: string[] };
-    meta?: object;
+    meta?: IObject;
     metakeyMouseEvents?: string[];
     focusHighlight?: boolean;
   };
@@ -475,7 +479,7 @@ export interface IGeoJSMap extends IGeoJsSceneObject {
     (() => IGeoJSPosition);
   createLayer: <T extends string>(
     layerName: T,
-    arg?: object,
+    arg?: IObject,
   ) => T extends "osm"
     ? IGeoJSOsmLayer
     : T extends "annotation"
@@ -505,22 +509,22 @@ export interface IGeoJSMap extends IGeoJsSceneObject {
   node: () => JQuery;
   rotation: ((
     rotation: number,
-    origin?: object,
+    origin?: IObject,
     ignoreRotationFunc?: boolean,
   ) => IGeoJSMap) &
     (() => number);
   screenshot: <Type extends TGeoJSScreenShotTypes = "image/png">(
-    layers: IGeoJSLayer | IGeoJSLayer[] | false | object | undefined,
+    layers: IGeoJSLayer | IGeoJSLayer[] | false | IObject | undefined,
     type?: Type,
     encoderOptions?: number,
-    opts?: object,
+    opts?: IObject,
   ) => Promise<Type extends "canvas" ? HTMLCanvasElement : string>;
   size: ((arg: IGeoScreenSize) => IGeoJSMap) & (() => IGeoScreenSize);
   unitsPerPixel: ((zoom: number, unit: number) => IGeoJSMap) &
     ((zoom?: number, unit?: null) => number);
   zoom: ((
     val: number,
-    origin?: object,
+    origin?: IObject,
     ingoreDiscreteZoom?: boolean,
     ignoreClampBounds?: boolean,
   ) => IGeoJSMap) &
@@ -545,7 +549,7 @@ export interface IGeoJSLayerSpec {
   renderer?: string | IGeoJSRenderer;
   autoshareRenderer?: boolean | string;
   canvas?: HTMLCanvasElement;
-  annotations?: string[] | object;
+  annotations?: string[] | IObject;
   features?: string[];
   active?: boolean;
   attribution?: string;
@@ -667,11 +671,11 @@ export interface IGeoJSOsmLayer extends IGeoJSLayer {
 export interface IGeoJSFeature extends IGeoJSFeatureBase<IGeoJSFeature> {}
 export interface IGeoJSFeatureBase<ThisType> extends IGeoJsSceneObject {
   data: ((arg: any[]) => ThisType) & (() => any[]);
-  draw: (arg?: object) => ThisType;
-  style: (() => object) &
-    ((arg1: string) => object) &
-    ((arg1: string, arg2: object) => ThisType) &
-    ((arg1: object) => ThisType);
+  draw: (arg?: IObject) => ThisType;
+  style: (() => IObject) &
+    ((arg1: string) => IObject) &
+    ((arg1: string, arg2: IObject) => ThisType) &
+    ((arg1: IObject) => ThisType);
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.textFeature.html
@@ -688,7 +692,7 @@ export interface IGeoJSFeatureLayer extends IGeoJSLayer {
   readonly idle: boolean;
   createFeature: <T extends string>(
     featureName: T,
-    arg?: object,
+    arg?: IObject,
   ) => T extends "text" ? IGeoJSTextFeature : IGeoJSFeature;
   deleteFeature: (feature: IGeoJSFeature) => IGeoJSFeatureLayer;
   geoOn: (event: string, handler: Function) => IGeoJSFeatureLayer;
@@ -711,7 +715,7 @@ export interface IGeoJSWidget {}
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.gui.scaleWidget.html
 export interface IGeoJSScaleWidget {
-  options: (() => object) &
+  options: (() => IObject) &
     (<Key extends IGeoJSScaleWidgetOptions>(
       arg1: Key,
     ) => IGeoJSScaleWidgetSpec[Key]) &
@@ -743,8 +747,11 @@ export interface IGeoJSUiLayer extends IGeoJSLayer {
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.annotation.html
 export interface IGeoJSAnnotation {
-  options: (key?: string, value?: any) => any;
-  style: (value?: { [key: string]: any }) => any;
+  options: (() => IObject) &
+    ((key: string) => any) &
+    ((key: string, value: any) => IGeoJSAnnotation) &
+    ((values: IObject) => IGeoJSAnnotation);
+  style: (value?: IObject) => any;
   coordinates: () => IGeoJSPosition[];
   geojson: () => any;
 }

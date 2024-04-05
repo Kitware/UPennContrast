@@ -215,6 +215,19 @@ export default class AnnotationViewer extends Vue {
     return this.annotationStore.isAnnotationSelected;
   }
 
+  // Special annotations
+
+  // This annotation has not been submited yet
+  pendingAnnotation: IGeoJSAnnotation | null = null;
+  // This annotations comes from the mouse state preview
+  selectionAnnotation: IGeoJSAnnotation | null = null;
+  // These annotations represents the prompts of the user
+  samPromptAnnotations: IGeoJSAnnotation[] = [];
+  // User clicked to get this annotation when not in turbo mode
+  samUnsubmittedAnnotation: IGeoJSAnnotation | null = null;
+  // This is the annotation that is shown as a "what if the user clicks here"
+  samLivePreviewAnnotation: IGeoJSAnnotation | null = null;
+
   get selectedToolConfiguration(): IToolConfiguration | null {
     return this.store.selectedTool?.configuration ?? null;
   }
@@ -248,6 +261,7 @@ export default class AnnotationViewer extends Vue {
   pendingAnnotationChanged() {
     if (this.pendingAnnotation) {
       this.annotationLayer.removeAnnotation(this.pendingAnnotation);
+      this.pendingAnnotation = null;
     }
     if (this.pendingStoreAnnotation) {
       this.pendingAnnotation = this.createGeoJSAnnotation(
@@ -255,16 +269,10 @@ export default class AnnotationViewer extends Vue {
       );
     }
     if (this.pendingAnnotation) {
+      this.pendingAnnotation.options("specialAnnotation", true);
       this.annotationLayer.addAnnotation(this.pendingAnnotation);
     }
   }
-
-  pendingAnnotation: IGeoJSAnnotation | null = null;
-  selectionAnnotation: IGeoJSAnnotation | null = null;
-  samPromptAnnotations: IGeoJSAnnotation[] = [];
-
-  // User clicked to get this annotation
-  samUnsubmittedAnnotation: IGeoJSAnnotation | null = null;
 
   get samMainOutput() {
     return this.samToolState?.output ?? null;
@@ -290,16 +298,16 @@ export default class AnnotationViewer extends Vue {
       strokeOpacity: 1,
       strokeWidth: 1,
     };
-    const geoJsAnnotation: IGeoJSAnnotation =
-      geojs.annotation.polygonAnnotation({ style, vertices });
+    const geoJsAnnotation = geojs.annotation.polygonAnnotation({
+      style,
+      vertices,
+    });
+    geoJsAnnotation.options("specialAnnotation", true);
 
     // Add it to the layer
     this.samUnsubmittedAnnotation = geoJsAnnotation;
     this.annotationLayer.addAnnotation(this.samUnsubmittedAnnotation);
   }
-
-  // This is the annotation that is shown as a "what if the user clicks here"
-  samLivePreviewAnnotation: IGeoJSAnnotation | null = null;
 
   get samLivePreviewOutput() {
     return this.samToolState?.livePreview ?? null;
@@ -325,8 +333,11 @@ export default class AnnotationViewer extends Vue {
       strokeOpacity: 0.5,
       strokeWidth: 1,
     };
-    const geoJsAnnotation: IGeoJSAnnotation =
-      geojs.annotation.polygonAnnotation({ style, vertices });
+    const geoJsAnnotation = geojs.annotation.polygonAnnotation({
+      style,
+      vertices,
+    });
+    geoJsAnnotation.options("specialAnnotation", true);
 
     // Add it to the layer
     this.samLivePreviewAnnotation = geoJsAnnotation;
@@ -392,6 +403,7 @@ export default class AnnotationViewer extends Vue {
     }
 
     if (this.selectionAnnotation) {
+      this.selectionAnnotation.options("specialAnnotation", true);
       this.annotationLayer.addAnnotation(this.selectionAnnotation);
     }
   }
@@ -468,6 +480,7 @@ export default class AnnotationViewer extends Vue {
     const newAnnotations = [];
     for (const prompt of prompts) {
       const newAnnotation = samPromptToAnnotation(prompt, baseStyle);
+      newAnnotation.options("specialAnnotation", true);
       this.annotationLayer.addAnnotation(newAnnotation);
       newAnnotations.push(newAnnotation);
     }
@@ -832,18 +845,29 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer
       .annotations()
       .forEach((geoJsAnnotation: IGeoJSAnnotation) => {
-        if (geoJsAnnotation === this.annotationLayer.currentAnnotation) {
+        const {
+          girderId,
+          layerId,
+          isConnection,
+          childId,
+          parentId,
+          specialAnnotation,
+        } = geoJsAnnotation.options();
+
+        if (
+          geoJsAnnotation === this.annotationLayer.currentAnnotation ||
+          specialAnnotation
+        ) {
           // Don't do anything with currentAnnotation as it is used internally by geoJS
+          // Don't remove special annotations as they are removed by other ways
           return;
         }
+
         if (clearAll) {
           this.annotationLayer.removeAnnotation(geoJsAnnotation, false);
           this.annotationLayer.modified();
           return;
         }
-
-        const { girderId, layerId, isConnection, childId, parentId } =
-          geoJsAnnotation.options();
 
         if (!girderId) {
           return;
