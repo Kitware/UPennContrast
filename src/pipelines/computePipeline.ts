@@ -74,7 +74,11 @@ export class ComputeNode<
    * @param fun The wrapped function
    * @param parentNodes This will subscribe to all parents output, and provide function parameters
    */
-  constructor(fun: Fun, parentNodes: WrapInComputeNode<Params>) {
+  constructor(
+    fun: Fun,
+    parentNodes: WrapInComputeNode<Params>,
+    callbacks?: (() => void)[],
+  ) {
     this.fun = fun;
     this.computing = false;
     this.shouldRecompute = false;
@@ -88,6 +92,12 @@ export class ComputeNode<
       const computeCallback = this.createComputeCallback(parentNode);
       parentNode.onOutputUpdate(computeCallback);
     }
+
+    // Add initial callbacks
+    callbacks?.forEach((callback) => this.onOutputUpdate(callback));
+
+    // Recompute on initialization
+    this.compute();
   }
 
   /**
@@ -99,12 +109,11 @@ export class ComputeNode<
     let previousParentOutput = parentNode.output;
     const computeCallback = () => {
       const currentParentOutput = parentNode.output;
-      // Don't recompute when the parent output changes from NoOutput to NoOutput
-      // We still want to recompute if the previous and current output are the same
+      // Don't recompute when previousParentOutput and currentParentOutput are both NoOutput
+      // We still want to recompute if they are the same but not NoOutput
       // For example, in this case we want to recompute:
-      // const node = new ManualInputNode<any>();
       // const buffer = [0];
-      // node.setValue(buffer);
+      // const node = new ManualInputNode(buffer);
       // buffer.push(1);
       // node.setValue(buffer);
       if (

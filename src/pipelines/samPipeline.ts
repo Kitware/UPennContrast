@@ -571,11 +571,9 @@ export function createSamToolStateFromToolConfiguration(
     [previewNodes.sessionNode, "Creating decoder preview"],
   ];
   const recomputeLoadingMessage = () => {
-    const messages: string[] = [];
-    computingMessageMap
+    state.loadingMessages = computingMessageMap
       .filter(([node]) => node.isComputing)
-      .forEach(([, message]) => messages.push(message));
-    state.loadingMessages = messages;
+      .map(([, message]) => message);
   };
   computingMessageMap.forEach(([node]) => {
     node.onOutputUpdate(recomputeLoadingMessage);
