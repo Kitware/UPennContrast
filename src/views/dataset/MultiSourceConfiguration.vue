@@ -103,7 +103,7 @@ import {
 } from "@/utils/parsing";
 import { IGirderItem } from "@/girder";
 import { ITileMeta } from "@/store/GirderAPI";
-import { IGeoJSPoint, IJobEventData } from "@/store/model";
+import { IGeoJSPosition, IJobEventData } from "@/store/model";
 import { logError } from "@/utils/log";
 
 // Possible sources for variables
@@ -703,7 +703,7 @@ export default class MultiSourceConfiguration extends Vue {
       }
       const { mm_x, mm_y } = this.tilesMetadata![0];
       const framesMetadata = this.tilesInternalMetadata![0].nd2_frame_metadata;
-      const coordinates: IGeoJSPoint[] = framesMetadata.map((f: any) => {
+      const coordinates: IGeoJSPosition[] = framesMetadata.map((f: any) => {
         const framePos = f.position.stagePositionUm;
         return {
           x: framePos[0] / (mm_x * 1000),
@@ -821,5 +821,6 @@ export default class MultiSourceConfiguration extends Vue {
 
 .code-block {
   white-space: pre-wrap;
+  width: 100%;
 }
 </style>

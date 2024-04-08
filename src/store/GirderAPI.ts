@@ -156,18 +156,6 @@ export default class GirderAPI {
     });
   }
 
-  undo(datasetId: string) {
-    return this.client.put("history/undo", undefined, {
-      params: { datasetId },
-    });
-  }
-
-  redo(datasetId: string) {
-    return this.client.put("history/redo", undefined, {
-      params: { datasetId },
-    });
-  }
-
   async getHistoryEntries(datasetId: string): Promise<IHistoryEntry[]> {
     try {
       const params = { datasetId };

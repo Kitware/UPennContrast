@@ -1,5 +1,5 @@
 import { logError } from "@/utils/log";
-import { IGeoJSMap, IGeoJSPoint, IToolConfiguration } from "@/store/model";
+import { IGeoJSMap, IGeoJSPosition, IToolConfiguration } from "@/store/model";
 import {
   InterfaceTypes,
   runPipeline,
@@ -9,7 +9,7 @@ import {
 } from "itk-wasm";
 
 function geoJSCoordinatesToBinaryFileData(
-  coordinates: IGeoJSPoint[],
+  coordinates: IGeoJSPosition[],
   map: IGeoJSMap,
 ): Uint8Array {
   const numberOfPoints = coordinates.length;
@@ -69,9 +69,9 @@ async function runItkPipelineWrapper(
 
 async function getThresholdBlobInContour(
   image: Uint8Array,
-  contour: IGeoJSPoint[] = [],
+  contour: IGeoJSPosition[] = [],
   geoJSMap: IGeoJSMap,
-): Promise<IGeoJSPoint[]> {
+): Promise<IGeoJSPosition[]> {
   const meshFilePath = "./inpoints.obj";
   const meshFileData = geoJSCoordinatesToBinaryFileData(contour, geoJSMap);
   const meshFile: BinaryFile = { path: meshFilePath, data: meshFileData };
@@ -87,14 +87,14 @@ async function getThresholdBlobInContour(
       "Error getting data back from the pipeline. Could not find contour",
     );
   }
-  return geoJSMap.displayToGcs(outputContour as IGeoJSPoint[]);
+  return geoJSMap.displayToGcs(outputContour as IGeoJSPosition[]);
 }
 
 async function getMaximumPointInContour(
   image: Uint8Array,
-  contour: IGeoJSPoint[] = [],
+  contour: IGeoJSPosition[] = [],
   geoJSMap: IGeoJSMap,
-): Promise<IGeoJSPoint> {
+): Promise<IGeoJSPosition> {
   const meshFilePath = "./inpoints.obj";
   const meshFileData = geoJSCoordinatesToBinaryFileData(contour, geoJSMap);
   const meshFile: BinaryFile = { path: meshFilePath, data: meshFileData };
@@ -115,10 +115,10 @@ async function getMaximumPointInContour(
 
 async function getMaximumPointInCircle(
   image: Uint8Array,
-  gcsCenter: IGeoJSPoint,
+  gcsCenter: IGeoJSPosition,
   radius: number,
   geoJSMap: IGeoJSMap,
-): Promise<IGeoJSPoint> {
+): Promise<IGeoJSPosition> {
   const displayCenter = geoJSMap.gcsToDisplay(gcsCenter);
   const circleFileName = "./circle.txt";
   const textFile: TextFile = {
@@ -145,7 +145,7 @@ async function getMaximumPointInCircle(
 }
 
 export async function snapCoordinates(
-  coordinates: IGeoJSPoint[],
+  coordinates: IGeoJSPosition[],
   imageArray: Uint8Array,
   tool: IToolConfiguration,
   geoJSMap: IGeoJSMap,

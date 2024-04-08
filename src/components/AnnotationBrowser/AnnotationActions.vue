@@ -121,21 +121,21 @@ export default class AnnotationActions extends Vue {
     return this.store.history;
   }
 
-  async do(undo: boolean) {
+  async undoOrRedo(undo: boolean) {
     try {
       this.isDoing = true;
-      await this.store.do(undo);
+      await this.annotationStore.undoOrRedo(undo);
     } finally {
       this.isDoing = false;
     }
   }
 
   async undo() {
-    await this.do(true);
+    await this.undoOrRedo(true);
   }
 
   async redo() {
-    await this.do(false);
+    await this.undoOrRedo(false);
   }
 
   clearSelection() {

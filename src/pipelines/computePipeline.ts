@@ -66,7 +66,6 @@ export class ComputeNode<
   // The cached output, don't use it directly but using this.output instead
   private _output: Awaited<ReturnType<Fun>> | TNoOutput;
 
-  private computeCallback: () => void;
   private readonly parentNodes: WrapInComputeNode<Params>;
   private readonly outputUpdateCallbacks: (() => void)[] = [];
 
@@ -75,21 +74,61 @@ export class ComputeNode<
    * @param fun The wrapped function
    * @param parentNodes This will subscribe to all parents output, and provide function parameters
    */
-  constructor(fun: Fun, parentNodes: WrapInComputeNode<Params>) {
+  constructor(
+    fun: Fun,
+    parentNodes: WrapInComputeNode<Params>,
+    callbacks?: (() => void)[],
+  ) {
     this.fun = fun;
     this.computing = false;
     this.shouldRecompute = false;
     this._output = NoOutput;
     this.parentNodes = parentNodes;
-    this.computeCallback = this.compute.bind(this);
+
+    // Recompute when a parent node change
     const nParents = this.parentNodes.length;
     for (let parentIndex = 0; parentIndex < nParents; ++parentIndex) {
-      this.parentNodes[parentIndex].onOutputUpdate(this.computeCallback);
+      const parentNode = this.parentNodes[parentIndex];
+      const computeCallback = this.createComputeCallback(parentNode);
+      parentNode.onOutputUpdate(computeCallback);
     }
+
+    // Add initial callbacks
+    callbacks?.forEach((callback) => this.onOutputUpdate(callback));
+
+    // Recompute on initialization
+    this.compute();
+  }
+
+  /**
+   * Create and return a callback function that will trigger recomputation of this node
+   * @param parentNode The parent node that will trigger a recomputation
+   * @returns The callback that needs to be called when the parentNode's output changes
+   */
+  private createComputeCallback(parentNode: ComputeNode<any, any>) {
+    let previousParentOutput = parentNode.output;
+    const computeCallback = () => {
+      const currentParentOutput = parentNode.output;
+      // Don't recompute when previousParentOutput and currentParentOutput are both NoOutput
+      // We still want to recompute if they are the same but not NoOutput
+      // For example, in this case we want to recompute:
+      // const buffer = [0];
+      // const node = new ManualInputNode(buffer);
+      // buffer.push(1);
+      // node.setValue(buffer);
+      if (
+        !(currentParentOutput === NoOutput && previousParentOutput === NoOutput)
+      ) {
+        this.compute();
+      }
+      previousParentOutput = currentParentOutput;
+    };
+    return computeCallback;
   }
 
   /**
    * Register a callback to call when the output of this node changes
+   * This can be used to listen to output changes or to check if the node is computing
    * @param callback The callback to call
    */
   public onOutputUpdate(callback: () => void) {
@@ -148,8 +187,9 @@ export class ComputeNode<
       this.shouldRecompute = true;
       return;
     }
-    this.computing = true;
 
+    // Set computing flag before calling the callbacks by setting this.output
+    this.computing = true;
     // This will set all the children nodes output to "NoOutput"
     this.output = NoOutput;
 
@@ -173,10 +213,10 @@ export class ComputeNode<
       // Recompute if the parameters changed
     } while (this.shouldRecompute);
 
+    // Set computing flag before calling the callbacks by setting this.output
+    this.computing = false;
     // This triggers callbacks
     this.output = computedOutput;
-
-    this.computing = false;
   }
 
   public get output(): Awaited<ReturnType<Fun>> | TNoOutput {
@@ -184,9 +224,6 @@ export class ComputeNode<
   }
 
   protected set output(newOutput) {
-    if (newOutput === NoOutput && this._output === NoOutput) {
-      return;
-    }
     this._output = newOutput;
 
     // Trigger all callbacks for the pipeline nodes that have subscribed to output changes
@@ -201,7 +238,7 @@ export class ComputeNode<
   }
 
   public get isComputing() {
-    return this.computing !== null;
+    return this.computing;
   }
 }
 
@@ -226,7 +263,10 @@ export class ManualInputNode<T> extends ComputeNode<[], () => T | TNoOutput> {
   private readonly asyncSetValue?: DebouncedFunc<(value: T) => Promise<void>>;
   private readonly syncSetValue: (value: T) => Promise<void>;
 
-  constructor(asyncOptions?: TManualInputNodeAsyncOptions) {
+  constructor(
+    initialValue: T | TNoOutput = NoOutput,
+    asyncOptions?: TManualInputNodeAsyncOptions,
+  ) {
     super(() => NoOutput, []);
     // Set the value immediately after the resolution of the value
     this.syncSetValue = async (value: T) => {
@@ -237,6 +277,9 @@ export class ManualInputNode<T> extends ComputeNode<[], () => T | TNoOutput> {
       this.asyncSetValue = (
         asyncOptions.type === "debounce" ? debounce : throttle
       )(this.syncSetValue, asyncOptions.wait, asyncOptions.options);
+    }
+    if (initialValue !== NoOutput) {
+      this.setValue(initialValue);
     }
   }
 

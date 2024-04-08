@@ -331,6 +331,23 @@
           "hideShape": true,
           "defaultShape": "polygon"
         }
+      },
+      {
+        "name": "Simplification",
+        "id": "simplificationTolerance",
+        "type": "text",
+        "meta": {
+          "value": "2",
+          "type": "number"
+        }
+      },
+      {
+        "name": "Turbo mode",
+        "id": "turboMode",
+        "type": "checkbox",
+        "meta": {
+          "label": "Enable submit of annotation on prompt"
+        }
       }
     ]
   }

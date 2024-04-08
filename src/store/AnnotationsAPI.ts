@@ -25,6 +25,18 @@ export default class AnnotationsAPI {
 
   histogramsLoaded = 0;
 
+  undo(datasetId: string) {
+    return this.client.put("history/undo", undefined, {
+      params: { datasetId },
+    });
+  }
+
+  redo(datasetId: string) {
+    return this.client.put("history/redo", undefined, {
+      params: { datasetId },
+    });
+  }
+
   createAnnotation(
     annotationBase: IAnnotationBase,
   ): Promise<IAnnotation | null> {
@@ -129,7 +141,6 @@ export default class AnnotationsAPI {
       coordinates,
       id: _id,
       datasetId,
-      color,
     });
     if (color) {
       annotation.color = color;

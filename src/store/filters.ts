@@ -19,7 +19,7 @@ import {
   IPropertyAnnotationFilter,
   IROIAnnotationFilter,
   IIdAnnotationFilter,
-  IGeoJSPoint,
+  IGeoJSPosition,
   IShapeAnnotationFilter,
   AnnotationShape,
   TPropertyHistogram,
@@ -129,7 +129,7 @@ export class Filters extends VuexModule {
   }
 
   @Mutation
-  validateNewROIFilter(roi: IGeoJSPoint[]) {
+  validateNewROIFilter(roi: IGeoJSPosition[]) {
     if (!this.emptyROIFilter) {
       return;
     }
@@ -230,7 +230,7 @@ export class Filters extends VuexModule {
       const isInROI =
         enabledRoiFilters.length === 0 ||
         enabledRoiFilters.some((filter: IROIAnnotationFilter) =>
-          annotation.coordinates.some((point: IGeoJSPoint) =>
+          annotation.coordinates.some((point: IGeoJSPosition) =>
             geo.util.pointInPolygon(point, filter.roi),
           ),
         );

@@ -35,7 +35,7 @@
       :lowestLayer="mapentry.lowestLayer || 0"
       :layerCount="(mapentry.imageLayers || []).length / 2"
       :key="'annotation-viewer-' + index"
-    ></annotation-viewer>
+    />
     <div
       class="map-layout"
       ref="map-layout"
@@ -51,8 +51,9 @@
         :ref="`map-${index}`"
         :key="`geojsmap-${index}`"
         @mousedown.capture="mouseDown($event, index)"
-        @mousemove.capture="mouseMove"
+        @mousemove.capture="mouseMove($event, index)"
         @mouseup.capture="mouseUp"
+        @mouseleave.capture="mouseLeave"
       ></div>
     </div>
     <image-overview
@@ -61,31 +62,35 @@
       @centerChange="setCenter"
       @cornersChange="setCorners"
     />
-    <div
-      class="progress"
-      v-for="(cacheObj, cacheIdx) in progresses"
-      :key="'cache-' + cacheIdx"
-    >
-      <v-progress-linear
-        :indeterminate="cacheObj.total === 0"
-        :value="cacheObj.total ? (100 * cacheObj.progress) / cacheObj.total : 0"
-        color="#CCC"
-        background-color="blue-grey"
-        style="height: 100%; z-index: inherit"
+    <div>
+      <div
+        class="progress"
+        v-for="(cacheObj, cacheIdx) in progresses"
+        :key="'cache-' + cacheIdx"
       >
-        <strong class="text-center ma-1">
-          {{ cacheObj.title }}
-          <template v-if="cacheObj.total !== 0">
-            {{ ((100 * cacheObj.progress) / cacheObj.total).toFixed(1) }}% ({{
-              cacheObj.progress
-            }}&nbsp;/&nbsp;{{ cacheObj.total }})
-          </template>
-        </strong>
-      </v-progress-linear>
+        <v-progress-linear
+          :indeterminate="cacheObj.total === 0"
+          :value="
+            cacheObj.total ? (100 * cacheObj.progress) / cacheObj.total : 0
+          "
+          color="#CCC"
+          background-color="blue-grey"
+          style="height: 100%; z-index: inherit"
+        >
+          <strong class="text-center ma-1">
+            {{ cacheObj.title }}
+            <template v-if="cacheObj.total !== 0">
+              {{ ((100 * cacheObj.progress) / cacheObj.total).toFixed(1) }}% ({{
+                cacheObj.progress
+              }}&nbsp;/&nbsp;{{ cacheObj.total }})
+            </template>
+          </strong>
+        </v-progress-linear>
+      </div>
     </div>
     <v-alert
-      class="progress-done"
-      :value="loadedAndOptimized"
+      v-model="showOptimizedAlert"
+      class="viewer-alert"
       type="success"
       dense
       dismissible
@@ -93,6 +98,26 @@
     >
       Dataset fully loaded and optimized
     </v-alert>
+    <v-alert
+      v-model="showSamToolHelpAlert"
+      class="viewer-alert"
+      type="info"
+      dense
+      dismissible
+      transition="slide-x-transition"
+    >
+      Shift + left click to add a positive point<br />
+      Shift + right click to add a negative point<br />
+      Shift + click + drag to add box
+    </v-alert>
+    <v-btn
+      v-if="submitPendingAnnotation"
+      @click.capture.stop="submitPendingAnnotation(false)"
+      class="cancel-button"
+      small
+    >
+      Cancel (ctrl-Z)
+    </v-btn>
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="0"
@@ -127,16 +152,16 @@ import geojs from "geojs";
 import { markRaw } from "vue";
 
 import {
-  IGeoJSMap,
-  IGeoJSPoint,
+  IGeoJSPosition,
   IGeoJSScaleWidget,
   IGeoJSTile,
   IImage,
   ILayerStackImage,
   IMapEntry,
   ICameraInfo,
-  IXYPoint,
+  IGeoJSPoint2D,
   IMouseState,
+  SamAnnotationToolStateSymbol,
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
@@ -202,6 +227,10 @@ function generateFilterURL(
   setSlopeIntercept(index, "func-b", whitePoint, blackPoint, blue);
 }
 
+function isMouseStartEvent(evt: MouseEvent): boolean {
+  return evt.shiftKey && evt.buttons !== 0;
+}
+
 @Component({ components: { AnnotationViewer, ImageOverview, ScaleSettings } })
 export default class ImageViewer extends Vue {
   readonly store = store;
@@ -248,7 +277,7 @@ export default class ImageViewer extends Vue {
     {
       bind: "mod+z",
       handler: () => {
-        this.store.do(true);
+        this.annotationStore.undoOrRedo(true);
       },
       data: {
         section: "Objects",
@@ -258,7 +287,7 @@ export default class ImageViewer extends Vue {
     {
       bind: "mod+shift+z",
       handler: () => {
-        this.store.do(false);
+        this.annotationStore.undoOrRedo(false);
       },
       data: {
         section: "Objects",
@@ -310,6 +339,27 @@ export default class ImageViewer extends Vue {
   cacheProgresses: { progress: number; total: number }[] = [];
   scaleWidget: IGeoJSScaleWidget | null = null;
 
+  // Logic to show help for the SAM tool
+
+  showSamToolHelpAlert = false;
+
+  get selectedToolType() {
+    return this.selectedTool?.state.type ?? null;
+  }
+
+  @Watch("selectedToolType")
+  onSelectedToolTypeChanged() {
+    this.showSamToolHelpAlert =
+      this.selectedToolType === SamAnnotationToolStateSymbol;
+    if (this.showSamToolHelpAlert) {
+      setTimeout(() => (this.showSamToolHelpAlert = false), 10000);
+    }
+  }
+
+  // Logic to show an alert when the dataset is optimized
+
+  showOptimizedAlert = false;
+
   get loadedAndOptimized() {
     return (
       this.cacheProgresses.length === 0 &&
@@ -317,6 +367,16 @@ export default class ImageViewer extends Vue {
       this.histogramCaches <= 0
     );
   }
+
+  @Watch("loadedAndOptimized")
+  onOptimizedChanged() {
+    this.showOptimizedAlert = this.loadedAndOptimized;
+    if (this.showOptimizedAlert) {
+      setTimeout(() => (this.showOptimizedAlert = false), 3000);
+    }
+  }
+
+  // Logic to show the progress bars
 
   get progresses() {
     // Merge caching and downloading of annotations and connections
@@ -380,6 +440,10 @@ export default class ImageViewer extends Vue {
     return this.mouseState?.mapEntry ?? null;
   }
 
+  get submitPendingAnnotation() {
+    return this.annotationStore.submitPendingAnnotation;
+  }
+
   samMapEntry: IMapEntry | null = null;
 
   @Watch("mouseMap")
@@ -400,10 +464,8 @@ export default class ImageViewer extends Vue {
   @Watch("selectedTool")
   imageOrToolChanged() {
     const toolState = this.selectedTool?.state;
-    if (toolState && "pipeline" in toolState && this.layersReady) {
-      toolState.pipeline.geoJsMapInputNode.setValue(
-        this.samMapEntry ?? NoOutput,
-      );
+    if (toolState?.type === SamAnnotationToolStateSymbol && this.layersReady) {
+      toolState.nodes.input.geoJSMap.setValue(this.samMapEntry ?? NoOutput);
     }
   }
 
@@ -525,12 +587,17 @@ export default class ImageViewer extends Vue {
   mouseDown(evt: MouseEvent, mapIdx: number) {
     // Start selection on shift + mouseDown
     const mapEntry = this.maps?.[mapIdx];
-    if (!mapEntry || !evt.shiftKey || !(evt.target instanceof HTMLElement)) {
+    if (
+      !mapEntry ||
+      !isMouseStartEvent(evt) ||
+      !(evt.target instanceof HTMLElement)
+    ) {
       return;
     }
 
     // Setup initial mouse state
     this.mouseState = {
+      isMouseMovePreviewState: false,
       mapEntry,
       target: evt.target,
       path: [],
@@ -538,11 +605,34 @@ export default class ImageViewer extends Vue {
     };
 
     // Will add the current point and capture mouse if needed
-    this.mouseMove(evt);
+    this.mouseMove(evt, mapIdx);
   }
 
-  mouseMove(evt: MouseEvent) {
-    if (!this.mouseState) {
+  mouseLeave() {
+    if (!this.mouseState || this.mouseState.isMouseMovePreviewState) {
+      this.mouseState = null;
+    }
+  }
+
+  mouseMove(evt: MouseEvent, mapIdx: number) {
+    if (!this.mouseState || this.mouseState.isMouseMovePreviewState) {
+      // Create a preview mouse state
+      const mapEntry = this.maps?.[mapIdx];
+      const target = evt.target;
+      if (!mapEntry || !(target instanceof HTMLElement)) {
+        this.mouseState = null;
+        return;
+      }
+      const rect = target.getBoundingClientRect();
+      const displayPoint = { x: evt.x - rect.x, y: evt.y - rect.y };
+      const gcsPoint = mapEntry.map.displayToGcs(displayPoint);
+      this.mouseState = {
+        isMouseMovePreviewState: true,
+        mapEntry,
+        target,
+        path: [gcsPoint],
+        initialMouseEvent: evt,
+      };
       return;
     }
     evt.stopPropagation();
@@ -554,14 +644,14 @@ export default class ImageViewer extends Vue {
   }
 
   mouseUp(evt: MouseEvent) {
-    if (!this.mouseState) {
+    if (!this.mouseState || this.mouseState.isMouseMovePreviewState) {
       return;
     }
     evt.stopPropagation();
     this.mouseState = null;
   }
 
-  setCenter(center: IGeoJSPoint) {
+  setCenter(center: IGeoJSPosition) {
     this.cameraInfo.center = center;
     this.applyCameraInfo();
   }
@@ -679,9 +769,9 @@ export default class ImageViewer extends Vue {
       this.tileWidth,
       this.tileHeight,
     );
-    params.map.maxBounds.right = mapWidth;
-    params.map.maxBounds.bottom = mapHeight;
-    params.map.min -= Math.ceil(
+    params.map.maxBounds!.right = mapWidth;
+    params.map.maxBounds!.bottom = mapHeight;
+    params.map.min! -= Math.ceil(
       Math.log(Math.max(this.unrollW, this.unrollH)) / Math.log(2),
     );
     params.map.zoom = params.map.min;
@@ -691,7 +781,7 @@ export default class ImageViewer extends Vue {
     params.layer.nearestPixel = params.layer.maxLevel;
     delete params.layer.tilesMaxBounds;
     params.layer.url = this.blankUrl;
-    params.map.max += 5;
+    params.map.max! += 5;
 
     let needReset = forceReset || (this.maps[mllidx] && !mapElement.firstChild);
     if (needReset) {
@@ -699,7 +789,7 @@ export default class ImageViewer extends Vue {
     }
 
     if (this.maps.length <= mllidx || needReset) {
-      const map: IGeoJSMap = geojs.map(params.map);
+      const map = geojs.map(params.map);
       map.geoOn(geojs.event.pan, () => this._handlePan(mllidx));
 
       const interactorOpts = map.interactor().options();
@@ -754,8 +844,8 @@ export default class ImageViewer extends Vue {
         map.maxBounds({
           left: 0,
           top: 0,
-          right: params.map.maxBounds.right,
-          bottom: params.map.maxBounds.bottom,
+          right: params.map.maxBounds!.right,
+          bottom: params.map.maxBounds!.bottom,
         });
         map.zoomRange(params.map);
       }
@@ -914,7 +1004,7 @@ export default class ImageViewer extends Vue {
         };
         return result;
       };
-      layer.tileAtPoint = (point: IXYPoint, level: number) => {
+      layer.tileAtPoint = (point: IGeoJSPoint2D, level: number) => {
         point = layer.displayToLevel(
           layer.map().gcsToDisplay(point, null),
           someImage.levels - 1,
@@ -1204,10 +1294,16 @@ export default class ImageViewer extends Vue {
   width: 200px;
   z-index: 200;
 }
-.progress-done {
+.viewer-alert {
   width: fit-content;
   z-index: 200;
   margin: 4px;
+}
+.cancel-button {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 200;
 }
 .map-layout {
   position: absolute;

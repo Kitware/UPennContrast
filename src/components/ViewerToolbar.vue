@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div style="overflow-y: auto; scrollbar-width: none">
     <div v-mousetrap="mousetrapSliders">
       <v-layout>
         <value-slider
@@ -49,22 +49,22 @@
           :disabled="!(maxTime > 0 || unrollT)"
         />
       </v-layout>
-      <toolset></toolset>
-      <v-radio-group
-        v-model="layerMode"
-        label="Layers: "
-        mandatory
-        dense
-        row
-        hide-details
-        class="layer-mode-controls"
-      >
-        <v-radio value="single" label="Single" class="smaller" />
-        <v-radio value="multiple" label="Multiple" class="smaller" />
-        <v-radio value="unroll" label="Unroll" class="smaller" />
-      </v-radio-group>
     </div>
-    <div class="lowertools">
+    <toolset></toolset>
+    <v-radio-group
+      v-model="layerMode"
+      label="Layers: "
+      mandatory
+      dense
+      row
+      hide-details
+      class="layer-mode-controls"
+    >
+      <v-radio value="single" label="Single" class="smaller" />
+      <v-radio value="multiple" label="Multiple" class="smaller" />
+      <v-radio value="unroll" label="Unroll" class="smaller" />
+    </v-radio-group>
+    <div>
       <slot></slot>
     </div>
   </div>
@@ -83,6 +83,7 @@
   overflow-y: auto;
 }
 .layer-mode-controls {
+  margin: 10px 0;
   ::v-deep .v-radio {
     margin-right: 10px;
     > .v-input--selection-controls__input {

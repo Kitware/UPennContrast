@@ -1,18 +1,22 @@
 import {
+  ErrorToolStateSymbol,
   IErrorToolState,
   IGeoJSAnnotation,
-  IGeoJSPoint,
+  IGeoJSPosition,
   IGeoJSPolygonFeatureStyle,
   IMapEntry,
   IMouseState,
   ISamAnnotationToolState,
   IToolConfiguration,
   PromptType,
+  SamAnnotationToolStateSymbol,
   TSamPrompt,
 } from "@/store/model";
 import {
+  ComputeNode,
   ManualInputNode,
   NoOutput,
+  TManualInputNodeAsyncOptions,
   TNoOutput,
   createComputeNode,
 } from "./computePipeline";
@@ -89,6 +93,12 @@ function createEncoderContext(model: TSamModel): ISamEncoderContext {
   };
 }
 
+function createEncoderSession(model: TSamModel): Promise<InferenceSession> {
+  const encoderPath = `/onnx-models/sam/${model}/encoder.onnx`;
+  const encoderOptions = { executionProviders: ["webgpu"] };
+  return createOnnxInferenceSession(encoderPath, encoderOptions);
+}
+
 function createDecoderContext(): ISamDecoderContext {
   return {
     feedConstant: {
@@ -100,6 +110,12 @@ function createDecoderContext(): ISamDecoderContext {
       ),
     },
   };
+}
+
+function createDecoderSession(model: TSamModel): Promise<InferenceSession> {
+  const decoderPath = `/onnx-models/sam/${model}/decoder.onnx`;
+  const decoderOptions = {};
+  return createOnnxInferenceSession(decoderPath, decoderOptions);
 }
 
 async function screenshot({ map, imageLayers }: IMapEntry) {
@@ -230,7 +246,7 @@ function processPrompt(
   const xScale = canvasInfo.scaledWidth / canvasInfo.srcWidth;
   const yScale = canvasInfo.scaledHeight / canvasInfo.srcHeight;
   const pushPointToPrompt = (
-    point: IGeoJSPoint,
+    point: IGeoJSPosition,
     label: number,
     convertFromGcs: boolean,
   ) => {
@@ -299,11 +315,10 @@ async function runDecoder(
   return decoderOutput as unknown as IDecoderOutput;
 }
 
-interface IItkOutput {
-  contour: IGeoJSPoint[];
-}
-
-async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
+let cachedWebWorker: Worker | null = null;
+async function runItkPipeline({
+  masks,
+}: IDecoderOutput): Promise<IGeoJSPosition[]> {
   const array = masks.data;
   const width = masks.dims[3];
   const height = masks.dims[2];
@@ -341,127 +356,251 @@ async function runItkPipeline({ masks }: IDecoderOutput): Promise<IItkOutput> {
     pipelineArgs,
     pipelineOutputs,
     pipelineInputs,
+    { webWorker: cachedWebWorker },
   );
+  cachedWebWorker = webWorker ?? null;
 
   // Parse the output
-  try {
-    const textFile = outputs[0]?.data as TextFile | undefined;
-    if (!textFile?.data) {
-      throw new Error("Pipeline didn't return a value");
-    }
-    return JSON.parse(textFile.data);
-  } finally {
-    webWorker?.terminate();
+  const textFile = outputs[0]?.data as TextFile | undefined;
+  if (!textFile?.data) {
+    throw new Error("Pipeline didn't return a value");
   }
+  return JSON.parse(textFile.data);
 }
 
-function itkContourToAnnotationCoordinates(
-  { contour }: IItkOutput,
+function displayToWorld(
+  coords: IGeoJSPosition[],
   { map }: IMapEntry,
-): IGeoJSPoint[] {
-  return map.displayToGcs(contour);
+): IGeoJSPosition[] {
+  return map.displayToGcs(coords);
 }
 
-function createSamPipeline(
-  model: TSamModel,
-): ISamAnnotationToolState["pipeline"] {
+function simplifyCoordinates(
+  coords: IGeoJSPosition[],
+  tolerance: number,
+): IGeoJSPosition[] {
+  if (tolerance < 0) {
+    return coords;
+  }
+  return geojs.util.rdpLineSimplify(coords, tolerance, true);
+}
+
+function createSamPipelineEncoderNodes(
+  modelNameNode: ManualInputNode<TSamModel>,
+) {
+  // The map that need to be screenshot and that we use for coordinate conversions
+  // It is set by the user
+  const geoJsMapInputNode = new ManualInputNode<IMapEntry | TNoOutput>(
+    NoOutput,
+    {
+      type: "debounce",
+      wait: 1000,
+      options: { leading: false, trailing: true },
+    },
+  );
+
+  // The context is used as a cache for canvas, 2D context, tensors...
+  const contextNode = createComputeNode(createEncoderContext, [modelNameNode]);
+
+  // The session node is an input that contains the model
+  const sessionNode = createComputeNode(createEncoderSession, [modelNameNode]);
+
+  // Take a screenshot of the map
+  const screenshotNode = createComputeNode(screenshot, [geoJsMapInputNode]);
+
+  // Preprocess the image: resize, normalize and convert to tensor
+  const preprocessNode = createComputeNode(processCanvas, [
+    screenshotNode,
+    contextNode,
+  ]);
+
+  // Do the encoding
+  const inferenceNode = createComputeNode(runEncoder, [
+    sessionNode,
+    preprocessNode,
+  ]);
+
+  return {
+    geoJsMapInputNode,
+    contextNode,
+    sessionNode,
+    screenshotNode,
+    preprocessNode,
+    inferenceNode,
+  };
+}
+
+function createSamPipelineDecoderNodes(
+  modelNameNode: ManualInputNode<TSamModel>,
+  simplificationToleranceNode: ManualInputNode<number>,
+  encoderNodes: ReturnType<typeof createSamPipelineEncoderNodes>,
+  promptAsyncOptions?: TManualInputNodeAsyncOptions,
+) {
+  // Input for the prompt
+  // It is set by the user
+  const promptInputNode = new ManualInputNode<TSamPrompt[] | TNoOutput>(
+    NoOutput,
+    promptAsyncOptions,
+  );
+
+  // The context is used as a cache for canvas, 2D context, tensors...
+  const contextNode = new ManualInputNode(createDecoderContext());
+
+  // The session node is an input that contains the model
+  const sessionNode = createComputeNode(createDecoderSession, [modelNameNode]);
+
+  // Preprocess the prompt to match SAM API
+  const processPromptNode = createComputeNode(processPrompt, [
+    promptInputNode,
+    encoderNodes.preprocessNode,
+    contextNode,
+    encoderNodes.geoJsMapInputNode,
+  ]);
+
+  // Run the inference
+  const inferenceNode = createComputeNode(runDecoder, [
+    sessionNode,
+    processPromptNode,
+    encoderNodes.inferenceNode,
+  ]);
+
+  // Convert the mask into a polygon
+  const maskToPolygonNode = createComputeNode(runItkPipeline, [inferenceNode]);
+
+  // Simplify the polygon
+  const simplificationNode = createComputeNode(simplifyCoordinates, [
+    maskToPolygonNode,
+    simplificationToleranceNode,
+  ]);
+
+  // Convert coordinates from display to world
+  const coordinatesConversionNode = createComputeNode(displayToWorld, [
+    simplificationNode,
+    encoderNodes.geoJsMapInputNode,
+  ]);
+
+  return {
+    promptInputNode,
+    contextNode,
+    sessionNode,
+    processPromptNode,
+    inferenceNode,
+    maskToPolygonNode,
+    simplificationNode,
+    coordinatesConversionNode,
+  };
+}
+
+function createSamPipeline(model: TSamModel) {
   if (!("gpu" in navigator)) {
     throw new Error("Can't initialize SAM tool: WebGPU not available");
   }
-  // Create the encoder context
-  const encoderContext = createEncoderContext(model);
 
   // Create the pipeline
+  const modelNameNode = new ManualInputNode(model);
+  const simplificationToleranceNode = new ManualInputNode(0);
+  const encoderNodes = createSamPipelineEncoderNodes(modelNameNode);
+  const decoderNodes = createSamPipelineDecoderNodes(
+    modelNameNode,
+    simplificationToleranceNode,
+    encoderNodes,
+  );
+  const previewNodes = createSamPipelineDecoderNodes(
+    modelNameNode,
+    simplificationToleranceNode,
+    encoderNodes,
+    {
+      type: "debounce",
+      wait: 100,
+    },
+  );
 
-  // Encoder nodes
-  const geoJsMapInputNode = new ManualInputNode<IMapEntry | TNoOutput>({
-    type: "debounce",
-    wait: 1000,
-    options: { leading: false, trailing: true },
-  }); // User input
-  const encoderContextNode = new ManualInputNode<ISamEncoderContext>();
-  const encoderSessionNode = new ManualInputNode<InferenceSession>();
-  const screenshotNode = createComputeNode(screenshot, [geoJsMapInputNode]);
-  const encoderPreprocessNode = createComputeNode(processCanvas, [
-    screenshotNode,
-    encoderContextNode,
-  ]);
-  const encoderNode = createComputeNode(runEncoder, [
-    encoderSessionNode,
-    encoderPreprocessNode,
-  ]);
-
-  // Decoder nodes
-  const promptInputNode = new ManualInputNode<TSamPrompt[] | TNoOutput>(); // User input
-  const decoderContextNode = new ManualInputNode<ISamDecoderContext>();
-  const decoderSessionNode = new ManualInputNode<InferenceSession>();
-  const processPromptNode = createComputeNode(processPrompt, [
-    promptInputNode,
-    encoderPreprocessNode,
-    decoderContextNode,
-    geoJsMapInputNode,
-  ]);
-  const decoderNode = createComputeNode(runDecoder, [
-    decoderSessionNode,
-    processPromptNode,
-    encoderNode,
-  ]);
-
-  // Conversion to contour
-  const itkOutputNode = createComputeNode(runItkPipeline, [decoderNode]);
-  const pipelineOutput = createComputeNode(itkContourToAnnotationCoordinates, [
-    itkOutputNode,
-    geoJsMapInputNode,
-  ]);
-
-  // Set the constant context
-  encoderContextNode.setValue(encoderContext);
-  const decoderContext = createDecoderContext();
-  decoderContextNode.setValue(decoderContext);
-
-  // Set the encoder
-  const encoderPath = `/onnx-models/sam/${model}/encoder.onnx`;
-  const encoderOptions = { executionProviders: ["webgpu"] };
-  createOnnxInferenceSession(encoderPath, encoderOptions).then((session) => {
-    encoderSessionNode.setValue(session);
-  });
-
-  // Set the decoder
-  const decoderPath = `/onnx-models/sam/${model}/decoder.onnx`;
-  const decoderOptions = {};
-  createOnnxInferenceSession(decoderPath, decoderOptions).then((session) => {
-    decoderSessionNode.setValue(session);
-  });
-
-  return { geoJsMapInputNode, promptInputNode, pipelineOutput };
+  return {
+    allNodes: {
+      modelNameNode,
+      simplificationToleranceNode,
+      encoderNodes,
+      decoderNodes,
+      previewNodes,
+    },
+    input: {
+      model: modelNameNode,
+      simplificationTolerance: simplificationToleranceNode,
+      geoJSMap: encoderNodes.geoJsMapInputNode,
+      mainPrompt: decoderNodes.promptInputNode,
+      previewPrompt: previewNodes.promptInputNode,
+    },
+    output: {
+      mainOuput: decoderNodes.coordinatesConversionNode,
+      previewOuput: previewNodes.coordinatesConversionNode,
+    },
+  };
 }
+
+export type TSamNodes = ReturnType<typeof createSamPipeline>;
 
 export function createSamToolStateFromToolConfiguration(
   configuration: IToolConfiguration<"samAnnotation">,
 ): ISamAnnotationToolState | IErrorToolState {
   const model: TSamModel = configuration.values.model.value;
-  let pipeline: ISamAnnotationToolState["pipeline"];
+  let nodes: TSamNodes;
   try {
-    pipeline = createSamPipeline(model);
+    nodes = createSamPipeline(model);
   } catch (error) {
-    return { error: error as Error };
+    return { type: ErrorToolStateSymbol, error: error as Error };
   }
+
   const state: ISamAnnotationToolState = {
-    pipeline,
+    type: SamAnnotationToolStateSymbol,
+    nodes,
+    loadingMessages: [],
     mouseState: {
       path: [],
     },
     output: null,
+    livePreview: null,
   };
-  const outputNode = state.pipeline.pipelineOutput;
+
+  // Add a callback to update the loading message when computing
+  // Do this only for nodes that take a long time to compute
+  const { encoderNodes, decoderNodes, previewNodes } = nodes.allNodes;
+  const computingMessageMap: [ComputeNode<any, any>, string][] = [
+    [encoderNodes.sessionNode, "Creating encoder"],
+    [encoderNodes.inferenceNode, "Encoding"],
+    [decoderNodes.sessionNode, "Creating decoder"],
+    [previewNodes.sessionNode, "Creating decoder preview"],
+  ];
+  const recomputeLoadingMessage = () => {
+    state.loadingMessages = computingMessageMap
+      .filter(([node]) => node.isComputing)
+      .map(([, message]) => message);
+  };
+  computingMessageMap.forEach(([node]) => {
+    node.onOutputUpdate(recomputeLoadingMessage);
+  });
+
+  // State is reactive
+  // Main output is reactive
+  const outputNode = state.nodes.output.mainOuput;
   outputNode.onOutputUpdate(() => {
-    const rawOutput = outputNode.output;
-    const newOutput =
-      !rawOutput || rawOutput === NoOutput || rawOutput.length <= 0
+    const rawNodeOutput = outputNode.output;
+    const stateOutput =
+      !rawNodeOutput || rawNodeOutput === NoOutput || rawNodeOutput.length <= 0
         ? null
-        : rawOutput;
-    // State is meant to be reactive
-    Vue.set(state, "output", newOutput);
+        : rawNodeOutput;
+    Vue.set(state, "output", stateOutput);
+  });
+  // Preview output is reactive too
+  const previewNode = state.nodes.output.previewOuput;
+  previewNode.onOutputUpdate(() => {
+    const rawNodePreview = previewNode.output;
+    const statePreview =
+      !rawNodePreview ||
+      rawNodePreview === NoOutput ||
+      rawNodePreview.length <= 0
+        ? null
+        : rawNodePreview;
+    Vue.set(state, "livePreview", statePreview);
   });
   return state;
 }

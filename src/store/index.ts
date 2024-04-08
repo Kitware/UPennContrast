@@ -42,7 +42,8 @@ import {
   exampleConfigurationBase,
   IActiveTool,
   TToolType,
-  IBaseToolState,
+  BaseToolStateSymbol,
+  TToolState,
 } from "./model";
 
 import persister from "./Persister";
@@ -277,8 +278,11 @@ export class Main extends VuexModule {
   ) {
     if (configuration === null) {
       this.selectedTool = null;
+    } else if (this.selectedTool?.configuration.id === configuration.id) {
+      // Update the configuration but not the state
+      Vue.set(this.selectedTool, "configuration", configuration);
     } else {
-      let state;
+      let state: TToolState;
       switch (configuration.type) {
         case "samAnnotation":
           state = createSamToolStateFromToolConfiguration(
@@ -286,7 +290,7 @@ export class Main extends VuexModule {
           );
           break;
         default:
-          state = {} as IBaseToolState;
+          state = { type: BaseToolStateSymbol };
           break;
       }
       this.selectedTool = { configuration, state };
@@ -892,25 +896,6 @@ export class Main extends VuexModule {
       this.setHistory(history);
     } else {
       this.setHistory([]);
-    }
-  }
-
-  @Action
-  async do(undo: boolean) {
-    const datasetId = this.dataset?.id;
-    if (datasetId !== undefined) {
-      try {
-        sync.setSaving(true);
-        if (undo) {
-          await this.api.undo(datasetId);
-        } else {
-          await this.api.redo(datasetId);
-        }
-        this.context.dispatch("fetchAnnotations");
-        sync.setSaving(false);
-      } catch (error) {
-        sync.setSaving(error as Error);
-      }
     }
   }
 
