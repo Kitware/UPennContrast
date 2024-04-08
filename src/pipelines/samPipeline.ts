@@ -572,16 +572,14 @@ export function createSamToolStateFromToolConfiguration(
   ];
   const recomputeLoadingMessage = () => {
     const messages: string[] = [];
-    for (const [node, message] of computingMessageMap) {
-      if (node.isComputing) {
-        messages.push(message);
-      }
-    }
+    computingMessageMap
+      .filter(([node]) => node.isComputing)
+      .forEach(([, message]) => messages.push(message));
     state.loadingMessages = messages;
   };
-  for (const [node] of computingMessageMap) {
+  computingMessageMap.forEach(([node]) => {
     node.onOutputUpdate(recomputeLoadingMessage);
-  }
+  });
 
   // State is reactive
   // Main output is reactive
