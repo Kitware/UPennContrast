@@ -162,6 +162,7 @@ import {
   IGeoJSPoint2D,
   IMouseState,
   SamAnnotationToolStateSymbol,
+  IGeoJSMap,
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
@@ -173,6 +174,7 @@ import { convertLength } from "@/utils/conversion";
 import jobs, { jobStates } from "@/store/jobs";
 import { IHotkey } from "@/utils/v-mousetrap";
 import { NoOutput } from "@/pipelines/computePipeline";
+import { logWarning } from "@/utils/log";
 
 function generateFilterURL(
   index: number,
@@ -322,18 +324,15 @@ export default class ImageViewer extends Vue {
   unrollW: number = 1;
   unrollH: number = 1;
 
-  private _inPan: boolean = false;
-  cameraInfo: ICameraInfo = {
-    center: { x: 0, y: 0 },
-    zoom: 1,
-    rotate: 0,
-    gcsBounds: [
-      { x: 0, y: 0 },
-      { x: 0, y: 0 },
-      { x: 0, y: 0 },
-      { x: 0, y: 0 },
-    ],
-  };
+  get cameraInfo(): ICameraInfo {
+    return this.store.cameraInfo;
+  }
+
+  set cameraInfo(info: ICameraInfo) {
+    this.store.setCameraInfo(info);
+  }
+
+  mapSynchronizationCallbacks: Map<IGeoJSMap, () => void> = new Map();
 
   histogramCaches: number = 0;
   cacheProgresses: { progress: number; total: number }[] = [];
@@ -652,8 +651,7 @@ export default class ImageViewer extends Vue {
   }
 
   setCenter(center: IGeoJSPosition) {
-    this.cameraInfo.center = center;
-    this.applyCameraInfo();
+    this.cameraInfo = { ...this.cameraInfo, center };
   }
 
   setCorners(evt: any) {
@@ -680,19 +678,9 @@ export default class ImageViewer extends Vue {
     map.center(center, null);
   }
 
-  /**
-   * Synchronize all maps on any pan event.
-   */
-  private _handlePan(mapidx: number) {
-    if (!this.maps) {
-      return;
-    }
-    if (this._inPan) {
-      return;
-    }
-    this._inPan = true;
-    const map = this.maps[mapidx].map;
+  private synchroniseCameraFromMap(map: IGeoJSMap) {
     const size = map.size();
+    // Setting camera info will apply to all maps thanks to applyCameraInfo
     this.cameraInfo = {
       zoom: map.zoom(),
       rotate: map.rotation(),
@@ -704,23 +692,25 @@ export default class ImageViewer extends Vue {
         map.displayToGcs({ x: 0, y: size.height }),
       ],
     };
-    if (this.maps.length >= 2) {
-      this.applyCameraInfo(mapidx);
-    }
-    this._inPan = false;
   }
 
-  applyCameraInfo(excludeMapIdx?: number) {
-    try {
-      this.maps.forEach((mapentry, idx) => {
-        if (idx === excludeMapIdx) {
-          return;
-        }
-        mapentry.map.zoom(this.cameraInfo.zoom, undefined, true, true);
-        mapentry.map.rotation(this.cameraInfo.rotate, undefined, true);
-        mapentry.map.center(this.cameraInfo.center, undefined, true, true);
-      });
-    } catch (err) {}
+  synchronisationEnabled = true;
+
+  @Watch("cameraInfo")
+  applyCameraInfo() {
+    this.maps.forEach((mapentry) => {
+      const map = mapentry.map;
+      this.synchronisationEnabled = false;
+      try {
+        map.zoom(this.cameraInfo.zoom, undefined, true, true);
+        map.rotation(this.cameraInfo.rotate, undefined, true);
+        map.center(this.cameraInfo.center, undefined, true, true);
+      } catch (err) {
+        logWarning(err);
+      } finally {
+        this.synchronisationEnabled = true;
+      }
+    });
   }
 
   @Watch("compositionMode")
@@ -790,7 +780,12 @@ export default class ImageViewer extends Vue {
 
     if (this.maps.length <= mllidx || needReset) {
       const map = geojs.map(params.map);
-      map.geoOn(geojs.event.pan, () => this._handlePan(mllidx));
+      const synchronizationCallback = () => {
+        if (this.synchronisationEnabled) {
+          this.synchroniseCameraFromMap(map);
+        }
+      };
+      map.geoOn(geojs.event.pan, synchronizationCallback);
 
       const interactorOpts = map.interactor().options();
       const keyboardOpts = interactorOpts.keyboard;

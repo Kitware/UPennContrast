@@ -181,6 +181,7 @@ import annotationStore from "@/store/annotation";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 import { getStringFromPropertiesAndPath } from "@/utils/paths";
+import { simpleCentroid } from "@/utils/annotation";
 
 import TagPicker from "@/components/TagPicker.vue";
 
@@ -362,6 +363,11 @@ export default class AnnotationList extends Vue {
     this.store.setXY(annotation.location.XY);
     this.store.setZ(annotation.location.Z);
     this.store.setTime(annotation.location.Time);
+    // Also center the view on the annotation
+    this.store.setCameraInfo({
+      ...this.store.cameraInfo,
+      center: simpleCentroid(annotation.coordinates),
+    });
   }
 
   get hoveredId() {

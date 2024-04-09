@@ -44,6 +44,7 @@ import {
   TToolType,
   BaseToolStateSymbol,
   TToolState,
+  ICameraInfo,
 } from "./model";
 
 import persister from "./Persister";
@@ -87,6 +88,18 @@ export class Main extends VuexModule {
   z: number = 0;
   time: number = 0;
   layerMode: TLayerMode = "multiple";
+
+  cameraInfo: ICameraInfo = {
+    center: { x: 0, y: 0 },
+    zoom: 1,
+    rotate: 0,
+    gcsBounds: [
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+    ],
+  };
 
   drawAnnotations: boolean = true;
   filteredDraw: boolean = false;
@@ -452,6 +465,11 @@ export class Main extends VuexModule {
   @Mutation
   private setTimeImpl(value: number) {
     this.time = value;
+  }
+
+  @Mutation
+  private setCameraInfoImpl(value: ICameraInfo) {
+    this.cameraInfo = value;
   }
 
   @Mutation
@@ -922,6 +940,11 @@ export class Main extends VuexModule {
   @Action
   async setTime(value: number) {
     this.setTimeImpl(value);
+  }
+
+  @Action
+  async setCameraInfo(value: ICameraInfo) {
+    this.setCameraInfoImpl(value);
   }
 
   @Action
