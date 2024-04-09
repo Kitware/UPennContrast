@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from "node:url";
 import { defineConfig, normalizePath } from "vite";
 import vue from "@vitejs/plugin-vue2";
 import { viteStaticCopy } from "vite-plugin-static-copy";
+import { visualizer } from "rollup-plugin-visualizer";
 import path from "node:path";
 
 // Shouldn't be needed after moving to Vue 3
@@ -17,6 +18,7 @@ function joinAndNormalizePath(...paths) {
 export default defineConfig({
   plugins: [
     vue(),
+    visualizer(),
     Components({
       resolvers: [VuetifyResolver()],
       // Don't exclude girder web components
