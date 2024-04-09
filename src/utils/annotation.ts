@@ -105,14 +105,14 @@ export function simpleCentroid(coordinates: IGeoJSPosition[]): IGeoJSPosition {
     return coordinates[0];
   }
   const sums = { x: 0, y: 0, z: 0 };
-  const hasZ = coordinates.every((coord) => coord.z !== undefined);
+  let hasZ = true;
   coordinates.forEach(({ x, y, z }) => {
     sums.x += x;
     sums.y += y;
-    if (hasZ) {
-      // We know that z is not undefined
-      // @ts-ignore
+    if (z !== undefined) {
       sums.z += z;
+    } else {
+      hasZ = false;
     }
   });
   const centroid: IGeoJSPosition = {
