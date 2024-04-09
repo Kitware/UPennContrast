@@ -88,8 +88,7 @@ export default class GirderAPI {
     id: string,
     type: IGirderSelectAble["_modelType"],
   ): Promise<IGirderSelectAble> {
-    const config = { params: { type } };
-    const response = await this.client.get(`resource/${id}`, config);
+    const response = await this.client.get(`${type}/${id}`);
     const resource = response.data;
     if (resource) {
       resource._modelType = type;
