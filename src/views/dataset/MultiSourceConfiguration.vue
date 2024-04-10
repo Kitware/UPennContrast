@@ -5,7 +5,13 @@
       <v-divider class="my-2" />
       <v-data-table :headers="headers" :items="items" item-key="key" />
     </v-card>
-    <v-card class="pa-4 my-4">
+    <v-card v-if="initializing" class="my-4">
+      <v-card-title>
+        <v-progress-circular indeterminate class="mr-4" />
+        Computing all variables from dataset information
+      </v-card-title>
+    </v-card>
+    <v-card class="pa-4 my-4" v-else>
       <div class="d-flex">
         <v-subheader class="headline">Assignments</v-subheader>
         <v-spacer />
@@ -428,7 +434,9 @@ export default class MultiSourceConfiguration extends Vue {
     }
   }
 
-  initialized: Promise<void> | null = null;
+  // Used by other component to check if this one is initialized
+  public initialized: Promise<void> | null = null;
+
   mounted() {
     this.initialized = this.initialize();
   }
@@ -441,13 +449,12 @@ export default class MultiSourceConfiguration extends Vue {
       this.reinitialize = true;
       return;
     }
-    this.reinitialize = false;
     this.initializing = true;
-    await this.initializeImplementation();
+    do {
+      this.reinitialize = false;
+      await this.initializeImplementation();
+    } while (this.reinitialize);
     this.initializing = false;
-    if (this.reinitialize) {
-      await this.initialize();
-    }
   }
 
   async initializeImplementation() {
@@ -571,7 +578,10 @@ export default class MultiSourceConfiguration extends Vue {
       (count, assignment) => (assignment ? ++count : count),
       0,
     );
-    return filledAssignments >= this.items.length || filledAssignments >= 4;
+    return (
+      !this.initializing &&
+      (filledAssignments >= this.items.length || filledAssignments >= 4)
+    );
   }
 
   getCompositingValueFromAssignments(

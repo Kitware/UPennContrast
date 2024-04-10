@@ -17,7 +17,7 @@
       <girder-upload
         v-if="path && !hideUploader"
         ref="uploader"
-        class="mb-2"
+        class="mb-2 new-dataset-upload"
         :dest="path"
         hideStartButton
         hideHeadline
@@ -156,7 +156,10 @@ function findCommonPrefix(strings: string[]): string {
 
   // Extract the non-metadata prefix of each filename. Note that because of the
   // way the regex is constructed, the first match group will never be `null`.
-  const re = new RegExp(`(.*?)(?:_|-|${allTriggers.join("|")})`);
+  const triggerAndDigit = allTriggers.map(
+    (trigger) => `\\d${trigger}|${trigger}\\d`,
+  );
+  const re = new RegExp(`(.*?)(?:_|-|${triggerAndDigit.join("|")})`);
   const matches = strings.map((s) => s.match(re)![1]);
 
   // Get the minimum length of all the strings; the common prefix cannot be
@@ -468,3 +471,9 @@ export default class NewDataset extends Vue {
   }
 }
 </script>
+
+<style lang="scss">
+.new-dataset-upload .files-list {
+  max-height: 260px;
+}
+</style>
