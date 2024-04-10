@@ -1,3 +1,4 @@
+from girder.constants import AccessType
 from girder.exceptions import ValidationException
 from girder.models.model_base import AccessControlledModel
 
@@ -62,7 +63,7 @@ class DocumentChange(AccessControlledModel):
             raise ValidationException(exp)
         return document
 
-    def createChangesFromRecord(self, history_id, record):
+    def createChangesFromRecord(self, history_id, record, creator):
         # The record is a dict { model_name: { document_id: { before: ..., after: ... } } }
         for model_name in record:
             for document_id in record[model_name]:
@@ -74,4 +75,5 @@ class DocumentChange(AccessControlledModel):
                     'before': raw_change['before'],
                     'after': raw_change['after'],
                 }
+                self.setUserAccess(new_document_change, user=creator, level=AccessType.ADMIN)
                 self.save(new_document_change)

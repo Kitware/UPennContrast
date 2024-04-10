@@ -175,6 +175,6 @@ class History(AccessControlledModel):
 
         self.setUserAccess(entry, user=creator, level=AccessType.ADMIN, save=False)
         new_history_entry = self.save(entry)
-        self.documentChangeModel.createChangesFromRecord(new_history_entry['_id'], record)
+        self.documentChangeModel.createChangesFromRecord(new_history_entry['_id'], record, creator)
 
         return new_history_entry
