@@ -123,3 +123,11 @@ class UPennContrastWorkerClient:
         """
         property_values = {self.propertyId: values}
         self.annotationClient.addAnnotationPropertyValues(self.datasetId, annotation['_id'], property_values)
+
+    def add_multiple_annotation_property_values(self, annotation_property_list):
+        """
+        Add a list of property values to the annotations
+        :param list annotation_property_list: A list of dictionaries with items "datasetId", "annotationId", "values": { [propertyId: string]: recursive_dict_of_numbers }
+        """
+        self.annotationClient.addMultipleAnnotationPropertyValues(annotation_property_list)
+
