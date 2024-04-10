@@ -14,6 +14,7 @@ class PropertyValues(Resource):
 
         self.route('DELETE', (), self.delete)
         self.route('POST', (), self.add)
+        self.route('POST', ('multiple',), self.addMultiple)
         self.route('GET', (), self.find)
         self.route('GET', ('histogram',), self.histogram)
 
@@ -23,14 +24,25 @@ class PropertyValues(Resource):
     # TODO(performance): use objectId whenever possible
 
     @access.user
-    @describeRoute(Description("Save computed property values").param('body', 'Property values of type { [propertyId: string]: number | Map<string, number> }', paramType='body')
-                   .param('annotationId', 'The ID of the annotation')
-                   .param('datasetId', 'The ID of the dataset'))
+    @describeRoute(Description("Save computed property values")
+                   .param('body', 'Property values of type { [propertyId: string]: number | Map<string, number> }', paramType='body')
+                   .param('annotationId', 'The ID of the annotation')
+                   .param('datasetId', 'The ID of the dataset'))
     def add(self, params):
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
         return self._annotationPropertyValuesModel.appendValues(currentUser, self.getBodyJson(), params['annotationId'], params['datasetId'])
+
+    @access.user
+    @describeRoute(Description("Save multiple computed property values")
+                   .param('body', 'List of property values of type { datasetId: string, annotationId: string, values: { [propertyId: string]: any } }[]', paramType='body'))
+    def addMultiple(self, params):
+        currentUser = self.getCurrentUser()
+        if not currentUser:
+            raise AccessException('User not found', 'currentUser')
+        body = self.getBodyJson()
+        return [self._annotationPropertyValuesModel.appendValues(currentUser, entry['values'], entry['annotationId'], entry['datasetId']) for entry in body]
 
     @describeRoute(Description("Delete all the values for annotations in this dataset with this property's id")
         .param('propertyId', 'The property\'s Id', paramType='path')

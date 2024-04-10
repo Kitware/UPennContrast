@@ -79,7 +79,7 @@ class AnnotationPropertyValues(ProxiedAccessControlledModel):
     def appendValues(self, creator, values, annotationId, datasetId):
         property_values = {'annotationId': annotationId, 'values': values, 'datasetId': datasetId}
         self.setUserAccess(property_values, user=creator, level=AccessType.ADMIN)
-        self.save(property_values)
+        return self.save(property_values)
 
     def delete(self, propertyId, datasetId):
         # Could use self.collection.updateMany but girder doesn't expose this method
