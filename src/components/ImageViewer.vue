@@ -549,7 +549,10 @@ export default class ImageViewer extends Vue {
       [jobStates.inactive, jobStates.queued, jobStates.running],
     );
     const validityPromises = girderJobs.map(async (girderJob: any) => {
-      const largeImageId = girderJob?.kwargs?.itemId || null;
+      const largeImageId = girderJob?.kwargs?.itemId;
+      if (!largeImageId) {
+        return false;
+      }
       const largeImageItem = await this.girderResources.getItem(largeImageId);
       return !!largeImageItem && datasetId === largeImageItem.folderId;
     });
