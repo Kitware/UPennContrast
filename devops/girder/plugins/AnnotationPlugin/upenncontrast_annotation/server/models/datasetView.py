@@ -20,6 +20,24 @@ class DatasetViewSchema:
             }
         }
     }
+
+    locationSchema = {
+        'type': 'object',
+        'properties': {
+            'xy': {
+               'type': 'number',
+            },
+            'z': {
+               'type': 'number',
+            },
+            'time': {
+               'type': 'number',
+            },
+        },
+        'required': ['xy', 'z', 'time'],
+        'additionalProperties': False,
+    }
+
     datasetViewSchema = {
         '$schema': 'http://json-schema.org/schema#',
         'id': '/girder/plugins/upenncontrast_annotation/models/datasetView',
@@ -31,13 +49,14 @@ class DatasetViewSchema:
             'configurationId': {
                 'type': 'string'
             },
+            'lastLocation': locationSchema,
             # Associate a contrast to a layer id
             'layerContrasts': {
                 'type': 'object',
                 'additionalProperties': contrastSchema
             }
         },
-        'required': ['datasetId', 'configurationId', 'layerContrasts']
+        'required': ['datasetId', 'configurationId', 'layerContrasts', 'lastLocation']
     }
 
 class DatasetView(ProxiedAccessControlledModel):

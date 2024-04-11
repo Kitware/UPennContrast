@@ -53,10 +53,12 @@ import sync from "./sync";
 import { MAX_NUMBER_OF_RECENT_DATASET_VIEWS } from "./constants";
 import Vue from "vue";
 export { default as store } from "./root";
+import { app } from "@/main";
 
 import { Debounce } from "@/utils/debounce";
 import { TCompositionMode } from "@/utils/compositionModes";
 import { createSamToolStateFromToolConfiguration } from "@/pipelines/samPipeline";
+import { isEqual } from "lodash";
 
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
@@ -188,6 +190,14 @@ export class Main extends VuexModule {
 
   get scales() {
     return { ...this.configurationScales, ...this.viewScales };
+  }
+
+  get currentLocation() {
+    return {
+      xy: this.xy,
+      z: this.z,
+      time: this.time,
+    };
   }
 
   get layerSliceIndexes() {
@@ -528,6 +538,11 @@ export class Main extends VuexModule {
       layerContrasts: {},
       scales: {},
       lastViewed: Date.now(),
+      lastLocation: {
+        xy: this.xy,
+        z: this.z,
+        time: this.time,
+      },
     });
   }
 
@@ -693,6 +708,13 @@ export class Main extends VuexModule {
       const promises: Promise<any>[] = [
         this.api.updateDatasetView(datasetView),
       ];
+
+      const newLocation = datasetView.lastLocation;
+      const query = app.$route.query;
+      this.setXY(query.xy == null ? newLocation.xy : Number(query.xy));
+      this.setZ(query.z == null ? newLocation.z : Number(query.z));
+      this.setTime(query.time == null ? newLocation.time : Number(query.time));
+
       if (this.dataset?.id !== datasetView.datasetId) {
         promises.push(this.setSelectedDataset(datasetView.datasetId));
       }
@@ -917,9 +939,29 @@ export class Main extends VuexModule {
     }
   }
 
+  @Mutation
+  setLastLocationInDatasetView(location: IDatasetView["lastLocation"]) {
+    if (!this.datasetView) {
+      return;
+    }
+    Vue.set(this.datasetView, "lastLocation", location);
+  }
+
+  @Action
+  @Debounce(5000, { leading: false, trailing: true })
+  async updateLastLocationInDatasetView() {
+    const location = this.currentLocation;
+    if (!this.datasetView || isEqual(this.datasetView.lastLocation, location)) {
+      return;
+    }
+    this.setLastLocationInDatasetView(location);
+    await this.api.updateDatasetView(this.datasetView);
+  }
+
   @Action
   async setXY(value: number) {
     this.setXYImpl(value);
+    this.updateLastLocationInDatasetView();
   }
 
   @Action
@@ -930,6 +972,7 @@ export class Main extends VuexModule {
   @Action
   async setZ(value: number) {
     this.setZImpl(value);
+    this.updateLastLocationInDatasetView();
   }
 
   @Action
@@ -940,6 +983,7 @@ export class Main extends VuexModule {
   @Action
   async setTime(value: number) {
     this.setTimeImpl(value);
+    this.updateLastLocationInDatasetView();
   }
 
   @Action

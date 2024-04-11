@@ -19,6 +19,7 @@ import ContrastPanels from "@/components/ContrastPanels.vue";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
 import propertiesStore from "@/store/properties";
+import { Debounce } from "@/utils/debounce";
 
 @Component({
   components: {
@@ -56,6 +57,89 @@ export default class Viewer extends Vue {
   @Watch("configuration")
   configurationChanged() {
     this.propertyStore.fetchProperties();
+  }
+
+  async changeQuery(param: string, value: string) {
+    const old = this.$route.query[param];
+    if (old === value) {
+      return;
+    }
+    await this.$router.replace({
+      query: {
+        ...this.$route.query,
+        [param]: value,
+      },
+    });
+  }
+
+  get xy() {
+    return this.store.xy;
+  }
+
+  get z() {
+    return this.store.z;
+  }
+
+  get time() {
+    return this.store.time;
+  }
+
+  get unrollXY() {
+    return this.store.unrollXY;
+  }
+
+  get unrollZ() {
+    return this.store.unrollZ;
+  }
+
+  get unrollT() {
+    return this.store.unrollT;
+  }
+
+  get layerMode() {
+    return this.store.layerMode;
+  }
+
+  @Watch("xy")
+  @Debounce(500)
+  updateQueryParamsXY() {
+    this.changeQuery("xy", this.xy.toString());
+  }
+
+  @Watch("z")
+  @Debounce(500)
+  updateQueryParamsZ() {
+    this.changeQuery("z", this.z.toString());
+  }
+
+  @Watch("time")
+  @Debounce(500)
+  updateQueryParamsT() {
+    this.changeQuery("time", this.time.toString());
+  }
+
+  @Watch("unrollXY")
+  @Debounce(500)
+  updateQueryParamsUnrollXY() {
+    this.changeQuery("unrollXY", this.unrollXY.toString());
+  }
+
+  @Watch("unrollZ")
+  @Debounce(500)
+  updateQueryParamsUnrollZ() {
+    this.changeQuery("unrollZ", this.unrollZ.toString());
+  }
+
+  @Watch("unrollT")
+  @Debounce(500)
+  updateQueryParamsUnrollT() {
+    this.changeQuery("unrollT", this.unrollT.toString());
+  }
+
+  @Watch("layerMode")
+  @Debounce(500)
+  updateQueryParamsLayerMode() {
+    this.changeQuery("layer", this.layerMode);
   }
 }
 </script>
