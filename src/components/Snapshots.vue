@@ -820,6 +820,7 @@ export default class Snapshots extends Vue {
       if (!this.bboxLayer) {
         this.bboxLayer = map.createLayer("annotation", {
           autoshareRenderer: false,
+          showLabels: false,
         });
         this.bboxAnnotation = geojs.annotation.rectangleAnnotation({
           layer: this.bboxLayer,
