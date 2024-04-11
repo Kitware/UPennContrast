@@ -45,6 +45,7 @@ import {
   BaseToolStateSymbol,
   TToolState,
   ICameraInfo,
+  IDatasetLocation,
 } from "./model";
 
 import persister from "./Persister";
@@ -192,7 +193,7 @@ export class Main extends VuexModule {
     return { ...this.configurationScales, ...this.viewScales };
   }
 
-  get currentLocation() {
+  get currentLocation(): IDatasetLocation {
     return {
       xy: this.xy,
       z: this.z,

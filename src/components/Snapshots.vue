@@ -662,18 +662,17 @@ export default class Snapshots extends Vue {
   }
 
   getDownload() {
-    const location = {
-      xy: this.store.xy,
-      z: this.store.z,
-      time: this.store.time,
-    };
     const boundingBox = {
       left: this.bboxLeft,
       top: this.bboxTop,
       right: this.bboxRight,
       bottom: this.bboxBottom,
     };
-    this.downloadFromSnapshot(location, boundingBox, this.newName);
+    this.downloadFromSnapshot(
+      this.store.currentLocation,
+      boundingBox,
+      this.newName,
+    );
   }
 
   // We use xy, z, time, screenshot.bbox and name from the snapshot
