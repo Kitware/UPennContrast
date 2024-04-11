@@ -26,7 +26,7 @@ import {
   ICameraInfo,
 } from "@/store/model";
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
-import { ITileOptionsBands, getBandOption } from "@/store/images";
+import { ITileOptionsBands, getCurrentBandOption } from "@/store/images";
 
 interface ICorner {
   top: boolean;
@@ -155,7 +155,7 @@ export default class ImageViewer extends Vue {
     const pushBand = bands.push.bind(bands);
     layers.forEach((layer) => {
       if (layer.visible) {
-        promises.push(getBandOption(layer).then(pushBand));
+        promises.push(getCurrentBandOption(layer).then(pushBand));
       }
     });
 

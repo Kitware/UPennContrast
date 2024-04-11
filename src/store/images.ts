@@ -6,6 +6,7 @@ import {
   IDisplaySlice,
   IContrast,
   IImage,
+  IDatasetLocation,
 } from "./model";
 import main from "./index";
 
@@ -154,8 +155,39 @@ export function toStyle(
   return style;
 }
 
+export async function getBandOption(
+  dataset: IDataset,
+  layer: IDisplayLayer,
+  location: IDatasetLocation,
+) {
+  // Get the images at the location
+  const { xy, z, time } = location;
+  const indexes = getLayerSliceIndexes(layer, dataset, time, xy, z);
+  let images: IImage[] = [];
+  if (indexes) {
+    const { zIndex, tIndex, xyIndex } = indexes;
+    images = dataset.images(zIndex, tIndex, xyIndex, layer.channel);
+  }
+
+  // Fetch the histogram
+  const histogram = await main.api.getLayerHistogram(images);
+
+  const style = toStyle(
+    layer.color,
+    layer.contrast,
+    histogram,
+    layer,
+    main.dataset,
+    images[0],
+  );
+  if (images[0]) {
+    style.frame = images[0].frameIndex;
+  }
+  return style;
+}
+
 // Returns the style of the layer combined with the frame idx for the current dataset
-export async function getBandOption(layer: IDisplayLayer) {
+export async function getCurrentBandOption(layer: IDisplayLayer) {
   const image = (main.getImagesFromLayer(layer)[0] || null) as IImage | null;
   const histogram = await main.getLayerHistogram(layer);
   const style = toStyle(

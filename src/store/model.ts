@@ -1171,6 +1171,12 @@ export interface IUISetting {
   activeLayer: IDisplayLayer;
 }
 
+export interface IDatasetLocation {
+  xy: number;
+  z: number;
+  time: number;
+}
+
 // https://opengeoscience.github.io/geojs/apidocs/geo.util.html#.pixelCoordinateParams
 export interface IGeoJSPixelCoordinateParams {
   map: IGeoJSMapSpec;

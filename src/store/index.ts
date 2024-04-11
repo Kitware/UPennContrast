@@ -1258,15 +1258,6 @@ export class Main extends VuexModule {
     await this.syncConfiguration("layers");
   }
 
-  get getImagesFromChannel() {
-    return (channel: number) => {
-      if (!this.dataset) {
-        return [];
-      }
-      return this.dataset.images(this.z, this.time, this.xy, channel);
-    };
-  }
-
   get getImagesFromLayer() {
     return (layer: IDisplayLayer) => {
       if (!this.dataset) {
