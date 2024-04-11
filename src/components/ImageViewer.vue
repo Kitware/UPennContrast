@@ -875,12 +875,14 @@ export default class ImageViewer extends Vue {
     const oldWidgetLayer = this.scaleWidget?.layer();
     if (
       this.scaleWidget &&
-      oldWidgetLayer &&
-      (this.scaleWidget.options("scale") !== pixelSizeM ||
-        !this.showScalebar ||
-        oldWidgetLayer !== uiLayer)
+      (this.scaleWidget.options("scale") !== pixelSizeM || !this.showScalebar)
     ) {
-      oldWidgetLayer.deleteWidget(this.scaleWidget);
+      if (oldWidgetLayer && oldWidgetLayer === uiLayer) {
+        // If oldWidgetLayer and uiLayer are different,
+        // it means that the oldWidgetLayer has already been deleted and
+        // that this.scaleWidget has been deleted too
+        oldWidgetLayer.deleteWidget(this.scaleWidget);
+      }
       this.scaleWidget = null;
     }
     if (!this.scaleWidget && this.showScalebar) {
