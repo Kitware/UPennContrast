@@ -33,7 +33,7 @@ Vue.use(vDescription);
 main.initialize();
 main.setupWatchers();
 
-new Vue({
+const app = new Vue({
   provide: {
     // use a proxy to dynamically resolve to the right girderRest client
     girderRest: new Proxy(main, {
@@ -49,3 +49,5 @@ new Vue({
   vuetify,
   render: (h: any) => h(App),
 }).$mount("#app");
+
+export { app };

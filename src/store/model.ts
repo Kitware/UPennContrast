@@ -294,6 +294,11 @@ export interface IDatasetViewBase {
   };
   scales: Partial<IScales>;
   lastViewed: number;
+  lastLocation: {
+    xy: number;
+    z: number;
+    time: number;
+  };
 }
 
 export interface IDatasetView extends IDatasetViewBase {

@@ -111,19 +111,6 @@ import { IHotkey } from "@/utils/v-mousetrap";
 export default class ViewerToolbar extends Vue {
   readonly store = store;
 
-  private changeQuery(param: string, value: string) {
-    const old = this.$route.query[param];
-    if (old === value) {
-      return;
-    }
-    this.$router.replace({
-      query: {
-        ...this.$route.query,
-        [param]: value,
-      },
-    });
-  }
-
   get xy() {
     return this.store.xy;
   }
@@ -137,21 +124,15 @@ export default class ViewerToolbar extends Vue {
   }
 
   set xy(value: number) {
-    if (value !== this.xy) {
-      this.changeQuery("xy", value.toString());
-    }
+    this.store.setXY(value);
   }
 
   set z(value: number) {
-    if (value !== this.z) {
-      this.changeQuery("z", value.toString());
-    }
+    this.store.setZ(value);
   }
 
   set time(value: number) {
-    if (value !== this.time) {
-      this.changeQuery("time", value.toString());
-    }
+    this.store.setTime(value);
   }
 
   get unrollXY() {
@@ -159,9 +140,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   set unrollXY(value: boolean) {
-    if (value !== this.unrollXY) {
-      this.changeQuery("unrollXY", value.toString());
-    }
+    this.store.setUnrollXY(value);
   }
 
   @Watch("unrollXY")
@@ -174,9 +153,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   set unrollZ(value: boolean) {
-    if (value !== this.unrollZ) {
-      this.changeQuery("unrollZ", value.toString());
-    }
+    this.store.setUnrollZ(value);
   }
 
   @Watch("unrollZ")
@@ -189,9 +166,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   set unrollT(value: boolean) {
-    if (value !== this.unrollT) {
-      this.changeQuery("unrollT", value.toString());
-    }
+    this.store.setUnrollT(value);
   }
 
   @Watch("unrollT")
@@ -212,9 +187,7 @@ export default class ViewerToolbar extends Vue {
   }
 
   set layerMode(value: TLayerMode) {
-    if (value !== this.layerMode) {
-      this.changeQuery("layer", value);
-    }
+    this.store.setLayerMode(value);
   }
 
   get layerMode() {

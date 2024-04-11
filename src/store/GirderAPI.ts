@@ -312,7 +312,7 @@ export default class GirderAPI {
     return this.client.delete(`dataset_view/${id}`);
   }
 
-  updateDatasetView(datasetView: IDatasetView) {
+  updateDatasetView(datasetView: Partial<IDatasetView> & { id: string }) {
     return this.client.put(`dataset_view/${datasetView.id}`, datasetView);
   }
 
@@ -709,6 +709,7 @@ function asDatasetView(data: AxiosResponse["data"]): IDatasetView {
     layerContrasts: data.layerContrasts || {},
     scales: data.scales || {},
     lastViewed: data.lastViewed,
+    lastLocation: data.lastLocation || { xy: 0, z: 0, time: 0 },
   };
 }
 

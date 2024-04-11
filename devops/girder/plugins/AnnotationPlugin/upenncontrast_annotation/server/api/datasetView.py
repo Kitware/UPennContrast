@@ -40,7 +40,7 @@ class DatasetView(Resource):
             'datasetId': new_document['datasetId'] ,
             'configurationId': new_document['configurationId']
         }
-        cursor = self._datasetViewModel.findWithPermissions(query, user=self.getCurrentUser(), level=AccessType.READ)
+        cursor = self._datasetViewModel.findWithPermissions(query, user=currentUser, level=AccessType.WRITE)
         old_document = next(cursor, None)
         # If it exists, just update the document instead of creating a new one
         if old_document:
