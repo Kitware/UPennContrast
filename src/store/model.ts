@@ -225,6 +225,7 @@ export interface ISnapshot {
   tags: string[];
   created: any;
   modified: number;
+  datasetViewId: string;
   viewport: {
     tl: any;
     tr: any;
@@ -241,7 +242,6 @@ export interface ISnapshot {
   layerMode: TLayerMode;
   layers: IDisplayLayer[];
   screenshot: {
-    format: string;
     bbox: IGeoJSBounds;
   };
 }

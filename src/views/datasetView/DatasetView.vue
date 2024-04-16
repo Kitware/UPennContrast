@@ -5,9 +5,8 @@
 import store from "@/store";
 import { TLayerMode } from "@/store/model";
 import routeMapper from "@/utils/routeMapper";
-import { Component } from "vue-property-decorator";
 
-const SpecializedRouteMapper = routeMapper(
+export default routeMapper(
   {
     datasetViewId: {
       parse: String,
@@ -56,18 +55,6 @@ const SpecializedRouteMapper = routeMapper(
             : "multiple",
         ),
     },
-    snapshot: {
-      parse: (v) => v,
-      get: () => store.snapshot,
-      set: (value: string) => store.setSnapshot(value),
-    },
   },
 );
-
-@Component
-export default class DatasetViewWrapper extends SpecializedRouteMapper {
-  mounted() {
-    store.setDatasetViewId(store.datasetView?.id || null);
-  }
-}
 </script>

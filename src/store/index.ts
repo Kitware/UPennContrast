@@ -60,6 +60,7 @@ import { Debounce } from "@/utils/debounce";
 import { TCompositionMode } from "@/utils/compositionModes";
 import { createSamToolStateFromToolConfiguration } from "@/pipelines/samPipeline";
 import { isEqual } from "lodash";
+import { logError } from "@/utils/log";
 
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
@@ -132,7 +133,6 @@ export class Main extends VuexModule {
   unrollXY: boolean = false;
   unrollZ: boolean = false;
   unrollT: boolean = false;
-  snapshot?: string;
 
   maps: IMapEntry[] = [];
 
@@ -703,7 +703,17 @@ export class Main extends VuexModule {
     if (!id) {
       this.setDatasetViewImpl(null);
     } else {
-      const datasetView = await this.api.getDatasetView(id);
+      let datasetView: IDatasetView;
+      try {
+        datasetView = await this.api.getDatasetView(id);
+      } catch (err) {
+        // The datasetView doesn't exist
+        logError(
+          `Failed to fetch dataset view ${id}.\nIt may be because it has been deleted or that you don't have the access is forbidden.\n`,
+          err,
+        );
+        return;
+      }
       datasetView.lastViewed = Date.now();
       this.setDatasetViewImpl(datasetView);
       const promises: Promise<any>[] = [
@@ -712,9 +722,13 @@ export class Main extends VuexModule {
 
       const newLocation = datasetView.lastLocation;
       const query = app.$route.query;
-      this.setXY(query.xy == null ? newLocation.xy : Number(query.xy));
-      this.setZ(query.z == null ? newLocation.z : Number(query.z));
-      this.setTime(query.time == null ? newLocation.time : Number(query.time));
+      promises.push(
+        this.setXY(query.xy == null ? newLocation.xy : Number(query.xy)),
+        this.setZ(query.z == null ? newLocation.z : Number(query.z)),
+        this.setTime(
+          query.time == null ? newLocation.time : Number(query.time),
+        ),
+      );
 
       if (this.dataset?.id !== datasetView.datasetId) {
         promises.push(this.setSelectedDataset(datasetView.datasetId));
@@ -1522,18 +1536,6 @@ export class Main extends VuexModule {
       }
       return index;
     };
-  }
-
-  @Mutation
-  public setSnapshotImpl(value?: string) {
-    // check if snapshot is available.  If not, set to undefined
-    this.snapshot = value;
-    // TODO: also load the snapshot
-  }
-
-  @Action
-  async setSnapshot(value?: string) {
-    this.setSnapshotImpl(value);
   }
 
   @Action

@@ -1105,6 +1105,12 @@ export default class Snapshots extends Vue {
 
   async loadSnapshot(item: ISnapshotItem) {
     const snapshot = item.record;
+    if (
+      snapshot.datasetViewId &&
+      snapshot.datasetViewId !== this.store.datasetView?.id
+    ) {
+      await this.store.setDatasetViewId(snapshot.datasetViewId);
+    }
     if (this.areCurrentLayersCompatible(snapshot)) {
       await this.store.loadSnapshotLayers(snapshot);
     } else {
@@ -1113,26 +1119,22 @@ export default class Snapshots extends Vue {
     this.newName = snapshot.name || "";
     this.newDescription = snapshot.description || "";
     this.newTags = (snapshot.tags || []).slice();
-    this.format = snapshot.screenshot!.format;
     this.bboxLeft = snapshot.screenshot!.bbox!.left;
     this.bboxTop = snapshot.screenshot!.bbox!.top;
     this.bboxRight = snapshot.screenshot!.bbox!.right;
     this.bboxBottom = snapshot.screenshot!.bbox!.bottom;
 
-    await this.$router
-      .replace({
-        query: {
-          ...this.$route.query,
-          unrollXY: snapshot.unrollXY.toString(),
-          unrollZ: snapshot.unrollZ.toString(),
-          unrollT: snapshot.unrollT.toString(),
-          xy: snapshot.xy.toString(),
-          z: snapshot.z.toString(),
-          time: snapshot.time.toString(),
-          layer: snapshot.layerMode,
-        },
-      })
-      .catch(() => {}); /* catch redundant navigation warnings */
+    await Promise.all([
+      this.store.setXY(snapshot.xy),
+      this.store.setZ(snapshot.z),
+      this.store.setTime(snapshot.time),
+
+      this.store.setUnrollXY(snapshot.unrollXY),
+      this.store.setUnrollZ(snapshot.unrollZ),
+      this.store.setUnrollT(snapshot.unrollT),
+
+      this.store.setLayerMode(snapshot.layerMode),
+    ]);
 
     const map = this.firstMap;
     if (!map) {
@@ -1185,7 +1187,8 @@ export default class Snapshots extends Vue {
   saveSnapshot(): void {
     this.updateFormValidation();
     const map = this.firstMap;
-    if (!this.isSaveSnapshotValid || !map) {
+    const datasetView = this.store.datasetView;
+    if (!this.isSaveSnapshotValid || !map || !datasetView) {
       return;
     }
     const snapshot: ISnapshot = {
@@ -1193,6 +1196,7 @@ export default class Snapshots extends Vue {
       description: this.newDescription.trim(),
       tags: this.newTags.slice(),
       created: this.currentSnapshot ? this.currentSnapshot.created : Date.now(),
+      datasetViewId: datasetView.id,
       modified: Date.now(),
       viewport: {
         tl: map.displayToGcs({ x: 0, y: 0 }),
@@ -1210,7 +1214,6 @@ export default class Snapshots extends Vue {
       layerMode: store.layerMode,
       layers: store.layers.map(copyLayerWithoutPrivateAttributes),
       screenshot: {
-        format: this.format,
         bbox: {
           left: this.bboxLeft,
           top: this.bboxTop,
