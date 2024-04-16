@@ -852,6 +852,8 @@ export default class Snapshots extends Vue {
       this.showSnapshot(true);
       this.markCurrentArea();
       this.drawBoundingBox();
+    } else {
+      this.showSnapshot(false);
     }
   }
 
