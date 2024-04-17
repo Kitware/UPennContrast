@@ -23,12 +23,12 @@ const setUrlParamsOrQuery = awaitPreviousCallsDecorator(
     if (stringifiedValue === route[type][key]) {
       return;
     }
-    await router.replace({
-      [type]: {
-        ...route[type],
-        [key]: stringifiedValue,
-      },
-    });
+    const replacement = {
+      params: { ...route.params },
+      query: { ...route.query },
+    };
+    replacement[type][key] = stringifiedValue;
+    await router.replace(replacement);
   },
 );
 
