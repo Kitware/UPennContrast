@@ -79,7 +79,6 @@ export interface ITileOptionsSimple {
 
 export interface ITileOptionsBands {
   bands: { [key: string]: any }[];
-  frame?: number;
 }
 
 export type ITileOptions = ITileOptionsSimple | ITileOptionsBands;
@@ -177,29 +176,11 @@ export async function getBandOption(
     layer.contrast,
     histogram,
     layer,
-    main.dataset,
+    dataset,
     images[0],
   );
-  if (images[0]) {
+  if (images[0] && !("bands" in style)) {
     style.frame = images[0].frameIndex;
-  }
-  return style;
-}
-
-// Returns the style of the layer combined with the frame idx for the current dataset
-export async function getCurrentBandOption(layer: IDisplayLayer) {
-  const image = (main.getImagesFromLayer(layer)[0] || null) as IImage | null;
-  const histogram = await main.getLayerHistogram(layer);
-  const style = toStyle(
-    layer.color,
-    layer.contrast,
-    histogram,
-    layer,
-    main.dataset,
-    image,
-  );
-  if (image) {
-    style.frame = image.frameIndex;
   }
   return style;
 }

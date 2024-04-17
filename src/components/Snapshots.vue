@@ -320,10 +320,7 @@ import geojs from "geojs";
 import { formatDate } from "@/utils/date";
 import { downloadToClient } from "@/utils/download";
 import {
-  IDataset,
   IDatasetLocation,
-  IDisplayLayer,
-  IDownloadParameters,
   IGeoJSAnnotation,
   IGeoJSAnnotationLayer,
   IGeoJSBounds,
@@ -331,10 +328,15 @@ import {
   ISnapshot,
   copyLayerWithoutPrivateAttributes,
 } from "@/store/model";
-import { ITileOptionsBands, getBandOption } from "@/store/images";
 import axios from "axios";
 import { DeflateOptions, Zip, ZipDeflate } from "fflate";
 import girderResources from "@/store/girderResources";
+import {
+  getChannelsDownloadUrls,
+  getDownloadParameters,
+  getLayersDownloadUrls,
+  getBaseURLFromDownloadParameters,
+} from "@/utils/screenshot";
 
 interface ISnapshotItem {
   name: string;
@@ -346,131 +348,6 @@ interface ISnapshotItem {
 function intFromString(value: string) {
   const parsedValue = parseInt("0" + value, 10);
   return Number.isNaN(parsedValue) ? 0 : parsedValue;
-}
-
-function getDownloadParameters(
-  bounds: IGeoJSBounds,
-  fileName: string,
-  format: string,
-  maxPixels: number,
-  jpegQuality: number,
-  downloadMode: "layers" | "channels",
-) {
-  const params: IDownloadParameters = {
-    encoding: format.toUpperCase(),
-    contentDisposition: "attachment",
-    contentDispositionFilename: fileName,
-    ...bounds,
-    width: bounds.right - bounds.left,
-    height: bounds.bottom - bounds.top,
-  };
-  if (format === "jpeg") {
-    params.jpeqQuality = jpegQuality;
-  } else if (format === "tiff") {
-    params.tiffCompression = "raw";
-  }
-
-  // Maximum 4M pixels per image
-  const nPixels = params.width * params.height;
-  if (nPixels > maxPixels) {
-    if (downloadMode === "layers") {
-      // Scale the image
-      const scale = Math.sqrt(maxPixels / nPixels);
-      params.width = Math.floor(scale * params.width);
-      params.height = Math.floor(scale * params.height);
-    } else if (downloadMode === "channels") {
-      // Don't scale when in "channels" mode
-      return null;
-    }
-  }
-  return params;
-}
-
-function getURLFromDownloadParameters(
-  params: IDownloadParameters,
-  itemId: string,
-) {
-  const apiRoot = store.api.client.apiRoot;
-  const baseUrl = new URL(`${apiRoot}/item/${itemId}/tiles/region`);
-  for (const [key, value] of Object.entries(params)) {
-    baseUrl.searchParams.set(key, value);
-  }
-  return baseUrl;
-}
-
-async function getLayersDownloadUrls(
-  baseUrl: URL,
-  exportLayer: "all" | "composite" | string,
-  configurationLayers: IDisplayLayer[],
-  dataset: IDataset,
-  location: IDatasetLocation,
-) {
-  // Get layer bands: style and frame idx
-  const bands: ITileOptionsBands["bands"] = [];
-  const promises: Promise<any>[] = [];
-  const pushBand = bands.push.bind(bands);
-  if (exportLayer === "composite" || exportLayer === "all") {
-    configurationLayers.forEach((layer) => {
-      if (layer.visible || exportLayer === "all") {
-        promises.push(getBandOption(dataset, layer, location).then(pushBand));
-      }
-    });
-  } else {
-    const layerId = exportLayer;
-    const layer = configurationLayers.find((layer) => layer.id === layerId);
-    if (!layer) {
-      return [];
-    }
-    promises.push(getBandOption(dataset, layer, location).then(pushBand));
-  }
-  await Promise.all(promises);
-
-  // Return one URL per band or a single URL with all bands
-  if (exportLayer === "all") {
-    const urls = [];
-    for (const band of bands) {
-      const url = new URL(baseUrl);
-      const style = JSON.stringify({ bands: [band] });
-      url.searchParams.set("style", style);
-      urls.push(url);
-    }
-    return urls;
-  } else {
-    const url = new URL(baseUrl);
-    const style = JSON.stringify({ bands });
-    url.searchParams.set("style", style);
-    return [url];
-  }
-}
-
-function getChannelsDownloadUrls(
-  baseUrl: URL,
-  exportChannel: "all" | number,
-  dataset: IDataset,
-  location: IDatasetLocation,
-) {
-  const datasetChannels = dataset.channels;
-  let channelsToDownload: number[];
-  if (exportChannel === "all") {
-    channelsToDownload = datasetChannels;
-  } else {
-    channelsToDownload = [exportChannel];
-  }
-  const urls: URL[] = [];
-  const { xy, z, time } = location;
-  for (const channel of channelsToDownload) {
-    const image = dataset.images(z, time, xy, channel)[0];
-    if (!image) {
-      throw new Error(
-        `Image not found for channel ${dataset.channelNames.get(channel)}`,
-      );
-    }
-    // Don't modify the base url
-    const url = new URL(baseUrl);
-    url.searchParams.set("frame", image.frameIndex.toString());
-    urls.push(url);
-  }
-  return urls;
 }
 
 @Component({ components: { TagPicker } })
@@ -677,7 +554,6 @@ export default class Snapshots extends Vue {
 
   // We use xy, z, time, screenshot.bbox and name from the snapshot
   // TODO: add a datasetId and use it instead of using the dataset from store
-  // TODO: remove screenshot.format as it is not used
   async downloadFromSnapshot(
     location: IDatasetLocation,
     boundingBox: IGeoJSBounds,
@@ -739,7 +615,8 @@ export default class Snapshots extends Vue {
       this.downloading = false;
       return;
     }
-    const baseUrl = getURLFromDownloadParameters(params, itemId);
+    const apiRoot = store.api.client.apiRoot;
+    const baseUrl = getBaseURLFromDownloadParameters(params, itemId, apiRoot);
 
     let urls: URL[];
     if (this.downloadMode === "channels") {
