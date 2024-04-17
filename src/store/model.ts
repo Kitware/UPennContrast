@@ -207,7 +207,7 @@ export type TLayerMode = "single" | "multiple" | "unroll";
 export interface IDownloadParameters {
   encoding: string;
   contentDisposition: string;
-  contentDispositionFilename: string;
+  contentDispositionFilename?: string;
   left?: number;
   top?: number;
   right?: number;

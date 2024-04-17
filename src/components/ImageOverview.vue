@@ -162,7 +162,7 @@ export default class ImageViewer extends Vue {
       layers,
       dataset,
       this.store.currentLocation,
-    ).then((urls) => urls[0]);
+    ).then((urls) => urls[0].url);
   }
 
   mounted() {

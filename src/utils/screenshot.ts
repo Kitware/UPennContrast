@@ -1,4 +1,4 @@
-import { ITileOptionsBands, getBandOption } from "@/store/images";
+import { ITileOptions, ITileOptionsBands, getBandOption } from "@/store/images";
 import {
   IDataset,
   IDatasetLocation,
@@ -9,7 +9,6 @@ import {
 
 export function getDownloadParameters(
   bounds: IGeoJSBounds,
-  fileName: string,
   format: string,
   maxPixels: number,
   jpegQuality: number,
@@ -18,7 +17,6 @@ export function getDownloadParameters(
   const params: IDownloadParameters = {
     encoding: format.toUpperCase(),
     contentDisposition: "attachment",
-    contentDispositionFilename: fileName,
     ...bounds,
     width: bounds.right - bounds.left,
     height: bounds.bottom - bounds.top,
@@ -30,16 +28,18 @@ export function getDownloadParameters(
   }
 
   // Maximum 4M pixels per image
-  const nPixels = params.width * params.height;
-  if (nPixels > maxPixels) {
-    if (downloadMode === "layers") {
-      // Scale the image
-      const scale = Math.sqrt(maxPixels / nPixels);
-      params.width = Math.floor(scale * params.width);
-      params.height = Math.floor(scale * params.height);
-    } else if (downloadMode === "channels") {
-      // Don't scale when in "channels" mode
-      return null;
+  if (params.width && params.height) {
+    const nPixels = params.width * params.height;
+    if (nPixels > maxPixels) {
+      if (downloadMode === "layers") {
+        // Scale the image
+        const scale = Math.sqrt(maxPixels / nPixels);
+        params.width = Math.floor(scale * params.width);
+        params.height = Math.floor(scale * params.height);
+      } else if (downloadMode === "channels") {
+        // Don't scale when in "channels" mode
+        return null;
+      }
     }
   }
   return params;
@@ -65,13 +65,16 @@ export async function getLayersDownloadUrls(
   location: IDatasetLocation,
 ) {
   // Get layer bands: style and frame idx
-  const styles: ITileOptionsBands["bands"] = [];
+  const styles: { style: ITileOptions; layerId: string }[] = [];
   const promises: Promise<any>[] = [];
-  const pushStyle = styles.push.bind(styles);
   if (exportLayer === "composite" || exportLayer === "all") {
     configurationLayers.forEach((layer) => {
       if (layer.visible || exportLayer === "all") {
-        promises.push(getBandOption(dataset, layer, location).then(pushStyle));
+        promises.push(
+          getBandOption(dataset, layer, location).then((style) =>
+            styles.push({ layerId: layer.id, style }),
+          ),
+        );
       }
     });
   } else {
@@ -80,36 +83,42 @@ export async function getLayersDownloadUrls(
     if (!layer) {
       return [];
     }
-    promises.push(getBandOption(dataset, layer, location).then(pushStyle));
+    promises.push(
+      getBandOption(dataset, layer, location).then((style) =>
+        styles.push({ layerId: layer.id, style }),
+      ),
+    );
   }
   await Promise.all(promises);
 
   // Return one URL per band or a single URL with all bands
   if (exportLayer === "all") {
-    const urls = [];
-    for (const style of styles) {
+    const urls: { url: URL; layerIds: string[] }[] = [];
+    for (const { layerId, style } of styles) {
       const url = new URL(baseUrl);
       url.searchParams.set("style", JSON.stringify(style));
-      urls.push(url);
+      urls.push({ url, layerIds: [layerId] });
     }
     return urls;
   } else {
     const url = new URL(baseUrl);
+    const layerIds: string[] = [];
     const combinedStyle: ITileOptionsBands = {
       bands: styles.reduce(
-        (currentBands: ITileOptionsBands["bands"], style) => {
+        (currentBands: ITileOptionsBands["bands"], { layerId, style }) => {
           if ("bands" in style) {
             currentBands.push(...style.bands);
           } else {
             currentBands.push(style);
           }
+          layerIds.push(layerId);
           return currentBands;
         },
         [],
       ),
     };
     url.searchParams.set("style", JSON.stringify(combinedStyle));
-    return [url];
+    return [{ url, layerIds }];
   }
 }
 
@@ -126,19 +135,19 @@ export function getChannelsDownloadUrls(
   } else {
     channelsToDownload = [exportChannel];
   }
-  const urls: URL[] = [];
+  const urls: { url: URL; channel: number }[] = [];
   const { xy, z, time } = location;
   for (const channel of channelsToDownload) {
     const image = dataset.images(z, time, xy, channel)[0];
     if (!image) {
-      throw new Error(
-        `Image not found for channel ${dataset.channelNames.get(channel)}`,
-      );
+      const channelName =
+        dataset.channelNames.get(channel) ?? "Unknown channel";
+      throw new Error(`Image not found for channel ${channelName}`);
     }
     // Don't modify the base url
     const url = new URL(baseUrl);
     url.searchParams.set("frame", image.frameIndex.toString());
-    urls.push(url);
+    urls.push({ url, channel });
   }
   return urls;
 }

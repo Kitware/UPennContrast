@@ -267,15 +267,26 @@
           </v-col>
         </v-row>
       </v-card-text>
-      <v-card-actions>
-        <v-btn
-          color="primary"
-          @click="getDownload()"
-          :disabled="unroll || downloading"
-        >
-          <v-progress-circular v-if="downloading" indeterminate />
-          Download Snapshot images
-        </v-btn>
+      <v-card-actions class="d-block">
+        <v-progress-circular v-if="downloading" indeterminate />
+        <div class="mb-2">
+          <v-btn
+            color="primary"
+            @click="downloadImagesForCurrentState()"
+            :disabled="unroll || downloading"
+          >
+            Download images for current location
+          </v-btn>
+        </div>
+        <div class="mb-2">
+          <v-btn
+            color="primary"
+            @click="downloadImagesForAllSnapshots()"
+            :disabled="unroll || downloading"
+          >
+            Download images for all Snapshots
+          </v-btn>
+        </div>
       </v-card-actions>
 
       <v-divider />
@@ -538,49 +549,81 @@ export default class Snapshots extends Vue {
     });
   }
 
-  getDownload() {
+  async downloadImagesForCurrentState() {
+    const datasetId = this.store.dataset?.id;
+    if (!datasetId) {
+      return;
+    }
+    const location = this.store.currentLocation;
     const boundingBox = {
       left: this.bboxLeft,
       top: this.bboxTop,
       right: this.bboxRight,
       bottom: this.bboxBottom,
     };
-    this.downloadFromSnapshot(
-      this.store.currentLocation,
-      boundingBox,
-      this.newName,
-    );
+
+    this.downloading = true;
+
+    try {
+      const urls = await this.getUrlsForSnapshot(
+        location,
+        boundingBox,
+        datasetId,
+        this.newName,
+      );
+      if (!urls) {
+        return;
+      }
+      await this.downloadUrls(urls);
+    } finally {
+      this.downloading = false;
+    }
+  }
+
+  async downloadImagesForAllSnapshots() {
+    this.downloading = true;
+
+    try {
+      const allUrls: URL[] = [];
+      for (const snapshot of this.store.configuration?.snapshots || []) {
+        const datasetView = await this.store.api.getDatasetView(
+          snapshot.datasetViewId,
+        );
+        const currentUrls = await this.getUrlsForSnapshot(
+          snapshot,
+          snapshot.screenshot.bbox,
+          datasetView.datasetId,
+          snapshot.name,
+        );
+        if (currentUrls) {
+          allUrls.push(...currentUrls);
+        }
+      }
+      await this.downloadUrls(allUrls);
+    } finally {
+      this.downloading = false;
+    }
   }
 
   // We use xy, z, time, screenshot.bbox and name from the snapshot
-  // TODO: add a datasetId and use it instead of using the dataset from store
-  async downloadFromSnapshot(
+  async getUrlsForSnapshot(
     location: IDatasetLocation,
     boundingBox: IGeoJSBounds,
+    datasetId: string,
     name: string,
   ) {
-    this.downloading = true;
-
-    const datasetId = this.store.dataset?.id;
-    if (!datasetId) {
-      this.downloading = false;
-      return;
-    }
-
     // Get dataset
     const dataset =
       store.dataset?.id === datasetId
         ? store.dataset
         : await girderResources.getDataset({ id: datasetId });
     if (!dataset) {
-      this.downloading = false;
       return;
     }
 
     // Get the id of the image for this dataset
     const anyImage = dataset.anyImage();
     if (!anyImage) {
-      this.downloading = false;
       return;
     }
     const itemId = anyImage.item._id;
@@ -588,14 +631,12 @@ export default class Snapshots extends Vue {
     // Snapshots always come from the current configuration
     const configuration = this.store.configuration;
     if (!configuration) {
-      this.downloading = false;
       return;
     }
 
     // Get the filename
     const dateStr = formatDate(new Date());
     const extension = this.format === "tiled" ? "tiff" : this.format;
-    const fileName = `${dataset.name}-${configuration.name}-${name}-${dateStr}.${extension}`;
 
     const jpegQuality =
       typeof this.jpegQuality !== "number"
@@ -603,7 +644,6 @@ export default class Snapshots extends Vue {
         : this.jpegQuality;
     const params = getDownloadParameters(
       boundingBox,
-      fileName,
       this.format,
       this.maxPixels,
       jpegQuality,
@@ -612,34 +652,47 @@ export default class Snapshots extends Vue {
     if (params === null) {
       // Image is too big
       this.imageTooBigDialog = true;
-      this.downloading = false;
       return;
     }
     const apiRoot = store.api.client.apiRoot;
     const baseUrl = getBaseURLFromDownloadParameters(params, itemId, apiRoot);
 
-    let urls: URL[];
+    const urls: URL[] = [];
     if (this.downloadMode === "channels") {
-      urls = getChannelsDownloadUrls(
+      const channelUrls = getChannelsDownloadUrls(
         baseUrl,
         this.exportChannel,
         dataset,
         location,
       );
+      for (const { url, channel } of channelUrls) {
+        const channelName =
+          dataset.channelNames.get(channel) ?? "Unknown channel";
+        const fileName = `${name} - ${channelName} - ${dataset.name} - ${configuration.name} - ${dateStr}.${extension}`;
+        url.searchParams.set("contentDispositionFilename", fileName);
+        urls.push(url);
+      }
     } else {
-      urls = await getLayersDownloadUrls(
+      const layerUrls = await getLayersDownloadUrls(
         baseUrl,
         this.exportLayer,
         configuration.layers,
         dataset,
         location,
       );
+      for (const { url, layerIds } of layerUrls) {
+        const layerNames = layerIds.map(
+          (layerId) =>
+            configuration.layers.find((layer) => layer.id === layerId)?.name ??
+            "Unknown layer",
+        );
+        const fileName = `${name} - ${layerNames.join(" ")} - ${dataset.name} - ${configuration.name} - ${dateStr}.${extension}`;
+        url.searchParams.set("contentDispositionFilename", fileName);
+        urls.push(url);
+      }
     }
-    try {
-      await this.downloadUrls(urls);
-    } finally {
-      this.downloading = false;
-    }
+
+    return urls;
   }
 
   async downloadUrls(urls: URL[]) {
@@ -683,8 +736,11 @@ export default class Snapshots extends Vue {
       const baseFullFilename =
         url.searchParams.get("contentDispositionFilename") || "snapshot";
       let fileName = baseFullFilename;
+      let pointIdx = Math.max(baseFullFilename.lastIndexOf("."), 0);
+      const baseName = baseFullFilename.slice(0, pointIdx);
+      const extension = baseFullFilename.slice(pointIdx);
       for (let counter = 1; filenames.has(fileName); counter++) {
-        fileName = "(" + counter + ") " + baseFullFilename;
+        fileName = baseName + " (" + counter + ")" + extension;
       }
       filenames.add(fileName);
       // Add file to zip and set its data
