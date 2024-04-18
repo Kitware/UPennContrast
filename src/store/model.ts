@@ -566,6 +566,8 @@ export interface IGeoJSLayerSpec {
   visible?: boolean;
   zIndex?: number;
 
+  // For OSM layers (should move to a different interface):
+  minLevel?: number;
   maxLevel?: number;
   nearestPixel?: boolean | number;
   queue?: IGeoJSFetchQueue;
