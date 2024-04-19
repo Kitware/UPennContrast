@@ -74,6 +74,7 @@ export default class ValueSlider extends Vue {
   @Prop({ default: 0 })
   readonly offset!: number;
 
+  // Will be immediatiely updated by watchValue()
   private internalValue = 0;
 
   get slider() {
@@ -93,11 +94,7 @@ export default class ValueSlider extends Vue {
     this.internalValue = this.value + this.offset;
   }
 
-  mounted() {
-    this.updateInternalValue();
-  }
-
-  @Watch("value")
+  @Watch("value", { immediate: true })
   watchValue() {
     this.updateInternalValue();
   }

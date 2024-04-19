@@ -24,9 +24,13 @@ import {
   IGeoJSMap,
   IGeoJSOsmLayer,
   ICameraInfo,
+  IDownloadParameters,
 } from "@/store/model";
 import { Vue, Component, Prop, Watch } from "vue-property-decorator";
-import { ITileOptionsBands, getBandOption } from "@/store/images";
+import {
+  getBaseURLFromDownloadParameters,
+  getLayersDownloadUrls,
+} from "@/utils/screenshot";
 
 interface ICorner {
   top: boolean;
@@ -131,39 +135,34 @@ export default class ImageViewer extends Vue {
     return this.store.dataset;
   }
 
-  get baseURL() {
-    const anyImage = this.dataset?.anyImage();
-    if (!anyImage) {
-      return null;
+  get urlPromise() {
+    const apiRoot = this.store.api.client.apiRoot;
+    const dataset = this.dataset;
+    const layers = this.store.layers;
+    const anyImage = dataset?.anyImage();
+    const node = this.map?.node();
+    if (!dataset || !layers || !anyImage || !node) {
+      return;
     }
     const itemId = anyImage.item._id;
-    const apiRoot = this.store.api.client.apiRoot;
-    const baseUrl = `${apiRoot}/item/${itemId}/tiles/zxy/{z}/{x}/{y}`;
-    return baseUrl;
-  }
 
-  get urlPromise() {
-    const layers = this.store.layers;
-    const baseUrl = this.baseURL;
-    if (!layers || !baseUrl) {
-      return null;
-    }
+    const params: IDownloadParameters = {
+      encoding: "JPEG",
+      contentDisposition: "inline",
+      contentDispositionFilename: "overview.jpeg",
+      width: 150,
+      height: 150,
+    };
 
-    // Get layer bands: style and frame idx
-    const bands: ITileOptionsBands["bands"] = [];
-    const promises: Promise<any>[] = [];
-    const pushBand = bands.push.bind(bands);
-    layers.forEach((layer) => {
-      if (layer.visible) {
-        promises.push(getBandOption(layer).then(pushBand));
-      }
-    });
+    const baseUrl = getBaseURLFromDownloadParameters(params, itemId, apiRoot);
 
-    // Create URL promise
-    return Promise.all(promises).then(() => {
-      const style = JSON.stringify({ bands });
-      return baseUrl + "?style=" + encodeURIComponent(style);
-    });
+    return getLayersDownloadUrls(
+      baseUrl,
+      "composite",
+      layers,
+      dataset,
+      this.store.currentLocation,
+    ).then((urls) => urls[0].url);
   }
 
   mounted() {

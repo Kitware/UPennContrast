@@ -267,15 +267,26 @@
           </v-col>
         </v-row>
       </v-card-text>
-      <v-card-actions>
-        <v-btn
-          color="primary"
-          @click="getDownload()"
-          :disabled="unroll || downloading"
-        >
-          <v-progress-circular v-if="downloading" indeterminate />
-          Download Snapshot images
-        </v-btn>
+      <v-card-actions class="d-block">
+        <v-progress-circular v-if="downloading" indeterminate />
+        <div class="mb-2">
+          <v-btn
+            color="primary"
+            @click="downloadImagesForCurrentState()"
+            :disabled="unroll || downloading"
+          >
+            Download images for current location
+          </v-btn>
+        </div>
+        <div class="mb-2">
+          <v-btn
+            color="primary"
+            @click="downloadImagesForAllSnapshots()"
+            :disabled="unroll || downloading"
+          >
+            Download images for all Snapshots
+          </v-btn>
+        </div>
       </v-card-actions>
 
       <v-divider />
@@ -320,20 +331,27 @@ import geojs from "geojs";
 import { formatDate } from "@/utils/date";
 import { downloadToClient } from "@/utils/download";
 import {
-  IDownloadParameters,
+  IDatasetLocation,
   IGeoJSAnnotation,
   IGeoJSAnnotationLayer,
+  IGeoJSBounds,
   IGeoJSMap,
-  IImage,
   ISnapshot,
   copyLayerWithoutPrivateAttributes,
 } from "@/store/model";
-import { ITileOptionsBands, getBandOption } from "@/store/images";
 import axios from "axios";
 import { DeflateOptions, Zip, ZipDeflate } from "fflate";
+import girderResources from "@/store/girderResources";
+import {
+  getChannelsDownloadUrls,
+  getDownloadParameters,
+  getLayersDownloadUrls,
+  getBaseURLFromDownloadParameters,
+} from "@/utils/screenshot";
 
 interface ISnapshotItem {
   name: string;
+  datasetName: string;
   key: string;
   record: ISnapshot;
   modified: string;
@@ -368,6 +386,12 @@ export default class Snapshots extends Vue {
     class?: string;
   }[] = [
     { text: "Name", value: "name", sortable: true, class: "text-no-wrap" },
+    {
+      text: "Dataset",
+      value: "datasetName",
+      sortable: true,
+      class: "text-no-wrap",
+    },
     {
       text: "Timestamp",
       value: "modified",
@@ -511,57 +535,6 @@ export default class Snapshots extends Vue {
     return results;
   }
 
-  getBasicDownloadParams() {
-    // Determine fileName
-    const datasetName = store.dataset?.name || "unknown";
-    const configurationName = store.configuration?.name || "unknown";
-    const snapshotName = this.newName ? `-${this.newName}` : "";
-    const dateStr = formatDate(new Date());
-    const extension = this.format === "tiled" ? "tiff" : this.format;
-    // Should be dataset-configuration-snapshot-date
-    const fileName = `${datasetName}-${configurationName}${snapshotName}-${dateStr}.${extension}`;
-
-    let params: IDownloadParameters = {
-      encoding: this.format.toUpperCase(),
-      contentDisposition: "attachment",
-      contentDispositionFilename: fileName,
-      left: this.bboxLeft,
-      top: this.bboxTop,
-      right: this.bboxRight,
-      bottom: this.bboxBottom,
-      width: 0,
-      height: 0,
-    };
-    if (this.format === "jpeg") {
-      if (typeof this.jpegQuality === "string") {
-        this.jpegQuality = parseInt(this.jpegQuality);
-      }
-      params.jpeqQuality = this.jpegQuality;
-    }
-    if (this.format === "tiff") {
-      params.tiffCompression = "raw";
-    }
-
-    params.width = params.right - params.left;
-    params.height = params.bottom - params.top;
-
-    // Maximum 4M pixels per image
-    const nPixels = params.width * params.height;
-    if (nPixels > this.maxPixels) {
-      if (this.downloadMode === "layers") {
-        // Scale the image
-        const scale = Math.sqrt(this.maxPixels / nPixels);
-        params.width = Math.floor(scale * params.width);
-        params.height = Math.floor(scale * params.height);
-      }
-      if (this.downloadMode === "channels") {
-        this.imageTooBigDialog = true;
-        return null;
-      }
-    }
-    return params;
-  }
-
   async screenshotViewport() {
     const map = this.firstMap;
     if (!map) {
@@ -583,177 +556,218 @@ export default class Snapshots extends Vue {
     });
   }
 
-  async getDownload() {
+  async downloadImagesForCurrentState() {
+    const datasetId = this.store.dataset?.id;
+    if (!datasetId) {
+      return;
+    }
+    const location = this.store.currentLocation;
+    const boundingBox = {
+      left: this.bboxLeft,
+      top: this.bboxTop,
+      right: this.bboxRight,
+      bottom: this.bboxBottom,
+    };
+
     this.downloading = true;
-    let urls: URL[] = [];
-    if (this.downloadMode === "layers") {
-      urls = await this.getLayerDownloadURLs();
-    }
-    if (this.downloadMode === "channels") {
-      urls = this.getChannelDownloadURLs();
-    }
-    if (urls.length <= 0) {
-      this.downloading = false;
-      throw "No urls to download";
-    } else if (urls.length === 1) {
-      downloadToClient({ href: urls[0].href });
-      this.downloading = false;
-    } else {
-      // Create and setup a zip object
-      const zip: Zip = new Zip();
-      const zipChunks: Uint8Array[] = [];
-      const zipDone: Promise<Blob> = new Promise((resolve, reject) => {
-        zip.ondata = (err, data, final) => {
-          if (!err) {
-            zipChunks.push(data);
-            if (final) {
-              resolve(new Blob(zipChunks));
-            }
-          } else {
-            reject(err);
-          }
-        };
-      });
-      // Get all the files and add them to the zip
-      const deflateOptions: DeflateOptions = {
-        level: ["jpeg", "png"].includes(this.format) ? 0 : 9,
-      };
-      const filenames = new Set();
-      const filesPushed: Promise<void>[] = [];
-      for (const url of urls) {
-        // Fetch file
-        const getPromise = axios.get(url.href, { responseType: "arraybuffer" });
-        // Create a unique file name
-        const baseFullFilename =
-          url.searchParams.get("contentDispositionFilename") || "snapshot";
-        const lastPointIdx = baseFullFilename.lastIndexOf(".");
-        let baseFileName = baseFullFilename;
-        let baseExtension = "";
-        if (lastPointIdx > 0) {
-          baseFileName = baseFullFilename.slice(0, lastPointIdx);
-          baseExtension = baseFullFilename.slice(lastPointIdx);
-        }
-        let fileName = baseFileName + baseExtension;
-        let counter = 1;
-        while (filenames.has(fileName)) {
-          fileName = baseFileName + " (" + counter + ")" + baseExtension;
-          counter++;
-        }
-        filenames.add(fileName);
-        // Add file to zip
-        const zipFile = new ZipDeflate(fileName, deflateOptions);
-        zip.add(zipFile);
-        filesPushed.push(
-          getPromise.then(({ data }) =>
-            zipFile.push(new Uint8Array(data), true),
-          ),
-        );
+
+    try {
+      const urls = await this.getUrlsForSnapshot(
+        location,
+        boundingBox,
+        datasetId,
+        this.newName,
+      );
+      if (!urls) {
+        return;
       }
-      // Wait for all files to be pushed to end the zip
-      Promise.all(filesPushed).then(zip.end.bind(zip));
-      zipDone
-        .then((blob) => {
-          const dataURL = URL.createObjectURL(blob);
-          const params = {
-            href: dataURL,
-            download: "snapshot.zip",
-          };
-          downloadToClient(params);
-        })
-        .finally(() => (this.downloading = false));
+      await this.downloadUrls(urls);
+    } finally {
+      this.downloading = false;
     }
   }
 
-  getChannelDownloadURLs() {
-    const allChannels = this.store.dataset?.channels;
-    const baseUrl = this.getBaseURL();
-    if (!allChannels || !baseUrl) {
-      return [];
+  async downloadImagesForAllSnapshots() {
+    this.downloading = true;
+
+    try {
+      const allUrls: URL[] = [];
+      for (const snapshot of this.store.configuration?.snapshots || []) {
+        const datasetView = await this.store.api.getDatasetView(
+          snapshot.datasetViewId,
+        );
+        const currentUrls = await this.getUrlsForSnapshot(
+          snapshot,
+          snapshot.screenshot.bbox,
+          datasetView.datasetId,
+          snapshot.name,
+        );
+        if (currentUrls) {
+          allUrls.push(...currentUrls);
+        }
+      }
+      await this.downloadUrls(allUrls);
+    } finally {
+      this.downloading = false;
     }
-    let channelsToDownload = [];
-    if (this.exportChannel === "all") {
-      channelsToDownload = allChannels;
-    } else {
-      channelsToDownload = [this.exportChannel];
+  }
+
+  // We use xy, z, time, screenshot.bbox and name from the snapshot
+  async getUrlsForSnapshot(
+    location: IDatasetLocation,
+    boundingBox: IGeoJSBounds,
+    datasetId: string,
+    name: string,
+  ) {
+    // Get dataset
+    const dataset =
+      store.dataset?.id === datasetId
+        ? store.dataset
+        : await girderResources.getDataset({ id: datasetId });
+    if (!dataset) {
+      return;
     }
+
+    // Get the id of the image for this dataset
+    const anyImage = dataset.anyImage();
+    if (!anyImage) {
+      return;
+    }
+    const itemId = anyImage.item._id;
+
+    // Snapshots always come from the current configuration
+    const configuration = this.store.configuration;
+    if (!configuration) {
+      return;
+    }
+
+    // Get the filename
+    const dateStr = formatDate(new Date());
+    const extension = this.format === "tiled" ? "tiff" : this.format;
+
+    const jpegQuality =
+      typeof this.jpegQuality !== "number"
+        ? Number(this.jpegQuality)
+        : this.jpegQuality;
+    const params = getDownloadParameters(
+      boundingBox,
+      this.format,
+      this.maxPixels,
+      jpegQuality,
+      this.downloadMode,
+    );
+    if (params === null) {
+      // Image is too big
+      this.imageTooBigDialog = true;
+      return;
+    }
+    const apiRoot = store.api.client.apiRoot;
+    const baseUrl = getBaseURLFromDownloadParameters(params, itemId, apiRoot);
+
     const urls: URL[] = [];
-    for (const channel of channelsToDownload) {
-      const url = this.getChannelDownloadURL(baseUrl, channel);
-      if (url) {
+    if (this.downloadMode === "channels") {
+      const channelUrls = getChannelsDownloadUrls(
+        baseUrl,
+        this.exportChannel,
+        dataset,
+        location,
+      );
+      for (const { url, channel } of channelUrls) {
+        const channelName =
+          dataset.channelNames.get(channel) ?? "Unknown channel";
+        const fileName = `${name} - ${channelName} - ${dataset.name} - ${configuration.name} - ${dateStr}.${extension}`;
+        url.searchParams.set("contentDispositionFilename", fileName);
+        urls.push(url);
+      }
+    } else {
+      const layerUrls = await getLayersDownloadUrls(
+        baseUrl,
+        this.exportLayer,
+        configuration.layers,
+        dataset,
+        location,
+      );
+      for (const { url, layerIds } of layerUrls) {
+        const layerNames = layerIds.map(
+          (layerId) =>
+            configuration.layers.find((layer) => layer.id === layerId)?.name ??
+            "Unknown layer",
+        );
+        const fileName = `${name} - ${layerNames.join(" ")} - ${dataset.name} - ${configuration.name} - ${dateStr}.${extension}`;
+        url.searchParams.set("contentDispositionFilename", fileName);
         urls.push(url);
       }
     }
+
     return urls;
   }
 
-  getChannelDownloadURL(baseUrl: URL, channel: number) {
-    const image = this.store.getImagesFromChannel(channel)[0];
-    if (!image) {
-      return null;
-    }
-    const url = new URL(baseUrl);
-    url.searchParams.set("frame", image.frameIndex.toString());
-    return url;
-  }
-
-  async getLayerDownloadURLs() {
-    const layers = this.store.layers;
-    const baseUrl = this.getBaseURL();
-    if (!layers || !baseUrl) {
-      return [];
+  async downloadUrls(urls: URL[]) {
+    if (urls.length <= 0) {
+      return;
     }
 
-    // Get layer bands: style and frame idx
-    const bands: ITileOptionsBands["bands"] = [];
-    const promises: Promise<any>[] = [];
-    const pushBand = bands.push.bind(bands);
-    if (this.exportLayer === "composite" || this.exportLayer === "all") {
-      layers.forEach((layer) => {
-        if (layer.visible || this.exportLayer === "all") {
-          promises.push(getBandOption(layer).then(pushBand));
+    if (urls.length === 1) {
+      downloadToClient({ href: urls[0].href });
+      return;
+    }
+
+    // Create and setup a zip object
+    const zip: Zip = new Zip();
+    const zipChunks: Uint8Array[] = [];
+    const zipDone: Promise<Blob> = new Promise((resolve, reject) => {
+      zip.ondata = (err, data, final) => {
+        if (!err) {
+          zipChunks.push(data);
+          if (final) {
+            resolve(new Blob(zipChunks));
+          }
+        } else {
+          reject(err);
         }
+      };
+    });
+
+    // Get all the files and add them to the zip
+    const deflateOptions: DeflateOptions = {
+      // Don't compress the zip when the files are already compressed
+      level: ["jpeg", "png"].includes(this.format) ? 0 : 9,
+    };
+    const filenames: Set<string> = new Set();
+    const filesPushed = urls.map(async (url) => {
+      // Fetch the file data
+      const { data } = await axios.get(url.href, {
+        responseType: "arraybuffer",
       });
-    } else {
-      const layerId = this.exportLayer;
-      const layer = this.store.getLayerFromId(layerId);
-      if (!layer) {
-        return [];
+      // Create a unique file name
+      const baseFullFilename =
+        url.searchParams.get("contentDispositionFilename") || "snapshot";
+      let fileName = baseFullFilename;
+      let pointIdx = Math.max(baseFullFilename.lastIndexOf("."), 0);
+      const baseName = baseFullFilename.slice(0, pointIdx);
+      const extension = baseFullFilename.slice(pointIdx);
+      for (let counter = 1; filenames.has(fileName); counter++) {
+        fileName = baseName + " (" + counter + ")" + extension;
       }
-      promises.push(getBandOption(layer).then(pushBand));
-    }
-    await Promise.all(promises);
+      filenames.add(fileName);
+      // Add file to zip and set its data
+      const zipFile = new ZipDeflate(fileName, deflateOptions);
+      zip.add(zipFile);
+      zipFile.push(new Uint8Array(data), true);
+    });
 
-    // Return one URL per band or a single URL with all bands
-    if (this.exportLayer === "all") {
-      const urls = [];
-      for (const band of bands) {
-        const url = new URL(baseUrl);
-        const style = JSON.stringify({ bands: [band] });
-        url.searchParams.set("style", style);
-        urls.push(url);
-      }
-      return urls;
-    } else {
-      const url = new URL(baseUrl);
-      const style = JSON.stringify({ bands });
-      url.searchParams.set("style", style);
-      return [url];
-    }
-  }
+    // Wait for all files to be pushed to end the zip
+    await Promise.all(filesPushed);
+    zip.end();
 
-  getBaseURL() {
-    const anyImage: IImage | undefined = this.store.getImagesFromChannel(0)[0];
-    const params = this.getBasicDownloadParams();
-    if (!anyImage || !params) {
-      return null;
-    }
-    const itemId = anyImage.item._id;
-    const apiRoot = this.store.api.client.apiRoot;
-    const baseUrl = new URL(`${apiRoot}/item/${itemId}/tiles/region`);
-    for (const [key, value] of Object.entries(params)) {
-      baseUrl.searchParams.set(key, value);
-    }
-    return baseUrl;
+    // When the zip is ready, download it to the client
+    const blob = await zipDone;
+    const dataURL = URL.createObjectURL(blob);
+    const params = {
+      href: dataURL,
+      download: "snapshot.zip",
+    };
+    downloadToClient(params);
   }
 
   setBoundingBox(left: number, top: number, right: number, bottom: number) {
@@ -778,6 +792,8 @@ export default class Snapshots extends Vue {
       this.showSnapshot(true);
       this.markCurrentArea();
       this.drawBoundingBox();
+    } else {
+      this.showSnapshot(false);
     }
   }
 
@@ -820,6 +836,7 @@ export default class Snapshots extends Vue {
       if (!this.bboxLayer) {
         this.bboxLayer = map.createLayer("annotation", {
           autoshareRenderer: false,
+          showLabels: false,
         });
         this.bboxAnnotation = geojs.annotation.rectangleAnnotation({
           layer: this.bboxLayer,
@@ -981,13 +998,32 @@ export default class Snapshots extends Vue {
           sre.exec(s.description) ||
           s.tags.some((t: string) => sre.exec(t))
         ) {
-          results.push({
+          const item = {
             name: s.name,
+            datasetName: "",
             key: s.name,
             record: s,
             // format the date to string
             modified: formatDate(new Date(s.modified || s.created)),
-          });
+          };
+          results.push(item);
+
+          // Asynchronously fetch the dataset name
+          let datasetViewPromise;
+          if (this.store.datasetView?.id === s.datasetViewId) {
+            datasetViewPromise = Promise.resolve(this.store.datasetView);
+          } else {
+            datasetViewPromise = this.store.api.getDatasetView(s.datasetViewId);
+          }
+          datasetViewPromise
+            .then(({ datasetId }) =>
+              girderResources.getDataset({
+                id: datasetId,
+              }),
+            )
+            .then((dataset) => {
+              Vue.set(item, "datasetName", dataset?.name || "Unknown dataset");
+            });
         }
       });
     }
@@ -1030,6 +1066,12 @@ export default class Snapshots extends Vue {
 
   async loadSnapshot(item: ISnapshotItem) {
     const snapshot = item.record;
+    if (
+      snapshot.datasetViewId &&
+      snapshot.datasetViewId !== this.store.datasetView?.id
+    ) {
+      await this.store.setDatasetViewId(snapshot.datasetViewId);
+    }
     if (this.areCurrentLayersCompatible(snapshot)) {
       await this.store.loadSnapshotLayers(snapshot);
     } else {
@@ -1038,26 +1080,23 @@ export default class Snapshots extends Vue {
     this.newName = snapshot.name || "";
     this.newDescription = snapshot.description || "";
     this.newTags = (snapshot.tags || []).slice();
-    this.format = snapshot.screenshot!.format;
     this.bboxLeft = snapshot.screenshot!.bbox!.left;
     this.bboxTop = snapshot.screenshot!.bbox!.top;
     this.bboxRight = snapshot.screenshot!.bbox!.right;
     this.bboxBottom = snapshot.screenshot!.bbox!.bottom;
 
-    await this.$router
-      .replace({
-        query: {
-          ...this.$route.query,
-          unrollXY: snapshot.unrollXY.toString(),
-          unrollZ: snapshot.unrollZ.toString(),
-          unrollT: snapshot.unrollT.toString(),
-          xy: snapshot.xy.toString(),
-          z: snapshot.z.toString(),
-          time: snapshot.time.toString(),
-          layer: snapshot.layerMode,
-        },
-      })
-      .catch(() => {}); /* catch redundant navigation warnings */
+    await Promise.all([
+      this.store.setXY(snapshot.xy),
+      this.store.setZ(snapshot.z),
+      this.store.setTime(snapshot.time),
+
+      this.store.setUnrollXY(snapshot.unrollXY),
+      this.store.setUnrollZ(snapshot.unrollZ),
+      this.store.setUnrollT(snapshot.unrollT),
+
+      this.store.setConfigurationLayers(snapshot.layers),
+      this.store.setLayerMode(snapshot.layerMode),
+    ]);
 
     const map = this.firstMap;
     if (!map) {
@@ -1110,7 +1149,8 @@ export default class Snapshots extends Vue {
   saveSnapshot(): void {
     this.updateFormValidation();
     const map = this.firstMap;
-    if (!this.isSaveSnapshotValid || !map) {
+    const datasetView = this.store.datasetView;
+    if (!this.isSaveSnapshotValid || !map || !datasetView) {
       return;
     }
     const snapshot: ISnapshot = {
@@ -1118,6 +1158,7 @@ export default class Snapshots extends Vue {
       description: this.newDescription.trim(),
       tags: this.newTags.slice(),
       created: this.currentSnapshot ? this.currentSnapshot.created : Date.now(),
+      datasetViewId: datasetView.id,
       modified: Date.now(),
       viewport: {
         tl: map.displayToGcs({ x: 0, y: 0 }),
@@ -1135,7 +1176,6 @@ export default class Snapshots extends Vue {
       layerMode: store.layerMode,
       layers: store.layers.map(copyLayerWithoutPrivateAttributes),
       screenshot: {
-        format: this.format,
         bbox: {
           left: this.bboxLeft,
           top: this.bboxTop,

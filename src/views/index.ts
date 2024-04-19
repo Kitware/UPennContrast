@@ -1,5 +1,6 @@
 import Home from "./Home.vue";
-import DefaultRouterView from "./DefaultRouterView.vue";
+import DatasetAndConfigurationRouter from "./DatasetAndConfigurationRouter.vue";
+import EmptyRouterView from "./EmptyRouterView.vue";
 import datasetRoutes from "./dataset";
 import configurationRoutes from "./configuration";
 import datasetViewRoutes from "./datasetView";
@@ -18,17 +19,17 @@ const routes: RouteConfig[] = [
   {
     path: "/dataset",
     children: datasetRoutes,
-    component: DefaultRouterView,
+    component: DatasetAndConfigurationRouter,
   },
   {
     path: "/configuration",
     children: configurationRoutes,
-    component: DefaultRouterView,
+    component: DatasetAndConfigurationRouter,
   },
   {
     path: "/datasetView",
     children: datasetViewRoutes,
-    component: DefaultRouterView,
+    component: EmptyRouterView,
   },
   {
     path: "*",

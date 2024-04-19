@@ -219,13 +219,14 @@ export type TLayerMode = "single" | "multiple" | "unroll";
 export interface IDownloadParameters {
   encoding: string;
   contentDisposition: string;
-  contentDispositionFilename: string;
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-  width: number;
-  height: number;
+  contentDispositionFilename?: string;
+  left?: number;
+  top?: number;
+  right?: number;
+  bottom?: number;
+  width?: number;
+  height?: number;
+  magnification?: number;
   jpeqQuality?: number;
   style?: string;
   tiffCompression?: string;
@@ -237,6 +238,7 @@ export interface ISnapshot {
   tags: string[];
   created: any;
   modified: number;
+  datasetViewId: string;
   viewport: {
     tl: any;
     tr: any;
@@ -253,7 +255,6 @@ export interface ISnapshot {
   layerMode: TLayerMode;
   layers: IDisplayLayer[];
   screenshot: {
-    format: string;
     bbox: IGeoJSBounds;
   };
 }
@@ -577,6 +578,8 @@ export interface IGeoJSLayerSpec {
   visible?: boolean;
   zIndex?: number;
 
+  // For OSM layers (should move to a different interface):
+  minLevel?: number;
   maxLevel?: number;
   nearestPixel?: boolean | number;
   queue?: IGeoJSFetchQueue;
@@ -1181,6 +1184,12 @@ export interface IUISetting {
   z: number;
   time: number;
   activeLayer: IDisplayLayer;
+}
+
+export interface IDatasetLocation {
+  xy: number;
+  z: number;
+  time: number;
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.util.html#.pixelCoordinateParams

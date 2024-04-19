@@ -6,6 +6,7 @@ import {
   IDisplaySlice,
   IContrast,
   IImage,
+  IDatasetLocation,
 } from "./model";
 import main from "./index";
 
@@ -78,7 +79,6 @@ export interface ITileOptionsSimple {
 
 export interface ITileOptionsBands {
   bands: { [key: string]: any }[];
-  frame?: number;
 }
 
 export type ITileOptions = ITileOptionsSimple | ITileOptionsBands;
@@ -154,20 +154,33 @@ export function toStyle(
   return style;
 }
 
-// Returns the style of the layer combined with the frame idx for the current dataset
-export async function getBandOption(layer: IDisplayLayer) {
-  const image = (main.getImagesFromLayer(layer)[0] || null) as IImage | null;
-  const histogram = await main.getLayerHistogram(layer);
+export async function getBandOption(
+  dataset: IDataset,
+  layer: IDisplayLayer,
+  location: IDatasetLocation,
+) {
+  // Get the images at the location
+  const { xy, z, time } = location;
+  const indexes = getLayerSliceIndexes(layer, dataset, time, xy, z);
+  let images: IImage[] = [];
+  if (indexes) {
+    const { zIndex, tIndex, xyIndex } = indexes;
+    images = dataset.images(zIndex, tIndex, xyIndex, layer.channel);
+  }
+
+  // Fetch the histogram
+  const histogram = await main.api.getLayerHistogram(images);
+
   const style = toStyle(
     layer.color,
     layer.contrast,
     histogram,
     layer,
-    main.dataset,
-    image,
+    dataset,
+    images[0],
   );
-  if (image) {
-    style.frame = image.frameIndex;
+  if (images[0] && !("bands" in style)) {
+    style.frame = images[0].frameIndex;
   }
   return style;
 }

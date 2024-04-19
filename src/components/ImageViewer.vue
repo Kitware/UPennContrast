@@ -112,7 +112,9 @@
     </v-alert>
     <v-btn
       v-if="submitPendingAnnotation"
-      @click.capture.stop="submitPendingAnnotation(false)"
+      @click.capture.stop="
+        submitPendingAnnotation && submitPendingAnnotation(false)
+      "
       class="cancel-button"
       small
     >
@@ -654,7 +656,12 @@ export default class ImageViewer extends Vue {
   }
 
   setCenter(center: IGeoJSPosition) {
-    this.cameraInfo = { ...this.cameraInfo, center };
+    const map = this.maps[0]?.map;
+    if (!map) {
+      return;
+    }
+    map.center(center);
+    this.synchroniseCameraFromMap(map);
   }
 
   setCorners(evt: any) {
@@ -679,6 +686,7 @@ export default class ImageViewer extends Vue {
     const zoom = map.zoom() - Math.log2(Math.max(scaling.x, scaling.y));
     map.zoom(zoom);
     map.center(center, null);
+    this.synchroniseCameraFromMap(map);
   }
 
   private synchroniseCameraFromMap(map: IGeoJSMap) {
