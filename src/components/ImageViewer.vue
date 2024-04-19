@@ -56,15 +56,8 @@
         @mouseleave.capture="mouseLeave"
       ></div>
     </div>
-    <!--
-      Use `v-show="false"` to hide the minimap
-      The minimap had the same issues as the snapshot with max merge
-      The code of the minimap and the snapshot have been factorized but this introduces a new issue
-      The minimap is not at the right scale anymore (usually too small)
-    -->
     <image-overview
       v-if="overview && !unrolling"
-      v-show="false"
       :parentCameraInfo="cameraInfo"
       @centerChange="setCenter"
       @cornersChange="setCorners"
