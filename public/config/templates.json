@@ -161,12 +161,20 @@
         "meta": {
           "items": [
             {
-              "text": "Add",
-              "value": "add"
+              "text": "Lasso connect",
+              "value": "add_lasso"
             },
             {
-              "text": "Delete",
-              "value": "delete"
+              "text": "Click connect",
+              "value": "add_click"
+            },
+            {
+              "text": "Lasso disconnect",
+              "value": "delete_lasso"
+            },
+            {
+              "text": "Click disconnect",
+              "value": "delete_click"
             }
           ]
         }

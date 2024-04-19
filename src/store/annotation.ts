@@ -488,7 +488,6 @@ export class Annotations extends VuexModule {
     parentIds: string[];
     childIds: string[];
   }) {
-    sync.setSaving(true);
     const parentsSet = new Set(parentIds);
     const childrenSet = new Set(childIds);
     const connectionsToDelete = this.annotationConnections.filter(
@@ -496,14 +495,17 @@ export class Annotations extends VuexModule {
         parentsSet.has(connection.parentId) &&
         childrenSet.has(connection.childId),
     );
-    await this.annotationsAPI.deleteMultipleConnections(
-      connectionsToDelete.map((connection) => connection.id),
-    );
-    this.deleteMultipleConnections(
-      connectionsToDelete.map((connection) => connection.id),
-    );
+    const connectionIds = connectionsToDelete.map(({ id }) => id);
+    return await this.deleteConnections(connectionIds);
+  }
+
+  @Action
+  public async deleteConnections(connectionIds: string[]) {
+    sync.setSaving(true);
+    await this.annotationsAPI.deleteMultipleConnections(connectionIds);
+    this.deleteMultipleConnections(connectionIds);
     sync.setSaving(false);
-    return connectionsToDelete;
+    return connectionIds;
   }
 
   @Action
@@ -513,6 +515,9 @@ export class Annotations extends VuexModule {
     sync.setSaving(true);
     const newConnection: IAnnotationConnection | null =
       await this.annotationsAPI.createConnection(annotationConnectionBase);
+    if (newConnection) {
+      this.addMultipleConnections([newConnection]);
+    }
     sync.setSaving(false);
     return newConnection;
   }
