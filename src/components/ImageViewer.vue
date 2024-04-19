@@ -58,6 +58,7 @@
     </div>
     <image-overview
       v-if="overview && !unrolling"
+      v-show="false"
       :parentCameraInfo="cameraInfo"
       @centerChange="setCenter"
       @cornersChange="setCorners"
