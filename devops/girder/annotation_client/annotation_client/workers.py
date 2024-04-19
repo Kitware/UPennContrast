@@ -166,6 +166,7 @@ class UPennContrastWorkerClient:
         propertyId = self.propertyId
         for datasetId in values:
             for annotationId in values[datasetId]:
+                print("datasetId: {datasetId}, annotationId: {annotationId}, valuesDatasetId: {values[datasetId]}")
                 reformatedValues.append({
                     "datasetId": datasetId,
                     "annotationId": annotationId,
