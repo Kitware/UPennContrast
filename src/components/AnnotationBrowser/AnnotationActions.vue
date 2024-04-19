@@ -55,6 +55,11 @@
             <annotation-export block />
           </v-col>
         </v-row>
+        <v-row>
+          <v-col class="pa-1">
+            <delete-connections block />
+          </v-col>
+        </v-row>
       </v-container>
     </v-expansion-panel-content>
   </v-expansion-panel>
@@ -70,12 +75,14 @@ import filterStore from "@/store/filters";
 import AnnotationCsvDialog from "@/components/AnnotationBrowser/AnnotationCSVDialog.vue";
 import AnnotationExport from "@/components/AnnotationBrowser/AnnotationExport.vue";
 import AnnotationImport from "@/components/AnnotationBrowser/AnnotationImport.vue";
+import DeleteConnections from "@/components/AnnotationBrowser/DeleteConnections.vue";
 
 @Component({
   components: {
     AnnotationCsvDialog,
     AnnotationExport,
     AnnotationImport,
+    DeleteConnections,
   },
 })
 export default class AnnotationActions extends Vue {

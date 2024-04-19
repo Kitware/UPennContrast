@@ -104,7 +104,7 @@ class AnnotationConnection(ProxiedAccessControlledModel):
     query = {
       '_id': { '$in': [ObjectId(stringId) for stringId in connectionStringIds] },
     }
-    self.removeWithQuery(query)
+    return self.removeWithQuery(query)
 
   def update(self, connection):
     return self.save(connection)

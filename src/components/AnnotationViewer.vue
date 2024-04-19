@@ -40,6 +40,7 @@ import {
   SamAnnotationToolStateSymbol,
   TSamPrompt,
   TToolState,
+  ConnectionToolStateSymbol,
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -251,6 +252,17 @@ export default class AnnotationViewer extends Vue {
   get samPrompts(): TSamPrompt[] {
     const prompts = this.samToolState?.nodes.input.mainPrompt.output;
     return prompts === undefined || prompts === NoOutput ? [] : prompts;
+  }
+
+  get toolHighlightedAnnotationIds(): Set<string> {
+    const state = this.selectedToolState;
+    if (
+      state?.type === ConnectionToolStateSymbol &&
+      state.selectedAnnotationId
+    ) {
+      return new Set([state.selectedAnnotationId]);
+    }
+    return new Set();
   }
 
   get pendingStoreAnnotation(): IAnnotation | null {
@@ -535,7 +547,10 @@ export default class AnnotationViewer extends Vue {
     layerColor?: string,
     annotationColor?: string,
   ) {
-    const hovered = annotationId === this.hoveredAnnotationId;
+    // Use "hover" style for annotations selected by a tool
+    const hovered =
+      annotationId === this.hoveredAnnotationId ||
+      this.toolHighlightedAnnotationIds.has(annotationId);
     const selected = this.isAnnotationSelected(annotationId);
     return getAnnotationStyleFromBaseStyle(
       this.baseStyle,
@@ -1264,20 +1279,74 @@ export default class AnnotationViewer extends Vue {
     const parentIds = parents.map((a) => a.id);
     const childIds = children.map((a) => a.id);
 
-    if (this.selectedToolConfiguration.values.action.value === "add") {
-      // Add all connections between a parent and a child
-      await this.annotationStore.createAllConnections({
-        parentIds,
-        childIds,
-        label: this.selectedToolConfiguration.name,
-        tags: [...parentTemplate.tags, ...childTemplate.tags],
-      });
+    // Can be add_click, add_lasso, delete_lasso, delete_click
+    const action = this.selectedToolConfiguration.values.action.value;
+    const addAction = action.startsWith("add");
+    const clickAction = action.endsWith("click");
+    const clickedAnnotation = selectedAnnotations[0];
+
+    if (addAction) {
+      if (clickAction) {
+        // Select an annotation or connect to selected annotation
+        if (
+          clickedAnnotation &&
+          this.selectedToolState?.type === ConnectionToolStateSymbol &&
+          this.selectedToolState.selectedAnnotationId
+        ) {
+          // Connect to selected
+          this.annotationStore.createConnection({
+            parentId: this.selectedToolState.selectedAnnotationId,
+            childId: clickedAnnotation.id,
+            datasetId,
+            label: this.selectedToolConfiguration.name,
+            tags: [...parentTemplate.tags, ...childTemplate.tags],
+          });
+        }
+      } else {
+        // Add all connections between a parent and a child
+        await this.annotationStore.createAllConnections({
+          parentIds,
+          childIds,
+          label: this.selectedToolConfiguration.name,
+          tags: [...parentTemplate.tags, ...childTemplate.tags],
+        });
+      }
     } else {
-      // Delete any connection between a parent and a child
-      await this.annotationStore.deleteAllConnections({
-        parentIds,
-        childIds,
-      });
+      if (clickAction) {
+        // Select an annotation or connect to selected annotation
+        if (
+          clickedAnnotation &&
+          this.selectedToolState?.type === ConnectionToolStateSymbol &&
+          this.selectedToolState.selectedAnnotationId
+        ) {
+          // Disconnect from selected
+          const firstId = this.selectedToolState.selectedAnnotationId;
+          const secondId = clickedAnnotation.id;
+          this.annotationStore.deleteAllConnections({
+            childIds: [firstId, secondId],
+            parentIds: [firstId, secondId],
+          });
+        }
+      } else {
+        // Delete any connection between a parent and a child
+        await this.annotationStore.deleteAllConnections({
+          parentIds,
+          childIds,
+        });
+      }
+    }
+
+    // Reset or set the selected annotation id in the tool state
+    if (
+      clickAction &&
+      this.selectedToolState?.type === ConnectionToolStateSymbol
+    ) {
+      const selectedId = this.selectedToolState.selectedAnnotationId;
+      Vue.set(
+        this.selectedToolState,
+        "selectedAnnotationId",
+        selectedId || !clickedAnnotation ? null : clickedAnnotation.id,
+      );
     }
 
     // Remove the selection annotation from layer (do not show the annotation used to select)
@@ -1481,7 +1550,13 @@ export default class AnnotationViewer extends Vue {
         // TODO: for now with just a compute button, but later previews, custom forms served from the started worker ?
         break;
       case "connection":
-        this.annotationLayer.mode("polygon");
+        if (
+          this.selectedToolConfiguration.values.action.value.endsWith("click")
+        ) {
+          this.annotationLayer.mode("point");
+        } else {
+          this.annotationLayer.mode("polygon");
+        }
         break;
       case "select":
         const selectionType =
@@ -1598,6 +1673,7 @@ export default class AnnotationViewer extends Vue {
 
   @Watch("baseStyle")
   @Watch("layers")
+  @Watch("toolHighlightedAnnotationIds")
   onRestyleNeeded() {
     this.restyleAnnotations();
   }

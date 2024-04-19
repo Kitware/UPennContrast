@@ -105,7 +105,7 @@ class AnnotationConnection(Resource):
     def deleteMultiple(self, params, *args, **kwargs):
         bodyJson = kwargs["memoizedBodyJson"]
         stringIds = [stringId for stringId in bodyJson]
-        self._connectionModel.deleteMultiple(stringIds)
+        return self._connectionModel.deleteMultiple(stringIds)
 
     @describeRoute(Description("Update an existing connection")
                    .param('id', 'The ID of the connection.', paramType='path')

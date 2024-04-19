@@ -46,6 +46,7 @@ import {
   TToolState,
   ICameraInfo,
   IDatasetLocation,
+  ConnectionToolStateSymbol,
 } from "./model";
 
 import persister from "./Persister";
@@ -312,6 +313,12 @@ export class Main extends VuexModule {
           state = createSamToolStateFromToolConfiguration(
             configuration as IToolConfiguration<"samAnnotation">,
           );
+          break;
+        case "connection":
+          state = {
+            type: ConnectionToolStateSymbol,
+            selectedAnnotationId: null,
+          };
           break;
         default:
           state = { type: BaseToolStateSymbol };
