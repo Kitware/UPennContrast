@@ -515,6 +515,9 @@ export class Annotations extends VuexModule {
     sync.setSaving(true);
     const newConnection: IAnnotationConnection | null =
       await this.annotationsAPI.createConnection(annotationConnectionBase);
+    if (newConnection) {
+      this.addMultipleConnections([newConnection]);
+    }
     sync.setSaving(false);
     return newConnection;
   }
