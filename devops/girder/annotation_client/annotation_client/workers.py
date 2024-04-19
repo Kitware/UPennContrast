@@ -1,7 +1,6 @@
 import annotation_client.annotations as annotations
 import annotation_client.tiles as tiles
 import girder_client
-import numpy as np
 import urllib
 
 PATHS = {
@@ -124,10 +123,54 @@ class UPennContrastWorkerClient:
         property_values = {self.propertyId: values}
         self.annotationClient.addAnnotationPropertyValues(self.datasetId, annotation['_id'], property_values)
 
-    def add_multiple_annotation_property_values(self, annotation_property_list):
+    def add_multiple_annotation_property_values(self, values):
         """
         Add a list of property values to the annotations
-        :param list annotation_property_list: A list of dictionaries with items "datasetId", "annotationId", "values": { [propertyId: string]: recursive_dict_of_numbers }
+        :param list values: A dict that links a dataset ID to a dict containing a value for each annotation ID
+        Example of valid values:
+        ```
+        {
+            "myDatasetId": {
+                "myAnnotationId": 42,
+                "anotherAnnotationId": 84,
+            },
+            "anotherDatasetId": {
+                "lastAnnotationId": { "x": 0, "y": 1 },
+            }
+        }
+        ```
         """
-        self.annotationClient.addMultipleAnnotationPropertyValues(annotation_property_list)
-
+        # Convert the values to the following format
+        """
+        ```
+        [
+            {
+                'datasetId': 'myDatasetId',
+                'annotationId': 'myAnnotationId',
+                'values': { self.propertyId: 42 },
+            },
+            {
+                'datasetId': 'myDatasetId',
+                'annotationId': 'anotherAnnotationId',
+                'values': { self.propertyId: 84 },
+            },
+            {
+                'datasetId': 'anotherDatasetId',
+                'annotationId': 'lastAnnotationId',
+                'values': { self.propertyId: {'x': 0, 'y': 1} },
+            },
+        ]
+        ```
+        """
+        reformatedValues = []
+        propertyId = self.propertyId
+        for datasetId in values:
+            for annotationId in values[datasetId]:
+                reformatedValues.append({
+                    "datasetId": datasetId,
+                    "annotationId": annotationId,
+                    "values": {
+                        propertyId: values[datasetId][annotationId]
+                    },
+                })
+        self.annotationClient.addMultipleAnnotationPropertyValues(reformatedValues)
