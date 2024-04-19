@@ -351,6 +351,7 @@ import {
 
 interface ISnapshotItem {
   name: string;
+  datasetName: string;
   key: string;
   record: ISnapshot;
   modified: string;
@@ -385,6 +386,12 @@ export default class Snapshots extends Vue {
     class?: string;
   }[] = [
     { text: "Name", value: "name", sortable: true, class: "text-no-wrap" },
+    {
+      text: "Dataset",
+      value: "datasetName",
+      sortable: true,
+      class: "text-no-wrap",
+    },
     {
       text: "Timestamp",
       value: "modified",
@@ -991,13 +998,32 @@ export default class Snapshots extends Vue {
           sre.exec(s.description) ||
           s.tags.some((t: string) => sre.exec(t))
         ) {
-          results.push({
+          const item = {
             name: s.name,
+            datasetName: "",
             key: s.name,
             record: s,
             // format the date to string
             modified: formatDate(new Date(s.modified || s.created)),
-          });
+          };
+          results.push(item);
+
+          // Asynchronously fetch the dataset name
+          let datasetViewPromise;
+          if (this.store.datasetView?.id === s.datasetViewId) {
+            datasetViewPromise = Promise.resolve(this.store.datasetView);
+          } else {
+            datasetViewPromise = this.store.api.getDatasetView(s.datasetViewId);
+          }
+          datasetViewPromise
+            .then(({ datasetId }) =>
+              girderResources.getDataset({
+                id: datasetId,
+              }),
+            )
+            .then((dataset) => {
+              Vue.set(item, "datasetName", dataset?.name || "Unknown dataset");
+            });
         }
       });
     }
