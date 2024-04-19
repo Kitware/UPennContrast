@@ -140,6 +140,17 @@ export interface ISamAnnotationToolState {
   livePreview: IGeoJSPosition[] | null;
 }
 
+export const ConnectionToolStateSymbol: unique symbol = Symbol(
+  "ConnectionToolState",
+);
+
+export type TConnectionToolStateSymbol = typeof ConnectionToolStateSymbol;
+
+export interface IConnectionToolState {
+  type: TConnectionToolStateSymbol;
+  selectedAnnotationId: null | string;
+}
+
 export interface IMouseState {
   isMouseMovePreviewState: boolean;
   mapEntry: IMapEntry;
@@ -159,6 +170,7 @@ export interface IErrorToolState {
 
 interface IExplicitToolStateMap {
   samAnnotation: ISamAnnotationToolState | IErrorToolState;
+  connection: IConnectionToolState;
 }
 
 type TFullToolStateMap = {
