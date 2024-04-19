@@ -1094,6 +1094,7 @@ export default class Snapshots extends Vue {
       this.store.setUnrollZ(snapshot.unrollZ),
       this.store.setUnrollT(snapshot.unrollT),
 
+      this.store.setConfigurationLayers(snapshot.layers),
       this.store.setLayerMode(snapshot.layerMode),
     ]);
 
