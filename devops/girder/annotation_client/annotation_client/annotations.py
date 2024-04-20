@@ -12,6 +12,7 @@ PATHS = {
     'connect_to_nearest': '/annotation_connection/connectTo/',
 
     'add_property_values': '/annotation_property_values?datasetId={datasetId}&annotationId={annotationId}',
+    'add_multiple_property_values': '/annotation_property_values/multiple',
     'get_dataset_properties': '/annotation_property_values?datasetId={datasetId}',
     'get_annotation_properties': '/annotation_property_values?datasetId={datasetId}&annotationId={annotationId}',
     'histogram': '/annotation_property_values/histogram?propertyPath={propertyPath}&datasetId={datasetId}&buckets={buckets}'
@@ -216,11 +217,20 @@ class UPennContrastAnnotationClient:
     def addAnnotationPropertyValues(self, datasetId, annotationId, values):
         """
           Save one or multiple computed property values for the specified annotation
+          The recursive_dict_of_numbers can be (and usually is) just a number
           :param str datasetId: The dataset id
           :param str annotationId: The annotation id
-          :param dict values: A dict of values - { [propertyId]: number | Map<string, number> }
+          :param dict values: A dict of values - { [propertyId]: recursive_dict_of_numbers }
         """
         return self.client.post(PATHS['add_property_values'].format(datasetId=datasetId, annotationId=annotationId), json=values)
+
+    def addMultipleAnnotationPropertyValues(self, entries):
+        """
+          Save one or multiple computed property values for the specified annotations
+          The recursive_dict_of_numbers can be (and usually is) just a number
+          :param list entries: A list of property values for an annotation. Each entry is of type { "datasetId": string, "annotationId": string, "values": { [propertyId: string]: recursive_dict_of_numbers } }
+        """
+        return self.client.post(PATHS['add_multiple_property_values'], json=entries)
 
     def getPropertyHistogram(self, propertyPath, datasetId, buckets=255):
         """
