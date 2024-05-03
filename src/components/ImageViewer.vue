@@ -900,6 +900,14 @@ export default class ImageViewer extends Vue {
         tickLength: 0,
         position: { bottom: 20, right: 10 },
       });
+      uiLayer.createWidget("scale", {
+        scale: 1,
+        strokeWidth: 5,
+        tickLength: 0,
+        position: { bottom: 50, right: 10 },
+        units: [{ unit: "px", scale: 1 }],
+        orientation: "top",
+      });
       const svgElement = this.scaleWidget.parentCanvas()
         .firstChild as SVGElement;
       svgElement.classList.add("scale-widget");
