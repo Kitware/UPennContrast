@@ -103,6 +103,7 @@ class Annotation(ProxiedAccessControlledModel):
     # Cleaning the database when annotations are removed is done by a custom event: model.upenn_annotation.removeStringIds
     events.bind('model.upenn_annotation.remove', 'upenn.connections.annotationRemovedEvent', self.annotationRemovedEvent)
     events.bind('model.upenn_annotation.removeMultiple', 'upenn.connections.multipleAnnotationsRemovedEvent', self.multipleAnnotationsRemovedEvent)
+    self.ensureIndices(['datasetId'])
 
   def cleanOrphaned(self, event):
     if event.info and event.info['_id']:
