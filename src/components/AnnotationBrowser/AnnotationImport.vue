@@ -212,17 +212,17 @@ export default class AnnotationImport extends Vue {
       const annotationBaseList: IAnnotationBase[] = [];
       for (let arrayIdx = 0; arrayIdx < this.annotations.length; arrayIdx++) {
         const oldAnnotation = this.annotations[arrayIdx];
-        const newAnnotation = {
+        const newAnnotation: IAnnotationBase = {
           tags: oldAnnotation.tags,
           shape: oldAnnotation.shape,
           channel: oldAnnotation.channel,
           location: oldAnnotation.location,
           coordinates: oldAnnotation.coordinates,
           datasetId: this.store.dataset!.id,
-        } as IAnnotationBase;
+        };
 
         // Check if the 'color' property exists in the old annotation and add it to the new annotation
-        if ("color" in oldAnnotation) {
+        if (oldAnnotation.color) {
           newAnnotation.color = oldAnnotation.color;
         }
 
