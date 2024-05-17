@@ -136,31 +136,34 @@ export default class ImageViewer extends Vue {
   }
 
   get urlPromise() {
-    const apiRoot = this.store.api.client.apiRoot;
-    const dataset = this.dataset;
-    const layers = this.store.layers;
-    const anyImage = dataset?.anyImage();
-    const node = this.map?.node();
-    if (!dataset || !layers || !anyImage || !node) {
+    if (!this.dataset || !this.map) {
       return;
     }
-    const itemId = anyImage.item._id;
 
+    const anyImage = this.dataset.anyImage();
+    if (!anyImage) {
+      return;
+    }
+
+    // Always use level 0
+    const unitsPerPixel = this.map.unitsPerPixel(0);
     const params: IDownloadParameters = {
       encoding: "JPEG",
       contentDisposition: "inline",
       contentDispositionFilename: "overview.jpeg",
-      width: 150,
-      height: 150,
+      width: Math.round(anyImage.sizeX / unitsPerPixel),
+      height: Math.round(anyImage.sizeY / unitsPerPixel),
     };
-
+    const itemId = anyImage.item._id;
+    const apiRoot = this.store.api.client.apiRoot;
     const baseUrl = getBaseURLFromDownloadParameters(params, itemId, apiRoot);
 
+    const layers = this.store.layers;
     return getLayersDownloadUrls(
       baseUrl,
       "composite",
       layers,
-      dataset,
+      this.dataset,
       this.store.currentLocation,
     ).then((urls) => urls[0].url);
   }
@@ -229,6 +232,8 @@ export default class ImageViewer extends Vue {
     }
 
     params.layer.autoshareRenderer = false;
+    // Always use level 0
+    params.layer.tileRounding = () => 0;
     this.osmLayer = this.map.createLayer("osm", params.layer);
     this.featureLayer = this.map.createLayer("feature", {
       features: ["polygon"],
@@ -301,7 +306,9 @@ export default class ImageViewer extends Vue {
   onParentPan() {
     if (this.map && this.parentCameraInfo.rotate !== this.map.rotation()) {
       this.map.rotation(this.parentCameraInfo.rotate);
-      this.map.zoom(this.map.zoom() - 1);
+      // Always use the smallest zoom possible
+      // It will be clamped automatically
+      this.map.zoom(-Infinity);
     }
     this.outlineFeature?.data([this.parentCameraInfo.gcsBounds]).draw();
   }

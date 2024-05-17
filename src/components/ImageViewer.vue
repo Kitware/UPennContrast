@@ -893,7 +893,7 @@ export default class ImageViewer extends Vue {
       }
       this.scaleWidget = null;
     }
-    if (!this.scaleWidget && this.showScalebar) {
+    if (!this.scaleWidget && this.showScalebar && pixelSizeM > 0) {
       this.scaleWidget = uiLayer.createWidget("scale", {
         scale: pixelSizeM,
         strokeWidth: 5,
