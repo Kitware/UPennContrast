@@ -23,7 +23,7 @@ export default defineConfig({
       resolvers: [VuetifyResolver()],
       // Don't exclude girder web components
       exclude: [
-        /[\\/]node_modules[\\/](?!@girder[\\/]components[\\/])/,
+        /[\\/]node_modules[\\/](?!(@girder[\\/]components[\\/]|\.pnpm[\\/]@girder.*))/,
         /[\\/]\.git[\\/]/,
         /[\\/]\.nuxt[\\/]/,
       ],

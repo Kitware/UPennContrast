@@ -1,7 +1,7 @@
 // Desc: Unit tests for parserModule.ts
 // Tests are written using vitest
 // To run the vitest tests, run the following commands in the terminal:
-// npm run build && npm run test
+// pnpm build && pnpm test
 // This runs 3 different filename patterns: filenames1, filenames2, filenames3
 // The expected output for each pattern is stored in expectedOutput1, expectedOutput2, expectedOutput3
 // filenames1 and filenames2 are small enough to be stored in this file

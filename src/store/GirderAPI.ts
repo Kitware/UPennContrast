@@ -596,7 +596,12 @@ export default class GirderAPI {
     };
     const response = await this.client.get("job", {
       params,
-      paramsSerializer: stringify, // function from qs
+      paramsSerializer: (obj, options) =>
+        stringify(obj, {
+          ...options,
+          encoder: options?.encode,
+          encode: !!options?.encode,
+        }), // function from qs
     });
     return response.data;
   }
