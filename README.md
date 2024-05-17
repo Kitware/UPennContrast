@@ -6,43 +6,39 @@
 
 This [this git book](https://arjun-raj-lab.gitbook.io/nimbusimage) for documentation.
 
-## Project setup
-
-```
-npm install
-```
-
 ## Development environment
 
 Clone the repo and install node modules:
+
 ```sh
 git clone https://github.com/Kitware/UPennContrast.git
 cd UPennContrast
-npm install
+pnpm install
 ```
 
 Compile C++ code to wasm with this command:
+
 ```sh
-npm run emscripten-build
+pnpm emscripten-build
 ```
 
-This will run the command `npm run emscripten-build:release`.
-You can also run `npm run emscripten-build:debug` to build with debug symbols.
+This will run the command `pnpm emscripten-build:release`.
+You can also run `pnpm emscripten-build:debug` to build with debug symbols.
 
 Start docker images and run the server:
+
 ```sh
 docker-compose up -d
-npm run dev
+pnpm dev
 ```
 
 To setup an environment for native C++ development for ITK, see [`itk/README.md`](./itk/README.md).
 
 For technical documentation about tools, see [`TOOLS.md`](./TOOLS.md).
 
-
 ### Girder Defaults
 
-By default, a admin user will be created with the name `admin` and the password `password`.  To use a different admin user, register a new user, log in as the `admin` user and make the new user an admin, then delete the original `admin` user.
+By default, a admin user will be created with the name `admin` and the password `password`. To use a different admin user, register a new user, log in as the `admin` user and make the new user an admin, then delete the original `admin` user.
 
 A default assetstore is also created.
 
@@ -58,8 +54,9 @@ The users that already opened the app once will have the field "Girder Domain" f
 ### Compiles and minifies for production
 
 To compile for production, run this command:
+
 ```
-npm run build
+pnpm build
 ```
 
 It will also produce a `stats.html` file at the root of the project.
@@ -69,19 +66,19 @@ You can change the generated file by playing with the options of the plugin in `
 If you want to preview the production build:
 
 ```
-npm run serve
+pnpm serve
 ```
 
 ### Lints and fixes files
 
 ```
-npm run lint:fix
+pnpm lint:fix
 ```
 
 ### Run typescript compiler
 
 ```
-npm run tsc
+pnpm tsc
 ```
 
 ### Customize configuration
