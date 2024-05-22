@@ -1,0 +1,23 @@
+name: Lint python
+
+on:
+  push:
+    paths:
+      - devops/girder/**
+  pull_request:
+    paths:
+      - devops/girder/**
+
+jobs:
+  all:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: flake8 Lint
+        uses: py-actions/flake8@v2

@@ -11,27 +11,19 @@ from girder.models.folder import Folder
 
 class PreviewSchema:
     previewSchema = {
-        '$schema': 'http://json-schema.org/schema#',
-        'id': '/girder/plugins/upenncontrast_annotation/models/workerPreviews',
-        'type': 'object',
-        'properties': {
-            'name': {
-                'type': 'string'
+        "$schema": "http://json-schema.org/schema#",
+        "id": "/girder/plugins/upenncontrast_annotation/models/workerPreviews",
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "image": {"type": "string"},
+            "preview": {
+                "type": "object",
+                "properties": {
+                    "image": {"type": "string"},
+                    "preview": {"type": "object"},
+                },
             },
-            'image': {
-                'type': 'string'
-            },
-            'preview': {
-                'type': 'object',
-                'properties': {
-                    'image': {
-                        'type': 'string'
-                    },
-                    'preview': {
-                        'type': 'object'
-                    }
-                }
-            }
         },
         # 'additionalProperties': False
     }
@@ -39,9 +31,7 @@ class PreviewSchema:
 
 class WorkerPreviewModel(ProxiedAccessControlledModel):
 
-    validator = jsonschema.Draft4Validator(
-        PreviewSchema.previewSchema
-    )
+    validator = jsonschema.Draft4Validator(PreviewSchema.previewSchema)
 
     def initialize(self):
         self.name = "worker_preview"
@@ -54,9 +44,10 @@ class WorkerPreviewModel(ProxiedAccessControlledModel):
         return document
 
     def create(self, creator, image, preview):
-        created = {'image': image, 'preview': preview}
-        self.setUserAccess(created, user=creator,
-                           level=AccessType.ADMIN, save=False)
+        created = {"image": image, "preview": preview}
+        self.setUserAccess(
+            created, user=creator, level=AccessType.ADMIN, save=False
+        )
         return self.save(created)
 
     def delete(self, image):
@@ -66,17 +57,18 @@ class WorkerPreviewModel(ProxiedAccessControlledModel):
         existing = self.getImagePreview(image)
         if existing is None:
             return self.create(creator, image, preview)
-        existing['preview'] = preview
+        existing["preview"] = preview
         return self.save(existing)
 
     def getImagePreview(self, image):
-        query = {'image': image}
+        query = {"image": image}
         return self.findOne(query)
 
     def requestPreviewUpdate(self, image, datasetId, parameters, user):
         dataset = Folder().load(datasetId, user=user, level=AccessType.WRITE)
         if not dataset:
             raise RestException(
-                code=500, message="Invalid dataset id in annotation")
+                code=500, message="Invalid dataset id in annotation"
+            )
 
-        return runJobRequest(image, datasetId, parameters, 'preview')
+        return runJobRequest(image, datasetId, parameters, "preview")

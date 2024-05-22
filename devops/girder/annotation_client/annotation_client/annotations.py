@@ -1,28 +1,43 @@
 import girder_client
 
 PATHS = {
-    'annotation': '/upenn_annotation/',
-    'multiple_annotations': '/upenn_annotation/multiple',
-    'annotation_by_id': '/upenn_annotation/{annotationId}',
-    'annotation_by_dataset': '/upenn_annotation?datasetId={datasetId}',
-
-    'connection': '/annotation_connection/',
-    'multiple_connections': '/annotation_connection/multiple',
-    'connection_by_id': '/annotation_connection/{connectionId}',
-    'connect_to_nearest': '/annotation_connection/connectTo/',
-
-    'add_property_values': '/annotation_property_values?datasetId={datasetId}&annotationId={annotationId}',
-    'add_multiple_property_values': '/annotation_property_values/multiple',
-    'get_dataset_properties': '/annotation_property_values?datasetId={datasetId}',
-    'get_annotation_properties': '/annotation_property_values?datasetId={datasetId}&annotationId={annotationId}',
-    'histogram': '/annotation_property_values/histogram?propertyPath={propertyPath}&datasetId={datasetId}&buckets={buckets}'
+    "annotation": "/upenn_annotation/",
+    "multiple_annotations": "/upenn_annotation/multiple",
+    "annotation_by_id": "/upenn_annotation/{annotationId}",
+    "annotation_by_dataset": "/upenn_annotation?datasetId={datasetId}",
+    "connection": "/annotation_connection/",
+    "multiple_connections": "/annotation_connection/multiple",
+    "connection_by_id": "/annotation_connection/{connectionId}",
+    "connect_to_nearest": "/annotation_connection/connectTo/",
+    "add_property_values": (
+        "/annotation_property_values"
+        "?datasetId={datasetId}"
+        "&annotationId={annotationId}"
+    ),
+    "add_multiple_property_values": "/annotation_property_values/multiple",
+    "get_dataset_properties": (
+        "/annotation_property_values" "?datasetId={datasetId}"
+    ),
+    "get_annotation_properties": (
+        "/annotation_property_values"
+        "?datasetId={datasetId}"
+        "&annotationId={annotationId}"
+    ),
+    "histogram": (
+        "/annotation_property_values/histogram"
+        "?propertyPath={propertyPath}"
+        "&datasetId={datasetId}"
+        "&buckets={buckets}"
+    ),
 }
 
 
 class UPennContrastAnnotationClient:
     """
-    Helper class to exchange annotation related information from a remote UPennContrast girder instance.
-    Most methods simply send a translated request to the girder API and return the result. No particular checks are done.
+    Helper class to exchange annotation related information from a remote
+    UPennContrast girder instance.
+    Most methods simply send a translated request to the girder API and return
+    the result. No particular checks are done.
     """
 
     def __init__(self, apiUrl, token):
@@ -38,7 +53,9 @@ class UPennContrastAnnotationClient:
 
     # Annotations
 
-    def getAnnotationsByDatasetId(self, datasetId, shape=None, tags=None, limit=1_000_000, offset=0):
+    def getAnnotationsByDatasetId(
+        self, datasetId, shape=None, tags=None, limit=1_000_000, offset=0
+    ):
         """
         Get the list of all annotations in the specified dataset
 
@@ -46,13 +63,13 @@ class UPennContrastAnnotationClient:
         :param str shape: optional filter by shape
         :return: A list of annotations
         """
-        url = PATHS['annotation_by_dataset'].format(datasetId=datasetId)
+        url = PATHS["annotation_by_dataset"].format(datasetId=datasetId)
 
-        url = f'{url}&limit={limit}&offset{offset}'
+        url = f"{url}&limit={limit}&offset{offset}"
         if shape:
-            url = f'{url}&shape={shape}'
+            url = f"{url}&shape={shape}"
         if tags:
-            url = f'{url}&tags={tags}'
+            url = f"{url}&tags={tags}"
 
         return self.client.get(url)
 
@@ -64,98 +81,135 @@ class UPennContrastAnnotationClient:
         :return: The annotation dict
         :rtype: dict
         """
-        return self.client.get(PATHS['annotation_by_id'].format(annotationId=annotationId))
+        return self.client.get(
+            PATHS["annotation_by_id"].format(annotationId=annotationId)
+        )
 
     def createAnnotation(self, annotation):
         """
         Create an annotation with the specified metadata.
-        The annotation data should match the standard UPennContrast annotation schema
-        Note: you can add an additional 'properties' field to the annotation to directly specify property values.
-        The 'properties' field will be extracted and added to the property values in the database.
+        The annotation data should match the standard UPennContrast annotation
+        schema
+        Note: you can add an additional 'properties' field to the annotation
+        to directly specify property values.
+        The 'properties' field will be extracted and added to the property
+        values in the database.
 
         :param dict annotation: The annotation metadata
-        :return: The created annotation object (Note: will contain the _id field)
+        :return: The created annotation object (Note: will contain the _id
+            field)
         :rtype: dict
         """
-        return self.client.post(PATHS['annotation'], json=annotation)
+        return self.client.post(PATHS["annotation"], json=annotation)
 
     def createMultipleAnnotations(self, annotations):
         """
         Create multiple annotations with the specified metadata.
-        The annotations data should match the standard UPennContrast annotation schema
-        Note: you can add an additional 'properties' field to the annotation to directly specify property values.
-        The 'properties' field will be extracted and added to the property values in the database.
+        The annotations data should match the standard UPennContrast
+        annotation schema
+        Note: you can add an additional 'properties' field to the annotation
+        to directly specify property values.
+        The 'properties' field will be extracted and added to the property
+        values in the database.
 
         :param list annotations: The list of annotations metadata
-        :return: The created annotation object (Note: will contain the _id field)
+        :return: The created annotation object (Note: will contain the _id
+            field)
         :rtype: dict
         """
-        return self.client.post(PATHS['multiple_annotations'], json=annotations)
-    
+        return self.client.post(
+            PATHS["multiple_annotations"], json=annotations
+        )
+
     def createMultipleConnections(self, connections):
         """
         Create multiple connections with the specified metadata.
-        The connections data should match the standard UPennContrast connection schema
+        The connections data should match the standard UPennContrast
+        connection schema
 
         :param list connections: The list of connections metadata
-        :return: The created connection object (Note: will contain the _id field)
+        :return: The created connection object (Note: will contain the _id
+            field)
         :rtype: dict
         """
-        return self.client.post(PATHS['multiple_connections'], json=connections)
+        return self.client.post(
+            PATHS["multiple_connections"], json=connections
+        )
 
     def updateAnnotation(self, annotationId, annotation):
         """
         Update an annotation with the specified metadata.
-        The annotation data should match the standard UPennContrast annotation schema
-        Note: you can add an additional 'properties' field to the annotation to directly specify property values.
-        The 'properties' field will be extracted and added to the property values in the database.
+        The annotation data should match the standard UPennContrast annotation
+        schema
+        Note: you can add an additional 'properties' field to the annotation
+        to directly specify property values.
+        The 'properties' field will be extracted and added to the property
+        values in the database.
 
         :param str annotationId: The annotation id
         :param dict annotation: The annotation metadata
         :return: The updated annotation object
         :rtype: dict
         """
-        return self.client.put(PATHS['annotation_by_id'].format(annotationId=annotationId), json=annotation)
+        return self.client.put(
+            PATHS["annotation_by_id"].format(annotationId=annotationId),
+            json=annotation,
+        )
 
     def deleteAnnotation(self, annotationId):
         """
         Delete an annotation by its id
         :param str annotationId: The annotation's id
         """
-        return self.client.delete(PATHS['annotation_by_id'].format(annotationId=annotationId))
+        return self.client.delete(
+            PATHS["annotation_by_id"].format(annotationId=annotationId)
+        )
 
     # Connections
-    def getAnnotationConnections(self, datasetId=None, childId=None, parentId=None, nodeId=None, limit=50, offset=0):
+    def getAnnotationConnections(
+        self,
+        datasetId=None,
+        childId=None,
+        parentId=None,
+        nodeId=None,
+        limit=50,
+        offset=0,
+    ):
         """
         Search for annotation connections with various parameters
 
         :param str datasetId: The dataset to which connections should belong
-        :param str childId: Id of the annotation to which connections should point
-        :param str parentId: Id of the annotation from which connections should point
-        :param str nodeId: Id of the annotation that should be either a child or parent in the desired connections
+        :param str childId: Id of the annotation to which connections should
+            point
+        :param str parentId: Id of the annotation from which connections
+            should point
+        :param str nodeId: Id of the annotation that should be either a child
+            or parent in the desired connections
         :return: The resulting list of connections
         :rtype: list
         """
-        query = '?'
+        query = "?"
         if datasetId:
-            query += 'datasetId=' + str(datasetId) + '&'
+            query += "datasetId=" + str(datasetId) + "&"
 
         if childId:
-            query += 'childId=' + str(childId) + '&'
+            query += "childId=" + str(childId) + "&"
 
         if parentId:
-            query += 'parentId=' + str(parentId) + '&'
+            query += "parentId=" + str(parentId) + "&"
 
         if nodeId:
-            query += 'nodeId=' + str(nodeId) + '&'
-            
-        if limit:
-            query += 'limit=' + str(limit) + '&'
-        
-        if offset:
-            query += 'offset=' + str(offset) + '&'
+            query += "nodeId=" + str(nodeId) + "&"
 
-        return self.client.get(PATHS['connection'] + query, )
+        if limit:
+            query += "limit=" + str(limit) + "&"
+
+        if offset:
+            query += "offset=" + str(offset) + "&"
+
+        return self.client.get(
+            PATHS["connection"] + query,
+        )
 
     def getAnnotationConnectionById(self, connectionId=None):
         """
@@ -166,97 +220,134 @@ class UPennContrastAnnotationClient:
         :rtype: dict
         """
 
-        return self.client.get(PATHS['connection_by_id'] .format(connectionId=connectionId))
+        return self.client.get(
+            PATHS["connection_by_id"].format(connectionId=connectionId)
+        )
 
     def createConnection(self, connection):
         """
         Create a connection with the specified metadata.
-        The connection dict should match the standard UPennContrast connection schema
+        The connection dict should match the standard UPennContrast connection
+        schema
 
         :param dict annotation: The connection metadata
-        :return: The created connection object (Note: will contain the _id field)
+        :return: The created connection object (Note: will contain the _id
+            field)
         :rtype: dict
         """
-        return self.client.post(PATHS['connection'], json=connection)
+        return self.client.post(PATHS["connection"], json=connection)
 
     def updateConnection(self, connectionId, connection):
         """
         Update an connection with the specified metadata.
-        The connection data should match the standard UPennContrast connection schema
+        The connection data should match the standard UPennContrast connection
+        schema
 
         :param str connectionId: The connection id
         :param dict connection: The connection metadata
         :return: The updated connection object
         :rtype: dict
         """
-        return self.client.put(PATHS['connection_by_id'].format(connectionId=connectionId), json=connection)
+        return self.client.put(
+            PATHS["connection_by_id"].format(connectionId=connectionId),
+            json=connection,
+        )
 
     def deleteConnection(self, connectionId):
         """
         Delete a connection by its id.
         :param str connectionId: The connection id
         """
-        return self.client.delete(PATHS['connection_by_id'].format(connectionId=connectionId))
-    
+        return self.client.delete(
+            PATHS["connection_by_id"].format(connectionId=connectionId)
+        )
+
     def connectToNearest(self, connectTo, annotationsIds):
         """
-        Automatically create connections between a list of annotations and the nearest annotation of a specified tag.
-        :param dict connectTo: A dict of connect to nearest specifications for tags and layer.
+        Automatically create connections between a list of annotations and the
+        nearest annotation of a specified tag.
+
+        :param dict connectTo: A dict of connect to nearest specifications for
+            tags and layer.
         :param list annotationsIds: Annotation ids to be connected.
         """
         body = {
             "annotationsIds": annotationsIds,
-            "tags": connectTo['tags'],
-            "channelId": connectTo['channel']
+            "tags": connectTo["tags"],
+            "channelId": connectTo["channel"],
         }
-        
-        return self.client.post(PATHS['connect_to_nearest'], json=body)
+
+        return self.client.post(PATHS["connect_to_nearest"], json=body)
 
     # Property values
 
     def addAnnotationPropertyValues(self, datasetId, annotationId, values):
         """
-          Save one or multiple computed property values for the specified annotation
-          The recursive_dict_of_numbers can be (and usually is) just a number
-          :param str datasetId: The dataset id
-          :param str annotationId: The annotation id
-          :param dict values: A dict of values - { [propertyId]: recursive_dict_of_numbers }
+        Save one or multiple computed property values for the specified
+        annotation
+        The recursive_dict_of_numbers can be (and usually is) just a number
+        :param str datasetId: The dataset id
+        :param str annotationId: The annotation id
+        :param dict values: A dict of values - { [propertyId]:
+            recursive_dict_of_numbers }
         """
-        return self.client.post(PATHS['add_property_values'].format(datasetId=datasetId, annotationId=annotationId), json=values)
+        return self.client.post(
+            PATHS["add_property_values"].format(
+                datasetId=datasetId, annotationId=annotationId
+            ),
+            json=values,
+        )
 
     def addMultipleAnnotationPropertyValues(self, entries):
         """
-          Save one or multiple computed property values for the specified annotations
-          The recursive_dict_of_numbers can be (and usually is) just a number
-          :param list entries: A list of property values for an annotation. Each entry is of type { "datasetId": string, "annotationId": string, "values": { [propertyId: string]: recursive_dict_of_numbers } }
+        Save one or multiple computed property values for the specified
+        annotations
+        The recursive_dict_of_numbers can be (and usually is) just a number
+        :param list entries: A list of property values for an annotation. Each
+            entry is of type { "datasetId": string, "annotationId": string,
+            "values": { [propertyId: string]: recursive_dict_of_numbers } }
         """
-        return self.client.post(PATHS['add_multiple_property_values'], json=entries)
+        return self.client.post(
+            PATHS["add_multiple_property_values"], json=entries
+        )
 
     def getPropertyHistogram(self, propertyPath, datasetId, buckets=255):
         """
-          Get a histogram of the specified property across all annotations in the specified dataset
-          :param str propertyPath: The property path: '.'.join([propertyId, subId0, subId1]). Usually the propertyId
-          :param str datasetId: The dataset id
-          :param str buckets: The number of buckets in the histogram
-          :return: The list of bins
-          :rtype: list
+        Get a histogram of the specified property across all annotations in
+        the specified dataset
+        :param str propertyPath: The property path:
+            '.'.join([propertyId, subId0, subId1]). Usually the propertyId
+        :param str datasetId: The dataset id
+        :param str buckets: The number of buckets in the histogram
+        :return: The list of bins
+        :rtype: list
         """
-        return self.client.get(PATHS['histogram'].format(propertyPath=propertyPath, datasetId=datasetId, buckets=buckets))
+        return self.client.get(
+            PATHS["histogram"].format(
+                propertyPath=propertyPath, datasetId=datasetId, buckets=buckets
+            )
+        )
 
     def getPropertyValuesForDataset(self, datasetId):
         """
-          Get property values for all annotations in the specified dataset
-          :param str datasetId:
-          :return: All property values
-          :rtype: list
+        Get property values for all annotations in the specified dataset
+        :param str datasetId:
+        :return: All property values
+        :rtype: list
         """
-        return self.client.get(PATHS['get_dataset_properties'].format(datasetId=datasetId))
+        return self.client.get(
+            PATHS["get_dataset_properties"].format(datasetId=datasetId)
+        )
 
     def getPropertyValuesForAnnotation(self, datasetId, annotationId):
         """
-          Get property values for an annotation
-          :param str datasetId: The id of the annotation's dataset
-          :param str annotationId: The annotation's id
-          :return: Property values for the annotation
+        Get property values for an annotation
+        :param str datasetId: The id of the annotation's dataset
+        :param str annotationId: The annotation's id
+        :return: Property values for the annotation
         """
-        return self.client.get(PATHS['get_annotation_properties'].format(annotationId=annotationId, datasetId=datasetId))
+        return self.client.get(
+            PATHS["get_annotation_properties"].format(
+                annotationId=annotationId, datasetId=datasetId
+            )
+        )

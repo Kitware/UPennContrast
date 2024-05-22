@@ -7,7 +7,7 @@ import datetime
 import json
 import re
 
-# TODO: security: disable pickle, never pull images ?
+# TODO: security: disable pickle, never pull images ?
 # accept_content = ['json', 'yaml', 'girder_io']
 # app.conf.update(
 #   CELERY_ACCEPT_CONTENT = accept_content,
@@ -17,29 +17,37 @@ import re
 
 
 def runJobRequest(image, datasetId, params, request):
-    name = params.get('name', 'unknown')
+    name = params.get("name", "unknown")
     # Make sure name is a valid name for a docker container
-    name = ''.join(re.findall('[a-zA-Z0-9_.-]', name))
+    name = "".join(re.findall("[a-zA-Z0-9_.-]", name))
     params = json.dumps(params)
 
     containerArgs = [
-        '--apiUrl', Setting().get('worker.api_url') or 'http://localhost:8080/api/v1',
-        '--token', getCurrentToken()['_id'],
-        '--request', request,
-        '--parameters', params
+        "--apiUrl",
+        Setting().get("worker.api_url") or "http://localhost:8080/api/v1",
+        "--token",
+        getCurrentToken()["_id"],
+        "--request",
+        request,
+        "--parameters",
+        params,
     ]
-    if (datasetId):
-        containerArgs.append('--datasetId')
+    if datasetId:
+        containerArgs.append("--datasetId")
         containerArgs.append(datasetId)
 
-    job = docker_run.apply_async(
-        (image,),
-        kwargs={
-            'pull_image': False,
-            'container_args': containerArgs,
-            'remove_container': True,
-            'name': '{}_{}_{}'.format(name, datasetId, datetime.datetime.now().timestamp()),
-            # 'girder_result_hooks': [testHook]
-        }
-    ).job,
+    job = (
+        docker_run.apply_async(
+            (image,),
+            kwargs={
+                "pull_image": False,
+                "container_args": containerArgs,
+                "remove_container": True,
+                "name": "{}_{}_{}".format(
+                    name, datasetId, datetime.datetime.now().timestamp()
+                ),
+                # 'girder_result_hooks': [testHook]
+            },
+        ).job,
+    )
     return job

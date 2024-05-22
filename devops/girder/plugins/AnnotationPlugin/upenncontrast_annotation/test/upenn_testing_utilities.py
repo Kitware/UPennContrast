@@ -1,26 +1,16 @@
 import copy
 import random
 
-datasetMetadata = {'subtype': 'contrastDataset'}
+datasetMetadata = {"subtype": "contrastDataset"}
 
-sampleAnnotationName = 'sample annotation'
+sampleAnnotationName = "sample annotation"
 sampleAnnotation = {
     "tags": ["tag"],
     "shape": "point",
     "name": sampleAnnotationName,
     "channel": 0,
-    "location": {
-        "XY": 0,
-        "Z": 0,
-        "Time": 0
-    },
-    "coordinates": [
-        {
-            "x": 761.152955940129,
-            "y": 792.514654689579,
-            "z": 0
-        }
-    ],
+    "location": {"XY": 0, "Z": 0, "Time": 0},
+    "coordinates": [{"x": 761.152955940129, "y": 792.514654689579, "z": 0}],
     "datasetId": None,
 }
 
@@ -28,8 +18,8 @@ sampleAnnotation = {
 def getSampleAnnotation(datasetId):
     label = "Test Annotation {}".format(random.random())
     annotation = copy.deepcopy(sampleAnnotation)
-    annotation['name'] = label
-    annotation['datasetId'] = str(datasetId)
+    annotation["name"] = label
+    annotation["datasetId"] = str(datasetId)
     return annotation
 
 
@@ -49,5 +39,5 @@ def getSampleConnection(parentId, childId, datasetId):
         "tags": [],
         "parentId": str(parentId),
         "childId": str(childId),
-        "datasetId": str(datasetId)
+        "datasetId": str(datasetId),
     }

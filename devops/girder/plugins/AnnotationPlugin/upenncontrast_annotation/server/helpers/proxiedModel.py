@@ -3,19 +3,20 @@ from girder.api import rest
 from girder.exceptions import AccessException
 from .customModel import CustomAccessControlledModel
 
-from copy import deepcopy
 from ..models.history import History as HistoryModel
 
-from types import MethodType
 from functools import wraps
 from bson.objectid import ObjectId
 
+
 def memoizeBodyJson(func):
-    '''
-    A decorator on rest.Resource methods to cache the result of self.getBodyJson()
+    """
+    A decorator on rest.Resource methods to cache the result of
+    self.getBodyJson()
     This is usefull when some decorators and the decorated function use it
-    For example, when using @recordable with a findDatasetIdFn that uses bodyJson
-    
+    For example, when using @recordable with a findDatasetIdFn that uses
+    bodyJson
+
     Use this decorator before any other decorator using memoizedBodyJson:
     ```
     @memoizeBodyJson
@@ -23,17 +24,21 @@ def memoizeBodyJson(func):
     def f(self, *args, **kwargs):
         pass
     ```
-    '''
+    """
+
     @wraps(func)
     def wrapped(self: rest.Resource, *args, **kwargs):
         return func(self, *args, **kwargs, memoizedBodyJson=self.getBodyJson())
 
     return wrapped
 
+
 class recordable:
     """
-    A decorator which makes a function able to record the write operations on the database
+    A decorator which makes a function able to record the write operations on
+    the database
     """
+
     def __init__(self, actionName, findDatasetIdFn):
         self.historyModel: HistoryModel = HistoryModel()
         self.actionName = actionName
@@ -50,20 +55,20 @@ class recordable:
                 return fun(*args, **kwargs)
 
             # Wrap original endpoint between a start and a stop recording
-            events.trigger('proxiedModel.startRecording')
+            events.trigger("proxiedModel.startRecording")
             val = fun(*args, **kwargs)
-            record = events.trigger('proxiedModel.stopRecording', {}).info
+            record = events.trigger("proxiedModel.stopRecording", {}).info
 
             # Create a new history document
             user = rest.getCurrentUser()
             if user is None:
-                raise AccessException('You must be logged in.')
+                raise AccessException("You must be logged in.")
             document = {
-                'actionName': self.actionName,
-                'actionDate': actionDate,
-                'userId': user['_id'], # type: ignore
-                'isUndone': False,
-                'datasetId': ObjectId(datasetId),
+                "actionName": self.actionName,
+                "actionDate": actionDate,
+                "userId": user["_id"],  # type: ignore
+                "isUndone": False,
+                "datasetId": ObjectId(datasetId),
             }
             self.historyModel.create(user, document, record)
 
@@ -71,35 +76,52 @@ class recordable:
 
         return wrapped_fun
 
+
 class ModelRecord:
     """
     A record of changes made to the database
     "changes" associates a string id (not an ObjectId) with a dict:
     { 'before': document or None, 'after': document or None }
     """
+
     def __init__(self):
         self.changes = {}
 
     def changeDocument(self, before, after):
-        doc_with_id = before if before is not None else after if after is not None else None
+        doc_with_id = (
+            before
+            if before is not None
+            else after if after is not None else None
+        )
         if doc_with_id is None:
             return
-        string_id = str(doc_with_id['_id'])
+        string_id = str(doc_with_id["_id"])
         old_change = self.changes.get(string_id, None)
         if old_change:
             # old_change['after'] == before
-            old_change['after'] = after
+            old_change["after"] = after
         else:
-            self.changes[string_id] = { 'before': before, 'after': after }
+            self.changes[string_id] = {"before": before, "after": after}
 
 
 class ProxiedAccessControlledModel(CustomAccessControlledModel):
     """
     Enable recording of changes made to the database
     """
+
     def __init__(self):
-        events.bind('proxiedModel.startRecording', 'upenn.proxiedModel.' + self.__class__.__name__ + '.startRecording', self.startRecordingEvent)
-        events.bind('proxiedModel.stopRecording', 'upenn.proxiedModel.' + self.__class__.__name__ + '.stopRecording', self.stopRecordingEvent)
+        events.bind(
+            "proxiedModel.startRecording",
+            "upenn.proxiedModel."
+            + self.__class__.__name__
+            + ".startRecording",
+            self.startRecordingEvent,
+        )
+        events.bind(
+            "proxiedModel.stopRecording",
+            "upenn.proxiedModel." + self.__class__.__name__ + ".stopRecording",
+            self.stopRecordingEvent,
+        )
         super().__init__()
         self.is_recording = False
         self.record = ModelRecord()
@@ -137,7 +159,7 @@ class ProxiedAccessControlledModel(CustomAccessControlledModel):
 
     def remove(self, document, **kwargs):
         if self.is_recording:
-            before = self.findOne({ '_id': document['_id'] })
+            before = self.findOne({"_id": document["_id"]})
             self.record.changeDocument(before, None)
         return super().remove(document, **kwargs)
 
@@ -155,8 +177,8 @@ class ProxiedAccessControlledModel(CustomAccessControlledModel):
 
     def save(self, document, validate=True, triggerEvents=True):
         if self.is_recording:
-            if '_id' in document:
-                before = self.findOne({ '_id': document['_id'] })
+            if "_id" in document:
+                before = self.findOne({"_id": document["_id"]})
                 self.record.changeDocument(before, None)
             after = super().save(document, validate, triggerEvents)
             self.record.changeDocument(None, after)

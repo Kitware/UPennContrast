@@ -9,40 +9,42 @@ from bson.objectid import ObjectId
 import datetime
 import jsonschema
 
+
 class HistorySchema:
     historySchema = {
-        '$schema': 'http://json-schema.org/schema#',
-        'id': '/girder/plugins/upenncontrast_annotation/models/history',
-        'type': 'object',
-        'properties': {
-            'actionName': {
-                'type': 'string',
+        "$schema": "http://json-schema.org/schema#",
+        "id": "/girder/plugins/upenncontrast_annotation/models/history",
+        "type": "object",
+        "properties": {
+            "actionName": {
+                "type": "string",
             },
             # https://pymongo.readthedocs.io/en/stable/examples/datetimes.html
-            'actionDate': {
+            "actionDate": {
                 # Special type defined in a custom validator
-                'type': 'datetime',
+                "type": "datetime",
             },
-            'userId': {
+            "userId": {
                 # Special type defined in a custom validator
-                'type': 'objectId',
+                "type": "objectId",
             },
-            'isUndone': {
-                'type': 'boolean',
+            "isUndone": {
+                "type": "boolean",
             },
-            'datasetId': {
+            "datasetId": {
                 # Special type defined in a custom validator
-                'type': 'objectId',
+                "type": "objectId",
             },
         },
-        'required': ['actionName', 'actionDate', 'userId', 'isUndone']
+        "required": ["actionName", "actionDate", "userId", "isUndone"],
     }
 
+
 class History(CustomAccessControlledModel):
-    '''
+    """
     Register actions on some endpoints using the ProxiedAccessControlledModel
     This class itself doesn't inherit the ProxiedAccessControlledModel
-    '''
+    """
 
     BaseValidator = jsonschema.Draft4Validator
 
@@ -50,13 +52,19 @@ class History(CustomAccessControlledModel):
     # https://python-jsonschema.readthedocs.io/en/latest/validate/#type-checking
     def is_datetime(checker, inst):
         return isinstance(inst, datetime.datetime)
+
     def is_objectId(checker, inst):
         return isinstance(inst, ObjectId) and ObjectId.is_valid(inst)
-    date_check = BaseValidator.TYPE_CHECKER.redefine('datetime', is_datetime).redefine('objectId', is_objectId)
+
+    date_check = BaseValidator.TYPE_CHECKER.redefine(
+        "datetime", is_datetime
+    ).redefine("objectId", is_objectId)
 
     # Build a validator with the new type checker
     # https://python-jsonschema.readthedocs.io/en/latest/creating/
-    CustomDraft4Validator = jsonschema.validators.extend(BaseValidator, type_checker=date_check)
+    CustomDraft4Validator = jsonschema.validators.extend(
+        BaseValidator, type_checker=date_check
+    )
     validator = CustomDraft4Validator(HistorySchema.historySchema)
 
     @staticmethod
@@ -71,19 +79,22 @@ class History(CustomAccessControlledModel):
         try:
             self.validator.validate(document)
         except jsonschema.ValidationError as exp:
-            print('Validation of an history document failed')
+            print("Validation of an history document failed")
             raise ValidationException(exp)
         return document
 
     def getLastEntries(self, user, datasetId: ObjectId):
         """
         Get the history entries for this user, sorted by descending actionDate
-        Only return some fields from the model, as the record can be heavy and the userId is useless
+        Only return some fields from the model, as the record can be heavy and
+        the userId is useless
         """
-        query = { 'userId': user['_id'], 'datasetId': datasetId }
-        sort = [('actionDate', SortDir.DESCENDING)]
-        fields = { '_id': 0, 'actionName': 1, 'actionDate': 1, 'isUndone': 1 }
-        return self.findWithPermissions(query, sort=sort, fields=fields, user=user)
+        query = {"userId": user["_id"], "datasetId": datasetId}
+        sort = [("actionDate", SortDir.DESCENDING)]
+        fields = {"_id": 0, "actionName": 1, "actionDate": 1, "isUndone": 1}
+        return self.findWithPermissions(
+            query, sort=sort, fields=fields, user=user
+        )
 
     def undo(self, user, datasetId):
         self.undoOrRedo(user, datasetId, True)
@@ -94,44 +105,55 @@ class History(CustomAccessControlledModel):
     def undoOrRedo(self, user, datasetId, undo: bool):
         # Get the most recent action which has (not) been undone
         query = {
-            'userId': user['_id'],
-            'datasetId': datasetId,
-            'isUndone': not undo,
+            "userId": user["_id"],
+            "datasetId": datasetId,
+            "isUndone": not undo,
         }
-        sort = [('actionDate', SortDir.DESCENDING if undo else SortDir.ASCENDING)]
-        history_entry = next(self.findWithPermissions(query, sort=sort, user=user, level=AccessType.WRITE, limit=1), None)
+        sort = [
+            ("actionDate", SortDir.DESCENDING if undo else SortDir.ASCENDING)
+        ]
+        history_entry = next(
+            self.findWithPermissions(
+                query, sort=sort, user=user, level=AccessType.WRITE, limit=1
+            ),
+            None,
+        )
         if history_entry is None:
             return
-        
+
         # Find the document changes for this history entry
         # Would have to use an aggregation pipeline to group by model_name
         # This feature is not available in girder, use the sort instead
         document_changes = self.documentChangeModel.findWithPermissions(
-            { 'historyId': history_entry['_id'] },
-            sort=[('model_name', SortDir.ASCENDING)],
+            {"historyId": history_entry["_id"]},
+            sort=[("model_name", SortDir.ASCENDING)],
             user=user,
             level=AccessType.READ,
         )
 
         # Undo or redo the action
-        change_key = 'before' if undo else 'after'
-        previous_model_name = ''
+        change_key = "before" if undo else "after"
+        previous_model_name = ""
         model = None
         for change in document_changes:
-            document_id = change['documentId']
-            model_name = change['modelName']
+            document_id = change["documentId"]
+            model_name = change["modelName"]
             if model_name != previous_model_name:
-                model: CustomAccessControlledModel = ModelImporter.model(model_name, 'upenncontrast_annotation')
+                model: CustomAccessControlledModel = ModelImporter.model(
+                    model_name, "upenncontrast_annotation"
+                )
                 previous_model_name = model_name
             # Use 'before' when undoing, and 'after' when redoing
             replacement = change[change_key]
             if replacement is None:
-                model.collection.delete_one({ '_id': document_id })
+                model.collection.delete_one({"_id": document_id})
             else:
-                model.collection.replace_one({ '_id': document_id }, replacement, upsert=True)
+                model.collection.replace_one(
+                    {"_id": document_id}, replacement, upsert=True
+                )
 
         # Update the entry
-        history_entry['isUndone'] = undo
+        history_entry["isUndone"] = undo
         return self.save(history_entry)
 
     def cleanRemoveWithQuery(self, query, creator, **kwargs):
@@ -140,41 +162,47 @@ class History(CustomAccessControlledModel):
             query=query,
             user=creator,
             level=AccessType.WRITE,
-            fields={ '_id': 1 },
+            fields={"_id": 1},
             **kwargs
         )
-        removed_ids = [entry['_id'] for entry in removed_docs]
+        removed_ids = [entry["_id"] for entry in removed_docs]
         if len(removed_ids) == 0:
             return
         # Remove the docs
-        self.removeWithQuery({ '_id': { '$in': removed_ids } })
+        self.removeWithQuery({"_id": {"$in": removed_ids}})
         # Cleanup the document changes
-        self.documentChangeModel.removeWithQuery({ 'historyId': { '$in': removed_ids } })
+        self.documentChangeModel.removeWithQuery(
+            {"historyId": {"$in": removed_ids}}
+        )
 
     def create(self, creator, entry, record):
         # Remove history entries older than 1 hour or that have been undone
         min_entry_date = History.now() - datetime.timedelta(hours=1)
         self.cleanRemoveWithQuery(
             {
-                '$or': [
-                    { 'actionDate': { '$lt': min_entry_date } },
-                    { 'userId': creator['_id'], 'isUndone': True },
+                "$or": [
+                    {"actionDate": {"$lt": min_entry_date}},
+                    {"userId": creator["_id"], "isUndone": True},
                 ]
             },
-            creator
+            creator,
         )
 
         # Cap the number of entries per user
         max_entries_per_user = 10
         self.cleanRemoveWithQuery(
-            { 'userId': creator['_id'] },
+            {"userId": creator["_id"]},
             creator,
-            sort=[('actionDate', SortDir.DESCENDING)],
-            offset=max_entries_per_user-1,
+            sort=[("actionDate", SortDir.DESCENDING)],
+            offset=max_entries_per_user - 1,
         )
 
-        self.setUserAccess(entry, user=creator, level=AccessType.ADMIN, save=False)
+        self.setUserAccess(
+            entry, user=creator, level=AccessType.ADMIN, save=False
+        )
         new_history_entry = self.save(entry)
-        self.documentChangeModel.createChangesFromRecord(new_history_entry['_id'], record, creator)
+        self.documentChangeModel.createChangesFromRecord(
+            new_history_entry["_id"], record, creator
+        )
 
         return new_history_entry

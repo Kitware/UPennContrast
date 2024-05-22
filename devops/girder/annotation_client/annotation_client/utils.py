@@ -1,6 +1,7 @@
 import sys
 import json
 
+
 def sendProgress(progress, title, info):
     """
     Send progress to the front end
@@ -9,9 +10,5 @@ def sendProgress(progress, title, info):
     :param str title: Text to show in bold in the progress bar
     :param str info: Text to show after the title in the progress bar
     """
-    print(json.dumps({
-        "progress": progress,
-        "title": title,
-        "info": info
-    }))
+    print(json.dumps({"progress": progress, "title": title, "info": info}))
     sys.stdout.flush()

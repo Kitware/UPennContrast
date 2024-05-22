@@ -8,27 +8,22 @@ import jsonschema
 
 class InterfaceSchema:
     interfaceSchema = {
-        '$schema': 'http://json-schema.org/schema#',
-        'id': '/girder/plugins/upenncontrast_annotation/models/workerInterfaces',
-        'type': 'object',
-        'properties': {
-            'name': {
-                'type': 'string'
+        "$schema": "http://json-schema.org/schema#",
+        "id": (
+            "/girder/plugins/upenncontrast_annotation/models/"
+            "workerInterfaces"
+        ),
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "image": {"type": "string"},
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "image": {"type": "string"},
+                    "interface": {"type": "object"},
+                },
             },
-            'image': {
-                'type': 'string'
-            },
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'image': {
-                        'type': 'string'
-                    },
-                    'interface': {
-                        'type': 'object'
-                    }
-                }
-            }
         },
         # 'additionalProperties': False
     }
@@ -36,9 +31,7 @@ class InterfaceSchema:
 
 class WorkerInterfaceModel(ProxiedAccessControlledModel):
 
-    validator = jsonschema.Draft4Validator(
-        InterfaceSchema.interfaceSchema
-    )
+    validator = jsonschema.Draft4Validator(InterfaceSchema.interfaceSchema)
 
     def initialize(self):
         self.name = "worker_interface"
@@ -51,25 +44,30 @@ class WorkerInterfaceModel(ProxiedAccessControlledModel):
         return document
 
     def create(self, creator, image, interface):
-        created = {'image': image, 'interface': interface}
-        self.setUserAccess(created, user=creator,
-                           level=AccessType.ADMIN, save=False)
+        created = {"image": image, "interface": interface}
+        self.setUserAccess(
+            created, user=creator, level=AccessType.ADMIN, save=False
+        )
         return self.save(created)
 
     def delete(self, interface):
         self.remove(self.find(interface))
 
     def update(self, creator, image, interface):
-        existing = self.findOne({'image': image})
+        existing = self.findOne({"image": image})
         if existing is None:
             return self.create(creator, image, interface)
-        existing['interface'] = interface
+        existing["interface"] = interface
         return self.save(existing)
 
     def getImageInterface(self, image):
-        query = {'image': image}
+        query = {"image": image}
         result = self.findOne(query)
-        return None if result is None or 'interface' not in result else result['interface']
+        return (
+            None
+            if result is None or "interface" not in result
+            else result["interface"]
+        )
 
     def requestWorkerUpdate(self, image):
-        return runJobRequest(image, None, { 'image': image }, 'interface')
+        return runJobRequest(image, None, {"image": image}, "interface")

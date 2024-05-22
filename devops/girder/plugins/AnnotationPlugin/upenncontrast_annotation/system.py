@@ -28,152 +28,209 @@ def addSystemEndpoints(apiRoot):
     :param apiRoot: Girder api root class.
     """
     # Added to the item route
-    apiRoot.item.route('GET', ('query',), getItemsByQuery)
-    apiRoot.item.route('PUT', (':itemId', 'cache_maxmerge'), cacheMaxMerge)
+    apiRoot.item.route("GET", ("query",), getItemsByQuery)
+    apiRoot.item.route("PUT", (":itemId", "cache_maxmerge"), cacheMaxMerge)
     # Added to the folder route
-    apiRoot.folder.route('GET', ('query',), getFoldersByQuery)
+    apiRoot.folder.route("GET", ("query",), getFoldersByQuery)
 
     # Also bind some events
-    events.bind('jobs.job.update.after', 'upenncontrast_annotation', _updateJob)
-    events.bind('model.job.save', 'upenncontrast_annotation', _updateJob)
-    events.bind('model.job.remove', 'upenncontrast_annotation', _updateJob)
+    events.bind(
+        "jobs.job.update.after", "upenncontrast_annotation", _updateJob
+    )
+    events.bind("model.job.save", "upenncontrast_annotation", _updateJob)
+    events.bind("model.job.remove", "upenncontrast_annotation", _updateJob)
 
 
 @access.public(scope=TokenScope.DATA_READ)
 @filtermodel(model=Item)
 @autoDescribeRoute(
-    Description('List items that match a query.')
-    .responseClass('Item', array=True)
-    .jsonParam('query', 'Find items that match this Mongo query.',
-               required=True, requireObject=True)
-    .pagingParams(defaultSort='_id')
+    Description("List items that match a query.")
+    .responseClass("Item", array=True)
+    .jsonParam(
+        "query",
+        "Find items that match this Mongo query.",
+        required=True,
+        requireObject=True,
+    )
+    .pagingParams(defaultSort="_id")
     .errorResponse()
 )
 @boundHandler()
 def getItemsByQuery(self, query, limit, offset, sort):
     user = self.getCurrentUser()
-    return Item().findWithPermissions(query, offset=offset, limit=limit, sort=sort, user=user)
+    return Item().findWithPermissions(
+        query, offset=offset, limit=limit, sort=sort, user=user
+    )
 
 
 @access.public(scope=TokenScope.DATA_READ)
 @filtermodel(model=Folder)
 @autoDescribeRoute(
-    Description('List folders that match a query.')
-    .responseClass('Folder', array=True)
-    .jsonParam('query', 'Find folders that match this Mongo query.',
-               required=True, requireObject=True)
-    .pagingParams(defaultSort='_id')
+    Description("List folders that match a query.")
+    .responseClass("Folder", array=True)
+    .jsonParam(
+        "query",
+        "Find folders that match this Mongo query.",
+        required=True,
+        requireObject=True,
+    )
+    .pagingParams(defaultSort="_id")
     .errorResponse()
 )
 @boundHandler()
 def getFoldersByQuery(self, query, limit, offset, sort):
     user = self.getCurrentUser()
-    return Folder().findWithPermissions(query, offset=offset, limit=limit, sort=sort, user=user)
+    return Folder().findWithPermissions(
+        query, offset=offset, limit=limit, sort=sort, user=user
+    )
 
 
 @access.user
 @autoDescribeRoute(
-    Description('Create images that cache max-merge values.')
-    .modelParam('itemId', model=Item, level=AccessType.READ)
+    Description("Create images that cache max-merge values.")
+    .modelParam("itemId", model=Item, level=AccessType.READ)
     .errorResponse()
 )
 @boundHandler()
 def cacheMaxMerge(self, item):
     user = self.getCurrentUser()
-    ts = ImageItem._loadTileSource(item, format=large_image.constants.TILE_FORMAT_NUMPY)
-    if ts.tileWidth != ts.tileHeight and (ts.tileWidth < ts.sizeX or ts.tileHeight < ts.sizeY):
-        raise RestException('Cannot generate merge file')
+    ts = ImageItem._loadTileSource(
+        item, format=large_image.constants.TILE_FORMAT_NUMPY
+    )
+    if ts.tileWidth != ts.tileHeight and (
+        ts.tileWidth < ts.sizeX or ts.tileHeight < ts.sizeY
+    ):
+        raise RestException("Cannot generate merge file")
     metadata = ts.getMetadata()
-    if 'IndexRange' not in metadata or 'IndexStride' not in metadata:
-        raise Exception('Specified item is not multi-frame')
+    if "IndexRange" not in metadata or "IndexStride" not in metadata:
+        raise Exception("Specified item is not multi-frame")
     sample = ts.getSingleTile()
-    for axis in ['Z', 'T', 'ZT']:
-        if axis != 'ZT':
-            stride = metadata['IndexStride'].get(f'Index{axis}', 1)
-            count = metadata['IndexRange'].get(f'Index{axis}', 0)
+    for axis in ["Z", "T", "ZT"]:
+        if axis != "ZT":
+            stride = metadata["IndexStride"].get(f"Index{axis}", 1)
+            count = metadata["IndexRange"].get(f"Index{axis}", 0)
             stride2 = 1
             count2 = 1
         else:
-            stride = metadata['IndexStride'].get('IndexZ', 1)
-            count = metadata['IndexRange'].get('IndexZ', 0)
-            stride2 = metadata['IndexStride'].get('IndexT', 1)
-            count2 = metadata['IndexRange'].get('IndexT', 0)
+            stride = metadata["IndexStride"].get("IndexZ", 1)
+            count = metadata["IndexRange"].get("IndexZ", 0)
+            stride2 = metadata["IndexStride"].get("IndexT", 1)
+            count2 = metadata["IndexRange"].get("IndexT", 0)
         if stride and count * count2 > 1:
             style = {
-                'dtype': str(sample['tile'].dtype),
-                'bands': [{'framedelta': idx * stride, 'min': 'full', 'max': 'full'}
-                          for idx in range(count)],
+                "dtype": str(sample["tile"].dtype),
+                "bands": [
+                    {"framedelta": idx * stride, "min": "full", "max": "full"}
+                    for idx in range(count)
+                ],
             }
-            if sample['tile'].shape[2] == 1:
-                style['axis'] = 0
+            if sample["tile"].shape[2] == 1:
+                style["axis"] = 0
             multi = {
-                'tileWidth': ts.tileWidth,
-                'tileHeight': ts.tileHeight,
-                'sources': [{
-                    'path': 'girder://%s' % item['_id'],
-                    'frames': [idx for idx in range(len(metadata['frames']))
-                               if not (idx // stride) % count and not (idx // stride2) % count2],
-                    'style': style,
-                }],
+                "tileWidth": ts.tileWidth,
+                "tileHeight": ts.tileHeight,
+                "sources": [
+                    {
+                        "path": "girder://%s" % item["_id"],
+                        "frames": [
+                            idx
+                            for idx in range(len(metadata["frames"]))
+                            if not (idx // stride) % count
+                            and not (idx // stride2) % count2
+                        ],
+                        "style": style,
+                    }
+                ],
             }
-            datasetFolder = Folder().load(item['folderId'], user=user, level=AccessType.WRITE)
-            foldername = 'maxmerge_cache'
-            multi['sources'][0]['path'] = '../%s' % item['name']
+            datasetFolder = Folder().load(
+                item["folderId"], user=user, level=AccessType.WRITE
+            )
+            foldername = "maxmerge_cache"
+            multi["sources"][0]["path"] = "../%s" % item["name"]
             destfolder = Folder().createFolder(
-                datasetFolder, foldername, public=datasetFolder['public'], creator=user, reuseExisting=True)
+                datasetFolder,
+                foldername,
+                public=datasetFolder["public"],
+                creator=user,
+                reuseExisting=True,
+            )
             dest = io.BytesIO()
             dest.write(yaml.dump(multi).encode())
             destsize = dest.tell()
             dest.seek(0)
-            destname = item['name'] + '_maxmerge_' + axis.lower() + '.yaml'
+            destname = item["name"] + "_maxmerge_" + axis.lower() + ".yaml"
             destfile = Upload().uploadFromFile(
-                dest, destsize, destname, 'folder', destfolder, user=user)
-            destitem = Item().load(destfile['itemId'], user=user, level=AccessType.READ)
+                dest, destsize, destname, "folder", destfolder, user=user
+            )
+            destitem = Item().load(
+                destfile["itemId"], user=user, level=AccessType.READ
+            )
             ImageItem().delete(destitem)
-            destitem = Item().load(destfile['itemId'], user=user, level=AccessType.READ)
+            destitem = Item().load(
+                destfile["itemId"], user=user, level=AccessType.READ
+            )
 
             job = ImageItem().convertImage(
-                destitem, destfile, user, localJob=True,
-                tileSize=max(ts.tileWidth, ts.tileHeight))
+                destitem,
+                destfile,
+                user,
+                localJob=True,
+                tileSize=max(ts.tileWidth, ts.tileHeight),
+            )
             subs = {}
-            for idx, frame in enumerate(multi['sources'][0]['frames']):
-                framelist = [frame + band['framedelta']
-                             for band in multi['sources'][0]['style']['bands']]
-                subs[json.dumps(framelist, separators=(',', ':'))] = {'frame': idx}
-            conversionJobs[str(job['_id'])] = {
-                'item': item['_id'],
-                'destitem': destitem['_id'],
-                'user': user['_id'],
-                'merge_substitutes': subs,
+            for idx, frame in enumerate(multi["sources"][0]["frames"]):
+                framelist = [
+                    frame + band["framedelta"]
+                    for band in multi["sources"][0]["style"]["bands"]
+                ]
+                subs[json.dumps(framelist, separators=(",", ":"))] = {
+                    "frame": idx
+                }
+            conversionJobs[str(job["_id"])] = {
+                "item": item["_id"],
+                "destitem": destitem["_id"],
+                "user": user["_id"],
+                "merge_substitutes": subs,
             }
 
 
 def _updateJob(event):
-    job = event.info['job'] if event.name == 'jobs.job.update.after' else event.info
-    if '_id' not in job or str(job['_id']) not in conversionJobs:
+    job = (
+        event.info["job"]
+        if event.name == "jobs.job.update.after"
+        else event.info
+    )
+    if "_id" not in job or str(job["_id"]) not in conversionJobs:
         return
-    status = job['status']
-    if event.name == 'model.job.remove' and status not in (
-            JobStatus.ERROR, JobStatus.CANCELED, JobStatus.SUCCESS):
+    status = job["status"]
+    if event.name == "model.job.remove" and status not in (
+        JobStatus.ERROR,
+        JobStatus.CANCELED,
+        JobStatus.SUCCESS,
+    ):
         status = JobStatus.CANCELED
     if status not in (JobStatus.ERROR, JobStatus.CANCELED, JobStatus.SUCCESS):
         return
-    info = conversionJobs.pop(str(job['_id']))
-    user = User().load(info['user'], force=True)
+    info = conversionJobs.pop(str(job["_id"]))
+    user = User().load(info["user"], force=True)
     try:
-        Item().remove(Item().load(info['destitem'], user=user, level=AccessType.ADMIN))
+        Item().remove(
+            Item().load(info["destitem"], user=user, level=AccessType.ADMIN)
+        )
     except Exception:
         pass
     if status != JobStatus.SUCCESS:
         return
-    item = Item().load(info['item'], user=user, level=AccessType.WRITE)
-    if 'largeImage' not in item:
+    item = Item().load(info["item"], user=user, level=AccessType.WRITE)
+    if "largeImage" not in item:
         return
-    item['largeImage'].setdefault('merge_substitutes', {})
-    newFile = File().load(job['results']['file'][0], user=user, level=AccessType.READ)
-    for sub, record in info['merge_substitutes'].items():
-        record['itemId'] = newFile['itemId']
-        item['largeImage']['merge_substitutes'][sub] = record
+    item["largeImage"].setdefault("merge_substitutes", {})
+    newFile = File().load(
+        job["results"]["file"][0], user=user, level=AccessType.READ
+    )
+    for sub, record in info["merge_substitutes"].items():
+        record["itemId"] = newFile["itemId"]
+        item["largeImage"]["merge_substitutes"][sub] = record
     item = Item().save(item)
 
 
@@ -182,40 +239,46 @@ _origImageItem_loadTileSource = ImageItem._loadTileSource
 
 @classmethod
 def _loadTileSource(cls, item, **kwargs):
-    style = kwargs.get('style', None)
+    style = kwargs.get("style", None)
     if style and not isinstance(style, dict):
         try:
             style = json.loads(style)
         except Exception:
             style = None
-    if (style and 'bands' in style and len(style['bands']) > 1 and
-            'merge_substitutes' in item['largeImage']):
+    if (
+        style
+        and "bands" in style
+        and len(style["bands"]) > 1
+        and "merge_substitutes" in item["largeImage"]
+    ):
         framelist = []
         uniform = sub = None
-        for entry in style['bands']:
-            if 'frame' not in entry:
+        for entry in style["bands"]:
+            if "frame" not in entry:
                 uniform = False
             else:
                 band = entry.copy()
-                framelist.append(band.pop('frame'))
+                framelist.append(band.pop("frame"))
                 if uniform is None:
                     uniform = band
                 elif uniform != band:
                     uniform = False
         if uniform:
-            key = json.dumps(framelist, separators=(',', ':'))
-            sub = item['largeImage']['merge_substitutes'].get(key)
+            key = json.dumps(framelist, separators=(",", ":"))
+            sub = item["largeImage"]["merge_substitutes"].get(key)
         if sub:
             try:
-                subitem = Item().load(sub['itemId'], force=True)
+                subitem = Item().load(sub["itemId"], force=True)
             except Exception:
-                logger.info('merge substitute file is no longer available')
+                logger.info("merge substitute file is no longer available")
                 subitem = None
         if sub and subitem:
             subkwargs = kwargs.copy()
-            subkwargs.pop('frame', None)
-            uniform['frame'] = sub['frame']
-            subkwargs['style'] = json.dumps({'bands': [uniform]}, separators=(',', ':'))
+            subkwargs.pop("frame", None)
+            uniform["frame"] = sub["frame"]
+            subkwargs["style"] = json.dumps(
+                {"bands": [uniform]}, separators=(",", ":")
+            )
             return _origImageItem_loadTileSource(subitem, **subkwargs)
     return _origImageItem_loadTileSource(item, **kwargs)
 

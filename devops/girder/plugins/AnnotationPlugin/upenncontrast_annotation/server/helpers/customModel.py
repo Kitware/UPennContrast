@@ -24,9 +24,9 @@ class CustomAccessControlledModel(AccessControlledModel):
         :type triggerEvents: bool
         """
         if validate and triggerEvents:
-            event = events.trigger('.'.join(('model', self.name,
-                                             'validateMultiple')),
-                                   documents)
+            event = events.trigger(
+                ".".join(("model", self.name, "validateMultiple")), documents
+            )
             if event.defaultPrevented:
                 validate = False
 
@@ -34,34 +34,38 @@ class CustomAccessControlledModel(AccessControlledModel):
             documents = [self.validate(document) for document in documents]
 
         if triggerEvents:
-            event = events.trigger('model.%s.saveMany' % self.name, documents)
+            event = events.trigger("model.%s.saveMany" % self.name, documents)
             if event.defaultPrevented:
                 return documents
 
-        idsToRemove = [ObjectId(document['_id'])
-                       for document in documents
-                       if '_id' in document]
+        idsToRemove = [
+            ObjectId(document["_id"])
+            for document in documents
+            if "_id" in document
+        ]
         if len(idsToRemove) > 0:
             try:
-                self.removeWithQuery({'_id': {'$in': idsToRemove}})
+                self.removeWithQuery({"_id": {"$in": idsToRemove}})
             except WriteError as e:
                 raise ValidationException(
-                    'Database save many failed while deleting duplicate keys: '
-                    + e.details)
+                    "Database save many failed while deleting duplicate keys: "
+                    + e.details
+                )
 
         try:
             documentIds = self.collection.insert_many(documents).inserted_ids
         except BulkWriteError as e:
             raise ValidationException(
-                'Database save many failed: ' + e.details)
+                "Database save many failed: " + e.details
+            )
 
         for document, documentId in zip(documents, documentIds):
-            document['_id'] = documentId
+            document["_id"] = documentId
 
         if triggerEvents:
-            events.trigger('model.%s.saveMany.after' % self.name, {
-                    'newDocuments': documents,
-                    'removedIds': idsToRemove
-                })
+            events.trigger(
+                "model.%s.saveMany.after" % self.name,
+                {"newDocuments": documents, "removedIds": idsToRemove},
+            )
 
         return documents

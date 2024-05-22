@@ -11,10 +11,10 @@ def unbindGirderEventsByHandlerName(handlerName):
 @pytest.fixture
 def unbindLargeImage(db):
     yield True
-    unbindGirderEventsByHandlerName('large_image')
+    unbindGirderEventsByHandlerName("large_image")
 
 
 @pytest.fixture
 def unbindAnnotation(db):
     yield True
-    unbindGirderEventsByHandlerName('upenncontrast_annotation')
+    unbindGirderEventsByHandlerName("upenncontrast_annotation")
