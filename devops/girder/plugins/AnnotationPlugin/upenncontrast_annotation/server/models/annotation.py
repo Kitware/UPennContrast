@@ -116,7 +116,7 @@ class Annotation(ProxiedAccessControlledModel):
   def save(self, document, validate=True, triggerEvents=True):
     '''
       Save a document in the database.
-      Behaves the same as AccessControlledModel, but will look for a 'properties' field, apply the found property values then remove the field.
+      Behaves the same as CustomAccessControlledModel, but will look for a 'properties' field, apply the found property values then remove the field.
     '''
     propertyValues = None
     if 'properties' in document:

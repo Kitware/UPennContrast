@@ -1,6 +1,7 @@
 from girder.constants import AccessType
 from girder.exceptions import ValidationException
-from girder.models.model_base import AccessControlledModel
+
+from helpers.customModel import CustomAccessControlledModel
 
 from bson.objectid import ObjectId
 import jsonschema
@@ -33,7 +34,7 @@ class DocumentChangeSchema:
         'required': ['historyId', 'modelName', 'before', 'after'],
     }
 
-class DocumentChange(AccessControlledModel):
+class DocumentChange(CustomAccessControlledModel):
     '''
     Register actions on some endpoints using the ProxiedAccessControlledModel
     This class itself doesn't inherit the ProxiedAccessControlledModel

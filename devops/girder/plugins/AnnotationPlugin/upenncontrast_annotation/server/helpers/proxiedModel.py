@@ -1,7 +1,7 @@
 from girder import events
 from girder.api import rest
 from girder.exceptions import AccessException
-from girder.models.model_base import AccessControlledModel
+from .customModel import CustomAccessControlledModel
 
 from copy import deepcopy
 from ..models.history import History as HistoryModel
@@ -93,7 +93,7 @@ class ModelRecord:
             self.changes[string_id] = { 'before': before, 'after': after }
 
 
-class ProxiedAccessControlledModel(AccessControlledModel):
+class ProxiedAccessControlledModel(CustomAccessControlledModel):
     """
     Enable recording of changes made to the database
     """
@@ -162,3 +162,12 @@ class ProxiedAccessControlledModel(AccessControlledModel):
             self.record.changeDocument(None, after)
             return after
         return super().save(document, validate, triggerEvents)
+
+    def saveMany(self, documents, validate=True, triggerEvents=True):
+        new_documents = super().saveMany(documents, validate, triggerEvents)
+        if self.is_recording:
+            # No need to record the removal of existing documents as
+            # saveMany() calls removeWithQuery() which records the removal
+            for after in new_documents:
+                self.record.changeDocument(None, after)
+        return new_documents

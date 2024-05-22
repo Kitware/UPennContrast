@@ -1,9 +1,9 @@
 from girder.constants import SortDir, AccessType
 from girder.exceptions import ValidationException
-from girder.models.model_base import AccessControlledModel
 from girder.utility.model_importer import ModelImporter
 
 from .documentChange import DocumentChange as DocumentChangeModel
+from helpers.customModel import CustomAccessControlledModel
 
 from bson.objectid import ObjectId
 import datetime
@@ -38,7 +38,7 @@ class HistorySchema:
         'required': ['actionName', 'actionDate', 'userId', 'isUndone']
     }
 
-class History(AccessControlledModel):
+class History(CustomAccessControlledModel):
     '''
     Register actions on some endpoints using the ProxiedAccessControlledModel
     This class itself doesn't inherit the ProxiedAccessControlledModel
@@ -121,7 +121,7 @@ class History(AccessControlledModel):
             document_id = change['documentId']
             model_name = change['modelName']
             if model_name != previous_model_name:
-                model: AccessControlledModel = ModelImporter.model(model_name, 'upenncontrast_annotation')
+                model: CustomAccessControlledModel = ModelImporter.model(model_name, 'upenncontrast_annotation')
                 previous_model_name = model_name
             # Use 'before' when undoing, and 'after' when redoing
             replacement = change[change_key]
