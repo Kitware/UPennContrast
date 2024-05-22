@@ -41,8 +41,7 @@ class PropertyValues(Resource):
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
-        body = self.getBodyJson()
-        return [self._annotationPropertyValuesModel.appendValues(currentUser, entry['values'], entry['annotationId'], entry['datasetId']) for entry in body]
+        return self._annotationPropertyValuesModel.appendMultipleValues(currentUser, self.getBodyJson())
 
     @describeRoute(Description("Delete all the values for annotations in this dataset with this property's id")
         .param('propertyId', 'The property\'s Id', paramType='path')

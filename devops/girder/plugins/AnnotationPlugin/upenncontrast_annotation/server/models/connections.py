@@ -97,6 +97,11 @@ class AnnotationConnection(ProxiedAccessControlledModel):
     self.setUserAccess(connection, user=creator, level=AccessType.ADMIN, save=False)
     return self.save(connection)
 
+  def createMultiple(self, creator, connections):
+    for connection in connections:
+      self.setUserAccess(connection, user=creator, level=AccessType.ADMIN, save=False)
+    return self.saveMany(connections)
+
   def delete(self, connection):
     self.remove(self.find(connection))
 

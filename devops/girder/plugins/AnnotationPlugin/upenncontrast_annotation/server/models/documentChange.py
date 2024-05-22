@@ -55,7 +55,7 @@ class DocumentChange(CustomAccessControlledModel):
 
     def initialize(self):
         self.name = 'document_change'
-    
+
     def validate(self, document):
         try:
             self.validator.validate(document)
@@ -65,7 +65,9 @@ class DocumentChange(CustomAccessControlledModel):
         return document
 
     def createChangesFromRecord(self, history_id, record, creator):
-        # The record is a dict { model_name: { document_id: { before: ..., after: ... } } }
+        # The record is a dict:
+        # { model_name: { document_id: { before: ..., after: ... } } }
+        document_changes = []
         for model_name in record:
             for document_id in record[model_name]:
                 raw_change = record[model_name][document_id]
@@ -76,5 +78,8 @@ class DocumentChange(CustomAccessControlledModel):
                     'before': raw_change['before'],
                     'after': raw_change['after'],
                 }
-                self.setUserAccess(new_document_change, user=creator, level=AccessType.ADMIN)
-                self.save(new_document_change)
+                self.setUserAccess(new_document_change,
+                                   user=creator,
+                                   level=AccessType.ADMIN)
+                document_changes.append(new_document_change)
+        self.saveMany(document_changes)

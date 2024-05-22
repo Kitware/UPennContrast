@@ -81,6 +81,11 @@ class AnnotationPropertyValues(ProxiedAccessControlledModel):
         self.setUserAccess(property_values, user=creator, level=AccessType.ADMIN)
         return self.save(property_values)
 
+    def appendMultipleValues(self, creator, list_of_property_values):
+        for property_values in list_of_property_values:
+            self.setUserAccess(property_values, user=creator, level=AccessType.ADMIN)
+        return self.saveMany(list_of_property_values)
+
     def delete(self, propertyId, datasetId):
         # Could use self.collection.updateMany but girder doesn't expose this method
         for document in self.find({'datasetId': datasetId, '.'.join(['values', propertyId]): { '$exists': True }}):

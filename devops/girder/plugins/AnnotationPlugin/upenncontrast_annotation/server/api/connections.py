@@ -87,7 +87,7 @@ class AnnotationConnection(Resource):
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
-        return [self._connectionModel.create(currentUser, connection) for connection in bodyJson]
+        return self._connectionModel.createMultiple(currentUser, bodyJson)
 
     @describeRoute(Description("Delete an existing connection").param('id', 'The connection\'s Id', paramType='path').errorResponse('ID was invalid.')
                    .errorResponse('Write access was denied for the connection.', 403))

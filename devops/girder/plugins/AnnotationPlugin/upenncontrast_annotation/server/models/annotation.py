@@ -113,40 +113,40 @@ class Annotation(ProxiedAccessControlledModel):
       }
       self.removeWithQuery(query)
 
-  def save(self, document, validate=True, triggerEvents=True):
-    '''
-      Save a document in the database.
-      Behaves the same as CustomAccessControlledModel, but will look for a 'properties' field, apply the found property values then remove the field.
-    '''
+  def validate(self, document):
+    # Extract property values if they exist
     propertyValues = None
     if 'properties' in document:
       propertyValues = document['properties']
       document.pop('properties')
-    document = super().save(document, validate, triggerEvents)
 
-    if propertyValues:
-      PropertiesModel().appendValues(None, propertyValues, document['_id'], document['datasetId'])
-
-    return document
-
-
-  def validate(self, document):
+    # Validate using the schema
     try:
       self.validator.validate(document)
     except jsonschema.ValidationError as exp:
       raise ValidationException(exp)
 
+    # Check if the dataset exists
     folder = Folder().load(document['datasetId'], force=True)
     if folder is None:
       raise ValidationException('Dataset does not exist')
     if 'meta' not in folder or folder['meta'].get('subtype', None) != 'contrastDataset':
       raise ValidationException('Folder is not a dataset')
 
+    # Add the property values if given
+    if propertyValues:
+      PropertiesModel().appendValues(None, propertyValues, document['_id'], document['datasetId'])
+
     return document
 
   def create(self, creator, annotation):
     self.setUserAccess(annotation, user=creator, level=AccessType.ADMIN, save=False)
     return self.save(annotation)
+
+  def createMultiple(self, creator, annotations):
+    for annotation in annotations:
+      self.setUserAccess(annotation, user=creator, level=AccessType.ADMIN, save=False)
+    return self.saveMany(annotations)
 
   def delete(self, annotation):
     self.remove(annotation)

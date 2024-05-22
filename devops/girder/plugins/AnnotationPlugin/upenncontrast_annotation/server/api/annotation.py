@@ -77,7 +77,7 @@ class Annotation(Resource):
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException('User not found', 'currentUser')
-        return [self._annotationModel.create(currentUser, annotation) for annotation in bodyJson]
+        return self._annotationModel.createMultiple(currentUser, bodyJson)
 
     @describeRoute(Description("Delete an existing annotation").param('id', 'The annotation\'s Id', paramType='path').errorResponse('ID was invalid.')
                    .errorResponse('Write access was denied for the annotation.', 403))
