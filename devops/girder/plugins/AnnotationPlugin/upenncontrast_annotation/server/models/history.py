@@ -3,7 +3,7 @@ from girder.exceptions import ValidationException
 from girder.utility.model_importer import ModelImporter
 
 from .documentChange import DocumentChange as DocumentChangeModel
-from helpers.customModel import CustomAccessControlledModel
+from ..helpers.customModel import CustomAccessControlledModel
 
 from bson.objectid import ObjectId
 import datetime

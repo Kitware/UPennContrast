@@ -1,7 +1,7 @@
 from girder.constants import AccessType
 from girder.exceptions import ValidationException
 
-from helpers.customModel import CustomAccessControlledModel
+from ..helpers.customModel import CustomAccessControlledModel
 
 from bson.objectid import ObjectId
 import jsonschema
