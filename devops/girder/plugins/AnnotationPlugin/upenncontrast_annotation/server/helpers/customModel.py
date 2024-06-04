@@ -23,6 +23,8 @@ class CustomAccessControlledModel(AccessControlledModel):
             pre- and post-save hooks.
         :type triggerEvents: bool
         """
+        if len(documents) == 0:
+            return documents
         if validate and triggerEvents:
             event = events.trigger(
                 ".".join(("model", self.name, "validateMultiple")), documents
