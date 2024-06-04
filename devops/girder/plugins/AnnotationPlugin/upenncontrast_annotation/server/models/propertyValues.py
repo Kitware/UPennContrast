@@ -57,27 +57,38 @@ class AnnotationPropertyValues(ProxiedAccessControlledModel):
         )
 
     def validate(self, document):
+        return self.validateMultiple([document])[0]
+
+    def validateMultiple(self, propertyValuesList):
         try:
-            self.jsonValidate(document)
+            for propertyValues in propertyValuesList:
+                self.jsonValidate(propertyValues)
         except fastjsonschema.JsonSchemaValueException as exp:
             raise ValidationException(exp)
 
-        # find existing property values for the annotation id
-        annotationId = document["annotationId"]
-        query = {"annotationId": annotationId}
-        existingProperties = self.findOne(query)
-
-        # keep existing values
-        if existingProperties:
-            existingValues = existingProperties["values"]
-            existingValues.update(document["values"])
-            document["values"] = existingValues
-            self.remove(existingProperties)
+        # find existing property values using the annotation id
+        annotationIds = [
+            propertyValues["annotationId"]
+            for propertyValues in propertyValuesList
+        ]
+        query = {"annotationId": {"$in": annotationIds}}
+        existingDocuments = {}  # indexed by annotation id
+        for existingDocument in self.find(query):
+            annotationId = existingDocument["annotationId"]
+            existingDocuments[annotationId] = existingDocument
+        # if some property values exist with the same annotation id, merge them
+        if len(existingDocuments) > 0:
+            for propertyValues in propertyValuesList:
+                annotationId = propertyValues["annotationId"]
+                existingDocument = existingDocuments.get(annotationId, None)
+                if existingDocument is not None:
+                    propertyValues["values"].update(existingDocument["values"])
+                    propertyValues["_id"] = existingDocument["_id"]
 
         # TODO(performance): create sparse index on properties if nonexisting
         # https://docs.mongodb.com/manual/reference/operator/query/exists/
 
-        return document
+        return propertyValuesList
 
     def appendValues(self, creator, values, annotationId, datasetId):
         property_values = {

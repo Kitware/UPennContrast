@@ -128,36 +128,55 @@ class Annotation(ProxiedAccessControlledModel):
             }
             self.removeWithQuery(query)
 
+    def isDatasetId(self, datasetId):
+        folder = Folder().load(datasetId, force=True)
+        return (
+            folder is not None
+            and "meta" in folder
+            and folder["meta"].get("subtype", None) == "contrastDataset"
+        )
+
     def validate(self, document):
+        self.validateMultiple([document], None)
+
+    def validateMultiple(self, annotations, user):
         # Extract property values if they exist
-        propertyValues = None
-        if "properties" in document:
-            propertyValues = document["properties"]
-            document.pop("properties")
+        propertyValues = []
+        for annotation in annotations:
+            if "properties" in annotation:
+                propertyValues.append(
+                    (annotation, annotation.pop("properties"))
+                )
 
         # Validate using the schema
         try:
-            self.jsonValidate(document)
+            for annotation in annotations:
+                self.jsonValidate(annotation)
         except fastjsonschema.JsonSchemaValueException as exp:
             raise ValidationException(exp)
 
-        # Check if the dataset exists
-        folder = Folder().load(document["datasetId"], force=True)
-        if folder is None:
-            raise ValidationException("Dataset does not exist")
-        if (
-            "meta" not in folder
-            or folder["meta"].get("subtype", None) != "contrastDataset"
-        ):
-            raise ValidationException("Folder is not a dataset")
+        # Check if the datasets exist
+        datasetIds = set(annotation["datasetId"] for annotation in annotations)
+
+        for datasetId in datasetIds:
+            if not self.isDatasetId(datasetId):
+                raise ValidationException("Annotation dataset ID is invalid")
 
         # Add the property values if given
-        if propertyValues:
-            PropertiesModel().appendValues(
-                None, propertyValues, document["_id"], document["datasetId"]
+        if len(propertyValues) > 0:
+            PropertiesModel().appendMultipleValues(
+                user,
+                [
+                    {
+                        "annotationId": annotation["_id"],
+                        "datasetId": annotation["datasetId"],
+                        "values": values,
+                    }
+                    for annotation, values in propertyValues
+                ],
             )
 
-        return document
+        return annotations
 
     def create(self, creator, annotation):
         self.setUserAccess(
@@ -170,7 +189,9 @@ class Annotation(ProxiedAccessControlledModel):
             self.setUserAccess(
                 annotation, user=creator, level=AccessType.ADMIN, save=False
             )
-        return self.saveMany(annotations)
+        # Batched validation for performance: avoid many calls to Folder().load
+        annotations = self.validateMultiple(annotations, creator)
+        return self.saveMany(annotations, validate=False)
 
     def delete(self, annotation):
         self.remove(annotation)

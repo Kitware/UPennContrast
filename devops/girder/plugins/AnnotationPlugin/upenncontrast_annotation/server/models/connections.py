@@ -76,29 +76,43 @@ class AnnotationConnection(ProxiedAccessControlledModel):
         )
 
     def validate(self, document):
+        return self.validateMultiple([document])[0]
+
+    def validateMultiple(self, connections):
         try:
-            self.jsonValidate(document)
+            for connection in connections:
+                self.jsonValidate(connection)
         except fastjsonschema.JsonSchemaValueException as exp:
             raise ValidationException(exp)
 
-        folder = Folder().load(document["datasetId"], force=True)
-        if folder is None:
-            raise ValidationException("Dataset does not exist")
-        if (
-            "meta" not in folder
-            or folder["meta"].get("subtype", None) != "contrastDataset"
-        ):
-            raise ValidationException("Folder is not a dataset")
+        datasetIds = set(connection["datasetId"] for connection in connections)
+        for datasetId in datasetIds:
+            folder = Folder().load(datasetId, force=True)
+            if folder is None or not (
+                "meta" in folder
+                and folder["meta"].get("subtype", None) == "contrastDataset"
+            ):
+                raise ValidationException("Connection dataset ID is invalid")
 
-        child = Annotation().load(document["childId"], force=True)
-        if child is None:
-            raise ValidationException("Child does not exist")
+        annotationModel = Annotation()
 
-        parent = Annotation().load(document["parentId"], force=True)
-        if parent is None:
-            raise ValidationException("Parent does not exist")
+        childIds = set(connection["childId"] for connection in connections)
+        childObjectIds = [ObjectId(childId) for childId in childIds]
+        nFoundChildren = annotationModel.collection.count_documents(
+            {"_id": {"$in": childObjectIds}}
+        )
+        if nFoundChildren != len(childIds):
+            raise ValidationException("A child annotation does not exist")
 
-        return document
+        parentIds = set(connection["parentId"] for connection in connections)
+        parentObjectIds = [ObjectId(parentId) for parentId in parentIds]
+        nFoundParents = annotationModel.collection.count_documents(
+            {"_id": {"$in": parentObjectIds}}
+        )
+        if nFoundParents != len(parentIds):
+            raise ValidationException("A parent annotation does not exist")
+
+        return connections
 
     def create(self, creator, connection):
         self.setUserAccess(
@@ -111,7 +125,8 @@ class AnnotationConnection(ProxiedAccessControlledModel):
             self.setUserAccess(
                 connection, user=creator, level=AccessType.ADMIN, save=False
             )
-        return self.saveMany(connections)
+        self.validateMultiple(connections)
+        return self.saveMany(connections, validate=False)
 
     def delete(self, connection):
         self.remove(self.find(connection))
