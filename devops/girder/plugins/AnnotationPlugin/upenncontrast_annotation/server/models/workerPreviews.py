@@ -3,7 +3,8 @@ from girder.exceptions import ValidationException, RestException
 from girder.constants import AccessType
 from ..helpers.tasks import runJobRequest
 
-import jsonschema
+from ..helpers.fastjsonschema import customJsonSchemaCompile
+import fastjsonschema
 
 
 from girder.models.folder import Folder
@@ -11,7 +12,7 @@ from girder.models.folder import Folder
 
 class PreviewSchema:
     previewSchema = {
-        "$schema": "http://json-schema.org/schema#",
+        "$schema": "http://json-schema.org/draft-04/schema",
         "id": "/girder/plugins/upenncontrast_annotation/models/workerPreviews",
         "type": "object",
         "properties": {
@@ -31,15 +32,17 @@ class PreviewSchema:
 
 class WorkerPreviewModel(ProxiedAccessControlledModel):
 
-    validator = jsonschema.Draft4Validator(PreviewSchema.previewSchema)
+    jsonValidate = staticmethod(
+        customJsonSchemaCompile(PreviewSchema.previewSchema)
+    )
 
     def initialize(self):
         self.name = "worker_preview"
 
     def validate(self, document):
         try:
-            self.validator.validate(document)
-        except jsonschema.ValidationError as exp:
+            self.jsonValidate(document)
+        except fastjsonschema.JsonSchemaValueException as exp:
             raise ValidationException(exp)
         return document
 

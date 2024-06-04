@@ -2,14 +2,15 @@ from girder.constants import AccessType
 from girder.exceptions import ValidationException
 
 from ..helpers.customModel import CustomAccessControlledModel
+from ..helpers.fastjsonschema import customJsonSchemaCompile
+import fastjsonschema
 
 from bson.objectid import ObjectId
-import jsonschema
 
 
 class DocumentChangeSchema:
     documentChangeSchema = {
-        "$schema": "http://json-schema.org/schema#",
+        "$schema": "http://json-schema.org/draft-04/schema",
         "id": "/girder/plugins/upenncontrast_annotation/models/documentChange",
         "type": "object",
         "properties": {
@@ -42,22 +43,8 @@ class DocumentChange(CustomAccessControlledModel):
     This class itself doesn't inherit the ProxiedAccessControlledModel
     """
 
-    BaseValidator = jsonschema.Draft4Validator
-
-    # Build a new type checker
-    # https://python-jsonschema.readthedocs.io/en/latest/validate/#type-checking
-    def is_objectId(checker, inst):
-        return isinstance(inst, ObjectId) and ObjectId.is_valid(inst)
-
-    date_check = BaseValidator.TYPE_CHECKER.redefine("objectId", is_objectId)
-
-    # Build a validator with the new type checker
-    # https://python-jsonschema.readthedocs.io/en/latest/creating/
-    CustomDraft4Validator = jsonschema.validators.extend(
-        BaseValidator, type_checker=date_check
-    )
-    validator = CustomDraft4Validator(
-        DocumentChangeSchema.documentChangeSchema
+    jsonValidate = staticmethod(
+        customJsonSchemaCompile(DocumentChangeSchema.documentChangeSchema)
     )
 
     def initialize(self):
@@ -65,8 +52,8 @@ class DocumentChange(CustomAccessControlledModel):
 
     def validate(self, document):
         try:
-            self.validator.validate(document)
-        except jsonschema.ValidationError as exp:
+            self.jsonValidate(document)
+        except fastjsonschema.JsonSchemaValueException as exp:
             print("Validation of an history document failed")
             raise ValidationException(exp)
         return document

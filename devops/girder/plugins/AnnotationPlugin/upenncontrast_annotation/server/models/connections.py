@@ -9,7 +9,8 @@ from girder.models.folder import Folder
 from .annotation import Annotation
 from ..helpers.connections import annotationToAnnotationDistance
 
-import jsonschema
+from ..helpers.fastjsonschema import customJsonSchemaCompile
+import fastjsonschema
 import numpy as np
 
 
@@ -17,7 +18,7 @@ class ConnectionSchema:
     tagsSchema = {"type": "array", "items": {"type": "string"}}
 
     connectionSchema = {
-        "$schema": "http://json-schema.org/schema#",
+        "$schema": "http://json-schema.org/draft-04/schema",
         "id": (
             "/girder/plugins/upenncontrast_annotation/models/"
             "annotation_connection"
@@ -38,7 +39,9 @@ class AnnotationConnection(ProxiedAccessControlledModel):
     # TODO: write lock
     # TODO(performance): indexing
 
-    validator = jsonschema.Draft4Validator(ConnectionSchema.connectionSchema)
+    jsonValidate = staticmethod(
+        customJsonSchemaCompile(ConnectionSchema.connectionSchema)
+    )
 
     def annotationsRemovedEvent(self, event):
         # Clean connections orphaned by the deletion of the annotations
@@ -74,8 +77,8 @@ class AnnotationConnection(ProxiedAccessControlledModel):
 
     def validate(self, document):
         try:
-            self.validator.validate(document)
-        except jsonschema.ValidationError as exp:
+            self.jsonValidate(document)
+        except fastjsonschema.JsonSchemaValueException as exp:
             raise ValidationException(exp)
 
         folder = Folder().load(document["datasetId"], force=True)

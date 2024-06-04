@@ -3,17 +3,18 @@ from girder.constants import AccessType
 from girder.exceptions import ValidationException
 from girder import events
 
-import jsonschema
+from ..helpers.fastjsonschema import customJsonSchemaCompile
+import fastjsonschema
 
 
 class PropertySchema:
     annotationPropertySchema = {
-        "$schema": "http://json-schema.org/schema#",
+        "$schema": "http://json-schema.org/draft-04/schema",
         "id": "/girder/plugins/upenncontrast_annotation/models/propertyValues",
         "type": "object",
         "properties": {
             "annotationId": {
-                "bsonType": "objectId",
+                "type": "objectId",
             },
             "datasetId": {"type": "string"},
             "values": {
@@ -25,7 +26,7 @@ class PropertySchema:
                         },
                         {
                             "type": "object",
-                            "additionalProperties": "number",
+                            "additionalProperties": {"type": "number"},
                         },
                     ],
                 },
@@ -36,8 +37,9 @@ class PropertySchema:
 
 
 class AnnotationPropertyValues(ProxiedAccessControlledModel):
-    validator = jsonschema.Draft4Validator(
-        PropertySchema.annotationPropertySchema
+
+    jsonValidate = staticmethod(
+        customJsonSchemaCompile(PropertySchema.annotationPropertySchema)
     )
 
     def annotationsRemovedEvent(self, event):
@@ -56,8 +58,8 @@ class AnnotationPropertyValues(ProxiedAccessControlledModel):
 
     def validate(self, document):
         try:
-            self.validator.validate(document)
-        except jsonschema.ValidationError as exp:
+            self.jsonValidate(document)
+        except fastjsonschema.JsonSchemaValueException as exp:
             raise ValidationException(exp)
 
         # find existing property values for the annotation id

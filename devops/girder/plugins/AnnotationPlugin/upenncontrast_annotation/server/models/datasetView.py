@@ -2,7 +2,8 @@ from girder.constants import AccessType
 from girder.exceptions import ValidationException
 from ..helpers.proxiedModel import ProxiedAccessControlledModel
 
-import jsonschema
+from ..helpers.fastjsonschema import customJsonSchemaCompile
+import fastjsonschema
 
 
 class DatasetViewSchema:
@@ -33,7 +34,7 @@ class DatasetViewSchema:
     }
 
     datasetViewSchema = {
-        "$schema": "http://json-schema.org/schema#",
+        "$schema": "http://json-schema.org/draft-04/schema",
         "id": "/girder/plugins/upenncontrast_annotation/models/datasetView",
         "type": "object",
         "properties": {
@@ -56,15 +57,18 @@ class DatasetViewSchema:
 
 
 class DatasetView(ProxiedAccessControlledModel):
-    validator = jsonschema.Draft4Validator(DatasetViewSchema.datasetViewSchema)
+
+    jsonValidate = staticmethod(
+        customJsonSchemaCompile(DatasetViewSchema.datasetViewSchema)
+    )
 
     def initialize(self):
         self.name = "dataset_view"
 
     def validate(self, document):
         try:
-            self.validator.validate(document)
-        except jsonschema.ValidationError as exp:
+            self.jsonValidate(document)
+        except fastjsonschema.JsonSchemaValueException as exp:
             print("not validated cause objectId")
             raise ValidationException(exp)
         return document

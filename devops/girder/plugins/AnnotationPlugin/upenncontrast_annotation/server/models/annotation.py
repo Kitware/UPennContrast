@@ -9,7 +9,8 @@ from bson.objectid import ObjectId
 
 from girder.models.folder import Folder
 
-import jsonschema
+from ..helpers.fastjsonschema import customJsonSchemaCompile
+import fastjsonschema
 
 
 class AnnotationSchema:
@@ -41,7 +42,7 @@ class AnnotationSchema:
     shapeSchema = {"type": "string", "enum": ["point", "line", "polygon"]}
 
     annotationSchema = {
-        "$schema": "http://json-schema.org/schema#",
+        "$schema": "http://json-schema.org/draft-04/schema",
         "id": "/girder/plugins/upenncontrast_annotation/models/annotation",
         "type": "object",
         "properties": {
@@ -80,7 +81,9 @@ class Annotation(ProxiedAccessControlledModel):
     # TODO: save creatorId, creation and update dates
     # TODO(performance): indexing
 
-    validator = jsonschema.Draft4Validator(AnnotationSchema.annotationSchema)
+    jsonValidate = staticmethod(
+        customJsonSchemaCompile(AnnotationSchema.annotationSchema)
+    )
 
     def annotationRemovedEvent(self, event):
         if event.info and event.info["_id"]:
@@ -134,8 +137,8 @@ class Annotation(ProxiedAccessControlledModel):
 
         # Validate using the schema
         try:
-            self.validator.validate(document)
-        except jsonschema.ValidationError as exp:
+            self.jsonValidate(document)
+        except fastjsonschema.JsonSchemaValueException as exp:
             raise ValidationException(exp)
 
         # Check if the dataset exists

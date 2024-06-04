@@ -3,12 +3,13 @@ from girder.exceptions import ValidationException
 from girder.constants import AccessType
 from ..helpers.tasks import runJobRequest
 
-import jsonschema
+from ..helpers.fastjsonschema import customJsonSchemaCompile
+import fastjsonschema
 
 
 class InterfaceSchema:
     interfaceSchema = {
-        "$schema": "http://json-schema.org/schema#",
+        "$schema": "http://json-schema.org/draft-04/schema",
         "id": (
             "/girder/plugins/upenncontrast_annotation/models/"
             "workerInterfaces"
@@ -31,15 +32,17 @@ class InterfaceSchema:
 
 class WorkerInterfaceModel(ProxiedAccessControlledModel):
 
-    validator = jsonschema.Draft4Validator(InterfaceSchema.interfaceSchema)
+    jsonValidate = staticmethod(
+        customJsonSchemaCompile(InterfaceSchema.interfaceSchema)
+    )
 
     def initialize(self):
         self.name = "worker_interface"
 
     def validate(self, document):
         try:
-            self.validator.validate(document)
-        except jsonschema.ValidationError as exp:
+            self.jsonValidate(document)
+        except fastjsonschema.JsonSchemaValueException as exp:
             raise ValidationException(exp)
         return document
 

@@ -3,12 +3,13 @@ from girder.exceptions import ValidationException, RestException
 from girder.constants import AccessType
 from ..helpers.tasks import runJobRequest
 
-import jsonschema
+from ..helpers.fastjsonschema import customJsonSchemaCompile
+import fastjsonschema
 
 
 class PropertySchema:
     propertySchema = {
-        "$schema": "http://json-schema.org/schema#",
+        "$schema": "http://json-schema.org/draft-04/schema",
         "id": "/girder/plugins/upenncontrast_annotation/models/property",
         "type": "object",
         "properties": {
@@ -32,15 +33,17 @@ class AnnotationProperty(ProxiedAccessControlledModel):
     # TODO: delete hooks: remove all computed values if the property is
     #   deleted ? (big operation)
 
-    validator = jsonschema.Draft4Validator(PropertySchema.propertySchema)
+    jsonValidate = staticmethod(
+        customJsonSchemaCompile(PropertySchema.propertySchema)
+    )
 
     def initialize(self):
         self.name = "annotation_property"
 
     def validate(self, document):
         try:
-            self.validator.validate(document)
-        except jsonschema.ValidationError as exp:
+            self.jsonValidate(document)
+        except fastjsonschema.JsonSchemaValueException as exp:
             print("not validated cause objectId")
             raise ValidationException(exp)
         return document

@@ -5,14 +5,16 @@ from girder.utility.model_importer import ModelImporter
 from .documentChange import DocumentChange as DocumentChangeModel
 from ..helpers.customModel import CustomAccessControlledModel
 
+from ..helpers.fastjsonschema import customJsonSchemaCompile
+import fastjsonschema
+
 from bson.objectid import ObjectId
 import datetime
-import jsonschema
 
 
 class HistorySchema:
     historySchema = {
-        "$schema": "http://json-schema.org/schema#",
+        "$schema": "http://json-schema.org/draft-04/schema",
         "id": "/girder/plugins/upenncontrast_annotation/models/history",
         "type": "object",
         "properties": {
@@ -46,26 +48,9 @@ class History(CustomAccessControlledModel):
     This class itself doesn't inherit the ProxiedAccessControlledModel
     """
 
-    BaseValidator = jsonschema.Draft4Validator
-
-    # Build a new type checker
-    # https://python-jsonschema.readthedocs.io/en/latest/validate/#type-checking
-    def is_datetime(checker, inst):
-        return isinstance(inst, datetime.datetime)
-
-    def is_objectId(checker, inst):
-        return isinstance(inst, ObjectId) and ObjectId.is_valid(inst)
-
-    date_check = BaseValidator.TYPE_CHECKER.redefine(
-        "datetime", is_datetime
-    ).redefine("objectId", is_objectId)
-
-    # Build a validator with the new type checker
-    # https://python-jsonschema.readthedocs.io/en/latest/creating/
-    CustomDraft4Validator = jsonschema.validators.extend(
-        BaseValidator, type_checker=date_check
+    jsonValidate = staticmethod(
+        customJsonSchemaCompile(HistorySchema.historySchema)
     )
-    validator = CustomDraft4Validator(HistorySchema.historySchema)
 
     @staticmethod
     def now():
@@ -77,8 +62,8 @@ class History(CustomAccessControlledModel):
 
     def validate(self, document):
         try:
-            self.validator.validate(document)
-        except jsonschema.ValidationError as exp:
+            self.jsonValidate(document)
+        except fastjsonschema.JsonSchemaValueException as exp:
             print("Validation of an history document failed")
             raise ValidationException(exp)
         return document
