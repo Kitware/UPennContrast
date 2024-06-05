@@ -6,6 +6,7 @@ node_modules
 multi_data
 # local env files
 *.local
+.venv
 
 #unplugin-vue-components plugin
 components.d.ts

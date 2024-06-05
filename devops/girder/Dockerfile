@@ -17,6 +17,7 @@ RUN pip install girder[mount] girder girder-user-quota
 COPY ./provision.py /src/provision.py
 COPY ./girder.cfg /etc/girder.cfg
 
+RUN pip install fastjsonschema
 COPY plugins/AnnotationPlugin /src/AnnotationPlugin
 RUN pip install -e /src/AnnotationPlugin
 

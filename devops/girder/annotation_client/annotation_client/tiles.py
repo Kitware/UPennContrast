@@ -3,11 +3,11 @@ import pickle
 import girder_client
 
 PATHS = {
-    'image': '/item/{datasetId}/tiles/fzxy/{frameIndex}/0/0/0',
-    'item': '/item?folderId={datasetId}',
-    'region': '/item/{itemId}/tiles/region',
-    'tiles': '/item/{datasetId}/tiles',
-    'tilesInternal': '/item/{datasetId}/tiles/internal_metadata',
+    "image": "/item/{datasetId}/tiles/fzxy/{frameIndex}/0/0/0",
+    "item": "/item?folderId={datasetId}",
+    "region": "/item/{itemId}/tiles/region",
+    "tiles": "/item/{datasetId}/tiles",
+    "tilesInternal": "/item/{datasetId}/tiles/internal_metadata",
 }
 
 
@@ -18,13 +18,16 @@ class UPennContrastDataset:
     request to the girder API and return the result. No particular checks
     are done.
     """
+
     def __init__(self, apiUrl, token, datasetId):
         """
-        The constructor will initialize the client, and fetch necessary dataset information
+        The constructor will initialize the client, and fetch necessary
+        dataset information
 
         :param str apiUrl: The api URL to the girder server
         :param str token: The girder token for authentication
-        :param str datasetId: The id of the dataset from which images are downloaded
+        :param str datasetId: The id of the dataset from which images are
+            downloaded
         """
         self.client = girder_client.GirderClient(apiUrl=apiUrl)
         self.client.setToken(token)
@@ -32,10 +35,10 @@ class UPennContrastDataset:
         self.folderId = datasetId
         # Get the dataset item's id
         self.dataset = self.getDataset(datasetId)
-        self.datasetId = self.dataset['_id']
+        self.datasetId = self.dataset["_id"]
 
         self.tiles = self.getTilesForDataset(self.datasetId)
-        self.map = self.buildMap(self.tiles.get('frames', None))
+        self.map = self.buildMap(self.tiles.get("frames", None))
 
         self.tilesInternal = self.getTilesInternalForDataset(self.datasetId)
 
@@ -55,14 +58,15 @@ class UPennContrastDataset:
 
         map = {}
         for frame in frames:
-            channel = frame.get('IndexC', 0)
-            XY = frame.get('IndexXY', 0)
-            Z = frame.get('IndexZ', 0)
-            T = frame.get('IndexT', 0)
-            index = frame['Frame']
+            channel = frame.get("IndexC", 0)
+            XY = frame.get("IndexXY", 0)
+            Z = frame.get("IndexZ", 0)
+            T = frame.get("IndexT", 0)
+            index = frame["Frame"]
 
-            map.setdefault(channel, {}).setdefault(
-                T, {}).setdefault(Z, {}).setdefault(XY, index)
+            map.setdefault(channel, {}).setdefault(T, {}).setdefault(
+                Z, {}
+            ).setdefault(XY, index)
         return map
 
     def getDataset(self, datasetId):
@@ -73,8 +77,8 @@ class UPennContrastDataset:
         :return: The dataset item
         :rtype: dict
         """
-        items = self.client.get(PATHS['item'].format(datasetId=datasetId))
-        dataset = next(filter(lambda item: 'largeImage' in item, items))
+        items = self.client.get(PATHS["item"].format(datasetId=datasetId))
+        dataset = next(filter(lambda item: "largeImage" in item, items))
         return dataset
 
     def getTilesForDataset(self, datasetId):
@@ -85,17 +89,20 @@ class UPennContrastDataset:
         :return: The tiles metadata
         :rtype: dict
         """
-        return self.client.get(PATHS['tiles'].format(datasetId=datasetId))
+        return self.client.get(PATHS["tiles"].format(datasetId=datasetId))
 
     def getTilesInternalForDataset(self, datasetId):
         """
-        Get the tiles internal metadata for a dataset (/item/{id}/tiles/internal_metadata)
+        Get the tiles internal metadata for a dataset
+        (/item/{id}/tiles/internal_metadata)
 
         :param str datasetId: The dataset id
         :return: The tiles internal metadata
         :rtype: dict
         """
-        return self.client.get(PATHS['tilesInternal'].format(datasetId=datasetId))
+        return self.client.get(
+            PATHS["tilesInternal"].format(datasetId=datasetId)
+        )
 
     def coordinatesToFrameIndex(self, XY, Z=0, T=0, channel=0):
         """
@@ -119,8 +126,12 @@ class UPennContrastDataset:
         :return: The downloaded image as a binary buffer
         """
         frameIndex = self.coordinatesToFrameIndex(XY, Z, T, channel)
-        response = self.client.get(PATHS['image'].format(
-            datasetId=self.datasetId, frameIndex=frameIndex), jsonResp=False)
+        response = self.client.get(
+            PATHS["image"].format(
+                datasetId=self.datasetId, frameIndex=frameIndex
+            ),
+            jsonResp=False,
+        )
         return response.content
 
     def getRegion(self, datasetId=None, **kwargs):
@@ -143,17 +154,21 @@ class UPennContrastDataset:
         :return: The tiles metadata
         :rtype: dict
         """
-        if (datasetId is None or datasetId == self.datasetId or
-                datasetId == self.dataset['folderId']):
+        if (
+            datasetId is None
+            or datasetId == self.datasetId
+            or datasetId == self.dataset["folderId"]
+        ):
             itemId = self.datasetId
         else:
-            itemId = self.getDataset(datasetId)['_id']
+            itemId = self.getDataset(datasetId)["_id"]
         params = kwargs.copy()
-        params['encoding'] = 'pickle:' + str(pickle.HIGHEST_PROTOCOL)
-        params.pop('format', None)
+        params["encoding"] = "pickle:" + str(pickle.HIGHEST_PROTOCOL)
+        params.pop("format", None)
         return pickle.loads(
             self.client.get(
-                PATHS['region'].format(itemId=itemId),
+                PATHS["region"].format(itemId=itemId),
                 parameters=params,
                 jsonResp=False,
-            ).content)
+            ).content
+        )

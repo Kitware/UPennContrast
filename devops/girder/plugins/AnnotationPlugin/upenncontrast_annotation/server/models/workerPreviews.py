@@ -3,7 +3,8 @@ from girder.exceptions import ValidationException, RestException
 from girder.constants import AccessType
 from ..helpers.tasks import runJobRequest
 
-import jsonschema
+from ..helpers.fastjsonschema import customJsonSchemaCompile
+import fastjsonschema
 
 
 from girder.models.folder import Folder
@@ -11,27 +12,19 @@ from girder.models.folder import Folder
 
 class PreviewSchema:
     previewSchema = {
-        '$schema': 'http://json-schema.org/schema#',
-        'id': '/girder/plugins/upenncontrast_annotation/models/workerPreviews',
-        'type': 'object',
-        'properties': {
-            'name': {
-                'type': 'string'
+        "$schema": "http://json-schema.org/draft-04/schema",
+        "id": "/girder/plugins/upenncontrast_annotation/models/workerPreviews",
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "image": {"type": "string"},
+            "preview": {
+                "type": "object",
+                "properties": {
+                    "image": {"type": "string"},
+                    "preview": {"type": "object"},
+                },
             },
-            'image': {
-                'type': 'string'
-            },
-            'preview': {
-                'type': 'object',
-                'properties': {
-                    'image': {
-                        'type': 'string'
-                    },
-                    'preview': {
-                        'type': 'object'
-                    }
-                }
-            }
         },
         # 'additionalProperties': False
     }
@@ -39,8 +32,8 @@ class PreviewSchema:
 
 class WorkerPreviewModel(ProxiedAccessControlledModel):
 
-    validator = jsonschema.Draft4Validator(
-        PreviewSchema.previewSchema
+    jsonValidate = staticmethod(
+        customJsonSchemaCompile(PreviewSchema.previewSchema)
     )
 
     def initialize(self):
@@ -48,15 +41,16 @@ class WorkerPreviewModel(ProxiedAccessControlledModel):
 
     def validate(self, document):
         try:
-            self.validator.validate(document)
-        except jsonschema.ValidationError as exp:
+            self.jsonValidate(document)
+        except fastjsonschema.JsonSchemaValueException as exp:
             raise ValidationException(exp)
         return document
 
     def create(self, creator, image, preview):
-        created = {'image': image, 'preview': preview}
-        self.setUserAccess(created, user=creator,
-                           level=AccessType.ADMIN, save=False)
+        created = {"image": image, "preview": preview}
+        self.setUserAccess(
+            created, user=creator, level=AccessType.ADMIN, save=False
+        )
         return self.save(created)
 
     def delete(self, image):
@@ -66,17 +60,18 @@ class WorkerPreviewModel(ProxiedAccessControlledModel):
         existing = self.getImagePreview(image)
         if existing is None:
             return self.create(creator, image, preview)
-        existing['preview'] = preview
+        existing["preview"] = preview
         return self.save(existing)
 
     def getImagePreview(self, image):
-        query = {'image': image}
+        query = {"image": image}
         return self.findOne(query)
 
     def requestPreviewUpdate(self, image, datasetId, parameters, user):
         dataset = Folder().load(datasetId, user=user, level=AccessType.WRITE)
         if not dataset:
             raise RestException(
-                code=500, message="Invalid dataset id in annotation")
+                code=500, message="Invalid dataset id in annotation"
+            )
 
-        return runJobRequest(image, datasetId, parameters, 'preview')
+        return runJobRequest(image, datasetId, parameters, "preview")

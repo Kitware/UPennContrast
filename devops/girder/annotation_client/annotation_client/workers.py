@@ -4,8 +4,8 @@ import girder_client
 import urllib
 
 PATHS = {
-    'interface': '/worker_interface?image={image}',
-    'preview': '/worker_preview?image={image}',
+    "interface": "/worker_interface?image={image}",
+    "preview": "/worker_preview?image={image}",
 }
 
 
@@ -34,7 +34,12 @@ class UPennContrastWorkerPreviewClient:
         :return: The created object (Note: will contain the _id field)
         :rtype: dict
         """
-        return self.client.post(PATHS['interface'].format(image=urllib.parse.quote(image, safe='')), json=interface)
+        return self.client.post(
+            PATHS["interface"].format(
+                image=urllib.parse.quote(image, safe="")
+            ),
+            json=interface,
+        )
 
     def setWorkerImagePreview(self, image, preview):
         """
@@ -44,8 +49,11 @@ class UPennContrastWorkerPreviewClient:
         :return: The created object (Note: will contain the _id field)
         :rtype: dict
         """
-        return self.client.post(PATHS['preview'].format(image=urllib.parse.quote(image, safe='')), json=preview)
-    
+        return self.client.post(
+            PATHS["preview"].format(image=urllib.parse.quote(image, safe="")),
+            json=preview,
+        )
+
 
 class UPennContrastWorkerClient:
 
@@ -56,20 +64,22 @@ class UPennContrastWorkerClient:
         self.token = token
         self.params = params
 
-        self.propertyId = params.get('id', 'unknown_property')
+        self.propertyId = params.get("id", "unknown_property")
 
         # Setup helper classes with url and credentials
         self.annotationClient = annotations.UPennContrastAnnotationClient(
-            apiUrl=apiUrl, token=token)
+            apiUrl=apiUrl, token=token
+        )
         self.datasetClient = tiles.UPennContrastDataset(
-            apiUrl=apiUrl, token=token, datasetId=datasetId)
+            apiUrl=apiUrl, token=token, datasetId=datasetId
+        )
 
         # Cache downloaded images by location
         self.images = {}
 
     def get_annotation_list_by_id(self):
 
-        annotationIds = self.params.get('annotationIds', None)
+        annotationIds = self.params.get("annotationIds", None)
 
         annotationList = []
         # Get the annotations specified by id in the parameters
@@ -82,32 +92,43 @@ class UPennContrastWorkerClient:
 
         # Get all point annotations from the dataset
         annotationList = self.annotationClient.getAnnotationsByDatasetId(
-            self.datasetId, shape=shape, limit=limit, offset=offset)
+            self.datasetId, shape=shape, limit=limit, offset=offset
+        )
 
         return annotationList
 
     def get_image_for_annotation(self, annotation):
 
         # Get image location
-        channel = self.params['workerInterface'].get('Channel', None)
+        channel = self.params["workerInterface"].get("Channel", None)
         if channel is None:
-            channel = self.params.get('channel', None)
-        if channel is None:  # Default to the annotation's channel, null means Any was selected
-            channel = annotation.get('channel', None)
+            channel = self.params.get("channel", None)
+        if (
+            channel is None
+        ):  # Default to the annotation's channel, null means Any was selected
+            channel = annotation.get("channel", None)
         if channel is None:
             return None
 
-        location = annotation['location']
-        time, z, xy = location['Time'], location['Z'], location['XY']
+        location = annotation["location"]
+        time, z, xy = location["Time"], location["Z"], location["XY"]
 
         # Look for cached image. Initialize cache if necessary.
-        image = self.images.setdefault(channel, {}).setdefault(
-            time, {}).setdefault(z, {}).get(xy, None)
+        image = (
+            self.images.setdefault(channel, {})
+            .setdefault(time, {})
+            .setdefault(z, {})
+            .get(xy, None)
+        )
 
         if image is None:
             # Obtain the image at specified location
-            frame = self.datasetClient.coordinatesToFrameIndex(xy, z, time, channel)
-            image = self.datasetClient.getRegion(self.datasetId, frame=frame).squeeze()
+            frame = self.datasetClient.coordinatesToFrameIndex(
+                xy, z, time, channel
+            )
+            image = self.datasetClient.getRegion(
+                self.datasetId, frame=frame
+            ).squeeze()
 
             # Cache the image
             self.images[channel][time][z][xy] = image
@@ -118,15 +139,19 @@ class UPennContrastWorkerClient:
         """
         Add property values to this annotation
         :param dict annotation: The annotation having the properties
-        :param (number|dict) values: The value for this property (a number or a dict of numbers)
+        :param (number|dict) values: The value for this property (a number or
+            a dict of numbers)
         """
         property_values = {self.propertyId: values}
-        self.annotationClient.addAnnotationPropertyValues(self.datasetId, annotation['_id'], property_values)
+        self.annotationClient.addAnnotationPropertyValues(
+            self.datasetId, annotation["_id"], property_values
+        )
 
     def add_multiple_annotation_property_values(self, values):
         """
         Add a list of property values to the annotations
-        :param list values: A dict that links a dataset ID to a dict containing a value for each annotation ID
+        :param list values: A dict that links a dataset ID to a dict
+        containing a value for each annotation ID
         Example of valid values:
         ```
         {
@@ -166,11 +191,15 @@ class UPennContrastWorkerClient:
         propertyId = self.propertyId
         for datasetId in values:
             for annotationId in values[datasetId]:
-                reformatedValues.append({
-                    "datasetId": datasetId,
-                    "annotationId": annotationId,
-                    "values": {
-                        propertyId: values[datasetId][annotationId]
-                    },
-                })
-        self.annotationClient.addMultipleAnnotationPropertyValues(reformatedValues)
+                reformatedValues.append(
+                    {
+                        "datasetId": datasetId,
+                        "annotationId": annotationId,
+                        "values": {
+                            propertyId: values[datasetId][annotationId]
+                        },
+                    }
+                )
+        self.annotationClient.addMultipleAnnotationPropertyValues(
+            reformatedValues
+        )
