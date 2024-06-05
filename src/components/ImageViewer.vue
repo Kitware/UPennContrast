@@ -339,6 +339,7 @@ export default class ImageViewer extends Vue {
   histogramCaches: number = 0;
   cacheProgresses: { progress: number; total: number }[] = [];
   scaleWidget: IGeoJSScaleWidget | null = null;
+  scalePixelWidget: IGeoJSScaleWidget | null = null;
 
   // Logic to show help for the SAM tool
 
@@ -498,8 +499,16 @@ export default class ImageViewer extends Vue {
     return this.store.backgroundColor;
   }
 
+  get pixelSize() {
+    return this.store.scales.pixelSize;
+  }
+
   get showScalebar() {
     return this.store.showScalebar;
+  }
+
+  get showPixelScalebar() {
+    return this.store.showPixelScalebar;
   }
 
   mounted() {
@@ -865,16 +874,18 @@ export default class ImageViewer extends Vue {
         mapentry.uiLayer.node().css({ "mix-blend-mode": "unset" });
       }
       this.updateScaleWidget();
+      this.updateScalePixelWidget();
     }
   }
 
   @Watch("showScalebar")
+  @Watch("pixelSize")
   updateScaleWidget() {
     const uiLayer = this.maps[0]?.uiLayer;
     if (!uiLayer) {
       return;
     }
-    const pixelSizeScale = this.store.scales.pixelSize;
+    const pixelSizeScale = this.pixelSize;
     const pixelSizeM = convertLength(
       pixelSizeScale.value,
       pixelSizeScale.unit,
@@ -897,11 +908,57 @@ export default class ImageViewer extends Vue {
       this.scaleWidget = uiLayer.createWidget("scale", {
         scale: pixelSizeM,
         strokeWidth: 5,
-        tickLength: 0,
+        tickLength: 2.5, // has to be strokeWidth/2 instead of 0
         position: { bottom: 20, right: 10 },
       });
-      const svgElement = this.scaleWidget.parentCanvas()
-        .firstChild as SVGElement;
+      const svgElement = this.scaleWidget.canvas();
+      svgElement.classList.add("scale-widget");
+      svgElement.onclick = (event: MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.scaleDialog = true;
+      };
+    }
+  }
+
+  @Watch("showPixelScalebar")
+  @Watch("pixelSize")
+  updateScalePixelWidget() {
+    const uiLayer = this.maps[0]?.uiLayer;
+    if (!uiLayer) {
+      return;
+    }
+    const oldWidgetLayer = this.scaleWidget?.layer();
+    if (this.scalePixelWidget && !this.showPixelScalebar) {
+      if (oldWidgetLayer && oldWidgetLayer === uiLayer) {
+        // If oldWidgetLayer and uiLayer are different,
+        // it means that the oldWidgetLayer has already been deleted and
+        // that this.scalePixelWidget has been deleted too
+        oldWidgetLayer.deleteWidget(this.scalePixelWidget);
+      }
+      this.scalePixelWidget = null;
+    }
+    if (!this.scalePixelWidget && this.showPixelScalebar) {
+      this.scalePixelWidget = uiLayer.createWidget("scale", {
+        strokeWidth: 5,
+        maxWidth: 200,
+        tickLength: 2.5, // has to be strokeWidth/2 instead of 0
+        position: { bottom: 60, right: 10 },
+        orientation: "top",
+        units: [
+          {
+            unit: "pixels",
+            scale: 1,
+            multiples: [
+              { multiple: 10, digit: 1 },
+              { multiple: 1, digit: 1 },
+            ],
+          },
+        ],
+        distance: (pt1: IGeoJSPoint2D, pt2: IGeoJSPoint2D) =>
+          Math.sqrt((pt1.x - pt2.x) ** 2 + (pt1.y - pt2.y) ** 2),
+      });
+      const svgElement = this.scalePixelWidget.canvas();
       svgElement.classList.add("scale-widget");
       svgElement.onclick = (event: MouseEvent) => {
         event.preventDefault();
@@ -1274,7 +1331,7 @@ export default class ImageViewer extends Vue {
 }
 
 .geojs-scale-widget-bar {
-  stroke: white;
+  stroke: white !important;
 }
 
 .geojs-scale-widget-text {

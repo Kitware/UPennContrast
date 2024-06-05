@@ -40,6 +40,7 @@
               'Show the scalebar widget at the bottom right of the image; click scalebar to edit settings',
           }"
         />
+        <pixel-scale-bar-setting />
         <v-switch
           hide-details
           dense
@@ -96,8 +97,9 @@ import {
   compositionItems,
   advancedCompositionItems,
 } from "@/utils/compositionModes";
+import PixelScaleBarSetting from "@/components/PixelScaleBarSetting.vue";
 
-@Component
+@Component({ components: { PixelScaleBarSetting } })
 export default class ViewerSettings extends Vue {
   readonly store = store;
   readonly compositionItems = [

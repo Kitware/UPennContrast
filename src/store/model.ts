@@ -746,6 +746,7 @@ export interface IGeoJSScaleWidget {
   parent: (() => IGeoJsSceneObject) &
     ((arg: IGeoJsSceneObject) => IGeoJSScaleWidget);
   parentCanvas: () => HTMLElement;
+  canvas: (() => HTMLElement) & ((val: HTMLElement) => IGeoJSScaleWidget);
   layer: () => IGeoJSUiLayer;
 }
 

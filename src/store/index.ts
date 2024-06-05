@@ -119,6 +119,7 @@ export class Main extends VuexModule {
   hoverValue: { [layerId: string]: number[] } | null = null;
 
   showScalebar: boolean = true;
+  showPixelScalebar: boolean = true;
 
   scaleAnnotationsWithZoom: boolean = true;
 
@@ -245,6 +246,11 @@ export class Main extends VuexModule {
   @Mutation
   public setShowScalebar(value: boolean) {
     this.showScalebar = value;
+  }
+
+  @Mutation
+  public setShowPixelScalebar(value: boolean) {
+    this.showPixelScalebar = value;
   }
 
   @Mutation
