@@ -33,7 +33,10 @@ class CustomAccessControlledModel(AccessControlledModel):
                 validate = False
 
         if validate:
-            documents = [self.validate(document) for document in documents]
+            if getattr(self, "validateMultiple", None) is not None:
+                documents = self.validateMultiple(documents)
+            else:
+                documents = [self.validate(document) for document in documents]
 
         if triggerEvents:
             event = events.trigger("model.%s.saveMany" % self.name, documents)

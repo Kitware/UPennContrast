@@ -125,8 +125,7 @@ class AnnotationConnection(ProxiedAccessControlledModel):
             self.setUserAccess(
                 connection, user=creator, level=AccessType.ADMIN, save=False
             )
-        self.validateMultiple(connections)
-        return self.saveMany(connections, validate=False)
+        return self.saveMany(connections)
 
     def delete(self, connection):
         self.remove(self.find(connection))

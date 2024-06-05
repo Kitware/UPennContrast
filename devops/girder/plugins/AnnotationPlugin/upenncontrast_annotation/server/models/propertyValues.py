@@ -8,6 +8,11 @@ import fastjsonschema
 
 
 class PropertySchema:
+    recursiveValuesId = (
+        "/girder/plugins/upenncontrast_annotation/models"
+        "/propertyValues/recursiveValues"
+    )
+
     annotationPropertySchema = {
         "$schema": "http://json-schema.org/draft-04/schema",
         "id": "/girder/plugins/upenncontrast_annotation/models/propertyValues",
@@ -18,6 +23,7 @@ class PropertySchema:
             },
             "datasetId": {"type": "string"},
             "values": {
+                "id": recursiveValuesId,
                 "type": "object",
                 "additionalProperties": {
                     "anyOf": [
@@ -25,8 +31,7 @@ class PropertySchema:
                             "type": "number",
                         },
                         {
-                            "type": "object",
-                            "additionalProperties": {"type": "number"},
+                            "$ref": recursiveValuesId,
                         },
                     ],
                 },

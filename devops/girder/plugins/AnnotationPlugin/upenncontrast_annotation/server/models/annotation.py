@@ -137,9 +137,9 @@ class Annotation(ProxiedAccessControlledModel):
         )
 
     def validate(self, document):
-        self.validateMultiple([document], None)
+        return self.validateMultiple([document])[0]
 
-    def validateMultiple(self, annotations, user):
+    def validateMultiple(self, annotations):
         # Extract property values if they exist
         propertyValues = []
         for annotation in annotations:
@@ -165,7 +165,7 @@ class Annotation(ProxiedAccessControlledModel):
         # Add the property values if given
         if len(propertyValues) > 0:
             PropertiesModel().appendMultipleValues(
-                user,
+                None,
                 [
                     {
                         "annotationId": annotation["_id"],
@@ -189,9 +189,7 @@ class Annotation(ProxiedAccessControlledModel):
             self.setUserAccess(
                 annotation, user=creator, level=AccessType.ADMIN, save=False
             )
-        # Batched validation for performance: avoid many calls to Folder().load
-        annotations = self.validateMultiple(annotations, creator)
-        return self.saveMany(annotations, validate=False)
+        return self.saveMany(annotations)
 
     def delete(self, annotation):
         self.remove(annotation)
