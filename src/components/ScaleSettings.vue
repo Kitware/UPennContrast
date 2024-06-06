@@ -52,6 +52,11 @@
         </span>
       </v-list-item-content>
     </v-list-item>
+    <v-list-item>
+      <v-list-item-content>
+        <pixel-scale-bar-setting class="mx-2" />
+      </v-list-item-content>
+    </v-list-item>
   </v-list>
 </template>
 
@@ -70,13 +75,15 @@ import {
 import { convertLength, convertTime } from "@/utils/conversion";
 import { getDatasetScales } from "@/store/GirderAPI";
 
+import PixelScaleBarSetting from "@/components/PixelScaleBarSetting.vue";
+
 interface IScaleItem {
   text: string;
   key: keyof IScales;
   unit: "time" | "length";
 }
 
-@Component
+@Component({ components: { PixelScaleBarSetting } })
 export default class ScaleSettings extends Vue {
   readonly store = store;
   readonly unitLengthOptions = unitLengthOptions;

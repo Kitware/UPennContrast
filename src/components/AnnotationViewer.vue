@@ -404,7 +404,7 @@ export default class AnnotationViewer extends Vue {
     } else {
       // Preview shift drag select
       const vertices = mouseState?.path ?? [];
-      if (vertices.length > 0) {
+      if (vertices.length > 1) {
         this.selectionAnnotation = geojs.annotation.lineAnnotation({
           style: baseStyle,
           vertices,
