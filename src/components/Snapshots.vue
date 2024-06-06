@@ -332,6 +332,7 @@ import { formatDate } from "@/utils/date";
 import { downloadToClient } from "@/utils/download";
 import {
   IDatasetLocation,
+  IDisplayLayer,
   IGeoJSAnnotation,
   IGeoJSAnnotationLayer,
   IGeoJSBounds,
@@ -571,12 +572,20 @@ export default class Snapshots extends Vue {
 
     this.downloading = true;
 
+    // Snapshots always come from the current configuration
+    const configuration = this.store.configuration;
+    if (!configuration) {
+      return;
+    }
+
     try {
       const urls = await this.getUrlsForSnapshot(
         location,
         boundingBox,
         datasetId,
         this.newName,
+        configuration.layers,
+        configuration.name,
       );
       if (!urls) {
         return;
@@ -592,7 +601,11 @@ export default class Snapshots extends Vue {
 
     try {
       const allUrls: URL[] = [];
-      for (const snapshot of this.store.configuration?.snapshots || []) {
+      const configuration = this.store.configuration;
+      if (!configuration) {
+        return;
+      }
+      for (const snapshot of configuration.snapshots || []) {
         const datasetView = await this.store.api.getDatasetView(
           snapshot.datasetViewId,
         );
@@ -601,6 +614,8 @@ export default class Snapshots extends Vue {
           snapshot.screenshot.bbox,
           datasetView.datasetId,
           snapshot.name,
+          snapshot.layers,
+          configuration.name,
         );
         if (currentUrls) {
           allUrls.push(...currentUrls);
@@ -618,6 +633,8 @@ export default class Snapshots extends Vue {
     boundingBox: IGeoJSBounds,
     datasetId: string,
     name: string,
+    layers: IDisplayLayer[],
+    configurationName: string,
   ) {
     // Get dataset
     const dataset =
@@ -634,12 +651,6 @@ export default class Snapshots extends Vue {
       return;
     }
     const itemId = anyImage.item._id;
-
-    // Snapshots always come from the current configuration
-    const configuration = this.store.configuration;
-    if (!configuration) {
-      return;
-    }
 
     // Get the filename
     const dateStr = formatDate(new Date());
@@ -675,7 +686,7 @@ export default class Snapshots extends Vue {
       for (const { url, channel } of channelUrls) {
         const channelName =
           dataset.channelNames.get(channel) ?? "Unknown channel";
-        const fileName = `${name} - ${channelName} - ${dataset.name} - ${configuration.name} - ${dateStr}.${extension}`;
+        const fileName = `${name} - ${channelName} - ${dataset.name} - ${configurationName} - ${dateStr}.${extension}`;
         url.searchParams.set("contentDispositionFilename", fileName);
         urls.push(url);
       }
@@ -683,17 +694,17 @@ export default class Snapshots extends Vue {
       const layerUrls = await getLayersDownloadUrls(
         baseUrl,
         this.exportLayer,
-        configuration.layers,
+        layers,
         dataset,
         location,
       );
       for (const { url, layerIds } of layerUrls) {
         const layerNames = layerIds.map(
           (layerId) =>
-            configuration.layers.find((layer) => layer.id === layerId)?.name ??
+            layers.find((layer) => layer.id === layerId)?.name ??
             "Unknown layer",
         );
-        const fileName = `${name} - ${layerNames.join(" ")} - ${dataset.name} - ${configuration.name} - ${dateStr}.${extension}`;
+        const fileName = `${name} - ${layerNames.join(" ")} - ${dataset.name} - ${configurationName} - ${dateStr}.${extension}`;
         url.searchParams.set("contentDispositionFilename", fileName);
         urls.push(url);
       }
