@@ -104,24 +104,27 @@
                   @click.stop="() => toggleAnnotationSelection(item.annotation)"
                 />
               </td>
-              <td :class="tableItemClass" v-if="selectedColumns.includes('id')">
+              <td
+                :class="tableItemClass"
+                v-if="selectedColumns.includes('annotation.id')"
+              >
                 <span>{{ item.annotation.id }}</span>
               </td>
               <td
                 :class="tableItemClass"
                 v-if="selectedColumns.includes('index')"
               >
-                <span>{{ annotationIdToIndex[item.annotation.id] }}</span>
+                <span>{{ item.index }}</span>
               </td>
               <td
                 :class="tableItemClass"
-                v-if="selectedColumns.includes('shape')"
+                v-if="selectedColumns.includes('shapeName')"
               >
                 <span>{{ item.shapeName }}</span>
               </td>
               <td
                 :class="tableItemClass"
-                v-if="selectedColumns.includes('tags')"
+                v-if="selectedColumns.includes('annotation.tags')"
               >
                 <span>
                   <v-chip
@@ -133,18 +136,18 @@
                   >
                 </span>
               </td>
-              <td v-if="selectedColumns.includes('xy')">
+              <td v-if="selectedColumns.includes('annotation.location.XY')">
                 {{ item.annotation.location.XY + 1 }}
               </td>
-              <td v-if="selectedColumns.includes('z')">
+              <td v-if="selectedColumns.includes('annotation.location.Z')">
                 {{ item.annotation.location.Z + 1 }}
               </td>
-              <td v-if="selectedColumns.includes('time')">
+              <td v-if="selectedColumns.includes('annotation.location.Time')">
                 {{ item.annotation.location.Time + 1 }}
               </td>
               <td
                 :class="tableItemClass"
-                v-if="selectedColumns.includes('name')"
+                v-if="selectedColumns.includes('annotation.name')"
               >
                 <v-text-field
                   hide-details
@@ -191,11 +194,30 @@ import {
   IAnnotationPropertyValues,
 } from "@/store/model";
 
+const allHeaders = [
+  { text: "Annotation ID", value: "annotation.id" },
+  { text: "Index", value: "index" },
+  { text: "Shape", value: "shapeName" },
+  { text: "Tags", value: "annotation.tags" },
+  { text: "XY", value: "annotation.location.XY" },
+  { text: "Z", value: "annotation.location.Z" },
+  { text: "Time", value: "annotation.location.Time" },
+  { text: "Name", value: "annotation.name" },
+] as const satisfies readonly {
+  readonly text: string;
+  readonly value: string;
+}[];
+
+const allHeaderIds = allHeaders.map(({ value }) => value);
+
+type THeaderId = (typeof allHeaderIds)[number];
+
 interface IAnnotationListItem {
   annotation: IAnnotation;
+  index: number;
   shapeName: string;
   isSelected: boolean;
-  properties: IAnnotationPropertyValues[0];
+  properties: IAnnotationPropertyValues[string];
 }
 
 @Component({
@@ -208,18 +230,9 @@ export default class AnnotationList extends Vue {
   readonly filterStore = filterStore;
   readonly getStringFromPropertiesAndPath = getStringFromPropertiesAndPath;
 
-  columnOptions = [
-    { text: "Annotation ID", value: "id" },
-    { text: "Index", value: "index" },
-    { text: "Shape", value: "shape" },
-    { text: "Tags", value: "tags" },
-    { text: "XY", value: "xy" },
-    { text: "Z", value: "z" },
-    { text: "Time", value: "time" },
-    { text: "Name", value: "name" },
-  ];
+  readonly columnOptions = allHeaders;
 
-  selectedColumns = ["id", "index", "shape", "tags", "xy", "z", "time", "name"];
+  selectedColumns: THeaderId[] = allHeaderIds;
 
   tableItemClass = "px-1"; // To enable dividers, use v-data-table__divider
 
@@ -275,6 +288,7 @@ export default class AnnotationList extends Vue {
   get annotationToItem() {
     return (annotation: IAnnotation) => ({
       annotation,
+      index: this.annotationIdToIndex[annotation.id],
       shapeName: AnnotationNames[annotation.shape],
       isSelected: this.annotationStore.isAnnotationSelected(annotation.id),
       properties: this.propertyStore.propertyValues[annotation.id] || {},
@@ -321,18 +335,6 @@ export default class AnnotationList extends Vue {
   }
 
   get headers() {
-    const allHeaders = [
-      { text: "Annotation ID", value: "id" },
-      { text: "Index", value: "index" },
-      { text: "Shape", value: "shape" },
-      { text: "Tags", value: "tags" },
-      { text: "XY", value: "xy" },
-      { text: "Z", value: "z" },
-      { text: "Time", value: "time" },
-      { text: "Name", value: "name" },
-      // Add more headers if necessary
-    ];
-
     // Filter headers based on selectedColumns while preserving the order defined above
     const filteredHeaders = allHeaders.filter((header) =>
       this.selectedColumns.includes(header.value),
@@ -349,7 +351,7 @@ export default class AnnotationList extends Vue {
       const fullName = this.propertyStore.getFullNameFromPath(path);
       propertyHeaders.push({
         text: fullName,
-        value: "", // Not optional but not used because the slot "body" is used
+        value: "properties." + path.join("."),
       });
     }
     return propertyHeaders;
