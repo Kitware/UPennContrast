@@ -46,12 +46,12 @@
         </template>
       </v-card-text>
       <v-card-actions>
-        <v-btn @click="download" :enabled="text && text.length">
-          <v-icon> mdi-save </v-icon>
-          DOWNLOAD
-        </v-btn>
         <v-spacer></v-spacer>
-        <v-btn @click="dialog = false" text>Done</v-btn>
+        <v-btn @click="dialog = false" text>Close</v-btn>
+        <v-btn @click="download" :enabled="text && text.length" color="success">
+          <v-icon> mdi-save </v-icon>
+          Download
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
