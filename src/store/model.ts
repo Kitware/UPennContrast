@@ -768,13 +768,17 @@ export interface IGeoJSUiLayer extends IGeoJSLayer {
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.annotation.html
 export interface IGeoJSAnnotation {
+  draw: () => IGeoJSAnnotation;
   options: (() => IObject) &
     ((key: string) => any) &
     ((key: string, value: any) => IGeoJSAnnotation) &
     ((values: IObject) => IGeoJSAnnotation);
   style: (value?: IObject) => any;
   coordinates: () => IGeoJSPosition[];
+  _coordinates: (coordinates?: IGeoJSPosition[]) => IGeoJSPosition[];
   geojson: () => any;
+  type: () => AnnotationShape;
+  layer: ((arg: IGeoJSLayer) => IGeoJSAnnotation) & (() => IGeoJSLayer);
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.html#.mouseState
