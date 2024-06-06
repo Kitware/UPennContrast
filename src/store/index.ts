@@ -1,4 +1,9 @@
-import { RestClient, RestClientInstance, IGirderItem } from "@/girder";
+import {
+  RestClient,
+  RestClientInstance,
+  IGirderItem,
+  IGirderLocation,
+} from "@/girder";
 import { IGirderSelectAble, IGirderUser } from "@/girder";
 import {
   Action,
@@ -77,6 +82,7 @@ export class Main extends VuexModule {
   propertiesAPI = new PropertiesAPI(this.girderRest);
 
   girderUser: IGirderUser | null = this.girderRest.user;
+  folderLocation: IGirderLocation = this.girderUser || { type: "users" };
 
   history: IHistoryEntry[] = [];
 
@@ -216,6 +222,11 @@ export class Main extends VuexModule {
         this.z,
       );
     };
+  }
+
+  @Mutation
+  setFolderLocation(location: IGirderLocation) {
+    this.folderLocation = location;
   }
 
   @Mutation
@@ -415,6 +426,9 @@ export class Main extends VuexModule {
     this.girderUrl = persister.set("girderUrl", girderUrl);
     this.girderRest = girderRest;
     this.girderUser = girderRest.user;
+    if (this.girderUser) {
+      this.folderLocation = this.girderUser;
+    }
     // don't replace the api hook with a new one.
     /*
     this.api = new GirderAPI(this.girderRest);
