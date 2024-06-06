@@ -139,14 +139,25 @@ export default class Home extends Vue {
   readonly store = store;
   readonly girderResources = girderResources;
 
-  location: IGirderLocation | null = null;
+  get location() {
+    return this.store.folderLocation;
+  }
+
+  set location(location: IGirderLocation) {
+    if (
+      !location ||
+      ("_modelType" in location &&
+        location._modelType == "folder" &&
+        isDatasetFolder(location))
+    ) {
+      return;
+    }
+    this.store.setFolderLocation(location);
+  }
 
   uploadTab: number = 0;
 
   get locationName() {
-    if (!this.location) {
-      return "";
-    }
     // @ts-ignore: name or login may be undefined, but this case is checked
     const name: string = this.location.name || this.location.login;
     if (name) {
