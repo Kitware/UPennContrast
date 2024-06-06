@@ -104,32 +104,27 @@ export function toStyle(
 ): ITileOptions {
   // unless we add a gamma function, 2 steps are all that are necessary.
   const p = palette(color, 2);
-  if (contrast.mode === "absolute") {
-    return {
-      min: contrast.blackPoint,
-      max: contrast.whitePoint,
-      palette: p,
-    };
-  }
   let style: ITileOptions = {
     min: "min",
     max: "max",
     palette: p,
   };
-  if (hist) {
+  if (contrast.mode === "absolute") {
+    style.max = contrast.whitePoint;
+    style.min = contrast.blackPoint;
+  } else if (hist) {
     const scale = scaleLinear()
       .domain([0, 100])
       .rangeRound([hist.min, hist.max]);
-    style = {
-      min: scale(contrast.blackPoint),
-      max: scale(contrast.whitePoint),
-      palette: p,
-    };
+    style.min = scale(contrast.blackPoint);
+    style.max = scale(contrast.whitePoint);
   }
   if (layer && ds && image) {
     const mmxy = layer.xy.type === "max-merge";
     const mmt = layer.time.type === "max-merge";
     const mmz = layer.z.type === "max-merge";
+    const channel = image.key.c;
+    const offset = image.keyOffset;
     if (mmxy || mmt || mmz) {
       const composite: { [key: string]: any }[] = [];
       for (let xyi = 0; xyi < (mmxy ? ds.xy.length : 1); xyi += 1) {
@@ -138,13 +133,9 @@ export function toStyle(
           const t = mmt ? ds.time[ti] : image.key.t;
           for (let zi = 0; zi < (mmz ? ds.z.length : 1); zi += 1) {
             const z = mmz ? ds.z[zi] : image.key.z;
-            composite.push({
-              frame: ds.images(z, t, xy, image.key.c)[image.keyOffset]
-                .frameIndex,
-              min: style.min,
-              max: style.max,
-              palette: style.palette,
-            });
+            const compositeImage = ds.images(z, t, xy, channel)[offset];
+            const frame = compositeImage.frameIndex;
+            composite.push({ ...style, frame });
           }
         }
       }
