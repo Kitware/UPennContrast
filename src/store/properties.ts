@@ -99,6 +99,7 @@ export class Properties extends VuexModule {
     const workerPreview = await this.propertiesAPI.getWorkerPreview(image);
     this.setWorkerPreview({ image, workerPreview });
   }
+
   @Mutation
   setWorkerInterface({
     image,
@@ -114,6 +115,11 @@ export class Properties extends VuexModule {
   }
 
   @Mutation
+  deleteWorkerInterface(image: string) {
+    Vue.delete(this.workerInterfaces, image);
+  }
+
+  @Mutation
   setDisplayWorkerPreview(value: boolean) {
     this.displayWorkerPreview = value;
   }
@@ -126,13 +132,17 @@ export class Properties extends VuexModule {
     image: string;
     force?: boolean;
   }) {
+    this.deleteWorkerInterface(image);
     // First request to see if girder already has the worker interface
     let workerInterface: IWorkerInterface | null = null;
     if (!force) {
       workerInterface = await this.propertiesAPI.getWorkerInterface(image);
     }
-    if (!workerInterface) {
-      // If girder didn't fetch the interface, make it ask the worker for its interface
+    if (
+      !workerInterface ||
+      Object.values(workerInterface).find(({ noCache }) => noCache)
+    ) {
+      // If girder didn't fetch the interface or the cache is disabled, make it ask the worker for its interface
       await this.requestWorkerInterface(image);
       // Then, getWorkerInterface: client asks girder for the interface it should have received
       workerInterface = await this.propertiesAPI.getWorkerInterface(image);
