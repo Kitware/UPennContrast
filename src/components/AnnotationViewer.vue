@@ -655,7 +655,7 @@ export default class AnnotationViewer extends Vue {
 
   drawTooltips = throttle(this.drawTooltipsNoThrottle, THROTTLE).bind(this);
   drawTooltipsNoThrottle() {
-    this.textLayer.features().forEach((feature: any) => {
+    this.textLayer.features().forEach((feature: IGeoJSFeature) => {
       this.textLayer.deleteFeature(feature);
     });
 
@@ -1125,9 +1125,11 @@ export default class AnnotationViewer extends Vue {
 
   private shouldSelectAnnotation(
     selectionAnnotationType: AnnotationShape,
-    selectionAnnotationCoordinates: any[],
+    selectionAnnotationCoordinates: IGeoJSPosition[],
     annotation: IAnnotation,
-    annotationStyle: any,
+    annotationStyle: IGeoJSPointFeatureStyle &
+      IGeoJSLineFeatureStyle &
+      IGeoJSPolygonFeatureStyle,
     unitsPerPixel: number,
   ) {
     const annotationCoordinates = annotation.coordinates;
@@ -1145,7 +1147,8 @@ export default class AnnotationViewer extends Vue {
       const { radius, strokeWidth } = annotationStyle;
 
       if (annotation.shape === AnnotationShape.Point) {
-        const annotationRadius = (radius + strokeWidth) * unitsPerPixel;
+        const annotationRadius =
+          ((radius as number) + (strokeWidth as number)) * unitsPerPixel;
         const annotationPosition = annotationCoordinates[0];
         return (
           pointDistance(selectionPosition, annotationPosition) <
@@ -1153,9 +1156,9 @@ export default class AnnotationViewer extends Vue {
         );
       } else if (annotation.shape === AnnotationShape.Line) {
         // Check if click on points of the line, or on the line directly
-        const width = strokeWidth * unitsPerPixel;
+        const width = (strokeWidth as number) * unitsPerPixel;
         return annotationCoordinates.reduce(
-          (isIn: boolean, point: any, index: number) => {
+          (isIn: boolean, point: IGeoJSPosition, index: number) => {
             let isPointInLine = false;
             if (index === annotationCoordinates.length - 1) {
               // Specific case for the last point that does not have a next point
@@ -1182,13 +1185,15 @@ export default class AnnotationViewer extends Vue {
       // If the selection annotation type is "Polygon"
       // Check if the tested annotation (independently from its type)
       // is in the defined polygon
-      return annotation.coordinates.some((point: any) => {
+      return annotation.coordinates.some((point: IGeoJSPosition) => {
         return geojs.util.pointInPolygon(point, selectionAnnotationCoordinates);
       });
     }
   }
 
-  private getSelectedAnnotationsFromAnnotation(selectAnnotation: any) {
+  private getSelectedAnnotationsFromAnnotation(
+    selectAnnotation: IGeoJSAnnotation,
+  ) {
     const coordinates = selectAnnotation.coordinates();
     const type = selectAnnotation.type();
 
@@ -1235,7 +1240,7 @@ export default class AnnotationViewer extends Vue {
     return selectedAnnotations;
   }
 
-  private selectAnnotations(selectAnnotation: any) {
+  private selectAnnotations(selectAnnotation: IGeoJSAnnotation) {
     if (!selectAnnotation) {
       return;
     }
@@ -1258,7 +1263,9 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.removeAnnotation(selectAnnotation);
   }
 
-  private async handleAnnotationConnections(selectAnnotation: any) {
+  private async handleAnnotationConnections(
+    selectAnnotation: IGeoJSAnnotation,
+  ) {
     const datasetId = this.dataset?.id;
     if (!selectAnnotation || !datasetId || !this.selectedToolConfiguration) {
       return;
@@ -1353,7 +1360,7 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.removeAnnotation(selectAnnotation);
   }
 
-  private async addAnnotationFromGeoJsAnnotation(annotation: any) {
+  private async addAnnotationFromGeoJsAnnotation(annotation: IGeoJSAnnotation) {
     if (!annotation || !this.selectedToolConfiguration) {
       return;
     }
@@ -1368,7 +1375,7 @@ export default class AnnotationViewer extends Vue {
     );
   }
 
-  async addAnnotationFromSnapping(annotation: any) {
+  async addAnnotationFromSnapping(annotation: IGeoJSAnnotation) {
     if (!annotation || this.maps.length !== 1) {
       return;
     }
@@ -1418,7 +1425,7 @@ export default class AnnotationViewer extends Vue {
     );
   }
 
-  handleNewROIFilter(geojsAnnotation: any) {
+  handleNewROIFilter(geojsAnnotation: IGeoJSAnnotation) {
     if (!this.roiFilter) {
       return;
     }
@@ -1430,7 +1437,7 @@ export default class AnnotationViewer extends Vue {
     return this.selectedToolConfiguration?.values?.radius;
   }
 
-  cursorAnnotation: any = null;
+  cursorAnnotation: IGeoJSAnnotation | null = null;
   lastCursorPosition: { x: number; y: number } = { x: 0, y: 0 };
 
   @Watch("selectedToolRadius")
@@ -1632,29 +1639,28 @@ export default class AnnotationViewer extends Vue {
       return;
     }
 
-    switch (evt.event) {
-      case "geo_annotation_state":
-        if (this.selectedToolConfiguration) {
-          switch (this.selectedToolConfiguration.type) {
-            case "create":
-              this.addAnnotationFromGeoJsAnnotation(evt.annotation);
-              break;
-            case "snap":
-              this.addAnnotationFromSnapping(evt.annotation);
-              break;
-            case "select":
-              this.selectAnnotations(evt.annotation);
-              break;
-            case "connection":
-              this.handleAnnotationConnections(evt.annotation);
-              break;
-          }
-        } else if (evt.annotation) {
-          this.handleNewROIFilter(evt.annotation);
+    if (
+      evt.event === "geo_annotation_state" &&
+      evt.annotation?.layer() === this.annotationLayer
+    ) {
+      if (this.selectedToolConfiguration) {
+        switch (this.selectedToolConfiguration.type) {
+          case "create":
+            this.addAnnotationFromGeoJsAnnotation(evt.annotation);
+            break;
+          case "snap":
+            this.addAnnotationFromSnapping(evt.annotation);
+            break;
+          case "select":
+            this.selectAnnotations(evt.annotation);
+            break;
+          case "connection":
+            this.handleAnnotationConnections(evt.annotation);
+            break;
         }
-        break;
-      default:
-        break;
+      } else {
+        this.handleNewROIFilter(evt.annotation);
+      }
     }
   }
 
