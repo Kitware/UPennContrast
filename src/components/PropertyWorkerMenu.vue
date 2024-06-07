@@ -7,8 +7,12 @@
     </v-row>
     <v-row class="pa-0 ma-0">
       <v-col cols="12">
+        <v-progress-circular
+          v-if="workerInterface === undefined"
+          indeterminate
+        />
         <worker-interface-values
-          v-if="workerInterface"
+          v-else-if="workerInterface"
           :workerInterface="workerInterface"
           v-model="interfaceValues"
         />
@@ -51,7 +55,7 @@ export default class PropertyWorkerMenu extends Vue {
   get workerInterface() {
     return this.image !== null
       ? this.propertyStore.getWorkerInterface(this.image)
-      : undefined;
+      : null;
   }
 }
 </script>

@@ -212,10 +212,7 @@ export default class PropertyCreation extends Vue {
   @Watch("dockerImage")
   dockerImageChanged() {
     this.isNameGenerated = true;
-    if (
-      this.dockerImage &&
-      this.propertyStore.workerInterfaces[this.dockerImage] === undefined
-    ) {
+    if (this.dockerImage) {
       this.propertyStore.fetchWorkerInterface({ image: this.dockerImage });
     }
   }

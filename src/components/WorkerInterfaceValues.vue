@@ -5,11 +5,7 @@
       See: https://github.com/Kitware/UPennContrast/pull/391#issuecomment-1557606390
     -->
     <v-list-item-group>
-      <v-row
-        v-for="[id, item] in Object.entries(workerInterface)"
-        :key="id"
-        class="pa-0 ma-0"
-      >
+      <v-row v-for="[id, item] in orderItemEntries" :key="id" class="pa-0 ma-0">
         <v-col class="pa-0 ma-0" cols="4">
           <v-subheader>
             {{ id }}
@@ -124,6 +120,17 @@ export default class WorkerInterfaceValues extends Vue {
       case "checkbox":
         return false;
     }
+  }
+
+  get orderItemEntries() {
+    const allEntries = Object.entries(this.workerInterface);
+    const alphabeticalOrderItems = allEntries.filter(
+      ([, { displayOrder }]) => displayOrder === undefined,
+    );
+    const explicitlySortedItems = allEntries
+      .filter(([, { displayOrder }]) => displayOrder !== undefined)
+      .sort(([, { displayOrder: a }], [, { displayOrder: b }]) => a! - b!);
+    return [...explicitlySortedItems, ...alphabeticalOrderItems];
   }
 
   mounted() {
