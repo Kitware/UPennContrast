@@ -1796,7 +1796,7 @@ export default class AnnotationViewer extends Vue {
 
   handleValueOnMouseMoveDebounce = debounce(
     this.handleValueOnMouseMoveNoDebounce,
-    100,
+    25,
   );
   async handleValueOnMouseMoveNoDebounce(e: any) {
     if (!this.dataset) {
