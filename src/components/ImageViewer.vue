@@ -62,7 +62,29 @@
       @centerChange="setCenter"
       @cornersChange="setCorners"
     />
-    <div>
+    <v-alert
+      v-model="showOptimizedAlert"
+      class="viewer-alert"
+      type="success"
+      dense
+      dismissible
+      transition="slide-x-transition"
+    >
+      Dataset fully loaded and optimized
+    </v-alert>
+    <v-alert
+      v-model="showSamToolHelpAlert"
+      class="viewer-alert"
+      type="info"
+      dense
+      dismissible
+      transition="slide-x-transition"
+    >
+      Shift + left click to add a positive point<br />
+      Shift + right click to add a negative point<br />
+      Shift + click + drag to add box
+    </v-alert>
+    <div class="bottom-right-container">
       <div
         class="progress"
         v-for="(cacheObj, cacheIdx) in progresses"
@@ -87,39 +109,16 @@
           </strong>
         </v-progress-linear>
       </div>
+      <v-btn
+        v-if="submitPendingAnnotation"
+        @click.capture.stop="
+          submitPendingAnnotation && submitPendingAnnotation(false)
+        "
+        small
+      >
+        Cancel (ctrl-Z)
+      </v-btn>
     </div>
-    <v-alert
-      v-model="showOptimizedAlert"
-      class="viewer-alert"
-      type="success"
-      dense
-      dismissible
-      transition="slide-x-transition"
-    >
-      Dataset fully loaded and optimized
-    </v-alert>
-    <v-alert
-      v-model="showSamToolHelpAlert"
-      class="viewer-alert"
-      type="info"
-      dense
-      dismissible
-      transition="slide-x-transition"
-    >
-      Shift + left click to add a positive point<br />
-      Shift + right click to add a negative point<br />
-      Shift + click + drag to add box
-    </v-alert>
-    <v-btn
-      v-if="submitPendingAnnotation"
-      @click.capture.stop="
-        submitPendingAnnotation && submitPendingAnnotation(false)
-      "
-      class="cancel-button"
-      small
-    >
-      Cancel (ctrl-Z)
-    </v-btn>
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="0"
@@ -1364,7 +1363,7 @@ export default class ImageViewer extends Vue {
   z-index: 200;
   margin: 4px;
 }
-.cancel-button {
+.bottom-right-container {
   position: absolute;
   bottom: 10px;
   left: 10px;
