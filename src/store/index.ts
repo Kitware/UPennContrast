@@ -411,6 +411,16 @@ export class Main extends VuexModule {
     girderRest: RestClientInstance;
   }) {
     await this.loggedInImpl({ girderRest, girderUrl });
+    const user = this.girderUser;
+    if (user) {
+      this.api.getUserPublicFolder(user._id).then((publicFolder) => {
+        if (publicFolder) {
+          this.setFolderLocation(publicFolder);
+        } else {
+          this.setFolderLocation(user);
+        }
+      });
+    }
     this.setSelectedConfiguration(this.selectedConfigurationId);
     this.setSelectedDataset(this.selectedDatasetId);
   }
@@ -426,9 +436,6 @@ export class Main extends VuexModule {
     this.girderUrl = persister.set("girderUrl", girderUrl);
     this.girderRest = girderRest;
     this.girderUser = girderRest.user;
-    if (this.girderUser) {
-      this.folderLocation = this.girderUser;
-    }
     // don't replace the api hook with a new one.
     /*
     this.api = new GirderAPI(this.girderRest);
