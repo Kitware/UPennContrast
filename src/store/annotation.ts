@@ -19,7 +19,7 @@ import {
   IAnnotationBase,
   IAnnotationConnectionBase,
   IWorkerInterfaceValues,
-  IComputeJob,
+  IAnnotationComputeJob,
   IProgressInfo,
 } from "./model";
 
@@ -725,16 +725,16 @@ export class Annotations extends VuexModule {
     if (!jobId) {
       return null;
     }
-    const computeJob: IComputeJob = {
+    const computeJob: IAnnotationComputeJob = {
+      toolId: tool.id,
       jobId,
       datasetId,
-      callback: (success: boolean) => {
-        this.fetchAnnotations();
-        callback(success);
-      },
       eventCallback: createProgressEventCallback(progress),
     };
-    jobs.addJob(computeJob);
+    jobs.addJob(computeJob).then((success: boolean) => {
+      this.fetchAnnotations();
+      callback(success);
+    });
     return computeJob;
   }
 

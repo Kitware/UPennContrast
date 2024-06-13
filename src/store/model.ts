@@ -1165,19 +1165,22 @@ export type TJobType =
   | "large_image_cache_tile_frames"
   | "large_image_tiff";
 
-export interface IComputeJob {
+export interface IComputeJobBase {
   jobId: string;
-  callback: (success: boolean) => void;
   datasetId: string | null;
   eventCallback?: (data: IJobEventData) => void;
 }
-export interface IAnnotationComputeJob extends IComputeJob {
-  tool: IToolConfiguration;
+export interface IAnnotationComputeJob extends IComputeJobBase {
+  toolId: string;
 }
-export interface IPropertyComputeJob extends IComputeJob {
+export interface IPropertyComputeJob extends IComputeJobBase {
   propertyId: string;
-  annotationIds: string[];
 }
+
+export type IComputeJob =
+  | IAnnotationComputeJob
+  | IPropertyComputeJob
+  | IComputeJobBase;
 
 export interface IContrast {
   mode: "percentile" | "absolute";

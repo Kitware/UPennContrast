@@ -49,18 +49,56 @@ export function createProgressEventCallback(progressObject: IProgressInfo) {
   };
 }
 
+interface IJobInfo {
+  listeners: IComputeJob[];
+  successPromise: Promise<boolean>;
+  successResolve: (success: boolean) => void;
+}
+
 @Module({ dynamic: true, store, name: "jobs" })
 export class Jobs extends VuexModule {
   notificationSource: EventSource | null = null;
   latestNotificationTime: number = 0;
 
-  runningJobs: IComputeJob[] = [];
+  private jobInfoMap: { [jobId: string]: IJobInfo } = {};
 
   connectionErrors: number = 0;
 
+  get getPromiseForJobId() {
+    return (jobId: string) => this.jobInfoMap[jobId].successPromise;
+  }
+
+  get jobIdForToolId() {
+    const jobsPerToolId: { [tooldId: string]: string } = {};
+    for (const jobId in this.jobInfoMap) {
+      const listeners = this.jobInfoMap[jobId].listeners;
+      for (const listener of listeners) {
+        if ("toolId" in listener) {
+          jobsPerToolId[listener.toolId] = jobId;
+          continue;
+        }
+      }
+    }
+    return jobsPerToolId;
+  }
+
   @Mutation
   rawAddJob(job: IComputeJob) {
-    this.runningJobs = [...this.runningJobs, job];
+    let jobData: IJobInfo | undefined = this.jobInfoMap[job.jobId];
+    if (!jobData) {
+      // Create a promise and extract the "resolve" from it
+      let successResolve!: (success: boolean) => void;
+      const successPromise = new Promise<boolean>(
+        (resolve) => (successResolve = resolve),
+      );
+      jobData = {
+        listeners: [],
+        successPromise,
+        successResolve,
+      };
+      Vue.set(this.jobInfoMap, job.jobId, jobData);
+    }
+    jobData.listeners.push(job);
   }
 
   @Action
@@ -69,19 +107,18 @@ export class Jobs extends VuexModule {
       await this.initializeNotificationSubscription();
     }
     this.rawAddJob(job);
+    return this.jobInfoMap[job.jobId].successPromise;
   }
 
   @Mutation
   rawRemoveJob(jobId: string) {
-    this.runningJobs = this.runningJobs.filter(
-      (job: IComputeJob) => job.jobId !== jobId,
-    );
+    Vue.delete(this.jobInfoMap, jobId);
   }
 
   @Action
   async removeJob(jobId: string) {
     this.rawRemoveJob(jobId);
-    if (this.runningJobs.length <= 0) {
+    if (Object.keys(this.jobInfoMap).length <= 0) {
       await this.closeNotificationSubscription();
     }
     // A job is done, add badge to annotation panel if it is closed
@@ -120,14 +157,16 @@ export class Jobs extends VuexModule {
     }
     this.setLatestNotificationTime(notificationTime);
 
-    const jobData = data.data;
-    const jobTasks = this.runningJobs.filter(
-      (job) => job.jobId === jobData._id,
-    );
-    for (const task of jobTasks) {
-      task.eventCallback?.(jobData);
+    const jobEvent = data.data;
+    const jobId = jobEvent._id;
+    const jobInfo: IJobInfo | undefined = this.jobInfoMap[jobId];
+    if (!jobInfo) {
+      return;
     }
-    const status = jobData.status;
+    for (const listener of jobInfo.listeners) {
+      listener.eventCallback?.(jobEvent);
+    }
+    const status = jobEvent.status;
     if (
       ![jobStates.cancelled, jobStates.success, jobStates.error].includes(
         status,
@@ -139,15 +178,13 @@ export class Jobs extends VuexModule {
     const success = status === jobStates.success;
     if (!success) {
       logError(
-        `Compute job with id ${jobData._id} ${
+        `Compute job with id ${jobId} ${
           status === jobStates.cancelled ? "cancelled" : "failed"
         }`,
       );
     }
-    this.removeJob(jobData._id);
-    for (const jobTask of jobTasks) {
-      jobTask.callback(success);
-    }
+    this.removeJob(jobId);
+    jobInfo.successResolve(success);
   }
 
   @Action
