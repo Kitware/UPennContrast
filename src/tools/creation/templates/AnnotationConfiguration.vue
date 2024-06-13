@@ -64,9 +64,9 @@
                   <v-text-field
                     dense
                     type="number"
-                    :min="0"
+                    :min="1"
                     class="pl-4"
-                    v-model="coordinateAssignments[coordinate].value"
+                    v-model.number="coordinateAssignments[coordinate].value"
                     @change="changed"
                     :disabled="
                       coordinateAssignments[coordinate].type === 'layer'
@@ -110,7 +110,7 @@ import { AnnotationNames, AnnotationShape } from "@/store/model";
 
 type VForm = Vue & { validate: () => boolean };
 
-interface IAnnotationSetup {
+export interface IAnnotationSetup {
   tags: string[];
   coordinateAssignments: {
     layer: string | null | undefined;
@@ -213,11 +213,13 @@ export default class AnnotationConfiguration extends Vue {
   }
 
   get maxZ() {
-    return this.store.dataset?.z.length || 0;
+    // 1 indexing
+    return (this.store.dataset?.z.length || 0) + 1;
   }
 
   get maxTime() {
-    return this.store.dataset?.time.length || 0;
+    // 1 indexing
+    return (this.store.dataset?.time.length || 0) + 1;
   }
 
   isMaxMerge(axis: string, layerId?: string) {
