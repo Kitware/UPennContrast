@@ -584,13 +584,12 @@ export default class ImageViewer extends Vue {
         }
       };
       eventCallback(girderJob);
-      // Decrease number of caching histograms if it has been increased
-      const callback = () => {
+      jobs.addJob({ jobId, datasetId, eventCallback }).then(() => {
+        // Decrease number of caching histograms if it has been increased
         if (cacheIncreased) {
           --this.histogramCaches;
         }
-      };
-      jobs.addJob({ jobId, datasetId, callback, eventCallback });
+      });
     });
   }
 

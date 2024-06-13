@@ -904,14 +904,11 @@ export class Main extends VuexModule {
             "Failed to transcode the large image: no job received",
           );
         }
-        const success = await new Promise((resolve) =>
-          jobs.addJob({
-            jobId,
-            datasetId: parentId,
-            callback: (success: boolean) => resolve(success),
-            eventCallback,
-          }),
-        );
+        const success = await jobs.addJob({
+          jobId,
+          datasetId: parentId,
+          eventCallback,
+        });
         if (!success) {
           throw new Error("Failed to transcode the large image: job failed");
         }

@@ -16,7 +16,7 @@ import {
   IAnnotationPropertyConfiguration,
   IAnnotation,
   IWorkerInterfaceValues,
-  IComputeJob,
+  IPropertyComputeJob,
   TNestedValues,
   IProgressInfo,
 } from "./model";
@@ -319,18 +319,19 @@ export class Properties extends VuexModule {
     if (!main.dataset) {
       return null;
     }
+    const propertyId = property.id;
     const datasetId = main.dataset.id;
     const scales = main.scales;
 
-    if (!this.propertyStatuses[property.id]) {
-      Vue.set(this.propertyStatuses, property.id, defaultStatus());
+    if (!this.propertyStatuses[propertyId]) {
+      Vue.set(this.propertyStatuses, propertyId, defaultStatus());
     }
-    const status = this.propertyStatuses[property.id];
+    const status = this.propertyStatuses[propertyId];
     Vue.set(status, "running", true);
     Vue.set(status, "previousRun", null);
 
     const response = await this.propertiesAPI.computeProperty(
-      property.id,
+      propertyId,
       datasetId,
       property,
       scales,
@@ -341,19 +342,19 @@ export class Properties extends VuexModule {
     if (!jobId) {
       return null;
     }
-    const computeJob: IComputeJob = {
+    const computeJob: IPropertyComputeJob = {
+      propertyId,
       jobId,
       datasetId,
-      callback: async (success: boolean) => {
-        await this.fetchPropertyValues();
-        await filters.updateHistograms();
-        Vue.set(status, "running", false);
-        Vue.set(status, "previousRun", success);
-        Vue.set(status, "progressInfo", {});
-      },
       eventCallback: createProgressEventCallback(status.progressInfo),
     };
-    jobs.addJob(computeJob);
+    jobs.addJob(computeJob).then(async (success: boolean) => {
+      await this.fetchPropertyValues();
+      await filters.updateHistograms();
+      Vue.set(status, "running", false);
+      Vue.set(status, "previousRun", success);
+      Vue.set(status, "progressInfo", {});
+    });
     return computeJob;
   }
 
@@ -433,13 +434,7 @@ export class Properties extends VuexModule {
     if (!jobId) {
       return;
     }
-    return new Promise((resolve) => {
-      jobs.addJob({
-        jobId: jobId,
-        datasetId: main.dataset?.id || null,
-        callback: resolve,
-      });
-    });
+    return jobs.addJob({ jobId: jobId, datasetId: main.dataset?.id || null });
   }
 
   @Action
@@ -481,15 +476,16 @@ export class Properties extends VuexModule {
           return;
         }
         if (job && job._id) {
-          jobs.addJob({
-            jobId: job._id,
-            datasetId: main.dataset?.id || "",
-            callback: (success: boolean) => {
+          jobs
+            .addJob({
+              jobId: job._id,
+              datasetId: main.dataset?.id || "",
+            })
+            .then((success: boolean) => {
               if (success) {
                 this.fetchWorkerPreview(image);
               }
-            },
-          });
+            });
           setTimeout(() => {
             this.fetchWorkerPreview(image);
           }, 5000);
