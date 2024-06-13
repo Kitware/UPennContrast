@@ -26,6 +26,7 @@ import {
 import Vue, { markRaw } from "vue";
 import { simpleCentroid } from "@/utils/annotation";
 import { logError } from "@/utils/log";
+import { IAnnotationSetup } from "@/tools/creation/templates/AnnotationConfiguration.vue";
 
 interface IFetchingProgress {
   annotationProgress: number;
@@ -740,7 +741,7 @@ export class Annotations extends VuexModule {
 
   @Action
   public getAnnotationLocationFromTool(tool: IToolConfiguration) {
-    const toolAnnotation = tool.values.annotation;
+    const toolAnnotation = tool.values.annotation as IAnnotationSetup;
     // Find location in the assigned layer
     const location = {
       XY: main.xy,
@@ -749,7 +750,7 @@ export class Annotations extends VuexModule {
     };
 
     const layerId = toolAnnotation.coordinateAssignments.layer;
-    const layer = main.getLayerFromId(layerId);
+    const layer = layerId ? main.getLayerFromId(layerId) : null;
     const channel = layer?.channel ?? 0;
     if (layer) {
       const indexes = main.layerSliceIndexes(layer);
@@ -757,12 +758,10 @@ export class Annotations extends VuexModule {
         const { xyIndex, zIndex, tIndex } = indexes;
         location.XY = xyIndex;
         const assign = toolAnnotation.coordinateAssignments;
-        location.Z =
-          assign.Z.type === "layer" ? zIndex : Number.parseInt(assign.Z.value);
+        // Values are 1 indexed, but the location uses 0 indexing
+        location.Z = assign.Z.type === "layer" ? zIndex : assign.Z.value - 1;
         location.Time =
-          assign.Time.type === "layer"
-            ? tIndex
-            : Number.parseInt(assign.Time.value);
+          assign.Time.type === "layer" ? tIndex : assign.Time.value - 1;
       }
     }
     return { channel, location };
