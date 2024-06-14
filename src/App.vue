@@ -48,8 +48,13 @@
           Settings
         </v-btn>
       </template>
-      <server-status />
-      <user-menu class="ml-1" />
+      <div class="mx-4 d-flex align-center">
+        <v-btn icon @click="helpPanelIsOpen = !helpPanelIsOpen">
+          <v-icon>mdi-help-circle-outline</v-icon>
+        </v-btn>
+        <server-status />
+        <user-menu />
+      </div>
     </v-app-bar>
 
     <v-main>
@@ -141,14 +146,20 @@ export default class App extends Vue {
 
   readonly appHotkeys: IHotkey = {
     bind: "tab",
-    handler: this.toggleHotkeyDialog,
+    handler: this.toggleHelpDialogUsingHotkey,
     data: {
       section: "Global",
-      description: "Toggle hotkey and feature display",
+      description: "Toggle help dialog",
     },
   };
 
-  helpPanelIsOpen = false;
+  get helpPanelIsOpen() {
+    return this.store.isHelpPanelOpen;
+  }
+
+  set helpPanelIsOpen(isOpen: boolean) {
+    this.store.setIsHelpPanelOpen(isOpen);
+  }
 
   snapshotPanel = false;
   snapshotPanelFull = false;
@@ -202,7 +213,7 @@ export default class App extends Vue {
     this.lastModifiedRightPanel = panel;
   }
 
-  toggleHotkeyDialog(_elem: any, e: Event) {
+  toggleHelpDialogUsingHotkey(_elem: any, e: Event) {
     e.preventDefault();
     this.helpPanelIsOpen = !this.helpPanelIsOpen;
   }

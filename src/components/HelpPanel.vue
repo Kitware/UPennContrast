@@ -1,5 +1,14 @@
 <template>
   <v-card>
+    <v-divider />
+    <v-card-title> Documentation </v-card-title>
+    <v-card-text>
+      Read
+      <a href="https://arjun-raj-lab.gitbook.io/nimbusimage" target="_blank">
+        the documentation
+      </a>
+      for more information on how to use NimbusImage.
+    </v-card-text>
     <v-card-title> Hotkeys </v-card-title>
     <v-card-text class="container">
       <p v-for="[sectionName, sectionItems] of hotkeyItems" :key="sectionName">
@@ -87,7 +96,6 @@ export default class HelpPanel extends Vue {
   column-fill: balance;
   column-rule: inset;
   orphans: 4;
-  min-height: 200px;
 }
 
 .span-title {

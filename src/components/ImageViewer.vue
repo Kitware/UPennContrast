@@ -41,8 +41,8 @@
       ref="map-layout"
       v-description="{
         section: 'Objects',
-        title: 'shift-click-drag',
-        description: 'Lasso to select objects',
+        title: 'Quick Lasso',
+        description: 'Use shift-click-drag to select objects using a lasso',
       }"
       :map-count="mapLayerList.length"
     >
