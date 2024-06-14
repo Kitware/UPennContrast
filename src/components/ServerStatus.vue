@@ -47,8 +47,7 @@ export default class ServerStatus extends Vue {
 
 <style lang="scss" scoped>
 .server-status {
-  margin-left: 1em;
-
+  margin: 8px;
   span {
     text-decoration: none;
   }

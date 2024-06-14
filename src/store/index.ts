@@ -146,6 +146,7 @@ export class Main extends VuexModule {
 
   isAnnotationPanelOpen: boolean = false;
   annotationPanelBadge: boolean = false;
+  isHelpPanelOpen: boolean = false;
 
   toolTemplateList: any[] = [];
   selectedTool: IActiveTool | null = null;
@@ -540,6 +541,11 @@ export class Main extends VuexModule {
   @Mutation
   public setIsAnnotationPanelOpen(value: boolean) {
     this.isAnnotationPanelOpen = value;
+  }
+
+  @Mutation
+  public setIsHelpPanelOpen(value: boolean) {
+    this.isHelpPanelOpen = value;
   }
 
   @Action
