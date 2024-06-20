@@ -211,7 +211,7 @@ const allHeaders = [
 const allHeaderIds = allHeaders.map(({ value }) => value);
 
 // Remove a few headers by default because they are not commonly used and clutter the interface
-const headersToRemoveByDefault = [
+const headersToRemoveByDefault: THeaderId[] = [
   "annotation.id",
   "shapeName",
   "annotation.name",
