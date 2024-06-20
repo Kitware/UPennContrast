@@ -46,15 +46,15 @@
       <v-card-actions>
         <v-container class="button-bar ma-0 pa-0">
           <v-spacer />
+          <v-btn class="mr-4" color="warning" @click="close">CANCEL</v-btn>
           <v-btn
             class="mr-4"
             color="primary"
             @click="createTool"
             :disabled="!selectedTemplate"
           >
-            ADD TOOL TO THE CURRENT TOOLSET
+            ADD TOOL TO TOOLSET
           </v-btn>
-          <v-btn class="mr-4" color="warning" @click="close">CANCEL</v-btn>
         </v-container>
       </v-card-actions>
     </v-card>

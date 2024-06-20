@@ -17,7 +17,7 @@
       </v-radio-group>
       <template v-if="option.type == 'add'">
         <custom-file-manager
-          title="Choose a dataset or a folder of datasets to add in the current Configuration"
+          title="Choose a dataset or a folder of datasets to add in the current collection"
           class="smart-overflow"
           :breadcrumb="true"
           :selectable="true"

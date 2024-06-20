@@ -4,7 +4,7 @@
       <v-col cols="8">
         <v-card class="my-3">
           <v-toolbar>
-            <v-toolbar-title>Configurations</v-toolbar-title>
+            <v-toolbar-title>Collections</v-toolbar-title>
           </v-toolbar>
           <v-card-text>
             <v-dialog
@@ -14,7 +14,7 @@
             >
               <v-card>
                 <v-card-title>
-                  Are you sure to remove the view for configuration "{{
+                  Are you sure to remove the view for collection "{{
                     configInfo[viewToRemove.configurationId]
                       ? configInfo[viewToRemove.configurationId].name
                       : "Unnamed configuration"
@@ -36,7 +36,7 @@
                 <div v-if="dataset && datasetViewItems.length <= 0">
                   <v-text-field
                     v-model="defaultConfigurationName"
-                    label="New Configuration Name"
+                    label="New collection name"
                     dense
                     hide-details
                     class="ma-1 pb-2 important-field"
@@ -53,8 +53,8 @@
                         View Dataset
                       </v-btn>
                     </template>
-                    Create a default configuration with the given name in the
-                    same folder as the dataset and view it
+                    Create a collection with the given name in the same folder
+                    as the dataset and view it
                   </v-tooltip>
                   <v-divider class="my-4" />
                 </div>
@@ -155,7 +155,7 @@
                     </v-btn>
                     <girder-location-chooser
                       @input="duplicateView(d.datasetView, $event)"
-                      title="Select a Folder for Duplicated Configuration"
+                      title="Select a folder for duplicated configuration"
                     >
                       <template v-slot:activator="{ on }">
                         <v-btn color="primary" v-on="on">
@@ -337,7 +337,7 @@ export default class DatasetInfo extends Vue {
   @Watch("datasetName")
   updateDefaultConfigurationName() {
     this.defaultConfigurationName =
-      (this.datasetName || "Default") + " Configuration";
+      (this.datasetName || "Default") + " collection";
   }
 
   toRoute(datasetView: IDatasetView) {
