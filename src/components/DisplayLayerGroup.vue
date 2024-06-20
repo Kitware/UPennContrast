@@ -138,6 +138,7 @@ export default class DisplayLayerGroup extends Vue {
 <style>
 .denseCol {
   flex-grow: 0;
+  font-size: 0.8em;
 }
 
 .textCol {
