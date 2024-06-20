@@ -44,15 +44,25 @@
       </v-dialog>
       <v-row>
         <v-col cols="12" md="6">
-          <v-select
+          <v-chip-group
             v-model="selectedColumns"
-            :items="columnOptions"
-            attach
-            chips
-            label="Select columns"
+            column
             multiple
-            small-chips
-          ></v-select>
+            active-class="selected-chip"
+          >
+            <v-chip
+              v-for="option in columnOptions"
+              :key="option.value"
+              :value="option.value"
+              :class="{
+                'selected-chip': selectedColumns.includes(option.value),
+              }"
+              outlined
+              x-small
+            >
+              {{ option.text }}
+            </v-chip>
+          </v-chip-group>
         </v-col>
         <v-col cols="12" md="6">
           <v-text-field
@@ -500,6 +510,16 @@ tbody tr.is-hovered:hover {
 
 .v-input__slot {
   justify-content: center;
+}
+
+.selected-chip {
+  border-color: #ffffff !important; /* Change to your preferred color */
+}
+
+.v-chip {
+  transition:
+    background-color 0.3s,
+    color 0.3s; /* Smooth transition */
 }
 
 td span {
