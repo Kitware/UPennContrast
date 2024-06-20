@@ -96,7 +96,7 @@
       </v-radio-group>
       <v-expansion-panel>
         <v-expansion-panel-header
-          >Advanced Layer Options</v-expansion-panel-header
+          >Advanced layer options</v-expansion-panel-header
         >
         <v-expansion-panel-content>
           <display-slice
@@ -127,7 +127,9 @@
             :offset="1"
           />
           <div class="buttons">
-            <v-btn color="warning" small @click="removeLayer">Remove</v-btn>
+            <v-btn color="warning" small @click="removeLayer"
+              >Delete layer</v-btn
+            >
           </div>
         </v-expansion-panel-content>
       </v-expansion-panel>

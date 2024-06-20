@@ -7,7 +7,7 @@
       <girder-location-chooser
         v-model="path"
         :breadcrumb="true"
-        title="Select a Folder to Create the New Configuration"
+        title="Select a folder to create the new collection in"
       />
 
       <div class="button-bar">

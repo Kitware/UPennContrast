@@ -6,11 +6,11 @@
         <v-row class="home-row">
           <v-col class="fill-height">
             <section class="mb-4 home-section">
-              <v-subheader class="headline mb-4">Upload Dataset</v-subheader>
+              <v-subheader class="headline mb-4">Upload dataset</v-subheader>
               <v-card>
                 <v-tabs v-model="uploadTab">
-                  <v-tab> Quick Upload and View Dataset </v-tab>
-                  <v-tab> Comprehensive Upload </v-tab>
+                  <v-tab> Quick upload/view </v-tab>
+                  <v-tab> Advanced upload </v-tab>
                 </v-tabs>
               </v-card>
               <v-tabs-items v-model="uploadTab" class="flex-window-items">
@@ -18,15 +18,11 @@
                   <file-dropzone @input="quickUpload">
                     <template #afterMessage>
                       <span class="caption d-flex">
-                        <v-icon size="20px" class="pa-1">
-                          mdi-information
-                        </v-icon>
                         <div>
-                          Dataset will be uploaded in:
+                          Dataset will be uploaded to:
                           <strong>{{ locationName }}</strong>
                           <br />
-                          Default collection will be created in same folder as
-                          dataset
+                          Collection will be created in same folder as dataset
                         </div>
                       </span>
                     </template>
@@ -40,7 +36,7 @@
           </v-col>
           <v-col class="fill-height recent-dataset">
             <section class="mb-4 home-section">
-              <v-subheader class="headline mb-4">Recent Dataset</v-subheader>
+              <v-subheader class="headline mb-4">Recent datasets</v-subheader>
               <v-list two-line class="scrollable py-0">
                 <div v-for="d in datasetViewItems" :key="d.datasetView.id">
                   <v-tooltip

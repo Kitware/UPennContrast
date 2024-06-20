@@ -249,7 +249,7 @@ export default class BreadCrumbs extends Vue {
     let configurationItem: IBreadCrumbItem | undefined;
     if (configurationId) {
       configurationItem = {
-        title: "Configuration:",
+        title: "Collection:",
         to: {
           name: "configuration",
           params,
