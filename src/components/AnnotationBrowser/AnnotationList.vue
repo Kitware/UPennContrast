@@ -210,6 +210,16 @@ const allHeaders = [
 
 const allHeaderIds = allHeaders.map(({ value }) => value);
 
+// Remove a few headers by default because they are not commonly used and clutter the interface
+const headersToRemoveByDefault: THeaderId[] = [
+  "annotation.id",
+  "shapeName",
+  "annotation.name",
+];
+const initialSelectedColumns = allHeaderIds.filter(
+  (value) => !headersToRemoveByDefault.includes(value),
+);
+
 type THeaderId = (typeof allHeaderIds)[number];
 
 interface IAnnotationListItem {
@@ -232,7 +242,8 @@ export default class AnnotationList extends Vue {
 
   readonly columnOptions = allHeaders;
 
-  selectedColumns: THeaderId[] = allHeaderIds;
+  // Pick the default columns to display
+  selectedColumns: THeaderId[] = initialSelectedColumns;
 
   tableItemClass = "px-1"; // To enable dividers, use v-data-table__divider
 
