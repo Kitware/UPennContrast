@@ -53,8 +53,8 @@
                         View Dataset
                       </v-btn>
                     </template>
-                    Create a default collection with the given name in the
-                    same folder as the dataset and view it
+                    Create a collection with the given name in the same folder
+                    as the dataset and view it
                   </v-tooltip>
                   <v-divider class="my-4" />
                 </div>
