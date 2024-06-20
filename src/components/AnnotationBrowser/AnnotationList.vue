@@ -54,7 +54,9 @@
               v-for="option in columnOptions"
               :key="option.value"
               :value="option.value"
-              :class="{'selected-chip': selectedColumns.includes(option.value)}"
+              :class="{
+                'selected-chip': selectedColumns.includes(option.value),
+              }"
               outlined
               x-small
             >
