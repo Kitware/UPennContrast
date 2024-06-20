@@ -83,7 +83,7 @@ import annotationStore from "@/store/annotation";
 import {
   AnnotationShape,
   IWorkerLabels,
-  AnnotationNames,
+  //AnnotationNames,
   IWorkerInterfaceValues,
 } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
@@ -175,7 +175,7 @@ export default class PropertyCreation extends Vue {
     } else {
       nameList.push("No image");
     }
-    return removeRepeatedWords(nameList.join(" "));;
+    return removeRepeatedWords(nameList.join(" "));
   }
 
   @Watch("isNameGenerated")
