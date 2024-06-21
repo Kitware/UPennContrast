@@ -1,6 +1,6 @@
 [
   {
-    "name": "Manual annotation tool",
+    "name": "Manual object tool",
     "type": "create",
     "shortName": "Manual",
     "interface": [
@@ -125,7 +125,7 @@
     ]
   },
   {
-    "name": "Select annotation tools",
+    "name": "Selection tools",
     "type": "select",
     "interface": [
       {
@@ -144,55 +144,6 @@
               "value": "lasso"
             }
           ]
-        }
-      }
-    ]
-  },
-  {
-    "name": "Annotation Connections",
-    "type": "connection",
-    "shortName": "Connection",
-    "interface": [
-      {
-        "name": "Action",
-        "type": "select",
-        "id": "action",
-        "isSubmenu": true,
-        "meta": {
-          "items": [
-            {
-              "text": "Lasso connect",
-              "value": "add_lasso"
-            },
-            {
-              "text": "Click connect",
-              "value": "add_click"
-            },
-            {
-              "text": "Lasso disconnect",
-              "value": "delete_lasso"
-            },
-            {
-              "text": "Click disconnect",
-              "value": "delete_click"
-            }
-          ]
-        }
-      },
-      {
-        "name": "Parent Annotation",
-        "id": "parentAnnotation",
-        "type": "restrictTagsAndLayer",
-        "meta": {
-          "inclusiveToggle": true
-        }
-      },
-      {
-        "name": "Child Annotation",
-        "id": "childAnnotation",
-        "type": "restrictTagsAndLayer",
-        "meta": {
-          "inclusiveToggle": true
         }
       }
     ]
@@ -274,7 +225,7 @@
     ]
   },
   {
-    "name": "Automated annotation tools",
+    "name": "Automated object finding tools",
     "type": "segmentation",
     "shortName": "Automated",
     "comment": "TODO: ROI selection, auto annotation tags    ",
@@ -314,7 +265,7 @@
     ]
   },
   {
-    "name": "Segment Anything Annotation (experimental, WebGPU only)",
+    "name": "Segment Anything Model (experimental, Chrome/WebGPU only)",
     "type": "samAnnotation",
     "shortName": "SAM",
     "interface": [
@@ -355,6 +306,55 @@
         "type": "checkbox",
         "meta": {
           "label": "Enable submit of annotation on prompt"
+        }
+      }
+    ]
+  },
+  {
+    "name": "Annotation Connections",
+    "type": "connection",
+    "shortName": "Connection",
+    "interface": [
+      {
+        "name": "Action",
+        "type": "select",
+        "id": "action",
+        "isSubmenu": true,
+        "meta": {
+          "items": [
+            {
+              "text": "Lasso connect",
+              "value": "add_lasso"
+            },
+            {
+              "text": "Click connect",
+              "value": "add_click"
+            },
+            {
+              "text": "Lasso disconnect",
+              "value": "delete_lasso"
+            },
+            {
+              "text": "Click disconnect",
+              "value": "delete_click"
+            }
+          ]
+        }
+      },
+      {
+        "name": "Parent Annotation",
+        "id": "parentAnnotation",
+        "type": "restrictTagsAndLayer",
+        "meta": {
+          "inclusiveToggle": true
+        }
+      },
+      {
+        "name": "Child Annotation",
+        "id": "childAnnotation",
+        "type": "restrictTagsAndLayer",
+        "meta": {
+          "inclusiveToggle": true
         }
       }
     ]

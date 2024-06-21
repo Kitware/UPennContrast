@@ -1,23 +1,40 @@
 <template>
   <v-container>
-    <v-select
-      return-object
-      label="Tool type"
-      class="big-subheaders"
-      :items="submenuItems"
-      v-model="selectedItem"
-    >
-      <template #item="{ item }">
-        <div v-if="item.text" class="d-block">
-          <div>
-            {{ item.text }}
-          </div>
-          <div class="text--secondary caption mt-n2">
-            {{ item.description }}
-          </div>
-        </div>
+    <v-menu offset-x right>
+      <template v-slot:activator="{ on, attrs }">
+        <v-btn v-bind="attrs" v-on="on" class="big-subheaders">
+          {{ selectedItem ? selectedItem.text : "Select Tool Type" }}
+        </v-btn>
       </template>
-    </v-select>
+      <v-list class="floating-list">
+        <template v-for="(item, itemIndex) in submenuItems">
+          <v-subheader
+            v-if="'header' in item"
+            :key="item.header"
+            class="custom-subheader"
+          >
+            {{ item.header }}
+          </v-subheader>
+          <v-divider
+            v-else-if="'divider' in item"
+            :key="`divider-${itemIndex}`"
+          />
+          <v-list-item
+            v-else-if="'key' in item"
+            :key="item.key"
+            @click="selectedItem = item"
+            dense
+          >
+            <v-list-item-content>
+              <v-list-item-title>{{ item.text }}</v-list-item-title>
+              <v-list-item-subtitle v-if="item.description">
+                {{ item.description }}
+              </v-list-item-subtitle>
+            </v-list-item-content>
+          </v-list-item>
+        </template>
+      </v-list>
+    </v-menu>
   </v-container>
 </template>
 <script lang="ts">
@@ -29,7 +46,7 @@ import { IToolTemplate } from "@/store/model";
 
 interface Item {
   text: string;
-  description: string;
+  description?: string;
   value: any;
   key: string;
   [key: string]: any;
@@ -52,6 +69,11 @@ export interface TReturnType {
   selectedItem: AugmentedItem | null;
 }
 
+const hiddenToolTexts = new Set<string>([
+  '"Snap to" manual annotation tools',
+  "Annotation edit tools",
+]);
+
 @Component({
   components: {
     ToolConfiguration,
@@ -67,11 +89,8 @@ export default class ToolTypeSelection extends Vue {
   computedTemplate: IToolTemplate | null = null;
   defaultToolValues: any = {};
 
-  isMainMenuVisible = false;
   selectedItem: AugmentedItem | null = null;
 
-  // Returns a list of dividers, headers and items
-  // The items are submenu items augmented with a reference to their submenus
   get submenuItems() {
     return this.submenus.reduce(
       (items, submenu) => [
@@ -85,57 +104,61 @@ export default class ToolTypeSelection extends Vue {
   }
 
   get submenus(): Submenu[] {
-    return this.templates.map((template) => {
-      // For each template, an interface element is used as submenu
-      const submenuInterfaceIdx = template.interface.findIndex(
-        (elem: any) => elem.isSubmenu,
-      );
-      const submenuInterface = template.interface[submenuInterfaceIdx] || {};
-      let items: any[] = [];
-      switch (submenuInterface.type) {
-        case "select":
-          items = submenuInterface.meta.items.map((item: any) => ({
-            ...item,
-            value: item,
-          }));
-          break;
-        case "annotation":
-          items = this.store.availableToolShapes;
-          break;
-        case "dockerImage":
-          for (const image in this.propertyStore.workerImageList) {
-            const labels = this.propertyStore.workerImageList[image];
-            if (labels.isAnnotationWorker !== undefined) {
-              items.push({
-                text: labels.interfaceName || image,
-                description: labels.description || "",
-                value: { image },
-              });
+    return this.templates
+      .filter((template) => !hiddenToolTexts.has(template.name))
+      .map((template) => {
+        const submenuInterfaceIdx = template.interface.findIndex(
+          (elem: any) => elem.isSubmenu,
+        );
+        const submenuInterface = template.interface[submenuInterfaceIdx] || {};
+        let items: Omit<Item, "key">[] = [];
+        switch (submenuInterface.type) {
+          case "select":
+            items = submenuInterface.meta.items.map((item: any) => ({
+              ...item,
+              value: item,
+            }));
+            break;
+          case "annotation":
+            items = this.store.availableToolShapes;
+            break;
+          case "dockerImage":
+            for (const image in this.propertyStore.workerImageList) {
+              const labels = this.propertyStore.workerImageList[image];
+              if (labels.isAnnotationWorker !== undefined) {
+                items.push({
+                  text: labels.interfaceName || image,
+                  description: labels.description || "",
+                  value: { image },
+                });
+              }
             }
-          }
-          break;
-        default:
-          items.push({
-            text: template.name || "No Submenu",
-            value: "defaultSubmenu",
-          });
-          break;
-      }
-      const keydItems: Item[] = items.map((item, itemIdx) => ({
-        ...item,
-        key: template.type + "#" + itemIdx,
-      }));
-      return {
-        template,
-        submenuInterface,
-        submenuInterfaceIdx,
-        items: keydItems,
-      };
-    });
+            break;
+          default:
+            items.push({
+              text: template.name || "No Submenu",
+              value: "defaultSubmenu",
+            });
+            break;
+        }
+        const keydItems: Item[] = items
+          .filter((item) => !hiddenToolTexts.has(item.text))
+          .map(
+            (item, itemIdx) =>
+              ({
+                key: template.type + "#" + itemIdx,
+                ...item,
+              }) as Item,
+          );
+        return {
+          template,
+          submenuInterface,
+          submenuInterfaceIdx,
+          items: keydItems,
+        };
+      });
   }
 
-  // The new template and the default tool values are computed
-  // depending on the type of the interface element used as submenu
   @Watch("selectedItem")
   selectSubmenuItem() {
     if (!this.selectedItem) {
@@ -145,17 +168,13 @@ export default class ToolTypeSelection extends Vue {
     const submenu = this.selectedItem.submenu;
     const item = this.selectedItem;
     const { template, submenuInterface, submenuInterfaceIdx } = submenu;
-    this.isMainMenuVisible = false;
 
     let computedTemplate = template;
     let defaultToolValues: any = {};
 
-    // template references to the store template
-    // Shallow copy some parts of it to avoid overwriting
     switch (submenuInterface.type) {
       case "select":
       case "dockerImage":
-        // Remove the interface used as submenu
         computedTemplate = {
           ...template,
           interface: [
@@ -163,11 +182,9 @@ export default class ToolTypeSelection extends Vue {
             ...template.interface.slice(submenuInterfaceIdx + 1),
           ],
         };
-        // Set default value from item value
         defaultToolValues[submenuInterface.id] = item.value;
         break;
       case "annotation":
-        // Keep the annotation interface but hide shape and define default shape
         computedTemplate = {
           ...template,
           interface: template.interface.slice(),
@@ -216,7 +233,6 @@ export default class ToolTypeSelection extends Vue {
   @Watch("templates")
   @Watch("value")
   initialize() {
-    // Set initial value
     if (!this.value && this.templates.length) {
       this.reset();
     }
@@ -236,7 +252,16 @@ export default class ToolTypeSelection extends Vue {
 .floating-list {
   display: flex;
   flex-direction: column;
-  max-height: 90vh;
+  max-height: 90vh; /* Adjust as necessary for your desired height */
+  overflow-y: auto; /* Ensure list is scrollable */
+  padding: 0;
+  margin: 0;
+}
+
+.custom-subheader {
+  font-size: large;
+  text-align: left;
+  padding: 8px 16px;
 }
 </style>
 
