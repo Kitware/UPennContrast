@@ -1,12 +1,20 @@
 <template>
   <v-container>
     <v-btn @click="toggleMenu" class="big-subheaders">
-      {{ selectedItem ? selectedItem.text : 'Select Tool Type' }}
+      {{ selectedItem ? selectedItem.text : "Select Tool Type" }}
     </v-btn>
-    <v-menu v-model="menuVisible" :close-on-content-click="false" :activator="activator">
+    <v-menu
+      v-model="menuVisible"
+      :close-on-content-click="false"
+      :activator="activator"
+    >
       <v-list class="floating-list">
         <template v-for="item in submenuItems">
-          <v-subheader v-if="item.header" :key="item.header" class="custom-subheader">
+          <v-subheader
+            v-if="item.header"
+            :key="item.header"
+            class="custom-subheader"
+          >
             {{ item.header }}
           </v-subheader>
           <v-list-item
