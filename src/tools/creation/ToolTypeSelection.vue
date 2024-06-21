@@ -1,23 +1,30 @@
 <template>
   <v-container>
-    <v-select
-      return-object
-      label="Tool type"
-      class="big-subheaders"
-      :items="submenuItems"
-      v-model="selectedItem"
-    >
-      <template #item="{ item }">
-        <div v-if="item.text" class="d-block">
-          <div>
-            {{ item.text }}
-          </div>
-          <div class="text--secondary caption mt-n2">
-            {{ item.description }}
-          </div>
-        </div>
-      </template>
-    </v-select>
+    <v-btn @click="toggleMenu" class="big-subheaders">
+      {{ selectedItem ? selectedItem.text : 'Select Tool Type' }}
+    </v-btn>
+    <v-menu v-model="menuVisible" :close-on-content-click="false" :activator="activator">
+      <v-list class="floating-list">
+        <template v-for="item in submenuItems">
+          <v-subheader v-if="item.header" :key="item.header" class="custom-subheader">
+            {{ item.header }}
+          </v-subheader>
+          <v-list-item
+            v-if="!item.header && !item.divider"
+            :key="item.key"
+            @click="selectItem(item)"
+            dense
+          >
+            <v-list-item-content>
+              <v-list-item-title>{{ item.text }}</v-list-item-title>
+              <v-list-item-subtitle v-if="item.description">
+                {{ item.description }}
+              </v-list-item-subtitle>
+            </v-list-item-content>
+          </v-list-item>
+        </template>
+      </v-list>
+    </v-menu>
   </v-container>
 </template>
 <script lang="ts">
@@ -67,11 +74,9 @@ export default class ToolTypeSelection extends Vue {
   computedTemplate: IToolTemplate | null = null;
   defaultToolValues: any = {};
 
-  isMainMenuVisible = false;
+  menuVisible = false;
   selectedItem: AugmentedItem | null = null;
 
-  // Returns a list of dividers, headers and items
-  // The items are submenu items augmented with a reference to their submenus
   get submenuItems() {
     return this.submenus.reduce(
       (items, submenu) => [
@@ -86,7 +91,6 @@ export default class ToolTypeSelection extends Vue {
 
   get submenus(): Submenu[] {
     return this.templates.map((template) => {
-      // For each template, an interface element is used as submenu
       const submenuInterfaceIdx = template.interface.findIndex(
         (elem: any) => elem.isSubmenu,
       );
@@ -134,8 +138,6 @@ export default class ToolTypeSelection extends Vue {
     });
   }
 
-  // The new template and the default tool values are computed
-  // depending on the type of the interface element used as submenu
   @Watch("selectedItem")
   selectSubmenuItem() {
     if (!this.selectedItem) {
@@ -145,17 +147,13 @@ export default class ToolTypeSelection extends Vue {
     const submenu = this.selectedItem.submenu;
     const item = this.selectedItem;
     const { template, submenuInterface, submenuInterfaceIdx } = submenu;
-    this.isMainMenuVisible = false;
 
     let computedTemplate = template;
     let defaultToolValues: any = {};
 
-    // template references to the store template
-    // Shallow copy some parts of it to avoid overwriting
     switch (submenuInterface.type) {
       case "select":
       case "dockerImage":
-        // Remove the interface used as submenu
         computedTemplate = {
           ...template,
           interface: [
@@ -163,11 +161,9 @@ export default class ToolTypeSelection extends Vue {
             ...template.interface.slice(submenuInterfaceIdx + 1),
           ],
         };
-        // Set default value from item value
         defaultToolValues[submenuInterface.id] = item.value;
         break;
       case "annotation":
-        // Keep the annotation interface but hide shape and define default shape
         computedTemplate = {
           ...template,
           interface: template.interface.slice(),
@@ -216,7 +212,6 @@ export default class ToolTypeSelection extends Vue {
   @Watch("templates")
   @Watch("value")
   initialize() {
-    // Set initial value
     if (!this.value && this.templates.length) {
       this.reset();
     }
@@ -229,14 +224,48 @@ export default class ToolTypeSelection extends Vue {
     this.handleChange();
     this.refreshWorkers();
   }
+
+  toggleMenu() {
+    this.menuVisible = !this.menuVisible;
+  }
+
+  selectItem(item: AugmentedItem) {
+    this.selectedItem = item;
+    this.menuVisible = false;
+  }
 }
 </script>
-
 <style lang="scss" scoped>
 .floating-list {
   display: flex;
   flex-direction: column;
-  max-height: 90vh;
+  max-height: 90vh; /* Adjust as necessary for your desired height */
+  overflow-y: auto; /* Ensure list is scrollable */
+  padding: 0;
+  margin: 0;
+}
+
+.custom-subheader {
+  font-size: large;
+  text-align: left;
+  padding: 8px 16px;
+}
+
+.v-list-item {
+  padding: 8px 16px;
+}
+
+.v-list-item-title {
+  font-size: medium;
+}
+
+.v-list-item-subtitle {
+  font-size: small;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.v-select__selections {
+  margin: 0 !important;
 }
 </style>
 
