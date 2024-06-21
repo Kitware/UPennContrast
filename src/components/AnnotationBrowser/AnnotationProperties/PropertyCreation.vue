@@ -83,7 +83,6 @@ import annotationStore from "@/store/annotation";
 import {
   AnnotationShape,
   IWorkerLabels,
-  //AnnotationNames,
   IWorkerInterfaceValues,
 } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
