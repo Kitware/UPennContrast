@@ -46,7 +46,7 @@ import { IToolTemplate } from "@/store/model";
 
 interface Item {
   text: string;
-  description: string;
+  description?: string;
   value: any;
   key: string;
   [key: string]: any;
@@ -68,6 +68,8 @@ export interface TReturnType {
   defaultValues: any;
   selectedItem: AugmentedItem | null;
 }
+
+const hiddenToolTexts = new Set<string>([]);
 
 @Component({
   components: {
@@ -99,52 +101,59 @@ export default class ToolTypeSelection extends Vue {
   }
 
   get submenus(): Submenu[] {
-    return this.templates.map((template) => {
-      const submenuInterfaceIdx = template.interface.findIndex(
-        (elem: any) => elem.isSubmenu,
-      );
-      const submenuInterface = template.interface[submenuInterfaceIdx] || {};
-      let items: any[] = [];
-      switch (submenuInterface.type) {
-        case "select":
-          items = submenuInterface.meta.items.map((item: any) => ({
-            ...item,
-            value: item,
-          }));
-          break;
-        case "annotation":
-          items = this.store.availableToolShapes;
-          break;
-        case "dockerImage":
-          for (const image in this.propertyStore.workerImageList) {
-            const labels = this.propertyStore.workerImageList[image];
-            if (labels.isAnnotationWorker !== undefined) {
-              items.push({
-                text: labels.interfaceName || image,
-                description: labels.description || "",
-                value: { image },
-              });
+    return this.templates
+      .filter((template) => !hiddenToolTexts.has(template.name))
+      .map((template) => {
+        const submenuInterfaceIdx = template.interface.findIndex(
+          (elem: any) => elem.isSubmenu,
+        );
+        const submenuInterface = template.interface[submenuInterfaceIdx] || {};
+        let items: Omit<Item, "key">[] = [];
+        switch (submenuInterface.type) {
+          case "select":
+            items = submenuInterface.meta.items.map((item: any) => ({
+              ...item,
+              value: item,
+            }));
+            break;
+          case "annotation":
+            items = this.store.availableToolShapes;
+            break;
+          case "dockerImage":
+            for (const image in this.propertyStore.workerImageList) {
+              const labels = this.propertyStore.workerImageList[image];
+              if (labels.isAnnotationWorker !== undefined) {
+                items.push({
+                  text: labels.interfaceName || image,
+                  description: labels.description || "",
+                  value: { image },
+                });
+              }
             }
-          }
-          break;
-        default:
-          items.push({
-            text: template.name || "No Submenu",
-            value: "defaultSubmenu",
-          });
-          break;
-      }
-      const keydItems: Item[] = items.map((item, itemIdx) => ({
-        ...item,
-        key: template.type + "#" + itemIdx,
-      }));
-      return {
-        template,
-        submenuInterface,
-        submenuInterfaceIdx,
-        items: keydItems,
-      };
-    });
+            break;
+          default:
+            items.push({
+              text: template.name || "No Submenu",
+              value: "defaultSubmenu",
+            });
+            break;
+        }
+        const keydItems: Item[] = items
+          .filter((item) => !hiddenToolTexts.has(item.text))
+          .map(
+            (item, itemIdx) =>
+              ({
+                key: template.type + "#" + itemIdx,
+                ...item,
+              }) as Item,
+          );
+        return {
+          template,
+          submenuInterface,
+          submenuInterfaceIdx,
+          items: keydItems,
+        };
+      });
   }
 
   @Watch("selectedItem")
