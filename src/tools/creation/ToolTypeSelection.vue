@@ -69,7 +69,7 @@ export interface TReturnType {
   selectedItem: AugmentedItem | null;
 }
 
-const hiddenToolTexts = new Set<string>([]);
+const hiddenToolTexts = new Set<string>(["\"Snap to\" manual annotation tools", "Annotation edit tools"]);
 
 @Component({
   components: {
