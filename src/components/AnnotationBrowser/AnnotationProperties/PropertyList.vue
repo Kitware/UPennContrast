@@ -1,6 +1,6 @@
 <template>
   <v-card>
-    <v-card-title> Annotation Properties </v-card-title>
+    <v-card-title> Object Properties </v-card-title>
     <v-card-text>
       <v-btn
         outlined
@@ -8,9 +8,7 @@
         @click="computeUncomputedProperties"
         :disabled="uncomputedRunning > 0 || uncomputedProperties.length <= 0"
       >
-        {{
-          uncomputedRunning > 0 ? "Computing uncomputed" : "Compute uncomputed"
-        }}
+        {{ uncomputedRunning > 0 ? "Computing all" : "Compute all" }}
         <template v-if="uncomputedRunning > 0">
           <v-progress-circular indeterminate />
         </template>
@@ -23,7 +21,6 @@
           <!-- Header for property -->
           <v-expansion-panel readonly v-if="properties.length > 0">
             <v-expansion-panel-header>
-              <annotation-property-header />
               <template v-slot:actions>
                 <v-icon color="transparent">$expand</v-icon>
               </template>
@@ -55,14 +52,12 @@ import filterStore from "@/store/filters";
 
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import AnnotationProperty from "@/components/AnnotationBrowser/AnnotationProperties/Property.vue";
-import AnnotationPropertyHeader from "@/components/AnnotationBrowser/AnnotationProperties/PropertyHeader.vue";
 import AnnotationPropertyBody from "@/components/AnnotationBrowser/AnnotationProperties/PropertyBody.vue";
 
 @Component({
   components: {
     TagFilterEditor,
     AnnotationProperty,
-    AnnotationPropertyHeader,
     AnnotationPropertyBody,
   },
 })

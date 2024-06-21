@@ -1,6 +1,6 @@
 <template>
   <v-card class="ma-1">
-    <v-card-title> Analyze </v-card-title>
+    <v-card-title> Measure objects </v-card-title>
     <v-card-text>
       <property-creation />
       <property-list />
