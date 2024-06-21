@@ -17,8 +17,8 @@ import {
   IAnnotation,
   IWorkerInterfaceValues,
   IPropertyComputeJob,
-  TNestedValues,
   IProgressInfo,
+  TPropertyValue,
 } from "./model";
 
 import Vue from "vue";
@@ -248,14 +248,14 @@ export class Properties extends VuexModule {
     // Into a single object (e.g. {myPropertyId: {mySubId: {}}, anotherPropertyId: {} })
     const valuesObjectPerAnnotationId = this.propertyValues;
     const nestedAggregationObject: TNestedObject = {};
-    const aggregationStack: [TNestedObject, TNestedValues<number>][] = [];
+    const aggregationStack: [TNestedObject, TPropertyValue][] = [];
     for (const annotationId in valuesObjectPerAnnotationId) {
       const valuesObject = valuesObjectPerAnnotationId[annotationId];
       aggregationStack.push([nestedAggregationObject, valuesObject]);
     }
     while (aggregationStack.length > 0) {
       const [currentLocation, valuesObject] = aggregationStack.pop()!;
-      if (typeof valuesObject === "number") {
+      if (typeof valuesObject !== "object") {
         continue;
       }
       for (const key in valuesObject) {

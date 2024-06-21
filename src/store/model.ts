@@ -1122,9 +1122,12 @@ export interface IAnnotationProperty extends IAnnotationPropertyConfiguration {
 
 export type TNestedValues<T> = T | { [pathName: string]: TNestedValues<T> };
 
+// Can't be an object
+export type TPropertyValue = TNestedValues<number | null | string>;
+
 export interface IAnnotationPropertyValues {
   [annotationId: string]: {
-    [propertyId: string]: TNestedValues<number>;
+    [propertyId: string]: TPropertyValue;
   };
 }
 

@@ -52,7 +52,7 @@ import {
   geojsAnnotationFactory,
   tagFilterFunction,
 } from "@/utils/annotation";
-import { getValueFromObjectAndPath } from "@/utils/paths";
+import { getStringFromPropertiesAndPath } from "@/utils/paths";
 import {
   mouseStateToSamPrompt,
   samPromptToAnnotation,
@@ -700,21 +700,14 @@ export default class AnnotationViewer extends Vue {
           const propertyData: Map<string, string> = new Map();
           const filteredIds: string[] = [];
           for (const annotation of this.displayedAnnotations) {
-            const value = getValueFromObjectAndPath(
+            const stringValue = getStringFromPropertiesAndPath(
               propertyValues[annotation.id],
               propertyPath,
             );
-            if (typeof value !== "number") {
-              continue;
+            if (stringValue) {
+              propertyData.set(annotation.id, stringValue);
+              filteredIds.push(annotation.id);
             }
-            const fixedValue = value.toFixed(2);
-            const fixedError = Math.abs(value - parseFloat(fixedValue));
-            const precisedValue = value.toPrecision(3);
-            const precisedError = Math.abs(value - parseFloat(precisedValue));
-            const stringValue =
-              fixedError <= precisedError ? fixedValue : precisedValue;
-            propertyData.set(annotation.id, stringValue);
-            filteredIds.push(annotation.id);
           }
           this.textLayer
             .createFeature("text")

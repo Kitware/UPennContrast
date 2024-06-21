@@ -28,7 +28,7 @@ class PropertySchema:
                 "additionalProperties": {
                     "anyOf": [
                         {
-                            "type": "number",
+                            "type": ["number", "string", "null"],
                         },
                         {
                             "$ref": recursiveValuesId,

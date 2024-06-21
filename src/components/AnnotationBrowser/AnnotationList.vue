@@ -176,7 +176,10 @@
                 :class="tableItemClass"
               >
                 <span>{{
-                  getStringFromPropertiesAndPath(item.properties, propertyPath)
+                  getStringFromPropertiesAndPath(
+                    item.properties,
+                    propertyPath,
+                  ) ?? "-"
                 }}</span>
               </td>
             </tr>
@@ -326,16 +329,6 @@ export default class AnnotationList extends Vue {
 
   updateAnnotationName(name: string, id: string) {
     this.annotationStore.updateAnnotationName({ name, id });
-  }
-
-  get getPropertyValueForAnnotationId() {
-    return (annotationId: string, propertyId: string) => {
-      const values = this.propertyStore.propertyValues[annotationId];
-      if (!values || !Object.keys(values).includes(propertyId)) {
-        return "-";
-      }
-      return values[propertyId];
-    };
   }
 
   get selectAllIndeterminate() {
