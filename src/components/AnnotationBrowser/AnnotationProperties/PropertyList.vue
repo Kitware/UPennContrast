@@ -52,14 +52,12 @@ import filterStore from "@/store/filters";
 
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import AnnotationProperty from "@/components/AnnotationBrowser/AnnotationProperties/Property.vue";
-import AnnotationPropertyHeader from "@/components/AnnotationBrowser/AnnotationProperties/PropertyHeader.vue";
 import AnnotationPropertyBody from "@/components/AnnotationBrowser/AnnotationProperties/PropertyBody.vue";
 
 @Component({
   components: {
     TagFilterEditor,
     AnnotationProperty,
-    AnnotationPropertyHeader,
     AnnotationPropertyBody,
   },
 })
