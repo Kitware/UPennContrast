@@ -20,13 +20,14 @@ export function createPathStringFromPathArray(path: string[]): string {
 
 // The object given as argument is seen as a tree, and the keys along the tree form the path
 // Return the location where the path leads, and null if the path is unknown
-export function getValueFromObjectAndPath(
-  values: TNestedValues<number>,
+export function getValueFromObjectAndPath<T extends Exclude<any, object>>(
+  values: TNestedValues<T>,
   path: string[],
-): TNestedValues<number> | null {
+): TNestedValues<T> | null {
   let currentItem = values;
   for (const name of path) {
-    if (typeof currentItem === "object" && name in currentItem) {
+    if (currentItem && typeof currentItem === "object" && name in currentItem) {
+      // @ts-ignore: We from the check above that this is valid, as T can't be an object
       currentItem = currentItem[name];
     } else {
       return null;
@@ -40,9 +41,27 @@ export function getValueFromObjectAndPath(
 export function getStringFromPropertiesAndPath(
   properties: IAnnotationPropertyValues[0],
   path: string[],
-): string {
+): string | null {
   const value = getValueFromObjectAndPath(properties, path);
-  return typeof value === "number" ? "" + Math.round(value * 100) / 100 : "-";
+  if (typeof value === "number") {
+    const error = (stringValue: string) =>
+      Math.abs(value - parseFloat(stringValue));
+    // Use the representation that gives the minimum error
+    return [value.toFixed(0), value.toFixed(2), value.toPrecision(3)].reduce(
+      (currentBest: string, newValue: string) =>
+        error(currentBest) > error(newValue) ? newValue : currentBest,
+    );
+  } else if (typeof value === "string") {
+    return value;
+  } else if (typeof value === "object") {
+    // `value` is an object or null
+    // There is no property value
+    return null;
+  } else {
+    // `value` should be of type `never`
+    const neverValue: never = value;
+    return neverValue;
+  }
 }
 
 export default {

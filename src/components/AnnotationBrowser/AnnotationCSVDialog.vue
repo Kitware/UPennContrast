@@ -121,18 +121,6 @@ export default class AnnotationCsvDialog extends Vue {
   @Prop()
   readonly propertyPaths!: string[][];
 
-  getPropertyValueForAnnotation(annotation: IAnnotation, propertyId: string) {
-    const values = this.propertyStore.propertyValues[annotation.id];
-    if (!values) {
-      return "-";
-    }
-
-    if (!Object.keys(values).includes(propertyId)) {
-      return "-";
-    }
-    return values[propertyId];
-  }
-
   async generateCSVStringForAnnotations() {
     // Fields
     const fields = [
@@ -177,7 +165,15 @@ export default class AnnotationCsvDialog extends Vue {
           propValues[annotation.id],
           usedPaths[iProp],
         );
-        row.push(typeof value === "number" ? value : "-");
+        switch (typeof value) {
+          case "object":
+          case "undefined":
+            row.push("-");
+            break;
+          default:
+            row.push(value);
+            break;
+        }
       }
       data.push(row);
     }
