@@ -432,7 +432,7 @@ export default class Snapshots extends Vue {
   bboxLayer: IGeoJSAnnotationLayer | null = null;
   bboxAnnotation: IGeoJSAnnotation | null = null;
   downloadMode: "layers" | "channels" = "layers";
-  exportLayer: "all" | "composite" | string = "all";
+  exportLayer: "all" | "composite" | string = "composite";
   exportChannel: "all" | number = "all";
   format: string = "png";
 
@@ -507,8 +507,8 @@ export default class Snapshots extends Vue {
       text: string;
       value: string;
     }[] = [
-      { text: "All layers", value: "all" },
       { text: "Composite layers", value: "composite" },
+      { text: "All layers (zip)", value: "all" },
     ];
     store.layers.forEach((layer) => {
       if (layer.visible) {
