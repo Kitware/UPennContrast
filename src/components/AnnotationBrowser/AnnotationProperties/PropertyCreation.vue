@@ -3,7 +3,7 @@
     <v-card-text class="pt-0">
       <v-container class="elevation-3 mt-4">
         <div class="pb-4 subtitle-1">
-          Create property for annotations matching...
+          Create measurements for objects matching:
         </div>
         <v-row>
           <v-col>
@@ -32,7 +32,7 @@
         class="elevation-3 mt-4"
         v-if="filteringShape !== null && filteringTags.length > 0"
       >
-        <div class="pb-4 subtitle-1">Using these parameters...</div>
+        <div class="pb-4 subtitle-1">Measure this property:</div>
         <v-row>
           <v-col>
             <docker-image-select
@@ -83,7 +83,6 @@ import annotationStore from "@/store/annotation";
 import {
   AnnotationShape,
   IWorkerLabels,
-  AnnotationNames,
   IWorkerInterfaceValues,
 } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
@@ -92,6 +91,30 @@ import DockerImageSelect from "@/components/DockerImageSelect.vue";
 import TagPicker from "@/components/TagPicker.vue";
 import PropertyWorkerMenu from "@/components/PropertyWorkerMenu.vue";
 import { tagFilterFunction } from "@/utils/annotation";
+
+// Function to remove repeated words
+function removeRepeatedWords(input: string): string {
+  // Split the input string into words
+  const words = input.split(" ");
+  // Create a Set to track seen words
+  const seenWords = new Set<string>();
+  // Array to store the result
+  const result: string[] = [];
+
+  // Iterate over the words
+  for (const word of words) {
+    // Convert the word to lowercase for case-insensitive comparison
+    const lowerCaseWord = word.toLowerCase();
+    // If the word hasn't been seen before, add it to the result and mark it as seen
+    if (!seenWords.has(lowerCaseWord)) {
+      seenWords.add(lowerCaseWord);
+      result.push(word);
+    }
+  }
+
+  // Join the result array back into a string and return it
+  return result.join(" ");
+}
 
 // Popup for new tool configuration
 @Component({
@@ -140,9 +163,6 @@ export default class PropertyCreation extends Vue {
     } else {
       nameList.push("No tag");
     }
-    nameList.push(
-      this.filteringShape ? AnnotationNames[this.filteringShape] : "No shape",
-    );
     if (this.dockerImage) {
       const imageInterfaceName =
         this.propertyStore.workerImageList[this.dockerImage]?.interfaceName;
@@ -154,7 +174,7 @@ export default class PropertyCreation extends Vue {
     } else {
       nameList.push("No image");
     }
-    return nameList.join(" ");
+    return removeRepeatedWords(nameList.join(" "));
   }
 
   @Watch("isNameGenerated")
