@@ -1,26 +1,28 @@
 <template>
   <v-container>
-    <v-btn @click="toggleMenu" class="big-subheaders">
-      {{ selectedItem ? selectedItem.text : "Select Tool Type" }}
-    </v-btn>
-    <v-menu
-      v-model="menuVisible"
-      :close-on-content-click="false"
-      :activator="activator"
-    >
+    <v-menu offset-x right>
+      <template v-slot:activator="{ on, attrs }">
+        <v-btn v-bind="attrs" v-on="on" class="big-subheaders">
+          {{ selectedItem ? selectedItem.text : "Select Tool Type" }}
+        </v-btn>
+      </template>
       <v-list class="floating-list">
-        <template v-for="item in submenuItems">
+        <template v-for="(item, itemIndex) in submenuItems">
           <v-subheader
-            v-if="item.header"
+            v-if="'header' in item"
             :key="item.header"
             class="custom-subheader"
           >
             {{ item.header }}
           </v-subheader>
+          <v-divider
+            v-else-if="'divider' in item"
+            :key="`divider-${itemIndex}`"
+          />
           <v-list-item
-            v-if="!item.header && !item.divider"
+            v-else-if="'key' in item"
             :key="item.key"
-            @click="selectItem(item)"
+            @click="selectedItem = item"
             dense
           >
             <v-list-item-content>
@@ -82,7 +84,6 @@ export default class ToolTypeSelection extends Vue {
   computedTemplate: IToolTemplate | null = null;
   defaultToolValues: any = {};
 
-  menuVisible = false;
   selectedItem: AugmentedItem | null = null;
 
   get submenuItems() {
@@ -232,17 +233,9 @@ export default class ToolTypeSelection extends Vue {
     this.handleChange();
     this.refreshWorkers();
   }
-
-  toggleMenu() {
-    this.menuVisible = !this.menuVisible;
-  }
-
-  selectItem(item: AugmentedItem) {
-    this.selectedItem = item;
-    this.menuVisible = false;
-  }
 }
 </script>
+
 <style lang="scss" scoped>
 .floating-list {
   display: flex;
@@ -257,23 +250,6 @@ export default class ToolTypeSelection extends Vue {
   font-size: large;
   text-align: left;
   padding: 8px 16px;
-}
-
-.v-list-item {
-  padding: 8px 16px;
-}
-
-.v-list-item-title {
-  font-size: medium;
-}
-
-.v-list-item-subtitle {
-  font-size: small;
-  color: rgba(0, 0, 0, 0.6);
-}
-
-.v-select__selections {
-  margin: 0 !important;
 }
 </style>
 
