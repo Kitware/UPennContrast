@@ -59,6 +59,13 @@
 
     <v-main>
       <router-view />
+      <v-btn icon @click="toggleFloatingPanel" class="floating-menu-btn">
+        <v-icon>mdi-menu</v-icon>
+      </v-btn>
+
+      <div v-if="panelVisible" class="floating-panel">
+        <layer-info-grid :layers="store.layers" @close="toggleFloatingPanel" />
+      </div>
     </v-main>
 
     <v-navigation-drawer
@@ -122,6 +129,7 @@ import Snapshots from "./components/Snapshots.vue";
 import AnnotationBrowser from "@/components/AnnotationBrowser/AnnotationBrowser.vue";
 import HelpPanel from "./components/HelpPanel.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
+import LayerInfoGrid from "./components/LayerInfoGrid.vue";
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
@@ -138,6 +146,7 @@ import { IHotkey } from "@/utils/v-mousetrap";
     AnalyzeAnnotations,
     AnnotationsSettings,
     Snapshots,
+    LayerInfoGrid,
   },
 })
 export default class App extends Vue {
@@ -170,6 +179,8 @@ export default class App extends Vue {
 
   analyzePanel = false;
 
+  panelVisible = false;
+
   lastModifiedRightPanel: string | null = null;
 
   fetchConfig() {
@@ -197,6 +208,10 @@ export default class App extends Vue {
 
   goHome() {
     this.$router.push({ name: "root" });
+  }
+
+  toggleFloatingPanel() {
+    this.panelVisible = !this.panelVisible;
   }
 
   toggleRightPanel(panel: string | null) {
@@ -258,6 +273,26 @@ export default class App extends Vue {
   cursor: pointer;
   text-overflow: unset;
   overflow: unset;
+}
+.floating-menu-btn {
+  position: fixed;
+  bottom: 20px;
+  left: 20px; // Changed from right to left
+  z-index: 1000;
+}
+.floating-panel {
+  position: fixed;
+  bottom: 80px; // Changed from top to bottom
+  left: 20px; // Changed from right to left
+  width: auto; // Allow the panel to adjust its width based on content
+  max-width: calc(100vw - 40px); // Ensure it doesn't exceed the screen width
+  height: auto; // Allow the panel to adjust its height based on content
+  max-height: 300px; // Set a maximum height
+  overflow-y: auto;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
 }
 </style>
 <style lang="scss">
