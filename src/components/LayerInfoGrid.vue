@@ -1,19 +1,14 @@
 <template>
-  <div class="layer-info-grid">
-    <v-toolbar dense>
+  <div class="layer-info-grid d-flex flex-column">
+    <v-toolbar dense class="flex-grow-0">
       <v-toolbar-title>Contrast layers</v-toolbar-title>
       <v-spacer></v-spacer>
       <v-btn icon @click="$emit('close')">
         <v-icon>mdi-close</v-icon>
       </v-btn>
     </v-toolbar>
-    <v-container fluid>
-      <v-row
-        v-if="layers.length > 0"
-        no-gutters
-        class="flex-nowrap"
-        style="overflow-x: auto"
-      >
+    <v-container fluid class="flex-grow-1 overflow-auto pa-2">
+      <v-row v-if="layers.length > 0" no-gutters class="flex-nowrap">
         <v-col v-for="layer in layers" :key="layer.id" cols="auto" class="mr-2">
           <v-card outlined width="300">
             <v-card-title class="text-subtitle-2">
@@ -134,8 +129,9 @@ export default class LayerInfoGrid extends Vue {
 
 <style lang="scss" scoped>
 .layer-info-grid {
-  background-color: white;
+  background-color: rgb(0, 0, 0);
   max-width: 100vw;
+  height: 100%; // Ensure it takes full height of parent
 }
 
 .color-bar {
@@ -143,5 +139,10 @@ export default class LayerInfoGrid extends Vue {
   width: 100%;
   height: 1em;
   border: 2px solid grey;
+}
+
+// Add these styles for better scrolling
+.v-container {
+  max-height: calc(100% - 48px); // Adjust based on toolbar height
 }
 </style>

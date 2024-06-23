@@ -282,14 +282,14 @@ export default class App extends Vue {
 }
 .floating-panel {
   position: fixed;
-  bottom: 80px; // Changed from top to bottom
-  left: 20px; // Changed from right to left
-  width: auto; // Allow the panel to adjust its width based on content
-  max-width: calc(100vw - 40px); // Ensure it doesn't exceed the screen width
-  height: auto; // Allow the panel to adjust its height based on content
-  max-height: 300px; // Set a maximum height
-  overflow-y: auto;
-  background-color: white;
+  bottom: 80px;
+  left: 20px;
+  width: auto;
+  max-width: calc(100vw - 40px);
+  height: 355px; // Set a fixed height
+  max-height: calc(100vh - 160px); // Ensure it doesn't exceed screen height minus margins
+  overflow: hidden; // Changed from overflow-y: auto
+  background-color: rgb(0, 0, 0);
   border-radius: 4px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   z-index: 1000;
