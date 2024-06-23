@@ -1,7 +1,7 @@
 <template>
   <div class="layer-info-grid">
     <v-toolbar dense>
-      <v-toolbar-title>Layer Information</v-toolbar-title>
+      <v-toolbar-title>Contrast layers</v-toolbar-title>
       <v-spacer></v-spacer>
       <v-btn icon @click="$emit('close')">
         <v-icon>mdi-close</v-icon>
@@ -15,42 +15,51 @@
         style="overflow-x: auto"
       >
         <v-col v-for="layer in layers" :key="layer.id" cols="auto" class="mr-2">
-          <v-card outlined width="200">
+          <v-card outlined width="300">
             <v-card-title class="text-subtitle-2">
               <v-icon :color="layer.color" small left>mdi-circle</v-icon>
               {{ layer.name }}
+              <v-spacer></v-spacer>
+              <v-switch
+                v-model="layer.visible"
+                @change="toggleVisibility(layer.id)"
+                dense
+                hide-details
+                class="mt-0"
+              />
             </v-card-title>
             <v-card-text>
-              <v-row dense>
-                <v-col cols="12">
-                  <v-text-field
-                    :value="layer.name"
-                    @input="changeProp(layer.id, 'name', $event)"
-                    label="Name"
-                    dense
-                    hide-details
-                  />
-                </v-col>
-                <v-col cols="12">
-                  <v-select
-                    :value="layer.channel"
-                    @change="changeProp(layer.id, 'channel', $event)"
-                    :items="channelItems"
-                    label="Channel"
-                    dense
-                    hide-details
-                  />
-                </v-col>
-                <v-col cols="12">
-                  <v-switch
-                    v-model="layer.visible"
-                    @change="toggleVisibility(layer.id)"
-                    label="Visible"
-                    dense
-                    hide-details
-                  />
-                </v-col>
-              </v-row>
+              <contrast-histogram
+                :configurationContrast="getConfigurationContrast(layer.id)"
+                :viewContrast="layer.contrast"
+                @change="changeContrast(layer.id, $event, false)"
+                @commit="changeContrast(layer.id, $event, true)"
+                @revert="resetContrastInView(layer.id)"
+                :histogram="getLayerHistogram(layer)"
+              />
+              <v-menu
+                :close-on-content-click="false"
+                transition="scale-transition"
+                offset-x
+              >
+                <template #activator="{ on }">
+                  <div
+                    v-on="on"
+                    style="cursor: pointer"
+                    class="mt-2 d-flex align-center"
+                  >
+                    <span class="subtitle-2 mr-2">Color</span>
+                    <span
+                      :style="{ backgroundColor: layer.color }"
+                      class="color-bar"
+                    ></span>
+                  </div>
+                </template>
+                <v-color-picker
+                  :value="layer.color"
+                  @input="changeLayerColor(layer.id, $event)"
+                />
+              </v-menu>
             </v-card-text>
           </v-card>
         </v-col>
@@ -63,42 +72,61 @@
     </v-container>
   </div>
 </template>
-<script lang="ts">
-import { Vue, Component, Prop } from 'vue-property-decorator';
-import { IDisplayLayer } from '../store/model';
-import store from '../store';
 
-@Component
+<script lang="ts">
+import { Vue, Component, Prop } from "vue-property-decorator";
+import { IDisplayLayer, IContrast } from "../store/model";
+import store from "../store";
+import ContrastHistogram from "./ContrastHistogram.vue";
+
+@Component({
+  components: {
+    ContrastHistogram,
+  },
+})
 export default class LayerInfoGrid extends Vue {
   @Prop({ required: true }) readonly layers!: IDisplayLayer[];
-
-  get channelItems() {
-    return store.dataset
-      ? store.dataset.channels.map((channel) => ({
-          text: this.channelName(channel),
-          value: channel,
-        }))
-      : [];
-  }
-
-  channelName(channel: number): string {
-    let result = channel.toString();
-    if (store.dataset) {
-      result = store.dataset.channelNames.get(channel) || result;
-    }
-    return result;
-  }
 
   toggleVisibility(layerId: string) {
     store.toggleLayerVisibility(layerId);
   }
 
-  changeProp(layerId: string, prop: keyof IDisplayLayer, value: any) {
+  getConfigurationContrast(layerId: string) {
+    const configuration = store.configuration;
+    if (!configuration) {
+      return null;
+    }
+    const configurationLayer = store.getConfigurationLayerFromId(layerId);
+    if (!configurationLayer) {
+      return null;
+    }
+    return configurationLayer.contrast;
+  }
+
+  getLayerHistogram(layer: IDisplayLayer) {
+    return store.getLayerHistogram(layer);
+  }
+
+  changeContrast(
+    layerId: string,
+    contrast: IContrast,
+    syncConfiguration: boolean,
+  ) {
+    if (syncConfiguration) {
+      store.saveContrastInConfiguration({ layerId, contrast });
+    } else {
+      store.saveContrastInView({ layerId, contrast });
+    }
+  }
+
+  resetContrastInView(layerId: string) {
+    store.resetContrastInView(layerId);
+  }
+
+  changeLayerColor(layerId: string, color: string) {
     store.changeLayer({
       layerId,
-      delta: {
-        [prop]: value,
-      },
+      delta: { color },
     });
   }
 }
@@ -108,5 +136,12 @@ export default class LayerInfoGrid extends Vue {
 .layer-info-grid {
   background-color: white;
   max-width: 100vw;
+}
+
+.color-bar {
+  border-radius: 6px;
+  width: 100%;
+  height: 1em;
+  border: 2px solid grey;
 }
 </style>
