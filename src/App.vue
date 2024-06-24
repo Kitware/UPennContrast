@@ -259,26 +259,6 @@ export default class App extends Vue {
   text-overflow: unset;
   overflow: unset;
 }
-.floating-menu-btn {
-  position: fixed;
-  bottom: 20px;
-  left: 20px; // Changed from right to left
-  z-index: 1000;
-}
-.floating-panel {
-  position: fixed;
-  bottom: 60px;
-  left: 20px;
-  width: auto;
-  max-width: calc(100vw - 40px);
-  height: 355px; // Set a fixed height
-  max-height: calc(100vh - 160px); // Ensure it doesn't exceed screen height minus margins
-  overflow: hidden; // Changed from overflow-y: auto
-  background-color: rgb(0, 0, 0);
-  border-radius: 4px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
-}
 </style>
 <style lang="scss">
 body > div {
