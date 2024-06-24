@@ -59,13 +59,6 @@
 
     <v-main>
       <router-view />
-      <v-btn icon @click="toggleFloatingPanel" class="floating-menu-btn">
-        <v-icon>mdi-menu</v-icon>
-      </v-btn>
-
-      <div v-if="panelVisible" class="floating-panel">
-        <layer-info-grid :layers="store.layers" @close="toggleFloatingPanel" />
-      </div>
     </v-main>
 
     <v-navigation-drawer
@@ -129,7 +122,6 @@ import Snapshots from "./components/Snapshots.vue";
 import AnnotationBrowser from "@/components/AnnotationBrowser/AnnotationBrowser.vue";
 import HelpPanel from "./components/HelpPanel.vue";
 import BreadCrumbs from "./layout/BreadCrumbs.vue";
-import LayerInfoGrid from "./components/LayerInfoGrid.vue";
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
@@ -146,7 +138,6 @@ import { IHotkey } from "@/utils/v-mousetrap";
     AnalyzeAnnotations,
     AnnotationsSettings,
     Snapshots,
-    LayerInfoGrid,
   },
 })
 export default class App extends Vue {
@@ -179,8 +170,6 @@ export default class App extends Vue {
 
   analyzePanel = false;
 
-  panelVisible = false;
-
   lastModifiedRightPanel: string | null = null;
 
   fetchConfig() {
@@ -208,10 +197,6 @@ export default class App extends Vue {
 
   goHome() {
     this.$router.push({ name: "root" });
-  }
-
-  toggleFloatingPanel() {
-    this.panelVisible = !this.panelVisible;
   }
 
   toggleRightPanel(panel: string | null) {
@@ -282,7 +267,7 @@ export default class App extends Vue {
 }
 .floating-panel {
   position: fixed;
-  bottom: 80px;
+  bottom: 60px;
   left: 20px;
   width: auto;
   max-width: calc(100vw - 40px);

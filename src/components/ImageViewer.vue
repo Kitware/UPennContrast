@@ -140,6 +140,19 @@
         </filter>
       </defs>
     </svg>
+    <v-btn
+      icon
+      @click="toggleLayerInfo"
+      class="layer-info-btn"
+      color="primary"
+      v-if="store.layers.length > 0"
+    >
+      <v-icon>mdi-palette</v-icon>
+    </v-btn>
+
+    <div v-if="layerInfoVisible" class="layer-info-container">
+      <layer-info-grid :layers="store.layers" @close="toggleLayerInfo" />
+    </div>
   </div>
 </template>
 <script lang="ts">
@@ -170,6 +183,7 @@ import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 import AnnotationViewer from "@/components/AnnotationViewer.vue";
 import ImageOverview from "@/components/ImageOverview.vue";
 import ScaleSettings from "@/components/ScaleSettings.vue";
+import LayerInfoGrid from "./LayerInfoGrid.vue";
 import { ITileHistogram } from "@/store/images";
 import { convertLength } from "@/utils/conversion";
 import jobs, { jobStates } from "@/store/jobs";
@@ -234,7 +248,9 @@ function isMouseStartEvent(evt: MouseEvent): boolean {
   return evt.shiftKey && evt.buttons !== 0;
 }
 
-@Component({ components: { AnnotationViewer, ImageOverview, ScaleSettings } })
+@Component({
+  components: { AnnotationViewer, ImageOverview, ScaleSettings, LayerInfoGrid },
+})
 export default class ImageViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
@@ -306,6 +322,12 @@ export default class ImageViewer extends Vue {
   private resetMapsOnDraw = false;
 
   scaleDialog = false;
+
+  layerInfoVisible = false;
+
+  toggleLayerInfo() {
+    this.layerInfoVisible = !this.layerInfoVisible;
+  }
 
   get maps() {
     return this.store.maps;
@@ -1418,5 +1440,21 @@ export default class ImageViewer extends Vue {
   width: 25%;
   height: 25%;
   display: inline-block;
+}
+.layer-info-btn {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 1000;
+}
+.layer-info-container {
+  position: absolute;
+  left: 10px;
+  bottom: 40px;
+  z-index: 1000;
+  max-height: calc(100% - 70px);
+  overflow-y: auto;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
 }
 </style>
