@@ -101,7 +101,6 @@ export default class AnnotationProperties extends Vue {
     const filter = this.propFilter ? this.propFilter.toLowerCase().trim() : "";
     if (!filter) {
       return this.computedPropertyPaths;
-      //console.log(this.computedPropertyPaths[0]);
     }
     return this.computedPropertyPaths.filter((path) => {
       const fullName = this.propertyStore.getFullNameFromPath(path);
