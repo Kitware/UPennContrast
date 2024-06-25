@@ -3,6 +3,18 @@
     <v-expansion-panel-header> Properties </v-expansion-panel-header>
     <v-expansion-panel-content>
       <v-container>
+        <v-row class="mb-2">
+          <v-col>
+            <v-text-field
+              v-model="propFilter"
+              label="Filter properties"
+              single-line
+              clearable
+              dense
+              @click:clear="clearFilter"
+            ></v-text-field>
+          </v-col>
+        </v-row>
         <v-row class="caption text-center text--secondary font-weight-bold">
           <v-col class="px-1">
             Name
@@ -13,7 +25,7 @@
         </v-row>
         <v-divider class="my-2" />
         <div
-          v-for="(propertyPath, idx) of computedPropertyPaths"
+          v-for="(propertyPath, idx) of filteredPropertyPaths"
           :key="'property ' + idx"
         >
           <v-row>
@@ -79,8 +91,21 @@ export default class AnnotationProperties extends Vue {
   readonly filterStore = filterStore;
   readonly findIndexOfPath = findIndexOfPath;
 
+  propFilter: string = "";
+
   get computedPropertyPaths() {
     return this.propertyStore.computedPropertyPaths;
+  }
+
+  get filteredPropertyPaths() {
+    const filter = this.propFilter.toLowerCase().trim();
+    if (!filter) {
+      return this.computedPropertyPaths;
+    }
+    return this.computedPropertyPaths.filter(path => {
+      const fullName = this.propertyStore.getFullNameFromPath(path);
+      return fullName !== null && fullName.toLowerCase().includes(filter);
+    });
   }
 
   getTagsForPath(path: string[]) {
@@ -94,6 +119,10 @@ export default class AnnotationProperties extends Vue {
 
   toggleFilter(propertyPath: string[]) {
     this.filterStore.togglePropertyPathFiltering(propertyPath);
+  }
+
+  clearFilter() {
+    this.propFilter = "";
   }
 }
 </script>
