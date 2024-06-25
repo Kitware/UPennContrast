@@ -1,6 +1,6 @@
 <template>
   <div>
-    <v-dialog v-model="userMenu" v-if="!store.isLoggedIn" max-width="300px">
+    <v-dialog v-model="userMenu" v-if="!store.isLoggedIn" max-width="400px">
       <template #activator="{ on }">
         <v-btn v-on="on">{{ store.userName }}</v-btn>
       </template>
@@ -11,6 +11,19 @@
           'theme--dark': $vuetify.theme.dark,
         }"
       >
+        <div class="text-center mb-4">
+          <v-img
+            src="/public/img/icons/NimbusImageIcon.png"
+            max-height="80"
+            contain
+            class="mb-2"
+          ></v-img>
+          <h2 class="text-h5 font-weight-bold mb-2">Welcome to NimbusImage!</h2>
+          <p class="text-subtitle-1">
+            A cloud-based image analysis platform from the Raj Lab at the
+            University of Pennsylvania and Kitware
+          </p>
+        </div>
         <v-form @submit.prevent="login">
           <v-text-field
             v-model="domain"
@@ -34,10 +47,27 @@
             prepend-icon="mdi-lock"
           />
           <v-card-actions class="button-bar">
-            <v-btn type="submit" color="primary"> Login </v-btn>
+            <v-btn type="submit" color="primary">Login</v-btn>
           </v-card-actions>
         </v-form>
         <v-alert :value="Boolean(error)" color="error">{{ error }}</v-alert>
+        <div class="text-center mt-4">
+          <a
+            href="https://arjun-raj-lab.gitbook.io/nimbusimage"
+            target="_blank"
+            class="info-link"
+          >
+            More information
+          </a>
+          <br />
+          <a
+            href="https://arjun-raj-lab.gitbook.io/nimbusimage/quick-start#sign-up"
+            target="_blank"
+            class="signup-link"
+          >
+            Sign up
+          </a>
+        </div>
       </v-container>
     </v-dialog>
     <v-menu
@@ -123,5 +153,21 @@ export default class UserMenu extends Vue {
 <style lang="scss" scoped>
 .loginDialog.theme--light {
   background: white;
+}
+
+.loginDialog {
+  padding: 20px;
+}
+
+.info-link,
+.signup-link {
+  display: inline-block;
+  margin: 5px 0;
+  color: #64b5f6; // A lighter blue that works well with dark themes
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 </style>
