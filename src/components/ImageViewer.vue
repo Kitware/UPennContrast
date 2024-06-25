@@ -140,19 +140,21 @@
         </filter>
       </defs>
     </svg>
-    <v-btn
-      icon
-      @click="toggleLayerInfo"
-      class="layer-info-btn"
-      color="primary"
-      v-if="store.layers.length > 0"
-    >
-      <v-icon>mdi-palette</v-icon>
-    </v-btn>
 
-    <div v-if="layerInfoVisible" class="layer-info-container">
-      <layer-info-grid :layers="store.layers" @close="toggleLayerInfo" />
-    </div>
+    <v-menu offset-y top :close-on-content-click="false">
+      <template #activator="{ on }">
+        <v-btn
+          icon
+          v-on="on"
+          class="layer-info-btn"
+          color="primary"
+          v-if="store.layers.length > 0"
+        >
+          <v-icon>mdi-palette</v-icon>
+        </v-btn>
+      </template>
+      <layer-info-grid :layers="store.layers" />
+    </v-menu>
   </div>
 </template>
 <script lang="ts">
@@ -322,12 +324,6 @@ export default class ImageViewer extends Vue {
   private resetMapsOnDraw = false;
 
   scaleDialog = false;
-
-  layerInfoVisible = false;
-
-  toggleLayerInfo() {
-    this.layerInfoVisible = !this.layerInfoVisible;
-  }
 
   get maps() {
     return this.store.maps;
