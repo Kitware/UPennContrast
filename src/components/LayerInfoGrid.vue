@@ -32,29 +32,10 @@
                 @revert="resetContrastInView(layer.id)"
                 :histogram="getLayerHistogram(layer)"
               />
-              <v-menu
-                :close-on-content-click="false"
-                transition="scale-transition"
-                offset-x
-              >
-                <template #activator="{ on }">
-                  <div
-                    v-on="on"
-                    style="cursor: pointer"
-                    class="mt-2 d-flex align-center"
-                  >
-                    <span class="subtitle-2 mr-2">Color</span>
-                    <span
-                      :style="{ backgroundColor: layer.color }"
-                      class="color-bar"
-                    ></span>
-                  </div>
-                </template>
-                <v-color-picker
-                  :value="layer.color"
-                  @input="changeLayerColor(layer.id, $event)"
-                />
-              </v-menu>
+              <color-picker-menu
+                :value="layer.color"
+                @input="changeLayerColor(layer.id, $event)"
+              />
             </v-card-text>
           </v-card>
         </v-col>
@@ -73,10 +54,12 @@ import { Vue, Component, Prop } from "vue-property-decorator";
 import { IDisplayLayer, IContrast } from "../store/model";
 import store from "../store";
 import ContrastHistogram from "./ContrastHistogram.vue";
+import ColorPickerMenu from "./ColorPickerMenu.vue";
 
 @Component({
   components: {
     ContrastHistogram,
+    ColorPickerMenu,
   },
 })
 export default class LayerInfoGrid extends Vue {
@@ -132,17 +115,5 @@ export default class LayerInfoGrid extends Vue {
   background-color: rgb(0, 0, 0);
   max-width: 100vw;
   height: 100%; // Ensure it takes full height of parent
-}
-
-.color-bar {
-  border-radius: 6px;
-  width: 100%;
-  height: 1em;
-  border: 2px solid grey;
-}
-
-// Add these styles for better scrolling
-.v-container {
-  max-height: calc(100% - 48px); // Adjust based on toolbar height
 }
 </style>

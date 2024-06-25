@@ -56,29 +56,11 @@
         @revert="resetContrastInView()"
         :histogram="histogram"
       />
-      <v-menu
-        :close-on-content-click="false"
-        transition="scale-transition"
-        offset-x
-      >
-        <template #activator="{ on }">
-          <div
-            v-on="on"
-            style="cursor: pointer"
-            class="mb-4 d-flex align-center"
-          >
-            <span class="subtitle-1"> Color </span>
-            <span
-              :style="{ backgroundColor: value.color }"
-              class="color-bar"
-            ></span>
-          </div>
-        </template>
-        <v-color-picker
-          :value="value.color"
-          @input="changeProp('color', $event)"
-        />
-      </v-menu>
+      <color-picker-menu
+        :value="value.color"
+        @input="changeProp('color', $event)"
+        class="mb-4"
+      />
       <v-radio-group
         row
         v-model="channel"
@@ -142,6 +124,7 @@ import { Vue, Component, Prop, Watch } from "vue-property-decorator";
 import { IDisplayLayer, IContrast, IDisplaySlice } from "../store/model";
 import DisplaySlice from "./DisplaySlice.vue";
 import ContrastHistogram from "./ContrastHistogram.vue";
+import ColorPickerMenu from "./ColorPickerMenu.vue";
 import store from "../store";
 import { IHotkey } from "@/utils/v-mousetrap";
 
@@ -149,6 +132,7 @@ import { IHotkey } from "@/utils/v-mousetrap";
   components: {
     DisplaySlice,
     ContrastHistogram,
+    ColorPickerMenu,
   },
 })
 export default class DisplayLayer extends Vue {
@@ -353,14 +337,6 @@ export default class DisplayLayer extends Vue {
 </script>
 
 <style lang="scss" scoped>
-.color-bar {
-  border-radius: 6px;
-  width: 100%;
-  height: 1em;
-  margin-left: 10px;
-  border: 2px solid grey;
-}
-
 .notVisible {
   opacity: 0.5;
 }
@@ -396,17 +372,5 @@ export default class DisplayLayer extends Vue {
       font-size: 14px;
     }
   }
-}
-</style>
-
-<style lang="scss">
-.v-color-picker__dot {
-  box-shadow: 0px 0px 5px grey;
-}
-
-.v-color-picker .v-color-picker__controls .v-color-picker__edit i {
-  border: solid 2px grey;
-  border-radius: 5px;
-  padding: 12px;
 }
 </style>

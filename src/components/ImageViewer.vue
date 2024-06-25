@@ -1453,6 +1453,8 @@ export default class ImageViewer extends Vue {
   bottom: 40px;
   z-index: 1000;
   max-height: calc(100% - 70px);
+  max-width: stretch;
+  margin: 16px;
   overflow-y: auto;
   background-color: rgba(0, 0, 0, 0.7);
   border-radius: 4px;
