@@ -1,43 +1,71 @@
 <template>
   <div>
-    <v-dialog v-model="userMenu" v-if="!store.isLoggedIn" max-width="300px">
+    <v-dialog v-model="userMenu" v-if="!store.isLoggedIn" max-width="400px">
       <template #activator="{ on }">
-        <v-btn v-on="on">{{ store.userName }}</v-btn>
+        <v-btn v-on="on">Login</v-btn>
       </template>
-      <v-container
-        :class="{
-          loginDialog: true,
-          'theme--light': !$vuetify.theme.dark,
-          'theme--dark': $vuetify.theme.dark,
-        }"
-      >
-        <v-form @submit.prevent="login">
-          <v-text-field
-            v-model="domain"
-            name="domain"
-            label="Girder Domain"
-            required
-            prepend-icon="mdi-domain"
-          />
-          <v-text-field
-            v-model="username"
-            name="username"
-            label="Username or e-mail"
-            required
-            prepend-icon="mdi-account"
-          />
-          <v-text-field
-            v-model="password"
-            name="password"
-            type="password"
-            label="Password"
-            prepend-icon="mdi-lock"
-          />
-          <v-card-actions class="button-bar">
-            <v-btn type="submit" color="primary"> Login </v-btn>
-          </v-card-actions>
-        </v-form>
-        <v-alert :value="Boolean(error)" color="error">{{ error }}</v-alert>
+      <v-container class="pa-0">
+        <v-card class="pa-6">
+          <div class="text-center mb-8">
+            <v-img
+              src="/img/icons/NimbusImageIcon.png"
+              max-height="80"
+              contain
+              class="mb-2"
+            />
+            <h2 class="text-h5 font-weight-bold mb-2">
+              Welcome to NimbusImage!
+            </h2>
+            <p class="text-subtitle-1">
+              A cloud-based image analysis platform from the Raj Lab at the
+              University of Pennsylvania and Kitware
+            </p>
+          </div>
+          <v-form @submit.prevent="login" class="my-8">
+            <v-text-field
+              v-model="domain"
+              name="domain"
+              label="Girder Domain"
+              required
+              prepend-icon="mdi-domain"
+            />
+            <v-text-field
+              v-model="username"
+              name="username"
+              label="Username or e-mail"
+              required
+              prepend-icon="mdi-account"
+            />
+            <v-text-field
+              v-model="password"
+              name="password"
+              type="password"
+              label="Password"
+              prepend-icon="mdi-lock"
+            />
+            <v-card-actions class="button-bar">
+              <v-btn type="submit" color="primary">Login</v-btn>
+            </v-card-actions>
+          </v-form>
+          <v-alert :value="!!error" color="error">{{ error }}</v-alert>
+          <div class="text-center mt-4">
+            <a
+              href="https://arjun-raj-lab.gitbook.io/nimbusimage"
+              target="_blank"
+              class="link"
+            >
+              More information
+            </a>
+            <br />
+            <a
+              href="https://arjun-raj-lab.gitbook.io/nimbusimage/quick-start#sign-up"
+              target="_blank"
+              class="link"
+            >
+              Sign up
+            </a>
+          </div>
+        </v-card>
       </v-container>
     </v-dialog>
     <v-menu
@@ -121,7 +149,14 @@ export default class UserMenu extends Vue {
 </script>
 
 <style lang="scss" scoped>
-.loginDialog.theme--light {
-  background: white;
+.link {
+  display: inline-block;
+  margin: 5px 0;
+  color: #64b5f6; // A lighter blue that works well with dark themes
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 </style>
