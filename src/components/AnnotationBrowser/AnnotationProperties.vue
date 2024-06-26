@@ -18,7 +18,11 @@
         </v-row>
         <div class="miller-columns-container">
           <div class="miller-columns-scroll">
-            <div class="miller-column" v-for="(column, colIndex) in columns" :key="colIndex">
+            <div
+              class="miller-column"
+              v-for="(column, colIndex) in columns"
+              :key="colIndex"
+            >
               <v-list dense>
                 <v-list-item
                   v-for="item in column"
@@ -63,7 +67,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 import { findIndexOfPath } from "@/utils/paths";
@@ -84,15 +88,22 @@ export default class AnnotationProperties extends Vue {
   columns: PropertyItem[][] = [];
   selectedItems: PropertyItem[] = [];
 
-  created() {
+  mounted() {
+    this.initializeColumns();
+  }
+
+  @Watch("propertyStore.computedPropertyPaths")
+  onComputedPropertyPathsChange() {
     this.initializeColumns();
   }
 
   initializeColumns() {
-    const rootItems = this.buildPropertyTree(
-      this.propertyStore.computedPropertyPaths,
-    );
-    this.columns = [rootItems];
+    if (this.propertyStore.computedPropertyPaths.length > 0) {
+      const rootItems = this.buildPropertyTree(
+        this.propertyStore.computedPropertyPaths,
+      );
+      this.columns = [rootItems];
+    }
   }
 
   buildPropertyTree(paths: string[][]): PropertyItem[] {
@@ -216,10 +227,21 @@ export default class AnnotationProperties extends Vue {
 }
 
 .miller-column {
-  flex: 0 0 auto;
-  width: 250px;
+  flex: 0 1 auto; /* Changed from flex: 0 0 auto */
+  min-width: 150px; /* Minimum width */
+  max-width: 300px; /* Maximum width */
   padding-right: 1px;
   border-right: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.v-list-item__content {
+  overflow: hidden;
+}
+
+.v-list-item__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* For Webkit browsers like Chrome/Safari */
