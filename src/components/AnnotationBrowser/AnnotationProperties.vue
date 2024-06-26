@@ -34,7 +34,9 @@
                       v-for="item in column"
                       :key="item.path.join('.')"
                       @click="selectItem(item, colIndex)"
-                      :class="{ 'v-list-item--active': isSelected(item, colIndex) }"
+                      :class="{
+                        'v-list-item--active': isSelected(item, colIndex),
+                      }"
                     >
                       <v-list-item-content>
                         <v-list-item-title>
@@ -73,7 +75,9 @@
                       v-for="item in column"
                       :key="item.path.join('.')"
                       @click="selectItem(item, colIndex)"
-                      :class="{ 'v-list-item--active': isSelected(item, colIndex) }"
+                      :class="{
+                        'v-list-item--active': isSelected(item, colIndex),
+                      }"
                     >
                       <v-list-item-content>
                         <v-list-item-title>
