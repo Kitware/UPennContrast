@@ -7,7 +7,7 @@
           <v-col>
             <v-text-field
               v-model="propFilter"
-              label="Filter properties"
+              label="Search properties"
               single-line
               clearable
               dense
@@ -16,51 +16,90 @@
             ></v-text-field>
           </v-col>
         </v-row>
-        <div class="miller-columns-container">
-          <div class="miller-columns-scroll">
-            <div
-              class="miller-column"
-              v-for="(column, colIndex) in columns"
-              :key="colIndex"
-            >
-              <v-list dense>
-                <v-list-item
-                  v-for="item in column"
-                  :key="item.path.join('.')"
-                  @click="selectItem(item, colIndex)"
-                  :class="{ 'v-list-item--active': isSelected(item, colIndex) }"
+        <v-tabs v-model="activeTab" grow>
+          <v-tab key="display">Show in list</v-tab>
+          <v-tab key="filter">Use as filter</v-tab>
+        </v-tabs>
+        <v-tabs-items v-model="activeTab">
+          <v-tab-item key="display">
+            <div class="miller-columns-container">
+              <div class="miller-columns-scroll">
+                <div
+                  class="miller-column"
+                  v-for="(column, colIndex) in columns"
+                  :key="colIndex"
                 >
-                  <v-list-item-content>
-                    <v-list-item-title>
-                      {{ item.name }}
-                    </v-list-item-title>
-                  </v-list-item-content>
-                  <v-list-item-icon v-if="!isLeaf(item)" class="mr-2">
-                    <v-icon small>mdi-chevron-right</v-icon>
-                  </v-list-item-icon>
-                  <template v-if="isLeaf(item)">
-                    <v-list-item-action>
-                      <v-checkbox
-                        dense
-                        hide-details
-                        :input-value="isPropertyDisplayed(item.path)"
-                        @click.stop="toggleList(item.path)"
-                      />
-                    </v-list-item-action>
-                    <v-list-item-action>
-                      <v-checkbox
-                        dense
-                        hide-details
-                        :input-value="isPropertyFiltered(item.path)"
-                        @click.stop="toggleFilter(item.path)"
-                      />
-                    </v-list-item-action>
-                  </template>
-                </v-list-item>
-              </v-list>
+                  <v-list dense>
+                    <v-list-item
+                      v-for="item in column"
+                      :key="item.path.join('.')"
+                      @click="selectItem(item, colIndex)"
+                      :class="{ 'v-list-item--active': isSelected(item, colIndex) }"
+                    >
+                      <v-list-item-content>
+                        <v-list-item-title>
+                          {{ item.name }}
+                        </v-list-item-title>
+                      </v-list-item-content>
+                      <v-list-item-icon v-if="!isLeaf(item)" class="mr-2">
+                        <v-icon small>mdi-chevron-right</v-icon>
+                      </v-list-item-icon>
+                      <template v-if="isLeaf(item)">
+                        <v-list-item-action>
+                          <v-checkbox
+                            dense
+                            hide-details
+                            :input-value="isPropertyDisplayed(item.path)"
+                            @click.stop="toggleList(item.path)"
+                          />
+                        </v-list-item-action>
+                      </template>
+                    </v-list-item>
+                  </v-list>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </v-tab-item>
+          <v-tab-item key="filter">
+            <div class="miller-columns-container">
+              <div class="miller-columns-scroll">
+                <div
+                  class="miller-column"
+                  v-for="(column, colIndex) in columns"
+                  :key="colIndex"
+                >
+                  <v-list dense>
+                    <v-list-item
+                      v-for="item in column"
+                      :key="item.path.join('.')"
+                      @click="selectItem(item, colIndex)"
+                      :class="{ 'v-list-item--active': isSelected(item, colIndex) }"
+                    >
+                      <v-list-item-content>
+                        <v-list-item-title>
+                          {{ item.name }}
+                        </v-list-item-title>
+                      </v-list-item-content>
+                      <v-list-item-icon v-if="!isLeaf(item)" class="mr-2">
+                        <v-icon small>mdi-chevron-right</v-icon>
+                      </v-list-item-icon>
+                      <template v-if="isLeaf(item)">
+                        <v-list-item-action>
+                          <v-checkbox
+                            dense
+                            hide-details
+                            :input-value="isPropertyFiltered(item.path)"
+                            @click.stop="toggleFilter(item.path)"
+                          />
+                        </v-list-item-action>
+                      </template>
+                    </v-list-item>
+                  </v-list>
+                </div>
+              </div>
+            </div>
+          </v-tab-item>
+        </v-tabs-items>
       </v-container>
     </v-expansion-panel-content>
   </v-expansion-panel>
@@ -87,6 +126,7 @@ export default class AnnotationProperties extends Vue {
   propFilter: string = "";
   columns: PropertyItem[][] = [];
   selectedItems: PropertyItem[] = [];
+  activeTab: string = "display";
 
   mounted() {
     this.initializeColumns();
