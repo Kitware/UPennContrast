@@ -2,115 +2,68 @@
   <v-expansion-panel>
     <v-expansion-panel-header>Properties</v-expansion-panel-header>
     <v-expansion-panel-content>
-      <v-container fluid class="pa-0">
-        <v-row class="mb-2">
-          <v-col>
-            <v-text-field
-              v-model="propFilter"
-              label="Search properties"
-              single-line
-              clearable
-              dense
-              @click:clear="clearFilter"
-              @input="filterProperties"
-            ></v-text-field>
-          </v-col>
-        </v-row>
-        <v-tabs v-model="activeTab" grow>
-          <v-tab key="display">Show in list</v-tab>
-          <v-tab key="filter">Use as filter</v-tab>
-        </v-tabs>
-        <v-tabs-items v-model="activeTab">
-          <v-tab-item key="display">
-            <div class="miller-columns-container">
-              <div class="miller-columns-scroll">
-                <div
-                  class="miller-column"
-                  v-for="(column, colIndex) in columns"
-                  :key="colIndex"
+      <v-text-field
+        v-model="propFilter"
+        label="Search properties"
+        single-line
+        clearable
+      />
+      <v-tabs v-model="activeTabIndex" grow>
+        <v-tab v-for="{ key, text } in tabs" :key="key">{{ text }}</v-tab>
+      </v-tabs>
+      <div class="miller-columns-container">
+        <div
+          :class="{
+            'miller-column': true,
+            dark: $vuetify.theme.dark,
+          }"
+          v-for="(column, colIndex) in columns"
+          :key="colIndex"
+        >
+          <v-list dense>
+            <v-list-item
+              v-for="item in column"
+              :key="item.path.join('.')"
+              @click="selectedPath = item.path"
+              :class="{ 'v-list-item--active': item.isSelected }"
+            >
+              <v-list-item-content>
+                <v-list-item-title>
+                  {{ item.name }}
+                </v-list-item-title>
+              </v-list-item-content>
+              <v-list-item-action>
+                <v-btn
+                  v-if="item.isLeaf"
+                  @click="togglePropertySettings(item.path)"
+                  :height="16"
+                  :width="16"
+                  icon
                 >
-                  <v-list dense>
-                    <v-list-item
-                      v-for="item in column"
-                      :key="item.path.join('.')"
-                      @click="selectItem(item, colIndex)"
-                      :class="{
-                        'v-list-item--active': isSelected(item, colIndex),
-                      }"
-                    >
-                      <v-list-item-content>
-                        <v-list-item-title>
-                          {{ item.name }}
-                        </v-list-item-title>
-                      </v-list-item-content>
-                      <v-list-item-icon v-if="!isLeaf(item)" class="mr-2">
-                        <v-icon small>mdi-chevron-right</v-icon>
-                      </v-list-item-icon>
-                      <template v-if="isLeaf(item)">
-                        <v-list-item-action>
-                          <v-checkbox
-                            dense
-                            hide-details
-                            :input-value="isPropertyDisplayed(item.path)"
-                            @click.stop="toggleList(item.path)"
-                          />
-                        </v-list-item-action>
-                      </template>
-                    </v-list-item>
-                  </v-list>
-                </div>
-              </div>
-            </div>
-          </v-tab-item>
-          <v-tab-item key="filter">
-            <div class="miller-columns-container">
-              <div class="miller-columns-scroll">
-                <div
-                  class="miller-column"
-                  v-for="(column, colIndex) in columns"
-                  :key="colIndex"
-                >
-                  <v-list dense>
-                    <v-list-item
-                      v-for="item in column"
-                      :key="item.path.join('.')"
-                      @click="selectItem(item, colIndex)"
-                      :class="{
-                        'v-list-item--active': isSelected(item, colIndex),
-                      }"
-                    >
-                      <v-list-item-content>
-                        <v-list-item-title>
-                          {{ item.name }}
-                        </v-list-item-title>
-                      </v-list-item-content>
-                      <v-list-item-icon v-if="!isLeaf(item)" class="mr-2">
-                        <v-icon small>mdi-chevron-right</v-icon>
-                      </v-list-item-icon>
-                      <template v-if="isLeaf(item)">
-                        <v-list-item-action>
-                          <v-checkbox
-                            dense
-                            hide-details
-                            :input-value="isPropertyFiltered(item.path)"
-                            @click.stop="toggleFilter(item.path)"
-                          />
-                        </v-list-item-action>
-                      </template>
-                    </v-list-item>
-                  </v-list>
-                </div>
-              </div>
-            </div>
-          </v-tab-item>
-        </v-tabs-items>
-      </v-container>
+                  <v-icon small>
+                    {{
+                      activeTabKey === "display"
+                        ? getPropertySettings(item.path)
+                          ? "mdi-eye"
+                          : "mdi-eye-off"
+                        : getPropertySettings(item.path)
+                          ? "mdi-filter"
+                          : "mdi-filter-off"
+                    }}
+                  </v-icon>
+                </v-btn>
+                <v-icon v-else small>mdi-chevron-right</v-icon>
+              </v-list-item-action>
+            </v-list-item>
+          </v-list>
+        </div>
+      </div>
     </v-expansion-panel-content>
   </v-expansion-panel>
 </template>
 
 <script lang="ts">
-import { Vue, Component, Watch } from "vue-property-decorator";
+import { Vue, Component } from "vue-property-decorator";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 import { findIndexOfPath } from "@/utils/paths";
@@ -118,86 +71,118 @@ import { findIndexOfPath } from "@/utils/paths";
 interface PropertyItem {
   name: string;
   path: string[];
-  children?: PropertyItem[];
+  isLeaf: boolean;
+  isSelected: boolean;
 }
+
+const tabs = [
+  {
+    key: "display",
+    text: "Show in list",
+  },
+  {
+    key: "filter",
+    text: "Use as filter",
+  },
+] as const satisfies { key: string; text: string }[];
+
+type TTabKey = (typeof tabs)[number]["key"];
 
 @Component
 export default class AnnotationProperties extends Vue {
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
   readonly findIndexOfPath = findIndexOfPath;
+  readonly tabs = tabs;
 
-  propFilter: string = "";
-  columns: PropertyItem[][] = [];
-  selectedItems: PropertyItem[] = [];
-  activeTab: string = "display";
+  propFilter: string | null = null;
+  selectedPath: string[] = [];
+  activeTabKey: TTabKey = "display";
 
-  mounted() {
-    this.initializeColumns();
+  get activeTabIndex(): number {
+    return tabs.findIndex(({ key }) => this.activeTabKey === key);
   }
 
-  @Watch("propertyStore.computedPropertyPaths")
-  onComputedPropertyPathsChange() {
-    this.initializeColumns();
+  set activeTabIndex(index: number) {
+    this.activeTabKey = tabs[index].key;
   }
 
-  initializeColumns() {
-    if (this.propertyStore.computedPropertyPaths.length > 0) {
-      const rootItems = this.buildPropertyTree(
-        this.propertyStore.computedPropertyPaths,
+  togglePropertySettings(path: string[]): void {
+    switch (this.activeTabKey) {
+      case "display":
+        this.toggleList(path);
+        break;
+      case "filter":
+        this.toggleFilter(path);
+        break;
+    }
+  }
+
+  getPropertySettings(path: string[]): boolean {
+    switch (this.activeTabKey) {
+      case "display":
+        return this.isPropertyDisplayed(path);
+      case "filter":
+        return this.isPropertyFiltered(path);
+    }
+  }
+
+  get filteredPaths() {
+    const lowerCaseFilter = this.propFilter?.toLowerCase();
+    const allPaths = this.propertyStore.computedPropertyPaths;
+    return lowerCaseFilter
+      ? allPaths.filter(
+          (path) =>
+            this.propertyStore
+              .getFullNameFromPath(path)
+              ?.toLowerCase()
+              .includes(lowerCaseFilter) ?? true,
+        )
+      : allPaths;
+  }
+
+  get columns(): PropertyItem[][] {
+    // Add a column for each segment in the path
+    let remainingPaths = this.filteredPaths;
+    const columns: PropertyItem[][] = [];
+    for (
+      let columnIdx = 0;
+      columnIdx < this.selectedPath.length + 1;
+      ++columnIdx
+    ) {
+      // Remove paths that don't belong to this column
+      const currentSelectedPath = this.selectedPath.slice(0, columnIdx);
+      remainingPaths = remainingPaths.filter((path) =>
+        currentSelectedPath.every(
+          (pathSegment, pathSegmentIdx) => pathSegment === path[pathSegmentIdx],
+        ),
       );
-      this.columns = [rootItems];
-    }
-  }
-
-  buildPropertyTree(paths: string[][]): PropertyItem[] {
-    const tree: PropertyItem[] = [];
-    paths.forEach((path) => {
-      let currentLevel = tree;
-      path.forEach((segment, index) => {
-        let existingItem: PropertyItem | undefined;
-        let itemName: string;
-
-        if (index === 0) {
-          // Handle root level
-          const property = this.propertyStore.getPropertyById(segment);
-          itemName = property ? property.name : segment; // Fallback to segment if property not found
-        } else {
-          // Handle subsequent levels
-          itemName = segment;
+      // Find all unique segments for this column
+      const segmentItems: Map<string, PropertyItem> = new Map();
+      remainingPaths.forEach((path) => {
+        const segment = path[columnIdx]; // Property ID for column 0, sub-name otherwise
+        if (!segment || segmentItems.has(segment)) {
+          return;
         }
+        const itemName =
+          columnIdx === 0
+            ? this.propertyStore.getPropertyById(segment)?.name ?? segment // Handle root level
+            : segment; // Handle custom sub levels
 
-        existingItem = currentLevel.find((item) => item.name === itemName);
-        if (!existingItem) {
-          existingItem = {
-            name: itemName,
-            path: path.slice(0, index + 1),
-            children: [],
-          };
-          currentLevel.push(existingItem);
-        }
-
-        currentLevel = existingItem.children!;
+        segmentItems.set(segment, {
+          name: itemName,
+          path: path.slice(0, columnIdx + 1),
+          isLeaf: path.length === columnIdx + 1,
+          isSelected: segment === this.selectedPath[columnIdx],
+        });
       });
-    });
-    return tree;
-  }
-
-  selectItem(item: PropertyItem, columnIndex: number) {
-    this.selectedItems = this.selectedItems.slice(0, columnIndex);
-    this.selectedItems.push(item);
-    this.columns = this.columns.slice(0, columnIndex + 1);
-    if (item.children && item.children.length > 0) {
-      this.columns.push(item.children);
+      // Create the new column
+      if (segmentItems.size <= 0) {
+        break;
+      }
+      columns.push([...segmentItems.values()]);
     }
-  }
-
-  isSelected(item: PropertyItem, columnIndex: number): boolean {
-    return this.selectedItems[columnIndex] === item;
-  }
-
-  isLeaf(item: PropertyItem): boolean {
-    return !item.children || item.children.length === 0;
+    return columns;
   }
 
   getTagsForPath(path: string[]) {
@@ -222,48 +207,11 @@ export default class AnnotationProperties extends Vue {
   toggleFilter(propertyPath: string[]) {
     this.filterStore.togglePropertyPathFiltering(propertyPath);
   }
-
-  clearFilter() {
-    this.propFilter = "";
-    this.initializeColumns();
-  }
-
-  filterProperties() {
-    if (!this.propFilter) {
-      this.initializeColumns();
-      return;
-    }
-    const filteredPaths = this.propertyStore.computedPropertyPaths.filter(
-      (path) => {
-        const fullName = this.propertyStore.getFullNameFromPath(path);
-        return (
-          fullName !== null &&
-          fullName.toLowerCase().includes(this.propFilter.toLowerCase())
-        );
-      },
-    );
-    this.columns = [this.buildPropertyTree(filteredPaths)];
-    this.selectedItems = [];
-  }
 }
 </script>
 
-<style scoped>
-.v-list-item--active {
-  background-color: rgba(0, 0, 0, 0.12);
-}
-
-.v-list-item__icon {
-  margin-right: 8px !important;
-}
-
+<style lang="scss" scoped>
 .miller-columns-container {
-  position: relative;
-  overflow: hidden;
-  width: 100%;
-}
-
-.miller-columns-scroll {
   display: flex;
   overflow-x: auto;
   scrollbar-width: thin;
@@ -271,34 +219,15 @@ export default class AnnotationProperties extends Vue {
 }
 
 .miller-column {
-  flex: 0 1 auto; /* Changed from flex: 0 0 auto */
-  min-width: 150px; /* Minimum width */
-  max-width: 300px; /* Maximum width */
-  padding-right: 1px;
-  border-right: 1px solid rgba(0, 0, 0, 0.12);
-}
+  flex: 0 1 auto;
+  min-width: 150px;
+  max-width: 300px;
+  padding: 0px 2px;
+  border-right: 1px solid;
 
-.v-list-item__content {
-  overflow: hidden;
-}
-
-.v-list-item__title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* For Webkit browsers like Chrome/Safari */
-.miller-columns-scroll::-webkit-scrollbar {
-  height: 8px;
-}
-
-.miller-columns-scroll::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.3);
-  border-radius: 4px;
-}
-
-.miller-columns-scroll::-webkit-scrollbar-track {
-  background-color: transparent;
+  border-color: rgba(0, 0, 0, 0.12);
+  &.dark {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
 }
 </style>
