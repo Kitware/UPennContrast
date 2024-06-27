@@ -37,14 +37,6 @@
                   v-if="item.isLeaf"
                   :value="getPropertySettings(item.path)"
                   @input="togglePropertySettings(item.path)"
-                  :on-icon="
-                    activeTabKey === 'display' ? 'mdi-eye' : 'mdi-filter'
-                  "
-                  :off-icon="
-                    activeTabKey === 'display'
-                      ? 'mdi-eye-off'
-                      : 'mdi-filter-off'
-                  "
                 />
                 <v-icon v-else>mdi-chevron-right</v-icon>
               </v-list-item-action>
