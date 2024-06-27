@@ -1,68 +1,49 @@
 <template>
   <v-expansion-panel>
-    <v-expansion-panel-header> Properties </v-expansion-panel-header>
+    <v-expansion-panel-header>Properties</v-expansion-panel-header>
     <v-expansion-panel-content>
-      <v-container>
-        <v-row class="caption text-center text--secondary font-weight-bold">
-          <v-col class="px-1">
-            Name
-            <v-chip small class="mx-1">tags</v-chip>
-          </v-col>
-          <v-col cols="2" class="px-1"> List property value </v-col>
-          <v-col cols="2" class="px-1"> Use property value as filter </v-col>
-        </v-row>
-        <v-divider class="my-2" />
+      <v-text-field
+        v-model="propFilter"
+        label="Search properties"
+        single-line
+        clearable
+      />
+      <v-tabs v-model="activeTabIndex" grow>
+        <v-tab v-for="{ key, text } in tabs" :key="key">{{ text }}</v-tab>
+      </v-tabs>
+      <div class="miller-columns-container">
         <div
-          v-for="(propertyPath, idx) of computedPropertyPaths"
-          :key="'property ' + idx"
+          :class="{
+            'miller-column': true,
+            dark: $vuetify.theme.dark,
+          }"
+          v-for="(column, colIndex) in columns"
+          :key="colIndex"
         >
-          <v-row>
-            <v-col>
-              {{ propertyStore.getFullNameFromPath(propertyPath) }}
-              <v-chip
-                v-for="(tag, idx) in getTagsForPath(propertyPath)"
-                :key="idx"
-                small
-                class="mx-1"
-              >
-                {{ tag }}
-              </v-chip>
-            </v-col>
-            <!-- In list checkbox -->
-            <v-col cols="2">
-              <div>
-                <v-checkbox
-                  dense
-                  hide-details
-                  :value="
-                    findIndexOfPath(
-                      propertyPath,
-                      propertyStore.displayedPropertyPaths,
-                    ) >= 0
-                  "
-                  @click.stop="() => toggleList(propertyPath)"
-                  class="ma-0"
+          <v-list dense>
+            <v-list-item
+              v-for="item in column"
+              :key="item.path.join('.')"
+              @click="selectedPath = item.path"
+              :class="{ 'v-list-item--active': item.isSelected }"
+            >
+              <v-list-item-content>
+                <v-list-item-title>
+                  {{ item.name }}
+                </v-list-item-title>
+              </v-list-item-content>
+              <v-list-item-action class="my-2">
+                <v-simple-checkbox
+                  v-if="item.isLeaf"
+                  :value="getPropertySettings(item.path)"
+                  @input="togglePropertySettings(item.path)"
                 />
-              </div>
-            </v-col>
-            <!-- As filter checkbox -->
-            <v-col cols="2">
-              <div>
-                <v-checkbox
-                  dense
-                  hide-details
-                  :value="
-                    findIndexOfPath(propertyPath, filterStore.filterPaths) >= 0
-                  "
-                  @click.stop="() => toggleFilter(propertyPath)"
-                  class="ma-0"
-                />
-              </div>
-            </v-col>
-          </v-row>
-          <v-divider class="my-2" />
+                <v-icon v-else>mdi-chevron-right</v-icon>
+              </v-list-item-action>
+            </v-list-item>
+          </v-list>
         </div>
-      </v-container>
+      </div>
     </v-expansion-panel-content>
   </v-expansion-panel>
 </template>
@@ -73,19 +54,136 @@ import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
 import { findIndexOfPath } from "@/utils/paths";
 
+interface PropertyItem {
+  name: string;
+  path: string[];
+  isLeaf: boolean;
+  isSelected: boolean;
+}
+
+const tabs = [
+  {
+    key: "display",
+    text: "Show in list",
+  },
+  {
+    key: "filter",
+    text: "Use as filter",
+  },
+] as const satisfies { key: string; text: string }[];
+
+type TTabKey = (typeof tabs)[number]["key"];
+
 @Component
 export default class AnnotationProperties extends Vue {
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
   readonly findIndexOfPath = findIndexOfPath;
+  readonly tabs = tabs;
 
-  get computedPropertyPaths() {
-    return this.propertyStore.computedPropertyPaths;
+  propFilter: string | null = null;
+  selectedPath: string[] = [];
+  activeTabKey: TTabKey = "display";
+
+  get activeTabIndex(): number {
+    return tabs.findIndex(({ key }) => this.activeTabKey === key);
+  }
+
+  set activeTabIndex(index: number) {
+    this.activeTabKey = tabs[index].key;
+  }
+
+  togglePropertySettings(path: string[]): void {
+    switch (this.activeTabKey) {
+      case "display":
+        this.toggleList(path);
+        break;
+      case "filter":
+        this.toggleFilter(path);
+        break;
+    }
+  }
+
+  getPropertySettings(path: string[]): boolean {
+    switch (this.activeTabKey) {
+      case "display":
+        return this.isPropertyDisplayed(path);
+      case "filter":
+        return this.isPropertyFiltered(path);
+    }
+  }
+
+  get filteredPaths() {
+    const lowerCaseFilter = this.propFilter?.toLowerCase();
+    const allPaths = this.propertyStore.computedPropertyPaths;
+    return lowerCaseFilter
+      ? allPaths.filter(
+          (path) =>
+            this.propertyStore
+              .getFullNameFromPath(path)
+              ?.toLowerCase()
+              .includes(lowerCaseFilter) ?? true,
+        )
+      : allPaths;
+  }
+
+  get columns(): PropertyItem[][] {
+    // Add a column for each segment in the path
+    let remainingPaths = this.filteredPaths;
+    const columns: PropertyItem[][] = [];
+    for (
+      let columnIdx = 0;
+      columnIdx < this.selectedPath.length + 1;
+      ++columnIdx
+    ) {
+      // Remove paths that don't belong to this column
+      const currentSelectedPath = this.selectedPath.slice(0, columnIdx);
+      remainingPaths = remainingPaths.filter((path) =>
+        currentSelectedPath.every(
+          (pathSegment, pathSegmentIdx) => pathSegment === path[pathSegmentIdx],
+        ),
+      );
+      // Find all unique segments for this column
+      const segmentItems: Map<string, PropertyItem> = new Map();
+      remainingPaths.forEach((path) => {
+        const segment = path[columnIdx]; // Property ID for column 0, sub-name otherwise
+        if (!segment || segmentItems.has(segment)) {
+          return;
+        }
+        const itemName =
+          columnIdx === 0
+            ? this.propertyStore.getPropertyById(segment)?.name ?? segment // Handle root level
+            : segment; // Handle custom sub levels
+
+        segmentItems.set(segment, {
+          name: itemName,
+          path: path.slice(0, columnIdx + 1),
+          isLeaf: path.length === columnIdx + 1,
+          isSelected: segment === this.selectedPath[columnIdx],
+        });
+      });
+      // Create the new column
+      if (segmentItems.size <= 0) {
+        break;
+      }
+      columns.push([...segmentItems.values()]);
+    }
+    return columns;
   }
 
   getTagsForPath(path: string[]) {
     const property = this.propertyStore.getPropertyById(path[0]);
     return property?.tags.tags || [];
+  }
+
+  isPropertyDisplayed(path: string[]): boolean {
+    return (
+      this.findIndexOfPath(path, this.propertyStore.displayedPropertyPaths) >= 0
+    );
+  }
+
+  isPropertyFiltered(path: string[]): boolean {
+    return this.findIndexOfPath(path, this.filterStore.filterPaths) >= 0;
   }
 
   toggleList(propertyPath: string[]) {
@@ -97,3 +195,25 @@ export default class AnnotationProperties extends Vue {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+.miller-columns-container {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+}
+
+.miller-column {
+  flex: 0 1 auto;
+  min-width: 150px;
+  max-width: 300px;
+  padding: 0px 2px;
+  border-right: 1px solid;
+
+  border-color: rgba(0, 0, 0, 0.12);
+  &.dark {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+}
+</style>
