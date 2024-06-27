@@ -32,27 +32,21 @@
                   {{ item.name }}
                 </v-list-item-title>
               </v-list-item-content>
-              <v-list-item-action>
-                <v-btn
+              <v-list-item-action class="my-2">
+                <v-simple-checkbox
                   v-if="item.isLeaf"
-                  @click="togglePropertySettings(item.path)"
-                  :height="16"
-                  :width="16"
-                  icon
-                >
-                  <v-icon small>
-                    {{
-                      activeTabKey === "display"
-                        ? getPropertySettings(item.path)
-                          ? "mdi-eye"
-                          : "mdi-eye-off"
-                        : getPropertySettings(item.path)
-                          ? "mdi-filter"
-                          : "mdi-filter-off"
-                    }}
-                  </v-icon>
-                </v-btn>
-                <v-icon v-else small>mdi-chevron-right</v-icon>
+                  :value="getPropertySettings(item.path)"
+                  @input="togglePropertySettings(item.path)"
+                  :on-icon="
+                    activeTabKey === 'display' ? 'mdi-eye' : 'mdi-filter'
+                  "
+                  :off-icon="
+                    activeTabKey === 'display'
+                      ? 'mdi-eye-off'
+                      : 'mdi-filter-off'
+                  "
+                />
+                <v-icon v-else>mdi-chevron-right</v-icon>
               </v-list-item-action>
             </v-list-item>
           </v-list>
