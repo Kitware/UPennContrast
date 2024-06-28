@@ -197,6 +197,10 @@ export default class Toolset extends Vue {
       }
     }
 
+    if (tool.hotkey !== null) {
+      propDesc.push(["Hotkey", tool.hotkey]);
+    }
+
     return propDesc;
   }
 }
