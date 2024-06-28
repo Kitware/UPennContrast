@@ -170,6 +170,12 @@
               class="ma-2"
             />
           </template>
+          <!-- Datasets -->
+          <template v-slot:item.datasetName="{ item }">
+            <div style="max-width: 100px">
+              {{ item.datasetName }}
+            </div>
+          </template>
           <!-- Tags -->
           <template v-slot:item.tags="{ item }">
             <v-chip
