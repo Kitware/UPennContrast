@@ -46,7 +46,7 @@
         <v-card>
           <v-card-title> New name </v-card-title>
           <v-card-text>
-            <v-form @submit="rename">
+            <v-form @submit.prevent="rename">
               <v-text-field v-model="newName" autofocus />
               <div class="d-flex">
                 <v-spacer />

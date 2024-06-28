@@ -99,7 +99,7 @@
                 lazy-validation
                 ref="saveSnapshotForm"
                 @input="updateFormValidation"
-                @submit="saveSnapshot"
+                @submit.prevent="saveSnapshot"
               >
                 <v-card-text
                   title="Add a name, description, or tags to create a new snapshot."
@@ -153,7 +153,7 @@
       <v-card-title class="headline"> Snapshot list </v-card-title>
       <v-card-text>
         <v-data-table
-          :items="snapshotList()"
+          :items="snapshotList"
           :headers="tableHeaders"
           :items-per-page="5"
           item-key="key"
@@ -169,6 +169,12 @@
               hide-details
               class="ma-2"
             />
+          </template>
+          <!-- Datasets -->
+          <template v-slot:item.datasetName="{ item }">
+            <div style="max-width: 100px">
+              {{ item.datasetName }}
+            </div>
           </template>
           <!-- Tags -->
           <template v-slot:item.tags="{ item }">
@@ -993,16 +999,14 @@ export default class Snapshots extends Vue {
     }
   }
 
-  snapshotList(sortMode?: string) {
+  get snapshotList() {
     const sre = new RegExp(this.snapshotSearch || "", "i");
     const results: ISnapshotItem[] = [];
-    if (store.configuration && store.configuration.snapshots) {
-      const snapshots = store.configuration.snapshots.slice();
-      if (!sortMode) {
-        snapshots.sort(
-          (a, b) => (b.modified || b.created) - (a.modified || a.created),
-        );
-      }
+    if (this.store.configuration && this.store.configuration.snapshots) {
+      const snapshots = this.store.configuration.snapshots.slice();
+      snapshots.sort(
+        (a, b) => (b.modified || b.created) - (a.modified || a.created),
+      );
       snapshots.forEach((s) => {
         if (
           sre.exec(s.name) ||
