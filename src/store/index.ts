@@ -411,19 +411,25 @@ export class Main extends VuexModule {
     girderUrl: string;
     girderRest: RestClientInstance;
   }) {
-    await this.loggedInImpl({ girderRest, girderUrl });
+    this.loggedInImpl({ girderRest, girderUrl });
     const user = this.girderUser;
+    const promises = [];
     if (user) {
-      this.api.getUserPublicFolder(user._id).then((publicFolder) => {
-        if (publicFolder) {
-          this.setFolderLocation(publicFolder);
-        } else {
-          this.setFolderLocation(user);
-        }
-      });
+      promises.push(
+        this.api.getUserPublicFolder(user._id).then((publicFolder) => {
+          if (publicFolder) {
+            this.setFolderLocation(publicFolder);
+          } else {
+            this.setFolderLocation(user);
+          }
+        }),
+      );
     }
-    this.setSelectedConfiguration(this.selectedConfigurationId);
-    this.setSelectedDataset(this.selectedDatasetId);
+    promises.push(
+      this.setSelectedConfiguration(this.selectedConfigurationId),
+      this.setSelectedDataset(this.selectedDatasetId),
+      this.fetchRecentDatasetViews(),
+    );
   }
 
   @Mutation
@@ -615,7 +621,6 @@ export class Main extends VuexModule {
       }
       await this.initFromUrl();
       sync.setLoading(false);
-      await this.fetchRecentDatasetViews();
     } catch (error) {
       sync.setLoading(error as Error);
     }
