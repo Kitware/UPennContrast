@@ -99,7 +99,7 @@
                 lazy-validation
                 ref="saveSnapshotForm"
                 @input="updateFormValidation"
-                @submit="saveSnapshot"
+                @submit.prevent="saveSnapshot"
               >
                 <v-card-text
                   title="Add a name, description, or tags to create a new snapshot."
