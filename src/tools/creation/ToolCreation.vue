@@ -192,6 +192,7 @@ export default class ToolCreation extends Vue {
     this.toolName = "New Tool";
     this.selectedTemplate = null;
     this.selectedDefaultValues = null;
+    this.hotkey = null;
 
     if (!this.$refs.toolConfiguration) {
       return;
