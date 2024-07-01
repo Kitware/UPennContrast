@@ -42,8 +42,7 @@
                   <v-tooltip
                     top
                     :disabled="
-                      !datasetInfo[d.datasetView.datasetId] &&
-                      !configInfo[d.datasetView.configurationId]
+                      !d.datasetInfo.description && !d.configInfo.description
                     "
                   >
                     <template v-slot:activator="{ on, attrs }">

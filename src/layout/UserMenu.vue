@@ -88,7 +88,7 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component } from "vue-property-decorator";
+import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import UserProfileSettings from "@/components/UserProfileSettings.vue";
 
@@ -100,7 +100,7 @@ import UserProfileSettings from "@/components/UserProfileSettings.vue";
 export default class UserMenu extends Vue {
   readonly store = store;
 
-  userMenu: boolean | string = "auto";
+  userMenu: boolean = false;
 
   domain = store.girderUrl;
   username = import.meta.env.VITE_DEFAULT_USER || "";
@@ -108,41 +108,33 @@ export default class UserMenu extends Vue {
 
   error = "";
 
-  mounted() {
-    // delay auto open for auto relogin to finish
-    setTimeout(() => {
-      // if the environment has a default user and password, login.
-      if (this.userMenu === "auto") {
-        this.userMenu = false;
-        if (this.username && this.password) {
-          this.login();
-        }
-        setTimeout(() => {
-          if (!this.userMenu) {
-            this.userMenu = !store.isLoggedIn;
-          }
-        }, 500);
-        return;
-      }
-      if (!this.userMenu) {
-        this.userMenu = !store.isLoggedIn;
-      }
-    }, 500);
+  async mounted() {
+    this.loggedInOrOut();
+    if (this.username && this.password) {
+      await this.login();
+    }
+  }
+
+  @Watch("store.isLoggedIn")
+  loggedInOrOut() {
+    this.userMenu = !store.isLoggedIn;
   }
 
   async login() {
     this.error = "";
-    const result = await store.login({
-      domain: this.domain,
-      username: this.username,
-      password: this.password,
-    });
-    if (result) {
+    try {
+      const result = await store.login({
+        domain: this.domain,
+        username: this.username,
+        password: this.password,
+      });
+      if (result) {
+        this.error = result;
+      } else {
+        this.userMenu = false;
+      }
+    } finally {
       this.password = "";
-      this.error = result;
-    } else {
-      this.error = "";
-      this.userMenu = false;
     }
   }
 }
