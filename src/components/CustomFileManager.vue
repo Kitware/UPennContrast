@@ -184,7 +184,7 @@ export default class CustomFileManager extends Vue {
 
   @Watch("isLoggedIn")
   async fetchLocation() {
-    const publicFolder = await this.store.api.getUserPublicFolder();
+    const publicFolder = await this.store.api.getUserPrivateFolder();
     this.defaultLocation = publicFolder || this.store.girderUser;
   }
 

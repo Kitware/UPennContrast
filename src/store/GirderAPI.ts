@@ -108,7 +108,14 @@ export default class GirderAPI {
     return users.map((user: IGirderUser) => user._id);
   }
 
-  async getUserPublicFolder(userId?: string): Promise<IGirderFolder | null> {
+  getUserPrivateFolder(userId?: string): Promise<IGirderFolder | null> {
+    return this.getUserFolder("Private", userId);
+  }
+
+  async getUserFolder(
+    folderName: string,
+    userId?: string,
+  ): Promise<IGirderFolder | null> {
     let parentId = userId;
     if (userId === undefined) {
       const me = await this.client.get("user/me");
@@ -121,7 +128,7 @@ export default class GirderAPI {
     }
 
     const result = await this.client.get(
-      `folder?parentType=user&parentId=${parentId}&name=Public`,
+      `folder?parentType=user&parentId=${parentId}&name=${folderName}`,
     );
     return result.data.length > 0 ? result.data[0] : null;
   }
