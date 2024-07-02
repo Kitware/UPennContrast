@@ -333,7 +333,7 @@ export default class NewDataset extends Vue {
     if (this.initialUploadLocation) {
       this.path = this.initialUploadLocation;
     } else {
-      const publicFolder = await this.store.api.getUserPublicFolder();
+      const publicFolder = await this.store.api.getUserPrivateFolder();
       if (!publicFolder) {
         return;
       }
