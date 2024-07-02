@@ -416,9 +416,9 @@ export class Main extends VuexModule {
     const promises = [];
     if (user) {
       promises.push(
-        this.api.getUserPrivateFolder(user._id).then((publicFolder) => {
-          if (publicFolder) {
-            this.setFolderLocation(publicFolder);
+        this.api.getUserPrivateFolder(user._id).then((privateFolder) => {
+          if (privateFolder) {
+            this.setFolderLocation(privateFolder);
           } else {
             this.setFolderLocation(user);
           }
