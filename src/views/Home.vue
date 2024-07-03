@@ -97,23 +97,18 @@
                 :initial-items-per-page="100"
                 :items-per-page-options="[10, 20, 50, 100, -1]"
               >
-                <template #options="{ items, closeMenu }">
+                <template #options="{ items }">
                   <!--
                     Add an option to open the dataset folder in the file browser.
                     When clicking the dataset, the user is taken to the dataset route.
                   -->
-                  <tempalte
+                  <template
                     v-if="items.length === 1 && isDatasetFolder(items[0])"
                   >
-                    <v-list-item
-                      @click.stop="
-                        location = items[0];
-                        closeMenu();
-                      "
-                    >
+                    <v-list-item @click="location = items[0]">
                       <v-list-item-title> Browse </v-list-item-title>
                     </v-list-item>
-                  </tempalte>
+                  </template>
                 </template>
               </custom-file-manager>
             </section>
