@@ -37,8 +37,8 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-    <!-- Renaming -->
     <template v-if="items.length === 1">
+      <!-- Renaming -->
       <v-list-item @click.stop="renameDialog = true">
         <v-list-item-title> Rename </v-list-item-title>
       </v-list-item>
@@ -60,6 +60,8 @@
         </v-card>
       </v-dialog>
     </template>
+    <!-- Custom options for a all options -->
+    <slot :items="items" :closeMenu="closeMenu"></slot>
   </v-list>
 </template>
 

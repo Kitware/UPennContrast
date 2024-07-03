@@ -73,7 +73,11 @@
             @itemsChanged="reloadItems"
             :items="[props.item]"
             @closeMenu="rowOptionsMenu[props.item._id] = false"
-          />
+          >
+            <template #default="optionsSlotAttributes">
+              <slot name="options" v-bind="optionsSlotAttributes"></slot>
+            </template>
+          </file-manager-options>
         </v-menu>
       </template>
     </girder-file-manager>
