@@ -565,6 +565,7 @@ export interface IGeoJSLayerSpec {
   id?: number;
   map?: IGeoJSMap | null;
   renderer?: string | IGeoJSRenderer;
+  crossDomain?: "anonymous" | "use-credentials";
   autoshareRenderer?: boolean | string;
   canvas?: HTMLCanvasElement;
   annotations?: string[] | IObject;

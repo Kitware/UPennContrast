@@ -802,7 +802,7 @@ export default class ImageViewer extends Vue {
     );
     params.map.zoom = params.map.min;
     params.map.center = { x: mapWidth / 2, y: mapHeight / 2 };
-    params.layer.useCredentials = true;
+    params.layer.crossDomain = "use-credentials";
     params.layer.autoshareRenderer = false;
     params.layer.nearestPixel = params.layer.maxLevel;
     delete params.layer.tilesMaxBounds;

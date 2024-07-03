@@ -187,7 +187,7 @@ export default class ImageViewer extends Vue {
       someImage.tileWidth,
       someImage.tileHeight,
     );
-    params.layer.useCredentials = true;
+    params.layer.crossDomain = "use-credentials";
     params.layer.url = "";
     params.layer.renderer = "canvas";
     /* We want the actions to trigger on the overview, but affect the main

@@ -76,7 +76,7 @@ export default function setFrameQuad(
   const options: ISetQuadStatusOptions = {
     progress: () => {},
     adjustMinLevel: true,
-    crossOrigin: "anonymous",
+    crossOrigin: "use-credentials",
     redrawOnFirstLoad: true,
     ...partialOptions,
   };
