@@ -117,7 +117,7 @@
 import { Vue, Component, Prop } from "vue-property-decorator";
 import store from "@/store";
 import girderResources from "@/store/girderResources";
-import { IGirderSelectAble } from "@/girder";
+import { IGirderLocation } from "@/girder";
 import GirderLocationChooser from "@/components/GirderLocationChooser.vue";
 import FileDropzone from "@/components/Files/FileDropzone.vue";
 import { IDataset } from "@/store/model";
@@ -208,7 +208,7 @@ export default class NewDataset extends Vue {
   readonly autoMultiConfig!: boolean;
 
   @Prop()
-  readonly initialUploadLocation?: IGirderSelectAble;
+  readonly initialUploadLocation!: IGirderLocation;
 
   uploadedFiles: File[] | null = null;
 
@@ -222,7 +222,7 @@ export default class NewDataset extends Vue {
   name = "";
   description = "";
 
-  path: IGirderSelectAble | null = null;
+  path: IGirderLocation | null = null;
 
   dataset: IDataset | null = null;
 
@@ -330,19 +330,7 @@ export default class NewDataset extends Vue {
   }
 
   async mounted() {
-    if (this.initialUploadLocation) {
-      this.path = this.initialUploadLocation;
-    } else {
-      const publicFolder = await this.store.api.getUserPublicFolder();
-      if (!publicFolder) {
-        return;
-      }
-      if (this.quickupload) {
-        this.path = await this.store.api.getQuickUploadFolder(publicFolder._id);
-      } else {
-        this.path = publicFolder;
-      }
-    }
+    this.path = this.initialUploadLocation;
   }
 
   async uploadMounted() {
@@ -356,7 +344,7 @@ export default class NewDataset extends Vue {
   }
 
   async submit() {
-    if (!this.valid || !this.path) {
+    if (!this.valid || !this.path || !("_id" in this.path)) {
       return;
     }
 

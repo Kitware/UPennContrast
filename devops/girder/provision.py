@@ -21,7 +21,7 @@ def provision(opts):
         # Allow cross origin requests, but since this may be undesired,
         # only do it if we are creating an admin user so it doesn't happen
         # on subsequent starts.
-        Setting().set("core.cors.allow_origin", "*")
+        Setting().set("core.cors.allow_origin", "http://localhost:*")
 
         # Increase the allowed files that can be cached, as this is used for
         # tiled frames
