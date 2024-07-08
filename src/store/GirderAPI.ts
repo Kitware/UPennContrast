@@ -4,6 +4,7 @@ import {
   IGirderFolder,
   IGirderSelectAble,
   IGirderUser,
+  IGirderFile,
 } from "@/girder";
 import {
   configurationBaseKeys,
@@ -144,13 +145,10 @@ export default class GirderAPI {
     });
   }
 
-  renameItem(item: IGirderSelectAble, name: string) {
-    const type = item._modelType;
-    if (!(type === "folder" || type === "item")) {
-      return;
-    }
-    const id = item._id;
-    return this.client.put(`${type}/${id}`, null, { params: { name } });
+  renameItem(renamable: IGirderFolder | IGirderItem, name: string) {
+    return this.client.put(`${renamable._modelType}/${renamable._id}`, null, {
+      params: { name },
+    });
   }
 
   deleteItems(items: IGirderSelectAble[]) {
@@ -160,6 +158,19 @@ export default class GirderAPI {
         resources: JSON.stringify(resourceObj),
       },
     });
+  }
+
+  downloadResource(
+    girderDownloadable: IGirderItem | IGirderFile | IGirderFolder,
+  ) {
+    return this.client
+      .get<Blob>(
+        `${girderDownloadable._modelType}/${girderDownloadable._id}/download`,
+        {
+          responseType: "blob",
+        },
+      )
+      .then((r) => r.data);
   }
 
   async getHistoryEntries(datasetId: string): Promise<IHistoryEntry[]> {

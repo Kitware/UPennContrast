@@ -92,11 +92,25 @@
             <section class="mb-4 home-section">
               <v-subheader class="headline mb-4">Browse</v-subheader>
               <custom-file-manager
-                :location.sync="location"
+                :location="location"
+                @update:location="onLocationUpdate"
                 :initial-items-per-page="100"
                 :items-per-page-options="[10, 20, 50, 100, -1]"
-                @rowclick="onRowClick"
-              />
+              >
+                <template #options="{ items }">
+                  <!--
+                    Add an option to open the dataset folder in the file browser.
+                    When clicking the dataset, the user is taken to the dataset route.
+                  -->
+                  <template
+                    v-if="items.length === 1 && isDatasetFolder(items[0])"
+                  >
+                    <v-list-item @click="location = items[0]">
+                      <v-list-item-title> Browse </v-list-item-title>
+                    </v-list-item>
+                  </template>
+                </template>
+              </custom-file-manager>
             </section>
           </v-col>
         </v-row>
@@ -133,20 +147,13 @@ import { isConfigurationItem, isDatasetFolder } from "@/utils/girderSelectable";
 export default class Home extends Vue {
   readonly store = store;
   readonly girderResources = girderResources;
+  readonly isDatasetFolder = isDatasetFolder;
 
   get location() {
     return this.store.folderLocation;
   }
 
   set location(location: IGirderLocation) {
-    if (
-      !location ||
-      ("_modelType" in location &&
-        location._modelType == "folder" &&
-        isDatasetFolder(location))
-    ) {
-      return;
-    }
     this.store.setFolderLocation(location);
   }
 
@@ -234,18 +241,22 @@ export default class Home extends Vue {
     this.fetchDatasetsAndConfigurations();
   }
 
-  onRowClick(selectable: IGirderSelectAble) {
+  onLocationUpdate(selectable: IGirderSelectAble) {
     if (isDatasetFolder(selectable)) {
       this.$router.push({
         name: "dataset",
         params: { datasetId: selectable._id },
       });
-    }
-    if (isConfigurationItem(selectable)) {
+    } else if (isConfigurationItem(selectable)) {
       this.$router.push({
         name: "configuration",
         params: { configurationId: selectable._id },
       });
+    } else if (
+      selectable._modelType !== "file" &&
+      selectable._modelType !== "item"
+    ) {
+      this.location = selectable;
     }
   }
 

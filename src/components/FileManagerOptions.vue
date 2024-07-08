@@ -1,5 +1,6 @@
 <template>
   <v-list class="pa-0" :disabled="disableOptions">
+    <v-progress-circular v-if="isLoading" indeterminate />
     <!-- Moving -->
     <v-list-item @click.stop="moveDialog = true">
       <v-list-item-title> Move </v-list-item-title>
@@ -37,8 +38,8 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-    <!-- Renaming -->
     <template v-if="items.length === 1">
+      <!-- Renaming -->
       <v-list-item @click.stop="renameDialog = true">
         <v-list-item-title> Rename </v-list-item-title>
       </v-list-item>
@@ -60,6 +61,19 @@
         </v-card>
       </v-dialog>
     </template>
+    <template
+      v-if="
+        items.length === 1 &&
+        (items[0]._modelType === 'file' || items[0]._modelType === 'item')
+      "
+    >
+      <!-- Downloading -->
+      <v-list-item @click.stop="downloadResource()">
+        <v-list-item-title> Download </v-list-item-title>
+      </v-list-item>
+    </template>
+    <!-- Custom options for a all options -->
+    <slot :items="items"></slot>
   </v-list>
 </template>
 
@@ -69,7 +83,9 @@ import store from "@/store";
 import girderResources from "@/store/girderResources";
 import { IGirderFolder, IGirderSelectAble } from "@/girder";
 import { createDecorator } from "vue-class-component";
+import { downloadToClient } from "@/utils/download";
 
+// Use this decorator for any action
 const OptionAction = createDecorator((options, key) => {
   const methods = options.methods;
   if (!methods) {
@@ -87,6 +103,26 @@ const OptionAction = createDecorator((options, key) => {
       return await originalMethod.apply(this, args);
     } finally {
       afterAction?.apply(this, args);
+    }
+  };
+});
+
+// Use this decorator when the resources are invalidated by the action
+const MutatingAction = createDecorator((options, key) => {
+  const methods = options.methods;
+  if (!methods) {
+    return;
+  }
+  // Keep the original method for later.
+  const originalMethod = methods[key];
+  const afterMutating = methods.afterMutating;
+
+  // Run the original method.
+  methods[key] = async function wrapperMethod(...args) {
+    try {
+      return await originalMethod.apply(this, args);
+    } finally {
+      afterMutating?.apply(this, args);
     }
   };
 });
@@ -125,12 +161,15 @@ export default class FileManagerOptions extends Vue {
   }
 
   afterAction() {
+    this.disableOptions = false;
+    this.isLoading = false;
+  }
+
+  afterMutating() {
     for (const item of this.items) {
       this.girderResources.ressourceChanged(item._id);
     }
     this.$emit("itemsChanged");
-    this.disableOptions = false;
-    this.isLoading = false;
   }
 
   @Watch("items")
@@ -159,6 +198,7 @@ export default class FileManagerOptions extends Vue {
     this.$emit("closeMenu");
   }
 
+  @MutatingAction
   @OptionAction
   async move(location: IGirderFolder | null) {
     if (!location || !this.items.length) {
@@ -167,21 +207,46 @@ export default class FileManagerOptions extends Vue {
     await this.store.api.moveItems(this.items, location._id);
   }
 
+  @MutatingAction
   @OptionAction
   async rename() {
     if (this.items.length !== 1) {
       return;
     }
     const item = this.items[0];
+    if (item._modelType !== "item" && item._modelType !== "folder") {
+      return;
+    }
     await this.store.api.renameItem(item, this.newName);
     this.newName = "";
     this.renameDialog = false;
   }
 
+  @MutatingAction
   @OptionAction
   async deleteItems() {
     await this.store.api.deleteItems(this.items);
     this.deleteDialog = false;
+  }
+
+  @OptionAction
+  async downloadResource() {
+    if (this.items.length !== 1) {
+      return;
+    }
+    const item = this.items[0];
+    if (item._modelType !== "item" && item._modelType !== "file") {
+      return;
+    }
+    try {
+      const data = await this.store.api.downloadResource(item);
+      downloadToClient({
+        href: URL.createObjectURL(data),
+        download: item.name,
+      });
+    } finally {
+      this.closeMenu();
+    }
   }
 }
 </script>

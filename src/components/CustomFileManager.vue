@@ -73,7 +73,11 @@
             @itemsChanged="reloadItems"
             :items="[props.item]"
             @closeMenu="rowOptionsMenu[props.item._id] = false"
-          />
+          >
+            <template #default="optionsSlotAttributes">
+              <slot name="options" v-bind="optionsSlotAttributes"></slot>
+            </template>
+          </file-manager-options>
         </v-menu>
       </template>
     </girder-file-manager>
@@ -144,6 +148,7 @@ export default class CustomFileManager extends Vue {
   })
   useDefaultLocation!: boolean;
 
+  overridingLocation: IGirderLocation | null = null;
   defaultLocation: IGirderLocation | null = null;
   chipsPerItemId: { [itemId: string]: IChipAttrs[] } = {};
   debouncedChipsPerItemId: { [itemId: string]: IChipAttrs[] } = {};
@@ -156,13 +161,18 @@ export default class CustomFileManager extends Vue {
   rowOptionsMenu: { [itemId: string]: boolean } = {};
 
   async reloadItems() {
-    const location = this.currentLocation;
-    this.currentLocation = { type: "root" };
-    await Vue.nextTick();
-    this.currentLocation = location;
+    try {
+      this.overridingLocation = { type: "root" };
+      await Vue.nextTick();
+    } finally {
+      this.overridingLocation = null;
+    }
   }
 
   get currentLocation() {
+    if (this.overridingLocation) {
+      return this.overridingLocation;
+    }
     if (this.useDefaultLocation && this.location === null) {
       this.$emit("update:location", this.defaultLocation);
       return this.defaultLocation;
