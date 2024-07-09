@@ -296,7 +296,7 @@
         "id": "simplificationTolerance",
         "type": "text",
         "meta": {
-          "value": "2",
+          "value": "1",
           "type": "number"
         }
       },
@@ -305,7 +305,8 @@
         "id": "turboMode",
         "type": "checkbox",
         "meta": {
-          "label": "Enable submit of annotation on prompt"
+          "value": true,
+          "label": "Submit annotation immediately upon click/drag"
         }
       }
     ]
