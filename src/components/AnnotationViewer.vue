@@ -1,3 +1,4 @@
+<!-- eslint-disable prettier/prettier -->
 <template>
   <div></div>
 </template>
@@ -214,6 +215,10 @@ export default class AnnotationViewer extends Vue {
 
   get isAnnotationSelected() {
     return this.annotationStore.isAnnotationSelected;
+  }
+
+  get showAnnotationsFromHiddenLayers(): boolean {
+    return this.store.showAnnotationsFromHiddenLayers;
   }
 
   // Special annotations
@@ -629,7 +634,7 @@ export default class AnnotationViewer extends Vue {
       return;
     }
 
-    // First remove undesired annotations (layer was disabled, uneligible coordinates...)
+    // First remove undesired annotations (layer was disabled and showAnnotationsFromHiddenLayers is false, uneligible coordinates...)
     this.clearOldAnnotations(false, false);
 
     // We want to ignore these already displayed annotations
@@ -793,8 +798,10 @@ export default class AnnotationViewer extends Vue {
       // Create a new set of annotation ids for this layer
       const annotationIdsSet: Map<string, IAnnotation> = new Map();
       layerIdToAnnotationIds.set(layer.id, annotationIdsSet);
-      if (layer.visible) {
-        // Get all annotations in the layer's channel
+
+      // Get all annotations in the layer's channel
+      // Check if we should include annotations for this layer
+      if (layer.visible || this.showAnnotationsFromHiddenLayers) {
         const layerChannelAnnotations =
           channelToAnnotationIds.get(layer.channel) || [];
         const sliceIndexes = this.store.layerSliceIndexes(layer);

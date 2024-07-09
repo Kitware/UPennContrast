@@ -117,6 +117,8 @@ export class Main extends VuexModule {
   annotationSelectionType: AnnotationSelectionTypes =
     AnnotationSelectionTypes.TOGGLE;
 
+  showAnnotationsFromHiddenLayers: boolean = true;
+
   showTooltips: boolean = false;
   filteredAnnotationTooltips: boolean = false;
 
@@ -248,6 +250,15 @@ export class Main extends VuexModule {
   @Mutation
   public setFilteredAnnotationTooltips(value: boolean) {
     this.filteredAnnotationTooltips = value;
+  }
+
+  @Mutation
+  public setShowAnnotationsFromHiddenLayers(value: boolean) {
+    this.showAnnotationsFromHiddenLayers = value;
+  }
+
+  get shouldShowAnnotationsFromHiddenLayers() {
+    return this.showAnnotationsFromHiddenLayers;
   }
 
   @Mutation

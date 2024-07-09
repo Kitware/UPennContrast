@@ -13,6 +13,13 @@
       dense
       hide-details
     />
+    <v-switch
+      class="filter-element"
+      label="Show annotations from hidden layers"
+      v-model="showAnnotationsFromHiddenLayers"
+      dense
+      hide-details
+    />
     <roi-filters class="filter-element" />
     <property-filter-histogram
       v-for="(propertyPath, idx) in propertyPaths"
@@ -26,6 +33,7 @@
 import { Vue, Component, Prop } from "vue-property-decorator";
 
 import filterStore from "@/store/filters";
+import store from "@/store";
 
 import { ITagAnnotationFilter, IShapeAnnotationFilter } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
@@ -42,6 +50,7 @@ import RoiFilters from "@/components/AnnotationBrowser/ROIFilters.vue";
 })
 export default class AnnotationFilters extends Vue {
   readonly filterStore = filterStore;
+  readonly store = store;
 
   @Prop()
   readonly additionalTags!: string[];
@@ -78,6 +87,14 @@ export default class AnnotationFilters extends Vue {
 
   get propertyFilters() {
     return this.filterStore.propertyFilters;
+  }
+
+  get showAnnotationsFromHiddenLayers() {
+    return this.store.showAnnotationsFromHiddenLayers;
+  }
+
+  set showAnnotationsFromHiddenLayers(value: boolean) {
+    this.store.setShowAnnotationsFromHiddenLayers(value);
   }
 }
 </script>
