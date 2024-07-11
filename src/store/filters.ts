@@ -11,7 +11,8 @@ import main from "./index";
 import annotation from "./annotation";
 import properties from "./properties";
 
-import { tagFilterFunction } from "@/utils/annotation";
+//import { tagFilterFunction } from "@/utils/annotation";
+import { tagCloudFilterFunction } from "@/utils/annotation";
 
 import {
   IAnnotation,
@@ -202,7 +203,7 @@ export class Filters extends VuexModule {
       // Tag filter
       if (
         tagFilter.enabled &&
-        !tagFilterFunction(annotation.tags, tagFilter.tags, tagFilter.exclusive)
+        !tagCloudFilterFunction(annotation.tags, tagFilter.tags, tagFilter.exclusive)
       ) {
         return false;
       }

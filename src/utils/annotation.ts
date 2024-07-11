@@ -199,3 +199,14 @@ export function tagFilterFunction(
   }
   return filterTags.every((filterTag) => inputTags.includes(filterTag));
 }
+
+export function tagCloudFilterFunction(
+  inputTags: string[],
+  filterTags: string[],
+  exclusive: boolean,
+) {
+  if (exclusive && inputTags.length !== filterTags.length) {
+    return false;
+  }
+  return inputTags.some((inputTag) => filterTags.includes(inputTag));
+}

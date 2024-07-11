@@ -113,7 +113,7 @@ export class Main extends VuexModule {
   };
 
   drawAnnotations: boolean = true;
-  filteredDraw: boolean = false;
+  filteredDraw: boolean = true;
   annotationSelectionType: AnnotationSelectionTypes =
     AnnotationSelectionTypes.TOGGLE;
 
