@@ -2,7 +2,7 @@
   <div>
     <v-chip-group v-model="tags" column multiple active-class="selected-chip">
       <v-chip
-        v-for="tag in availableTags"
+        v-for="tag in tagList"
         :key="tag"
         :value="tag"
         :class="{
@@ -19,14 +19,36 @@
 
 <script lang="ts">
 import { Vue, Component, Prop, VModel } from "vue-property-decorator";
+import store from "@/store";
+import annotationStore from "@/store/annotation";
 
 @Component
 export default class TagCloudPicker extends Vue {
-  @Prop({ type: Array, default: () => [] })
-  readonly availableTags!: string[];
-
   @VModel({ type: Array, default: () => [] })
   tags!: string[];
+
+  readonly store = store;
+  readonly annotationStore = annotationStore;
+
+  get tagList(): string[] {
+    const tagSet: Set<string> = new Set();
+    // Tags from annotations
+    for (const { tags } of this.annotationStore.annotations) {
+      for (const tag of tags) {
+        tagSet.add(tag);
+      }
+    }
+    // Tags from tools
+    for (const tool of this.store.tools) {
+      if (tool.values?.annotation?.tags) {
+        const tags = tool.values.annotation.tags;
+        for (const tag of tags) {
+          tagSet.add(tag);
+        }
+      }
+    }
+    return Array.from(tagSet);
+  }
 }
 </script>
 
