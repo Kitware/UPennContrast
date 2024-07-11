@@ -1,4 +1,3 @@
-<!-- eslint-disable prettier/prettier -->
 <template>
   <div></div>
 </template>
@@ -928,7 +927,7 @@ export default class AnnotationViewer extends Vue {
   drawNewAnnotations(drawnGeoJSAnnotations: Map<string, IGeoJSAnnotation[]>) {
     for (const [layerId, annotationMap] of this.layerAnnotations) {
       const layer = this.store.getLayerFromId(layerId);
-      if (layer?.visible) {
+      if (layer) {
         for (const [annotationId, annotation] of annotationMap) {
           const excluded = drawnGeoJSAnnotations
             .get(annotationId)
@@ -1671,7 +1670,6 @@ export default class AnnotationViewer extends Vue {
   @Watch("time")
   @Watch("hoveredAnnotationId")
   @Watch("selectedAnnotations")
-  @Watch("shouldDrawAnnotations")
   @Watch("shouldDrawConnections")
   onRedrawNeeded() {
     this.drawAnnotationsAndTooltips();
