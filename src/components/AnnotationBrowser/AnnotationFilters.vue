@@ -1,10 +1,5 @@
 <template>
   <v-container class="filter-main-container">
-    <shape-filter-editor
-      class="filter-element"
-      id="shape-filter"
-      v-model="shapeFilter"
-    />
     <tag-filter-editor class="filter-element" v-model="tagFilter" />
     <v-switch
       class="filter-element"

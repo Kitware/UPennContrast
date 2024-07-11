@@ -1,6 +1,7 @@
 <template>
   <div class="body-1">
-    Show
+    <tag-cloud-picker v-model="tags" />
+    Tag match:
     <v-select
       dense
       hide-details
@@ -11,7 +12,6 @@
       item-text="text"
       item-value="value"
     />
-    <tag-cloud-picker v-model="tags" />
   </div>
 </template>
 
