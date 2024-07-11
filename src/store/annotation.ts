@@ -55,7 +55,7 @@ export class Annotations extends VuexModule {
   progresses: IFetchingProgress[] = [];
 
   pendingAnnotation: IAnnotation | null = null;
-  submitPendingAnnotationTimeout: number = 3;
+  submitPendingAnnotationTimeout: number = 1;
   submitPendingAnnotation: ((submit: boolean) => void) | null = null;
 
   get selectedAnnotationIds() {
