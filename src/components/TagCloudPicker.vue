@@ -1,5 +1,8 @@
 <template>
-  <div>
+  <div class="d-flex">
+    <div class="mr-4">
+      <select-all-none-chips @selectAll="selectAll" @selectNone="selectNone" />
+    </div>
     <v-chip-group v-model="tags" column multiple active-class="selected-chip">
       <v-chip
         v-for="tag in tagList"
@@ -18,11 +21,16 @@
 </template>
 
 <script lang="ts">
-import { Vue, Component, Prop, VModel } from "vue-property-decorator";
+import { Vue, Component, VModel } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
+import SelectAllNoneChips from "./SelectAllNoneChips.vue";
 
-@Component
+@Component({
+  components: {
+    SelectAllNoneChips,
+  },
+})
 export default class TagCloudPicker extends Vue {
   @VModel({ type: Array, default: () => [] })
   tags!: string[];
@@ -48,6 +56,14 @@ export default class TagCloudPicker extends Vue {
       }
     }
     return Array.from(tagSet);
+  }
+
+  selectAll() {
+    this.tags = [...this.tagList];
+  }
+
+  selectNone() {
+    this.tags = [];
   }
 }
 </script>
