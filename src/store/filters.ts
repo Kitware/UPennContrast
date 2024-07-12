@@ -20,8 +20,6 @@ import {
   IROIAnnotationFilter,
   IIdAnnotationFilter,
   IGeoJSPosition,
-  IShapeAnnotationFilter,
-  AnnotationShape,
   TPropertyHistogram,
   IAnnotationLocation,
 } from "./model";
@@ -46,13 +44,6 @@ export class Filters extends VuexModule {
     exclusive: false,
     enabled: false,
     tags: [],
-  };
-
-  shapeFilter: IShapeAnnotationFilter = {
-    id: "shapeFilter",
-    enabled: false,
-    exclusive: true,
-    shape: AnnotationShape.Point,
   };
 
   onlyCurrentFrame: boolean = false;
@@ -158,7 +149,6 @@ export class Filters extends VuexModule {
   }
 
   get filteredAnnotations() {
-    const shapeFilter = this.shapeFilter;
     const selectionFilter = this.selectionFilter;
     const tagFilter = this.tagFilter;
     const propertyFilters = this.propertyFilters;
@@ -183,11 +173,6 @@ export class Filters extends VuexModule {
           annotation.location.Z !== currentFrameLocation.Z ||
           annotation.location.Time !== currentFrameLocation.Time)
       ) {
-        return false;
-      }
-
-      // Shape filter
-      if (shapeFilter.enabled && annotation.shape !== shapeFilter.shape) {
         return false;
       }
 
@@ -260,11 +245,6 @@ export class Filters extends VuexModule {
       ),
       value,
     ];
-  }
-
-  @Mutation
-  public setShapeFilter(filter: IShapeAnnotationFilter) {
-    this.shapeFilter = filter;
   }
 
   @Mutation

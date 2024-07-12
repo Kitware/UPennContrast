@@ -30,16 +30,14 @@ import { Vue, Component, Prop } from "vue-property-decorator";
 import filterStore from "@/store/filters";
 import store from "@/store";
 
-import { ITagAnnotationFilter, IShapeAnnotationFilter } from "@/store/model";
+import { ITagAnnotationFilter } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
-import ShapeFilterEditor from "@/components/AnnotationBrowser/ShapeFilterEditor.vue";
 import PropertyFilterHistogram from "@/components/AnnotationBrowser/AnnotationProperties/PropertyFilterHistogram.vue";
 import RoiFilters from "@/components/AnnotationBrowser/ROIFilters.vue";
 @Component({
   components: {
     PropertyFilterHistogram,
     RoiFilters,
-    ShapeFilterEditor,
     TagFilterEditor,
   },
 })
@@ -59,13 +57,6 @@ export default class AnnotationFilters extends Vue {
   }
   set tagFilter(filter: ITagAnnotationFilter) {
     this.filterStore.setTagFilter(filter);
-  }
-
-  get shapeFilter() {
-    return this.filterStore.shapeFilter;
-  }
-  set shapeFilter(filter: IShapeAnnotationFilter) {
-    this.filterStore.setShapeFilter(filter);
   }
 
   get onlyCurrentFrame() {
