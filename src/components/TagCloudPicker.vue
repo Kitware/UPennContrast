@@ -68,14 +68,8 @@ export default class TagCloudPicker extends Vue {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .selected-chip {
   border-color: #ffffff !important;
-}
-
-.v-chip {
-  transition:
-    background-color 0.3s,
-    color 0.3s;
 }
 </style>
