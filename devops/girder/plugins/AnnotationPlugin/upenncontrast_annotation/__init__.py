@@ -40,6 +40,7 @@ class UPennContrastAnnotationAPIPlugin(GirderPlugin):
         from .server.api.workerPreviews import WorkerPreviews
         from .server.api.datasetView import DatasetView
         from .server.api.history import History
+        from .server.api.user_assetstore import UserAssetstore
 
         ModelImporter.registerModel(
             "upenn_annotation", AnnotationModel, "upenncontrast_annotation"
@@ -81,4 +82,5 @@ class UPennContrastAnnotationAPIPlugin(GirderPlugin):
         info["apiRoot"].worker_preview = WorkerPreviews()
         info["apiRoot"].dataset_view = DatasetView()
         info["apiRoot"].history = History()
+        info["apiRoot"].user_assetstore = UserAssetstore()
         system.addSystemEndpoints(info["apiRoot"])
