@@ -11,9 +11,16 @@ import {
   IDisplayLayer,
   TPropertyHistogram,
   IScales,
+  TPropertyValue,
 } from "./model";
 
 import { fetchAllPages } from "@/utils/fetch";
+
+export type TAnnotationPropertyValuesAggregation = {
+  datasetId: string;
+  annotationId: string;
+  values: { [propertyId: string]: TPropertyValue };
+}[];
 
 export default class PropertiesAPI {
   private readonly client: RestClientInstance;
@@ -56,6 +63,16 @@ export default class PropertiesAPI {
         `annotation_property_values/histogram?datasetId=${datasetId}&propertyPath=${joinedPath}&buckets=${buckets}`,
       )
       .then((res) => res.data);
+  }
+
+  async addAggregatedPropertyValues(
+    aggregatedPropertyValues: TAnnotationPropertyValuesAggregation,
+  ): Promise<TAnnotationPropertyValuesAggregation> {
+    const response = await this.client.post(
+      `annotation_property_values/multiple`,
+      aggregatedPropertyValues,
+    );
+    return response.data;
   }
 
   async computeProperty(

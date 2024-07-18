@@ -110,6 +110,7 @@ import {
   IAnnotationProperty,
   IAnnotationPropertyValues,
   ISerializedData,
+  TPropertyValue,
 } from "@/store/model";
 
 @Component({})
@@ -296,27 +297,35 @@ export default class AnnotationImport extends Vue {
       // Need annotations and properties to be sent before sending values
       Promise.all([allAnnotationsPromise, allPropertiesPromise]).then(
         ([oldIdToNewAnnotation, newProperties]) => {
+          const aggregatedPropertyValues: {
+            datasetId: string;
+            annotationId: string;
+            values: { [propertyId: string]: TPropertyValue };
+          }[] = [];
           for (const oldAnnotationId in this.values) {
             const newAnnotation = oldIdToNewAnnotation.get(oldAnnotationId);
             if (!newAnnotation) {
               throw "Can't find the annotation having the values";
             }
             const oldAnnotationValues = this.values[oldAnnotationId];
-            const newAnnotationValues: IAnnotationPropertyValues[0] = {};
+            const newValues: IAnnotationPropertyValues[string] = {};
             for (const oldPropertyId in oldAnnotationValues) {
               const newProperty =
                 newProperties[propertyOldIdToIdx[oldPropertyId]];
               const value = oldAnnotationValues[oldPropertyId];
-              newAnnotationValues[newProperty.id] = value;
+              newValues[newProperty.id] = value;
             }
-            const newValueDonePromise = this.store.girderRest.post(
-              `annotation_property_values?datasetId=${
-                this.store.dataset!.id
-              }&annotationId=${newAnnotation.id}`,
-              newAnnotationValues,
-            );
-            newValueDonePromises.push(newValueDonePromise);
+            aggregatedPropertyValues.push({
+              datasetId: newAnnotation.datasetId,
+              annotationId: newAnnotation.id,
+              values: newValues,
+            });
           }
+          newValueDonePromises.push(
+            this.store.propertiesAPI.addAggregatedPropertyValues(
+              aggregatedPropertyValues,
+            ),
+          );
         },
       );
     }
