@@ -283,7 +283,7 @@ export default class AnnotationImport extends Vue {
     if (this.importProperties) {
       for (const oldProperty of this.properties) {
         const newPropertyPromise =
-          this.store.propertiesAPI.createProperty(oldProperty);
+          this.propertyStore.createProperty(oldProperty);
         const idx = propertyPromises.push(newPropertyPromise) - 1;
         propertyOldIdToIdx[oldProperty.id] = idx;
       }
