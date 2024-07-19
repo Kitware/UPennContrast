@@ -1,17 +1,19 @@
 <template>
-  <div class="body-1">
-    <tag-cloud-picker v-model="tags" />
-    Tag match:
-    <v-select
-      dense
-      hide-details
-      single-line
-      class="mx-2 select-exclusive-filter"
-      v-model="exclusive"
-      :items="exclusiveItems"
-      item-text="text"
-      item-value="value"
-    />
+  <div class="body-1 d-flex flex-wrap">
+    <tag-cloud-picker v-model="tags" :allSelected.sync="allSelected" />
+    <div>
+      Tag match:
+      <v-select
+        dense
+        hide-details
+        single-line
+        class="mx-2 select-exclusive-filter"
+        v-model="exclusive"
+        :items="exclusiveItems"
+        item-text="text"
+        item-value="value"
+      />
+    </div>
   </div>
 </template>
 
@@ -44,7 +46,16 @@ export default class TagFilterEditor extends Vue {
   }
 
   set tags(tags: string[]) {
-    this.filter = { ...this.filter, enabled: true, tags };
+    this.filter = { ...this.filter, tags };
+  }
+
+  get allSelected() {
+    return !this.filter.enabled;
+  }
+
+  set allSelected(allSelected: boolean) {
+    const exclusive = allSelected ? false : this.filter.exclusive;
+    this.filter = { ...this.filter, enabled: !allSelected, exclusive };
   }
 
   get exclusive() {

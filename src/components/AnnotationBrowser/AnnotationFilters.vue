@@ -1,6 +1,10 @@
 <template>
   <v-container class="filter-main-container">
-    <tag-filter-editor class="filter-element" v-model="tagFilter" />
+    <tag-filter-editor
+      class="filter-element"
+      v-model="tagFilter"
+      style="flex-basis: content"
+    />
     <v-switch
       class="filter-element"
       label="Current frame only"
