@@ -1,5 +1,5 @@
 <template>
-  <v-dialog v-model="dialog">
+  <v-dialog v-model="importDialog">
     <template v-slot:activator="{ on, attrs }">
       <v-btn
         v-bind="{ ...attrs, ...$attrs }"
@@ -52,9 +52,14 @@
             <v-checkbox
               v-model="overwriteAnnotations"
               :label="`Overwrite ${annotationStore.annotations.length} annotations (delete current annotations)`"
-              @change="overwriteChanged"
+              @change="overwriteAnnotationsDialog = overwriteAnnotations"
             />
-            <v-dialog v-model="overwriteDialog" persistent>
+            <v-checkbox
+              v-model="overwriteProperties"
+              :label="`Overwrite ${propertyStore.properties.length} properties (delete current properties)`"
+              @change="overwritePropertiesDialog = overwriteProperties"
+            />
+            <v-dialog v-model="overwriteAnnotationsDialog" persistent>
               <v-card class="pa-2">
                 <v-card-title> Overwrite annotations? </v-card-title>
                 <v-card-text>
@@ -66,7 +71,7 @@
                   <v-btn
                     @click="
                       overwriteAnnotations = true;
-                      overwriteDialog = false;
+                      overwriteAnnotationsDialog = false;
                     "
                     color="warning"
                   >
@@ -75,7 +80,37 @@
                   <v-btn
                     @click="
                       overwriteAnnotations = false;
-                      overwriteDialog = false;
+                      overwriteAnnotationsDialog = false;
+                    "
+                    color="primary"
+                  >
+                    Cancel
+                  </v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+            <v-dialog v-model="overwritePropertiesDialog" persistent>
+              <v-card class="pa-2">
+                <v-card-title> Overwrite properties? </v-card-title>
+                <v-card-text>
+                  This will remove
+                  {{ propertyStore.properties.length }} properties forever
+                </v-card-text>
+                <v-card-actions>
+                  <v-spacer />
+                  <v-btn
+                    @click="
+                      overwriteProperties = true;
+                      overwritePropertiesDialog = false;
+                    "
+                    color="warning"
+                  >
+                    Overwrite
+                  </v-btn>
+                  <v-btn
+                    @click="
+                      overwriteProperties = false;
+                      overwritePropertiesDialog = false;
                     "
                     color="primary"
                   >
@@ -119,8 +154,7 @@ export default class AnnotationImport extends Vue {
   readonly annotationStore = annotationStore;
   readonly propertyStore = propertyStore;
 
-  dialog = false;
-  overwriteDialog = false;
+  importDialog = false;
 
   jsonFile: File | null = null;
   isLoadingFile = false;
@@ -136,7 +170,12 @@ export default class AnnotationImport extends Vue {
   importConnections = true;
   importProperties = true;
   importValues = true;
+
   overwriteAnnotations = false;
+  overwriteAnnotationsDialog = false;
+
+  overwriteProperties = false;
+  overwritePropertiesDialog = false;
 
   get canImport() {
     return !!store.dataset;
@@ -170,15 +209,9 @@ export default class AnnotationImport extends Vue {
       .finally(() => (this.isLoadingFile = false));
   }
 
-  overwriteChanged() {
-    if (this.overwriteAnnotations) {
-      this.overwriteDialog = true;
-    }
-  }
-
   reset() {
-    this.dialog = false;
-    this.overwriteDialog = false;
+    this.importDialog = false;
+    this.overwriteAnnotationsDialog = false;
 
     this.jsonFile = null;
     this.isLoadingFile = false;
@@ -202,6 +235,13 @@ export default class AnnotationImport extends Vue {
     if (this.overwriteAnnotations) {
       for (const { id } of annotationStore.annotations) {
         annotationIdsToRemove.push(id);
+      }
+    }
+
+    let propertyIdsToRemove: string[] = [];
+    if (this.overwriteProperties) {
+      for (const { id } of propertyStore.properties) {
+        propertyIdsToRemove.push(id);
       }
     }
 
@@ -283,6 +323,7 @@ export default class AnnotationImport extends Vue {
     const propertyOldIdToIdx: { [oldId: string]: number } = {};
     if (this.importProperties) {
       for (const oldProperty of this.properties) {
+        // Use this function to make sure that the property is added to the configuration
         const newPropertyPromise =
           this.propertyStore.createProperty(oldProperty);
         const idx = propertyPromises.push(newPropertyPromise) - 1;
@@ -338,29 +379,46 @@ export default class AnnotationImport extends Vue {
       allConnectionsPromise,
       allValuesDonePromise,
     ])
-      .catch(() => {
-        // Don't remove annotations
+      .catch(async () => {
+        // Don't remove annotations and properties
         annotationIdsToRemove.length = 0;
+        propertyIdsToRemove.length = 0;
         // Remove imported annotations if possible
-        allAnnotationsPromise
-          .then((oldIdToNewAnnotation) => {
-            for (const { id } of oldIdToNewAnnotation.values()) {
-              annotationIdsToRemove.push(id);
-            }
-          })
-          .catch();
+        await allAnnotationsPromise.then((oldIdToNewAnnotation) => {
+          for (const { id } of oldIdToNewAnnotation.values()) {
+            annotationIdsToRemove.push(id);
+          }
+        });
+        await Promise.all(
+          propertyPromises.map((propertyPromise) =>
+            propertyPromise.then(({ id }) => propertyIdsToRemove.push(id)),
+          ),
+        );
       })
-      .then(() => {
+      .finally(() => {
+        // Remove annotations and properties if needed
+        const promises: Promise<any>[] = [];
         if (annotationIdsToRemove.length > 0) {
-          return this.store.annotationsAPI.deleteMultipleAnnotations(
-            annotationIdsToRemove,
+          promises.push(
+            this.store.annotationsAPI.deleteMultipleAnnotations(
+              annotationIdsToRemove,
+            ),
           );
         }
-        return null;
+        if (propertyIdsToRemove.length > 0) {
+          for (const id of propertyIdsToRemove) {
+            promises.push(this.propertyStore.deleteProperty(id));
+          }
+        }
+        return Promise.all(promises);
       })
-      .then(() => {
-        this.annotationStore.fetchAnnotations();
-        this.propertyStore.fetchPropertyValues();
+      .finally(async () => {
+        // Fetch annotations and properties
+        return Promise.all([
+          this.annotationStore.fetchAnnotations(),
+          this.propertyStore.fetchPropertyValues(),
+          this.propertyStore.fetchProperties(),
+        ]);
       })
       .finally(() => {
         this.reset();
