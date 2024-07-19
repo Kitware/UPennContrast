@@ -82,6 +82,16 @@ export class Annotations extends VuexModule {
     };
   }
 
+  get annotationTags() {
+    const tagSet: Set<string> = new Set();
+    for (const { tags } of this.annotations) {
+      for (const tag of tags) {
+        tagSet.add(tag);
+      }
+    }
+    return tagSet;
+  }
+
   hoveredAnnotationId: string | null = null;
 
   @Action

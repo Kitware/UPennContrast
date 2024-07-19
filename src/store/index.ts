@@ -171,6 +171,19 @@ export class Main extends VuexModule {
     return this.configuration?.tools || [];
   }
 
+  get toolTags() {
+    const tagSet: Set<string> = new Set();
+    for (const tool of this.tools) {
+      if (tool.values?.annotation?.tags) {
+        const tags = tool.values.annotation.tags;
+        for (const tag of tags) {
+          tagSet.add(tag);
+        }
+      }
+    }
+    return tagSet;
+  }
+
   get layers(): IDisplayLayer[] {
     const configurationLayers = this.configuration?.layers || [];
     // Use contrast from dataset view
