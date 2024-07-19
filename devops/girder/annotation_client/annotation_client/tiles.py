@@ -4,7 +4,7 @@ import girder_client
 
 PATHS = {
     "image": "/item/{datasetId}/tiles/fzxy/{frameIndex}/0/0/0",
-    "item": "/item?folderId={datasetId}",
+    "item": "/item?folderId={datasetId}&limit=0",
     "region": "/item/{itemId}/tiles/region",
     "tiles": "/item/{datasetId}/tiles",
     "tilesInternal": "/item/{datasetId}/tiles/internal_metadata",
