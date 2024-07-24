@@ -199,3 +199,19 @@ export function tagFilterFunction(
   }
   return filterTags.every((filterTag) => inputTags.includes(filterTag));
 }
+
+// Same as above, except the inclusive filter is less restrictive
+// Inclusive filter: some tag of the input list of tags is also in the filter list of tags
+export function tagCloudFilterFunction(
+  inputTags: string[],
+  filterTags: string[],
+  exclusive: boolean,
+) {
+  if (exclusive) {
+    if (inputTags.length !== filterTags.length) {
+      return false;
+    }
+    return filterTags.every((filterTag) => inputTags.includes(filterTag));
+  }
+  return inputTags.some((inputTag) => filterTags.includes(inputTag));
+}

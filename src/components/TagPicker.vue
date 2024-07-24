@@ -47,23 +47,9 @@ export default class TagPicker extends Vue {
   @VModel({ type: Array }) tags!: string[];
 
   get tagList(): string[] {
-    const tagSet: Set<string> = new Set();
-    // Tags from annotations
-    for (const { tags } of this.annotationStore.annotations) {
-      for (const tag of tags) {
-        tagSet.add(tag);
-      }
-    }
-    // Tags from tools
-    for (const tool of this.store.tools) {
-      if (tool.values?.annotation?.tags) {
-        const tags = tool.values.annotation.tags;
-        for (const tag of tags) {
-          tagSet.add(tag);
-        }
-      }
-    }
-    return Array.from(tagSet);
+    return Array.from(
+      new Set([...this.annotationStore.annotationTags, ...this.store.toolTags]),
+    );
   }
 
   tagSearchInput: string = "";

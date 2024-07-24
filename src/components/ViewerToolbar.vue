@@ -67,6 +67,7 @@
     <div>
       <slot></slot>
     </div>
+    <tag-filter-editor class="filter-element" v-model="tagFilter" />
   </div>
 </template>
 
@@ -98,7 +99,8 @@ import ValueSlider from "./ValueSlider.vue";
 import SwitchToggle from "./SwitchToggle.vue";
 import Toolset from "@/tools/toolsets/Toolset.vue";
 import store from "@/store";
-import { TLayerMode } from "@/store/model";
+import filterStore from "@/store/filters";
+import { ITagAnnotationFilter, TLayerMode } from "@/store/model";
 import { IHotkey } from "@/utils/v-mousetrap";
 
 @Component({
@@ -110,6 +112,7 @@ import { IHotkey } from "@/utils/v-mousetrap";
 })
 export default class ViewerToolbar extends Vue {
   readonly store = store;
+  readonly filterStore = filterStore;
 
   get xy() {
     return this.store.xy;
@@ -192,6 +195,14 @@ export default class ViewerToolbar extends Vue {
 
   get layerMode() {
     return this.store.layerMode;
+  }
+
+  get tagFilter() {
+    return this.filterStore.tagFilter;
+  }
+
+  set tagFilter(filter: ITagAnnotationFilter) {
+    this.filterStore.setTagFilter(filter);
   }
 
   // Mousetrap bindings

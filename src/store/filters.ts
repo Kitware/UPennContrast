@@ -11,7 +11,7 @@ import main from "./index";
 import annotation from "./annotation";
 import properties from "./properties";
 
-import { tagFilterFunction } from "@/utils/annotation";
+import { tagCloudFilterFunction } from "@/utils/annotation";
 
 import {
   IAnnotation,
@@ -20,8 +20,6 @@ import {
   IROIAnnotationFilter,
   IIdAnnotationFilter,
   IGeoJSPosition,
-  IShapeAnnotationFilter,
-  AnnotationShape,
   TPropertyHistogram,
   IAnnotationLocation,
 } from "./model";
@@ -46,13 +44,6 @@ export class Filters extends VuexModule {
     exclusive: false,
     enabled: false,
     tags: [],
-  };
-
-  shapeFilter: IShapeAnnotationFilter = {
-    id: "shapeFilter",
-    enabled: false,
-    exclusive: true,
-    shape: AnnotationShape.Point,
   };
 
   onlyCurrentFrame: boolean = false;
@@ -158,7 +149,6 @@ export class Filters extends VuexModule {
   }
 
   get filteredAnnotations() {
-    const shapeFilter = this.shapeFilter;
     const selectionFilter = this.selectionFilter;
     const tagFilter = this.tagFilter;
     const propertyFilters = this.propertyFilters;
@@ -186,11 +176,6 @@ export class Filters extends VuexModule {
         return false;
       }
 
-      // Shape filter
-      if (shapeFilter.enabled && annotation.shape !== shapeFilter.shape) {
-        return false;
-      }
-
       // Selection filter
       if (
         selectionFilter.enabled &&
@@ -202,7 +187,11 @@ export class Filters extends VuexModule {
       // Tag filter
       if (
         tagFilter.enabled &&
-        !tagFilterFunction(annotation.tags, tagFilter.tags, tagFilter.exclusive)
+        !tagCloudFilterFunction(
+          annotation.tags,
+          tagFilter.tags,
+          tagFilter.exclusive,
+        )
       ) {
         return false;
       }
@@ -256,11 +245,6 @@ export class Filters extends VuexModule {
       ),
       value,
     ];
-  }
-
-  @Mutation
-  public setShapeFilter(filter: IShapeAnnotationFilter) {
-    this.shapeFilter = filter;
   }
 
   @Mutation

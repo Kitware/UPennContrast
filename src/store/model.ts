@@ -1084,10 +1084,6 @@ export interface ITagAnnotationFilter extends IAnnotationFilter {
   tags: string[];
 }
 
-export interface IShapeAnnotationFilter extends IAnnotationFilter {
-  shape: AnnotationShape;
-}
-
 export interface IPropertyAnnotationFilter extends IAnnotationFilter {
   propertyPath: string[];
   range: {
