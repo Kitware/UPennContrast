@@ -1,8 +1,15 @@
 <template>
   <div class="d-flex overflow-auto flex-wrap">
-    <div class="mr-4">
-      <select-all-none-chips @selectAll="selectAll" @selectNone="selectNone" />
-    </div>
+    <select-all-none-chips
+      @selectAll="selectAll"
+      @selectNone="selectNone"
+      class="ma-1"
+    />
+    <v-text-field
+      v-model="tagSearchFilter"
+      style="max-width: 150px"
+      class="ma-1"
+    />
     <v-chip-group
       @change="setTagsFromUserInput($event)"
       :value="tags"
@@ -11,7 +18,7 @@
       active-class="selected-chip"
     >
       <v-chip
-        v-for="tag in availableTags"
+        v-for="tag in displayedTags"
         :key="tag"
         :value="tag"
         :class="{
@@ -48,6 +55,7 @@ export default class TagCloudPicker extends Vue {
   allSelected!: boolean;
 
   allSelectedInternal = false;
+  tagSearchFilter: string = "";
 
   @Watch("allSelectedInternal")
   emiAllSelected() {
@@ -67,6 +75,16 @@ export default class TagCloudPicker extends Vue {
   get availableTags(): string[] {
     return Array.from(
       new Set([...this.annotationStore.annotationTags, ...this.store.toolTags]),
+    );
+  }
+
+  get displayedTags(): string[] {
+    if (!this.tagSearchFilter) {
+      return this.availableTags;
+    }
+    const lowerCaseFilter = this.tagSearchFilter.toLowerCase();
+    return this.availableTags.filter((tag) =>
+      tag.toLowerCase().includes(lowerCaseFilter),
     );
   }
 
