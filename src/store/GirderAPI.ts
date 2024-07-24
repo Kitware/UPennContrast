@@ -5,6 +5,7 @@ import {
   IGirderSelectAble,
   IGirderUser,
   IGirderFile,
+  IGirderAssetstore,
 } from "@/girder";
 import {
   configurationBaseKeys,
@@ -132,6 +133,20 @@ export default class GirderAPI {
       `folder?parentType=user&parentId=${parentId}&name=${folderName}`,
     );
     return result.data.length > 0 ? result.data[0] : null;
+  }
+
+  async getAssetstores(): Promise<IGirderAssetstore[]> {
+    const response = await this.client.get("user_assetstore");
+    return response.data;
+  }
+
+  async moveFolderToAssetstore(folderId: string, assetstoreId: string) {
+    const response = await this.client.put(
+      `user_assetstore/${folderId}/move`,
+      null,
+      { params: { assetstoreId, ignoreImported: false, progress: true } },
+    );
+    return response.data;
   }
 
   moveItems(items: IGirderSelectAble[], folderId: string) {

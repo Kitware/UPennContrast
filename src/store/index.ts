@@ -3,6 +3,7 @@ import {
   RestClientInstance,
   IGirderItem,
   IGirderLocation,
+  IGirderAssetstore,
 } from "@/girder";
 import { IGirderSelectAble, IGirderUser } from "@/girder";
 import {
@@ -83,6 +84,7 @@ export class Main extends VuexModule {
 
   girderUser: IGirderUser | null = this.girderRest.user;
   folderLocation: IGirderLocation = this.girderUser || { type: "users" };
+  assetstores: IGirderAssetstore[] = [];
 
   history: IHistoryEntry[] = [];
 
@@ -238,6 +240,11 @@ export class Main extends VuexModule {
         this.z,
       );
     };
+  }
+
+  @Mutation
+  setAssetstores(assetstores: IGirderAssetstore[]) {
+    this.assetstores = assetstores;
   }
 
   @Mutation
@@ -447,7 +454,15 @@ export class Main extends VuexModule {
             this.setFolderLocation(user);
           }
         }),
+        this.api
+          .getAssetstores()
+          .then((assetstores) => this.setAssetstores(assetstores))
+          .catch(() => {
+            this.setAssetstores([]);
+          }),
       );
+    } else {
+      this.setAssetstores([]);
     }
     promises.push(
       this.setSelectedConfiguration(this.selectedConfigurationId),

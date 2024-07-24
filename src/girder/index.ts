@@ -5,6 +5,11 @@ export {
 import { RestClientInstance as RCInterface } from "@girder/components/src/rest";
 export interface RestClientInstance extends RCInterface {}
 
+export interface IGirderAssetstore {
+  _id: string;
+  name: string;
+}
+
 export interface IGirderUser {
   name: string; // TODO check
   _modelType: "user";

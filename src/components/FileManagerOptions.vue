@@ -60,6 +60,45 @@
           </v-card-text>
         </v-card>
       </v-dialog>
+      <template v-if="items[0]._modelType === 'folder'">
+        <!-- Change assetstore -->
+        <template v-for="assetstore in assetstores">
+          <v-list-item
+            @click.stop="moveFolderToAssetstore(items[0]._id, assetstore._id)"
+            :key="assetstore._id"
+          >
+            <v-list-item-title>
+              Move to assetstore {{ assetstore.name }}
+            </v-list-item-title>
+          </v-list-item>
+        </template>
+        <v-dialog :value="!!moveFolderToAssetstorResolve">
+          <v-card>
+            <v-card-title>
+              Move folder content to a different assetstore?
+            </v-card-title>
+            <v-card-text class="d-flex">
+              <v-progress-circular v-if="isLoading" indeterminate />
+              <v-spacer />
+              <v-btn
+                @click="moveFolderToAssetstorResolve?.(true)"
+                :disabled="isLoading"
+                class="mx-2"
+                color="primary"
+              >
+                Confirm
+              </v-btn>
+              <v-btn
+                @click="moveFolderToAssetstorResolve?.(false)"
+                class="mx-2"
+                :disabled="isLoading"
+              >
+                Cancel
+              </v-btn>
+            </v-card-text>
+          </v-card>
+        </v-dialog>
+      </template>
     </template>
     <template
       v-if="
@@ -149,7 +188,30 @@ export default class FileManagerOptions extends Vue {
 
   deleteDialog: boolean = false;
 
+  moveFolderToAssetstorResolve: ((confirmation: boolean) => void) | null = null;
+
   isLoading: boolean = false;
+
+  get assetstores() {
+    return this.store.assetstores;
+  }
+
+  async moveFolderToAssetstore(folderId: string, assetstoreId: string) {
+    try {
+      this.isLoading = false;
+      const confirmation = await new Promise<boolean>((resolve) => {
+        this.moveFolderToAssetstorResolve = resolve;
+      });
+      if (confirmation) {
+        this.isLoading = true;
+        await this.store.api.moveFolderToAssetstore(folderId, assetstoreId);
+      }
+    } finally {
+      this.moveFolderToAssetstorResolve = null;
+      this.isLoading = false;
+      this.closeMenu();
+    }
+  }
 
   mounted() {
     this.onItemsChanged();
