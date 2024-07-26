@@ -40,6 +40,8 @@ def addSystemEndpoints(apiRoot):
     events.bind("model.job.save", "upenncontrast_annotation", _updateJob)
     events.bind("model.job.remove", "upenncontrast_annotation", _updateJob)
 
+    events.bind("model.user.save", "upenncontrast_annotation", lambda event: event.info.update({'public': False}))
+
 
 @access.public(scope=TokenScope.DATA_READ)
 @filtermodel(model=Item)
