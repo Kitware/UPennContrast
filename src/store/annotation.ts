@@ -58,6 +58,8 @@ export class Annotations extends VuexModule {
   submitPendingAnnotationTimeout: number = 1;
   submitPendingAnnotation: ((submit: boolean) => void) | null = null;
 
+  mutatingAnnotationRenderingProperties = false;
+
   get selectedAnnotationIds() {
     return this.selectedAnnotations.map(
       (annotation: IAnnotation) => annotation.id,
@@ -93,6 +95,11 @@ export class Annotations extends VuexModule {
   }
 
   hoveredAnnotationId: string | null = null;
+
+  @Mutation
+  setMutatingAnnotationRenderingProperties(value: boolean) {
+    this.mutatingAnnotationRenderingProperties = value;
+  }
 
   @Action
   async undoOrRedo(undo: boolean) {
@@ -340,11 +347,8 @@ export class Annotations extends VuexModule {
       channel,
       coordinates,
       datasetId,
+      color: color ?? null,
     };
-    // Optional color
-    if (color) {
-      annotationBase.color = color;
-    }
     const annotation = await this.createAnnotation(annotationBase);
     if (!annotation) {
       return null;
@@ -576,6 +580,29 @@ export class Annotations extends VuexModule {
   }
 
   @Action
+  public async colorAnnotationIds({
+    annotationIds,
+    color,
+  }: {
+    annotationIds: string[];
+    color: string | null;
+  }) {
+    return this.updateAnnotations({
+      annotationIds,
+      getUpdatedAnnotation: (annotation: IAnnotation): IAnnotation =>
+        markRaw({ ...annotation, color }),
+    });
+  }
+
+  @Action
+  public colorSelectedAnnotations(color: string | null) {
+    this.colorAnnotationIds({
+      annotationIds: this.selectedAnnotationIds,
+      color,
+    });
+  }
+
+  @Action
   public async tagAnnotationIds({
     annotationIds,
     tags,
@@ -583,38 +610,57 @@ export class Annotations extends VuexModule {
     annotationIds: string[];
     tags: string[];
   }) {
-    sync.setSaving(true);
-    await Promise.all(
-      annotationIds
-        .map((annotationId) =>
-          this.annotations.findIndex(
-            (annotation: IAnnotation) => annotation.id === annotationId,
-          ),
-        )
-        .filter((annotationIndex: number) => annotationIndex !== -1)
-        .map((annotationIndex: number) => {
-          const annotation = this.annotations[annotationIndex];
-          // Add a tag only if it doesn't exist
-          const newTags = tags.reduce((newTags: string[], tag: string) => {
-            if (!newTags.includes(tag)) {
-              newTags.push(tag);
-            }
-            return newTags;
-          }, annotation.tags);
-          const newAnnotation = markRaw({ ...annotation, tags: newTags });
-          this.setAnnotation({
-            annotation: newAnnotation,
-            index: annotationIndex,
-          });
-          return this.annotationsAPI.updateAnnotation(newAnnotation);
-        }),
-    );
-    sync.setSaving(false);
+    const addTagsFunction = (annotation: IAnnotation): IAnnotation => {
+      // Add a tag only if it doesn't exist
+      const newTags = tags.reduce((newTags: string[], tag: string) => {
+        if (!newTags.includes(tag)) {
+          newTags.push(tag);
+        }
+        return newTags;
+      }, annotation.tags);
+      return markRaw({ ...annotation, tags: newTags });
+    };
+    return this.updateAnnotations({
+      annotationIds,
+      getUpdatedAnnotation: addTagsFunction,
+    });
   }
 
   @Action
   public tagSelectedAnnotations(tags: string[]) {
     this.tagAnnotationIds({ annotationIds: this.selectedAnnotationIds, tags });
+  }
+
+  @Action
+  public async updateAnnotations({
+    annotationIds,
+    getUpdatedAnnotation,
+  }: {
+    annotationIds: string[];
+    getUpdatedAnnotation: (annotation: IAnnotation) => IAnnotation;
+  }) {
+    sync.setSaving(true);
+    this.setMutatingAnnotationRenderingProperties(true);
+    const newAnnotations = annotationIds.reduce(
+      (newAnnotations, annotationId) => {
+        const annotationIndex = this.annotationIdToIdx[annotationId];
+        if (annotationIndex === undefined) {
+          return newAnnotations;
+        }
+        const annotation = this.annotations[annotationIndex];
+        const newAnnotation = getUpdatedAnnotation(annotation);
+        this.setAnnotation({
+          annotation: newAnnotation,
+          index: annotationIndex,
+        });
+        newAnnotations.push(newAnnotation);
+        return newAnnotations;
+      },
+      [] as IAnnotation[],
+    );
+    await this.annotationsAPI.updateAnnotations(newAnnotations);
+    this.setMutatingAnnotationRenderingProperties(false);
+    sync.setSaving(false);
   }
 
   @Mutation

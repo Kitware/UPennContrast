@@ -260,12 +260,8 @@ export default class AnnotationImport extends Vue {
           location: oldAnnotation.location,
           coordinates: oldAnnotation.coordinates,
           datasetId: this.store.dataset!.id,
+          color: oldAnnotation.color ?? null,
         };
-
-        // Check if the 'color' property exists in the old annotation and add it to the new annotation
-        if (oldAnnotation.color) {
-          newAnnotation.color = oldAnnotation.color;
-        }
 
         annotationBaseList.push(newAnnotation);
       }
