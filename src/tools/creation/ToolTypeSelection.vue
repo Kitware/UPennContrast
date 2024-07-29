@@ -132,13 +132,12 @@ export default class ToolTypeSelection extends Vue {
                 );
                 const annotationSetupDefault: Partial<IAnnotationSetup> = {
                   shape: labels.annotationShape ?? AnnotationShape.Point,
-                  tags: [],
                 };
                 items.push({
                   text: labels.interfaceName || image,
                   description: labels.description || "",
                   value: {
-                    [submenuInterface.id]: image,
+                    [submenuInterface.id]: { image },
                     [annotationInterface.id]: annotationSetupDefault,
                   },
                 });

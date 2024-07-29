@@ -232,7 +232,7 @@ export default class AnnotationConfiguration extends Vue {
   }
 
   mounted() {
-    if (this.value) {
+    if (this.value?.tags) {
       this.useAutoTags = false;
     }
     this.updateFromValue();
