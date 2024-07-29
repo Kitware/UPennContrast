@@ -42,7 +42,8 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import propertiesStore from "@/store/properties";
 import store from "@/store";
 import ToolConfiguration from "@/tools/creation/ToolConfiguration.vue";
-import { IToolTemplate } from "@/store/model";
+import { AnnotationShape, IToolTemplate } from "@/store/model";
+import { IAnnotationSetup } from "./templates/AnnotationConfiguration.vue";
 
 interface Item {
   text: string;
@@ -113,23 +114,32 @@ export default class ToolTypeSelection extends Vue {
         const submenuInterface = template.interface[submenuInterfaceIdx] || {};
         let items: Omit<Item, "key">[] = [];
         switch (submenuInterface.type) {
+          case "annotation":
+            items = this.store.availableToolShapes;
+            break;
           case "select":
             items = submenuInterface.meta.items.map((item: any) => ({
               ...item,
-              value: item,
+              value: { [submenuInterface.id]: item },
             }));
-            break;
-          case "annotation":
-            items = this.store.availableToolShapes;
             break;
           case "dockerImage":
             for (const image in this.propertyStore.workerImageList) {
               const labels = this.propertyStore.workerImageList[image];
               if (labels.isAnnotationWorker !== undefined) {
+                const annotationInterface = template.interface.find(
+                  (elem: any) => elem.type === "annotation",
+                );
+                const annotationSetupDefault: Partial<IAnnotationSetup> = {
+                  shape: labels.annotationShape ?? AnnotationShape.Point,
+                };
                 items.push({
                   text: labels.interfaceName || image,
                   description: labels.description || "",
-                  value: { image },
+                  value: {
+                    [submenuInterface.id]: { image },
+                    [annotationInterface.id]: annotationSetupDefault,
+                  },
                 });
               }
             }
@@ -137,7 +147,7 @@ export default class ToolTypeSelection extends Vue {
           default:
             items.push({
               text: template.name || "No Submenu",
-              value: "defaultSubmenu",
+              value: { [submenuInterface.id]: "defaultSubmenu" },
             });
             break;
         }
@@ -182,7 +192,7 @@ export default class ToolTypeSelection extends Vue {
             ...template.interface.slice(submenuInterfaceIdx + 1),
           ],
         };
-        defaultToolValues[submenuInterface.id] = item.value;
+        defaultToolValues = item.value;
         break;
       case "annotation":
         computedTemplate = {
