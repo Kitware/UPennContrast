@@ -511,6 +511,10 @@ export default class AnnotationViewer extends Vue {
     return this.annotationStore.selectedAnnotations;
   }
 
+  get mutatingAnnotationRenderingProperties() {
+    return this.annotationStore.mutatingAnnotationRenderingProperties;
+  }
+
   getAnyLayerForChannel(channel: number) {
     return this.layers.find(
       (layer: IDisplayLayer) => channel === layer.channel,
@@ -549,7 +553,7 @@ export default class AnnotationViewer extends Vue {
   getAnnotationStyle(
     annotationId: string,
     layerColor?: string,
-    annotationColor?: string,
+    annotationColor?: string | null,
   ) {
     // Use "hover" style for annotations selected by a tool
     const hovered =
@@ -558,7 +562,7 @@ export default class AnnotationViewer extends Vue {
     const selected = this.isAnnotationSelected(annotationId);
     return getAnnotationStyleFromBaseStyle(
       this.baseStyle,
-      annotationColor || layerColor,
+      annotationColor ?? layerColor,
       hovered,
       selected,
     );
@@ -1695,6 +1699,17 @@ export default class AnnotationViewer extends Vue {
   @Watch("displayedPropertyPaths")
   onDrawTooltipsChanged() {
     this.drawTooltips();
+  }
+
+  @Watch("mutatingAnnotationRenderingProperties")
+  mutatingAnnotationRenderingPropertiesChanged(
+    isMutating: boolean,
+    wasMutating: boolean,
+  ) {
+    if (!isMutating && wasMutating) {
+      this.clearOldAnnotations(true);
+      this.drawAnnotationsAndTooltips();
+    }
   }
 
   @Watch("unrollH")

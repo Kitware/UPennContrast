@@ -120,6 +120,10 @@ export default class AnnotationsAPI {
     return this.client.put(`upenn_annotation/${annotation.id}`, newAnnotation);
   }
 
+  updateAnnotations(annotations: (Partial<IAnnotation> & { id: string })[]) {
+    return this.client.put("upenn_annotation/multiple", annotations);
+  }
+
   toAnnotation = (item: any): IAnnotation => {
     const {
       name,
@@ -141,10 +145,8 @@ export default class AnnotationsAPI {
       coordinates,
       id: _id,
       datasetId,
+      color: color ?? null, // Retrocompatibility
     });
-    if (color) {
-      annotation.color = color;
-    }
     return annotation;
   };
 
