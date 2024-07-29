@@ -6,12 +6,14 @@
       <v-container style="width: auto">
         <v-row>
           <v-col class="pa-1">
-            <v-btn block @click.stop="deleteSelected">Delete Selected</v-btn>
+            <v-btn block dense @click.stop="deleteSelected" small>
+              Delete Selected
+            </v-btn>
           </v-col>
           <v-col class="pa-1">
             <v-dialog v-model="tagSelectedDialog" width="50%">
               <template v-slot:activator="{ on, attrs }">
-                <v-btn block v-bind="attrs" v-on="on" @click.stop>
+                <v-btn block dense v-bind="attrs" v-on="on" @click.stop small>
                   Tag Selected
                 </v-btn>
               </template>
@@ -30,7 +32,7 @@
           <v-col class="pa-1">
             <v-dialog v-model="colorSelectedDialog" width="50%">
               <template v-slot:activator="{ on, attrs }">
-                <v-btn block v-bind="attrs" v-on="on" @click.stop>
+                <v-btn block dense v-bind="attrs" v-on="on" @click.stop small>
                   Color Selected
                 </v-btn>
               </template>
