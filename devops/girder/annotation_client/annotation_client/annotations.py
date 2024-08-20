@@ -279,7 +279,6 @@ class UPennContrastAnnotationClient:
         }
 
         return self.client.post(PATHS["connect_to_nearest"], json=body)
-    
 
     # Properties
     def getPropertyById(self, propertyId):
@@ -289,10 +288,11 @@ class UPennContrastAnnotationClient:
         :return: The property dict
         :rtype: dict
         """
-        return self.client.get(PATHS["property_by_id"].format(propertyId=propertyId))
+        return self.client.get(
+            PATHS["property_by_id"].format(propertyId=propertyId)
+        )
 
     # Property values
-
     def addAnnotationPropertyValues(self, datasetId, annotationId, values):
         """
         Save one or multiple computed property values for the specified
