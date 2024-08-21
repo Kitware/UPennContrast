@@ -9,16 +9,17 @@ PATHS = {
     "multiple_connections": "/annotation_connection/multiple",
     "connection_by_id": "/annotation_connection/{connectionId}",
     "connect_to_nearest": "/annotation_connection/connectTo/",
+    "property_by_id": "/annotation_property/{propertyId}",
     "add_property_values": (
         "/annotation_property_values"
         "?datasetId={datasetId}"
         "&annotationId={annotationId}"
     ),
     "add_multiple_property_values": "/annotation_property_values/multiple",
-    "get_dataset_properties": (
+    "get_dataset_properties_values": (
         "/annotation_property_values" "?datasetId={datasetId}"
     ),
-    "get_annotation_properties": (
+    "get_annotation_property_values": (
         "/annotation_property_values"
         "?datasetId={datasetId}"
         "&annotationId={annotationId}"
@@ -279,8 +280,19 @@ class UPennContrastAnnotationClient:
 
         return self.client.post(PATHS["connect_to_nearest"], json=body)
 
-    # Property values
+    # Properties
+    def getPropertyById(self, propertyId):
+        """
+        Get a property by its id
+        :param str propertyId: The property's id
+        :return: The property dict
+        :rtype: dict
+        """
+        return self.client.get(
+            PATHS["property_by_id"].format(propertyId=propertyId)
+        )
 
+    # Property values
     def addAnnotationPropertyValues(self, datasetId, annotationId, values):
         """
         Save one or multiple computed property values for the specified
@@ -336,7 +348,7 @@ class UPennContrastAnnotationClient:
         :rtype: list
         """
         return self.client.get(
-            PATHS["get_dataset_properties"].format(datasetId=datasetId)
+            PATHS["get_dataset_properties_values"].format(datasetId=datasetId)
         )
 
     def getPropertyValuesForAnnotation(self, datasetId, annotationId):
@@ -347,7 +359,7 @@ class UPennContrastAnnotationClient:
         :return: Property values for the annotation
         """
         return self.client.get(
-            PATHS["get_annotation_properties"].format(
+            PATHS["get_annotation_property_values"].format(
                 annotationId=annotationId, datasetId=datasetId
             )
         )
