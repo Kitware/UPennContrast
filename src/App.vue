@@ -54,8 +54,13 @@
         </v-btn>
         <server-status />
         <user-menu />
+        <v-btn icon @click="chatbotOpen = !chatbotOpen">
+          <v-icon>mdi-chat</v-icon>
+        </v-btn>
       </div>
     </v-app-bar>
+
+    <chat-component v-if="chatbotOpen" @close="chatbotOpen = false" />
 
     <v-main>
       <router-view />
@@ -125,8 +130,10 @@ import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
+import chatStore from "@/store/chat";
 import { logError } from "@/utils/log";
 import { IHotkey } from "@/utils/v-mousetrap";
+import ChatComponent from "@/components/ChatComponent.vue";
 
 @Component({
   components: {
@@ -138,11 +145,13 @@ import { IHotkey } from "@/utils/v-mousetrap";
     AnalyzeAnnotations,
     AnnotationsSettings,
     Snapshots,
+    ChatComponent,
   },
 })
 export default class App extends Vue {
   readonly store = store;
   readonly propertyStore = propertyStore;
+  readonly chatStore = chatStore;
 
   readonly appHotkeys: IHotkey = {
     bind: "tab",
@@ -170,6 +179,8 @@ export default class App extends Vue {
 
   analyzePanel = false;
 
+  chatbotOpen = false;
+
   lastModifiedRightPanel: string | null = null;
 
   fetchConfig() {
@@ -193,6 +204,7 @@ export default class App extends Vue {
 
   mounted() {
     this.fetchConfig();
+    this.chatStore.initDB();
   }
 
   goHome() {
