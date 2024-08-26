@@ -18,8 +18,13 @@ COPY ./provision.py /src/provision.py
 COPY ./girder.cfg /etc/girder.cfg
 
 RUN pip install fastjsonschema
+RUN pip install anthropic
+
 COPY plugins/AnnotationPlugin /src/AnnotationPlugin
 RUN pip install -e /src/AnnotationPlugin
+
+COPY plugins/girder-claude-chat /src/girder-claude-chat
+RUN pip install -e /src/girder-claude-chat
 
 RUN girder build
 
