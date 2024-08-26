@@ -24,6 +24,14 @@ class ClaudeChatResource(Resource):
             raise ValidationException('Anthropic API key is not set in environment variables')
 
         client = Anthropic(api_key=api_key)
+
+        try:
+            with open("/src/girder-claude-chat/system_prompt_1.txt", "r") as f:
+                system_prompt = f.read().strip()
+            print("Successfully loaded system prompt")
+        except IOError:
+            print("Failed to load system prompt")
+            system_prompt = ""
         
         try:
             response = client.messages.create(
