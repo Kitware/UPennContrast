@@ -6,35 +6,25 @@ import {
   getModule,
 } from "vuex-module-decorators";
 import store from "./root";
-
-export interface Message {
-  type: "user" | "bot" | "system" | "error";
-  content: string;
-  images?: Image[];
-}
-
-export interface Image {
-  data: string;
-  type: string;
-}
+import { IChatMessage, IChatImage } from "./model";
 
 @Module({ dynamic: true, store, name: "chat" })
 export class Chat extends VuexModule {
-  messages: Message[] = [];
-  currentImages: Image[] = [];
+  messages: IChatMessage[] = [];
+  currentImages: IChatImage[] = [];
 
   @Mutation
-  ADD_MESSAGE(message: Message) {
+  ADD_MESSAGE(message: IChatMessage) {
     this.messages.push(message);
   }
 
   @Mutation
-  SET_MESSAGES(messages: Message[]) {
+  SET_MESSAGES(messages: IChatMessage[]) {
     this.messages = messages;
   }
 
   @Mutation
-  ADD_CURRENT_IMAGE(image: Image) {
+  ADD_CURRENT_IMAGE(image: IChatImage) {
     this.currentImages.push(image);
   }
 
@@ -91,7 +81,7 @@ export class Chat extends VuexModule {
   }
 
   @Action
-  async addMessage(message: Message) {
+  async addMessage(message: IChatMessage) {
     this.ADD_MESSAGE(message);
 
     try {
@@ -121,7 +111,7 @@ export class Chat extends VuexModule {
   }
 
   @Action
-  addCurrentImage(image: Image) {
+  addCurrentImage(image: IChatImage) {
     this.ADD_CURRENT_IMAGE(image);
   }
 

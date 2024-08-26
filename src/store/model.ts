@@ -1453,3 +1453,14 @@ export const AnnotationSelectionTypesTooltips = {
   [AnnotationSelectionTypes.TOGGLE]: "Toggle annotations selection",
   [AnnotationSelectionTypes.REMOVE]: "Remove annotation from selection",
 };
+
+export interface IChatImage {
+  data: string;
+  type: string;
+}
+
+export interface IChatMessage {
+  type: "user" | "bot" | "system" | "error";
+  content: string;
+  images?: IChatImage[];
+}

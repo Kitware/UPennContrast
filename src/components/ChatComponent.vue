@@ -73,7 +73,8 @@
 
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
-import chatStore, { Message, Image } from "@/store/chat";
+import chatStore from "@/store/chat";
+import { IChatMessage, IChatImage } from "@/store/model";
 
 @Component
 export default class ChatComponent extends Vue {
@@ -100,7 +101,7 @@ export default class ChatComponent extends Vue {
 
   formatMessagesForAPI() {
     return this.messages
-      .map((message: Message) => {
+      .map((message: IChatMessage) => {
         if (message.type === "user") {
           const content: Array<{
             type: string;
@@ -108,7 +109,7 @@ export default class ChatComponent extends Vue {
             source?: { type: string; media_type: string; data: string };
           }> = [{ type: "text", text: message.content }];
           if (message.images && message.images.length > 0) {
-            message.images.forEach((image: Image) => {
+            message.images.forEach((image: IChatImage) => {
               const mimeType = this.getMimeType(image.data);
               content.push({
                 type: "image",
@@ -141,7 +142,7 @@ export default class ChatComponent extends Vue {
     if (this.userInput.trim() === "" && this.currentImages.length === 0) return;
 
     const messageContent = this.userInput.trim();
-    const userMessage: Message = {
+    const userMessage: IChatMessage = {
       type: "user",
       content: messageContent,
       images: [...this.currentImages],
@@ -159,7 +160,7 @@ export default class ChatComponent extends Vue {
       // Here you would typically make an API call
       // For now, we'll simulate a response
       const imageCount = userMessage.images ? userMessage.images.length : 0;
-      const botResponse: Message = {
+      const botResponse: IChatMessage = {
         type: "bot",
         content: `Thanks for your chat! You attached ${imageCount} image(s).`,
       };
@@ -168,7 +169,7 @@ export default class ChatComponent extends Vue {
       }, 500);
     } catch (error: any) {
       console.error("Error sending message:", error);
-      const errorMessage: Message = {
+      const errorMessage: IChatMessage = {
         type: "error",
         content: `Error sending message: ${error.message}. Please check console for details.`,
       };
@@ -199,7 +200,7 @@ export default class ChatComponent extends Vue {
     }
 
     if (this.currentImages.length > 0) {
-      const systemMessage: Message = {
+      const systemMessage: IChatMessage = {
         type: "system",
         content: `${this.currentImages.length} image(s) ready to send`,
       };
@@ -225,7 +226,7 @@ export default class ChatComponent extends Vue {
             const result = e.target?.result as string;
             await chatStore.addCurrentImage({ data: result, type: blob.type });
             if (!imageAdded) {
-              const systemMessage: Message = {
+              const systemMessage: IChatMessage = {
                 type: "system",
                 content: "Pasted image ready to send",
               };
