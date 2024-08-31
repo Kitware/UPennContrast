@@ -263,7 +263,7 @@ export default class ChatComponent extends Vue {
   }
 
   formatMarkdown(content: string): string {
-    return marked(content);
+    return marked.parse(content);
   }
 }
 </script>
