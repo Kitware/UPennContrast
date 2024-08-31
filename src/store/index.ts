@@ -16,6 +16,7 @@ import {
 
 import AnnotationsAPI from "./AnnotationsAPI";
 import PropertiesAPI from "./PropertiesAPI";
+import ChatAPI from "./ChatAPI";
 import GirderAPI from "./GirderAPI";
 
 import { getLayerImages, getLayerSliceIndexes } from "./images";
@@ -81,7 +82,8 @@ export class Main extends VuexModule {
   api = new GirderAPI(this.girderRest);
   annotationsAPI = new AnnotationsAPI(this.girderRest);
   propertiesAPI = new PropertiesAPI(this.girderRest);
-
+  chatAPI = new ChatAPI(this.girderRest);
+  
   girderUser: IGirderUser | null = this.girderRest.user;
   folderLocation: IGirderLocation = this.girderUser || { type: "users" };
   assetstores: IGirderAssetstore[] = [];

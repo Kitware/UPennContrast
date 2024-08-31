@@ -1460,7 +1460,7 @@ export interface IChatImage {
 }
 
 export interface IChatMessage {
-  type: "user" | "bot" | "system" | "error";
+  type: "user" | "assistant" | "system" | "error";
   content: string;
   images?: IChatImage[];
 }

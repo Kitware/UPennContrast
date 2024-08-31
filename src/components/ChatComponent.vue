@@ -73,6 +73,7 @@
 
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
+import store from "@/store";
 import chatStore from "@/store/chat";
 import { IChatMessage, IChatImage } from "@/store/model";
 
@@ -122,7 +123,7 @@ export default class ChatComponent extends Vue {
             });
           }
           return { role: "user", content };
-        } else if (message.type === "bot") {
+        } else if (message.type === "assistant") {
           return {
             role: "assistant",
             content: [{ type: "text", text: message.content }],
@@ -157,13 +158,10 @@ export default class ChatComponent extends Vue {
       console.log("Sending request to server:", {
         messages: formattedMessages,
       });
-      // Here you would typically make an API call
-      // For now, we'll simulate a response
-      const imageCount = userMessage.images ? userMessage.images.length : 0;
-      const botResponse: IChatMessage = {
-        type: "bot",
-        content: `Thanks for your chat! You attached ${imageCount} image(s).`,
-      };
+
+      const botResponse = await store.chatAPI.sendFullChatMessage({
+        messages: formattedMessages,
+      });
       setTimeout(() => {
         chatStore.addMessage(botResponse);
       }, 500);
@@ -176,7 +174,7 @@ export default class ChatComponent extends Vue {
       await chatStore.addMessage(errorMessage);
     }
 
-    this.$nextTick(() => {
+    Vue.nextTick(() => {
       this.scrollToBottom();
     });
   }
@@ -198,17 +196,6 @@ export default class ChatComponent extends Vue {
         console.error("Error processing file:", error);
       }
     }
-
-    if (this.currentImages.length > 0) {
-      const systemMessage: IChatMessage = {
-        type: "system",
-        content: `${this.currentImages.length} image(s) ready to send`,
-      };
-      await chatStore.addMessage(systemMessage);
-      this.$nextTick(() => {
-        this.scrollToBottom();
-      });
-    }
   }
 
   async handlePaste(event: ClipboardEvent) {
@@ -216,7 +203,6 @@ export default class ChatComponent extends Vue {
     const items = event.clipboardData?.items;
     if (!items) return;
 
-    let imageAdded = false;
     for (let i = 0; i < items.length && this.currentImages.length < 4; i++) {
       if (items[i].type.indexOf("image") !== -1) {
         const blob = items[i].getAsFile();
@@ -225,17 +211,6 @@ export default class ChatComponent extends Vue {
           reader.onload = async (e) => {
             const result = e.target?.result as string;
             await chatStore.addCurrentImage({ data: result, type: blob.type });
-            if (!imageAdded) {
-              const systemMessage: IChatMessage = {
-                type: "system",
-                content: "Pasted image ready to send",
-              };
-              await chatStore.addMessage(systemMessage);
-              this.$nextTick(() => {
-                this.scrollToBottom();
-              });
-              imageAdded = true;
-            }
           };
           reader.readAsDataURL(blob);
         }
