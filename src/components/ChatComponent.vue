@@ -3,6 +3,9 @@
     <v-card-title>
       Nimbus chat
       <v-spacer></v-spacer>
+      <v-btn icon @click="refreshChat">
+        <v-icon>mdi-refresh</v-icon>
+      </v-btn>
       <v-btn icon @click="$emit('close')">
         <v-icon>mdi-close</v-icon>
       </v-btn>
@@ -67,7 +70,6 @@
         style="display: none"
       />
     </v-card-actions>
-    <v-btn @click="refreshChat" class="refresh-button">Refresh Chat</v-btn>
   </v-card>
 </template>
 
