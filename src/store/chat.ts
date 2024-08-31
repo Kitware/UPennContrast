@@ -100,10 +100,6 @@ export class Chat extends VuexModule {
         addRequest.onerror = () => {
           console.error("Error saving message");
         };
-
-        addRequest.onsuccess = () => {
-          console.log("Message saved successfully");
-        };
       };
     } catch (error) {
       console.error("Failed to save message:", error);
@@ -144,10 +140,6 @@ export class Chat extends VuexModule {
 
         clearRequest.onerror = () => {
           console.error("Error clearing database");
-        };
-
-        clearRequest.onsuccess = () => {
-          console.log("Database cleared successfully");
         };
       };
     } catch (error) {

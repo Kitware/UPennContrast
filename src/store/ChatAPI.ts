@@ -1,9 +1,5 @@
 import { RestClientInstance } from "@/girder";
-import { IChatMessage, IChatImage } from "./model";
-
-// import { logError } from "@/utils/log";
-// import { fetchAllPages } from "@/utils/fetch";
-// import { markRaw } from "vue";
+import { IChatMessage } from "./model";
 
 export default class ChatAPI {
   private readonly client: RestClientInstance;
@@ -20,15 +16,22 @@ export default class ChatAPI {
 
   sendFullChatMessage(messages: IChatMessage[]): Promise<IChatMessage | null> {
     return this.client
-      .post("claude_chat/full_chat", messages)
-      .then((response) => this.toChatMessage(response));
+      .post("claude_chat/full_chat", { messages })
+      .then((response) => {
+        if (response && response.data) {
+          return this.toChatMessage(response);
+        }
+        return null;
+      });
   }
 
-  toChatMessage(item: any): IChatMessage {
-    console.log(item);
-    return {
-      type: "assistant",
-      content: item.data.response,
-    };
+  toChatMessage(item: any): IChatMessage | null {
+    if (item && item.data && item.data.response) {
+      return {
+        type: "assistant",
+        content: item.data.response,
+      };
+    }
+    return null;
   }
 }

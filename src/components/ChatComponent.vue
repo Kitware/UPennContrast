@@ -34,7 +34,11 @@
               />
             </div>
           </template>
-          <div>{{ message.content }}</div>
+          <div
+            v-if="message.type === 'assistant'"
+            v-html="formatMarkdown(message.content)"
+          ></div>
+          <div v-else>{{ message.content }}</div>
         </div>
       </div>
       <div v-if="currentImages.length > 0" class="current-images">
@@ -83,6 +87,7 @@
 
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
+import { marked } from "marked";
 import store from "@/store";
 import chatStore from "@/store/chat";
 import { IChatMessage, IChatImage } from "@/store/model";
@@ -168,16 +173,16 @@ export default class ChatComponent extends Vue {
 
     try {
       const formattedMessages = this.formatMessagesForAPI();
-      console.log("Sending request to server:", {
-        messages: formattedMessages,
-      });
 
-      const botResponse = await store.chatAPI.sendFullChatMessage({
-        messages: formattedMessages,
-      });
-      setTimeout(() => {
-        chatStore.addMessage(botResponse);
-      }, 500);
+      const botResponse =
+        await store.chatAPI.sendFullChatMessage(formattedMessages);
+
+      if (botResponse !== null) {
+        await chatStore.addMessage(botResponse);
+      } else {
+        console.error("Received null response from API");
+      }
+
     } catch (error: any) {
       console.error("Error sending message:", error);
       const errorMessage: IChatMessage = {
@@ -243,6 +248,7 @@ export default class ChatComponent extends Vue {
 
   $refs!: {
     chatMessages: HTMLElement;
+    fileInput: HTMLInputElement;
   };
 
   scrollToBottom() {
@@ -254,7 +260,10 @@ export default class ChatComponent extends Vue {
   async refreshChat() {
     await chatStore.clearAll();
     this.userInput = "";
-    console.log("Chat history cleared");
+  }
+
+  formatMarkdown(content: string): string {
+    return marked(content);
   }
 }
 </script>
@@ -264,7 +273,7 @@ export default class ChatComponent extends Vue {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 400px;
+  width: 600px;
   height: 600px;
   z-index: 1000;
   background-color: rgba(0, 0, 0, 0.202) !important;
@@ -341,5 +350,46 @@ export default class ChatComponent extends Vue {
 
 .refresh-button {
   margin-top: 10px;
+}
+
+/* Add these new styles for Markdown formatting */
+.bot :deep(p) {
+  margin-bottom: 10px;
+}
+
+.bot :deep(ul),
+.bot :deep(ol) {
+  padding-left: 20px;
+  margin-bottom: 10px;
+}
+
+.bot :deep(h1),
+.bot :deep(h2),
+.bot :deep(h3),
+.bot :deep(h4),
+.bot :deep(h5),
+.bot :deep(h6) {
+  margin-top: 15px;
+  margin-bottom: 10px;
+}
+
+.bot :deep(code) {
+  background-color: #f0f0f0;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.bot :deep(pre) {
+  background-color: #f0f0f0;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.bot :deep(blockquote) {
+  border-left: 4px solid #ccc;
+  padding-left: 10px;
+  margin-left: 0;
+  color: #666;
 }
 </style>
