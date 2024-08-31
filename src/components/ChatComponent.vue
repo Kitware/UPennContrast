@@ -52,7 +52,10 @@
     </v-card-text>
     <v-card-actions>
       <template v-if="isWaiting">
-        <v-progress-circular indeterminate color="primary"></v-progress-circular>
+        <v-progress-circular
+          indeterminate
+          color="primary"
+        ></v-progress-circular>
       </template>
       <template v-else>
         <v-text-field
@@ -238,8 +241,13 @@ export default class ChatComponent extends Vue {
     chatStore.removeCurrentImage(index);
   }
 
+  $refs!: {
+    chatMessages: HTMLElement;
+  };
+
   scrollToBottom() {
     const chatMessages = this.$refs.chatMessages as HTMLElement;
+    console.log("scrollToBottom", chatMessages); // Appears to pick up the right element, not sure why it doesn't scroll
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
