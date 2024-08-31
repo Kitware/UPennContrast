@@ -51,24 +51,29 @@
       </div>
     </v-card-text>
     <v-card-actions>
-      <v-text-field
-        v-model="userInput"
-        label="Type a message"
-        @keyup.enter="sendMessage"
-        @paste="handlePaste"
-      ></v-text-field>
-      <v-btn @click="sendMessage">Send</v-btn>
-      <v-btn icon @click="$refs.fileInput.click()">
-        <v-icon>mdi-image</v-icon>
-      </v-btn>
-      <input
-        ref="fileInput"
-        type="file"
-        @change="handleFileUpload"
-        accept="image/*"
-        multiple
-        style="display: none"
-      />
+      <template v-if="isWaiting">
+        <v-progress-circular indeterminate color="primary"></v-progress-circular>
+      </template>
+      <template v-else>
+        <v-text-field
+          v-model="userInput"
+          label="Type a message"
+          @keyup.enter="sendMessage"
+          @paste="handlePaste"
+        ></v-text-field>
+        <v-btn @click="sendMessage">Send</v-btn>
+        <v-btn icon @click="$refs.fileInput.click()">
+          <v-icon>mdi-image</v-icon>
+        </v-btn>
+        <input
+          ref="fileInput"
+          type="file"
+          @change="handleFileUpload"
+          accept="image/*"
+          multiple
+          style="display: none"
+        />
+      </template>
     </v-card-actions>
   </v-card>
 </template>
@@ -82,6 +87,7 @@ import { IChatMessage, IChatImage } from "@/store/model";
 @Component
 export default class ChatComponent extends Vue {
   userInput = "";
+  isWaiting = false; // Add this data property
 
   get messages() {
     return chatStore.messages;
@@ -144,6 +150,8 @@ export default class ChatComponent extends Vue {
   async sendMessage() {
     if (this.userInput.trim() === "" && this.currentImages.length === 0) return;
 
+    this.isWaiting = true; // Set isWaiting to true when sending a message
+
     const messageContent = this.userInput.trim();
     const userMessage: IChatMessage = {
       type: "user",
@@ -175,6 +183,8 @@ export default class ChatComponent extends Vue {
       };
       await chatStore.addMessage(errorMessage);
     }
+
+    this.isWaiting = false; // Set isWaiting to false after receiving a response
 
     Vue.nextTick(() => {
       this.scrollToBottom();
