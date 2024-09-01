@@ -1466,7 +1466,7 @@ export interface IChatMessage {
 }
 
 export interface IFullChatMessage {
-  role: string;
+  role: "user" | "assistant" | "system";
   content: {
     type: string;
     text?: string;

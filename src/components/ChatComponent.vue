@@ -90,7 +90,7 @@ import { Vue, Component } from "vue-property-decorator";
 import { marked } from "marked";
 import store from "@/store";
 import chatStore from "@/store/chat";
-import { IChatMessage, IChatImage } from "@/store/model";
+import { IChatMessage, IChatImage, IFullChatMessage } from "@/store/model";
 
 @Component
 export default class ChatComponent extends Vue {
@@ -116,15 +116,13 @@ export default class ChatComponent extends Vue {
     return mime && mime.length ? mime[1] : "image/jpeg";
   }
 
-  formatMessagesForAPI() {
+  formatMessagesForAPI(): IFullChatMessage[] {
     return this.messages
-      .map((message: IChatMessage) => {
+      .map((message: IChatMessage): IFullChatMessage | null => {
         if (message.type === "user") {
-          const content: Array<{
-            type: string;
-            text?: string;
-            source?: { type: string; media_type: string; data: string };
-          }> = [{ type: "text", text: message.content }];
+          const content: IFullChatMessage["content"] = [
+            { type: "text", text: message.content },
+          ];
           if (message.images && message.images.length > 0) {
             message.images.forEach((image: IChatImage) => {
               const mimeType = this.getMimeType(image.data);
@@ -152,7 +150,7 @@ export default class ChatComponent extends Vue {
         }
         return null;
       })
-      .filter(Boolean);
+      .filter((message): message is IFullChatMessage => message !== null);
   }
 
   async sendMessage() {
@@ -182,7 +180,6 @@ export default class ChatComponent extends Vue {
       } else {
         console.error("Received null response from API");
       }
-
     } catch (error: any) {
       console.error("Error sending message:", error);
       const errorMessage: IChatMessage = {
