@@ -1,5 +1,5 @@
 import { RestClientInstance } from "@/girder";
-import { IChatMessage } from "./model";
+import { IChatMessage, IFullChatMessage } from "./model";
 
 export default class ChatAPI {
   private readonly client: RestClientInstance;
@@ -14,7 +14,9 @@ export default class ChatAPI {
       .then((response) => this.toChatMessage(response));
   }
 
-  sendFullChatMessage(messages: IChatMessage[]): Promise<IChatMessage | null> {
+  sendFullChatMessage(
+    messages: IFullChatMessage[],
+  ): Promise<IChatMessage | null> {
     return this.client
       .post("claude_chat/full_chat", { messages })
       .then((response) => {
