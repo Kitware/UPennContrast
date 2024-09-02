@@ -5,6 +5,7 @@ import {
   Action,
   getModule,
 } from "vuex-module-decorators";
+import { logError } from "@/utils/log";
 import store from "./root";
 import { IChatMessage, IChatImage } from "./model";
 
@@ -50,7 +51,7 @@ export class Chat extends VuexModule {
       const request = indexedDB.open("ChatHistoryDB", 1);
 
       request.onerror = () => {
-        console.error("Error opening database");
+        logError("Error opening database");
       };
 
       request.onsuccess = (event) => {
@@ -60,7 +61,7 @@ export class Chat extends VuexModule {
         const getRequest = store.getAll();
 
         getRequest.onerror = () => {
-          console.error("Error loading messages");
+          logError("Error loading messages");
         };
 
         getRequest.onsuccess = () => {
@@ -76,7 +77,7 @@ export class Chat extends VuexModule {
         });
       };
     } catch (error) {
-      console.error("Failed to initialize chat database:", error);
+      logError("Failed to initialize chat database:", error);
     }
   }
 
@@ -88,7 +89,7 @@ export class Chat extends VuexModule {
       const request = indexedDB.open("ChatHistoryDB", 1);
 
       request.onerror = () => {
-        console.error("Error opening database");
+        logError("Error opening database");
       };
 
       request.onsuccess = (event) => {
@@ -98,11 +99,11 @@ export class Chat extends VuexModule {
         const addRequest = store.add(message);
 
         addRequest.onerror = () => {
-          console.error("Error saving message");
+          logError("Error saving message");
         };
       };
     } catch (error) {
-      console.error("Failed to save message:", error);
+      logError("Failed to save message:", error);
     }
   }
 
@@ -129,7 +130,7 @@ export class Chat extends VuexModule {
       const request = indexedDB.open("ChatHistoryDB", 1);
 
       request.onerror = () => {
-        console.error("Error opening database");
+        logError("Error opening database");
       };
 
       request.onsuccess = (event) => {
@@ -139,11 +140,11 @@ export class Chat extends VuexModule {
         const clearRequest = store.clear();
 
         clearRequest.onerror = () => {
-          console.error("Error clearing database");
+          logError("Error clearing database");
         };
       };
     } catch (error) {
-      console.error("Failed to clear database:", error);
+      logError("Failed to clear database:", error);
     }
   }
 }

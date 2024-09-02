@@ -87,6 +87,7 @@
 
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
+import { logError } from "@/utils/log";
 import store from "@/store";
 import chatStore from "@/store/chat";
 import { IChatMessage, IChatImage, IFullChatMessage } from "@/store/model";
@@ -177,10 +178,10 @@ export default class ChatComponent extends Vue {
       if (botResponse !== null) {
         await chatStore.addMessage(botResponse);
       } else {
-        console.error("Received null response from API");
+        logError("Received null response from API");
       }
     } catch (error: any) {
-      console.error("Error sending message:", error);
+      logError("Error sending message:", error);
       const errorMessage: IChatMessage = {
         type: "error",
         content: `Error sending message: ${error.message}. Please check console for details.`,
@@ -209,7 +210,7 @@ export default class ChatComponent extends Vue {
         };
         reader.readAsDataURL(file);
       } catch (error) {
-        console.error("Error processing file:", error);
+        logError("Error processing file:", error);
       }
     }
   }
