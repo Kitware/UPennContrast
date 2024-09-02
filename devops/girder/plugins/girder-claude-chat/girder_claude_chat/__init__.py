@@ -86,7 +86,8 @@ class ClaudeChatResource(Resource):
             )
 
             logger.debug(
-                f"Received response from Anthropic API: {response.content[0].text[:100]}..."
+                "Received response from Anthropic API: "
+                f"{response.content[0].text[:100]}..."
             )
             return {'response': response.content[0].text}
         except Exception as e:

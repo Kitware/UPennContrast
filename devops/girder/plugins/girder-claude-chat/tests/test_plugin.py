@@ -1,6 +1,7 @@
 import pytest
 from pytest_girder.assertions import assertStatusOk
 
+
 @pytest.mark.plugin('claude_chat')
 def testClaudeChat(server):
     resp = server.request(
