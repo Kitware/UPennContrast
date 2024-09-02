@@ -83,7 +83,7 @@ export class Main extends VuexModule {
   annotationsAPI = new AnnotationsAPI(this.girderRest);
   propertiesAPI = new PropertiesAPI(this.girderRest);
   chatAPI = new ChatAPI(this.girderRest);
-  
+
   girderUser: IGirderUser | null = this.girderRest.user;
   folderLocation: IGirderLocation = this.girderUser || { type: "users" };
   assetstores: IGirderAssetstore[] = [];
