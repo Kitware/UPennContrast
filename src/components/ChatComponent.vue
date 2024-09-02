@@ -36,7 +36,7 @@
           </template>
           <div
             v-if="message.type === 'assistant'"
-            v-html="formatMarkdown(message.content)"
+            v-html="message.content"
           ></div>
           <div v-else>{{ message.content }}</div>
         </div>
@@ -259,9 +259,9 @@ export default class ChatComponent extends Vue {
     this.userInput = "";
   }
 
-  formatMarkdown(content: string): string {
-    return marked.parse(content);
-  }
+  // formatMarkdown(content: string): string {
+  //   return marked.parse(content);
+  // }
 }
 </script>
 
