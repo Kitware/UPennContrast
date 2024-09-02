@@ -87,7 +87,6 @@
 
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
-import { marked } from "marked";
 import store from "@/store";
 import chatStore from "@/store/chat";
 import { IChatMessage, IChatImage, IFullChatMessage } from "@/store/model";
