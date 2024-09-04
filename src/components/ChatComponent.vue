@@ -29,7 +29,11 @@
               class="message-image"
             />
           </div>
-          <div>{{ message.content }}</div>
+          <div
+            v-if="message.type === 'assistant'"
+            v-html="marked(message.content)"
+          ></div>
+          <div v-else>{{ message.content }}</div>
         </div>
       </div>
     </v-card-text>
@@ -86,12 +90,15 @@ import { Vue, Component } from "vue-property-decorator";
 import { logError } from "@/utils/log";
 import chatStore from "@/store/chat";
 import { IChatImage, IChatMessage } from "@/store/model";
+import { marked } from "marked";
 
 @Component
 export default class ChatComponent extends Vue {
   textInput = "";
   imagesInput: IChatImage[] = [];
   isWaiting = false;
+
+  marked = marked;
 
   $refs!: {
     chatMessages: HTMLElement;
@@ -188,10 +195,6 @@ export default class ChatComponent extends Vue {
     this.clearInputs();
     await chatStore.clearAll();
   }
-
-  // formatMarkdown(content: string): string {
-  //   return marked.parse(content);
-  // }
 }
 </script>
 
