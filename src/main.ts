@@ -23,6 +23,7 @@ import "mousetrap";
 import "mousetrap/plugins/record/mousetrap-record.min.js";
 import vMousetrap from "@/utils/v-mousetrap";
 import vDescription from "@/utils/v-description";
+import chat from "./store/chat";
 
 Vue.config.productionTip = false;
 
@@ -32,6 +33,7 @@ Vue.use(vDescription);
 
 main.initialize();
 main.setupWatchers();
+chat.initializeChatDatabase();
 
 const app = new Vue({
   provide: {

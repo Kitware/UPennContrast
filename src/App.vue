@@ -54,8 +54,13 @@
         </v-btn>
         <server-status />
         <user-menu />
+        <v-btn icon @click="chatbotOpen = !chatbotOpen">
+          <v-icon>mdi-chat</v-icon>
+        </v-btn>
       </div>
     </v-app-bar>
+
+    <chat-component v-if="chatbotOpen" @close="chatbotOpen = false" />
 
     <v-main>
       <router-view />
@@ -127,6 +132,7 @@ import store from "@/store";
 import propertyStore from "@/store/properties";
 import { logError } from "@/utils/log";
 import { IHotkey } from "@/utils/v-mousetrap";
+import ChatComponent from "@/components/ChatComponent.vue";
 
 @Component({
   components: {
@@ -138,6 +144,7 @@ import { IHotkey } from "@/utils/v-mousetrap";
     AnalyzeAnnotations,
     AnnotationsSettings,
     Snapshots,
+    ChatComponent,
   },
 })
 export default class App extends Vue {
@@ -169,6 +176,8 @@ export default class App extends Vue {
   settingsPanel = false;
 
   analyzePanel = false;
+
+  chatbotOpen = false;
 
   lastModifiedRightPanel: string | null = null;
 

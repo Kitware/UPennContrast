@@ -26,6 +26,8 @@ services:
       - '/var/run/docker.sock:/var/run/docker.sock'
     env_file:
       - "./docker.env"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
       - "mongodb"
       - "broker"
