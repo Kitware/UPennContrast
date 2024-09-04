@@ -130,7 +130,6 @@ import BreadCrumbs from "./layout/BreadCrumbs.vue";
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
 import propertyStore from "@/store/properties";
-import chatStore from "@/store/chat";
 import { logError } from "@/utils/log";
 import { IHotkey } from "@/utils/v-mousetrap";
 import ChatComponent from "@/components/ChatComponent.vue";
@@ -151,7 +150,6 @@ import ChatComponent from "@/components/ChatComponent.vue";
 export default class App extends Vue {
   readonly store = store;
   readonly propertyStore = propertyStore;
-  readonly chatStore = chatStore;
 
   readonly appHotkeys: IHotkey = {
     bind: "tab",
@@ -204,7 +202,6 @@ export default class App extends Vue {
 
   mounted() {
     this.fetchConfig();
-    this.chatStore.initDB();
   }
 
   goHome() {

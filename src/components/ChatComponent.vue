@@ -13,44 +13,23 @@
     <v-card-text>
       <div ref="chatMessages" class="chat-messages">
         <div
-          v-for="(message, index) in messages"
+          v-for="(message, index) in messages.toReversed()"
           :key="index"
           :class="message.type"
         >
-          <template
-            v-if="
-              message.type === 'user' &&
-              message.images &&
-              message.images.length > 0
-            "
-          >
-            <div class="image-grid">
-              <img
-                v-for="(image, imgIndex) in message.images"
-                :key="imgIndex"
-                :src="image.data"
-                alt="User uploaded image"
-                class="message-image"
-              />
-            </div>
-          </template>
           <div
-            v-if="message.type === 'assistant'"
-            v-html="message.content"
-          ></div>
-          <div v-else>{{ message.content }}</div>
-        </div>
-      </div>
-      <div v-if="currentImages.length > 0" class="current-images">
-        <div
-          v-for="(image, index) in currentImages"
-          :key="index"
-          class="current-image-container"
-        >
-          <img :src="image.data" alt="Current image" class="current-image" />
-          <v-btn icon small class="remove-image" @click="removeImage(index)">
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
+            v-if="message.images && message.images.length > 0"
+            class="image-grid"
+          >
+            <img
+              v-for="(image, imgIndex) in message.images"
+              :key="imgIndex"
+              :src="image.data"
+              alt="User uploaded image"
+              class="message-image"
+            />
+          </div>
+          <div>{{ message.content }}</div>
         </div>
       </div>
     </v-card-text>
@@ -62,24 +41,41 @@
         ></v-progress-circular>
       </template>
       <template v-else>
-        <v-text-field
-          v-model="userInput"
-          label="Type a message"
-          @keyup.enter="sendMessage"
-          @paste="handlePaste"
-        ></v-text-field>
-        <v-btn @click="sendMessage">Send</v-btn>
-        <v-btn icon @click="$refs.fileInput.click()">
-          <v-icon>mdi-image</v-icon>
-        </v-btn>
-        <input
-          ref="fileInput"
-          type="file"
-          @change="handleFileUpload"
-          accept="image/*"
-          multiple
-          style="display: none"
-        />
+        <div v-if="imagesInput.length > 0" class="current-images">
+          <div
+            v-for="(image, index) in imagesInput"
+            :key="index"
+            class="current-image-container"
+          >
+            <img :src="image.data" alt="Current image" class="current-image" />
+            <v-btn icon small class="remove-image" @click="removeImage(index)">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </div>
+        </div>
+        <div class="bottom-inputs">
+          <v-textarea
+            v-model="textInput"
+            class="mx-2"
+            label="Type a message"
+            rows="2"
+            no-resize
+            @keyup.enter="!$event.shiftKey ? sendMessage() : undefined"
+            @paste="handlePaste"
+          />
+          <v-btn @click="sendMessage" outlined>Send</v-btn>
+          <v-btn icon @click="$refs.fileInput.click()">
+            <v-icon>mdi-image</v-icon>
+          </v-btn>
+          <input
+            ref="fileInput"
+            type="file"
+            @change="handleFileUpload"
+            accept="image/*"
+            multiple
+            style="display: none"
+          />
+        </div>
       </template>
     </v-card-actions>
   </v-card>
@@ -88,131 +84,81 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import { logError } from "@/utils/log";
-import store from "@/store";
 import chatStore from "@/store/chat";
-import { IChatMessage, IChatImage, IFullChatMessage } from "@/store/model";
+import { IChatImage, IChatMessage } from "@/store/model";
 
 @Component
 export default class ChatComponent extends Vue {
-  userInput = "";
-  isWaiting = false; // Add this data property
+  textInput = "";
+  imagesInput: IChatImage[] = [];
+  isWaiting = false;
+
+  $refs!: {
+    chatMessages: HTMLElement;
+    fileInput: HTMLInputElement;
+  };
 
   get messages() {
     return chatStore.messages;
   }
 
-  get currentImages() {
-    return chatStore.currentImages;
-  }
-
-  async mounted() {
-    await chatStore.initDB();
-  }
-
-  getMimeType(base64String: string): string {
-    const mime = base64String.match(
-      /data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,.*/,
-    );
-    return mime && mime.length ? mime[1] : "image/jpeg";
-  }
-
-  formatMessagesForAPI(): IFullChatMessage[] {
-    return this.messages
-      .map((message: IChatMessage): IFullChatMessage | null => {
-        if (message.type === "user") {
-          const content: IFullChatMessage["content"] = [
-            { type: "text", text: message.content },
-          ];
-          if (message.images && message.images.length > 0) {
-            message.images.forEach((image: IChatImage) => {
-              const mimeType = this.getMimeType(image.data);
-              content.push({
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: mimeType,
-                  data: image.data.split(",")[1],
-                },
-              });
-            });
-          }
-          return { role: "user", content };
-        } else if (message.type === "assistant") {
-          return {
-            role: "assistant",
-            content: [{ type: "text", text: message.content }],
-          };
-        } else if (message.type === "system" || message.type === "error") {
-          return {
-            role: "system",
-            content: [{ type: "text", text: message.content }],
-          };
-        }
-        return null;
-      })
-      .filter((message): message is IFullChatMessage => message !== null);
+  clearInputs() {
+    this.textInput = "";
+    this.imagesInput = [];
   }
 
   async sendMessage() {
-    if (this.userInput.trim() === "" && this.currentImages.length === 0) return;
-
-    this.isWaiting = true; // Set isWaiting to true when sending a message
-
-    const messageContent = this.userInput.trim();
-    const userMessage: IChatMessage = {
-      type: "user",
-      content: messageContent,
-      images: [...this.currentImages],
-    };
-    await chatStore.addMessage(userMessage);
-
-    this.userInput = "";
-    chatStore.clearCurrentImages();
-
-    try {
-      const formattedMessages = this.formatMessagesForAPI();
-
-      const botResponse =
-        await store.chatAPI.sendFullChatMessage(formattedMessages);
-
-      if (botResponse !== null) {
-        await chatStore.addMessage(botResponse);
-      } else {
-        logError("Received null response from API");
-      }
-    } catch (error: any) {
-      logError("Error sending message:", error);
-      const errorMessage: IChatMessage = {
-        type: "error",
-        content: `Error sending message: ${error.message}. Please check console for details.`,
-      };
-      await chatStore.addMessage(errorMessage);
+    const trimmedInput = this.textInput.trim();
+    if (this.isWaiting || trimmedInput === "") {
+      return;
     }
 
-    this.isWaiting = false; // Set isWaiting to false after receiving a response
+    const userMessage: IChatMessage = {
+      type: "user",
+      content: trimmedInput,
+      images: [...this.imagesInput],
+    };
 
-    Vue.nextTick(() => {
-      this.scrollToBottom();
-    });
+    this.clearInputs();
+    try {
+      this.isWaiting = true;
+      await chatStore.sendMessage(userMessage);
+    } finally {
+      this.isWaiting = false;
+    }
+  }
+
+  addImageFile(file: File) {
+    if (this.imagesInput.length >= 4) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (this.imagesInput.length >= 4) {
+        return;
+      }
+      const result = e.target?.result as string;
+      this.imagesInput.push({ data: result, type: file.type });
+    };
+    reader.readAsDataURL(file);
   }
 
   async handleFileUpload(event: Event) {
     const files = (event.target as HTMLInputElement).files;
-    if (!files) return;
+    if (!files || !files.length) {
+      return;
+    }
 
-    for (let i = 0; i < files.length && this.currentImages.length < 4; i++) {
+    // Up to 4 images can be uploaded
+    for (let i = 0; i < files.length; i++) {
       try {
         const file = files[i];
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const result = e.target?.result as string;
-          chatStore.addCurrentImage({ data: result, type: file.type });
-        };
-        reader.readAsDataURL(file);
+        this.addImageFile(file);
       } catch (error) {
         logError("Error processing file:", error);
       }
     }
+    this.$refs.fileInput.value = "";
   }
 
   async handlePaste(event: ClipboardEvent) {
@@ -220,43 +166,27 @@ export default class ChatComponent extends Vue {
     const items = event.clipboardData?.items;
     if (!items) return;
 
-    for (let i = 0; i < items.length && this.currentImages.length < 4; i++) {
+    for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf("image") !== -1) {
-        const blob = items[i].getAsFile();
-        if (blob) {
-          const reader = new FileReader();
-          reader.onload = async (e) => {
-            const result = e.target?.result as string;
-            await chatStore.addCurrentImage({ data: result, type: blob.type });
-          };
-          reader.readAsDataURL(blob);
+        const file = items[i].getAsFile();
+        if (file) {
+          this.addImageFile(file);
         }
       } else if (items[i].type === "text/plain") {
         items[i].getAsString((text) => {
-          this.userInput += text;
+          this.textInput += text;
         });
       }
     }
   }
 
   removeImage(index: number) {
-    chatStore.removeCurrentImage(index);
-  }
-
-  $refs!: {
-    chatMessages: HTMLElement;
-    fileInput: HTMLInputElement;
-  };
-
-  scrollToBottom() {
-    const chatMessages = this.$refs.chatMessages as HTMLElement;
-    // console.log("scrollToBottom", chatMessages); // Appears to pick up the right element, not sure why it doesn't scroll
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    this.imagesInput.splice(index, 1);
   }
 
   async refreshChat() {
+    this.clearInputs();
     await chatStore.clearAll();
-    this.userInput = "";
   }
 
   // formatMarkdown(content: string): string {
@@ -272,6 +202,7 @@ export default class ChatComponent extends Vue {
   right: 20px;
   width: 600px;
   height: 600px;
+  max-height: 600px;
   z-index: 1000;
   background-color: rgba(0, 0, 0, 0.202) !important;
   display: flex;
@@ -279,31 +210,46 @@ export default class ChatComponent extends Vue {
 }
 
 .v-card__text {
+  display: flex;
+  flex-direction: column;
   flex-grow: 1;
-  overflow-y: auto;
+  overflow-y: hidden;
+}
+
+.v-card__actions {
+  flex-direction: column;
+  align-items: start;
 }
 
 .chat-messages {
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
+  overflow-y: auto;
 }
 
 .user {
-  text-align: right;
+  align-self: flex-end;
   color: #2196f3;
-  margin: 5px 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 3px 10px;
+  margin: 2px 0px 2px 20px;
+  width: fit-content;
 }
 
-.bot {
-  text-align: left;
+.assistant {
+  align-self: flex-start;
   color: #4caf50;
-  margin: 5px 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 3px 10px;
+  margin: 2px 20px 2px 0px;
+  width: fit-content;
 }
 
 .system,
 .error {
   text-align: center;
-  color: gray;
+  color: black;
+  background-color: aliceblue;
   margin: 5px 0;
 }
 
@@ -337,56 +283,22 @@ export default class ChatComponent extends Vue {
   object-fit: contain;
 }
 
+.bottom-inputs {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
 .remove-image {
   position: absolute;
   top: 0;
   right: 0;
-  background: rgba(255, 0, 0, 0.7) !important;
-  color: white !important;
+  background: rgba(255, 0, 0, 0.7);
+  color: white;
 }
 
 .refresh-button {
   margin-top: 10px;
-}
-
-/* Add these new styles for Markdown formatting */
-.bot :deep(p) {
-  margin-bottom: 10px;
-}
-
-.bot :deep(ul),
-.bot :deep(ol) {
-  padding-left: 20px;
-  margin-bottom: 10px;
-}
-
-.bot :deep(h1),
-.bot :deep(h2),
-.bot :deep(h3),
-.bot :deep(h4),
-.bot :deep(h5),
-.bot :deep(h6) {
-  margin-top: 15px;
-  margin-bottom: 10px;
-}
-
-.bot :deep(code) {
-  background-color: #f0f0f0;
-  padding: 2px 4px;
-  border-radius: 4px;
-}
-
-.bot :deep(pre) {
-  background-color: #f0f0f0;
-  padding: 10px;
-  border-radius: 4px;
-  overflow-x: auto;
-}
-
-.bot :deep(blockquote) {
-  border-left: 4px solid #ccc;
-  padding-left: 10px;
-  margin-left: 0;
-  color: #666;
 }
 </style>

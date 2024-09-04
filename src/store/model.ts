@@ -1464,16 +1464,3 @@ export interface IChatMessage {
   content: string;
   images?: IChatImage[];
 }
-
-export interface IFullChatMessage {
-  role: "user" | "assistant" | "system";
-  content: {
-    type: string;
-    text?: string;
-    source?: {
-      type: string;
-      media_type: string;
-      data: string;
-    };
-  }[];
-}
