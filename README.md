@@ -46,6 +46,15 @@ By default, a admin user will be created with the name `admin` and the password 
 
 A default assetstore is also created.
 
+To change the default settings of the landing pange for unauthenticated users, create a `.env` file following this pattern:
+```
+VITE_GIRDER_URL=http://localhost:8080
+VITE_DEFAULT_USER=User
+VITE_DEFAULT_PASSWORD=Password
+```
+
+The users that already opened the app once will have the field "Girder Domain" filled with the last domain they used. Otherwise, the `VITE_GIRDER_URL` variable will be used. If the default user and password are set, the app will try to log in with these credentials.
+
 ### Compiles and minifies for production
 
 To compile for production, run this command:
