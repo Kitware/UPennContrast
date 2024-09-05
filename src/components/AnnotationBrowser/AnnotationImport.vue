@@ -259,6 +259,7 @@ export default class AnnotationImport extends Vue {
           channel: oldAnnotation.channel,
           location: oldAnnotation.location,
           coordinates: oldAnnotation.coordinates,
+          color: oldAnnotation.color ?? null,
           datasetId: this.store.dataset!.id,
         };
 

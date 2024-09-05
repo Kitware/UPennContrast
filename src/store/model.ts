@@ -1054,7 +1054,7 @@ export interface IAnnotationBase {
   location: IAnnotationLocation;
   coordinates: IGeoJSPosition[];
   datasetId: string;
-  color?: string;
+  color: string | null;
 }
 
 export interface IAnnotation extends IAnnotationBase {

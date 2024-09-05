@@ -548,8 +548,8 @@ export default class AnnotationViewer extends Vue {
 
   getAnnotationStyle(
     annotationId: string,
+    annotationColor: string | null,
     layerColor?: string,
-    annotationColor?: string,
   ) {
     // Use "hover" style for annotations selected by a tool
     const hovered =
@@ -866,6 +866,7 @@ export default class AnnotationViewer extends Vue {
           childId,
           parentId,
           specialAnnotation,
+          color,
         } = geoJsAnnotation.options();
 
         if (
@@ -910,7 +911,8 @@ export default class AnnotationViewer extends Vue {
         if (
           layer &&
           annotation &&
-          this.layerDisplaysAnnotation(layer.id, annotation.id)
+          this.layerDisplaysAnnotation(layer.id, annotation.id) &&
+          annotation.color === color
         ) {
           return;
         }
@@ -962,8 +964,8 @@ export default class AnnotationViewer extends Vue {
           const layer = this.store.getLayerFromId(layerId);
           const newStyle = this.getAnnotationStyle(
             annotationId,
-            layer?.color,
             customColor,
+            layer?.color,
           );
           geoJSAnnotation.options("style", { ...style, ...newStyle });
           geoJSAnnotation.options("isHovered", isHoveredGT);
@@ -1014,6 +1016,7 @@ export default class AnnotationViewer extends Vue {
       isHovered: annotation.id === this.hoveredAnnotationId,
       location: annotation.location,
       channel: annotation.channel,
+      color: annotation.color,
       isSelected: false,
       layerId,
     };
@@ -1052,8 +1055,8 @@ export default class AnnotationViewer extends Vue {
     const layer = this.store.getLayerFromId(layerId);
     const newStyle = this.getAnnotationStyle(
       annotation.id,
-      layer?.color,
       customColor,
+      layer?.color,
     );
     newGeoJSAnnotation.options("style", Object.assign({}, style, newStyle));
 
@@ -1103,8 +1106,8 @@ export default class AnnotationViewer extends Vue {
         const layer = this.store.getLayerFromId(layerId);
         const newStyle = this.getAnnotationStyle(
           girderId,
-          layer?.color,
           customColor,
+          layer?.color,
         );
         geoJSAnnotation.options("style", Object.assign({}, style, newStyle));
       }

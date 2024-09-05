@@ -340,11 +340,8 @@ export class Annotations extends VuexModule {
       channel,
       coordinates,
       datasetId,
+      color: color ?? null, // Can be undefined because color was optional
     };
-    // Optional color
-    if (color) {
-      annotationBase.color = color;
-    }
     const annotation = await this.createAnnotation(annotationBase);
     if (!annotation) {
       return null;
@@ -388,20 +385,6 @@ export class Annotations extends VuexModule {
       simpleCentroid(annotation.coordinates),
     );
     Vue.set(this.annotationIdToIdx, annotation.id, index);
-  }
-
-  @Action
-  public updateAnnotationName({ name, id }: { name: string; id: string }) {
-    const annotation = this.annotations.find(
-      (annotation: IAnnotation) => annotation.id === id,
-    );
-    if (annotation) {
-      this.annotationsAPI.updateAnnotation({ ...annotation, name });
-      this.setAnnotation({
-        annotation: markRaw({ ...annotation, name }),
-        index: this.annotations.indexOf(annotation),
-      });
-    }
   }
 
   @Mutation
@@ -576,6 +559,38 @@ export class Annotations extends VuexModule {
   }
 
   @Action
+  public async updateAnnotationsPerId({
+    annotationIds,
+    editFunction,
+  }: {
+    annotationIds: string[];
+    editFunction: (annotation: IAnnotation) => void;
+  }) {
+    sync.setSaving(true);
+    const newAnnotations = [];
+    for (const annotationId of annotationIds) {
+      const annotationIndex = this.annotations.findIndex(
+        (annotation: IAnnotation) => annotation.id === annotationId,
+      );
+      if (annotationIndex === -1) {
+        continue;
+      }
+      const oldAnnotation = this.annotations[annotationIndex];
+      const newAnnotation = markRaw(structuredClone(oldAnnotation));
+      editFunction(newAnnotation);
+      this.setAnnotation({
+        annotation: newAnnotation,
+        index: annotationIndex,
+      });
+      newAnnotations.push(newAnnotation);
+    }
+    if (newAnnotations.length) {
+      await this.annotationsAPI.updateAnnotations(newAnnotations);
+    }
+    sync.setSaving(false);
+  }
+
+  @Action
   public async tagAnnotationIds({
     annotationIds,
     tags,
@@ -583,38 +598,52 @@ export class Annotations extends VuexModule {
     annotationIds: string[];
     tags: string[];
   }) {
-    sync.setSaving(true);
-    await Promise.all(
-      annotationIds
-        .map((annotationId) =>
-          this.annotations.findIndex(
-            (annotation: IAnnotation) => annotation.id === annotationId,
-          ),
-        )
-        .filter((annotationIndex: number) => annotationIndex !== -1)
-        .map((annotationIndex: number) => {
-          const annotation = this.annotations[annotationIndex];
-          // Add a tag only if it doesn't exist
-          const newTags = tags.reduce((newTags: string[], tag: string) => {
-            if (!newTags.includes(tag)) {
-              newTags.push(tag);
-            }
-            return newTags;
-          }, annotation.tags);
-          const newAnnotation = markRaw({ ...annotation, tags: newTags });
-          this.setAnnotation({
-            annotation: newAnnotation,
-            index: annotationIndex,
-          });
-          return this.annotationsAPI.updateAnnotation(newAnnotation);
-        }),
-    );
-    sync.setSaving(false);
+    const editFunction = (annotation: IAnnotation): void => {
+      // Add a tag only if it doesn't exist
+      const newTags = tags.reduce((newTags: string[], tag: string) => {
+        if (!newTags.includes(tag)) {
+          newTags.push(tag);
+        }
+        return newTags;
+      }, annotation.tags);
+      annotation.tags = newTags;
+    };
+    this.updateAnnotationsPerId({ annotationIds, editFunction });
   }
 
   @Action
   public tagSelectedAnnotations(tags: string[]) {
     this.tagAnnotationIds({ annotationIds: this.selectedAnnotationIds, tags });
+  }
+
+  @Action
+  public colorAnnotationIds({
+    color,
+    annotationIds,
+  }: {
+    color: string | null;
+    annotationIds: string[];
+  }) {
+    const editFunction = (annotation: IAnnotation): void => {
+      annotation.color = color;
+    };
+    this.updateAnnotationsPerId({ annotationIds, editFunction });
+  }
+
+  @Action
+  public colorSelectedAnnotations(color: string | null) {
+    this.colorAnnotationIds({
+      annotationIds: this.selectedAnnotationIds,
+      color,
+    });
+  }
+
+  @Action
+  public updateAnnotationName({ name, id }: { name: string; id: string }) {
+    const editFunction = (annotation: IAnnotation): void => {
+      annotation.name = name;
+    };
+    this.updateAnnotationsPerId({ annotationIds: [id], editFunction });
   }
 
   @Mutation
