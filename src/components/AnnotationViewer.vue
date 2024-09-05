@@ -974,34 +974,30 @@ export default class AnnotationViewer extends Vue {
   }
 
   drawNewConnections(drawnGeoJSAnnotations: Map<string, IGeoJSAnnotation[]>) {
-    this.annotationConnections
-      .filter(
-        (connection: IAnnotationConnection) =>
-          !drawnGeoJSAnnotations.has(connection.id) &&
-          (this.displayedAnnotationIds.has(connection.parentId) ||
-            this.displayedAnnotationIds.has(connection.childId)),
-      )
-      .forEach((connection: IAnnotationConnection) => {
-        {
-          const childAnnotation = this.getAnnotationFromId(connection.childId);
-          const parentAnnotation = this.getAnnotationFromId(
-            connection.parentId,
-          );
-          if (
-            !childAnnotation ||
-            !parentAnnotation ||
-            !this.displayedAnnotationIds.has(childAnnotation.id) ||
-            !this.displayedAnnotationIds.has(parentAnnotation.id)
-          ) {
-            return;
-          }
-          this.drawGeoJSAnnotationFromConnection(
-            connection,
-            childAnnotation,
-            parentAnnotation,
-          );
-        }
-      });
+    const displayedAnnotationIds = this.displayedAnnotationIds;
+    const getAnnotationFromId = this.getAnnotationFromId;
+    this.annotationConnections.forEach((connection: IAnnotationConnection) => {
+      // If connection is drawn, or one of the parent is not displayed, don't display
+      if (
+        drawnGeoJSAnnotations.has(connection.id) ||
+        !displayedAnnotationIds.has(connection.parentId) ||
+        !displayedAnnotationIds.has(connection.childId)
+      ) {
+        return;
+      }
+      // Get the two annotations for this connection
+      const childAnnotation = getAnnotationFromId(connection.childId);
+      const parentAnnotation = getAnnotationFromId(connection.parentId);
+      if (!childAnnotation || !parentAnnotation) {
+        return;
+      }
+      // Draw the connection
+      this.drawGeoJSAnnotationFromConnection(
+        connection,
+        childAnnotation,
+        parentAnnotation,
+      );
+    });
   }
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
@@ -1070,16 +1066,10 @@ export default class AnnotationViewer extends Vue {
     parent: IAnnotation,
     child: IAnnotation,
   ) {
-    if (!this.store.drawAnnotationConnections) {
-      return;
-    }
-    const anyImage = this.store.dataset?.anyImage();
-
-    if (!anyImage) {
-      return;
-    }
-    const pA = this.unrolledCentroidCoordinates[child.id];
-    const pB = this.unrolledCentroidCoordinates[parent.id];
+    const pA = { ...this.unrolledCentroidCoordinates[child.id] };
+    delete pA.z;
+    const pB = { ...this.unrolledCentroidCoordinates[parent.id] };
+    delete pB.z;
     const line = geojs.annotation.lineAnnotation();
     line.options("vertices", [pA, pB]);
     line.options("isConnection", true);
