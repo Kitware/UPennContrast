@@ -2,7 +2,7 @@ import { RestClientInstance } from "@/girder";
 import { IChatImage, IChatMessage } from "./model";
 
 interface IClaudeAPIChatMessage {
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant";
   content: {
     type: string;
     text?: string;
@@ -14,43 +14,59 @@ interface IClaudeAPIChatMessage {
   }[];
 }
 
-function toClaudeApiMessage(message: IChatMessage): IClaudeAPIChatMessage {
-  switch (message.type) {
-    case "user":
-      const content: IClaudeAPIChatMessage["content"] = [
-        { type: "text", text: message.content },
-      ];
-      if (message.images && message.images.length > 0) {
-        message.images.forEach((image: IChatImage) => {
-          const match = image.data.match(
-            /data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,(.*)/,
-          );
-          if (match?.length === 3) {
-            const [, media_type, data] = match;
-            content.push({
-              type: "image",
-              source: {
-                type: "base64",
-                media_type,
-                data,
-              },
-            });
-          }
+function toClaudeApiMessages(
+  messages: IChatMessage[],
+): IClaudeAPIChatMessage[] {
+  const outputConversation: IClaudeAPIChatMessage[] = [];
+  for (const message of messages) {
+    const currentRole = message.type;
+    // The only two possible roles are assistant and user
+    if (currentRole !== "assistant" && currentRole !== "user") {
+      continue;
+    }
+
+    // The first message has to be from the user
+    const previousRole =
+      outputConversation[outputConversation.length - 1]?.role;
+    if (!previousRole && currentRole !== "user") {
+      continue;
+    }
+
+    const messageContent: IClaudeAPIChatMessage["content"] = [
+      { type: "text", text: message.content },
+    ];
+    message.images?.forEach((image: IChatImage) => {
+      const match = image.data.match(
+        /data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,(.*)/,
+      );
+      if (match?.length === 3) {
+        const [, mediaType, data] = match;
+        messageContent.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: mediaType,
+            data,
+          },
         });
       }
-      return { role: "user", content };
-    case "assistant":
-      return {
-        role: "assistant",
-        content: [{ type: "text", text: message.content }],
-      };
-    case "system":
-    case "error":
-      return {
-        role: "system",
-        content: [{ type: "text", text: message.content }],
-      };
+    });
+
+    const claudeApiMessage: IClaudeAPIChatMessage = {
+      role: currentRole,
+      content: messageContent,
+    };
+    // The API specifies that the same role can't appear twice in a row
+    // It is usually because an error occured, and the user didn't receive an answer to his message
+    // In this case, the last message from the user should be used, so the last message is replaced
+    // Otherwise the message is pushed in the conversation
+    if (previousRole === currentRole) {
+      outputConversation[outputConversation.length - 1] = claudeApiMessage;
+    } else {
+      outputConversation.push(claudeApiMessage);
+    }
   }
+  return outputConversation;
 }
 
 function toChatMessage(item: any): IChatMessage | null {
@@ -74,7 +90,7 @@ export default class ChatAPI {
     messages: IChatMessage[],
   ): Promise<IChatMessage | null> {
     const response = await this.client.post("claude_chat", {
-      messages: messages.map(toClaudeApiMessage),
+      messages: toClaudeApiMessages(messages),
     });
     const { data } = response;
     if (!data) {

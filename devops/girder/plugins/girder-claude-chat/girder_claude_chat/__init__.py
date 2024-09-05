@@ -6,7 +6,6 @@ from girder import plugin
 from girder.api import access
 from girder.api.describe import Description, autoDescribeRoute
 from girder.api.rest import Resource
-from girder.exceptions import ValidationException
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -29,12 +28,14 @@ class ClaudeChatResource(Resource):
             self.system_prompt = ""
 
         # Create client
-        api_key = os.environ.get('ANTHROPIC_API_KEY')
-        if not api_key:
-            raise ValidationException(
-                'Anthropic API key is not set in environment variables'
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if api_key:
+            self.client = Anthropic(api_key=api_key)
+        else:
+            logger.error(
+                "Can't create an Anthropic client without an API key,"
+                "the claude_chat endpoint will not work"
             )
-        self.client = Anthropic(api_key=api_key)
 
     @access.user
     @autoDescribeRoute(
