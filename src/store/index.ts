@@ -74,7 +74,7 @@ import { logError } from "@/utils/log";
 export class Main extends VuexModule {
   girderUrl = persister.get(
     "girderUrl",
-    import.meta.env.VUE_APP_GIRDER_URL || "http://localhost:8080",
+    import.meta.env.VITE_GIRDER_URL || "http://localhost:8080",
   );
   girderRest = new RestClient({
     apiRoot: `${this.girderUrl}/api/v1`,
