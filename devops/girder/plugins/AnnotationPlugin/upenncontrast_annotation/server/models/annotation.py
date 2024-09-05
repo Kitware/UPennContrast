@@ -56,10 +56,10 @@ class AnnotationSchema:
             "shape": shapeSchema,
             "datasetId": {"type": "string", "minLength": 1},
             "color": {
-                "type": "string",
+                "type": ["string", "null"],
             },
         },
-        # color is optional
+        # color is optional (legacy, equivalent to null)
         "required": [
             "coordinates",
             "tags",
@@ -210,6 +210,26 @@ class Annotation(ProxiedAccessControlledModel):
 
     def update(self, annotation):
         return self.save(annotation)
+
+    def updateMultiple(self, annotationUpdates, user):
+        annotationIdToUpdate = dict((ObjectId(update["id"]), update)
+                                    for update in annotationUpdates)
+        query = {
+            "_id": {
+                "$in": list(annotationIdToUpdate.keys())
+            },
+        }
+        cursor = self.findWithPermissions(
+            query, user=user, level=AccessType.WRITE
+        )
+        updatedAnnotations = []
+        for annotation in cursor:
+            annotationId = annotation["_id"]
+            updateDoc = annotationIdToUpdate[annotationId]
+            updateDoc.pop("id")
+            annotation.update(updateDoc)
+            updatedAnnotations.append(annotation)
+        return self.saveMany(updatedAnnotations)
 
     def compute(self, datasetId, tool, user=None):
         dataset = Folder().load(datasetId, user=user, level=AccessType.WRITE)

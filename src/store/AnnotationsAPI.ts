@@ -114,6 +114,10 @@ export default class AnnotationsAPI {
     });
   }
 
+  updateAnnotations(annotations: (Partial<IAnnotation> & { id: string })[]) {
+    return this.client.put("upenn_annotation/multiple", annotations);
+  }
+
   updateAnnotation(annotation: IAnnotation) {
     const newAnnotation: Partial<IAnnotation> = { ...annotation };
     delete newAnnotation.id;
@@ -141,10 +145,8 @@ export default class AnnotationsAPI {
       coordinates,
       id: _id,
       datasetId,
+      color: color ?? null,
     });
-    if (color) {
-      annotation.color = color;
-    }
     return annotation;
   };
 

@@ -56,6 +56,7 @@ class Annotation(Resource):
         self.route("GET", (), self.find)
         self.route("POST", (), self.create)
         self.route("PUT", (":id",), self.update)
+        self.route("PUT", ("multiple",), self.updateMultiple)
         self.route("POST", ("compute",), self.compute)
         self.route("POST", ("multiple",), self.createMultiple)
         self.route("DELETE", ("multiple",), self.deleteMultiple)
@@ -155,6 +156,27 @@ class Annotation(Resource):
         bodyJson = kwargs["memoizedBodyJson"]
         upenn_annotation.update(bodyJson)
         self._annotationModel.update(upenn_annotation)
+
+    @describeRoute(
+        Description("Update multiple existing annotation")
+        .param(
+            "body",
+            (
+                "A JSON array of objects containing the annotations to update."
+                "Each annotation must at least have an 'id' field"
+            ),
+            paramType="body",
+        )
+        .errorResponse("Write access was denied for the item.", 403)
+        .errorResponse("Invalid JSON passed in request body.")
+        .errorResponse("Validation Error: JSON doesn't follow schema.")
+    )
+    @access.user
+    @memoizeBodyJson
+    @recordable("Update an annotation", getDatasetIdFromAnnotationListInBody)
+    def updateMultiple(self, params, *args, **kwargs):
+        bodyJson = kwargs["memoizedBodyJson"]
+        self._annotationModel.updateMultiple(bodyJson, self.getCurrentUser())
 
     @access.user
     @autoDescribeRoute(

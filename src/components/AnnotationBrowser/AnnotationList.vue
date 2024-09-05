@@ -5,13 +5,15 @@
       <v-spacer />
       <v-container style="width: auto">
         <v-row>
-          <v-col class="pa-1">
-            <v-btn block @click.stop="deleteSelected">Delete Selected</v-btn>
+          <v-col class="pa-0 mx-1">
+            <v-btn block small @click.stop="deleteSelected">
+              Delete Selected
+            </v-btn>
           </v-col>
-          <v-col class="pa-1">
+          <v-col class="pa-0 mx-1">
             <v-dialog v-model="tagSelectedDialog" width="50%">
               <template v-slot:activator="{ on, attrs }">
-                <v-btn block v-bind="attrs" v-on="on" @click.stop>
+                <v-btn block small v-bind="attrs" v-on="on" @click.stop>
                   Tag Selected
                 </v-btn>
               </template>
@@ -23,6 +25,35 @@
                   <v-spacer></v-spacer>
                   <v-btn color="warning" @click="tagsToAdd = []"> Clear </v-btn>
                   <v-btn color="primary" @click="tagSelected"> Submit </v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+          </v-col>
+          <v-col class="pa-0 mx-1">
+            <v-dialog v-model="colorSelectedDialog" width="50%">
+              <template v-slot:activator="{ on, attrs }">
+                <v-btn block small v-bind="attrs" v-on="on" @click.stop>
+                  Color Selected
+                </v-btn>
+              </template>
+              <v-card>
+                <v-card-title> Color selected annotations </v-card-title>
+                <v-card-text>
+                  <v-checkbox
+                    v-model="useColorFromLayer"
+                    label="Use color from layer"
+                  />
+                  <color-picker-menu
+                    v-if="!useColorFromLayer"
+                    v-model="customSelectedColor"
+                  />
+                </v-card-text>
+                <v-card-actions>
+                  <v-spacer />
+                  <v-btn color="warning" @click="colorSelectedDialog = false">
+                    Cancel
+                  </v-btn>
+                  <v-btn color="primary" @click="colorSelected"> Submit </v-btn>
                 </v-card-actions>
               </v-card>
             </v-dialog>
@@ -200,6 +231,7 @@ import { getStringFromPropertiesAndPath } from "@/utils/paths";
 import { simpleCentroid } from "@/utils/annotation";
 
 import TagPicker from "@/components/TagPicker.vue";
+import ColorPickerMenu from "@/components/ColorPickerMenu.vue";
 
 import {
   AnnotationNames,
@@ -244,7 +276,7 @@ interface IAnnotationListItem {
 }
 
 @Component({
-  components: { TagPicker },
+  components: { TagPicker, ColorPickerMenu },
 })
 export default class AnnotationList extends Vue {
   readonly store = store;
@@ -471,6 +503,17 @@ export default class AnnotationList extends Vue {
     this.annotationStore.tagSelectedAnnotations(this.tagsToAdd);
     this.tagSelectedDialog = false;
     this.tagsToAdd = [];
+  }
+
+  colorSelectedDialog: boolean = false;
+  useColorFromLayer: boolean = true;
+  customSelectedColor: string = "#FFFFFF";
+  colorSelected() {
+    const newColor = this.useColorFromLayer ? null : this.customSelectedColor;
+    this.annotationStore.colorSelectedAnnotations(newColor);
+    this.colorSelectedDialog = false;
+    this.useColorFromLayer = true;
+    this.customSelectedColor = "#FFFFFF";
   }
 
   deleteSelected() {
