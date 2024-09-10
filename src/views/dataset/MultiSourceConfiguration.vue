@@ -715,10 +715,25 @@ export default class MultiSourceConfiguration extends Vue {
       const framesMetadata = this.tilesInternalMetadata![0].nd2_frame_metadata;
       const coordinates: IGeoJSPosition[] = framesMetadata.map((f: any) => {
         const framePos = f.position.stagePositionUm;
-        return {
+        const pos = {
           x: framePos[0] / (mm_x * 1000),
           y: framePos[1] / (mm_y * 1000),
         };
+        if (this.tilesInternalMetadata![0].nd2 && this.tilesInternalMetadata![0].nd2.channels) {
+          const chan = this.tilesInternalMetadata![0].nd2.channels;
+          const chan0 = chan.volume !== undefined ? chan.volume : chan[0].volume;
+          if (chan0.cameraTransformationMatrix && Math.abs(chan0.cameraTransformationMatrix[0] - -1) < 0.01 && Math.abs(chan0.cameraTransformationMatrix[3] - -1)) {
+            pos.x *= -1;
+            pos.y *= -1;
+            /* The full transform is this:
+            pos.s11 = chan0.cameraTransformationMatrix[0];
+            pos.s12 = chan0.cameraTransformationMatrix[1];
+            pos.s21 = chan0.cameraTransformationMatrix[2];
+            pos.s22 = chan0.cameraTransformationMatrix[3];
+            */
+          }
+        }
+        return pos;
       });
       const minCoordinate = {
         x: Math.min(...coordinates.map((coordinate) => coordinate.x)),
@@ -728,14 +743,23 @@ export default class MultiSourceConfiguration extends Vue {
         x: Math.max(...coordinates.map((coordinate) => coordinate.x)),
         y: Math.max(...coordinates.map((coordinate) => coordinate.y)),
       };
-      const intCoordinates = coordinates.map((coordinate) => ({
+      let finalCoordinates = coordinates.map((coordinate) => ({
         x: Math.round(coordinate.x - minCoordinate.x),
         y: Math.round(maxCoordinate.y - coordinate.y),
       }));
-
+      /* If we are doing a full transform, we'd want to do this:
+      finalCoordinates = coordinates.map((coordinate) => ({
+        x: coordinate.x - minCoordinate.x,
+        y: maxCoordinate.y - coordinate.y,
+        s11: coordinate.s11,
+        s12: coordinate.s12,
+        s21: coordinate.s21,
+        s22: coordinate.s22,
+      }));
+      */
       compositingSources.forEach((source, sourceIdx) => {
         source.position =
-          intCoordinates[Math.floor(sourceIdx / channels!.length)];
+          finalCoordinates[Math.floor(sourceIdx / channels!.length)];
         source.xySet = 0;
       });
     } else {
