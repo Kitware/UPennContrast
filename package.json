@@ -51,6 +51,7 @@
     "dataframe-js": "^1.4.4",
     "fflate": "^0.7.4",
     "fs-extra": "^10.0.0",
+    "html2canvas": "^1.4.1",
     "itk-wasm": "^1.0.0-b.166",
     "lodash": "^4.17.21",
     "marked": "^14.1.1",

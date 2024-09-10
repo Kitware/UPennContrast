@@ -91,6 +91,7 @@ import { logError } from "@/utils/log";
 import chatStore from "@/store/chat";
 import { IChatImage, IChatMessage } from "@/store/model";
 import { marked } from "marked";
+import html2canvas from "html2canvas";
 
 @Component
 export default class ChatComponent extends Vue {
@@ -118,6 +119,11 @@ export default class ChatComponent extends Vue {
     const trimmedInput = this.textInput.trim();
     if (this.isWaiting || trimmedInput === "") {
       return;
+    }
+
+    const screenshot = await this.captureScreenshot();
+    if (screenshot) {
+      this.imagesInput.push(screenshot);
     }
 
     const userMessage: IChatMessage = {
@@ -194,6 +200,17 @@ export default class ChatComponent extends Vue {
   async refreshChat() {
     this.clearInputs();
     await chatStore.clearAll();
+  }
+
+  async captureScreenshot(): Promise<IChatImage | null> {
+    try {
+      const canvas = await html2canvas(document.body);
+      const imageData = canvas.toDataURL("image/png");
+      return { data: imageData, type: "image/png" };
+    } catch (error) {
+      logError("Error capturing screenshot:", error);
+      return null;
+    }
   }
 }
 </script>
