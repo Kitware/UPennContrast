@@ -95,6 +95,7 @@ import html2canvas from "html2canvas";
 
 @Component
 export default class ChatComponent extends Vue {
+  $el!: HTMLElement;
   textInput = "";
   imagesInput: IChatImage[] = [];
   isWaiting = false;
@@ -204,7 +205,11 @@ export default class ChatComponent extends Vue {
 
   async captureScreenshot(): Promise<IChatImage | null> {
     try {
-      const canvas = await html2canvas(document.body);
+      const canvas = await html2canvas(document.body, {
+        ignoreElements: (element) => {
+          return element === this.$el || this.$el.contains(element);
+        },
+      });
       const imageData = canvas.toDataURL("image/png");
       return { data: imageData, type: "image/png" };
     } catch (error) {
