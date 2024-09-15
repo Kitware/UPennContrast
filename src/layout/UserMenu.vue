@@ -231,6 +231,7 @@ export default class UserMenu extends Vue {
       firstName: this.signupFirstName,
       lastName: this.signupLastName,
       password: this.signupPassword,
+      admin: false,
     });
 
     if (result.success) {
