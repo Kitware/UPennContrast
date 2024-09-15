@@ -159,6 +159,7 @@
 <script lang="ts">
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
+import userAPI from "@/store/UserAPI";
 import UserProfileSettings from "@/components/UserProfileSettings.vue";
 
 @Component({
@@ -222,58 +223,33 @@ export default class UserMenu extends Vue {
 
   async signUp() {
     this.error = "";
-    try {
-      // Simulate server response
-      if (this.signupUsername === "existing") {
-        throw {
-          field: "login",
-          message: "That login is already registered.",
-          type: "validation",
-        };
-      }
-      if (this.signupEmail === "existing@example.com") {
-        throw {
-          field: "email",
-          message: "That email is already registered.",
-          type: "validation",
-        };
-      }
-      // Simulate success
-      const response = {
-        _accessLevel: 2,
-        _id: "66e6b9682410668ab75ceccf",
-        _modelType: "user",
-        admin: false,
-        created: new Date().toISOString(),
-        email: this.signupEmail,
-        emailVerified: false,
-        firstName: this.signupFirstName,
-        groupInvites: [],
-        groups: [],
-        lastName: this.signupLastName,
-        login: this.signupUsername,
-        otp: false,
-        public: false,
-        size: 0,
-        status: "enabled",
-      };
-      // On success, return to login page
+    this.successMessage = "";
+
+    const result = await store.userAPI.signUp({
+      login: this.signupUsername,
+      email: this.signupEmail,
+      firstName: this.signupFirstName,
+      lastName: this.signupLastName,
+      password: this.signupPassword,
+    });
+
+    if (result.success) {
+      // Handle successful signup
       this.signUpMode = false;
-      this.signupUsername = "";
-      this.signupEmail = "";
-      this.signupFirstName = "";
-      this.signupLastName = "";
-      this.signupPassword = "";
-      this.successMessage =
-        "Sign-up successful! Please verify your email before logging in.";
-    } catch (err) {
-      // Handle error
-      if (err instanceof Error) {
-        this.error = err.message;
-      } else {
-        this.error = "An error occurred during sign-up.";
-      }
+      this.clearSignupFields();
+      this.successMessage = "Sign-up successful! Please verify your email before logging in.";
+    } else {
+      // Handle signup error from API
+      this.error = result.message; // result.field would tell you what field was invalid in case you needed it
     }
+  }
+
+  clearSignupFields() {
+    this.signupUsername = "";
+    this.signupEmail = "";
+    this.signupFirstName = "";
+    this.signupLastName = "";
+    this.signupPassword = "";
   }
 
   switchToSignUp() {

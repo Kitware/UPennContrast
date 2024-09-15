@@ -18,6 +18,7 @@ import AnnotationsAPI from "./AnnotationsAPI";
 import PropertiesAPI from "./PropertiesAPI";
 import ChatAPI from "./ChatAPI";
 import GirderAPI from "./GirderAPI";
+import UserAPI from "./UserAPI";
 
 import { getLayerImages, getLayerSliceIndexes } from "./images";
 import jobs from "./jobs";
@@ -83,6 +84,7 @@ export class Main extends VuexModule {
   annotationsAPI = new AnnotationsAPI(this.girderRest);
   propertiesAPI = new PropertiesAPI(this.girderRest);
   chatAPI = new ChatAPI(this.girderRest);
+  userAPI = new UserAPI(this.girderRest);
 
   girderUser: IGirderUser | null = this.girderRest.user;
   folderLocation: IGirderLocation = this.girderUser || { type: "users" };
