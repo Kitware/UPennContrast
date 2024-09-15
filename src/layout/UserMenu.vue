@@ -237,7 +237,8 @@ export default class UserMenu extends Vue {
       // Handle successful signup
       this.signUpMode = false;
       this.clearSignupFields();
-      this.successMessage = "Sign-up successful! Please verify your email before logging in.";
+      this.successMessage =
+        "Sign-up successful! Please verify your email before logging in.";
     } else {
       // Handle signup error from API
       this.error = result.message; // result.field would tell you what field was invalid in case you needed it

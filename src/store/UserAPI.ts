@@ -1,6 +1,15 @@
 import { RestClientInstance } from "@/girder";
 import { AxiosResponse } from "axios";
 
+interface IUser {
+  login: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+  admin: boolean;
+}
+
 interface UserAPIResponse {
   success: boolean;
   message: string;
