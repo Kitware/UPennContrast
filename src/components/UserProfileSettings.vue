@@ -1,7 +1,7 @@
 <template>
   <v-card>
     <v-card-title>
-      Profile settings: <b class="username"> {{ store.userName }} </b>
+      Profile settings:&nbsp;<b> {{ store.userName }} </b>
     </v-card-title>
     <v-card-text>
       <v-container>
@@ -33,9 +33,3 @@ export default class UserProfileSettings extends Vue {
   }
 }
 </script>
-
-<style scoped>
-.username::before {
-  content: "\00a0";
-}
-</style>
