@@ -4,8 +4,10 @@ import {
   IGirderItem,
   IGirderLocation,
   IGirderAssetstore,
+  IGirderSelectAble,
+  IGirderUser,
 } from "@/girder";
-import { IGirderSelectAble, IGirderUser } from "@/girder";
+import type { AxiosError } from "axios";
 import {
   Action,
   getModule,
@@ -18,7 +20,6 @@ import AnnotationsAPI from "./AnnotationsAPI";
 import PropertiesAPI from "./PropertiesAPI";
 import ChatAPI from "./ChatAPI";
 import GirderAPI from "./GirderAPI";
-import UserAPI from "./UserAPI";
 
 import { getLayerImages, getLayerSliceIndexes } from "./images";
 import jobs from "./jobs";
@@ -71,20 +72,41 @@ import { createSamToolStateFromToolConfiguration } from "@/pipelines/samPipeline
 import { isEqual } from "lodash";
 import { logError } from "@/utils/log";
 
+const apiRootSuffix = "/api/v1";
+const defaultGirderUrl =
+  import.meta.env.VITE_GIRDER_URL || "http://localhost:8080";
+
+export function girderUrlFromApiRoot(apiRoot: string): string {
+  if (apiRoot.endsWith(apiRootSuffix)) {
+    return apiRoot.slice(0, apiRoot.length - apiRootSuffix.length);
+  }
+  return apiRoot;
+}
+
+function apiRootFromGirderUrl(girderUrl: string) {
+  return girderUrl + apiRootSuffix;
+}
+
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
-  girderUrl = persister.get(
-    "girderUrl",
-    import.meta.env.VITE_GIRDER_URL || "http://localhost:8080",
-  );
   girderRest = new RestClient({
-    apiRoot: `${this.girderUrl}/api/v1`,
+    apiRoot: apiRootFromGirderUrl(persister.get("girderUrl", defaultGirderUrl)),
   });
-  api = new GirderAPI(this.girderRest);
-  annotationsAPI = new AnnotationsAPI(this.girderRest);
-  propertiesAPI = new PropertiesAPI(this.girderRest);
-  chatAPI = new ChatAPI(this.girderRest);
-  userAPI = new UserAPI(this.girderRest);
+
+  // Use a proxy to dynamically resolve to the right girderRest client
+  girderRestProxy = new Proxy(this, {
+    get(obj: Main, prop: keyof RestClientInstance) {
+      return obj.girderRest[prop];
+    },
+    set() {
+      throw new Error("The rest client proxy is read-only.");
+    },
+  }) as unknown as RestClientInstance;
+
+  api = new GirderAPI(this.girderRestProxy);
+  annotationsAPI = new AnnotationsAPI(this.girderRestProxy);
+  propertiesAPI = new PropertiesAPI(this.girderRestProxy);
+  chatAPI = new ChatAPI(this.girderRestProxy);
 
   girderUser: IGirderUser | null = this.girderRest.user;
   folderLocation: IGirderLocation = this.girderUser || { type: "users" };
@@ -439,14 +461,8 @@ export class Main extends VuexModule {
   }
 
   @Action
-  protected async loggedIn({
-    girderUrl,
-    girderRest,
-  }: {
-    girderUrl: string;
-    girderRest: RestClientInstance;
-  }) {
-    this.loggedInImpl({ girderRest, girderUrl });
+  protected async loggedIn(girderRest: RestClientInstance) {
+    this.setGirderRest(girderRest);
     const user = this.girderUser;
     const promises = [];
     if (user) {
@@ -473,25 +489,15 @@ export class Main extends VuexModule {
       this.setSelectedDataset(this.selectedDatasetId),
       this.fetchRecentDatasetViews(),
     );
+    await Promise.allSettled(promises);
   }
 
   @Mutation
-  protected loggedInImpl({
-    girderUrl,
-    girderRest,
-  }: {
-    girderUrl: string;
-    girderRest: RestClientInstance;
-  }) {
-    this.girderUrl = persister.set("girderUrl", girderUrl);
+  protected setGirderRest(girderRest: RestClientInstance) {
     this.girderRest = girderRest;
     this.girderUser = girderRest.user;
-    // don't replace the api hook with a new one.
-    /*
-    this.api = new GirderAPI(this.girderRest);
-    this.annotationsAPI = new AnnotationsAPI(this.girderRest);
-    this.propertiesAPI = new PropertiesAPI(this.girderRest);
-    */
+    const girderUrl = girderUrlFromApiRoot(girderRest.apiRoot);
+    persister.set("girderUrl", girderUrl);
   }
 
   @Mutation
@@ -657,10 +663,7 @@ export class Main extends VuexModule {
       sync.setLoading(true);
       const user = await this.girderRest.fetchUser();
       if (user) {
-        await this.loggedIn({
-          girderUrl: this.girderUrl,
-          girderRest: this.girderRest,
-        });
+        await this.loggedIn(this.girderRest);
       }
       await this.initFromUrl();
       sync.setLoading(false);
@@ -712,16 +715,13 @@ export class Main extends VuexModule {
     username: string;
     password: string;
   }) {
-    Object.assign(this.girderRest, { apiRoot: `${domain}/api/v1` });
-    /* Don't create a new client
     const restClient = new RestClient({
-      apiRoot: `${domain}/api/v1`
+      apiRoot: apiRootFromGirderUrl(domain),
     });
-    */
 
     try {
       sync.setLoading(true);
-      await this.girderRest.login(username, password);
+      await restClient.login(username, password);
       sync.setLoading(false);
     } catch (error) {
       const err = error as any;
@@ -735,13 +735,60 @@ export class Main extends VuexModule {
       }
     }
 
-    await this.loggedIn({
-      girderUrl: domain,
-      girderRest: this.girderRest,
+    await this.loggedIn(restClient);
+    await this.initFromUrl();
+  }
+
+  @Action
+  async signUp({
+    domain,
+    ...user
+  }: {
+    domain: string;
+    login: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    password: string;
+    admin: boolean;
+  }): Promise<void> {
+    const restClient = new RestClient({
+      apiRoot: apiRootFromGirderUrl(domain),
     });
 
-    await this.initFromUrl();
-    return null;
+    const formData = new FormData();
+    formData.append("login", user.login);
+    formData.append("email", user.email);
+    formData.append("firstName", user.firstName);
+    formData.append("lastName", user.lastName);
+    formData.append("password", user.password);
+    formData.append("admin", `${user.admin}`);
+
+    try {
+      await restClient.post("user", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          accept: "application/json",
+        },
+      });
+    } catch (unknownError: unknown) {
+      // Assume this is an object that looks like an AxiosError
+      const error = unknownError as Partial<AxiosError>;
+      if (error.response) {
+        // The request was made and the server responded with a status code that falls out of the range of 2xx
+        throw new Error(error.response.data.message || "An error occurred");
+      }
+      if (error.request) {
+        // The request was made but no response was received
+        throw new Error(
+          "No response received from server. Please try again later.",
+        );
+      }
+      // Something happened in setting up the request that triggered an Error
+      throw new Error("An unexpected error occurred. Please try again later.");
+    }
+
+    this.setGirderRest(restClient);
   }
 
   @Action

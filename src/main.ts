@@ -8,9 +8,8 @@ import vuetify from "./plugins/vuetify";
 import VueAsyncComputed from "vue-async-computed";
 import "./plugins/router";
 import "./plugins/resize";
-import { RestClientInstance } from "./girder";
 
-import main, { store, Main } from "./store";
+import main, { store } from "./store";
 
 import routes from "./views";
 import App from "./App.vue";
@@ -37,12 +36,7 @@ chat.initializeChatDatabase();
 
 const app = new Vue({
   provide: {
-    // use a proxy to dynamically resolve to the right girderRest client
-    girderRest: new Proxy(main, {
-      get(obj: Main, prop: keyof RestClientInstance) {
-        return obj.girderRest[prop];
-      },
-    }),
+    girderRest: main.girderRestProxy,
   },
   router: new VueRouter({
     routes,

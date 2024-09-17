@@ -66,6 +66,14 @@
             </div>
             <v-form @submit.prevent="signUp" class="my-8">
               <v-text-field
+                v-if="!isDomainLocked"
+                v-model="domain"
+                name="domain"
+                label="Girder Domain"
+                required
+                prepend-icon="mdi-domain"
+              />
+              <v-text-field
                 v-model="signupUsername"
                 name="username"
                 label="Username"
@@ -153,7 +161,7 @@
 
 <script lang="ts">
 import { Vue, Component, Watch } from "vue-property-decorator";
-import store from "@/store";
+import store, { girderUrlFromApiRoot } from "@/store";
 import UserProfileSettings from "@/components/UserProfileSettings.vue";
 
 @Component({
@@ -167,7 +175,9 @@ export default class UserMenu extends Vue {
   userMenu: boolean = false;
 
   isDomainLocked = !!import.meta.env.VITE_GIRDER_URL;
-  domain = import.meta.env.VITE_GIRDER_URL || store.girderUrl;
+  domain =
+    import.meta.env.VITE_GIRDER_URL ||
+    girderUrlFromApiRoot(store.girderRest.apiRoot);
   username = import.meta.env.VITE_DEFAULT_USER || "";
   password = import.meta.env.VITE_DEFAULT_PASSWORD || "";
 
@@ -217,7 +227,8 @@ export default class UserMenu extends Vue {
     this.successMessage = "";
 
     try {
-      await store.userAPI.signUp({
+      await store.signUp({
+        domain: this.domain,
         login: this.signupUsername,
         email: this.signupEmail,
         firstName: this.signupFirstName,
