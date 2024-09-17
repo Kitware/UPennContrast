@@ -1,7 +1,7 @@
 <template>
   <v-card>
     <v-card-title>
-      Profile settings: <b class="username"> {{ store.userName }} </b>
+      Profile settings:&nbsp;<b> {{ store.userName }} </b>
     </v-card-title>
     <v-card-text>
       <v-container>
@@ -11,7 +11,7 @@
         </div>
         <div>
           <h3>Girder domain:</h3>
-          <p>{{ store.girderUrl }}</p>
+          <p>{{ girderUrlFromApiRoot(store.girderRest.apiRoot) }}</p>
         </div>
         <v-btn color="error" dark @click="logout"> Logout </v-btn>
       </v-container>
@@ -21,11 +21,12 @@
 
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
-import store from "@/store";
+import store, { girderUrlFromApiRoot } from "@/store";
 
 @Component
 export default class UserProfileSettings extends Vue {
   readonly store = store;
+  readonly girderUrlFromApiRoot = girderUrlFromApiRoot;
 
   async logout() {
     await this.store.logout();
@@ -33,9 +34,3 @@ export default class UserProfileSettings extends Vue {
   }
 }
 </script>
-
-<style scoped>
-.username::before {
-  content: "\00a0";
-}
-</style>
