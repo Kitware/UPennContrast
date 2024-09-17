@@ -155,7 +155,7 @@ export default class ImageViewer extends Vue {
       height: Math.round(anyImage.sizeY / unitsPerPixel),
     };
     const itemId = anyImage.item._id;
-    const apiRoot = this.store.api.client.apiRoot;
+    const apiRoot = this.store.girderRest.apiRoot;
     const baseUrl = getBaseURLFromDownloadParameters(params, itemId, apiRoot);
 
     const layers = this.store.layers;

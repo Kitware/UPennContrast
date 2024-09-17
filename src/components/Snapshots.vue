@@ -678,7 +678,7 @@ export default class Snapshots extends Vue {
       this.imageTooBigDialog = true;
       return;
     }
-    const apiRoot = store.api.client.apiRoot;
+    const apiRoot = store.girderRest.apiRoot;
     const baseUrl = getBaseURLFromDownloadParameters(params, itemId, apiRoot);
 
     const urls: URL[] = [];

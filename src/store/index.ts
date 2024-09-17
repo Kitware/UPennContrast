@@ -1483,7 +1483,7 @@ export class Main extends VuexModule {
         results.baseQuadOptions = {
           baseUrl: results.fullUrls[0].split("/tiles")[0] + "/tiles",
           restRequest: (params: any) =>
-            this.api.client
+            this.girderRest
               .get(params.url, { params: params.data })
               .then((data) => data.data),
           restUrl:
