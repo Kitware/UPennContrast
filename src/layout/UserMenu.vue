@@ -6,14 +6,14 @@
       </template>
       <v-container class="pa-0">
         <v-card class="pa-6">
+          <v-img
+            src="/img/icons/NimbusImageIcon.png"
+            max-height="80"
+            contain
+            class="mb-2 text-center"
+          />
           <template v-if="!signUpMode">
             <div class="text-center mb-8">
-              <v-img
-                src="/img/icons/NimbusImageIcon.png"
-                max-height="80"
-                contain
-                class="mb-2"
-              />
               <h2 class="text-h5 font-weight-bold mb-2">
                 Welcome to NimbusImage!
               </h2>
@@ -22,12 +22,9 @@
                 University of Pennsylvania and Kitware
               </p>
             </div>
-            <v-alert :value="!!successMessage" type="success">{{
-              successMessage
-            }}</v-alert>
             <v-form @submit.prevent="login" class="my-8">
               <v-text-field
-                v-if="!isGirderUrlSet"
+                v-if="!isDomainLocked"
                 v-model="domain"
                 name="domain"
                 label="Girder Domain"
@@ -40,6 +37,7 @@
                 label="Username or e-mail"
                 required
                 prepend-icon="mdi-account"
+                autocomplete="username"
               />
               <v-text-field
                 v-model="password"
@@ -47,32 +45,18 @@
                 type="password"
                 label="Password"
                 prepend-icon="mdi-lock"
+                autocomplete="current-password"
               />
-              <v-card-actions class="button-bar">
+              <div class="d-flex flex-column">
                 <v-btn type="submit" color="primary">Login</v-btn>
-              </v-card-actions>
+                <v-btn text class="align-self-end my-2" @click="switchToSignUp">
+                  Sign up
+                </v-btn>
+              </div>
             </v-form>
-            <v-alert :value="!!error" color="error">{{ error }}</v-alert>
-            <div class="text-center mt-4">
-              <a
-                href="https://arjun-raj-lab.gitbook.io/nimbusimage"
-                target="_blank"
-                class="link"
-              >
-                More information
-              </a>
-              <br />
-              <v-btn text class="link" @click="switchToSignUp">Sign up</v-btn>
-            </div>
           </template>
           <template v-else>
             <div class="text-center mb-8">
-              <v-img
-                src="/img/icons/NimbusImageIcon.png"
-                max-height="80"
-                contain
-                class="mb-2"
-              />
               <h2 class="text-h5 font-weight-bold mb-2">
                 Sign up for NimbusImage!
               </h2>
@@ -87,6 +71,7 @@
                 label="Username"
                 required
                 prepend-icon="mdi-account"
+                autocomplete="username"
               />
               <v-text-field
                 v-model="signupEmail"
@@ -94,6 +79,7 @@
                 label="Email"
                 required
                 prepend-icon="mdi-email"
+                autocomplete="email"
               />
               <v-text-field
                 v-model="signupFirstName"
@@ -101,6 +87,7 @@
                 label="First Name"
                 required
                 prepend-icon="mdi-account"
+                autocomplete="given-name"
               />
               <v-text-field
                 v-model="signupLastName"
@@ -108,6 +95,7 @@
                 label="Last Name"
                 required
                 prepend-icon="mdi-account"
+                autocomplete="family-name"
               />
               <v-text-field
                 v-model="signupPassword"
@@ -116,24 +104,31 @@
                 label="Password"
                 required
                 prepend-icon="mdi-lock"
+                autocomplete="new-password"
               />
-              <v-card-actions class="button-bar">
-                <v-btn type="submit" color="primary">Sign up</v-btn>
-                <v-spacer></v-spacer>
-                <v-btn text @click="switchToLogin">Back to login</v-btn>
-              </v-card-actions>
+              <div class="d-flex flex-column">
+                <v-btn type="submit" color="primary"> Sign up </v-btn>
+                <v-btn text class="align-self-end my-2" @click="switchToLogin">
+                  Back to login
+                </v-btn>
+              </div>
             </v-form>
-            <v-alert :value="!!error" color="error">{{ error }}</v-alert>
-            <div class="text-center mt-4">
-              <a
-                href="https://arjun-raj-lab.gitbook.io/nimbusimage"
-                target="_blank"
-                class="link"
-              >
-                More information
-              </a>
-            </div>
           </template>
+          <v-alert :value="!!errorMessage" type="error">
+            {{ errorMessage }}
+          </v-alert>
+          <v-alert :value="!!successMessage" type="success">
+            {{ successMessage }}
+          </v-alert>
+          <div class="text-center mt-4">
+            <a
+              href="https://arjun-raj-lab.gitbook.io/nimbusimage"
+              target="_blank"
+              class="link"
+            >
+              More information
+            </a>
+          </div>
         </v-card>
       </v-container>
     </v-dialog>
@@ -159,7 +154,6 @@
 <script lang="ts">
 import { Vue, Component, Watch } from "vue-property-decorator";
 import store from "@/store";
-import userAPI from "@/store/UserAPI";
 import UserProfileSettings from "@/components/UserProfileSettings.vue";
 
 @Component({
@@ -172,11 +166,12 @@ export default class UserMenu extends Vue {
 
   userMenu: boolean = false;
 
-  domain = store.girderUrl;
+  isDomainLocked = !!import.meta.env.VITE_GIRDER_URL;
+  domain = import.meta.env.VITE_GIRDER_URL || store.girderUrl;
   username = import.meta.env.VITE_DEFAULT_USER || "";
   password = import.meta.env.VITE_DEFAULT_PASSWORD || "";
 
-  error = "";
+  errorMessage = "";
   successMessage = "";
 
   signUpMode: boolean = false;
@@ -185,10 +180,6 @@ export default class UserMenu extends Vue {
   signupFirstName: string = "";
   signupLastName: string = "";
   signupPassword: string = "";
-
-  get isGirderUrlSet(): boolean {
-    return !!import.meta.env.VITE_GIRDER_URL;
-  }
 
   async mounted() {
     this.loggedInOrOut();
@@ -203,7 +194,7 @@ export default class UserMenu extends Vue {
   }
 
   async login() {
-    this.error = "";
+    this.errorMessage = "";
     this.successMessage = "";
     try {
       const result = await store.login({
@@ -212,7 +203,7 @@ export default class UserMenu extends Vue {
         password: this.password,
       });
       if (result) {
-        this.error = result;
+        this.errorMessage = result;
       } else {
         this.userMenu = false;
       }
@@ -222,27 +213,25 @@ export default class UserMenu extends Vue {
   }
 
   async signUp() {
-    this.error = "";
+    this.errorMessage = "";
     this.successMessage = "";
 
-    const result = await store.userAPI.signUp({
-      login: this.signupUsername,
-      email: this.signupEmail,
-      firstName: this.signupFirstName,
-      lastName: this.signupLastName,
-      password: this.signupPassword,
-      admin: false,
-    });
-
-    if (result.success) {
+    try {
+      await store.userAPI.signUp({
+        login: this.signupUsername,
+        email: this.signupEmail,
+        firstName: this.signupFirstName,
+        lastName: this.signupLastName,
+        password: this.signupPassword,
+        admin: false,
+      });
       // Handle successful signup
       this.signUpMode = false;
       this.clearSignupFields();
       this.successMessage =
         "Sign-up successful! Please verify your email before logging in.";
-    } else {
-      // Handle signup error from API
-      this.error = result.message; // result.field would tell you what field was invalid in case you needed it
+    } catch (error) {
+      this.errorMessage = (error as Error).message;
     }
   }
 
@@ -256,13 +245,13 @@ export default class UserMenu extends Vue {
 
   switchToSignUp() {
     this.signUpMode = true;
-    this.error = "";
+    this.errorMessage = "";
     this.successMessage = "";
   }
 
   switchToLogin() {
     this.signUpMode = false;
-    this.error = "";
+    this.errorMessage = "";
     this.successMessage = "";
   }
 }
