@@ -137,6 +137,17 @@ class UPennContrastAnnotationClient:
             PATHS["multiple_connections"], json=connections
         )
 
+    def deleteMultipleAnnotations(self, annotationIds):
+        """
+        Delete multiple annotations by their ids
+        :param list annotationIds: The list of annotations ids
+        """
+        return self.client.sendRestRequest(
+            'DELETE',
+            PATHS["multiple_annotations"],
+            json=annotationIds
+        )
+
     def updateAnnotation(self, annotationId, annotation):
         """
         Update an annotation with the specified metadata.
