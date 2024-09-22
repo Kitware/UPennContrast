@@ -24,6 +24,11 @@ PATHS = {
         "?datasetId={datasetId}"
         "&annotationId={annotationId}"
     ),
+    "delete_multiple_annotation_property_values": (
+        "/annotation_property_values"
+        "?propertyId={propertyId}"
+        "&datasetId={datasetId}"
+    ),
     "histogram": (
         "/annotation_property_values/histogram"
         "?propertyPath={propertyPath}"
@@ -122,6 +127,17 @@ class UPennContrastAnnotationClient:
             PATHS["multiple_annotations"], json=annotations
         )
 
+    def deleteMultipleAnnotations(self, annotationIds):
+        """
+        Delete multiple annotations by their ids
+        :param list annotationIds: The list of annotations ids
+        """
+        return self.client.sendRestRequest(
+            'DELETE',
+            PATHS["multiple_annotations"],
+            json=annotationIds
+        )
+
     def createMultipleConnections(self, connections):
         """
         Create multiple connections with the specified metadata.
@@ -137,15 +153,15 @@ class UPennContrastAnnotationClient:
             PATHS["multiple_connections"], json=connections
         )
 
-    def deleteMultipleAnnotations(self, annotationIds):
+    def deleteMultipleConnections(self, connectionIds):
         """
-        Delete multiple annotations by their ids
-        :param list annotationIds: The list of annotations ids
+        Delete multiple connections by their ids
+        :param list connectionIds: The list of connections ids
         """
         return self.client.sendRestRequest(
             'DELETE',
-            PATHS["multiple_annotations"],
-            json=annotationIds
+            PATHS["multiple_connections"],
+            json=connectionIds
         )
 
     def updateAnnotation(self, annotationId, annotation):
@@ -332,6 +348,19 @@ class UPennContrastAnnotationClient:
         """
         return self.client.post(
             PATHS["add_multiple_property_values"], json=entries
+        )
+
+    def deleteAnnotationPropertyValues(self, propertyId, datasetId):
+        """
+        Delete one or multiple computed property values for the specified
+        annotations
+        :param str propertyId: The property id
+        :param str datasetId: The dataset id
+        """
+        return self.client.delete(
+            PATHS["delete_multiple_annotation_property_values"].format(
+                propertyId=propertyId, datasetId=datasetId
+            ),
         )
 
     def getPropertyHistogram(self, propertyPath, datasetId, buckets=255):
