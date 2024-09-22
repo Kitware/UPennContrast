@@ -24,7 +24,7 @@ PATHS = {
         "?datasetId={datasetId}"
         "&annotationId={annotationId}"
     ),
-    "delete_multiple_annotation_property_values": (
+    "delete_all_annotation_property_values": (
         "/annotation_property_values"
         "?propertyId={propertyId}"
         "&datasetId={datasetId}"
@@ -358,7 +358,7 @@ class UPennContrastAnnotationClient:
         :param str datasetId: The dataset id
         """
         return self.client.delete(
-            PATHS["delete_multiple_annotation_property_values"].format(
+            PATHS["delete_all_annotation_property_values"].format(
                 propertyId=propertyId, datasetId=datasetId
             ),
         )
