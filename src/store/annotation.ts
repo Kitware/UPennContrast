@@ -740,6 +740,7 @@ export class Annotations extends VuexModule {
     callback: (success: boolean) => void;
   }) {
     if (!main.dataset || !main.configuration) {
+      callback(false);
       return null;
     }
     const datasetId = main.dataset.id;
@@ -763,6 +764,7 @@ export class Annotations extends VuexModule {
     // Keep track of running jobs
     const jobId = response.data[0]?._id;
     if (!jobId) {
+      callback(false);
       return null;
     }
     const computeJob: IAnnotationComputeJob = {
