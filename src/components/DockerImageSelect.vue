@@ -1,6 +1,15 @@
 <template>
   <!-- image -->
-  <v-select :items="items" dense v-model="image" label="Algorithm" />
+  <v-select :items="items" dense v-model="image" label="Algorithm">
+    <template v-slot:item="item">
+      <div>
+        <div>{{ item.item.text }}</div>
+        <div v-if="item.item.description" :style="{ color: 'grey' }">
+          {{ item.item.description }}
+        </div>
+      </div>
+    </template>
+  </v-select>
 </template>
 
 <script lang="ts">
@@ -8,6 +17,12 @@ import { Vue, Component, VModel, Prop } from "vue-property-decorator";
 import store from "@/store";
 import propertiesStore from "@/store/properties";
 import { IWorkerLabels } from "@/store/model";
+
+interface DockerImageSelectEntry {
+  text: string;
+  value: string;
+  description: string | undefined;
+}
 
 // Interface element selecting an image
 @Component({
@@ -27,7 +42,9 @@ export default class DockerImageSelect extends Vue {
   }
 
   get items() {
-    const imagesPerCategory: { [category: string]: string[] } = {};
+    const imagesPerCategory: {
+      [category: string]: DockerImageSelectEntry[];
+    } = {};
     for (const image in this.images) {
       const labels = this.images[image];
       if (this.imageFilter(labels)) {
@@ -35,18 +52,20 @@ export default class DockerImageSelect extends Vue {
         if (!imagesPerCategory[category]) {
           imagesPerCategory[category] = [];
         }
-        imagesPerCategory[category].push(image);
+        imagesPerCategory[category].push({
+          text: labels.interfaceName || image,
+          value: image,
+          description: labels.description,
+        });
       }
     }
     const items = [];
     for (const category in imagesPerCategory) {
-      items.push({ divider: true }, { header: category });
-      for (const image of imagesPerCategory[category]) {
-        items.push({
-          text: this.images[image].interfaceName || image,
-          value: image,
-        });
-      }
+      items.push(
+        { divider: true },
+        { header: category },
+        ...imagesPerCategory[category],
+      );
     }
     return items;
   }
