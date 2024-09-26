@@ -18,7 +18,7 @@ import store from "@/store";
 import propertiesStore from "@/store/properties";
 import { IWorkerLabels } from "@/store/model";
 
-interface DockerImageSelectEntry {
+interface IDockerImageSelectEntry {
   text: string;
   value: string;
   description: string | undefined;
@@ -43,7 +43,7 @@ export default class DockerImageSelect extends Vue {
 
   get items() {
     const imagesPerCategory: {
-      [category: string]: DockerImageSelectEntry[];
+      [category: string]: IDockerImageSelectEntry[];
     } = {};
     for (const image in this.images) {
       const labels = this.images[image];
