@@ -146,6 +146,13 @@ export default class ToolCreation extends Vue {
       return;
     }
     const toolNameStrings: string[] = [];
+    const dockerImage = this.toolValues?.image?.image;
+    if (dockerImage) {
+      const defaultToolName = this.propertyStore.defaultToolName(dockerImage);
+      if (defaultToolName) {
+        toolNameStrings.push(defaultToolName);
+      }
+    }
     if (this.toolValues?.annotation?.tags) {
       toolNameStrings.push(this.toolValues.annotation.tags.join(", "));
     }

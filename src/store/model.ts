@@ -1025,6 +1025,7 @@ export interface IWorkerLabels {
   description?: string;
   advancedOptionsPanel?: string;
   annotationConfigurationPanel?: string;
+  defaultToolName?: string;
 }
 
 export interface IWorkerImageList {
