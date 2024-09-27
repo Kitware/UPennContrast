@@ -499,6 +499,13 @@ export class Properties extends VuexModule {
       return labels ? labels.advancedOptionsPanel !== "False" : true;
     };
   }
+
+  get showAnnotationConfigurationPanel() {
+    return (image: string) => {
+      const labels = this.workerImageList[image];
+      return labels ? labels.annotationConfigurationPanel !== "False" : true;
+    };
+  }
 }
 
 export default getModule(Properties);

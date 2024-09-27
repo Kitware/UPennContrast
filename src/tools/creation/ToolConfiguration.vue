@@ -3,6 +3,7 @@
     <v-container v-if="basicInternalTemplate.length > 0">
       <template v-for="(item, index) in basicInternalTemplate">
         <tool-configuration-item
+          v-if="shouldShowConfigurationItem(item)"
           :key="index"
           :item="item"
           :advanced="false"
@@ -24,6 +25,7 @@
           <v-container>
             <template v-for="(item, index) in advancedInternalTemplate">
               <tool-configuration-item
+                v-if="shouldShowConfigurationItem(item)"
                 :key="index"
                 :item="item"
                 :advanced="true"
@@ -237,6 +239,16 @@ export default class ToolConfiguration extends Vue {
     const dockerImage = this.toolValues?.image?.image;
     return dockerImage
       ? this.propertiesStore.showAdvancedOptionsPanel(dockerImage)
+      : true;
+  }
+
+  shouldShowConfigurationItem(item: any) {
+    if (item.type !== "annotation") {
+      return true;
+    }
+    const dockerImage = this.toolValues?.image?.image;
+    return dockerImage
+      ? this.propertiesStore.showAnnotationConfigurationPanel(dockerImage)
       : true;
   }
 }

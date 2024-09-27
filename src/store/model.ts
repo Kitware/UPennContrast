@@ -1024,6 +1024,7 @@ export interface IWorkerLabels {
   annotationShape?: AnnotationShape;
   description?: string;
   advancedOptionsPanel?: string;
+  annotationConfigurationPanel?: string;
 }
 
 export interface IWorkerImageList {
