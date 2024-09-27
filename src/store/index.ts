@@ -776,7 +776,8 @@ export class Main extends VuexModule {
       const error = unknownError as Partial<AxiosError>;
       if (error.response) {
         // The request was made and the server responded with a status code that falls out of the range of 2xx
-        throw new Error(error.response.data.message || "An error occurred");
+        const responseData = error.response.data as { message: string };
+        throw new Error(responseData.message || "An error occurred");
       }
       if (error.request) {
         // The request was made but no response was received
