@@ -1023,6 +1023,7 @@ export interface IWorkerLabels {
   interfaceCategory?: string;
   annotationShape?: AnnotationShape;
   description?: string;
+  advancedOptionsPanel?: string;
 }
 
 export interface IWorkerImageList {

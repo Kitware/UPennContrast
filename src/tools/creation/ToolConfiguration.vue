@@ -13,7 +13,7 @@
       </template>
     </v-container>
     <v-expansion-panels
-      v-if="advancedInternalTemplate.length > 0"
+      v-if="advancedInternalTemplate.length > 0 && showAdvancedPanel"
       v-model="advancedPanel"
     >
       <v-expansion-panel>
@@ -42,6 +42,7 @@
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
+import propertiesStore from "@/store/properties";
 import ToolConfigurationItem from "@/tools/creation/ToolConfigurationItem.vue";
 import AnnotationConfiguration from "@/tools/creation/templates/AnnotationConfiguration.vue";
 import TagAndLayerRestriction from "@/tools/creation/templates/TagAndLayerRestriction.vue";
@@ -55,6 +56,7 @@ import DockerImage from "@/tools/creation/templates/DockerImage.vue";
 // Creates a tool configuration interface based on the current selected template.
 export default class ToolConfiguration extends Vue {
   readonly store = store;
+  readonly propertiesStore = propertiesStore;
 
   @Prop()
   readonly value!: Record<string, any>;
@@ -229,6 +231,13 @@ export default class ToolConfiguration extends Vue {
         };
       }
     });
+  }
+
+  get showAdvancedPanel() {
+    const dockerImage = this.toolValues?.image?.image;
+    return dockerImage
+      ? this.propertiesStore.showAdvancedOptionsPanel(dockerImage)
+      : true;
   }
 }
 </script>

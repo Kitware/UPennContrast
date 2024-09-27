@@ -492,6 +492,13 @@ export class Properties extends VuexModule {
         }
       });
   }
+
+  get showAdvancedOptionsPanel() {
+    return (image: string) => {
+      const labels = this.workerImageList[image];
+      return labels ? labels.advancedOptionsPanel !== "False" : true;
+    };
+  }
 }
 
 export default getModule(Properties);
