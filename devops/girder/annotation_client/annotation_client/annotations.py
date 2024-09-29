@@ -10,6 +10,7 @@ PATHS = {
     "connection_by_id": "/annotation_connection/{connectionId}",
     "connect_to_nearest": "/annotation_connection/connectTo/",
     "property_by_id": "/annotation_property/{propertyId}",
+    "property": "/annotation_property",
     "add_property_values": (
         "/annotation_property_values"
         "?datasetId={datasetId}"
@@ -318,6 +319,13 @@ class UPennContrastAnnotationClient:
         return self.client.get(
             PATHS["property_by_id"].format(propertyId=propertyId)
         )
+
+    def addProperty(self, property):
+        """
+        Add a property to the database
+        :param dict property: The property to add
+        """
+        return self.client.post(PATHS["property"], json=property)
 
     # Property values
     def addAnnotationPropertyValues(self, datasetId, annotationId, values):
