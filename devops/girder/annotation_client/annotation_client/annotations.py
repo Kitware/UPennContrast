@@ -320,7 +320,7 @@ class UPennContrastAnnotationClient:
             PATHS["property_by_id"].format(propertyId=propertyId)
         )
 
-    def addProperty(self, property):
+    def createNewProperty(self, property):
         """
         Add a property to the database
         :param dict property: The property to add
