@@ -414,7 +414,7 @@ class UPennContrastAnnotationClient:
                 annotationId=annotationId, datasetId=datasetId
             )
         )
-    
+
     def setPropertiesByConfigurationId(self, configurationId, propertyIdList):
         """
         Set the properties for a configuration
@@ -422,13 +422,15 @@ class UPennContrastAnnotationClient:
         :param list propertyIdList: The list of property ids to set
         """
         metadata = json.dumps({"propertyIds": propertyIdList})
-        
+
         params = {
             'metadata': metadata
         }
-        
+
         return self.client.put(
-            PATHS["properties_by_configuration"].format(configurationId=configurationId),
+            PATHS["properties_by_configuration"].format(
+                configurationId=configurationId
+            ),
             parameters=params
         )
 
@@ -440,9 +442,11 @@ class UPennContrastAnnotationClient:
         :param str configurationId: The id of the configuration
         """
         return self.client.get(
-            PATHS["properties_by_configuration"].format(configurationId=configurationId)
+            PATHS["properties_by_configuration"].format(
+                configurationId=configurationId
+            )
         )
-    
+
     def getConfigurationsByDatasetId(self, datasetId):
         """
         Get the configurations for a dataset
