@@ -1,4 +1,5 @@
 import girder_client
+import json
 
 PATHS = {
     "annotation": "/upenn_annotation/",
@@ -36,6 +37,8 @@ PATHS = {
         "&datasetId={datasetId}"
         "&buckets={buckets}"
     ),
+    "configurations_by_dataset": "/dataset_view?datasetId={datasetId}",
+    "properties_by_configuration": "/item/{configurationId}",
 }
 
 
@@ -410,4 +413,41 @@ class UPennContrastAnnotationClient:
             PATHS["get_annotation_property_values"].format(
                 annotationId=annotationId, datasetId=datasetId
             )
+        )
+    
+    def setPropertiesByConfigurationId(self, configurationId, propertyIdList):
+        """
+        Set the properties for a configuration
+        :param str configurationId: The id of the configuration
+        :param list propertyIdList: The list of property ids to set
+        """
+        metadata = json.dumps({"propertyIds": propertyIdList})
+        
+        params = {
+            'metadata': metadata
+        }
+        
+        return self.client.put(
+            PATHS["properties_by_configuration"].format(configurationId=configurationId),
+            parameters=params
+        )
+
+    # Configurations
+
+    def getPropertiesByConfigurationId(self, configurationId):
+        """
+        Get the properties for a configuration
+        :param str configurationId: The id of the configuration
+        """
+        return self.client.get(
+            PATHS["properties_by_configuration"].format(configurationId=configurationId)
+        )
+    
+    def getConfigurationsByDatasetId(self, datasetId):
+        """
+        Get the configurations for a dataset
+        :param str datasetId: The id of the dataset
+        """
+        return self.client.get(
+            PATHS["configurations_by_dataset"].format(datasetId=datasetId)
         )
