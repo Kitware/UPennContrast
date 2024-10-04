@@ -37,8 +37,8 @@ PATHS = {
         "&datasetId={datasetId}"
         "&buckets={buckets}"
     ),
-    "configurations_by_dataset": "/dataset_view?datasetId={datasetId}",
-    "properties_by_configuration": "/item/{configurationId}",
+    "dataset_views_by_dataset": "/dataset_view?datasetId={datasetId}",
+    "item_by_id": "/item/{itemId}",
 }
 
 
@@ -436,22 +436,22 @@ class UPennContrastAnnotationClient:
 
     # Configurations
 
-    def getPropertiesByConfigurationId(self, configurationId):
+    def getItemById(self, itemId):
         """
-        Get the properties for a configuration
-        :param str configurationId: The id of the configuration
+        Get the item by id
+        :param str itemId: The id of the item
         """
         return self.client.get(
-            PATHS["properties_by_configuration"].format(
-                configurationId=configurationId
+            PATHS["item_by_id"].format(
+                itemId=itemId
             )
         )
 
-    def getConfigurationsByDatasetId(self, datasetId):
+    def getDatasetViewsByDatasetId(self, datasetId):
         """
-        Get the configurations for a dataset
+        Get the dataset views for a dataset
         :param str datasetId: The id of the dataset
         """
         return self.client.get(
-            PATHS["configurations_by_dataset"].format(datasetId=datasetId)
+            PATHS["dataset_views_by_dataset"].format(datasetId=datasetId)
         )
