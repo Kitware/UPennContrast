@@ -1,4 +1,5 @@
 import girder_client
+import json
 
 PATHS = {
     "annotation": "/upenn_annotation/",
@@ -10,6 +11,7 @@ PATHS = {
     "connection_by_id": "/annotation_connection/{connectionId}",
     "connect_to_nearest": "/annotation_connection/connectTo/",
     "property_by_id": "/annotation_property/{propertyId}",
+    "property": "/annotation_property",
     "add_property_values": (
         "/annotation_property_values"
         "?datasetId={datasetId}"
@@ -35,6 +37,8 @@ PATHS = {
         "&datasetId={datasetId}"
         "&buckets={buckets}"
     ),
+    "dataset_views_by_dataset": "/dataset_view?datasetId={datasetId}",
+    "item_by_id": "/item/{itemId}",
 }
 
 
@@ -319,6 +323,13 @@ class UPennContrastAnnotationClient:
             PATHS["property_by_id"].format(propertyId=propertyId)
         )
 
+    def createNewProperty(self, property):
+        """
+        Add a property to the database
+        :param dict property: The property to add
+        """
+        return self.client.post(PATHS["property"], json=property)
+
     # Property values
     def addAnnotationPropertyValues(self, datasetId, annotationId, values):
         """
@@ -402,4 +413,45 @@ class UPennContrastAnnotationClient:
             PATHS["get_annotation_property_values"].format(
                 annotationId=annotationId, datasetId=datasetId
             )
+        )
+
+    def setPropertiesByConfigurationId(self, configurationId, propertyIdList):
+        """
+        Set the properties for a configuration
+        :param str configurationId: The id of the configuration
+        :param list propertyIdList: The list of property ids to set
+        """
+        metadata = json.dumps({"propertyIds": propertyIdList})
+
+        params = {
+            'metadata': metadata
+        }
+
+        return self.client.put(
+            PATHS["item_by_id"].format(
+                itemId=configurationId
+            ),
+            parameters=params
+        )
+
+    # Configurations
+
+    def getItemById(self, itemId):
+        """
+        Get the item by id
+        :param str itemId: The id of the item
+        """
+        return self.client.get(
+            PATHS["item_by_id"].format(
+                itemId=itemId
+            )
+        )
+
+    def getDatasetViewsByDatasetId(self, datasetId):
+        """
+        Get the dataset views for a dataset
+        :param str datasetId: The id of the dataset
+        """
+        return self.client.get(
+            PATHS["dataset_views_by_dataset"].format(datasetId=datasetId)
         )
