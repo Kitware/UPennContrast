@@ -4,7 +4,7 @@
 
 ## Documentation
 
-This [this git book](https://arjun-raj-lab.gitbook.io/nimbusimage) for documentation.
+See this [git book](https://arjun-raj-lab.gitbook.io/nimbusimage) for documentation.
 
 ## Development environment
 
@@ -28,7 +28,8 @@ You can also run `pnpm emscripten-build:debug` to build with debug symbols.
 Start docker images and run the server:
 
 ```sh
-docker-compose up -d
+docker compose build
+docker compose up -d
 pnpm dev
 ```
 
