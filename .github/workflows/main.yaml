@@ -7,25 +7,19 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
-    strategy:
-      matrix:
-        node-version: [18.x]
-
     steps:
-      - uses: actions/checkout@v1
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
-        with:
-          node-version: ${{ matrix.node-version }}
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
       - name: Typescript check
-        run: npm run tsc
+        run: pnpm tsc
       - name: Vue linter
-        run: npm run lint:ci
+        run: pnpm lint:ci
         env:
           NODE_ENV: production
       - name: Build project
-        run: npm run build
+        run: pnpm build
       - name: Run tests
-        run: npm test
+        run: pnpm test
