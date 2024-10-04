@@ -428,7 +428,7 @@ class UPennContrastAnnotationClient:
         }
 
         return self.client.put(
-            PATHS["properties_by_configuration"].format(
+            PATHS["item_by_id"].format(
                 configurationId=configurationId
             ),
             parameters=params
