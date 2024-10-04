@@ -8,6 +8,11 @@ See this [git book](https://arjun-raj-lab.gitbook.io/nimbusimage) for documentat
 
 ## Development environment
 
+Install PNPM
+```sh
+npm i -g pnpm
+```
+
 Clone the repo and install node modules:
 
 ```sh
