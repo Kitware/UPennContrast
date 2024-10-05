@@ -62,6 +62,11 @@
           </v-row>
         </template>
       </v-container>
+      <v-checkbox
+        v-model="computeUponCreation"
+        label="Compute upon creation"
+        class="mt-4"
+      />
       <div class="button-bar">
         <v-spacer></v-spacer>
         <v-btn class="mr-4" color="primary" @click="createProperty">
@@ -138,6 +143,8 @@ export default class PropertyCreation extends Vue {
   isNameGenerated = true;
 
   interfaceValues: IWorkerInterfaceValues = {};
+
+  computeUponCreation = true;
 
   get deduplicatedName() {
     // Find a name which is not already taken
@@ -255,6 +262,9 @@ export default class PropertyCreation extends Vue {
       })
       .then((property) => {
         this.propertyStore.togglePropertyPathVisibility([property.id]);
+        if (this.computeUponCreation) {
+          this.propertyStore.computeProperty(property);
+        }
       });
     this.reset();
   }
@@ -266,6 +276,7 @@ export default class PropertyCreation extends Vue {
     this.dockerImage = null;
     this.originalName = "New Property";
     this.isNameGenerated = true;
+    this.computeUponCreation = true;
   }
 }
 </script>
