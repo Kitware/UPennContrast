@@ -276,7 +276,6 @@ export default class PropertyCreation extends Vue {
     this.dockerImage = null;
     this.originalName = "New Property";
     this.isNameGenerated = true;
-    this.computeUponCreation = true;
   }
 }
 </script>
