@@ -719,10 +719,18 @@ export default class MultiSourceConfiguration extends Vue {
           x: framePos[0] / (mm_x * 1000),
           y: framePos[1] / (mm_y * 1000),
         };
-        if (this.tilesInternalMetadata![0].nd2 && this.tilesInternalMetadata![0].nd2.channels) {
+        if (
+          this.tilesInternalMetadata![0].nd2 &&
+          this.tilesInternalMetadata![0].nd2.channels
+        ) {
           const chan = this.tilesInternalMetadata![0].nd2.channels;
-          const chan0 = chan.volume !== undefined ? chan.volume : chan[0].volume;
-          if (chan0.cameraTransformationMatrix && Math.abs(chan0.cameraTransformationMatrix[0] - -1) < 0.01 && Math.abs(chan0.cameraTransformationMatrix[3] - -1)) {
+          const chan0 =
+            chan.volume !== undefined ? chan.volume : chan[0].volume;
+          if (
+            chan0.cameraTransformationMatrix &&
+            Math.abs(chan0.cameraTransformationMatrix[0] - -1) < 0.01 &&
+            Math.abs(chan0.cameraTransformationMatrix[3] - -1)
+          ) {
             pos.x *= -1;
             pos.y *= -1;
             /* The full transform is this:
