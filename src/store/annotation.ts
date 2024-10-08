@@ -559,6 +559,24 @@ export class Annotations extends VuexModule {
   }
 
   @Action
+  public async deleteUnselectedAnnotations() {
+    const unselectedIds = this.annotations
+      .filter(
+        (annotation) =>
+          !this.selectedAnnotations.some(
+            (selected) => selected.id === annotation.id,
+          ),
+      )
+      .map((annotation) => annotation.id);
+
+    if (unselectedIds.length === 0) {
+      return;
+    }
+
+    await this.deleteAnnotations(unselectedIds);
+  }
+
+  @Action
   public async updateAnnotationsPerId({
     annotationIds,
     editFunction,

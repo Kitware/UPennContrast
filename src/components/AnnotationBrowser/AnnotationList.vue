@@ -11,6 +11,13 @@
             </v-btn>
           </v-col>
           <v-col class="pa-0 mx-1">
+            <v-btn block small @click.stop="deleteUnselected">
+              Delete Unselected
+            </v-btn>
+          </v-col>
+        </v-row>
+        <v-row>
+          <v-col class="pa-0 mx-1">
             <v-dialog v-model="tagSelectedDialog" width="50%">
               <template v-slot:activator="{ on, attrs }">
                 <v-btn block small v-bind="attrs" v-on="on" @click.stop>
@@ -518,6 +525,10 @@ export default class AnnotationList extends Vue {
 
   deleteSelected() {
     this.annotationStore.deleteSelectedAnnotations();
+  }
+
+  deleteUnselected() {
+    this.annotationStore.deleteUnselectedAnnotations();
   }
 }
 </script>
