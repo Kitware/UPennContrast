@@ -11,6 +11,8 @@
     dense
     label="Tags"
     :disabled="disabled"
+    @change="onTagChange"
+    ref="combobox"
   >
     <template v-slot:selection="{ attrs, index, item, parent }">
       <v-chip
@@ -32,6 +34,7 @@
 import { Vue, Component, VModel, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
+import Vue from 'vue';
 
 // Interface element for the input of annotation tags
 @Component({
@@ -55,6 +58,19 @@ export default class TagPicker extends Vue {
   tagSearchInput: string = "";
   get layers() {
     return this.store.layers;
+  }
+
+  $refs!: {
+    combobox: any;
+  };
+
+  onTagChange() {
+    // Close the combobox and remove focus
+    Vue.nextTick(() => {
+      if (this.$refs.combobox) {
+        this.$refs.combobox.blur();
+      }
+    });
   }
 }
 </script>
