@@ -34,7 +34,6 @@
 import { Vue, Component, VModel, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
-import Vue from 'vue';
 
 // Interface element for the input of annotation tags
 @Component({
