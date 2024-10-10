@@ -11,6 +11,8 @@
     dense
     label="Tags"
     :disabled="disabled"
+    @change="onTagChange"
+    ref="combobox"
   >
     <template v-slot:selection="{ attrs, index, item, parent }">
       <v-chip
@@ -55,6 +57,19 @@ export default class TagPicker extends Vue {
   tagSearchInput: string = "";
   get layers() {
     return this.store.layers;
+  }
+
+  $refs!: {
+    combobox: HTMLFormElement;
+  };
+
+  onTagChange() {
+    // Close the combobox and remove focus
+    Vue.nextTick(() => {
+      if (this.$refs.combobox) {
+        this.$refs.combobox.blur();
+      }
+    });
   }
 }
 </script>
