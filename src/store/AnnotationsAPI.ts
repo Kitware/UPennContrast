@@ -234,8 +234,8 @@ export default class AnnotationsAPI {
     const datasetId = dataset.id;
     const { id, name, type, values } = tool;
     const image = values.image.image;
-    const { annotation, connectTo, jobDateTag } = values;
-    let tags = annotation.tags;
+    const { annotation = {}, connectTo = {}, jobDateTag } = values;
+    let tags = annotation.tags ?? [];
     if (jobDateTag) {
       const date = new Date(Date.now());
       const timeZone = date.getTimezoneOffset() / 60;
@@ -250,9 +250,9 @@ export default class AnnotationsAPI {
       tags = [...tags, computedTag];
     }
     const connectToLayerId = connectTo.layer;
-    const connectToLayer = layers.find(
-      (layer) => layer.id === connectToLayerId,
-    );
+    const connectToLayer = connectToLayerId
+      ? layers.find((layer) => layer.id === connectToLayerId)
+      : null;
     const connectToChannel = connectToLayer ? connectToLayer.channel : null;
     const augmentedConnectTo = { ...connectTo, channel: connectToChannel };
     const params = {

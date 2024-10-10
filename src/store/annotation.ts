@@ -788,7 +788,7 @@ export class Annotations extends VuexModule {
       Time: main.time,
     };
 
-    const layerId = toolAnnotation.coordinateAssignments.layer;
+    const layerId = toolAnnotation?.coordinateAssignments?.layer;
     const layer = layerId ? main.getLayerFromId(layerId) : null;
     const channel = layer?.channel ?? 0;
     if (layer) {
@@ -796,11 +796,14 @@ export class Annotations extends VuexModule {
       if (indexes) {
         const { xyIndex, zIndex, tIndex } = indexes;
         location.XY = xyIndex;
-        const assign = toolAnnotation.coordinateAssignments;
+        const assign = toolAnnotation?.coordinateAssignments;
         // Values are 1 indexed, but the location uses 0 indexing
-        location.Z = assign.Z.type === "layer" ? zIndex : assign.Z.value - 1;
+        location.Z =
+          assign?.Z?.type === "layer" ? zIndex : (assign?.Z?.value ?? 1) - 1;
         location.Time =
-          assign.Time.type === "layer" ? tIndex : assign.Time.value - 1;
+          assign?.Time?.type === "layer"
+            ? tIndex
+            : (assign?.Time?.value ?? 1) - 1;
       }
     }
     return { channel, location };

@@ -1,7 +1,7 @@
 <template>
   <v-card>
     <v-card-title>
-      <span class="headline">Tool Edition:</span>
+      <span class="headline">Edit tool:</span>
       <v-text-field
         dense
         hide-details
