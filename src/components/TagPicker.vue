@@ -60,7 +60,7 @@ export default class TagPicker extends Vue {
   }
 
   $refs!: {
-    combobox: any;
+    combobox: HTMLFormElement;
   };
 
   onTagChange() {
