@@ -541,6 +541,10 @@ export class Annotations extends VuexModule {
 
   @Action
   public async deleteAnnotations(ids: string[]) {
+    if (ids.length === 0) {
+      return;
+    }
+
     sync.setSaving(true);
     await this.annotationsAPI.deleteMultipleAnnotations(ids);
     sync.setSaving(false);
@@ -569,11 +573,7 @@ export class Annotations extends VuexModule {
       )
       .map((annotation) => annotation.id);
 
-    if (unselectedIds.length === 0) {
-      return;
-    }
-
-    await this.deleteAnnotations(unselectedIds);
+    this.deleteAnnotations(unselectedIds);
   }
 
   @Action
