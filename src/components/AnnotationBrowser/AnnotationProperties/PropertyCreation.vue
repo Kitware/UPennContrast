@@ -28,10 +28,7 @@
           </v-col>
         </v-row>
       </v-container>
-      <v-container
-        class="elevation-3 mt-4"
-        v-if="filteringShape !== null && filteringTags.length > 0"
-      >
+      <v-container class="elevation-3 mt-4" v-if="filteringShape !== null">
         <div class="pb-4 subtitle-1">Measure this property:</div>
         <v-row>
           <v-col>
@@ -65,12 +62,17 @@
           </v-row>
         </template>
       </v-container>
+      <v-checkbox
+        v-model="computeUponCreation"
+        label="Compute upon creation"
+        class="mt-4"
+      />
       <div class="button-bar">
         <v-spacer></v-spacer>
         <v-btn class="mr-4" color="primary" @click="createProperty">
-          SUBMIT
+          Create Property
         </v-btn>
-        <v-btn class="mr-4" color="warning" @click="reset">CANCEL</v-btn>
+        <v-btn class="mr-4" color="warning" @click="reset">Cancel</v-btn>
       </div>
     </v-card-text>
   </v-card>
@@ -142,6 +144,8 @@ export default class PropertyCreation extends Vue {
 
   interfaceValues: IWorkerInterfaceValues = {};
 
+  computeUponCreation = true;
+
   get deduplicatedName() {
     // Find a name which is not already taken
     let count = 0;
@@ -161,7 +165,11 @@ export default class PropertyCreation extends Vue {
     if (this.filteringTags.length) {
       nameList.push(this.filteringTags.join(", "));
     } else {
-      nameList.push("No tag");
+      if (this.areTagsExclusive) {
+        nameList.push("No tag");
+      } else {
+        nameList.push("All");
+      }
     }
     if (this.dockerImage) {
       const imageInterfaceName =
@@ -238,11 +246,7 @@ export default class PropertyCreation extends Vue {
   }
 
   createProperty() {
-    if (
-      !this.dockerImage ||
-      !this.filteringShape ||
-      !this.filteringTags.length
-    ) {
+    if (!this.dockerImage || !this.filteringShape) {
       return;
     }
     this.propertyStore
@@ -258,6 +262,9 @@ export default class PropertyCreation extends Vue {
       })
       .then((property) => {
         this.propertyStore.togglePropertyPathVisibility([property.id]);
+        if (this.computeUponCreation) {
+          this.propertyStore.computeProperty(property);
+        }
       });
     this.reset();
   }
