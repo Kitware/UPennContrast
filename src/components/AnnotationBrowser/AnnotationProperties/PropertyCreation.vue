@@ -1,30 +1,34 @@
 <template>
   <v-card>
-    <v-card-text class="pt-0">
-      <v-container class="elevation-3 mt-4">
-        <div class="pb-4 subtitle-1">
-          Create measurements for objects matching:
-        </div>
-        <v-row>
-          <v-col>
+    <v-card-text>
+      <v-container>
+        <v-row align="center" class="mb-4" dense>
+          <v-col cols="3">
+            <v-subheader>Measure by tag:</v-subheader>
+          </v-col>
+          <v-col cols="6">
             <tag-picker v-model="filteringTags" />
           </v-col>
-          <v-col cols="auto">
+          <v-col cols="3">
             <v-checkbox
+              v-model="areTagsExclusive"
+              label="Exclusive"
               hide-details
               dense
-              label="Exclusive"
-              v-model="areTagsExclusive"
-            />
+            ></v-checkbox>
           </v-col>
         </v-row>
-        <v-row>
-          <v-col>
+        <v-row align="center" dense>
+          <v-col cols="3">
+            <v-subheader>Or by shape:</v-subheader>
+          </v-col>
+          <v-col cols="9">
             <v-select
               v-model="filteringShape"
-              label="Shape"
               :items="availableShapes"
-            />
+              label="Shape"
+              hide-details
+            ></v-select>
           </v-col>
         </v-row>
       </v-container>
@@ -211,6 +215,11 @@ export default class PropertyCreation extends Vue {
 
   @Watch("filteringTags")
   filteringTagsChanged() {
+    // If no tags are selected, then reset the shape to null
+    if (this.filteringTags.length === 0) {
+      this.filteringShape = null;
+      return;
+    }
     // The keys of counts are in AnnotationShape
     // Find the best matching shape for these tags
     const counts: { [key: string]: number } = {};
