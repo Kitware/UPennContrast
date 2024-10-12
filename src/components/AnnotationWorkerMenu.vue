@@ -35,7 +35,7 @@
           />
         </v-row>
         <v-row>
-          <v-btn @click="preview">Preview</v-btn>
+          <v-btn @click="preview" v-if="hasPreview">Preview</v-btn>
           <v-spacer></v-spacer>
           <v-btn @click="compute" :disabled="running">
             <v-progress-circular size="16" v-if="running" indeterminate />
