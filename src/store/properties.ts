@@ -517,6 +517,13 @@ export class Properties extends VuexModule {
       return labels ? labels.defaultToolName : null;
     };
   }
+
+  get hasPreview() {
+    return (image: string) => {
+      const labels = this.workerImageList[image];
+      return labels ? labels.hasPreview?.toLowerCase() === "true" : false;
+    };
+  }
 }
 
 export default getModule(Properties);
