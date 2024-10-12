@@ -28,6 +28,7 @@
               :items="availableShapes"
               label="Shape"
               hide-details
+              :disabled="filteringTags.length > 0"
             ></v-select>
           </v-col>
         </v-row>
