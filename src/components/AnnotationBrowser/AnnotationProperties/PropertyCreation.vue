@@ -20,7 +20,7 @@
         </v-row>
         <v-row align="center" dense>
           <v-col cols="3">
-            <v-subheader>Or by shape:</v-subheader>
+            <v-subheader>{{ shapeSelectionString }}</v-subheader>
           </v-col>
           <v-col cols="9">
             <v-select
@@ -286,6 +286,10 @@ export default class PropertyCreation extends Vue {
     this.dockerImage = null;
     this.originalName = "New Property";
     this.isNameGenerated = true;
+  }
+
+  get shapeSelectionString(): string {
+    return this.filteringTags.length > 0 ? "Of shape:" : "Or by shape:";
   }
 }
 </script>
