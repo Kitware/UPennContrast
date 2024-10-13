@@ -7,7 +7,7 @@
     <v-list-item-group>
       <v-row v-for="[id, item] in orderItemEntries" :key="id" class="pa-0 ma-0">
         <v-col class="pa-0 ma-0" cols="4">
-          <v-subheader>
+          <v-subheader class="font-weight-bold">
             {{ id }}
           </v-subheader>
         </v-col>
@@ -34,6 +34,9 @@
               </v-text-field>
             </template>
           </v-slider>
+          <div v-if="item.type === 'notes'" class="py-2 notes-container">
+            {{ item.value }}
+          </div>
           <v-text-field
             v-if="item.type === 'text'"
             v-bind="item.vueAttrs"
@@ -102,6 +105,9 @@ export default class WorkerInterfaceValues extends Vue {
       case "number":
         return 0.0;
 
+      case "notes":
+        return "";
+
       case "text":
         return "";
 
@@ -151,3 +157,11 @@ export default class WorkerInterfaceValues extends Vue {
   }
 }
 </script>
+
+<style scoped>
+.notes-container {
+  max-width: 300px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+</style>
