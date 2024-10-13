@@ -6,7 +6,12 @@
     <v-app-bar class="elevation-1" app clipped-right>
       <v-tooltip bottom open-delay="500">
         <template v-slot:activator="{ on, attrs }">
-          <v-toolbar-title @click="goHome" class="logo" v-bind="attrs" v-on="on">
+          <v-toolbar-title
+            @click="goHome"
+            class="logo"
+            v-bind="attrs"
+            v-on="on"
+          >
             <img
               src="/img/icons/NimbusImageIcon.png"
               alt="Icon"
