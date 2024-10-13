@@ -4,59 +4,139 @@
       <help-panel />
     </v-dialog>
     <v-app-bar class="elevation-1" app clipped-right>
-      <v-toolbar-title @click="goHome" class="logo" title="NimbusImage home">
-        <img
-          src="/img/icons/NimbusImageIcon.png"
-          alt="Icon"
-          class="logo-icon"
-        />
-      </v-toolbar-title>
+      <v-tooltip bottom open-delay="500">
+        <template v-slot:activator="{ on, attrs }">
+          <v-toolbar-title @click="goHome" class="logo" v-bind="attrs" v-on="on">
+            <img
+              src="/img/icons/NimbusImageIcon.png"
+              alt="Icon"
+              class="logo-icon"
+            />
+          </v-toolbar-title>
+        </template>
+        <span>NimbusImage home</span>
+      </v-tooltip>
       <bread-crumbs />
       <v-spacer />
-      <v-btn
-        color="primary"
-        class="ml-4"
-        :to="{ name: 'newdataset' }"
-        :disabled="!store.isLoggedIn"
-        title="Upload a new dataset"
-      >
-        Upload Data
-      </v-btn>
+      <v-tooltip bottom>
+        <template v-slot:activator="{ on, attrs }">
+          <v-btn
+            color="primary"
+            class="ml-4"
+            :to="{ name: 'newdataset' }"
+            :disabled="!store.isLoggedIn"
+            v-bind="attrs"
+            v-on="on"
+          >
+            Upload Data
+          </v-btn>
+        </template>
+        <span>Upload a new dataset</span>
+      </v-tooltip>
       <v-divider class="ml-1" vertical />
       <template v-if="store.dataset && routeName === 'datasetview'">
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('analyzePanel')">
-          <v-badge dot color="red" :value="hasUncomputedProperties">
-            Measure objects
-          </v-badge>
-        </v-btn>
-        <v-btn
-          class="ml-4"
-          @click.stop="
-            toggleRightPanel('annotationPanel');
-            annotationPanelBadge = false;
-          "
-        >
-          <v-badge dot color="green" :value="annotationPanelBadge">
-            Object list
-          </v-badge>
-        </v-btn>
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <v-btn
+              class="ml-4"
+              v-bind="attrs"
+              v-on="on"
+              @click.stop="toggleRightPanel('analyzePanel')"
+            >
+              <v-badge dot color="red" :value="hasUncomputedProperties">
+                Measure objects
+              </v-badge>
+            </v-btn>
+          </template>
+          <span
+            >Measure properties of your objects, like "area" or "number of
+            spots"</span
+          >
+        </v-tooltip>
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <v-btn
+              class="ml-4"
+              v-bind="attrs"
+              v-on="on"
+              @click.stop="
+                toggleRightPanel('annotationPanel');
+                annotationPanelBadge = false;
+              "
+            >
+              <v-badge dot color="green" :value="annotationPanelBadge">
+                Object list
+              </v-badge>
+            </v-btn>
+          </template>
+          <span
+            >List of all objects in the dataset, including their properties, and
+            various actions on them</span
+          >
+        </v-tooltip>
         <v-divider class="ml-4" vertical />
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('snapshotPanel')">
-          Snapshots
-        </v-btn>
-        <v-btn class="ml-4" @click.stop="toggleRightPanel('settingsPanel')">
-          Settings
-        </v-btn>
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <v-btn
+              class="ml-4"
+              v-bind="attrs"
+              v-on="on"
+              @click.stop="toggleRightPanel('snapshotPanel')"
+            >
+              Snapshots
+            </v-btn>
+          </template>
+          <span
+            >Snapshots for bookmarking and downloading cropped regions in your
+            dataset</span
+          >
+        </v-tooltip>
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <v-btn
+              class="ml-4"
+              v-bind="attrs"
+              v-on="on"
+              @click.stop="toggleRightPanel('settingsPanel')"
+            >
+              Settings
+            </v-btn>
+          </template>
+          <span>Image and object display settings</span>
+        </v-tooltip>
       </template>
       <div class="mx-4 d-flex align-center">
-        <v-btn icon @click="helpPanelIsOpen = !helpPanelIsOpen">
-          <v-icon>mdi-help-circle-outline</v-icon>
-        </v-btn>
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <v-btn
+              icon
+              v-bind="attrs"
+              v-on="on"
+              @click="helpPanelIsOpen = !helpPanelIsOpen"
+            >
+              <v-icon>mdi-help-circle-outline</v-icon>
+            </v-btn>
+          </template>
+          <span>Show the heads up display for commands and hotkeys</span>
+        </v-tooltip>
         <server-status />
         <user-menu />
-        <v-btn icon @click="chatbotOpen = !chatbotOpen">
-          <v-icon>mdi-chat</v-icon>
-        </v-btn>
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <v-btn
+              icon
+              v-bind="attrs"
+              v-on="on"
+              @click="chatbotOpen = !chatbotOpen"
+            >
+              <v-icon>mdi-chat</v-icon>
+            </v-btn>
+          </template>
+          <span
+            >Open NimbusImage chat for help with solving your particular image
+            analysis problems</span
+          >
+        </v-tooltip>
       </div>
     </v-app-bar>
 
