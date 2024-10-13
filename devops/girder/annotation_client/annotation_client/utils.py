@@ -12,3 +12,13 @@ def sendProgress(progress, title, info):
     """
     print(json.dumps({"progress": progress, "title": title, "info": info}))
     sys.stdout.flush()
+
+
+def sendError(errorMessage):
+    """
+    Send error message to the front end
+
+    :param str errorMessage: Error message to display
+    """
+    print(json.dumps({"error": errorMessage}))
+    sys.stdout.flush()
