@@ -9,8 +9,26 @@
               <v-subheader class="headline mb-4">Upload dataset</v-subheader>
               <v-card>
                 <v-tabs v-model="uploadTab">
-                  <v-tab> Quick upload/view </v-tab>
-                  <v-tab> Advanced upload </v-tab>
+                  <v-tooltip bottom>
+                    <template v-slot:activator="{ on, attrs }">
+                      <v-tab v-bind="attrs" v-on="on">
+                        Quick upload/view
+                      </v-tab>
+                    </template>
+                    <span
+                      >Directly upload a file using all default options and then
+                      go straight to the image viewer</span
+                    >
+                  </v-tooltip>
+                  <v-tooltip bottom>
+                    <template v-slot:activator="{ on, attrs }">
+                      <v-tab v-bind="attrs" v-on="on"> Advanced upload </v-tab>
+                    </template>
+                    <span
+                      >Upload a dataset with the option to assign variables to
+                      files, composite tiles, and more</span
+                    >
+                  </v-tooltip>
                 </v-tabs>
               </v-card>
               <v-tabs-items v-model="uploadTab" class="flex-window-items">
