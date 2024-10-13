@@ -948,6 +948,12 @@ export interface INumberWorkerInterfaceElement
   default?: number;
 }
 
+export interface INotesWorkerInterfaceElement
+  extends ICommonWorkerInterfaceElement {
+  type: "notes";
+  default?: string;
+}
+
 export interface ITextWorkerInterfaceElement
   extends ICommonWorkerInterfaceElement {
   type: "text";
@@ -990,6 +996,7 @@ export interface ICheckboxWorkerInterfaceElement
 
 export type TWorkerInterfaceElement =
   | INumberWorkerInterfaceElement
+  | INotesWorkerInterfaceElement
   | ITextWorkerInterfaceElement
   | ITagsWorkerInterfaceElement
   | ILayerWorkerInterfaceElement
