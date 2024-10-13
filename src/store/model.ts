@@ -951,6 +951,7 @@ export interface INumberWorkerInterfaceElement
 export interface INotesWorkerInterfaceElement
   extends ICommonWorkerInterfaceElement {
   type: "notes";
+  value?: string;
   default?: string;
 }
 
