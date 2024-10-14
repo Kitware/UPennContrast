@@ -15,6 +15,7 @@
           v-else-if="workerInterface"
           :workerInterface="workerInterface"
           v-model="interfaceValues"
+          tooltipPosition="left"
         />
       </v-col>
     </v-row>

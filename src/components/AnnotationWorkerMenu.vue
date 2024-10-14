@@ -32,6 +32,7 @@
             v-if="workerInterface"
             :workerInterface="workerInterface"
             v-model="interfaceValues"
+            tooltipPosition="right"
           />
         </v-row>
         <v-row>
