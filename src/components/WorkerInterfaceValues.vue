@@ -78,7 +78,7 @@
               </v-col>
             </v-row>
           </template>
-          <span>{{ item.tooltip }}</span>
+          <span v-html="formattedTooltip(item.tooltip)"></span>
         </v-tooltip>
         <!-- Render <v-row> without tooltip if item.tooltip does not exist -->
         <v-row v-else class="pa-0 ma-0" :key="id">
@@ -213,6 +213,10 @@ export default class WorkerInterfaceValues extends Vue {
       .filter(([, { displayOrder }]) => displayOrder !== undefined)
       .sort(([, { displayOrder: a }], [, { displayOrder: b }]) => a! - b!);
     return [...explicitlySortedItems, ...alphabeticalOrderItems];
+  }
+
+  formattedTooltip(text: string): string {
+    return text.replace(/\n/g, "<br>");
   }
 
   mounted() {
