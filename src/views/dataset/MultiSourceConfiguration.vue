@@ -733,6 +733,15 @@ export default class MultiSourceConfiguration extends Vue {
           ) {
             pos.x *= -1;
             pos.y *= -1;
+          } else if (
+            // If close to the identity matrix, then we don't need to apply the transform
+            chan0.cameraTransformationMatrix &&
+            Math.abs(chan0.cameraTransformationMatrix[0] - 1) < 0.01 &&
+            Math.abs(chan0.cameraTransformationMatrix[3] - 1) < 0.01
+          ) {
+            pos.x *= 1;
+            pos.y *= 1;
+          } else {
             /* The full transform is this:
             pos.s11 = chan0.cameraTransformationMatrix[0];
             pos.s12 = chan0.cameraTransformationMatrix[1];
