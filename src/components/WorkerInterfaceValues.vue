@@ -7,9 +7,15 @@
     <v-list-item-group>
       <template v-for="[id, item] in orderItemEntries">
         <!-- Conditionally wrap the entire <v-row> with <v-tooltip> if item.tooltip exists -->
-        <v-tooltip v-if="item.tooltip" right :key="id">
+        <v-tooltip
+          v-if="item.tooltip"
+          :left="isLeft"
+          :right="isRight"
+          :key="id"
+          content-class="custom-tooltip"
+        >
           <template v-slot:activator="{ on, attrs }">
-            <v-row class="pa-0 ma-0" v-bind="attrs" v-on="on">
+            <v-row v-bind="attrs" v-on="on" class="pa-0 ma-0">
               <v-col class="pa-0 ma-0" cols="4">
                 <v-subheader class="font-weight-bold">
                   {{ id }}
@@ -172,6 +178,8 @@ export default class WorkerInterfaceValues extends Vue {
   readonly workerInterface!: IWorkerInterface;
 
   @VModel({ type: Object }) interfaceValues!: IWorkerInterfaceValues;
+  @Prop({ default: "right", type: String })
+  readonly tooltipPosition!: "left" | "right";
 
   getDefault(type: TWorkerInterfaceType, defaultValue?: TWorkerInterfaceValue) {
     if (defaultValue) {
@@ -202,6 +210,13 @@ export default class WorkerInterfaceValues extends Vue {
       case "checkbox":
         return false;
     }
+  }
+  // Computed properties to determine tooltip alignment
+  get isLeft() {
+    return this.tooltipPosition === "left";
+  }
+  get isRight() {
+    return this.tooltipPosition === "right";
   }
 
   get orderItemEntries() {
