@@ -936,6 +936,7 @@ export type TGeoJSColor = string | number | IGeoJSColorObject;
 export interface ICommonWorkerInterfaceElement {
   displayOrder?: number;
   noCache?: boolean;
+  tooltip?: string;
   vueAttrs?: { [vueAttr: string]: any };
 }
 
