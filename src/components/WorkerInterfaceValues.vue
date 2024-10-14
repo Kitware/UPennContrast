@@ -113,6 +113,7 @@
                   :step="item.step || -1"
                   style="width: 60px"
                   class="mt-0 pt-0"
+                  :label="item.unit ? item.unit : undefined"
                 ></v-text-field>
               </template>
             </v-slider>
