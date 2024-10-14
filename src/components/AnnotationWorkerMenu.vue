@@ -35,7 +35,7 @@
           />
         </v-row>
         <v-row>
-          <v-btn @click="preview">preview</v-btn>
+          <v-btn @click="preview" v-if="hasPreview">Preview</v-btn>
           <v-spacer></v-spacer>
           <v-btn @click="compute" :disabled="running">
             <v-progress-circular size="16" v-if="running" indeterminate />
@@ -46,6 +46,7 @@
         </v-row>
         <v-row>
           <v-checkbox
+            v-if="hasPreview"
             v-model="displayWorkerPreview"
             label="Display Previews"
           ></v-checkbox>
@@ -148,6 +149,7 @@ export default class AnnotationWorkerMenu extends Vue {
 
   @Watch("tool")
   async updateInterface(force?: boolean) {
+    this.propertyStore.fetchWorkerImageList(); // Required to update docker image labels
     if (
       (force || this.workerInterface === undefined) &&
       !this.fetchingWorkerInterface
@@ -158,6 +160,10 @@ export default class AnnotationWorkerMenu extends Vue {
         .finally();
       this.fetchingWorkerInterface = false;
     }
+  }
+
+  get hasPreview() {
+    return this.propertyStore.hasPreview(this.image);
   }
 }
 </script>
