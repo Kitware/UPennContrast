@@ -946,6 +946,7 @@ export interface INumberWorkerInterfaceElement
   min?: number;
   max?: number;
   step?: number;
+  unit?: string;
   default?: number;
 }
 
