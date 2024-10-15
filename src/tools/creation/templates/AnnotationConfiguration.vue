@@ -254,7 +254,7 @@ export default class AnnotationConfiguration extends Vue {
   reset() {
     // Set internal values to the current input, or defaults
     this.updateCoordinateAssignement();
-    this.useAutoTags = true;
+    this.useAutoTags = !this.advanced;
     this.tagsInternal = [];
     this.shape = this.defaultShape;
     this.color = undefined;
