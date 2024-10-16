@@ -109,11 +109,7 @@ import {
 } from "@/utils/parsing";
 import { IGirderItem } from "@/girder";
 import { ITileMeta } from "@/store/GirderAPI";
-import {
-  IGeoJSPosition,
-  IGeoJSPositionWithTransform,
-  IJobEventData,
-} from "@/store/model";
+import { IGeoJSPositionWithTransform, IJobEventData } from "@/store/model";
 import { logError } from "@/utils/log";
 
 // Possible sources for variables
