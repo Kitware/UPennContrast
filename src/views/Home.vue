@@ -9,8 +9,22 @@
               <v-subheader class="headline mb-4">Upload dataset</v-subheader>
               <v-card>
                 <v-tabs v-model="uploadTab">
-                  <v-tab> Quick upload/view </v-tab>
-                  <v-tab> Advanced upload </v-tab>
+                  <span
+                    v-tooltip="
+                      'Directly upload a file using all default options and then go straight to the image viewer'
+                    "
+                    style="display: flex"
+                  >
+                    <v-tab> Quick upload/view </v-tab>
+                  </span>
+                  <span
+                    v-tooltip="
+                      'Upload a dataset with the option to assign variables to files, composite tiles, and more'
+                    "
+                    style="display: flex"
+                  >
+                    <v-tab> Advanced upload </v-tab>
+                  </span>
                 </v-tabs>
               </v-card>
               <v-tabs-items v-model="uploadTab" class="flex-window-items">

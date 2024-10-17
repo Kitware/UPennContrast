@@ -23,12 +23,15 @@ import "mousetrap/plugins/record/mousetrap-record.min.js";
 import vMousetrap from "@/utils/v-mousetrap";
 import vDescription from "@/utils/v-description";
 import chat from "./store/chat";
+import VueTooltipDirective from "vue-tooltip-directive";
+import NimbusTooltip from "@/components/NimbusTooltip.vue";
 
 Vue.config.productionTip = false;
 
 Vue.use(VueAsyncComputed);
 Vue.use(vMousetrap);
 Vue.use(vDescription);
+Vue.use(VueTooltipDirective, { component: NimbusTooltip });
 
 main.initialize();
 main.setupWatchers();
