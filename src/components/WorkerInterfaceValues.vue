@@ -5,72 +5,159 @@
       See: https://github.com/Kitware/UPennContrast/pull/391#issuecomment-1557606390
     -->
     <v-list-item-group>
-      <v-row v-for="[id, item] in orderItemEntries" :key="id" class="pa-0 ma-0">
-        <v-col class="pa-0 ma-0" cols="4">
-          <v-subheader>
-            {{ id }}
-          </v-subheader>
-        </v-col>
-        <v-col class="pa-0 ma-0">
-          <v-slider
-            v-if="item.type === 'number'"
-            v-bind="item.vueAttrs"
-            v-model="interfaceValues[id]"
-            :max="item.max"
-            :min="item.min"
-            :step="item.step || -1"
-            class="align-center"
-          >
-            <template v-slot:append>
-              <v-text-field
-                v-model="interfaceValues[id]"
-                type="number"
-                :max="item.max"
-                :min="item.min"
-                :step="item.step || -1"
-                style="width: 60px"
-                class="mt-0 pt-0"
-              >
-              </v-text-field>
-            </template>
-          </v-slider>
-          <v-text-field
-            v-if="item.type === 'text'"
-            v-bind="item.vueAttrs"
-            v-model="interfaceValues[id]"
-            dense
-          ></v-text-field>
-          <tag-picker
-            v-if="item.type === 'tags'"
-            v-bind="item.vueAttrs"
-            v-model="interfaceValues[id]"
-          ></tag-picker>
-          <layer-select
-            :clearable="!item.required"
-            v-if="item.type === 'layer'"
-            v-bind="item.vueAttrs"
-            v-model="interfaceValues[id]"
-          ></layer-select>
-          <v-select
-            :clearable="!item.required"
-            v-if="item.type === 'select'"
-            v-bind="item.vueAttrs"
-            v-model="interfaceValues[id]"
-            :items="item.items"
-          ></v-select>
-          <channel-select
-            :clearable="!item.required"
-            v-if="item.type === 'channel'"
-            v-bind="item.vueAttrs"
-            v-model="interfaceValues[id]"
-          ></channel-select>
-          <v-checkbox
-            v-if="item.type === 'checkbox'"
-            v-bind="item.vueAttrs"
-            v-model="interfaceValues[id]"
-          ></v-checkbox>
-        </v-col>
-      </v-row>
+      <template v-for="[id, item] in orderItemEntries">
+        <!-- Conditionally wrap the entire <v-row> with <v-tooltip> if item.tooltip exists -->
+        <v-tooltip
+          v-if="item.tooltip"
+          :left="isLeft"
+          :right="isRight"
+          :key="id"
+          content-class="custom-tooltip"
+        >
+          <template v-slot:activator="{ on, attrs }">
+            <v-row v-bind="attrs" v-on="on" class="pa-0 ma-0">
+              <v-col class="pa-0 ma-0" cols="4">
+                <v-subheader class="font-weight-bold">
+                  {{ id }}
+                </v-subheader>
+              </v-col>
+              <v-col class="pa-0 ma-0">
+                <v-slider
+                  v-if="item.type === 'number'"
+                  v-bind="item.vueAttrs"
+                  v-model="interfaceValues[id]"
+                  :max="item.max"
+                  :min="item.min"
+                  :step="item.step || -1"
+                  class="align-center"
+                >
+                  <template v-slot:append>
+                    <v-text-field
+                      v-model="interfaceValues[id]"
+                      type="number"
+                      :max="item.max"
+                      :min="item.min"
+                      :step="item.step || -1"
+                      style="width: 60px"
+                      class="mt-0 pt-0"
+                      :label="item.unit ? item.unit : undefined"
+                    ></v-text-field>
+                  </template>
+                </v-slider>
+                <div v-if="item.type === 'notes'" class="py-2 notes-container">
+                  {{ item.value }}
+                </div>
+                <v-text-field
+                  v-if="item.type === 'text'"
+                  v-bind="item.vueAttrs"
+                  v-model="interfaceValues[id]"
+                  dense
+                ></v-text-field>
+                <tag-picker
+                  v-if="item.type === 'tags'"
+                  v-bind="item.vueAttrs"
+                  v-model="interfaceValues[id]"
+                ></tag-picker>
+                <layer-select
+                  :clearable="!item.required"
+                  v-if="item.type === 'layer'"
+                  v-bind="item.vueAttrs"
+                  v-model="interfaceValues[id]"
+                ></layer-select>
+                <v-select
+                  :clearable="!item.required"
+                  v-if="item.type === 'select'"
+                  v-bind="item.vueAttrs"
+                  v-model="interfaceValues[id]"
+                  :items="item.items"
+                ></v-select>
+                <channel-select
+                  :clearable="!item.required"
+                  v-if="item.type === 'channel'"
+                  v-bind="item.vueAttrs"
+                  v-model="interfaceValues[id]"
+                ></channel-select>
+                <v-checkbox
+                  v-if="item.type === 'checkbox'"
+                  v-bind="item.vueAttrs"
+                  v-model="interfaceValues[id]"
+                ></v-checkbox>
+              </v-col>
+            </v-row>
+          </template>
+          <span v-html="formattedTooltip(item.tooltip)"></span>
+        </v-tooltip>
+        <!-- Render <v-row> without tooltip if item.tooltip does not exist -->
+        <v-row v-else class="pa-0 ma-0" :key="id">
+          <v-col class="pa-0 ma-0" cols="4">
+            <v-subheader class="font-weight-bold">
+              {{ id }}
+            </v-subheader>
+          </v-col>
+          <v-col class="pa-0 ma-0">
+            <v-slider
+              v-if="item.type === 'number'"
+              v-bind="item.vueAttrs"
+              v-model="interfaceValues[id]"
+              :max="item.max"
+              :min="item.min"
+              :step="item.step || -1"
+              class="align-center"
+            >
+              <template v-slot:append>
+                <v-text-field
+                  v-model="interfaceValues[id]"
+                  type="number"
+                  :max="item.max"
+                  :min="item.min"
+                  :step="item.step || -1"
+                  style="width: 60px"
+                  class="mt-0 pt-0"
+                  :label="item.unit ? item.unit : undefined"
+                ></v-text-field>
+              </template>
+            </v-slider>
+            <div v-if="item.type === 'notes'" class="py-2 notes-container">
+              {{ item.value }}
+            </div>
+            <v-text-field
+              v-if="item.type === 'text'"
+              v-bind="item.vueAttrs"
+              v-model="interfaceValues[id]"
+              dense
+            ></v-text-field>
+            <tag-picker
+              v-if="item.type === 'tags'"
+              v-bind="item.vueAttrs"
+              v-model="interfaceValues[id]"
+            ></tag-picker>
+            <layer-select
+              :clearable="!item.required"
+              v-if="item.type === 'layer'"
+              v-bind="item.vueAttrs"
+              v-model="interfaceValues[id]"
+            ></layer-select>
+            <v-select
+              :clearable="!item.required"
+              v-if="item.type === 'select'"
+              v-bind="item.vueAttrs"
+              v-model="interfaceValues[id]"
+              :items="item.items"
+            ></v-select>
+            <channel-select
+              :clearable="!item.required"
+              v-if="item.type === 'channel'"
+              v-bind="item.vueAttrs"
+              v-model="interfaceValues[id]"
+            ></channel-select>
+            <v-checkbox
+              v-if="item.type === 'checkbox'"
+              v-bind="item.vueAttrs"
+              v-model="interfaceValues[id]"
+            ></v-checkbox>
+          </v-col>
+        </v-row>
+      </template>
     </v-list-item-group>
   </v-container>
 </template>
@@ -93,6 +180,8 @@ export default class WorkerInterfaceValues extends Vue {
   readonly workerInterface!: IWorkerInterface;
 
   @VModel({ type: Object }) interfaceValues!: IWorkerInterfaceValues;
+  @Prop({ default: "right", type: String })
+  readonly tooltipPosition!: "left" | "right";
 
   getDefault(type: TWorkerInterfaceType, defaultValue?: TWorkerInterfaceValue) {
     if (defaultValue) {
@@ -101,6 +190,9 @@ export default class WorkerInterfaceValues extends Vue {
     switch (type) {
       case "number":
         return 0.0;
+
+      case "notes":
+        return "";
 
       case "text":
         return "";
@@ -121,6 +213,13 @@ export default class WorkerInterfaceValues extends Vue {
         return false;
     }
   }
+  // Computed properties to determine tooltip alignment
+  get isLeft() {
+    return this.tooltipPosition === "left";
+  }
+  get isRight() {
+    return this.tooltipPosition === "right";
+  }
 
   get orderItemEntries() {
     const allEntries = Object.entries(this.workerInterface);
@@ -131,6 +230,10 @@ export default class WorkerInterfaceValues extends Vue {
       .filter(([, { displayOrder }]) => displayOrder !== undefined)
       .sort(([, { displayOrder: a }], [, { displayOrder: b }]) => a! - b!);
     return [...explicitlySortedItems, ...alphabeticalOrderItems];
+  }
+
+  formattedTooltip(text: string): string {
+    return text.replace(/\n/g, "<br>");
   }
 
   mounted() {
@@ -151,3 +254,11 @@ export default class WorkerInterfaceValues extends Vue {
   }
 }
 </script>
+
+<style scoped>
+.notes-container {
+  max-width: 300px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+</style>

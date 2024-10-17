@@ -936,6 +936,7 @@ export type TGeoJSColor = string | number | IGeoJSColorObject;
 export interface ICommonWorkerInterfaceElement {
   displayOrder?: number;
   noCache?: boolean;
+  tooltip?: string;
   vueAttrs?: { [vueAttr: string]: any };
 }
 
@@ -945,7 +946,15 @@ export interface INumberWorkerInterfaceElement
   min?: number;
   max?: number;
   step?: number;
+  unit?: string;
   default?: number;
+}
+
+export interface INotesWorkerInterfaceElement
+  extends ICommonWorkerInterfaceElement {
+  type: "notes";
+  value?: string;
+  default?: string;
 }
 
 export interface ITextWorkerInterfaceElement
@@ -990,6 +999,7 @@ export interface ICheckboxWorkerInterfaceElement
 
 export type TWorkerInterfaceElement =
   | INumberWorkerInterfaceElement
+  | INotesWorkerInterfaceElement
   | ITextWorkerInterfaceElement
   | ITagsWorkerInterfaceElement
   | ILayerWorkerInterfaceElement
