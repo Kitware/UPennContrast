@@ -719,6 +719,7 @@ export default class MultiSourceConfiguration extends Vue {
         }
       }
       const { mm_x, mm_y } = this.tilesMetadata![0];
+      const { sizeX, sizeY } = this.tilesMetadata![0];
       const framesMetadata = this.tilesInternalMetadata![0].nd2_frame_metadata;
       const coordinates: IGeoJSPositionWithTransform[] = framesMetadata.map(
         (f: any) => {
@@ -781,13 +782,49 @@ export default class MultiSourceConfiguration extends Vue {
           return pos;
         },
       );
+      // We need to find the bounding box.
+      // The offset of the tile positions will depend on the transformation.
+      // First, define the corners of a single tile.
+      const corners = [
+        { x: 0, y: 0 },
+        { x: sizeX, y: 0 },
+        { x: 0, y: sizeY },
+        { x: sizeX, y: sizeY },
+      ];
+      // Apply the transformation to all corners
+      const transformedCorners = corners.map((corner) => ({
+        x:
+          (coordinates[0]?.s11 ?? 1) * corner.x +
+          (coordinates[0]?.s12 ?? 0) * corner.y,
+        y:
+          (coordinates[0]?.s21 ?? 0) * corner.x +
+          (coordinates[0]?.s22 ?? 1) * corner.y,
+      }));
+      // Find the minimum and maximum x and y values for the transformed corners
+      const offsetMin = {
+        x: Math.min(...transformedCorners.map((c) => c.x)),
+        y: Math.min(...transformedCorners.map((c) => c.y)),
+      };
+      const offsetMax = {
+        x: Math.max(...transformedCorners.map((c) => c.x)),
+        y: Math.max(...transformedCorners.map((c) => c.y)),
+      };
+      // Find the minimum and maximum x and y values for the coordinates
       const minCoordinate = {
-        x: Math.min(...coordinates.map((coordinate) => coordinate.x)),
-        y: Math.min(...coordinates.map((coordinate) => coordinate.y)),
+        x:
+          Math.min(...coordinates.map((coordinate) => coordinate.x)) +
+          offsetMin.x,
+        y:
+          Math.min(...coordinates.map((coordinate) => coordinate.y)) -
+          offsetMax.y, // Notice that the math is a little funny here. That's because Y is inverted.
       };
       const maxCoordinate = {
-        x: Math.max(...coordinates.map((coordinate) => coordinate.x)),
-        y: Math.max(...coordinates.map((coordinate) => coordinate.y)),
+        x:
+          Math.max(...coordinates.map((coordinate) => coordinate.x)) +
+          offsetMax.x,
+        y:
+          Math.max(...coordinates.map((coordinate) => coordinate.y)) -
+          offsetMin.y, // Notice that the math is a little funny here. That's because Y is inverted.
       };
       let finalCoordinates = coordinates.map((coordinate) => ({
         x: Math.round(coordinate.x - minCoordinate.x),
