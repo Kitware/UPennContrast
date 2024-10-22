@@ -109,7 +109,7 @@ import {
 } from "@/utils/parsing";
 import { IGirderItem } from "@/girder";
 import { ITileMeta } from "@/store/GirderAPI";
-import { IGeoJSPosition, IJobEventData } from "@/store/model";
+import { IGeoJSPositionWithTransform, IJobEventData } from "@/store/model";
 import { logError } from "@/utils/log";
 
 // Possible sources for variables
@@ -185,7 +185,14 @@ interface ICompositingSource {
   tSet: number;
   cSet: number;
   frames: number[];
-  position?: { x: number; y: number };
+  position?: {
+    x: number;
+    y: number;
+    s11?: number;
+    s12?: number;
+    s21?: number;
+    s22?: number;
+  };
 }
 
 @Component({
@@ -712,30 +719,124 @@ export default class MultiSourceConfiguration extends Vue {
         }
       }
       const { mm_x, mm_y } = this.tilesMetadata![0];
+      const { sizeX, sizeY } = this.tilesMetadata![0];
       const framesMetadata = this.tilesInternalMetadata![0].nd2_frame_metadata;
-      const coordinates: IGeoJSPosition[] = framesMetadata.map((f: any) => {
-        const framePos = f.position.stagePositionUm;
-        return {
-          x: framePos[0] / (mm_x * 1000),
-          y: framePos[1] / (mm_y * 1000),
-        };
-      });
+      const coordinates: IGeoJSPositionWithTransform[] = framesMetadata.map(
+        (f: any) => {
+          const framePos = f.position.stagePositionUm;
+          const pos = {
+            x: framePos[0] / (mm_x * 1000),
+            y: framePos[1] / (mm_y * 1000),
+            s11: 1,
+            s12: 0,
+            s21: 0,
+            s22: 1,
+          };
+          if (
+            this.tilesInternalMetadata![0].nd2 &&
+            this.tilesInternalMetadata![0].nd2.channels
+          ) {
+            const chan = this.tilesInternalMetadata![0].nd2.channels;
+            const chan0 =
+              chan.volume !== undefined ? chan.volume : chan[0].volume;
+            /* 
+            // In David's version, if it was close to an inversion, 
+            // it would just invert the position, but this ends up being inverted
+            // from what the transformation would do. Keeping for posterity.
+            if (
+              chan0.cameraTransformationMatrix &&
+              Math.abs(chan0.cameraTransformationMatrix[0] - -1) < 0.01 &&
+              Math.abs(chan0.cameraTransformationMatrix[3] - -1)
+            ) {
+              // pos.x *= -1;
+              // pos.y *= -1;
+            }
+            */
+            if (
+              // If close to the identity matrix, then we don't need to apply the transform
+              // Only apply transform if it's not close to the identity matrix
+              chan0.cameraTransformationMatrix &&
+              (Math.abs(chan0.cameraTransformationMatrix[0] - 1) > 0.01 ||
+                Math.abs(chan0.cameraTransformationMatrix[3] - 1) > 0.01)
+            ) {
+              // If close to an inversion matrix, then just round to inversion
+              if (
+                Math.abs(chan0.cameraTransformationMatrix[0] - -1) < 0.01 &&
+                Math.abs(chan0.cameraTransformationMatrix[3] - -1) < 0.01
+              ) {
+                pos.s11 = -1.0;
+                pos.s12 = 0.0;
+                pos.s21 = 0.0;
+                pos.s22 = -1.0;
+              } else {
+                // Otherwise, apply the matrix
+                // AR note: I wonder if we should apply the matrix to the position itself as well
+                // It is hard to say without an example with a more egregious transformation
+                pos.s11 = chan0.cameraTransformationMatrix[0];
+                pos.s12 = chan0.cameraTransformationMatrix[1];
+                pos.s21 = chan0.cameraTransformationMatrix[2];
+                pos.s22 = chan0.cameraTransformationMatrix[3];
+              }
+            }
+          }
+          return pos;
+        },
+      );
+      // We need to find the bounding box.
+      // The offset of the tile positions will depend on the transformation.
+      // First, define the corners of a single tile.
+      const corners = [
+        { x: 0, y: 0 },
+        { x: sizeX, y: 0 },
+        { x: 0, y: sizeY },
+        { x: sizeX, y: sizeY },
+      ];
+      // Apply the transformation to all corners
+      const transformedCorners = corners.map((corner) => ({
+        x:
+          (coordinates[0]?.s11 ?? 1) * corner.x +
+          (coordinates[0]?.s12 ?? 0) * corner.y,
+        y:
+          (coordinates[0]?.s21 ?? 0) * corner.x +
+          (coordinates[0]?.s22 ?? 1) * corner.y,
+      }));
+      // Find the minimum and maximum x and y values for the transformed corners
+      const offsetMin = {
+        x: Math.min(...transformedCorners.map((c) => c.x)),
+        y: Math.min(...transformedCorners.map((c) => c.y)),
+      };
+      const offsetMax = {
+        x: Math.max(...transformedCorners.map((c) => c.x)),
+        y: Math.max(...transformedCorners.map((c) => c.y)),
+      };
+      // Find the minimum and maximum x and y values for the coordinates
       const minCoordinate = {
-        x: Math.min(...coordinates.map((coordinate) => coordinate.x)),
-        y: Math.min(...coordinates.map((coordinate) => coordinate.y)),
+        x:
+          Math.min(...coordinates.map((coordinate) => coordinate.x)) +
+          offsetMin.x,
+        y:
+          Math.min(...coordinates.map((coordinate) => coordinate.y)) -
+          offsetMax.y, // Notice that the math is a little funny here. That's because Y is inverted.
       };
       const maxCoordinate = {
-        x: Math.max(...coordinates.map((coordinate) => coordinate.x)),
-        y: Math.max(...coordinates.map((coordinate) => coordinate.y)),
+        x:
+          Math.max(...coordinates.map((coordinate) => coordinate.x)) +
+          offsetMax.x,
+        y:
+          Math.max(...coordinates.map((coordinate) => coordinate.y)) -
+          offsetMin.y, // Notice that the math is a little funny here. That's because Y is inverted.
       };
-      const intCoordinates = coordinates.map((coordinate) => ({
+      let finalCoordinates = coordinates.map((coordinate) => ({
         x: Math.round(coordinate.x - minCoordinate.x),
         y: Math.round(maxCoordinate.y - coordinate.y),
+        s11: coordinate.s11,
+        s12: coordinate.s12,
+        s21: coordinate.s21,
+        s22: coordinate.s22,
       }));
-
       compositingSources.forEach((source, sourceIdx) => {
         source.position =
-          intCoordinates[Math.floor(sourceIdx / channels!.length)];
+          finalCoordinates[Math.floor(sourceIdx / channels!.length)];
         source.xySet = 0;
       });
     } else {
