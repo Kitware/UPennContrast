@@ -10,7 +10,7 @@
           v-tooltip="{
             content: item.tooltip ? formattedTooltip(item.tooltip) : '',
             position: tooltipPosition,
-            enabled: !!item.tooltip
+            enabled: !!item.tooltip,
           }"
           :key="id"
         >
