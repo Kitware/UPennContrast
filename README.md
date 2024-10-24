@@ -12,6 +12,8 @@ See this [gitbook](https://arjun-raj-lab.gitbook.io/nimbusimage) for documentati
 
 You can run the server yourself on most reasonably new computers (Mac, Linux, PC). The GPU workers (e.g. Cellpose, Piscis) only work on Linux and possibly Windows, but will fall back to CPU if no GPU is (properly) installed.
 
+Tye typical install time is probably around 1-2 hours.
+
 Software requirements:
 Docker (latest version) (be sure to follow the post install instructions for Linux, and 
 Node.js (latest version)
@@ -107,7 +109,10 @@ That will install all the workers. The machine learning workers will run on CPU 
 
 IMPORTANT: by default, a admin user will be created with the name `admin` and the password `password`. You can use that user to initially log into the system. For security, it is critical to add a new admin user in Girder and then remove the original admin user. To do this, go to ```localhost:8080```, where you can sign into Girder, then go to the `Users` tab on the left.
 
-## Test data
+## Demo and test data
+
+[Quick start](https://arjun-raj-lab.gitbook.io/nimbusimage/quick-start)
+[Vignettes](https://arjun-raj-lab.gitbook.io/nimbusimage/vignettes)
 
 [Test dataset with RNA FISH images](https://www.dropbox.com/scl/fi/hyg3bou153fnq6lye3zlb/DDX58_AXL_EGFR_well2.nd2?rlkey=lf00zmmkqv4hc7c6fy9qgqvfp&dl=0)
 [Test N-dimensional dataset with GFP labeled nuclei](https://www.dropbox.com/scl/fi/rakjixk7ei3b31h41nso5/normmedia_8well_col2_livecellgfp.nd2?rlkey=vjqiftvcqlihl692b8xsr79rd&dl=0)
