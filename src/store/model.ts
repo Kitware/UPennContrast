@@ -638,6 +638,14 @@ export interface IGeoJSPosition extends IGeoJSPoint2D {
   z?: number; // Optional z coordinate
 }
 
+// Includes the transform matrix for processing multi-source data
+export interface IGeoJSPositionWithTransform extends IGeoJSPosition {
+  s11?: number;
+  s12?: number;
+  s21?: number;
+  s22?: number;
+}
+
 // https://opengeoscience.github.io/geojs/apidocs/geo.fetchQueue.html
 export interface IGeoJSFetchQueue {}
 
