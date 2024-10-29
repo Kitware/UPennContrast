@@ -63,6 +63,7 @@ import store from "@/store";
 import annotationsStore from "@/store/annotation";
 import {
   IProgressInfo,
+  IErrorInfo,
   IToolConfiguration,
   IWorkerInterfaceValues,
 } from "@/store/model";
@@ -87,7 +88,7 @@ export default class AnnotationWorkerMenu extends Vue {
   running: boolean = false;
   previousRunStatus: boolean | null = null;
   progressInfo: IProgressInfo = {};
-
+  errorInfo: IErrorInfo = {};
   interfaceValues: IWorkerInterfaceValues = {};
 
   @Prop()
@@ -128,6 +129,7 @@ export default class AnnotationWorkerMenu extends Vue {
       tool: this.tool,
       workerInterface: this.interfaceValues,
       progress: this.progressInfo,
+      error: this.errorInfo,
       callback: (success) => {
         this.running = false;
         this.previousRunStatus = success;

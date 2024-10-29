@@ -8,7 +8,7 @@ import {
 import store from "./root";
 import Vue from "vue";
 
-import { IComputeJob, IJobEventData, IProgressInfo } from "./model";
+import { IComputeJob, IErrorInfo, IJobEventData, IProgressInfo } from "./model";
 
 import main from "./index";
 
@@ -38,11 +38,41 @@ export function createProgressEventCallback(progressObject: IProgressInfo) {
       }
       try {
         const progress = JSON.parse(line);
+        // Skip error messages, let them be handled by error callback
+        if (progress.error) {
+          continue;
+        }
         // The only required property is "progress"
         if (typeof progress.progress === "number") {
           for (const [k, v] of Object.entries(progress)) {
             Vue.set(progressObject, k, v);
           }
+        }
+      } catch {}
+    }
+  };
+}
+
+export function createErrorEventCallback(errorObject: IErrorInfo) {
+  return (jobData: IJobEventData) => {
+    const text = jobData.text;
+    if (!text || typeof text !== "string") {
+      return;
+    }
+    for (const line of text.split("\n")) {
+      if (!line) {
+        continue;
+      }
+      try {
+        const error = JSON.parse(line);
+        // Skip progress messages
+        if (error.progress) {
+          continue;
+        }
+        if (error.error) {
+          // Handle the error message
+          console.log(`Error: ${error.title} - ${error.error} - ${error.info}`);
+          // Update the errorObject or UI as needed
         }
       } catch {}
     }
@@ -165,6 +195,7 @@ export class Jobs extends VuexModule {
     }
     for (const listener of jobInfo.listeners) {
       listener.eventCallback?.(jobEvent);
+      listener.errorCallback?.(jobEvent);
     }
     const status = jobEvent.status;
     if (

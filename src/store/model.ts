@@ -1175,6 +1175,12 @@ export interface IProgressInfo {
   progress?: number;
 }
 
+export interface IErrorInfo {
+  title?: string;
+  error?: string;
+  info?: string;
+}
+
 export interface ICameraInfo {
   center: IGeoJSPosition;
   zoom: number;
@@ -1191,6 +1197,7 @@ export interface IComputeJobBase {
   jobId: string;
   datasetId: string | null;
   eventCallback?: (data: IJobEventData) => void;
+  errorCallback?: (data: IJobEventData) => void;
 }
 export interface IAnnotationComputeJob extends IComputeJobBase {
   toolId: string;
