@@ -8,7 +8,13 @@ import {
 import store from "./root";
 import Vue from "vue";
 
-import { IComputeJob, IErrorInfo, IJobEventData, IProgressInfo } from "./model";
+import {
+  IComputeJob,
+  IErrorInfo,
+  IJobEventData,
+  IProgressInfo,
+  MessageType,
+} from "./model";
 
 import main from "./index";
 
@@ -69,12 +75,16 @@ export function createErrorEventCallback(errorObject: IErrorInfoList) {
         if (error.progress) {
           continue;
         }
-        if (error.error) {
+        if (error.error || error.warning) {
           // Create new error info object
           const newError: IErrorInfo = {
             title: error.title,
             error: error.error,
+            warning: error.warning,
             info: error.info,
+            type:
+              error.type ||
+              (error.error ? MessageType.ERROR : MessageType.WARNING),
           };
           // Add to errors array while maintaining reactivity
           Vue.set(errorObject.errors, errorObject.errors.length, newError);

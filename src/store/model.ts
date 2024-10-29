@@ -1175,10 +1175,17 @@ export interface IProgressInfo {
   progress?: number;
 }
 
+export enum MessageType {
+  ERROR = "error",
+  WARNING = "warning",
+}
+
 export interface IErrorInfo {
   title?: string;
   error?: string;
+  warning?: string;
   info?: string;
+  type?: MessageType;
 }
 
 export interface IErrorInfoList {

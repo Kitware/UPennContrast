@@ -22,7 +22,18 @@
             {{ progressInfo.info }}
           </v-progress-linear>
         </v-row>
-        <v-row v-for="(error, index) in filteredErrors" :key="index">
+        <v-row
+          v-for="(warning, index) in filteredWarnings"
+          :key="'warning-' + index"
+        >
+          <v-alert type="warning" dense class="mb-2">
+            <div class="error-main">
+              {{ warning.title }}: {{ warning.warning }}
+            </div>
+            <div v-if="warning.info" class="error-info">{{ warning.info }}</div>
+          </v-alert>
+        </v-row>
+        <v-row v-for="(error, index) in filteredErrors" :key="'error-' + index">
           <v-alert type="error" dense class="mb-2">
             <div class="error-main">{{ error.title }}: {{ error.error }}</div>
             <div v-if="error.info" class="error-info">{{ error.info }}</div>
@@ -69,10 +80,10 @@ import store from "@/store";
 import annotationsStore from "@/store/annotation";
 import {
   IProgressInfo,
-  IErrorInfo,
   IToolConfiguration,
   IWorkerInterfaceValues,
   IErrorInfoList,
+  MessageType,
 } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
@@ -177,7 +188,15 @@ export default class AnnotationWorkerMenu extends Vue {
   }
 
   get filteredErrors() {
-    return this.errorInfo.errors.filter((error) => error.error);
+    return this.errorInfo.errors.filter(
+      (error) => error.error && error.type === MessageType.ERROR,
+    );
+  }
+
+  get filteredWarnings() {
+    return this.errorInfo.errors.filter(
+      (error) => error.warning && error.type === MessageType.WARNING,
+    );
   }
 }
 </script>
@@ -194,13 +213,14 @@ export default class AnnotationWorkerMenu extends Vue {
 
 .error-main {
   font-weight: 500;
-  max-width: 100px;
-  word-wrap: break-word; /* Ensures long words don't overflow */
+  max-width: 300px;
 }
 
 .error-info {
   font-size: 0.875em;
   margin-top: 4px;
+  max-width: 300px;
+  word-wrap: break-word; /* Ensures long words don't overflow */
   opacity: 0.9;
 }
 </style>
