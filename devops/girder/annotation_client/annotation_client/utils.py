@@ -22,9 +22,12 @@ def sendWarning(warning_message, title="Warning", info=None):
     :param str title: Title for the warning message
     :param str info: Additional information to send
     """
-    print(
-        json.dumps({"warning": warning_message, "title": title, "info": info, "type": "warning"})
-    )
+    print(json.dumps({
+        "warning": warning_message,
+        "title": title,
+        "info": info,
+        "type": "warning"
+    }))
     sys.stdout.flush()
 
 
@@ -36,7 +39,10 @@ def sendError(error_message, title="Error", info=None):
     :param str title: Title for the error message
     :param str info: Additional information to send
     """
-    print(
-        json.dumps({"error": error_message, "title": title, "info": info, "type": "error"})
-    )
+    print(json.dumps({
+        "error": error_message,
+        "title": title,
+        "info": info,
+        "type": "error"
+    }))
     sys.stdout.flush()

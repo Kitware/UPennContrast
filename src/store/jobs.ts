@@ -11,6 +11,7 @@ import Vue from "vue";
 import {
   IComputeJob,
   IErrorInfo,
+  IErrorInfoList,
   IJobEventData,
   IProgressInfo,
   MessageType,
