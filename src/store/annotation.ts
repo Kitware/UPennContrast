@@ -765,6 +765,9 @@ export class Annotations extends VuexModule {
     }
     const datasetId = main.dataset.id;
 
+    // Clear error while maintaining reactivity
+    Object.keys(error).forEach((key) => Vue.set(error, key, undefined));
+
     const { location, channel } =
       await this.getAnnotationLocationFromTool(tool);
     const tile = { XY: main.xy, Z: main.z, Time: main.time };
@@ -795,6 +798,7 @@ export class Annotations extends VuexModule {
     };
     jobs.addJob(computeJob).then((success: boolean) => {
       this.fetchAnnotations();
+      // TODO: We may also want to fetch connections and properties here, depending on flags set in the worker image
       callback(success);
     });
     return computeJob;

@@ -22,6 +22,12 @@
             {{ progressInfo.info }}
           </v-progress-linear>
         </v-row>
+        <v-row v-if="errorInfo.error">
+          <v-alert type="error" dense class="mb-2">
+            <div class="error-main">{{ errorInfo.title }}: {{ errorInfo.error }}</div>
+            <div v-if="errorInfo.info" class="error-info">{{ errorInfo.info }}</div>
+          </v-alert>
+        </v-row>
         <v-row>
           <v-col>
             <v-subheader>Image: {{ tool.values.image.image }}</v-subheader>
@@ -179,5 +185,17 @@ export default class AnnotationWorkerMenu extends Vue {
 // Set min-height to 0 when loaded
 .loaded {
   min-height: 0;
+}
+
+.error-main {
+  font-weight: 500;
+  max-width: 100px;
+  word-wrap: break-word; /* Ensures long words don't overflow */
+}
+
+.error-info {
+  font-size: 0.875em;
+  margin-top: 4px;
+  opacity: 0.9;
 }
 </style>

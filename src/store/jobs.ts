@@ -73,6 +73,9 @@ export function createErrorEventCallback(errorObject: IErrorInfo) {
           // Handle the error message
           console.log(`Error: ${error.title} - ${error.error} - ${error.info}`);
           // Update the errorObject or UI as needed
+          Vue.set(errorObject, "title", error.title);
+          Vue.set(errorObject, "error", error.error);
+          Vue.set(errorObject, "info", error.info);
         }
       } catch {}
     }
