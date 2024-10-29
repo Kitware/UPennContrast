@@ -90,7 +90,12 @@ import { Vue, Component } from "vue-property-decorator";
 import { logError } from "@/utils/log";
 import store from "@/store";
 import chatStore from "@/store/chat";
-import { IChatImage, IChatMessage } from "@/store/model";
+import {
+  IChatImage,
+  IChatMessage,
+  IGeoJSAnnotationLayer,
+  IGeoJSMap,
+} from "@/store/model";
 import { marked } from "marked";
 import html2canvas from "html2canvas";
 
