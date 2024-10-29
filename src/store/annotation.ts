@@ -9,7 +9,10 @@ import store from "./root";
 
 import main from "./index";
 import sync from "./sync";
-import jobs, { createProgressEventCallback, createErrorEventCallback } from "./jobs";
+import jobs, {
+  createProgressEventCallback,
+  createErrorEventCallback,
+} from "./jobs";
 
 import {
   IAnnotation,

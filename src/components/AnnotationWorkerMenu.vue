@@ -24,8 +24,12 @@
         </v-row>
         <v-row v-if="errorInfo.error">
           <v-alert type="error" dense class="mb-2">
-            <div class="error-main">{{ errorInfo.title }}: {{ errorInfo.error }}</div>
-            <div v-if="errorInfo.info" class="error-info">{{ errorInfo.info }}</div>
+            <div class="error-main">
+              {{ errorInfo.title }}: {{ errorInfo.error }}
+            </div>
+            <div v-if="errorInfo.info" class="error-info">
+              {{ errorInfo.info }}
+            </div>
           </v-alert>
         </v-row>
         <v-row>
