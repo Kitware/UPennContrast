@@ -25,6 +25,7 @@ import {
   IAnnotationComputeJob,
   IProgressInfo,
   IErrorInfo,
+  IErrorInfoList,
 } from "./model";
 
 import Vue, { markRaw } from "vue";
@@ -760,7 +761,7 @@ export class Annotations extends VuexModule {
     tool: IToolConfiguration;
     workerInterface: IWorkerInterfaceValues;
     progress: IProgressInfo;
-    error: IErrorInfo;
+    error: IErrorInfoList;
     callback: (success: boolean) => void;
   }) {
     if (!main.dataset || !main.configuration) {
@@ -768,8 +769,8 @@ export class Annotations extends VuexModule {
     }
     const datasetId = main.dataset.id;
 
-    // Clear error while maintaining reactivity
-    Object.keys(error).forEach((key) => Vue.set(error, key, undefined));
+    // Clear errors while maintaining reactivity
+    Vue.set(error, "errors", []);
 
     const { location, channel } =
       await this.getAnnotationLocationFromTool(tool);

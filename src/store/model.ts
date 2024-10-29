@@ -1181,6 +1181,10 @@ export interface IErrorInfo {
   info?: string;
 }
 
+export interface IErrorInfoList {
+  errors: IErrorInfo[];
+}
+
 export interface ICameraInfo {
   center: IGeoJSPosition;
   zoom: number;

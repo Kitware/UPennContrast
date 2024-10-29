@@ -53,7 +53,7 @@ export function createProgressEventCallback(progressObject: IProgressInfo) {
   };
 }
 
-export function createErrorEventCallback(errorObject: IErrorInfo) {
+export function createErrorEventCallback(errorObject: IErrorInfoList) {
   return (jobData: IJobEventData) => {
     const text = jobData.text;
     if (!text || typeof text !== "string") {
@@ -70,10 +70,14 @@ export function createErrorEventCallback(errorObject: IErrorInfo) {
           continue;
         }
         if (error.error) {
-          // Update the errorObject or UI as needed
-          Vue.set(errorObject, "title", error.title);
-          Vue.set(errorObject, "error", error.error);
-          Vue.set(errorObject, "info", error.info);
+          // Create new error info object
+          const newError: IErrorInfo = {
+            title: error.title,
+            error: error.error,
+            info: error.info,
+          };
+          // Add to errors array while maintaining reactivity
+          Vue.set(errorObject.errors, errorObject.errors.length, newError);
         }
       } catch {}
     }

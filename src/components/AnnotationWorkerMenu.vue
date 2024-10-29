@@ -22,14 +22,10 @@
             {{ progressInfo.info }}
           </v-progress-linear>
         </v-row>
-        <v-row v-if="errorInfo.error">
+        <v-row v-for="(error, index) in filteredErrors" :key="index">
           <v-alert type="error" dense class="mb-2">
-            <div class="error-main">
-              {{ errorInfo.title }}: {{ errorInfo.error }}
-            </div>
-            <div v-if="errorInfo.info" class="error-info">
-              {{ errorInfo.info }}
-            </div>
+            <div class="error-main">{{ error.title }}: {{ error.error }}</div>
+            <div v-if="error.info" class="error-info">{{ error.info }}</div>
           </v-alert>
         </v-row>
         <v-row>
@@ -76,6 +72,7 @@ import {
   IErrorInfo,
   IToolConfiguration,
   IWorkerInterfaceValues,
+  IErrorInfoList,
 } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
@@ -98,7 +95,7 @@ export default class AnnotationWorkerMenu extends Vue {
   running: boolean = false;
   previousRunStatus: boolean | null = null;
   progressInfo: IProgressInfo = {};
-  errorInfo: IErrorInfo = {};
+  errorInfo: IErrorInfoList = { errors: [] };
   interfaceValues: IWorkerInterfaceValues = {};
 
   @Prop()
@@ -177,6 +174,10 @@ export default class AnnotationWorkerMenu extends Vue {
 
   get hasPreview() {
     return this.propertyStore.hasPreview(this.image);
+  }
+
+  get filteredErrors() {
+    return this.errorInfo.errors.filter((error) => error.error);
   }
 }
 </script>
