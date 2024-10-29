@@ -88,6 +88,7 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import { logError } from "@/utils/log";
+import store from "@/store";
 import chatStore from "@/store/chat";
 import { IChatImage, IChatMessage } from "@/store/model";
 import { marked } from "marked";
@@ -95,10 +96,14 @@ import html2canvas from "html2canvas";
 
 @Component
 export default class ChatComponent extends Vue {
+  readonly store = store;
+
   $el!: HTMLElement;
   textInput = "";
   imagesInput: IChatImage[] = [];
   isWaiting = false;
+
+  bboxLayer: IGeoJSAnnotationLayer | null = null;
 
   marked = marked;
 
@@ -116,15 +121,28 @@ export default class ChatComponent extends Vue {
     this.imagesInput = [];
   }
 
+  get geoJSMaps() {
+    return this.store.maps.map((map) => map.map);
+  }
+
+  get firstMap(): IGeoJSMap | undefined {
+    return this.geoJSMaps[0];
+  }
+
   async sendMessage() {
     const trimmedInput = this.textInput.trim();
     if (this.isWaiting || trimmedInput === "") {
       return;
     }
 
-    const screenshot = await this.captureScreenshot();
-    if (screenshot) {
-      this.imagesInput.push(screenshot);
+    const interfaceScreenshot = await this.captureInterfaceScreenshot();
+    if (interfaceScreenshot) {
+      this.imagesInput.push(interfaceScreenshot);
+    }
+
+    const viewportScreenshot = await this.captureViewportScreenshot();
+    if (viewportScreenshot) {
+      this.imagesInput.push(viewportScreenshot);
     }
 
     const userMessage: IChatMessage = {
@@ -203,7 +221,7 @@ export default class ChatComponent extends Vue {
     await chatStore.clearAll();
   }
 
-  async captureScreenshot(): Promise<IChatImage | null> {
+  async captureInterfaceScreenshot(): Promise<IChatImage | null> {
     try {
       const canvas = await html2canvas(document.body, {
         ignoreElements: (element) => {
@@ -216,6 +234,18 @@ export default class ChatComponent extends Vue {
       logError("Error capturing screenshot:", error);
       return null;
     }
+  }
+
+  async captureViewportScreenshot(): Promise<IChatImage | null> {
+    const map = this.firstMap;
+    if (!map) {
+      return null;
+    }
+    const layers = map
+      .layers()
+      .filter((layer: any) => layer.node().css("visibility") !== "hidden");
+    const image = await map.screenshot(layers);
+    return { data: image, type: "image/png" };
   }
 }
 </script>
