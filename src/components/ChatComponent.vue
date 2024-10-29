@@ -3,7 +3,7 @@
     <v-card-title>
       Nimbus chat
       <v-spacer></v-spacer>
-      <v-btn icon @click="refreshChat">
+      <v-btn icon @click="refreshChat" :loading="isRefreshing">
         <v-icon>mdi-refresh</v-icon>
       </v-btn>
       <v-btn icon @click="$emit('close')">
@@ -13,7 +13,7 @@
     <v-card-text>
       <div ref="chatMessages" class="chat-messages">
         <div
-          v-for="(message, index) in messages.toReversed()"
+          v-for="(message, index) in filterVisibleMessages(messages)"
           :key="index"
           :class="message.type"
         >
@@ -107,6 +107,7 @@ export default class ChatComponent extends Vue {
   textInput = "";
   imagesInput: IChatImage[] = [];
   isWaiting = false;
+  isRefreshing = false;
 
   bboxLayer: IGeoJSAnnotationLayer | null = null;
 
@@ -134,8 +135,8 @@ export default class ChatComponent extends Vue {
     return this.geoJSMaps[0];
   }
 
-  async sendMessage() {
-    const trimmedInput = this.textInput.trim();
+  async sendMessage(visible: boolean = true, customInput?: string) {
+    const trimmedInput = customInput || this.textInput.trim();
     if (this.isWaiting || trimmedInput === "") {
       return;
     }
@@ -154,6 +155,7 @@ export default class ChatComponent extends Vue {
       type: "user",
       content: trimmedInput,
       images: [...this.imagesInput],
+      visible: visible,
     };
 
     this.clearInputs();
@@ -222,8 +224,19 @@ export default class ChatComponent extends Vue {
   }
 
   async refreshChat() {
+    this.isRefreshing = true;
     this.clearInputs();
     await chatStore.clearAll();
+    const firstMessage =
+      "This is the first hidden user message. You will get two screenshots, one of the interface and one of the image itself in the viewport. Start by saying 'Hello, I'm here to help you with NimbusImage! Looks like you are looking at' and then quickly summarize what you see in a couple sentences. Then offer to help by asking what the user would like to do.";
+    await this.sendMessage(false, firstMessage);
+    this.isRefreshing = false;
+  }
+
+  mounted() {
+    if (this.messages.length === 0) {
+      this.refreshChat();
+    }
   }
 
   async captureInterfaceScreenshot(): Promise<IChatImage | null> {
@@ -259,6 +272,14 @@ export default class ChatComponent extends Vue {
 
   get visibleImagesInput() {
     return this.filterVisibleImages(this.imagesInput);
+  }
+
+  filterVisibleMessages(messages: IChatMessage[]) {
+    return messages.filter((message) => message.visible !== false).toReversed();
+  }
+
+  get visibleMessages() {
+    return this.filterVisibleMessages(this.messages);
   }
 }
 </script>
