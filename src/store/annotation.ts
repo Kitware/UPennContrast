@@ -24,7 +24,6 @@ import {
   IWorkerInterfaceValues,
   IAnnotationComputeJob,
   IProgressInfo,
-  IErrorInfo,
   IErrorInfoList,
 } from "./model";
 
