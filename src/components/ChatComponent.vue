@@ -22,7 +22,7 @@
             class="image-grid"
           >
             <img
-              v-for="(image, imgIndex) in message.images"
+              v-for="(image, imgIndex) in filterVisibleImages(message.images)"
               :key="imgIndex"
               :src="image.data"
               alt="User uploaded image"
@@ -45,9 +45,9 @@
         ></v-progress-circular>
       </template>
       <template v-else>
-        <div v-if="imagesInput.length > 0" class="current-images">
+        <div v-if="visibleImagesInput.length > 0" class="current-images">
           <div
-            v-for="(image, index) in imagesInput"
+            v-for="(image, index) in visibleImagesInput"
             :key="index"
             class="current-image-container"
           >
@@ -142,12 +142,12 @@ export default class ChatComponent extends Vue {
 
     const interfaceScreenshot = await this.captureInterfaceScreenshot();
     if (interfaceScreenshot) {
-      this.imagesInput.push(interfaceScreenshot);
+      this.imagesInput.unshift(interfaceScreenshot);
     }
 
     const viewportScreenshot = await this.captureViewportScreenshot();
     if (viewportScreenshot) {
-      this.imagesInput.push(viewportScreenshot);
+      this.imagesInput.unshift(viewportScreenshot);
     }
 
     const userMessage: IChatMessage = {
@@ -234,7 +234,7 @@ export default class ChatComponent extends Vue {
         },
       });
       const imageData = canvas.toDataURL("image/png");
-      return { data: imageData, type: "image/png" };
+      return { data: imageData, type: "image/png", visible: false };
     } catch (error) {
       logError("Error capturing screenshot:", error);
       return null;
@@ -250,7 +250,15 @@ export default class ChatComponent extends Vue {
       .layers()
       .filter((layer: any) => layer.node().css("visibility") !== "hidden");
     const image = await map.screenshot(layers);
-    return { data: image, type: "image/png" };
+    return { data: image, type: "image/png", visible: false };
+  }
+
+  filterVisibleImages(images: IChatImage[]) {
+    return images.filter((image) => image.visible !== false);
+  }
+
+  get visibleImagesInput() {
+    return this.filterVisibleImages(this.imagesInput);
   }
 }
 </script>
