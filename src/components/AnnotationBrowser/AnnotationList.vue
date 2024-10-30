@@ -27,11 +27,18 @@
               <v-card>
                 <v-card-title> Add tags to selected annotations </v-card-title>
                 <tag-picker class="ma-4 pa-4" v-model="tagsToAdd"></tag-picker>
+                <v-checkbox
+                  v-model="replaceExistingTags"
+                  label="Replace existing tags"
+                  class="ma-4"
+                ></v-checkbox>
                 <v-divider></v-divider>
                 <v-card-actions>
                   <v-spacer></v-spacer>
-                  <v-btn color="warning" @click="tagsToAdd = []"> Clear </v-btn>
-                  <v-btn color="primary" @click="tagSelected"> Submit </v-btn>
+                  <v-btn color="warning" @click="tagsToAdd = []">
+                    Clear input
+                  </v-btn>
+                  <v-btn color="primary" @click="tagSelected"> Add tags </v-btn>
                 </v-card-actions>
               </v-card>
             </v-dialog>
@@ -506,10 +513,15 @@ export default class AnnotationList extends Vue {
 
   tagSelectedDialog: boolean = false;
   tagsToAdd: string[] = [];
+  replaceExistingTags: boolean = false;
   tagSelected() {
-    this.annotationStore.tagSelectedAnnotations(this.tagsToAdd);
+    this.annotationStore.tagSelectedAnnotations({
+      tags: this.tagsToAdd,
+      replace: this.replaceExistingTags,
+    });
     this.tagSelectedDialog = false;
     this.tagsToAdd = [];
+    this.replaceExistingTags = false;
   }
 
   colorSelectedDialog: boolean = false;

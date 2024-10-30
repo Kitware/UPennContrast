@@ -609,7 +609,7 @@ export class Annotations extends VuexModule {
   }
 
   @Action
-  public async tagAnnotationIds({
+  public async addTagsByAnnotationIds({
     annotationIds,
     tags,
   }: {
@@ -617,7 +617,6 @@ export class Annotations extends VuexModule {
     tags: string[];
   }) {
     const editFunction = (annotation: IAnnotation): void => {
-      // Add a tag only if it doesn't exist
       const newTags = tags.reduce((newTags: string[], tag: string) => {
         if (!newTags.includes(tag)) {
           newTags.push(tag);
@@ -630,8 +629,38 @@ export class Annotations extends VuexModule {
   }
 
   @Action
-  public tagSelectedAnnotations(tags: string[]) {
-    this.tagAnnotationIds({ annotationIds: this.selectedAnnotationIds, tags });
+  public async replaceTagsByAnnotationIds({
+    annotationIds,
+    tags,
+  }: {
+    annotationIds: string[];
+    tags: string[];
+  }) {
+    const editFunction = (annotation: IAnnotation): void => {
+      annotation.tags = [...tags];
+    };
+    this.updateAnnotationsPerId({ annotationIds, editFunction });
+  }
+
+  @Action
+  public tagSelectedAnnotations({
+    tags,
+    replace,
+  }: {
+    tags: string[];
+    replace: boolean;
+  }) {
+    if (replace) {
+      this.replaceTagsByAnnotationIds({
+        annotationIds: this.selectedAnnotationIds,
+        tags,
+      });
+    } else {
+      this.addTagsByAnnotationIds({
+        annotationIds: this.selectedAnnotationIds,
+        tags,
+      });
+    }
   }
 
   @Action
