@@ -159,11 +159,16 @@ export default class ToolCreation extends Vue {
     if (this.toolValues?.model) {
       toolNameStrings.push(this.toolValues.model.text);
     }
-    if (this.selectedTemplate?.shortName) {
-      toolNameStrings.push(`(${this.selectedTemplate.shortName})`);
-    }
+    // AR: I removed the shortName from the tool name because I thought it made the tool name cluttered,
+    // but I'm keeping it here in case we ever want to use it again.
+    // if (this.selectedTemplate?.shortName) {
+    //   toolNameStrings.push(`(${this.selectedTemplate.shortName})`);
+    // }
     if (this.toolValues?.action) {
       toolNameStrings.push(this.toolValues.action.text);
+    }
+    if (this.selectedTemplate?.type === "tagging" && this.toolValues?.tags) {
+      toolNameStrings.push(this.toolValues.tags.join(", "));
     }
     if (this.toolValues?.parentAnnotation && this.toolValues?.childAnnotation) {
       const parentValues = this.toolValues.parentAnnotation;
