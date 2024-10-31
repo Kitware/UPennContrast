@@ -383,10 +383,11 @@
                     "type": "tags"
                   },
                   {
-                    "name": "Remove existing tags",
+                    "name": "Tagging options",
                     "id": "removeExisting",
                     "type": "checkbox",
                     "meta": {
+                      "label": "Remove existing tags",
                       "value": false
                     }
                   }
