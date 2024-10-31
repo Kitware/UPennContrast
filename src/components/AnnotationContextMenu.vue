@@ -8,7 +8,7 @@
           label="Default to color of layer"
           class="mb-2"
         />
-        <color-picker-menu v-model="selectedColor" :disabled="useLayerColor" />
+        <color-picker-menu v-model="selectedColor" v-if="!useLayerColor" />
         <v-divider class="my-3"></v-divider>
         <tag-picker v-model="selectedTags" />
         <v-checkbox
@@ -145,3 +145,13 @@ export default class AnnotationContextMenu extends Vue {
   }
 }
 </script>
+
+<style>
+.v-card {
+  user-select: none;
+}
+
+.v-card::before {
+  background-color: transparent !important;
+}
+</style>
