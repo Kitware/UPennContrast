@@ -1533,7 +1533,13 @@ export default class AnnotationViewer extends Vue {
         this.annotationLayer.mode(annotation?.shape);
         break;
       case "tagging":
-        this.annotationLayer.mode(null);
+        if (
+          this.selectedToolConfiguration.values.action.value === "tag_click"
+        ) {
+          this.annotationLayer.mode("point");
+        } else {
+          this.annotationLayer.mode("polygon");
+        }
         break;
       case "snap":
         if (
@@ -1858,26 +1864,25 @@ export default class AnnotationViewer extends Vue {
     }
     const selectedAnnotations =
       this.getSelectedAnnotationsFromAnnotation(annotation);
-    if (selectedAnnotations.length === 1) {
-      const selectedAnnotation = selectedAnnotations[0];
+    if (selectedAnnotations.length > 0) {
       const newTags = this.selectedToolConfiguration?.values?.tags || [];
       const removeExisting =
         this.selectedToolConfiguration?.values?.removeExisting || false;
 
-      // Update the tags
-      this.annotationStore.updateAnnotationsPerId({
-        annotationIds: [selectedAnnotation.id],
+      // Update all selected annotations
+      await this.annotationStore.updateAnnotationsPerId({
+        annotationIds: selectedAnnotations.map((a) => a.id),
         editFunction: (annotation: IAnnotation) => {
-          // If removeExisting is true, completely replace tags
-          // Otherwise merge with existing tags
           annotation.tags = removeExisting
             ? [...newTags]
             : [...new Set([...annotation.tags, ...newTags])];
         },
       });
 
-      // Highlight the tagged annotation in the list
-      this.annotationStore.setHoveredAnnotationId(selectedAnnotation.id);
+      // Highlight the last tagged annotation in the list
+      if (selectedAnnotations.length === 1) {
+        this.annotationStore.setHoveredAnnotationId(selectedAnnotations[0].id);
+      }
     }
     this.annotationLayer.removeAnnotation(annotation);
   }

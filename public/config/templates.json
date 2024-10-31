@@ -393,6 +393,28 @@
                   }
                 ]
               }
+            },
+            {
+              "text": "Lasso to tag",
+              "value": "tag_lasso",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Tags to apply",
+                    "id": "tags",
+                    "type": "tags"
+                  },
+                  {
+                    "name": "Tagging options",
+                    "id": "removeExisting",
+                    "type": "checkbox",
+                    "meta": {
+                      "label": "Remove existing tags",
+                      "value": false
+                    }
+                  }
+                ]
+              }
             }
           ]
         }
