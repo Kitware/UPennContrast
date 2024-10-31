@@ -18,27 +18,45 @@
         </v-row>
         <v-row>
           <v-col class="pa-0 mx-1">
-            <v-dialog v-model="tagSelectedDialog" width="50%">
+            <v-dialog v-model="addRemoveTagsSelectedDialog" width="50%">
               <template v-slot:activator="{ on, attrs }">
                 <v-btn block small v-bind="attrs" v-on="on" @click.stop>
                   Tag Selected
                 </v-btn>
               </template>
               <v-card>
-                <v-card-title> Add tags to selected annotations </v-card-title>
-                <tag-picker class="ma-4 pa-4" v-model="tagsToAdd"></tag-picker>
+                <v-card-title>
+                  Add tags to or remove tags from selected objects
+                </v-card-title>
+                <tag-picker
+                  class="ma-4 pa-4"
+                  v-model="tagsToAddRemove"
+                ></tag-picker>
+                <v-radio-group v-model="addOrRemove" row class="ma-4">
+                  <v-radio
+                    label="Add tags to selected objects"
+                    value="add"
+                  ></v-radio>
+                  <v-radio
+                    label="Remove tags from selected objects"
+                    value="remove"
+                  ></v-radio>
+                </v-radio-group>
                 <v-checkbox
                   v-model="replaceExistingTags"
                   label="Replace existing tags"
                   class="ma-4"
+                  :disabled="addOrRemove === 'remove'"
                 ></v-checkbox>
                 <v-divider></v-divider>
                 <v-card-actions>
                   <v-spacer></v-spacer>
-                  <v-btn color="warning" @click="tagsToAdd = []">
+                  <v-btn color="warning" @click="tagsToAddRemove = []">
                     Clear input
                   </v-btn>
-                  <v-btn color="primary" @click="tagSelected"> Add tags </v-btn>
+                  <v-btn color="primary" @click="addRemoveTagsSelected">
+                    Add/remove tags
+                  </v-btn>
                 </v-card-actions>
               </v-card>
             </v-dialog>
@@ -67,7 +85,9 @@
                   <v-btn color="warning" @click="colorSelectedDialog = false">
                     Cancel
                   </v-btn>
-                  <v-btn color="primary" @click="colorSelected"> Submit </v-btn>
+                  <v-btn color="primary" @click="colorSelected">
+                    Apply color
+                  </v-btn>
                 </v-card-actions>
               </v-card>
             </v-dialog>
@@ -309,6 +329,8 @@ export default class AnnotationList extends Vue {
   annotationFilteredDialog: boolean = false;
   localIdFilter?: string = "";
 
+  addOrRemove: "add" | "remove" = "add";
+
   // These are "from" or "to" v-data-table
   page: number = 0; // one-way binding :page
   itemsPerPage: number = 10; // one-way binding @update:items-per-page
@@ -511,16 +533,22 @@ export default class AnnotationList extends Vue {
     this.annotationStore.setHoveredAnnotationId(annotationId);
   }
 
-  tagSelectedDialog: boolean = false;
-  tagsToAdd: string[] = [];
+  addRemoveTagsSelectedDialog: boolean = false;
+  tagsToAddRemove: string[] = [];
   replaceExistingTags: boolean = false;
-  tagSelected() {
-    this.annotationStore.tagSelectedAnnotations({
-      tags: this.tagsToAdd,
-      replace: this.replaceExistingTags,
-    });
-    this.tagSelectedDialog = false;
-    this.tagsToAdd = [];
+  addRemoveTagsSelected() {
+    if (this.addOrRemove === "add") {
+      this.annotationStore.tagSelectedAnnotations({
+        tags: this.tagsToAddRemove,
+        replace: this.replaceExistingTags,
+      });
+    } else {
+      this.annotationStore.removeTagsFromSelectedAnnotations(
+        this.tagsToAddRemove,
+      );
+    }
+    this.addRemoveTagsSelectedDialog = false;
+    this.tagsToAddRemove = [];
     this.replaceExistingTags = false;
   }
 

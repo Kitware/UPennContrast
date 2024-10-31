@@ -643,6 +643,20 @@ export class Annotations extends VuexModule {
   }
 
   @Action
+  public async removeTagsByAnnotationIds({
+    annotationIds,
+    tags,
+  }: {
+    annotationIds: string[];
+    tags: string[];
+  }) {
+    const editFunction = (annotation: IAnnotation): void => {
+      annotation.tags = annotation.tags.filter((tag) => !tags.includes(tag));
+    };
+    this.updateAnnotationsPerId({ annotationIds, editFunction });
+  }
+
+  @Action
   public tagSelectedAnnotations({
     tags,
     replace,
@@ -661,6 +675,14 @@ export class Annotations extends VuexModule {
         tags,
       });
     }
+  }
+
+  @Action
+  public removeTagsFromSelectedAnnotations(tags: string[]) {
+    this.removeTagsByAnnotationIds({
+      annotationIds: this.selectedAnnotationIds,
+      tags,
+    });
   }
 
   @Action
