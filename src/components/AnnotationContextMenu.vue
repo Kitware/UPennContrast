@@ -1,9 +1,14 @@
 <template>
   <v-menu v-model="showMenu" :position-x="x" :position-y="y" absolute offset-y>
-    <v-card min-width="200">
+    <v-card min-width="200" @click.stop>
       <v-card-title class="text-subtitle-1">Edit Annotation</v-card-title>
       <v-card-text>
-        <color-picker-menu v-model="selectedColor" />
+        <v-checkbox
+          v-model="useLayerColor"
+          label="Default to color of layer"
+          class="mb-2"
+        />
+        <color-picker-menu v-model="selectedColor" :disabled="useLayerColor" />
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
@@ -36,6 +41,7 @@ export default class AnnotationContextMenu extends Vue {
   readonly annotation!: IAnnotation | null;
 
   selectedColor = "#FFFFFF";
+  useLayerColor = false;
 
   get showMenu() {
     return this.show;
@@ -50,6 +56,7 @@ export default class AnnotationContextMenu extends Vue {
   @Watch("annotation", { immediate: true })
   onAnnotationChange() {
     if (this.annotation) {
+      this.useLayerColor = this.annotation.color === null;
       this.selectedColor = this.annotation.color || "#FFFFFF";
     }
   }
@@ -61,7 +68,7 @@ export default class AnnotationContextMenu extends Vue {
   save() {
     this.$emit("save", {
       annotationId: this.annotation?.id,
-      color: this.selectedColor,
+      color: this.useLayerColor ? null : this.selectedColor,
     });
   }
 }
