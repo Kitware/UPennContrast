@@ -802,6 +802,15 @@ export interface IGeoJSMouseState {
     right: boolean;
     middle: boolean;
   };
+  buttonsDown: {
+    left: boolean;
+    right: boolean;
+    middle: boolean;
+  };
+  evt: {
+    clientX: number;
+    clientY: number;
+  };
   modifiers: {
     alt: boolean;
     ctrl: boolean;
