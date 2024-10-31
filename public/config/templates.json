@@ -378,9 +378,17 @@
               "meta": {
                 "interface": [
                   {
-                    "name": "Tags to Apply",
+                    "name": "Tags to apply",
                     "id": "tags",
                     "type": "tags"
+                  },
+                  {
+                    "name": "Remove existing tags",
+                    "id": "removeExisting",
+                    "type": "checkbox",
+                    "meta": {
+                      "value": false
+                    }
                   }
                 ]
               }

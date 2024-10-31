@@ -1860,14 +1860,24 @@ export default class AnnotationViewer extends Vue {
       this.getSelectedAnnotationsFromAnnotation(annotation);
     if (selectedAnnotations.length === 1) {
       const selectedAnnotation = selectedAnnotations[0];
-      const newTags = this.selectedToolConfiguration?.values.tags || [];
+      const newTags = this.selectedToolConfiguration?.values?.tags || [];
+      const removeExisting =
+        this.selectedToolConfiguration?.values?.removeExisting || false;
 
-      await this.annotationStore.updateAnnotationsPerId({
+      // Update the tags
+      this.annotationStore.updateAnnotationsPerId({
         annotationIds: [selectedAnnotation.id],
         editFunction: (annotation: IAnnotation) => {
-          annotation.tags = [...new Set([...annotation.tags, ...newTags])];
+          // If removeExisting is true, completely replace tags
+          // Otherwise merge with existing tags
+          annotation.tags = removeExisting
+            ? [...newTags]
+            : [...new Set([...annotation.tags, ...newTags])];
         },
       });
+
+      // Highlight the tagged annotation in the list
+      this.annotationStore.setHoveredAnnotationId(selectedAnnotation.id);
     }
     this.annotationLayer.removeAnnotation(annotation);
   }
@@ -1889,12 +1899,18 @@ export default class AnnotationViewer extends Vue {
     if (selectedAnnotations.length === 1) {
       const selectedAnnotation = selectedAnnotations[0];
       const newTags = this.selectedToolConfiguration.values.tags || [];
+      const removeExisting =
+        this.selectedToolConfiguration.values.removeExisting || false;
 
       // Update the tags
       this.annotationStore.updateAnnotationsPerId({
         annotationIds: [selectedAnnotation.id],
         editFunction: (annotation: IAnnotation) => {
-          annotation.tags = [...new Set([...annotation.tags, ...newTags])];
+          // If removeExisting is true, completely replace tags
+          // Otherwise merge with existing tags
+          annotation.tags = removeExisting
+            ? [...newTags]
+            : [...new Set([...annotation.tags, ...newTags])];
         },
       });
 
