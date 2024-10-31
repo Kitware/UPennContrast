@@ -61,6 +61,14 @@
           max="100"
           label="Point annotations radius"
         />
+        <v-slider
+          v-model="annotationOpacity"
+          :thumb-label="true"
+          min="0"
+          max="1"
+          step="0.1"
+          label="Annotation opacity"
+        />
         <v-select
           hide-details
           label="Compositing mode"
@@ -143,6 +151,15 @@ export default class ViewerSettings extends Vue {
 
   set scaleAnnotationsWithZoom(value: boolean) {
     this.store.setScaleAnnotationsWithZoom(value);
+  }
+
+  get annotationOpacity() {
+    return this.store.annotationOpacity;
+  }
+
+  set annotationOpacity(value: number) {
+    const opacity = typeof value === "string" ? parseFloat(value) : value;
+    this.store.setAnnotationOpacity(opacity);
   }
 
   get annotationsRadius() {
