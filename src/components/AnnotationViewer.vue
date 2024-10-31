@@ -1890,12 +1890,16 @@ export default class AnnotationViewer extends Vue {
       const selectedAnnotation = selectedAnnotations[0];
       const newTags = this.selectedToolConfiguration.values.tags || [];
 
+      // Update the tags
       this.annotationStore.updateAnnotationsPerId({
         annotationIds: [selectedAnnotation.id],
         editFunction: (annotation: IAnnotation) => {
           annotation.tags = [...new Set([...annotation.tags, ...newTags])];
         },
       });
+
+      // Highlight the tagged annotation in the list
+      this.annotationStore.setHoveredAnnotationId(selectedAnnotation.id);
     }
   };
 }
