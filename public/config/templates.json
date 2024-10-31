@@ -415,6 +415,32 @@
                   }
                 ]
               }
+            },
+            {
+              "text": "Click to remove tag",
+              "value": "untag_click",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Tags to remove",
+                    "id": "tags",
+                    "type": "tags"
+                  }
+                ]
+              }
+            },
+            {
+              "text": "Lasso to remove tag",
+              "value": "untag_lasso",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Tags to remove",
+                    "id": "tags",
+                    "type": "tags"
+                  }
+                ]
+              }
             }
           ]
         }

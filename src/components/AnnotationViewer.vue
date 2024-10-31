@@ -1534,7 +1534,8 @@ export default class AnnotationViewer extends Vue {
         break;
       case "tagging":
         if (
-          this.selectedToolConfiguration.values.action.value === "tag_click"
+          this.selectedToolConfiguration.values.action.value === "tag_click" ||
+          this.selectedToolConfiguration.values.action.value === "untag_click"
         ) {
           this.annotationLayer.mode("point");
         } else {
@@ -1865,17 +1866,25 @@ export default class AnnotationViewer extends Vue {
     const selectedAnnotations =
       this.getSelectedAnnotationsFromAnnotation(annotation);
     if (selectedAnnotations.length > 0) {
-      const newTags = this.selectedToolConfiguration?.values?.tags || [];
+      const action = this.selectedToolConfiguration?.values?.action?.value;
+      const tags = this.selectedToolConfiguration?.values?.tags || [];
       const removeExisting =
         this.selectedToolConfiguration?.values?.removeExisting || false;
 
-      // Update all selected annotations
       await this.annotationStore.updateAnnotationsPerId({
         annotationIds: selectedAnnotations.map((a) => a.id),
         editFunction: (annotation: IAnnotation) => {
-          annotation.tags = removeExisting
-            ? [...newTags]
-            : [...new Set([...annotation.tags, ...newTags])];
+          if (action.startsWith("untag")) {
+            // Remove specified tags if they exist
+            annotation.tags = annotation.tags.filter(
+              (tag) => !tags.includes(tag),
+            );
+          } else {
+            // Add tags (either replacing or merging)
+            annotation.tags = removeExisting
+              ? [...tags]
+              : [...new Set([...annotation.tags, ...tags])];
+          }
         },
       });
 
@@ -1903,19 +1912,26 @@ export default class AnnotationViewer extends Vue {
 
     if (selectedAnnotations.length === 1) {
       const selectedAnnotation = selectedAnnotations[0];
-      const newTags = this.selectedToolConfiguration.values.tags || [];
-      const removeExisting =
-        this.selectedToolConfiguration.values.removeExisting || false;
+      const action = this.selectedToolConfiguration.values.action.value;
+      const tags = this.selectedToolConfiguration.values.tags || [];
 
       // Update the tags
       this.annotationStore.updateAnnotationsPerId({
         annotationIds: [selectedAnnotation.id],
         editFunction: (annotation: IAnnotation) => {
-          // If removeExisting is true, completely replace tags
-          // Otherwise merge with existing tags
-          annotation.tags = removeExisting
-            ? [...newTags]
-            : [...new Set([...annotation.tags, ...newTags])];
+          if (action.startsWith("untag")) {
+            // Remove specified tags if they exist
+            annotation.tags = annotation.tags.filter(
+              (tag) => !tags.includes(tag),
+            );
+          } else {
+            // Add tags (either replacing or merging)
+            const removeExisting =
+              this.selectedToolConfiguration?.values?.removeExisting || false;
+            annotation.tags = removeExisting
+              ? [...tags]
+              : [...new Set([...annotation.tags, ...tags])];
+          }
         },
       });
 
