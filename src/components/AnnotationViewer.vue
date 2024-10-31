@@ -538,8 +538,8 @@ export default class AnnotationViewer extends Vue {
   }
 
   get baseStyle(): IGeoJSPointFeatureStyle &
-    IGeoJSPolygonFeatureStyle &
-    IGeoJSLineFeatureStyle {
+    IGeoJSLineFeatureStyle &
+    IGeoJSPolygonFeatureStyle {
     return {
       scaled: this.store.scaleAnnotationsWithZoom ? false : 1,
       radius: this.store.annotationsRadius,
@@ -1532,6 +1532,9 @@ export default class AnnotationViewer extends Vue {
         const annotation = this.selectedToolConfiguration.values.annotation;
         this.annotationLayer.mode(annotation?.shape);
         break;
+      case "tagging":
+        this.annotationLayer.mode(null);
+        break;
       case "snap":
         if (
           this.selectedToolConfiguration.values.snapTo.value === "circleToDot"
@@ -1575,6 +1578,18 @@ export default class AnnotationViewer extends Vue {
           `${this.selectedToolConfiguration?.type} tools are not supported yet`,
         );
         this.annotationLayer.mode(null);
+    }
+
+    if (this.selectedToolConfiguration?.type === "tagging") {
+      this.annotationLayer.geoOn(
+        geojs.event.mouseclick,
+        this.handleTaggingClick,
+      );
+    } else {
+      this.annotationLayer.geoOff(
+        geojs.event.mouseclick,
+        this.handleTaggingClick,
+      );
     }
   }
 
@@ -1639,6 +1654,9 @@ export default class AnnotationViewer extends Vue {
         switch (this.selectedToolConfiguration.type) {
           case "create":
             this.addAnnotationFromGeoJsAnnotation(evt.annotation);
+            break;
+          case "tagging":
+            this.handleAnnotationTagging(evt.annotation);
             break;
           case "snap":
             this.addAnnotationFromSnapping(evt.annotation);
@@ -1833,6 +1851,53 @@ export default class AnnotationViewer extends Vue {
       }
     });
   }
+
+  private async handleAnnotationTagging(annotation: IGeoJSAnnotation) {
+    if (!annotation) {
+      return;
+    }
+    const selectedAnnotations =
+      this.getSelectedAnnotationsFromAnnotation(annotation);
+    if (selectedAnnotations.length === 1) {
+      const selectedAnnotation = selectedAnnotations[0];
+      const newTags = this.selectedToolConfiguration?.values.tags || [];
+
+      await this.annotationStore.updateAnnotationsPerId({
+        annotationIds: [selectedAnnotation.id],
+        editFunction: (annotation: IAnnotation) => {
+          annotation.tags = [...new Set([...annotation.tags, ...newTags])];
+        },
+      });
+    }
+    this.annotationLayer.removeAnnotation(annotation);
+  }
+
+  private handleTaggingClick = (evt: any) => {
+    if (
+      !this.selectedToolConfiguration ||
+      this.selectedToolConfiguration.type !== "tagging" ||
+      !evt?.geo
+    ) {
+      return;
+    }
+
+    const selectedAnnotations = this.getSelectedAnnotationsFromAnnotation({
+      type: () => AnnotationShape.Point,
+      coordinates: () => [evt.geo],
+    } as IGeoJSAnnotation);
+
+    if (selectedAnnotations.length === 1) {
+      const selectedAnnotation = selectedAnnotations[0];
+      const newTags = this.selectedToolConfiguration.values.tags || [];
+
+      this.annotationStore.updateAnnotationsPerId({
+        annotationIds: [selectedAnnotation.id],
+        editFunction: (annotation: IAnnotation) => {
+          annotation.tags = [...new Set([...annotation.tags, ...newTags])];
+        },
+      });
+    }
+  };
 }
 </script>
 

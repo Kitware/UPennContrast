@@ -62,7 +62,8 @@ export type TToolType =
   | "connection"
   | "edit"
   | "segmentation"
-  | "samAnnotation";
+  | "samAnnotation"
+  | "tagging";
 
 export interface IToolTemplateInterface {
   id: string;
@@ -1485,4 +1486,12 @@ export interface IChatMessage {
   type: "user" | "assistant" | "system" | "error";
   content: string;
   images?: IChatImage[];
+}
+
+export const TaggingToolStateSymbol: unique symbol = Symbol(
+  "TaggingToolState",
+);
+
+export interface ITaggingToolState {
+  type: TTaggingToolStateSymbol;
 }

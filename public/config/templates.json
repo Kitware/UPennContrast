@@ -359,5 +359,35 @@
         }
       }
     ]
+  },
+  {
+    "name": "Tagging tools",
+    "type": "tagging",
+    "shortName": "Tag",
+    "interface": [
+      {
+        "name": "Action",
+        "type": "select",
+        "id": "action",
+        "isSubmenu": true,
+        "meta": {
+          "items": [
+            {
+              "text": "Click to tag",
+              "value": "click_tag",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Tags to Apply",
+                    "id": "tags",
+                    "type": "tags"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
   }
 ]
