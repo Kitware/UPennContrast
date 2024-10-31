@@ -1488,9 +1488,9 @@ export interface IChatMessage {
   images?: IChatImage[];
 }
 
-export const TaggingToolStateSymbol: unique symbol = Symbol(
-  "TaggingToolState",
-);
+export const TaggingToolStateSymbol: unique symbol = Symbol("TaggingToolState");
+
+export type TTaggingToolStateSymbol = typeof TaggingToolStateSymbol;
 
 export interface ITaggingToolState {
   type: TTaggingToolStateSymbol;
