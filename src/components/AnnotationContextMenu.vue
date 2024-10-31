@@ -115,7 +115,7 @@ export default class AnnotationContextMenu extends Vue {
 
       // Update tags if changed
       if (tagsChanged) {
-        this.annotationStore.tagAnnotationIds({
+        this.annotationStore.replaceTagsByAnnotationIds({
           annotationIds,
           tags: this.selectedTags,
         });
@@ -130,7 +130,7 @@ export default class AnnotationContextMenu extends Vue {
       }
 
       if (tagsChanged) {
-        this.annotationStore.tagAnnotationIds({
+        this.annotationStore.replaceTagsByAnnotationIds({
           annotationIds: [this.annotation.id],
           tags: this.selectedTags,
         });
