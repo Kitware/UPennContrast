@@ -374,7 +374,7 @@
           "items": [
             {
               "text": "Click to tag",
-              "value": "click_tag",
+              "value": "tag_click",
               "meta": {
                 "interface": [
                   {
