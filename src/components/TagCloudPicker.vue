@@ -8,6 +8,7 @@
     <v-text-field
       v-model="tagSearchFilter"
       style="max-width: 150px"
+      placeholder="Filter tags by..."
       class="ma-1"
     />
     <v-chip-group
@@ -26,8 +27,26 @@
         }"
         outlined
         x-small
+        class="d-flex align-center"
       >
         {{ tag }}
+        <v-menu offset-y :close-on-content-click="true" bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <v-icon x-small class="ml-1" v-bind="attrs" v-on="on">
+              mdi-chevron-down
+            </v-icon>
+          </template>
+          <v-list dense>
+            <v-list-item @click="handleTagAddToAll(tag)">
+              <v-list-item-title>Add tag to all annotations</v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="handleTagRemoveFromAll(tag)">
+              <v-list-item-title
+                >Remove tag from all annotations</v-list-item-title
+              >
+            </v-list-item>
+          </v-list>
+        </v-menu>
       </v-chip>
     </v-chip-group>
   </div>
@@ -107,6 +126,18 @@ export default class TagCloudPicker extends Vue {
 
   selectNone() {
     this.setTagsFromUserInput([]);
+  }
+
+  handleTagRemove(tag: string) {
+    console.log("Remove tag:", tag);
+  }
+
+  async handleTagAddToAll(tag: string) {
+    await this.annotationStore.addTagsToAllAnnotations([tag]);
+  }
+
+  async handleTagRemoveFromAll(tag: string) {
+    await this.annotationStore.removeTagsFromAllAnnotations([tag]);
   }
 }
 </script>
