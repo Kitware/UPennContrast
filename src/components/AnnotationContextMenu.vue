@@ -1,21 +1,27 @@
 <template>
   <v-menu v-model="showMenu" :position-x="x" :position-y="y" absolute offset-y>
-    <v-card min-width="300" @click.stop>
+    <v-card min-width="300" @click.stop :ripple="false">
       <v-card-title class="text-subtitle-1">Edit Annotation</v-card-title>
       <v-card-text>
-        <v-checkbox
-          v-model="useLayerColor"
-          label="Default to color of layer"
-          class="mb-2"
-        />
-        <color-picker-menu v-model="selectedColor" v-if="!useLayerColor" />
+        <div class="mb-4">
+          <div class="text-subtitle-2 mb-2">Change Colors</div>
+          <v-checkbox
+            v-model="useLayerColor"
+            label="Default to color of layer"
+            class="mb-2"
+          />
+          <color-picker-menu v-model="selectedColor" v-if="!useLayerColor" />
+        </div>
         <v-divider class="my-3"></v-divider>
-        <tag-picker v-model="selectedTags" />
-        <v-checkbox
-          v-model="applyToSameTags"
-          label="Apply to all annotations with same tags"
-          class="mb-2"
-        />
+        <div>
+          <div class="text-subtitle-2 mb-2">Change Tags</div>
+          <tag-picker v-model="selectedTags" />
+          <v-checkbox
+            v-model="applyToSameTags"
+            label="Apply to all annotations with same tags"
+            class="mb-2"
+          />
+        </div>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
