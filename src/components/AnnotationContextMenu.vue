@@ -16,6 +16,9 @@
         <div>
           <div class="text-subtitle-2 mb-2">Change Tags</div>
           <tag-picker v-model="selectedTags" />
+        </div>
+        <v-divider class="my-3"></v-divider>
+        <div>
           <v-checkbox
             v-model="applyToSameTags"
             label="Apply to all annotations with same tags"
