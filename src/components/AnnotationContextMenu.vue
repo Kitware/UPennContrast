@@ -27,9 +27,10 @@
         </div>
       </v-card-text>
       <v-card-actions>
+        <v-btn color="error" @click="deleteAnnotation"> Delete Object </v-btn>
         <v-spacer></v-spacer>
-        <v-btn text @click="cancel">Cancel</v-btn>
-        <v-btn color="primary" @click="save">Apply</v-btn>
+        <v-btn color="secondary" @click="cancel"> Cancel </v-btn>
+        <v-btn color="primary" @click="save"> Apply </v-btn>
       </v-card-actions>
     </v-card>
   </v-menu>
@@ -146,6 +147,13 @@ export default class AnnotationContextMenu extends Vue {
       }
     }
 
+    this.$emit("cancel"); // Close the menu
+  }
+
+  deleteAnnotation() {
+    if (this.annotation) {
+      this.annotationStore.deleteAnnotations([this.annotation.id]);
+    }
     this.$emit("cancel"); // Close the menu
   }
 
