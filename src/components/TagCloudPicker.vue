@@ -128,10 +128,6 @@ export default class TagCloudPicker extends Vue {
     this.setTagsFromUserInput([]);
   }
 
-  handleTagRemove(tag: string) {
-    console.log("Remove tag:", tag);
-  }
-
   async handleTagAddToAll(tag: string) {
     await this.annotationStore.addTagsToAllAnnotations([tag]);
   }
