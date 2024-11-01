@@ -47,6 +47,20 @@
             :items="selected"
           />
         </v-menu>
+        <input
+          type="file"
+          ref="fileInput"
+          @change="handleFileUpload"
+          style="display: none"
+        />
+        <v-btn
+          class="mx-2"
+          @click="$refs.fileInput.click()"
+          :disabled="!currentLocation"
+        >
+          <v-icon left>mdi-upload</v-icon>
+          Upload Individual File
+        </v-btn>
       </template>
       <template #row-widget="props">
         {{ renderItem(props.item) }}
@@ -358,6 +372,23 @@ export default class CustomFileManager extends Vue {
       }
     }
     return ret;
+  }
+
+  async handleFileUpload(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+
+    const file = input.files[0];
+    const location = this.currentLocation;
+    if (!location || !location._id || !location._modelType) return;
+
+    try {
+      await this.store.api.uploadFile(file, location._id, location._modelType);
+      // Reload the current folder to show new file
+      await this.reloadItems();
+    } catch (error) {
+      console.error("Upload failed:", error);
+    }
   }
 }
 </script>
