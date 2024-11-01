@@ -174,6 +174,10 @@ export default class CustomFileManager extends Vue {
   selectedItemsOptionsMenu: boolean = false;
   rowOptionsMenu: { [itemId: string]: boolean } = {};
 
+  $refs!: {
+    fileInput: HTMLInputElement;
+  };
+
   async reloadItems() {
     try {
       this.overridingLocation = { type: "root" };
@@ -380,14 +384,20 @@ export default class CustomFileManager extends Vue {
 
     const file = input.files[0];
     const location = this.currentLocation;
-    if (!location || !location._id || !location._modelType) return;
-
-    try {
-      await this.store.api.uploadFile(file, location._id, location._modelType);
-      // Reload the current folder to show new file
-      await this.reloadItems();
-    } catch (error) {
-      console.error("Upload failed:", error);
+    if (!location) return;
+    // Check if location is a folder or user (has _id and _modelType)
+    if ("_id" in location && "_modelType" in location) {
+      try {
+        await this.store.api.uploadFile(
+          file,
+          location._id,
+          location._modelType,
+        );
+        // Reload the current folder to show new file
+        await this.reloadItems();
+      } catch (error) {
+        console.error("Upload failed:", error);
+      }
     }
   }
 }
