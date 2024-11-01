@@ -113,6 +113,7 @@ import { RawLocation } from "vue-router";
 import FileManagerOptions from "./FileManagerOptions.vue";
 import { Search as GirderSearch } from "@/girder/components";
 import { vuetifyConfig } from "@/girder";
+import { logError } from "@/utils/log";
 
 interface IChipAttrs {
   text: string;
@@ -396,7 +397,7 @@ export default class CustomFileManager extends Vue {
         // Reload the current folder to show new file
         await this.reloadItems();
       } catch (error) {
-        console.error("Upload failed:", error);
+        logError("Upload failed:", error);
       }
     }
   }
