@@ -384,6 +384,14 @@ export default class CustomFileManager extends Vue {
     if (!input.files?.length) return;
 
     const file = input.files[0];
+    // Check file size (500MB = 500 * 1024 * 1024 bytes)
+    if (file.size > 500 * 1024 * 1024) {
+      alert("File size exceeds 500MB limit");
+      // Reset the input so the same file can be selected again
+      input.value = "";
+      return;
+    }
+
     const location = this.currentLocation;
     if (!location) return;
     // Check if location is a folder or user (has _id and _modelType)
