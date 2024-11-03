@@ -1656,7 +1656,7 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-  @Watch("displayedAnnotations")
+  // @Watch("displayedAnnotations")  // Removing this for now. I think this is old and is causing double drawing
   @Watch("annotationConnections")
   @Watch("xy")
   @Watch("z")
