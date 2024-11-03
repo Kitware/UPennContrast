@@ -550,18 +550,35 @@ export default class AnnotationViewer extends Vue {
     annotationId: string,
     annotationColor: string | null,
     layerColor?: string,
+    timeOffset: number = 0,
   ) {
     // Use "hover" style for annotations selected by a tool
     const hovered =
       annotationId === this.hoveredAnnotationId ||
       this.toolHighlightedAnnotationIds.has(annotationId);
     const selected = this.isAnnotationSelected(annotationId);
-    return getAnnotationStyleFromBaseStyle(
+
+    // Get base style
+    const style = getAnnotationStyleFromBaseStyle(
       this.baseStyle,
       annotationColor || layerColor,
       hovered,
       selected,
     );
+
+    // Modify style based on time offset
+    if (timeOffset !== 0 && this.showTimelapseView) {
+      console.log("in timeOffset style, timeOffset = ", timeOffset);
+      const opacity = 0.2; // Reduced opacity for non-current annotations
+      return {
+        ...style,
+        fillOpacity: opacity,
+        strokeOpacity: opacity,
+        strokeWidth: (style.strokeWidth as number) * 0.5,
+      };
+    }
+
+    return style;
   }
 
   // Get the index of the tile an annotation should be drawn in.
@@ -807,13 +824,37 @@ export default class AnnotationViewer extends Vue {
         const allXY = this.store.unrollXY || layer.xy.type === "max-merge";
         const allZ = this.store.unrollZ || layer.z.type === "max-merge";
         const allT = this.store.unrollT || layer.time.type === "max-merge";
+
         for (const annotation of layerChannelAnnotations) {
-          if (
-            (allXY || annotation.location.XY === sliceIndexes?.xyIndex) &&
-            (allZ || annotation.location.Z === sliceIndexes?.zIndex) &&
-            (allT || annotation.location.Time === sliceIndexes?.tIndex)
-          ) {
-            annotationIdsSet.set(annotation.id, annotation);
+          // Check XY and Z as before
+          const matchesXY =
+            allXY || annotation.location.XY === sliceIndexes?.xyIndex;
+          const matchesZ =
+            allZ || annotation.location.Z === sliceIndexes?.zIndex;
+
+          // Modified time check to include adjacent slices
+          let timeOffset = 0; // 0 = current slice, -1 = previous, 1 = next
+          if (allT) {
+            timeOffset = 0;
+          } else if (this.showTimelapseView) {
+            const timeDiff =
+              annotation.location.Time - (sliceIndexes?.tIndex ?? 0);
+            if (timeDiff >= -1 && timeDiff <= 1) {
+              timeOffset = timeDiff;
+            } else {
+              continue;
+            }
+          } else if (annotation.location.Time === sliceIndexes?.tIndex) {
+            timeOffset = 0;
+          } else {
+            continue;
+          }
+
+          if (matchesXY && matchesZ) {
+            annotationIdsSet.set(annotation.id, {
+              ...annotation,
+              timeOffset,
+            });
           }
         }
       }
@@ -927,6 +968,7 @@ export default class AnnotationViewer extends Vue {
 
   // Add to the layer annotations that should be rendered and have not already been added.
   drawNewAnnotations(drawnGeoJSAnnotations: Map<string, IGeoJSAnnotation[]>) {
+    console.log("drawNewAnnotations");
     for (const [layerId, annotationMap] of this.layerAnnotations) {
       const layer = this.store.getLayerFromId(layerId);
       if (layer) {
@@ -941,6 +983,7 @@ export default class AnnotationViewer extends Vue {
             const geoJSAnnotation = this.createGeoJSAnnotation(
               annotation,
               layerId,
+              annotation.timeOffset,
             );
             if (geoJSAnnotation) {
               this.annotationLayer.addAnnotation(
@@ -957,20 +1000,21 @@ export default class AnnotationViewer extends Vue {
       const isHoveredGT = annotationId === this.hoveredAnnotationId;
       const isSelectedGT = this.isAnnotationSelected(annotationId);
       for (const geoJSAnnotation of geoJSAnnotationList) {
-        const { layerId, isHovered, isSelected, style, customColor } =
+        const { layerId, style, customColor, timeOffset } =
           geoJSAnnotation.options();
-        // If hover or select changed, update style
-        if (isHovered != isHoveredGT || isSelected != isSelectedGT) {
-          const layer = this.store.getLayerFromId(layerId);
-          const newStyle = this.getAnnotationStyle(
-            annotationId,
-            customColor,
-            layer?.color,
-          );
-          geoJSAnnotation.options("style", { ...style, ...newStyle });
-          geoJSAnnotation.options("isHovered", isHoveredGT);
-          geoJSAnnotation.options("isSelected", isSelectedGT);
-        }
+        // Unlike before, we don't need to check if hover or select changed
+        // because we are drawing all annotations again. This could be optimized
+        // in the future if we want to.
+        const layer = this.store.getLayerFromId(layerId);
+        const newStyle = this.getAnnotationStyle(
+          annotationId,
+          customColor,
+          layer?.color,
+          timeOffset,
+        );
+        geoJSAnnotation.options("style", { ...style, ...newStyle });
+        geoJSAnnotation.options("isHovered", isHoveredGT);
+        geoJSAnnotation.options("isSelected", isSelectedGT);
       }
     }
   }
@@ -1002,7 +1046,11 @@ export default class AnnotationViewer extends Vue {
     });
   }
 
-  createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
+  createGeoJSAnnotation(
+    annotation: IAnnotation,
+    layerId?: string,
+    timeOffset?: number,
+  ) {
     if (!this.store.dataset) {
       return null;
     }
@@ -1057,6 +1105,7 @@ export default class AnnotationViewer extends Vue {
       annotation.id,
       customColor,
       layer?.color,
+      timeOffset || 0,
     );
     newGeoJSAnnotation.options("style", Object.assign({}, style, newStyle));
 
@@ -1686,6 +1735,7 @@ export default class AnnotationViewer extends Vue {
   @Watch("properties")
   @Watch("propertyValues")
   @Watch("displayedPropertyPaths")
+  @Watch("showTimelapseView")
   onDrawTooltipsChanged() {
     this.drawTooltips();
   }
@@ -1832,6 +1882,11 @@ export default class AnnotationViewer extends Vue {
         this.setHoveredAnnotationFromCoordinates(evt.geo);
       }
     });
+  }
+
+  // Add new getter for the feature toggle
+  get showTimelapseView(): boolean {
+    return this.store.showTimelapseView;
   }
 }
 </script>
