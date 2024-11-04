@@ -18,7 +18,7 @@
         </v-row>
         <v-row>
           <v-col class="pa-0 mx-1">
-            <v-dialog v-model="addRemoveTagsSelectedDialog" width="50%">
+            <v-dialog v-model="showAddRemoveTagsSelectedDialog" width="50%">
               <template v-slot:activator="{ on, attrs }">
                 <v-btn block small v-bind="attrs" v-on="on" @click.stop>
                   Tag Selected
@@ -533,7 +533,7 @@ export default class AnnotationList extends Vue {
     this.annotationStore.setHoveredAnnotationId(annotationId);
   }
 
-  addRemoveTagsSelectedDialog: boolean = false;
+  showAddRemoveTagsSelectedDialog: boolean = false;
   tagsToAddRemove: string[] = [];
   replaceExistingTags: boolean = false;
   addRemoveTagsSelected() {
@@ -547,7 +547,7 @@ export default class AnnotationList extends Vue {
         this.tagsToAddRemove,
       );
     }
-    this.addRemoveTagsSelectedDialog = false;
+    this.showAddRemoveTagsSelectedDialog = false;
     this.tagsToAddRemove = [];
     this.replaceExistingTags = false;
   }
