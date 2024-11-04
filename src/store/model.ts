@@ -1175,6 +1175,23 @@ export interface IProgressInfo {
   progress?: number;
 }
 
+export enum MessageType {
+  ERROR = "error",
+  WARNING = "warning",
+}
+
+export interface IErrorInfo {
+  title?: string;
+  error?: string;
+  warning?: string;
+  info?: string;
+  type?: MessageType;
+}
+
+export interface IErrorInfoList {
+  errors: IErrorInfo[];
+}
+
 export interface ICameraInfo {
   center: IGeoJSPosition;
   zoom: number;
@@ -1191,6 +1208,7 @@ export interface IComputeJobBase {
   jobId: string;
   datasetId: string | null;
   eventCallback?: (data: IJobEventData) => void;
+  errorCallback?: (data: IJobEventData) => void;
 }
 export interface IAnnotationComputeJob extends IComputeJobBase {
   toolId: string;

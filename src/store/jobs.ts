@@ -8,7 +8,14 @@ import {
 import store from "./root";
 import Vue from "vue";
 
-import { IComputeJob, IJobEventData, IProgressInfo } from "./model";
+import {
+  IComputeJob,
+  IErrorInfo,
+  IErrorInfoList,
+  IJobEventData,
+  IProgressInfo,
+  MessageType,
+} from "./model";
 
 import main from "./index";
 
@@ -38,11 +45,50 @@ export function createProgressEventCallback(progressObject: IProgressInfo) {
       }
       try {
         const progress = JSON.parse(line);
+        // Skip error messages, let them be handled by error callback
+        if (progress.error) {
+          continue;
+        }
         // The only required property is "progress"
         if (typeof progress.progress === "number") {
           for (const [k, v] of Object.entries(progress)) {
             Vue.set(progressObject, k, v);
           }
+        }
+      } catch {}
+    }
+  };
+}
+
+export function createErrorEventCallback(errorObject: IErrorInfoList) {
+  return (jobData: IJobEventData) => {
+    const text = jobData.text;
+    if (!text || typeof text !== "string") {
+      return;
+    }
+    for (const line of text.split("\n")) {
+      if (!line) {
+        continue;
+      }
+      try {
+        const error = JSON.parse(line);
+        // Skip progress messages
+        if (error.progress) {
+          continue;
+        }
+        if (error.error || error.warning) {
+          // Create new error info object
+          const newError: IErrorInfo = {
+            title: error.title,
+            error: error.error,
+            warning: error.warning,
+            info: error.info,
+            type:
+              error.type ||
+              (error.error ? MessageType.ERROR : MessageType.WARNING),
+          };
+          // Add to errors array while maintaining reactivity
+          Vue.set(errorObject.errors, errorObject.errors.length, newError);
         }
       } catch {}
     }
@@ -165,6 +211,7 @@ export class Jobs extends VuexModule {
     }
     for (const listener of jobInfo.listeners) {
       listener.eventCallback?.(jobEvent);
+      listener.errorCallback?.(jobEvent);
     }
     const status = jobEvent.status;
     if (

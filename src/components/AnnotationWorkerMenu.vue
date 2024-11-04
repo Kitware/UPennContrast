@@ -22,6 +22,23 @@
             {{ progressInfo.info }}
           </v-progress-linear>
         </v-row>
+        <v-row
+          v-for="(warning, index) in filteredWarnings"
+          :key="'warning-' + index"
+        >
+          <v-alert type="warning" dense class="mb-2">
+            <div class="error-main">
+              {{ warning.title }}: {{ warning.warning }}
+            </div>
+            <div v-if="warning.info" class="error-info">{{ warning.info }}</div>
+          </v-alert>
+        </v-row>
+        <v-row v-for="(error, index) in filteredErrors" :key="'error-' + index">
+          <v-alert type="error" dense class="mb-2">
+            <div class="error-main">{{ error.title }}: {{ error.error }}</div>
+            <div v-if="error.info" class="error-info">{{ error.info }}</div>
+          </v-alert>
+        </v-row>
         <v-row>
           <v-col>
             <v-subheader>Image: {{ tool.values.image.image }}</v-subheader>
@@ -65,6 +82,8 @@ import {
   IProgressInfo,
   IToolConfiguration,
   IWorkerInterfaceValues,
+  IErrorInfoList,
+  MessageType,
 } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import LayerSelect from "@/components/LayerSelect.vue";
@@ -87,7 +106,7 @@ export default class AnnotationWorkerMenu extends Vue {
   running: boolean = false;
   previousRunStatus: boolean | null = null;
   progressInfo: IProgressInfo = {};
-
+  errorInfo: IErrorInfoList = { errors: [] };
   interfaceValues: IWorkerInterfaceValues = {};
 
   @Prop()
@@ -128,6 +147,7 @@ export default class AnnotationWorkerMenu extends Vue {
       tool: this.tool,
       workerInterface: this.interfaceValues,
       progress: this.progressInfo,
+      error: this.errorInfo,
       callback: (success) => {
         this.running = false;
         this.previousRunStatus = success;
@@ -166,6 +186,18 @@ export default class AnnotationWorkerMenu extends Vue {
   get hasPreview() {
     return this.propertyStore.hasPreview(this.image);
   }
+
+  get filteredErrors() {
+    return this.errorInfo.errors.filter(
+      (error) => error.error && error.type === MessageType.ERROR,
+    );
+  }
+
+  get filteredWarnings() {
+    return this.errorInfo.errors.filter(
+      (error) => error.warning && error.type === MessageType.WARNING,
+    );
+  }
 }
 </script>
 
@@ -177,5 +209,18 @@ export default class AnnotationWorkerMenu extends Vue {
 // Set min-height to 0 when loaded
 .loaded {
   min-height: 0;
+}
+
+.error-main {
+  font-weight: 500;
+  max-width: 300px;
+}
+
+.error-info {
+  font-size: 0.875em;
+  margin-top: 4px;
+  max-width: 300px;
+  word-wrap: break-word; /* Ensures long words don't overflow */
+  opacity: 0.9;
 }
 </style>

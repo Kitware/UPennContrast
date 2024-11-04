@@ -9,7 +9,10 @@ import store from "./root";
 
 import main from "./index";
 import sync from "./sync";
-import jobs, { createProgressEventCallback } from "./jobs";
+import jobs, {
+  createProgressEventCallback,
+  createErrorEventCallback,
+} from "./jobs";
 
 import {
   IAnnotation,
@@ -21,6 +24,7 @@ import {
   IWorkerInterfaceValues,
   IAnnotationComputeJob,
   IProgressInfo,
+  IErrorInfoList,
 } from "./model";
 
 import Vue, { markRaw } from "vue";
@@ -801,17 +805,22 @@ export class Annotations extends VuexModule {
     tool,
     workerInterface,
     progress,
+    error,
     callback,
   }: {
     tool: IToolConfiguration;
     workerInterface: IWorkerInterfaceValues;
     progress: IProgressInfo;
+    error: IErrorInfoList;
     callback: (success: boolean) => void;
   }) {
     if (!main.dataset || !main.configuration) {
       return null;
     }
     const datasetId = main.dataset.id;
+
+    // Clear errors while maintaining reactivity
+    Vue.set(error, "errors", []);
 
     const { location, channel } =
       await this.getAnnotationLocationFromTool(tool);
@@ -839,9 +848,11 @@ export class Annotations extends VuexModule {
       jobId,
       datasetId,
       eventCallback: createProgressEventCallback(progress),
+      errorCallback: createErrorEventCallback(error),
     };
     jobs.addJob(computeJob).then((success: boolean) => {
       this.fetchAnnotations();
+      // TODO: We may also want to fetch connections and properties here, depending on flags set in the worker image
       callback(success);
     });
     return computeJob;
