@@ -656,6 +656,27 @@ export default class AnnotationViewer extends Vue {
     // We want to ignore these already displayed annotations
     // Use a map with id as key for performance and layer id as key
     const drawnGeoJSAnnotations: Map<string, IGeoJSAnnotation[]> = new Map();
+
+    if (this.showTimelapseView) {
+      // Update timeOffsets for existing annotations when in timelapse mode
+      for (const geoJSAnnotation of this.annotationLayer.annotations()) {
+        const girderId = geoJSAnnotation.options("girderId");
+        const layerId = geoJSAnnotation.options("layerId");
+
+        if (girderId && layerId) {
+          // Get the current annotation with its updated timeOffset
+          const currentAnnotation = this.layerAnnotations
+            .get(layerId)
+            ?.get(girderId);
+          if (currentAnnotation) {
+            // Update the timeOffset in the GeoJS annotation
+            geoJSAnnotation.options("timeOffset", currentAnnotation.timeOffset);
+          }
+        }
+      }
+    }
+
+    // Regular annotation tracking (existing code)
     for (const geoJSAnnotation of this.annotationLayer.annotations()) {
       const id = geoJSAnnotation.options("girderId");
       if (id) {
