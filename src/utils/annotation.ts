@@ -56,8 +56,10 @@ export function getAnnotationStyleFromBaseStyle(
   }
   if (isSelected) {
     style.strokeWidth = 6;
-    const geoColor = { ...geojs.util.convertColor(annotationColor) };
-    style.strokeColor = geoColor;
+    if (annotationColor) {
+      const geoColor = { ...geojs.util.convertColor(annotationColor) };
+      style.strokeColor = geoColor;
+    }
   }
   return style;
 }
