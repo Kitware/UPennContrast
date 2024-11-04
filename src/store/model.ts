@@ -1479,10 +1479,12 @@ export const AnnotationSelectionTypesTooltips = {
 export interface IChatImage {
   data: string;
   type: string;
+  visible?: boolean;
 }
 
 export interface IChatMessage {
   type: "user" | "assistant" | "system" | "error";
   content: string;
   images?: IChatImage[];
+  visible?: boolean;
 }

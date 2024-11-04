@@ -3,7 +3,7 @@
     <v-card-title>
       Nimbus chat
       <v-spacer></v-spacer>
-      <v-btn icon @click="refreshChat">
+      <v-btn icon @click="refreshChat" :loading="isRefreshing">
         <v-icon>mdi-refresh</v-icon>
       </v-btn>
       <v-btn icon @click="$emit('close')">
@@ -13,7 +13,7 @@
     <v-card-text>
       <div ref="chatMessages" class="chat-messages">
         <div
-          v-for="(message, index) in messages.toReversed()"
+          v-for="(message, index) in filterVisibleMessages(messages)"
           :key="index"
           :class="message.type"
         >
@@ -22,7 +22,7 @@
             class="image-grid"
           >
             <img
-              v-for="(image, imgIndex) in message.images"
+              v-for="(image, imgIndex) in filterVisibleImages(message.images)"
               :key="imgIndex"
               :src="image.data"
               alt="User uploaded image"
@@ -45,9 +45,9 @@
         ></v-progress-circular>
       </template>
       <template v-else>
-        <div v-if="imagesInput.length > 0" class="current-images">
+        <div v-if="visibleImagesInput.length > 0" class="current-images">
           <div
-            v-for="(image, index) in imagesInput"
+            v-for="(image, index) in visibleImagesInput"
             :key="index"
             class="current-image-container"
           >
@@ -88,15 +88,28 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator";
 import { logError } from "@/utils/log";
+import store from "@/store";
 import chatStore from "@/store/chat";
-import { IChatImage, IChatMessage } from "@/store/model";
+import {
+  IChatImage,
+  IChatMessage,
+  IGeoJSAnnotationLayer,
+  IGeoJSMap,
+} from "@/store/model";
 import { marked } from "marked";
+import html2canvas from "html2canvas";
 
 @Component
 export default class ChatComponent extends Vue {
+  readonly store = store;
+
+  $el!: HTMLElement;
   textInput = "";
   imagesInput: IChatImage[] = [];
   isWaiting = false;
+  isRefreshing = false;
+
+  bboxLayer: IGeoJSAnnotationLayer | null = null;
 
   marked = marked;
 
@@ -114,16 +127,35 @@ export default class ChatComponent extends Vue {
     this.imagesInput = [];
   }
 
-  async sendMessage() {
-    const trimmedInput = this.textInput.trim();
-    if (this.isWaiting || trimmedInput === "") {
+  get geoJSMaps() {
+    return this.store.maps.map((map) => map.map);
+  }
+
+  get firstMap(): IGeoJSMap | undefined {
+    return this.geoJSMaps.length ? this.geoJSMaps[0] : undefined;
+  }
+
+  async sendMessage(visible: boolean = true, customInput?: string) {
+    const trimmedInput = customInput || this.textInput.trim();
+    if (this.isWaiting || !trimmedInput) {
       return;
+    }
+
+    const interfaceScreenshot = await this.captureInterfaceScreenshot();
+    if (interfaceScreenshot) {
+      this.imagesInput.unshift(interfaceScreenshot);
+    }
+
+    const viewportScreenshot = await this.captureViewportScreenshot();
+    if (viewportScreenshot) {
+      this.imagesInput.unshift(viewportScreenshot);
     }
 
     const userMessage: IChatMessage = {
       type: "user",
       content: trimmedInput,
       images: [...this.imagesInput],
+      visible: visible,
     };
 
     this.clearInputs();
@@ -192,8 +224,62 @@ export default class ChatComponent extends Vue {
   }
 
   async refreshChat() {
+    this.isRefreshing = true;
     this.clearInputs();
     await chatStore.clearAll();
+    const firstMessage =
+      "This is the first hidden user message. You will get two screenshots, one of the interface and one of the image itself in the viewport. Start by saying 'Hello, I'm here to help you with NimbusImage! Looks like you are looking at' and then quickly summarize what you see in a couple sentences. Then offer to help by asking what the user would like to do.";
+    await this.sendMessage(false, firstMessage);
+    this.isRefreshing = false;
+  }
+
+  mounted() {
+    if (this.messages.length === 0) {
+      this.refreshChat();
+    }
+  }
+
+  async captureInterfaceScreenshot(): Promise<IChatImage | null> {
+    try {
+      const canvas = await html2canvas(document.body, {
+        ignoreElements: (element) => {
+          return element === this.$el || this.$el.contains(element);
+        },
+      });
+      const imageData = canvas.toDataURL("image/png");
+      return { data: imageData, type: "image/png", visible: false };
+    } catch (error) {
+      logError("Error capturing screenshot:", error);
+      return null;
+    }
+  }
+
+  async captureViewportScreenshot(): Promise<IChatImage | null> {
+    const map = this.firstMap;
+    if (!map) {
+      return null;
+    }
+    const layers = map
+      .layers()
+      .filter((layer: any) => layer.node().css("visibility") !== "hidden");
+    const image = await map.screenshot(layers);
+    return { data: image, type: "image/png", visible: false };
+  }
+
+  filterVisibleImages(images: IChatImage[]) {
+    return images.filter((image) => image.visible !== false);
+  }
+
+  get visibleImagesInput() {
+    return this.filterVisibleImages(this.imagesInput);
+  }
+
+  filterVisibleMessages(messages: IChatMessage[]) {
+    return messages.filter((message) => message.visible !== false).toReversed();
+  }
+
+  get visibleMessages() {
+    return this.filterVisibleMessages(this.messages);
   }
 }
 </script>
