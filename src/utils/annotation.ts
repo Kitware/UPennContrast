@@ -28,7 +28,7 @@ export function getAnnotationStyleFromBaseStyle(
     stroke: true,
     strokeColor: "black",
     strokeOpacity: 1,
-    strokeWidth: 2,
+    strokeWidth: 4,
     fillColor: "white",
     fillOpacity: 0.5,
     fill: true,
@@ -45,13 +45,19 @@ export function getAnnotationStyleFromBaseStyle(
   }
   if (isHovered) {
     style.fillOpacity = 0;
-    style.strokeWidth = 4;
+    style.strokeWidth = 5;
     if (annotationColor) {
-      style.strokeColor = annotationColor;
+      style.strokeColor = {
+        r: 1,
+        g: 0.9,
+        b: 0.9,
+      };
     }
   }
   if (isSelected) {
     style.strokeWidth = 6;
+    const geoColor = { ...geojs.util.convertColor(annotationColor) };
+    style.strokeColor = geoColor;
   }
   return style;
 }
