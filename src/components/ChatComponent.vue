@@ -132,12 +132,12 @@ export default class ChatComponent extends Vue {
   }
 
   get firstMap(): IGeoJSMap | undefined {
-    return this.geoJSMaps[0];
+    return this.geoJSMaps.length ? this.geoJSMaps[0] : undefined;
   }
 
   async sendMessage(visible: boolean = true, customInput?: string) {
     const trimmedInput = customInput || this.textInput.trim();
-    if (this.isWaiting || trimmedInput === "") {
+    if (this.isWaiting || !trimmedInput) {
       return;
     }
 
