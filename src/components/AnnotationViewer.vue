@@ -1010,7 +1010,7 @@ export default class AnnotationViewer extends Vue {
           annotationId,
           customColor,
           layer?.color,
-          timeOffset,
+          timeOffset || 0,
         );
         geoJSAnnotation.options("style", { ...style, ...newStyle });
         geoJSAnnotation.options("isHovered", isHoveredGT);
@@ -1149,7 +1149,7 @@ export default class AnnotationViewer extends Vue {
 
   private restyleAnnotations() {
     for (const geoJSAnnotation of this.annotationLayer.annotations()) {
-      const { girderId, layerId, style, customColor } =
+      const { girderId, layerId, style, customColor, timeOffset } =
         geoJSAnnotation.options();
       if (girderId) {
         const layer = this.store.getLayerFromId(layerId);
@@ -1157,6 +1157,7 @@ export default class AnnotationViewer extends Vue {
           girderId,
           customColor,
           layer?.color,
+          timeOffset || 0,
         );
         geoJSAnnotation.options("style", Object.assign({}, style, newStyle));
       }
