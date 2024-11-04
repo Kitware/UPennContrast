@@ -569,12 +569,27 @@ export default class AnnotationViewer extends Vue {
     // Modify style based on time offset
     if (timeOffset !== 0 && this.showTimelapseView) {
       console.log("in timeOffset style, timeOffset = ", timeOffset);
-      const opacity = 0.2; // Reduced opacity for non-current annotations
+
+      // Calculate opacity reduction based on absolute timeOffset
+      // Each step reduces opacity by half
+      const fillOpacityBase = 0.2;
+      const strokeOpacityBase = 0.5;
+      const strokeWidthBase = 4;
+      const absOffset = Math.abs(timeOffset);
+      // const fillOpacity = fillOpacityBase / Math.pow(2, absOffset - 1);
+      const fillOpacity = 0;
+      const strokeOpacity = strokeOpacityBase / Math.pow(2, absOffset - 1);
+
+      // Determine color based on whether timeOffset is positive or negative
+      const baseColor = timeOffset > 0 ? "#FFA500" : "#00FFFF"; // orange : cyan
+
       return {
         ...style,
-        fillOpacity: opacity,
-        strokeOpacity: opacity,
-        strokeWidth: (style.strokeWidth as number) * 0.5,
+        fillColor: baseColor,
+        strokeColor: baseColor,
+        fillOpacity,
+        strokeOpacity,
+        strokeWidth: strokeWidthBase / Math.pow(1.3, absOffset - 1),
       };
     }
 
@@ -860,7 +875,7 @@ export default class AnnotationViewer extends Vue {
           } else if (this.showTimelapseView) {
             const timeDiff =
               annotation.location.Time - (sliceIndexes?.tIndex ?? 0);
-            if (timeDiff >= -1 && timeDiff <= 1) {
+            if (timeDiff >= -3 && timeDiff <= 3) {
               timeOffset = timeDiff;
             } else {
               continue;
@@ -1024,7 +1039,7 @@ export default class AnnotationViewer extends Vue {
         const { layerId, style, customColor, timeOffset } =
           geoJSAnnotation.options();
         // Unlike before, we don't need to check if hover or select changed
-        // because we are drawing all annotations again. This could be optimized
+        // because we are changing all annotations style again. This could be optimized
         // in the future if we want to.
         const layer = this.store.getLayerFromId(layerId);
         const newStyle = this.getAnnotationStyle(
