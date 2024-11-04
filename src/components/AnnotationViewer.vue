@@ -538,8 +538,8 @@ export default class AnnotationViewer extends Vue {
   }
 
   get baseStyle(): IGeoJSPointFeatureStyle &
-    IGeoJSPolygonFeatureStyle &
-    IGeoJSLineFeatureStyle {
+    IGeoJSLineFeatureStyle &
+    IGeoJSPolygonFeatureStyle {
     return {
       scaled: this.store.scaleAnnotationsWithZoom ? false : 1,
       radius: this.store.annotationsRadius,
@@ -1532,6 +1532,17 @@ export default class AnnotationViewer extends Vue {
         const annotation = this.selectedToolConfiguration.values.annotation;
         this.annotationLayer.mode(annotation?.shape);
         break;
+      case "tagging":
+        if (
+          ["tag_click", "untag_click"].includes(
+            this.selectedToolConfiguration.values.action.value,
+          )
+        ) {
+          this.annotationLayer.mode("point");
+        } else {
+          this.annotationLayer.mode("polygon");
+        }
+        break;
       case "snap":
         if (
           this.selectedToolConfiguration.values.snapTo.value === "circleToDot"
@@ -1575,6 +1586,18 @@ export default class AnnotationViewer extends Vue {
           `${this.selectedToolConfiguration?.type} tools are not supported yet`,
         );
         this.annotationLayer.mode(null);
+    }
+
+    if (this.selectedToolConfiguration?.type === "tagging") {
+      this.annotationLayer.geoOn(
+        geojs.event.mouseclick,
+        this.handleTaggingClick,
+      );
+    } else {
+      this.annotationLayer.geoOff(
+        geojs.event.mouseclick,
+        this.handleTaggingClick,
+      );
     }
   }
 
@@ -1639,6 +1662,9 @@ export default class AnnotationViewer extends Vue {
         switch (this.selectedToolConfiguration.type) {
           case "create":
             this.addAnnotationFromGeoJsAnnotation(evt.annotation);
+            break;
+          case "tagging":
+            this.handleAnnotationTagging(evt.annotation);
             break;
           case "snap":
             this.addAnnotationFromSnapping(evt.annotation);
@@ -1831,6 +1857,90 @@ export default class AnnotationViewer extends Vue {
       if (this.selectedToolConfiguration === null && evt?.geo) {
         this.setHoveredAnnotationFromCoordinates(evt.geo);
       }
+    });
+  }
+
+  private async handleAnnotationTagging(annotation: IGeoJSAnnotation) {
+    if (!annotation) {
+      return;
+    }
+    const selectedAnnotations =
+      this.getSelectedAnnotationsFromAnnotation(annotation);
+    if (selectedAnnotations.length > 0) {
+      const action = this.selectedToolConfiguration?.values?.action?.value;
+      const tags = this.selectedToolConfiguration?.values?.tags || [];
+      const removeExisting =
+        this.selectedToolConfiguration?.values?.removeExisting || false;
+
+      await this.updateAnnotationTags(
+        selectedAnnotations.map((a) => a.id),
+        action,
+        tags,
+        removeExisting,
+      );
+
+      // Highlight the last tagged annotation in the list
+      if (selectedAnnotations.length === 1) {
+        this.annotationStore.setHoveredAnnotationId(selectedAnnotations[0].id);
+      }
+    }
+    this.annotationLayer.removeAnnotation(annotation);
+  }
+
+  private handleTaggingClick = (evt: any) => {
+    if (
+      !this.selectedToolConfiguration ||
+      this.selectedToolConfiguration.type !== "tagging" ||
+      !evt?.geo
+    ) {
+      return;
+    }
+
+    const selectedAnnotations = this.getSelectedAnnotationsFromAnnotation({
+      type: () => AnnotationShape.Point,
+      coordinates: () => [evt.geo],
+    } as IGeoJSAnnotation);
+
+    if (selectedAnnotations.length === 1) {
+      const selectedAnnotation = selectedAnnotations[0];
+      const action = this.selectedToolConfiguration.values.action.value;
+      const tags = this.selectedToolConfiguration.values.tags || [];
+      const removeExisting =
+        this.selectedToolConfiguration?.values?.removeExisting || false;
+
+      this.updateAnnotationTags(
+        [selectedAnnotation.id],
+        action,
+        tags,
+        removeExisting,
+      );
+
+      // Highlight the tagged annotation in the list
+      this.annotationStore.setHoveredAnnotationId(selectedAnnotation.id);
+    }
+  };
+
+  private async updateAnnotationTags(
+    annotationIds: string[],
+    action: string,
+    tags: string[],
+    removeExisting: boolean,
+  ) {
+    await this.annotationStore.updateAnnotationsPerId({
+      annotationIds,
+      editFunction: (annotation: IAnnotation) => {
+        if (action.startsWith("untag")) {
+          // Remove specified tags if they exist
+          annotation.tags = annotation.tags.filter(
+            (tag) => !tags.includes(tag),
+          );
+        } else {
+          // Add tags (either replacing or merging)
+          annotation.tags = removeExisting
+            ? [...tags]
+            : [...new Set([...annotation.tags, ...tags])];
+        }
+      },
     });
   }
 }

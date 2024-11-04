@@ -41,6 +41,7 @@ import { VSelect, VCheckbox, VTextField, VRadioGroup } from "vuetify/lib";
 import AnnotationConfiguration from "@/tools/creation/templates/AnnotationConfiguration.vue";
 import TagAndLayerRestriction from "@/tools/creation/templates/TagAndLayerRestriction.vue";
 import DockerImage from "@/tools/creation/templates/DockerImage.vue";
+import TagPicker from "@/components/TagPicker.vue";
 
 // Used to determine :is="" value from template interface type
 const typeToComponentName = {
@@ -51,6 +52,7 @@ const typeToComponentName = {
   radio: "v-radio-group",
   text: "v-text-field",
   dockerImage: "docker-image",
+  tags: "tag-picker",
 };
 
 type TComponentType = keyof typeof typeToComponentName;
@@ -71,6 +73,7 @@ interface IItem {
     VTextField,
     VRadioGroup,
     DockerImage,
+    TagPicker,
   },
 })
 // Creates a tool configuration interface based on the current selected template.

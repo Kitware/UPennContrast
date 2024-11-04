@@ -22,7 +22,7 @@
           </v-col>
         </v-row>
         <!-- layer location -->
-        <v-row class="my-0">
+        <v-row class="my-0" v-if="!hideLayer">
           <v-col class="py-0">
             <layer-select v-model="layer" label="Layer" />
           </v-col>
@@ -145,6 +145,9 @@ export default class AnnotationConfiguration extends Vue {
 
   @Prop({ default: false })
   readonly hideShape!: string;
+
+  @Prop({ default: false })
+  readonly hideLayer!: boolean;
 
   @Prop({ default: AnnotationShape.Point })
   readonly defaultShape!: AnnotationShape;

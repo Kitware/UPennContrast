@@ -46,6 +46,44 @@ The last interface element of id `connectTo` is a simple interface element, with
 
 ### The logic
 
-You can look for all the occurences of `case "snap":` in the code. There is two occurences:
+You can look for all the occurences of `case "snap":` in the code. There are two occurrences:
 - One to set the cursor mode to polygon or set it to point and add a cursor annotation depending on if the tool is a circle to dot or not.
 - One to handle the click of the user and add an annotation accordingly.
+
+## Example: "Click to tag" tool
+
+### The template
+
+This tool has the type `tagging`. Like other tools that have different modes (e.g. the connection tool), it uses a select interface element as a submenu to provide different tagging actions. Currently, it only has "Click to tag", but could be extended to include actions like "Lasso to tag multiple" in the future.
+
+The interface list has two key elements:
+1. The submenu interface element (id: `action`, type: `select`) which defines the available tagging actions
+2. The tags interface element (id: `tags`, type: `tags`) which uses the TagPicker component to let users select which tags to apply
+
+The tool uses the `tags` interface type which maps to the `tag-picker` component in `ToolConfigurationItem.vue`. This component provides a consistent tag selection interface across the application.
+
+### The logic
+
+The tool follows a similar pattern to the click-connect tool, but simplified since it only needs to handle single clicks rather than pairs of clicks. Key points:
+
+1. In `refreshAnnotationMode()`, it:
+   - Sets annotation mode to null
+   - Sets up a direct mouseclick event handler instead of using annotation mode
+   - This avoids creating visible temporary point annotations
+
+2. The click handler:
+   - Creates a temporary "fake" point annotation just for hit testing
+   - Uses `getSelectedAnnotationsFromAnnotation()` to find what was clicked
+   - Updates the clicked annotation's tags using `updateAnnotationsPerId()`
+   - No temporary annotation is visible to the user
+
+This pattern of using direct mouse events rather than annotation mode is useful when:
+- You want to avoid visible temporary annotations
+- You need more direct control over the interaction
+- The tool is doing simple point-and-click operations
+
+The tool demonstrates how to:
+- Add new interface types to the template system
+- Reuse existing components (TagPicker)
+- Handle mouse interactions directly when appropriate
+- Follow existing patterns while simplifying them for simpler use cases

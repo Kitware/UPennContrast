@@ -359,5 +359,92 @@
         }
       }
     ]
+  },
+  {
+    "name": "Tagging tools",
+    "type": "tagging",
+    "shortName": "Tag",
+    "interface": [
+      {
+        "name": "Action",
+        "type": "select",
+        "id": "action",
+        "isSubmenu": true,
+        "meta": {
+          "items": [
+            {
+              "text": "Click to tag",
+              "value": "tag_click",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Tags to apply",
+                    "id": "tags",
+                    "type": "tags"
+                  },
+                  {
+                    "name": "Tagging options",
+                    "id": "removeExisting",
+                    "type": "checkbox",
+                    "meta": {
+                      "label": "Remove existing tags",
+                      "value": false
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "text": "Lasso to tag",
+              "value": "tag_lasso",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Tags to apply",
+                    "id": "tags",
+                    "type": "tags"
+                  },
+                  {
+                    "name": "Tagging options",
+                    "id": "removeExisting",
+                    "type": "checkbox",
+                    "meta": {
+                      "label": "Remove existing tags",
+                      "value": false
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "text": "Click to remove tag",
+              "value": "untag_click",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Tags to remove",
+                    "id": "tags",
+                    "type": "tags"
+                  }
+                ]
+              }
+            },
+            {
+              "text": "Lasso to remove tag",
+              "value": "untag_lasso",
+              "meta": {
+                "interface": [
+                  {
+                    "name": "Tags to remove",
+                    "id": "tags",
+                    "type": "tags"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
   }
 ]
