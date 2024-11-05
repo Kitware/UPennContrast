@@ -68,6 +68,10 @@ export class Annotations extends VuexModule {
     );
   }
 
+  get allAnnotationIds() {
+    return this.annotations.map((annotation: IAnnotation) => annotation.id);
+  }
+
   get isAnnotationSelected() {
     const annotationIdsSet = new Set(this.selectedAnnotationIds);
     return (annotationId: string) => annotationIdsSet.has(annotationId);
@@ -685,6 +689,22 @@ export class Annotations extends VuexModule {
   public removeTagsFromSelectedAnnotations(tags: string[]) {
     this.removeTagsByAnnotationIds({
       annotationIds: this.selectedAnnotationIds,
+      tags,
+    });
+  }
+
+  @Action
+  public async addTagsToAllAnnotations(tags: string[]) {
+    await this.addTagsByAnnotationIds({
+      annotationIds: this.allAnnotationIds,
+      tags,
+    });
+  }
+
+  @Action
+  public async removeTagsFromAllAnnotations(tags: string[]) {
+    await this.removeTagsByAnnotationIds({
+      annotationIds: this.allAnnotationIds,
       tags,
     });
   }

@@ -1,5 +1,14 @@
 <template>
-  <div></div>
+  <div>
+    <annotation-context-menu
+      :show="showContextMenu"
+      :x="contextMenuX"
+      :y="contextMenuY"
+      :annotation="rightClickedAnnotation"
+      @save="handleContextMenuSave"
+      @cancel="handleContextMenuCancel"
+    />
+  </div>
 </template>
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
@@ -41,6 +50,7 @@ import {
   TSamPrompt,
   TToolState,
   ConnectionToolStateSymbol,
+  IGeoJSMouseState,
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -58,6 +68,9 @@ import {
   samPromptToAnnotation,
 } from "@/pipelines/samPipeline";
 import { NoOutput } from "@/pipelines/computePipeline";
+
+import ColorPickerMenu from "@/components/ColorPickerMenu.vue";
+import AnnotationContextMenu from "@/components/AnnotationContextMenu.vue";
 
 function filterAnnotations(
   annotations: IAnnotation[],
@@ -80,7 +93,9 @@ function filterAnnotations(
 }
 
 // Draws annotations on the given layer, and provides functionnality for the user selected tool.
-@Component({ components: {} })
+@Component({
+  components: { ColorPickerMenu, AnnotationContextMenu },
+})
 export default class AnnotationViewer extends Vue {
   readonly store = store;
   readonly annotationStore = annotationStore;
@@ -1787,6 +1802,14 @@ export default class AnnotationViewer extends Vue {
       this.handleAnnotationChange,
     );
     this.drawAnnotationsAndTooltips();
+    this.annotationLayer.geoOn(
+      geojs.event.mouseclick,
+      (evt: IGeoJSMouseState) => {
+        if (evt.buttonsDown.right) {
+          this.handleAnnotationRightClick(evt);
+        }
+      },
+    );
   }
 
   @Watch("annotationLayer")
@@ -1942,6 +1965,70 @@ export default class AnnotationViewer extends Vue {
         }
       },
     });
+  }
+
+  showContextMenu = false;
+  contextMenuX = 0;
+  contextMenuY = 0;
+  rightClickedAnnotation: IAnnotation | null = null;
+
+  handleAnnotationRightClick(evt: IGeoJSMouseState) {
+    if (!evt) {
+      return;
+    }
+
+    // Find which annotation was clicked
+    // TODO: It is possible that this could be optimized by directly asking GeoJS for the annotationId
+    const geoAnnotations: IGeoJSAnnotation[] =
+      this.annotationLayer.annotations();
+    for (const geoAnnotation of geoAnnotations) {
+      const id = geoAnnotation.options("girderId");
+      if (!id) {
+        continue;
+      }
+      const annotation = this.getAnnotationFromId(id);
+      if (!annotation) {
+        continue;
+      }
+      const unitsPerPixel = this.getMapUnitsPerPixel();
+      const shouldSelect = this.shouldSelectAnnotation(
+        AnnotationShape.Point,
+        [evt.geo],
+        annotation,
+        geoAnnotation.style(),
+        unitsPerPixel,
+      );
+      if (shouldSelect) {
+        // Show context menu
+        this.rightClickedAnnotation = annotation;
+        this.contextMenuX = evt.evt.clientX;
+        this.contextMenuY = evt.evt.clientY;
+        this.showContextMenu = true;
+        break;
+      }
+    }
+  }
+
+  handleContextMenuCancel() {
+    this.showContextMenu = false;
+    this.rightClickedAnnotation = null;
+  }
+
+  handleContextMenuSave({
+    annotationId,
+    color,
+  }: {
+    annotationId?: string;
+    color: string;
+  }) {
+    if (annotationId) {
+      this.annotationStore.colorAnnotationIds({
+        annotationIds: [annotationId],
+        color,
+      });
+    }
+    this.showContextMenu = false;
+    this.rightClickedAnnotation = null;
   }
 }
 </script>
