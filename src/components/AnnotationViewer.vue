@@ -1978,6 +1978,7 @@ export default class AnnotationViewer extends Vue {
     }
 
     // Find which annotation was clicked
+    // TODO: It is possible that this could be optimized by directly asking GeoJS for the annotationId
     const geoAnnotations: IGeoJSAnnotation[] =
       this.annotationLayer.annotations();
     for (const geoAnnotation of geoAnnotations) {
