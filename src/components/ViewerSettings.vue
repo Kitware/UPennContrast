@@ -61,6 +61,14 @@
           max="100"
           label="Point annotations radius"
         />
+        <v-slider
+          v-model="annotationOpacity"
+          :thumb-label="true"
+          min="0"
+          max="1"
+          step="0.1"
+          label="Annotation opacity"
+        />
         <v-select
           hide-details
           label="Compositing mode"
@@ -98,6 +106,7 @@ import {
   advancedCompositionItems,
 } from "@/utils/compositionModes";
 import PixelScaleBarSetting from "@/components/PixelScaleBarSetting.vue";
+import { Debounce } from "@/utils/debounce";
 
 @Component({ components: { PixelScaleBarSetting } })
 export default class ViewerSettings extends Vue {
@@ -143,6 +152,20 @@ export default class ViewerSettings extends Vue {
 
   set scaleAnnotationsWithZoom(value: boolean) {
     this.store.setScaleAnnotationsWithZoom(value);
+  }
+
+  get annotationOpacity() {
+    return this.store.annotationOpacity;
+  }
+
+  set annotationOpacity(value: number) {
+    this.setOpacityDebounced(value);
+  }
+
+  @Debounce(250, { leading: false, trailing: true })
+  private setOpacityDebounced(value: number) {
+    const opacity = typeof value === "string" ? parseFloat(value) : value;
+    this.store.setAnnotationOpacity(opacity);
   }
 
   get annotationsRadius() {

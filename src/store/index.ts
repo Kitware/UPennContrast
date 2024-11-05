@@ -158,8 +158,8 @@ export class Main extends VuexModule {
   showPixelScalebar: boolean = true;
 
   scaleAnnotationsWithZoom: boolean = true;
-
   annotationsRadius: number = 10;
+  annotationOpacity: number = 0.5;
 
   compositionMode: TCompositionMode = "lighten";
   backgroundColor: string = "black";
@@ -340,6 +340,11 @@ export class Main extends VuexModule {
   @Mutation
   public setAnnotationsRadius(value: number) {
     this.annotationsRadius = value;
+  }
+
+  @Mutation
+  public setAnnotationOpacity(value: number) {
+    this.annotationOpacity = value;
   }
 
   @Mutation

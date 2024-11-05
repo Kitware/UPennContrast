@@ -543,6 +543,7 @@ export default class AnnotationViewer extends Vue {
     return {
       scaled: this.store.scaleAnnotationsWithZoom ? false : 1,
       radius: this.store.annotationsRadius,
+      fillOpacity: this.store.annotationOpacity,
     };
   }
 
