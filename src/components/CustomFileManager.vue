@@ -95,6 +95,7 @@
         </v-menu>
       </template>
     </girder-file-manager>
+    <alert-dialog ref="alert"></alert-dialog>
   </div>
 </template>
 
@@ -114,6 +115,7 @@ import FileManagerOptions from "./FileManagerOptions.vue";
 import { Search as GirderSearch } from "@/girder/components";
 import { vuetifyConfig } from "@/girder";
 import { logError } from "@/utils/log";
+import AlertDialog, { IAlert } from "@/components/AlertDialog.vue";
 
 interface IChipAttrs {
   text: string;
@@ -125,6 +127,7 @@ interface IChipAttrs {
   components: {
     FileManagerOptions,
     GirderSearch,
+    AlertDialog,
     GirderFileManager: () =>
       import("@/girder/components").then((mod) => mod.FileManager),
   },
@@ -177,6 +180,7 @@ export default class CustomFileManager extends Vue {
 
   $refs!: {
     fileInput: HTMLInputElement;
+    alert: AlertDialog;
   };
 
   async reloadItems() {
@@ -381,12 +385,17 @@ export default class CustomFileManager extends Vue {
 
   async handleFileUpload(event: Event) {
     const input = event.target as HTMLInputElement;
-    if (!input.files?.length) return;
+    if (!input.files?.length) {
+      return;
+    }
 
     const file = input.files[0];
     // Check file size (500MB = 500 * 1024 * 1024 bytes)
     if (file.size > 500 * 1024 * 1024) {
-      alert("File size exceeds 500MB limit");
+      this.$refs.alert.openAlert({
+        type: "error",
+        message: "File size exceeds 500MB limit"
+      });
       // Reset the input so the same file can be selected again
       input.value = "";
       return;
