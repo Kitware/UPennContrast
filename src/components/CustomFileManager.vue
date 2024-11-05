@@ -115,7 +115,7 @@ import FileManagerOptions from "./FileManagerOptions.vue";
 import { Search as GirderSearch } from "@/girder/components";
 import { vuetifyConfig } from "@/girder";
 import { logError } from "@/utils/log";
-import AlertDialog, { IAlert } from "@/components/AlertDialog.vue";
+import AlertDialog from "@/components/AlertDialog.vue";
 
 interface IChipAttrs {
   text: string;
@@ -394,7 +394,7 @@ export default class CustomFileManager extends Vue {
     if (file.size > 500 * 1024 * 1024) {
       this.$refs.alert.openAlert({
         type: "error",
-        message: "File size exceeds 500MB limit"
+        message: "File size exceeds 500MB limit",
       });
       // Reset the input so the same file can be selected again
       input.value = "";
