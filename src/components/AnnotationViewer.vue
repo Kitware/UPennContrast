@@ -1704,6 +1704,7 @@ export default class AnnotationViewer extends Vue {
   @Watch("time")
   @Watch("hoveredAnnotationId")
   @Watch("selectedAnnotations")
+  @Watch("shouldDrawAnnotations")
   @Watch("shouldDrawConnections")
   onRedrawNeeded() {
     this.drawAnnotationsAndTooltips();
