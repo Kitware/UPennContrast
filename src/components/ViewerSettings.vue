@@ -106,6 +106,7 @@ import {
   advancedCompositionItems,
 } from "@/utils/compositionModes";
 import PixelScaleBarSetting from "@/components/PixelScaleBarSetting.vue";
+import { Debounce } from "@/utils/debounce";
 
 @Component({ components: { PixelScaleBarSetting } })
 export default class ViewerSettings extends Vue {
@@ -158,6 +159,11 @@ export default class ViewerSettings extends Vue {
   }
 
   set annotationOpacity(value: number) {
+    this.setOpacityDebounced(value);
+  }
+
+  @Debounce(250, { leading: false, trailing: true })
+  private setOpacityDebounced(value: number) {
     const opacity = typeof value === "string" ? parseFloat(value) : value;
     this.store.setAnnotationOpacity(opacity);
   }

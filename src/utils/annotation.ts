@@ -43,23 +43,21 @@ export function getAnnotationStyleFromBaseStyle(
     style.fillColor = annotationColor;
     style.strokeColor = geoColor;
   }
-  if (isHovered) {
-    style.fillOpacity = 0;
-    style.strokeWidth = 5;
-    if (annotationColor) {
-      style.strokeColor = {
-        r: 1,
-        g: 0.9,
-        b: 0.9,
-      };
-    }
-  }
   if (isSelected) {
     style.strokeWidth = 6;
     if (annotationColor) {
       const geoColor = { ...geojs.util.convertColor(annotationColor) };
       style.strokeColor = geoColor;
     }
+  }
+  if (isHovered) {
+    style.fillOpacity = 0;
+    style.strokeWidth = 5;
+    style.strokeColor = {
+      r: 1,
+      g: 0.9,
+      b: 0.9,
+    };
   }
   return style;
 }
