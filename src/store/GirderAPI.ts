@@ -624,6 +624,22 @@ export default class GirderAPI {
     });
     return response.data;
   }
+
+  async uploadFile(
+    file: File,
+    parentId: string,
+    parentType: string = "folder",
+  ) {
+    return this.client.post(
+      `file?parentId=${parentId}&parentType=${parentType}&name=${file.name}&size=${file.size}`,
+      file,
+      {
+        headers: {
+          "Content-Type": "application/octet-stream",
+        },
+      },
+    );
+  }
 }
 
 export function asDataset(folder: IGirderFolder): IDataset {

@@ -47,6 +47,20 @@
             :items="selected"
           />
         </v-menu>
+        <input
+          type="file"
+          ref="fileInput"
+          @change="handleFileUpload"
+          style="display: none"
+        />
+        <v-btn
+          class="mx-2"
+          @click="$refs.fileInput.click()"
+          :disabled="!currentLocation"
+        >
+          <v-icon left>mdi-upload</v-icon>
+          Upload Individual File
+        </v-btn>
       </template>
       <template #row-widget="props">
         {{ renderItem(props.item) }}
@@ -81,6 +95,7 @@
         </v-menu>
       </template>
     </girder-file-manager>
+    <alert-dialog ref="alert"></alert-dialog>
   </div>
 </template>
 
@@ -99,6 +114,8 @@ import { RawLocation } from "vue-router";
 import FileManagerOptions from "./FileManagerOptions.vue";
 import { Search as GirderSearch } from "@/girder/components";
 import { vuetifyConfig } from "@/girder";
+import { logError } from "@/utils/log";
+import AlertDialog from "@/components/AlertDialog.vue";
 
 interface IChipAttrs {
   text: string;
@@ -110,6 +127,7 @@ interface IChipAttrs {
   components: {
     FileManagerOptions,
     GirderSearch,
+    AlertDialog,
     GirderFileManager: () =>
       import("@/girder/components").then((mod) => mod.FileManager),
   },
@@ -159,6 +177,11 @@ export default class CustomFileManager extends Vue {
 
   selectedItemsOptionsMenu: boolean = false;
   rowOptionsMenu: { [itemId: string]: boolean } = {};
+
+  $refs!: {
+    fileInput: HTMLInputElement;
+    alert: AlertDialog;
+  };
 
   async reloadItems() {
     try {
@@ -358,6 +381,42 @@ export default class CustomFileManager extends Vue {
       }
     }
     return ret;
+  }
+
+  async handleFileUpload(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) {
+      return;
+    }
+
+    const file = input.files[0];
+    // Check file size (500MB = 500 * 1024 * 1024 bytes)
+    if (file.size > 500 * 1024 * 1024) {
+      this.$refs.alert.openAlert({
+        type: "error",
+        message: "File size exceeds 500MB limit",
+      });
+      // Reset the input so the same file can be selected again
+      input.value = "";
+      return;
+    }
+
+    const location = this.currentLocation;
+    if (!location) return;
+    // Check if location is a folder or user (has _id and _modelType)
+    if ("_id" in location && "_modelType" in location) {
+      try {
+        await this.store.api.uploadFile(
+          file,
+          location._id,
+          location._modelType,
+        );
+        // Reload the current folder to show new file
+        await this.reloadItems();
+      } catch (error) {
+        logError("Upload failed:", error);
+      }
+    }
   }
 }
 </script>
