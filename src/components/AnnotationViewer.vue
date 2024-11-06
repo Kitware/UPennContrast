@@ -632,7 +632,6 @@ export default class AnnotationViewer extends Vue {
   }
 
   drawAnnotationsAndTooltips() {
-    console.log("drawing annotations and tooltips");
     this.drawAnnotations();
     this.drawTooltips();
   }
