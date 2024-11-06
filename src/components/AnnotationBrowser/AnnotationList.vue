@@ -148,6 +148,7 @@
         :footer-props="{
           'items-per-page-options': [10, 50, 200],
         }"
+        :virtual="true"
         @update:items-per-page="itemsPerPage = $event"
         @update:group-by="groupBy = $event"
         ref="dataTable"
@@ -313,6 +314,10 @@ interface IAnnotationListItem {
   components: { TagPicker, ColorPickerMenu },
 })
 export default class AnnotationList extends Vue {
+  beforeUpdate() {
+    console.trace("Component updating");
+  }
+
   readonly store = store;
   readonly annotationStore = annotationStore;
   readonly propertyStore = propertyStore;
@@ -337,6 +342,7 @@ export default class AnnotationList extends Vue {
   groupBy: string | string[] = []; // one-way binding @update:group-by
 
   get selected() {
+    console.log("getter: selected");
     return this.annotationStore.selectedAnnotations.filter((annotation) =>
       this.filteredAnnotationIdToIdx.has(annotation.id),
     );
@@ -347,6 +353,8 @@ export default class AnnotationList extends Vue {
   }
 
   get selectedItems() {
+    console.log("getter: selectedItems");
+    console.trace("selectedItems getter called");
     return this.filteredItems.filter((item) => item.isSelected);
   }
 
@@ -355,14 +363,17 @@ export default class AnnotationList extends Vue {
   }
 
   toggleAnnotationSelection(annotation: IAnnotation) {
+    console.log("method: toggleAnnotationSelection");
     this.annotationStore.toggleSelected([annotation]);
   }
 
   get filteredAnnotationIdToIdx() {
+    console.log("getter: filteredAnnotationIdToIdx");
     return this.filterStore.filteredAnnotationIdToIdx;
   }
 
   get listedAnnotations() {
+    console.log("getter: listedAnnotations");
     let annotations = this.filterStore.filteredAnnotations;
     const idFilter = this.localIdFilter?.trim();
     if (idFilter) {
@@ -374,10 +385,14 @@ export default class AnnotationList extends Vue {
   }
 
   get filteredItems() {
+    console.log("getter: filteredItems");
+    console.trace('filteredItems getter called');
+
     return this.listedAnnotations.map(this.annotationToItem);
   }
 
   get annotationToItem() {
+    console.log("getter: annotationToItem");
     return (annotation: IAnnotation) => ({
       annotation,
       index: this.annotationIdToIndex[annotation.id],
@@ -388,27 +403,33 @@ export default class AnnotationList extends Vue {
   }
 
   get displayedPropertyPaths() {
+    console.log("getter: displayedPropertyPaths");
     return this.propertyStore.displayedPropertyPaths;
   }
 
   get annotationIdToIndex() {
+    console.log("getter: annotationIdToIndex");
     return this.annotationStore.annotationIdToIdx;
   }
 
   updateAnnotationName(name: string, id: string) {
+    console.log("method: updateAnnotationName");
     this.annotationStore.updateAnnotationName({ name, id });
   }
 
   get selectAllIndeterminate() {
+    console.log("getter: selectAllIndeterminate");
     const nSelected = this.selectedItems.length;
     return nSelected > 0 && nSelected < this.filteredItems.length;
   }
 
   get selectAllValue() {
+    console.log("getter: selectAllValue");
     return this.selectedItems.length === this.filteredItems.length;
   }
 
   selectAllCallback() {
+    console.log("method: selectAllCallback");
     if (this.selectAllValue) {
       this.selectedItems = [];
     } else {
@@ -417,18 +438,16 @@ export default class AnnotationList extends Vue {
   }
 
   get headers() {
-    // Filter headers based on selectedColumns while preserving the order defined above
+    console.log("getter: headers");
     const filteredHeaders = allHeaders.filter((header) =>
       this.selectedColumns.includes(header.value),
     );
-
-    // Return the filtered headers with propertyHeaders appended at the end
     return [...filteredHeaders, ...this.propertyHeaders];
   }
 
   get propertyHeaders() {
+    console.log("getter: propertyHeaders");
     const propertyHeaders = [];
-    // Order is important, it should be the same as in the <td v-for="x in y"> above
     for (const path of this.displayedPropertyPaths) {
       const fullName = this.propertyStore.getFullNameFromPath(path);
       propertyHeaders.push({
@@ -440,6 +459,7 @@ export default class AnnotationList extends Vue {
   }
 
   goToAnnotationIdLocation(annotationId: string) {
+    console.log("method: goToAnnotationIdLocation");
     const annotation = this.annotationStore.getAnnotationFromId(annotationId);
     if (!annotation) {
       return;
@@ -501,6 +521,7 @@ export default class AnnotationList extends Vue {
   @Watch("hoveredId")
   @Watch("itemsPerPage")
   hoveredAnnotationChanged() {
+    console.log("method: hoveredAnnotationChanged");
     if (this.hoveredId === null) {
       return;
     }
@@ -526,10 +547,12 @@ export default class AnnotationList extends Vue {
 
   @Emit("clickedTag")
   clickedTag(tag: string) {
+    console.log("method: clickedTag");
     return tag;
   }
 
   hover(annotationId: string | null) {
+    console.log("method: hover");
     this.annotationStore.setHoveredAnnotationId(annotationId);
   }
 
@@ -537,6 +560,7 @@ export default class AnnotationList extends Vue {
   tagsToAddRemove: string[] = [];
   replaceExistingTags: boolean = false;
   addRemoveTagsSelected() {
+    console.log("method: addRemoveTagsSelected");
     if (this.addOrRemove === "add") {
       this.annotationStore.tagSelectedAnnotations({
         tags: this.tagsToAddRemove,
@@ -556,6 +580,7 @@ export default class AnnotationList extends Vue {
   useColorFromLayer: boolean = true;
   customSelectedColor: string = "#FFFFFF";
   colorSelected() {
+    console.log("method: colorSelected");
     const newColor = this.useColorFromLayer ? null : this.customSelectedColor;
     this.annotationStore.colorSelectedAnnotations(newColor);
     this.colorSelectedDialog = false;
@@ -564,10 +589,12 @@ export default class AnnotationList extends Vue {
   }
 
   deleteSelected() {
+    console.log("method: deleteSelected");
     this.annotationStore.deleteSelectedAnnotations();
   }
 
   deleteUnselected() {
+    console.log("method: deleteUnselected");
     this.annotationStore.deleteUnselectedAnnotations();
   }
 }

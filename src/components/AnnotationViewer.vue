@@ -943,40 +943,65 @@ export default class AnnotationViewer extends Vue {
 
   // Add to the layer annotations that should be rendered and have not already been added.
   drawNewAnnotations(drawnGeoJSAnnotations: Map<string, IGeoJSAnnotation[]>) {
+    console.time('drawNewAnnotations:total');
+    
+    // First loop - adding new annotations
+    console.time('drawNewAnnotations:firstLoop');
     for (const [layerId, annotationMap] of this.layerAnnotations) {
       const layer = this.store.getLayerFromId(layerId);
       if (layer) {
         for (const [annotationId, annotation] of annotationMap) {
+          console.time(`drawNewAnnotations:annotation:${annotationId}`);
+          
+          console.time('drawNewAnnotations:checkExclusion');
           const excluded = drawnGeoJSAnnotations
             .get(annotationId)
             ?.some(
               (geoJSAnnotation) =>
                 geoJSAnnotation.options("layerId") === layer.id,
             );
+          console.timeEnd('drawNewAnnotations:checkExclusion');
+
           if (!excluded) {
+            console.time('drawNewAnnotations:createAnnotation');
             const geoJSAnnotation = this.createGeoJSAnnotation(
               annotation,
               layerId,
             );
+            console.timeEnd('drawNewAnnotations:createAnnotation');
+
             if (geoJSAnnotation) {
+              console.time('drawNewAnnotations:addAnnotation');
               this.annotationLayer.addAnnotation(
                 geoJSAnnotation,
                 undefined,
                 false,
               );
+              console.timeEnd('drawNewAnnotations:addAnnotation');
             }
           }
+          
+          console.timeEnd(`drawNewAnnotations:annotation:${annotationId}`);
         }
       }
     }
+    console.timeEnd('drawNewAnnotations:firstLoop');
+
+    // Second loop - updating existing annotations
+    console.time('drawNewAnnotations:secondLoop');
     for (const [annotationId, geoJSAnnotationList] of drawnGeoJSAnnotations) {
+      console.time(`drawNewAnnotations:update:${annotationId}`);
+      
       const isHoveredGT = annotationId === this.hoveredAnnotationId;
       const isSelectedGT = this.isAnnotationSelected(annotationId);
+      
       for (const geoJSAnnotation of geoJSAnnotationList) {
         const { layerId, isHovered, isSelected, style, customColor } =
           geoJSAnnotation.options();
+        
         // If hover or select changed, update style
         if (isHovered != isHoveredGT || isSelected != isSelectedGT) {
+          console.time('drawNewAnnotations:updateStyle');
           const layer = this.store.getLayerFromId(layerId);
           const newStyle = this.getAnnotationStyle(
             annotationId,
@@ -986,9 +1011,15 @@ export default class AnnotationViewer extends Vue {
           geoJSAnnotation.options("style", { ...style, ...newStyle });
           geoJSAnnotation.options("isHovered", isHoveredGT);
           geoJSAnnotation.options("isSelected", isSelectedGT);
+          console.timeEnd('drawNewAnnotations:updateStyle');
         }
       }
+      
+      console.timeEnd(`drawNewAnnotations:update:${annotationId}`);
     }
+    console.timeEnd('drawNewAnnotations:secondLoop');
+
+    console.timeEnd('drawNewAnnotations:total');
   }
 
   drawNewConnections(drawnGeoJSAnnotations: Map<string, IGeoJSAnnotation[]>) {
