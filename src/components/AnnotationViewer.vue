@@ -1699,7 +1699,6 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-
   // AR: I added some code here to prevent duplicate redraws. I found that when e.g. xy changes, then the watcher for displayedAnnotations also changed.
   // This caused a double redraw. But the problem is that if you remove the watcher for displayedAnnotations, then the annotations are not redrawn when the user for instance deletes an annotation.
   // The solution implemented here is to have a flag that is set when any of the primary watchers are triggered, and then unset when the drawAnnotationsAndTooltips is called.
