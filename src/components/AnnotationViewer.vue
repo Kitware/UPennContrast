@@ -1698,6 +1698,17 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
+  // AR: I added some code here to prevent duplicate redraws. I found that when e.g. xy changes, then the watcher for displayedAnnotations also changed.
+  // This caused a double redraw. But the problem is that if you remove the watcher for displayedAnnotations, then the annotations are not redrawn when the user for instance deletes an annotation.
+  // The solution implemented here is to have a flag that is set when any of the primary watchers are triggered, and then unset when the drawAnnotationsAndTooltips is called.
+  // However, I don't think this is a robust solution, because it makes it very hard to track down exactly what watchers could be double-triggering the redraw.
+  // It also makes the code harder to understand.
+  // TODO: I think a better solution would be to have a Vuex store variable that sets a single flag for a redraw. Then, if multiple watchers trigger a redraw, the flag is already set and the redraw would not be triggered.
+  // That would also the logic for redrawing a lot more explicit and easier to understand.
+  // I decided not to implement this just yet because I think it would require a fair number of changes and debugging, so it didn't seem worth it right now. But if we run into more such issues, we should consider it.
+  // Add this property to track if we're handling a redraw from a primary change
+  private handlingPrimaryChange = false;
+
   @Watch("annotationConnections")
   @Watch("xy")
   @Watch("z")
@@ -1706,8 +1717,22 @@ export default class AnnotationViewer extends Vue {
   @Watch("selectedAnnotations")
   @Watch("shouldDrawAnnotations")
   @Watch("shouldDrawConnections")
-  onRedrawNeeded() {
+  onPrimaryChange() {
+    // Set flag before triggering redraw
+    this.handlingPrimaryChange = true;
     this.drawAnnotationsAndTooltips();
+    // Clear flag after a tick to allow Vue to process all watchers
+    Vue.nextTick(() => {
+      this.handlingPrimaryChange = false;
+    });
+  }
+
+  @Watch("displayedAnnotations")
+  onDisplayedAnnotationsChange() {
+    // Only trigger redraw if we're not already handling a primary change
+    if (!this.handlingPrimaryChange) {
+      this.drawAnnotationsAndTooltips();
+    }
   }
 
   @Watch("baseStyle")
