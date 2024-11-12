@@ -13,6 +13,8 @@ services:
       # access.  It should do no harm on other systems.
       - "./logs/girder:/root/.girder/logs:delegated"
       - '/var/run/docker.sock:/var/run/docker.sock'
+      # AWS Certificate to access DocumentDB
+      - "/root/global-bundle.pem:/root/global-bundle.pem"
     env_file:
       - "./docker.env"
       - "./docker-prod.env"
