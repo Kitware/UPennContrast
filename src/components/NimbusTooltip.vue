@@ -7,6 +7,7 @@
     :left="position === 'left'"
     :activator="activator"
     :open-delay="open_delay"
+    content-class="nimbus-tooltip-overlay"
   >
     <span v-html="formattedTooltip(content)"></span>
   </v-tooltip>
@@ -32,3 +33,9 @@ export default Vue.extend({
   },
 });
 </script>
+
+<style>
+.nimbus-tooltip-overlay {
+  z-index: 1000 !important;
+}
+</style>
