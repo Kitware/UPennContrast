@@ -38,12 +38,7 @@
           </template>
           <v-card min-width="250" @click.stop :ripple="false">
             <v-card-text>
-              <div class="mb-4">
-                <div class="text-subtitle-2 mb-2">Set Color for Tag</div>
-                <color-picker-menu v-model="tagColor" />
-              </div>
-              <v-divider class="my-3"></v-divider>
-              <v-list dense>
+              <v-list dense class="pa-0">
                 <v-list-item @click="handleTagAddToAll(tag)">
                   <v-list-item-title
                     >Add tag to all annotations</v-list-item-title
@@ -55,6 +50,11 @@
                   >
                 </v-list-item>
               </v-list>
+              <v-divider class="my-3"></v-divider>
+              <div>
+                <div class="text-subtitle-2 mb-2">Set Color for Tag</div>
+                <color-picker-menu v-model="tagColor" />
+              </div>
             </v-card-text>
             <v-card-actions>
               <v-spacer></v-spacer>
