@@ -20,6 +20,7 @@
       <v-card-text>
         <v-radio-group v-model="propertyExportMode" class="mb-4">
           <v-radio label="Export all properties" value="all"></v-radio>
+          <v-radio label="Export listed properties" value="listed"></v-radio>
           <v-radio
             label="Select properties to export"
             value="selected"
@@ -160,7 +161,7 @@ export default class AnnotationCsvDialog extends Vue {
   @Prop()
   readonly propertyPaths!: string[][];
 
-  propertyExportMode: "all" | "selected" = "all";
+  propertyExportMode: "all" | "selected" | "listed" = "all";
   propertyFilter: string = "";
   selectedPropertyPaths: PropertyPathItem[] = [];
 
@@ -195,10 +196,13 @@ export default class AnnotationCsvDialog extends Vue {
 
     for (const path of this.propertyPaths) {
       const pathName = this.propertyStore.getFullNameFromPath(path);
-      console.log(pathName);
       if (
         pathName &&
         (this.propertyExportMode === "all" ||
+          (this.propertyExportMode === "listed" &&
+            this.displayedPropertyPaths.some(
+              (displayPath) => displayPath.join(".") === path.join("."),
+            )) ||
           (this.propertyExportMode === "selected" &&
             this.selectedPropertyPaths.some(
               (selectedPath: PropertyPathItem) =>
@@ -208,9 +212,6 @@ export default class AnnotationCsvDialog extends Vue {
         fields.push(pathName);
         quotes.push(false);
         usedPaths.push(path);
-        console.log("used", pathName);
-      } else {
-        console.log("not used", pathName);
       }
     }
 
@@ -271,6 +272,10 @@ export default class AnnotationCsvDialog extends Vue {
       download: this.filename || "upenn_annotation_export.csv",
     };
     downloadToClient(params);
+  }
+
+  get displayedPropertyPaths() {
+    return this.propertyStore.displayedPropertyPaths;
   }
 }
 </script>
