@@ -258,11 +258,11 @@ interface IAnnotationListItem {
 }
 
 @Component({
-  components: { 
-    TagPicker, 
+  components: {
+    TagPicker,
     ColorPickerMenu,
     TagSelectionDialog,
-    ColorSelectionDialog
+    ColorSelectionDialog,
   },
 })
 export default class AnnotationList extends Vue {
@@ -489,7 +489,15 @@ export default class AnnotationList extends Vue {
   showTagDialog = false;
   showColorDialog = false;
 
-  handleTagSubmit({ tags, addOrRemove, replaceExisting }) {
+  handleTagSubmit({
+    tags,
+    addOrRemove,
+    replaceExisting,
+  }: {
+    tags: string[];
+    addOrRemove: "add" | "remove";
+    replaceExisting: boolean;
+  }) {
     if (addOrRemove === "add") {
       this.annotationStore.tagSelectedAnnotations({
         tags,
@@ -500,7 +508,13 @@ export default class AnnotationList extends Vue {
     }
   }
 
-  handleColorSubmit({ useColorFromLayer, color }) {
+  handleColorSubmit({
+    useColorFromLayer,
+    color,
+  }: {
+    useColorFromLayer: boolean;
+    color: string;
+  }) {
     const newColor = useColorFromLayer ? null : color;
     this.annotationStore.colorSelectedAnnotations(newColor);
   }
