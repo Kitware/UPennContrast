@@ -1122,6 +1122,8 @@ export interface IPropertyAnnotationFilter extends IAnnotationFilter {
     min: number;
     max: number;
   };
+  valuesOrRange: "values" | "range";
+  values?: number[];
   // Whether to exclude or include annotations that don't have the property
 }
 

@@ -1,49 +1,87 @@
 <template>
   <v-container v-if="propertyFullName">
-    <v-row class="title text--primary">
-      {{ propertyFullName }}
+    <v-row class="title text--primary d-flex align-center">
+      <v-checkbox
+        v-model="propertyFilter.enabled"
+        class="ml-4"
+        dense
+        hide-details
+        @change="toggleFilterEnabled"
+      ></v-checkbox>
+      <span>{{ propertyFullName }}</span>
+      <v-btn-toggle
+        v-model="propertyFilter.valuesOrRange"
+        mandatory
+        class="ml-4"
+        dense
+        @change="updateViewMode"
+      >
+        <v-btn value="range" small>Histogram</v-btn>
+        <v-btn value="values" small>Values</v-btn>
+      </v-btn-toggle>
     </v-row>
-    <v-row>
-      <v-col class="wrapper" ref="wrapper" :style="{ width: `${width}px` }">
-        <svg :width="width" :height="height" v-if="hist">
-          <path class="path" :d="area" />
-        </svg>
-        <div class="min-hint" :style="{ width: toValue(minValue) }"></div>
-        <div class="max-hint" :style="{ width: toValue(maxValue, true) }"></div>
-        <div ref="min" class="min" :style="{ left: toValue(minValue) }"></div>
-        <div
-          ref="max"
-          class="max"
-          :style="{ right: toValue(maxValue, true) }"
-        ></div>
-      </v-col>
-      <v-col>
-        <v-checkbox v-model="useCDF" label="CDF"></v-checkbox>
-      </v-col>
-      <v-col>
-        <v-checkbox v-model="useLog" label="log"></v-checkbox>
-      </v-col>
-    </v-row>
-    <v-row>
-      <v-col class="pa-1">
-        <v-text-field
-          dense
-          hide-details
-          label="Min"
-          type="number"
-          v-model="minValue"
-        ></v-text-field>
-      </v-col>
-      <v-col class="pa-1">
-        <v-text-field
-          dense
-          hide-details
-          type="number"
-          label="Max"
-          v-model="maxValue"
-        ></v-text-field>
-      </v-col>
-    </v-row>
+
+    <template v-if="propertyFilter.valuesOrRange === 'range'">
+      <v-row>
+        <v-col class="wrapper" ref="wrapper" :style="{ width: `${width}px` }">
+          <svg :width="width" :height="height" v-if="hist">
+            <path class="path" :d="area" />
+          </svg>
+          <div class="min-hint" :style="{ width: toValue(minValue) }"></div>
+          <div
+            class="max-hint"
+            :style="{ width: toValue(maxValue, true) }"
+          ></div>
+          <div ref="min" class="min" :style="{ left: toValue(minValue) }"></div>
+          <div
+            ref="max"
+            class="max"
+            :style="{ right: toValue(maxValue, true) }"
+          ></div>
+        </v-col>
+        <v-col>
+          <v-checkbox v-model="useCDF" label="CDF"></v-checkbox>
+        </v-col>
+        <v-col>
+          <v-checkbox v-model="useLog" label="log"></v-checkbox>
+        </v-col>
+      </v-row>
+      <v-row>
+        <v-col class="pa-1">
+          <v-text-field
+            dense
+            hide-details
+            label="Min"
+            type="number"
+            v-model="minValue"
+          ></v-text-field>
+        </v-col>
+        <v-col class="pa-1">
+          <v-text-field
+            dense
+            hide-details
+            type="number"
+            label="Max"
+            v-model="maxValue"
+          ></v-text-field>
+        </v-col>
+      </v-row>
+    </template>
+
+    <template v-else>
+      <v-row>
+        <v-col>
+          <v-textarea
+            v-model="valuesInput"
+            dense
+            rows="4"
+            hide-details
+            placeholder="Enter values separated by spaces, commas, tabs, or newlines"
+            @input="debouncedUpdateValues"
+          ></v-textarea>
+        </v-col>
+      </v-row>
+    </template>
   </v-container>
 </template>
 
@@ -62,6 +100,7 @@ import { area, curveStepBefore } from "d3-shape";
 import { v4 as uuidv4 } from "uuid";
 
 import { scaleLinear, scaleSymlog } from "d3-scale";
+import debounce from "lodash/debounce";
 
 @Component({
   components: {
@@ -83,6 +122,10 @@ export default class PropertyFilterHistogram extends Vue {
   useCDF: boolean = false;
 
   defaultMinMax: boolean = true;
+
+  valuesInput: string = "";
+
+  debouncedUpdateValues = debounce(this.updateValuesFilter, 500);
 
   get histToPixel() {
     const scale = scaleLinear()
@@ -160,6 +203,7 @@ export default class PropertyFilterHistogram extends Vue {
         propertyPath: this.propertyPath,
         exclusive: false,
         enabled: true,
+        valuesOrRange: "range",
       };
       this.filterStore.updatePropertyFilter(newFilter);
       return newFilter;
@@ -272,6 +316,14 @@ export default class PropertyFilterHistogram extends Vue {
   }
 
   mounted() {
+    // Initialize valuesInput if we have existing values
+    if (
+      this.propertyFilter.valuesOrRange === "values" &&
+      this.propertyFilter.values
+    ) {
+      this.valuesInput = this.propertyFilter.values.join(", ");
+    }
+
     // TODO(performance): should update only the related histogram
     this.filterStore.updateHistograms();
     if (!this.propertyFilter.enabled) {
@@ -281,6 +333,47 @@ export default class PropertyFilterHistogram extends Vue {
       });
     }
     this.initializeHandles();
+  }
+
+  updateValuesFilter() {
+    const values = this.valuesInput
+      .split(/[\s,;\t\n]+/)
+      .map((v) => v.trim())
+      .filter((v) => v !== "")
+      .map(Number)
+      .filter((v) => !isNaN(v));
+
+    if (values.length > 0) {
+      this.filterStore.updatePropertyFilter({
+        ...this.propertyFilter,
+        values: values,
+      });
+    }
+  }
+
+  updateViewMode(mode: "range" | "values") {
+    this.filterStore.updatePropertyFilter({
+      ...this.propertyFilter,
+      valuesOrRange: mode,
+      // Clear values when switching to range mode
+      values: mode === "range" ? undefined : this.propertyFilter.values,
+    });
+    // Force reinitialize handles when switching to range mode
+    if (mode === "range") {
+      this.$nextTick(() => {
+        this.initializeHandles();
+      });
+    } else {
+      // If we are switching to values mode, update the values filter
+      this.updateValuesFilter();
+    }
+  }
+
+  toggleFilterEnabled(enabled: boolean) {
+    this.filterStore.updatePropertyFilter({
+      ...this.propertyFilter,
+      enabled,
+    });
   }
 }
 </script>
@@ -385,5 +478,10 @@ $savedHint: 7px;
       #bdbdbd 10px
     );
   }
+}
+
+.v-input--selection-controls {
+  margin-top: 0;
+  padding-top: 0;
 }
 </style>
