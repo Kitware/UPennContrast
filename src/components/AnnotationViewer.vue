@@ -8,6 +8,15 @@
       @save="handleContextMenuSave"
       @cancel="handleContextMenuCancel"
     />
+    <annotation-action-panel
+      v-if="selectedAnnotations.length > 0"
+      :selected-count="selectedAnnotations.length"
+      @delete-selected="annotationStore.deleteSelectedAnnotations"
+      @delete-unselected="annotationStore.deleteUnselectedAnnotations"
+      @tag-selected="handleTagSelected"
+      @color-selected="handleColorSelected"
+      @deselect-all="handleDeselectAll"
+    />
   </div>
 </template>
 <script lang="ts">
@@ -71,7 +80,7 @@ import { NoOutput } from "@/pipelines/computePipeline";
 
 import ColorPickerMenu from "@/components/ColorPickerMenu.vue";
 import AnnotationContextMenu from "@/components/AnnotationContextMenu.vue";
-
+import AnnotationActionPanel from "@/components/AnnotationActionPanel.vue";
 function filterAnnotations(
   annotations: IAnnotation[],
   { tags, tagsInclusive, layerId }: IRestrictTagsAndLayer,
@@ -94,7 +103,7 @@ function filterAnnotations(
 
 // Draws annotations on the given layer, and provides functionnality for the user selected tool.
 @Component({
-  components: { ColorPickerMenu, AnnotationContextMenu },
+  components: { ColorPickerMenu, AnnotationContextMenu, AnnotationActionPanel },
 })
 export default class AnnotationViewer extends Vue {
   readonly store = store;
@@ -2055,6 +2064,23 @@ export default class AnnotationViewer extends Vue {
     }
     this.showContextMenu = false;
     this.rightClickedAnnotation = null;
+  }
+
+  // Add these methods
+  handleTagSelected() {
+    // You may want to show a dialog here to select tags
+    // For now, we'll just log
+    console.log("Tag selected clicked");
+  }
+
+  handleColorSelected() {
+    // You may want to show the color picker here
+    // For now, we'll just log
+    console.log("Color selected clicked");
+  }
+
+  handleDeselectAll() {
+    this.annotationStore.clearSelectedAnnotations();
   }
 }
 </script>
