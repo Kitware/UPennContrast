@@ -82,7 +82,6 @@ export default class AnnotationIDFilters extends Vue {
       .filter((id) => id.length > 0);
 
     if (this.editingFilter) {
-      console.log("updating", this.editingFilter.id, annotationIds);
       this.filterStore.updateAnnotationIdFilter({
         id: this.editingFilter.id,
         annotationIds: annotationIds,

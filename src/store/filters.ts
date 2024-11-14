@@ -165,7 +165,6 @@ export class Filters extends VuexModule {
     id: string;
     annotationIds: string[];
   }) {
-    console.log("mutation receiving", filterIdAndAnnotationIds);
     this.annotationIdFilters = this.annotationIdFilters.map((filter) =>
       filter.id === filterIdAndAnnotationIds.id
         ? {
