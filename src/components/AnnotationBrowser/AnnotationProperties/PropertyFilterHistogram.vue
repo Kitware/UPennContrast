@@ -19,6 +19,10 @@
         <v-btn value="range" small>Histogram</v-btn>
         <v-btn value="values" small>Values</v-btn>
       </v-btn-toggle>
+      <v-spacer></v-spacer>
+      <v-btn icon small class="mr-2" @click="removeFilter">
+        <v-icon>mdi-close</v-icon>
+      </v-btn>
     </v-row>
 
     <template v-if="propertyFilter.valuesOrRange === 'range'">
@@ -375,6 +379,10 @@ export default class PropertyFilterHistogram extends Vue {
       enabled,
     });
   }
+
+  removeFilter() {
+    this.filterStore.togglePropertyPathFiltering(this.propertyPath);
+  }
 }
 </script>
 <style scoped lang="scss">
@@ -483,5 +491,10 @@ $savedHint: 7px;
 .v-input--selection-controls {
   margin-top: 0;
   padding-top: 0;
+}
+
+.v-btn.v-btn--icon.v-size--small {
+  width: 24px;
+  height: 24px;
 }
 </style>

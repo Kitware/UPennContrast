@@ -1,6 +1,6 @@
 <template>
   <div>
-    <v-btn small @click="openNewFilterDialog">Add annotation list filter</v-btn>
+    <v-btn small @click="openNewFilterDialog">Annotation ID filter</v-btn>
     <div class="d-flex flex-column">
       <div
         v-for="filter in filters"
