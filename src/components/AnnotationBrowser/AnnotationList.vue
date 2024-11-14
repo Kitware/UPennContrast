@@ -18,83 +18,29 @@
         </v-row>
         <v-row>
           <v-col class="pa-0 mx-1">
-            <v-dialog v-model="showAddRemoveTagsSelectedDialog" width="50%">
-              <template v-slot:activator="{ on, attrs }">
-                <v-btn block small v-bind="attrs" v-on="on" @click.stop>
-                  Tag Selected
-                </v-btn>
-              </template>
-              <v-card>
-                <v-card-title>
-                  Add tags to or remove tags from selected objects
-                </v-card-title>
-                <tag-picker
-                  class="ma-4 pa-4"
-                  v-model="tagsToAddRemove"
-                ></tag-picker>
-                <v-radio-group v-model="addOrRemove" row class="ma-4">
-                  <v-radio
-                    label="Add tags to selected objects"
-                    value="add"
-                  ></v-radio>
-                  <v-radio
-                    label="Remove tags from selected objects"
-                    value="remove"
-                  ></v-radio>
-                </v-radio-group>
-                <v-checkbox
-                  v-model="replaceExistingTags"
-                  label="Replace existing tags"
-                  class="ma-4"
-                  :disabled="addOrRemove === 'remove'"
-                ></v-checkbox>
-                <v-divider></v-divider>
-                <v-card-actions>
-                  <v-spacer></v-spacer>
-                  <v-btn color="warning" @click="tagsToAddRemove = []">
-                    Clear input
-                  </v-btn>
-                  <v-btn color="primary" @click="addRemoveTagsSelected">
-                    Add/remove tags
-                  </v-btn>
-                </v-card-actions>
-              </v-card>
-            </v-dialog>
+            <v-btn block small @click.stop="showTagDialog = true">
+              Tag Selected
+            </v-btn>
           </v-col>
           <v-col class="pa-0 mx-1">
-            <v-dialog v-model="colorSelectedDialog" width="50%">
-              <template v-slot:activator="{ on, attrs }">
-                <v-btn block small v-bind="attrs" v-on="on" @click.stop>
-                  Color Selected
-                </v-btn>
-              </template>
-              <v-card>
-                <v-card-title> Color selected annotations </v-card-title>
-                <v-card-text>
-                  <v-checkbox
-                    v-model="useColorFromLayer"
-                    label="Use color from layer"
-                  />
-                  <color-picker-menu
-                    v-if="!useColorFromLayer"
-                    v-model="customSelectedColor"
-                  />
-                </v-card-text>
-                <v-card-actions>
-                  <v-spacer />
-                  <v-btn color="warning" @click="colorSelectedDialog = false">
-                    Cancel
-                  </v-btn>
-                  <v-btn color="primary" @click="colorSelected">
-                    Apply color
-                  </v-btn>
-                </v-card-actions>
-              </v-card>
-            </v-dialog>
+            <v-btn block small @click.stop="showColorDialog = true">
+              Color Selected
+            </v-btn>
           </v-col>
         </v-row>
       </v-container>
     </v-expansion-panel-header>
+
+    <tag-selection-dialog
+      :show.sync="showTagDialog"
+      @submit="handleTagSubmit"
+    />
+
+    <color-selection-dialog
+      :show.sync="showColorDialog"
+      @submit="handleColorSubmit"
+    />
+
     <v-expansion-panel-content>
       <v-dialog v-model="annotationFilteredDialog">
         <v-card>
@@ -266,6 +212,8 @@ import { simpleCentroid } from "@/utils/annotation";
 
 import TagPicker from "@/components/TagPicker.vue";
 import ColorPickerMenu from "@/components/ColorPickerMenu.vue";
+import TagSelectionDialog from "@/components/TagSelectionDialog.vue";
+import ColorSelectionDialog from "@/components/ColorSelectionDialog.vue";
 
 import {
   AnnotationNames,
@@ -310,7 +258,12 @@ interface IAnnotationListItem {
 }
 
 @Component({
-  components: { TagPicker, ColorPickerMenu },
+  components: { 
+    TagPicker, 
+    ColorPickerMenu,
+    TagSelectionDialog,
+    ColorSelectionDialog
+  },
 })
 export default class AnnotationList extends Vue {
   readonly store = store;
@@ -533,34 +486,23 @@ export default class AnnotationList extends Vue {
     this.annotationStore.setHoveredAnnotationId(annotationId);
   }
 
-  showAddRemoveTagsSelectedDialog: boolean = false;
-  tagsToAddRemove: string[] = [];
-  replaceExistingTags: boolean = false;
-  addRemoveTagsSelected() {
-    if (this.addOrRemove === "add") {
+  showTagDialog = false;
+  showColorDialog = false;
+
+  handleTagSubmit({ tags, addOrRemove, replaceExisting }) {
+    if (addOrRemove === "add") {
       this.annotationStore.tagSelectedAnnotations({
-        tags: this.tagsToAddRemove,
-        replace: this.replaceExistingTags,
+        tags,
+        replace: replaceExisting,
       });
     } else {
-      this.annotationStore.removeTagsFromSelectedAnnotations(
-        this.tagsToAddRemove,
-      );
+      this.annotationStore.removeTagsFromSelectedAnnotations(tags);
     }
-    this.showAddRemoveTagsSelectedDialog = false;
-    this.tagsToAddRemove = [];
-    this.replaceExistingTags = false;
   }
 
-  colorSelectedDialog: boolean = false;
-  useColorFromLayer: boolean = true;
-  customSelectedColor: string = "#FFFFFF";
-  colorSelected() {
-    const newColor = this.useColorFromLayer ? null : this.customSelectedColor;
+  handleColorSubmit({ useColorFromLayer, color }) {
+    const newColor = useColorFromLayer ? null : color;
     this.annotationStore.colorSelectedAnnotations(newColor);
-    this.colorSelectedDialog = false;
-    this.useColorFromLayer = true;
-    this.customSelectedColor = "#FFFFFF";
   }
 
   deleteSelected() {
