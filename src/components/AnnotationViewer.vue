@@ -2086,19 +2086,6 @@ export default class AnnotationViewer extends Vue {
     this.rightClickedAnnotation = null;
   }
 
-  // Add these methods
-  handleTagSelected() {
-    // You may want to show a dialog here to select tags
-    // For now, we'll just log
-    console.log("Tag selected clicked");
-  }
-
-  handleColorSelected() {
-    // You may want to show the color picker here
-    // For now, we'll just log
-    console.log("Color selected clicked");
-  }
-
   handleDeselectAll() {
     this.annotationStore.clearSelectedAnnotations();
   }
