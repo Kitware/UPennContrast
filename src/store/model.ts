@@ -1094,6 +1094,7 @@ export interface IAnnotationBase {
 export interface IAnnotation extends IAnnotationBase {
   id: string;
   name: string | null;
+  timeOffset?: number;
 }
 
 export interface IAnnotationConnectionBase {
