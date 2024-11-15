@@ -115,7 +115,7 @@ function filterAnnotations(
   return output;
 }
 
-// Draws annotations on the given layer, and provides functionnality for the user selected tool.
+// Draws annotations on the given layer, and provides functionality for the user selected tool.
 @Component({
   components: {
     ColorPickerMenu,
@@ -180,6 +180,9 @@ export default class AnnotationViewer extends Vue {
 
   @Prop()
   readonly workerPreviewFeature!: IGeoJSFeature;
+
+  @Prop()
+  readonly timelapseLayer!: IGeoJSFeatureLayer;
 
   @Prop()
   readonly unrollH!: number;
