@@ -25,6 +25,7 @@
       :key="'property ' + idx"
       :propertyPath="propertyPath"
     />
+    <annotation-id-filters class="filter-element" />
   </v-container>
 </template>
 
@@ -38,11 +39,13 @@ import { ITagAnnotationFilter } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import PropertyFilterHistogram from "@/components/AnnotationBrowser/AnnotationProperties/PropertyFilterHistogram.vue";
 import RoiFilters from "@/components/AnnotationBrowser/ROIFilters.vue";
+import AnnotationIdFilters from "@/components/AnnotationBrowser/AnnotationIdFilters.vue";
 @Component({
   components: {
     PropertyFilterHistogram,
     RoiFilters,
     TagFilterEditor,
+    AnnotationIdFilters,
   },
 })
 export default class AnnotationFilters extends Vue {

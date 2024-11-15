@@ -27,9 +27,7 @@ import { Vue, Component } from "vue-property-decorator";
 
 import filterStore from "@/store/filters";
 
-import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
-
-@Component({ components: { TagFilterEditor } })
+@Component({})
 export default class ROIFilters extends Vue {
   readonly filterStore = filterStore;
 

@@ -64,6 +64,8 @@ export class Filters extends VuexModule {
 
   histograms: TFilterHistograms = {};
 
+  annotationIdFilters: IIdAnnotationFilter[] = [];
+
   @Mutation
   togglePropertyPathFiltering(path: string[]) {
     const pathIdx = findIndexOfPath(path, this.filterPaths);
@@ -148,6 +150,48 @@ export class Filters extends VuexModule {
     }
   }
 
+  @Mutation
+  newAnnotationIdFilter(annotationIds: string[]) {
+    this.annotationIdFilters.push({
+      id: `Annotation List Filter ${this.annotationIdFilters.length}`,
+      exclusive: true,
+      enabled: true,
+      annotationIds,
+    });
+  }
+
+  @Mutation
+  updateAnnotationIdFilter(filterIdAndAnnotationIds: {
+    id: string;
+    annotationIds: string[];
+  }) {
+    this.annotationIdFilters = this.annotationIdFilters.map((filter) =>
+      filter.id === filterIdAndAnnotationIds.id
+        ? {
+            ...filter,
+            annotationIds: filterIdAndAnnotationIds.annotationIds,
+          }
+        : filter,
+    );
+  }
+
+  @Mutation
+  removeAnnotationIdFilter(id: string) {
+    this.annotationIdFilters = this.annotationIdFilters
+      .filter((filter) => filter.id !== id)
+      .map((filter, index) => ({
+        ...filter,
+        id: `Annotation List Filter ${index}`,
+      }));
+  }
+
+  @Mutation
+  toggleAnnotationIdFilterEnabled(id: string) {
+    this.annotationIdFilters = this.annotationIdFilters.map((filter) =>
+      filter.id === id ? { ...filter, enabled: !filter.enabled } : filter,
+    );
+  }
+
   get filteredAnnotations() {
     const selectionFilter = this.selectionFilter;
     const tagFilter = this.tagFilter;
@@ -165,6 +209,9 @@ export class Filters extends VuexModule {
       Z: main.z,
       Time: main.time,
     };
+    const enabledAnnotationIdFilters = this.annotationIdFilters.filter(
+      (filter: IIdAnnotationFilter) => filter.enabled,
+    );
     return annotation.annotations.filter((annotation: IAnnotation) => {
       // Location filter
       if (
@@ -212,6 +259,16 @@ export class Filters extends VuexModule {
         },
       );
       if (!matchesProperties) {
+        return false;
+      }
+
+      // Annotation ID filters
+      const matchesAnnotationIds =
+        enabledAnnotationIdFilters.length === 0 ||
+        enabledAnnotationIdFilters.some((filter) =>
+          filter.annotationIds.includes(annotation.id),
+        );
+      if (!matchesAnnotationIds) {
         return false;
       }
 
