@@ -25,7 +25,7 @@
       </v-btn>
     </v-row>
 
-    <template v-if="propertyFilter.valuesOrRange === 'range'">
+    <template v-if="propertyFilter.valuesOrRange === PropertyFilterMode.Range">
       <v-row>
         <v-col class="wrapper" ref="wrapper" :style="{ width: `${width}px` }">
           <svg :width="width" :height="height" v-if="hist">
@@ -98,7 +98,7 @@ import { arePathEquals, getValueFromObjectAndPath } from "@/utils/paths";
 import { selectAll, event as d3Event } from "d3-selection";
 import { drag, D3DragEvent } from "d3-drag";
 
-import { IPropertyAnnotationFilter } from "@/store/model";
+import { IPropertyAnnotationFilter, PropertyFilterMode } from "@/store/model";
 import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue";
 import { area, curveStepBefore } from "d3-shape";
 import { v4 as uuidv4 } from "uuid";
@@ -115,6 +115,7 @@ export default class PropertyFilterHistogram extends Vue {
   readonly store = store;
   readonly propertyStore = propertyStore;
   readonly filterStore = filterStore;
+  readonly PropertyFilterMode = PropertyFilterMode;
 
   @Prop()
   readonly propertyPath!: string[];
@@ -207,7 +208,7 @@ export default class PropertyFilterHistogram extends Vue {
         propertyPath: this.propertyPath,
         exclusive: false,
         enabled: true,
-        valuesOrRange: "range",
+        valuesOrRange: PropertyFilterMode.Range,
       };
       this.filterStore.updatePropertyFilter(newFilter);
       return newFilter;
@@ -322,7 +323,7 @@ export default class PropertyFilterHistogram extends Vue {
   mounted() {
     // Initialize valuesInput if we have existing values
     if (
-      this.propertyFilter.valuesOrRange === "values" &&
+      this.propertyFilter.valuesOrRange === PropertyFilterMode.Values &&
       this.propertyFilter.values
     ) {
       this.valuesInput = this.propertyFilter.values.join(", ");
@@ -339,15 +340,19 @@ export default class PropertyFilterHistogram extends Vue {
     this.initializeHandles();
   }
 
-  updateValuesFilter() {
-    const values = this.valuesInput
+  private parseValuesInput(input: string): number[] {
+    return input
       .split(/[\s,;\t\n]+/)
       .map((v) => v.trim())
       .filter((v) => v !== "")
       .map(Number)
       .filter((v) => !isNaN(v));
+  }
 
-    if (values.length > 0) {
+  updateValuesFilter() {
+    const values = this.parseValuesInput(this.valuesInput);
+
+    if (values.length) {
       this.filterStore.updatePropertyFilter({
         ...this.propertyFilter,
         values: values,
@@ -355,15 +360,18 @@ export default class PropertyFilterHistogram extends Vue {
     }
   }
 
-  updateViewMode(mode: "range" | "values") {
+  updateViewMode(mode: PropertyFilterMode) {
     this.filterStore.updatePropertyFilter({
       ...this.propertyFilter,
       valuesOrRange: mode,
       // Clear values when switching to range mode
-      values: mode === "range" ? undefined : this.propertyFilter.values,
+      values:
+        mode === PropertyFilterMode.Range
+          ? undefined
+          : this.propertyFilter.values,
     });
     // Force reinitialize handles when switching to range mode
-    if (mode === "range") {
+    if (mode === PropertyFilterMode.Range) {
       this.$nextTick(() => {
         this.initializeHandles();
       });
