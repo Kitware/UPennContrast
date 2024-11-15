@@ -1094,7 +1094,6 @@ export interface IAnnotationBase {
 export interface IAnnotation extends IAnnotationBase {
   id: string;
   name: string | null;
-  timeOffset?: number;
 }
 
 export interface IAnnotationConnectionBase {
@@ -1277,6 +1276,7 @@ export interface IMapEntry {
   workerPreviewLayer: IGeoJSFeatureLayer;
   workerPreviewFeature: IGeoJSFeature;
   textLayer: IGeoJSFeatureLayer;
+  timelapseLayer: IGeoJSFeatureLayer;
   uiLayer?: IGeoJSUiLayer;
   lowestLayer?: number;
 }
