@@ -576,6 +576,10 @@ export default class AnnotationViewer extends Vue {
     return this.store.showTooltips;
   }
 
+  get showTimelapseMode(): boolean {
+    return this.store.showTimelapseMode;
+  }
+
   get filteredAnnotationTooltips(): boolean {
     return this.store.filteredAnnotationTooltips;
   }
