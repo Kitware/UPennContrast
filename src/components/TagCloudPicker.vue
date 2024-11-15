@@ -30,22 +30,39 @@
         class="d-flex align-center"
       >
         {{ tag }}
-        <v-menu offset-y :close-on-content-click="true" bottom>
+        <v-menu offset-y :close-on-content-click="false" bottom>
           <template v-slot:activator="{ on, attrs }">
             <v-icon x-small class="ml-1" v-bind="attrs" v-on="on">
               mdi-chevron-down
             </v-icon>
           </template>
-          <v-list dense>
-            <v-list-item @click="handleTagAddToAll(tag)">
-              <v-list-item-title>Add tag to all annotations</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="handleTagRemoveFromAll(tag)">
-              <v-list-item-title
-                >Remove tag from all annotations</v-list-item-title
+          <v-card min-width="250" @click.stop :ripple="false">
+            <v-card-text>
+              <v-list dense class="pa-0">
+                <v-list-item @click="handleTagAddToAll(tag)">
+                  <v-list-item-title
+                    >Add tag to all annotations</v-list-item-title
+                  >
+                </v-list-item>
+                <v-list-item @click="handleTagRemoveFromAll(tag)">
+                  <v-list-item-title
+                    >Remove tag from all annotations</v-list-item-title
+                  >
+                </v-list-item>
+              </v-list>
+              <v-divider class="my-3"></v-divider>
+              <div>
+                <div class="text-subtitle-2 mb-2">Set Color for Tag</div>
+                <color-picker-menu v-model="tagColor" />
+              </div>
+            </v-card-text>
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn color="primary" @click="applyColorToTag(tag)"
+                >Apply Color</v-btn
               >
-            </v-list-item>
-          </v-list>
+            </v-card-actions>
+          </v-card>
         </v-menu>
       </v-chip>
     </v-chip-group>
@@ -57,10 +74,13 @@ import { Vue, Component, Watch, VModel, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
 import SelectAllNoneChips from "./SelectAllNoneChips.vue";
+import ColorPickerMenu from "@/components/ColorPickerMenu.vue";
+import { IAnnotation } from "@/store/model";
 
 @Component({
   components: {
     SelectAllNoneChips,
+    ColorPickerMenu,
   },
 })
 export default class TagCloudPicker extends Vue {
@@ -75,6 +95,7 @@ export default class TagCloudPicker extends Vue {
 
   allSelectedInternal = false;
   tagSearchFilter: string = "";
+  tagColor = "#FFFFFF";
 
   @Watch("allSelectedInternal")
   emiAllSelected() {
@@ -134,6 +155,18 @@ export default class TagCloudPicker extends Vue {
 
   async handleTagRemoveFromAll(tag: string) {
     await this.annotationStore.removeTagsFromAllAnnotations([tag]);
+  }
+
+  async applyColorToTag(tag: string) {
+    const annotationsWithTag = this.annotationStore.annotations.filter(
+      (annotation: IAnnotation) => annotation.tags.includes(tag),
+    );
+    const annotationIds = annotationsWithTag.map((a) => a.id);
+
+    await this.annotationStore.colorAnnotationIds({
+      annotationIds,
+      color: this.tagColor,
+    });
   }
 }
 </script>
