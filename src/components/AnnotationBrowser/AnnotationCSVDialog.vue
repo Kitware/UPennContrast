@@ -18,6 +18,40 @@
     <v-card>
       <v-card-title> Current Annotation List as CSV </v-card-title>
       <v-card-text>
+        <v-radio-group v-model="propertyExportMode" class="mb-4">
+          <v-radio label="Export all properties" value="all"></v-radio>
+          <v-radio label="Export listed properties" value="listed"></v-radio>
+          <v-radio
+            label="Select properties to export"
+            value="selected"
+          ></v-radio>
+        </v-radio-group>
+
+        <template v-if="propertyExportMode === 'selected'">
+          <v-text-field
+            v-model="propertyFilter"
+            label="Filter properties"
+            clearable
+            class="mb-4"
+          ></v-text-field>
+
+          <v-data-table
+            v-model="selectedPropertyPaths"
+            :headers="[{ text: 'Property Name', value: 'name' }]"
+            :items="filteredPropertyItems"
+            item-key="pathString"
+            show-select
+            class="mb-4"
+            height="300px"
+            fixed-header
+            :items-per-page="-1"
+          >
+            <template #[`item.name`]="{ item }">
+              {{ item.name }}
+            </template>
+          </v-data-table>
+        </template>
+
         <template v-if="text && text.length">
           <v-textarea ref="fieldToCopy" v-model="text" readonly>
             {{ text }}
@@ -70,6 +104,12 @@ import { IAnnotation } from "@/store/model";
 import { downloadToClient } from "@/utils/download";
 import { getValueFromObjectAndPath } from "@/utils/paths";
 
+interface PropertyPathItem {
+  name: string;
+  path: string[];
+  pathString: string;
+}
+
 @Component({
   components: {},
 })
@@ -121,6 +161,27 @@ export default class AnnotationCsvDialog extends Vue {
   @Prop()
   readonly propertyPaths!: string[][];
 
+  propertyExportMode: "all" | "selected" | "listed" = "all";
+  propertyFilter: string = "";
+  selectedPropertyPaths: PropertyPathItem[] = [];
+
+  get filteredPropertyItems() {
+    return (
+      this.propertyFilter
+        ? this.propertyPaths
+        : this.propertyPaths.filter((path) => {
+            const name = this.propertyStore.getFullNameFromPath(path);
+            return name
+              ?.toLowerCase()
+              .includes(this.propertyFilter.toLowerCase());
+          })
+    ).map((path) => ({
+      name: this.propertyStore.getFullNameFromPath(path) || "",
+      path: path,
+      pathString: path.join("."),
+    }));
+  }
+
   async generateCSVStringForAnnotations() {
     // Fields
     const fields = [
@@ -135,9 +196,10 @@ export default class AnnotationCsvDialog extends Vue {
     ];
     const quotes = [true, false, false, false, false, true, true, true];
     const usedPaths: string[][] = [];
+
     for (const path of this.propertyPaths) {
       const pathName = this.propertyStore.getFullNameFromPath(path);
-      if (pathName) {
+      if (pathName && this.shouldIncludePropertyPath(path)) {
         fields.push(pathName);
         quotes.push(false);
         usedPaths.push(path);
@@ -181,6 +243,9 @@ export default class AnnotationCsvDialog extends Vue {
     // Generate csv
     return Papa.unparse({ fields, data }, { quotes });
   }
+
+  @Watch("propertyExportMode")
+  @Watch("selectedPropertyPaths")
   @Watch("dialog")
   updateText() {
     if (this.dialog) {
@@ -198,6 +263,25 @@ export default class AnnotationCsvDialog extends Vue {
       download: this.filename || "upenn_annotation_export.csv",
     };
     downloadToClient(params);
+  }
+
+  get displayedPropertyPaths() {
+    return this.propertyStore.displayedPropertyPaths;
+  }
+
+  shouldIncludePropertyPath(path: string[]) {
+    const pathString = path.join(".");
+    return (
+      this.propertyExportMode === "all" ||
+      (this.propertyExportMode === "listed" &&
+        this.displayedPropertyPaths.some(
+          (displayPath: string[]) => displayPath.join(".") === pathString,
+        )) ||
+      (this.propertyExportMode === "selected" &&
+        this.selectedPropertyPaths.some(
+          (selectedPath) => selectedPath.pathString === pathString,
+        ))
+    );
   }
 }
 </script>
