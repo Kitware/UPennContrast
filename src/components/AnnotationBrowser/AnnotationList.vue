@@ -183,7 +183,7 @@
                 :class="tableItemClass"
                 v-if="selectedColumns.includes('annotation.id')"
               >
-                <span>{{ item.annotation.id }}</span>
+                <span class="user-select-text">{{ item.annotation.id }}</span>
               </td>
               <td
                 :class="tableItemClass"
@@ -613,5 +613,9 @@ td span {
   display: block;
   text-align: center;
   margin: auto;
+}
+
+.user-select-text {
+  user-select: text;
 }
 </style>
