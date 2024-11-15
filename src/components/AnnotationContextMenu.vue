@@ -25,6 +25,18 @@
             class="mb-2"
           />
         </div>
+        <div class="d-flex align-center position-relative">
+          <v-btn text small class="px-0" @click="copyAnnotationId">
+            <v-icon
+              small
+              class="mr-1"
+              :color="copySuccess ? 'success' : undefined"
+            >
+              {{ copySuccess ? "mdi-check" : "mdi-content-copy" }}
+            </v-icon>
+            Copy Annotation ID to clipboard
+          </v-btn>
+        </div>
       </v-card-text>
       <v-card-actions>
         <v-btn color="error" @click="deleteAnnotation"> Delete Object </v-btn>
@@ -44,6 +56,7 @@ import { IAnnotation } from "@/store/model";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
 import { tagFilterFunction } from "@/utils/annotation";
+import { logError } from "@/utils/log";
 
 @Component({
   components: { ColorPickerMenu, TagPicker },
@@ -68,6 +81,7 @@ export default class AnnotationContextMenu extends Vue {
   selectedTags: string[] = [];
   useLayerColor = false;
   applyToSameTags = false;
+  copySuccess = false;
 
   get showMenu() {
     return this.show;
@@ -160,9 +174,22 @@ export default class AnnotationContextMenu extends Vue {
   private areTagsEqual(tags1: string[], tags2: string[]): boolean {
     return tagFilterFunction(tags1, tags2, true);
   }
+
+  async copyAnnotationId() {
+    if (this.annotation) {
+      try {
+        await navigator.clipboard.writeText(this.annotation.id);
+        this.copySuccess = true;
+        setTimeout(() => {
+          this.copySuccess = false;
+        }, 2000);
+      } catch (err) {
+        logError("Failed to copy annotation ID:", err);
+      }
+    }
+  }
 }
 </script>
-
 <style>
 .v-card {
   user-select: none;
