@@ -1116,12 +1116,19 @@ export interface ITagAnnotationFilter extends IAnnotationFilter {
   tags: string[];
 }
 
+export enum PropertyFilterMode {
+  Values = "values",
+  Range = "range",
+}
+
 export interface IPropertyAnnotationFilter extends IAnnotationFilter {
   propertyPath: string[];
   range: {
     min: number;
     max: number;
   };
+  valuesOrRange: PropertyFilterMode;
+  values?: number[];
   // Whether to exclude or include annotations that don't have the property
 }
 

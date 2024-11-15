@@ -19,13 +19,14 @@
       dense
       hide-details
     />
-    <roi-filters class="filter-element" />
+    <property-filter-selector class="filter-element" />
     <property-filter-histogram
       v-for="(propertyPath, idx) in propertyPaths"
       :key="'property ' + idx"
       :propertyPath="propertyPath"
     />
     <annotation-id-filters class="filter-element" />
+    <roi-filters class="filter-element" />
   </v-container>
 </template>
 
@@ -40,12 +41,15 @@ import TagFilterEditor from "@/components/AnnotationBrowser/TagFilterEditor.vue"
 import PropertyFilterHistogram from "@/components/AnnotationBrowser/AnnotationProperties/PropertyFilterHistogram.vue";
 import RoiFilters from "@/components/AnnotationBrowser/ROIFilters.vue";
 import AnnotationIdFilters from "@/components/AnnotationBrowser/AnnotationIdFilters.vue";
+import PropertyFilterSelector from "@/components/AnnotationBrowser/PropertyFilterSelector.vue";
+
 @Component({
   components: {
     PropertyFilterHistogram,
     RoiFilters,
     TagFilterEditor,
     AnnotationIdFilters,
+    PropertyFilterSelector,
   },
 })
 export default class AnnotationFilters extends Vue {

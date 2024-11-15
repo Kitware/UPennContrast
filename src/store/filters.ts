@@ -251,11 +251,21 @@ export class Filters extends VuexModule {
             propertyValues,
             filter.propertyPath,
           );
-          return (
-            typeof value === "number" &&
-            value >= filter.range.min &&
-            value <= filter.range.max
-          );
+          if (filter.valuesOrRange === "values") {
+            // If no values specified, don't filter
+            if (!filter.values || filter.values.length === 0) {
+              return true;
+            }
+            // Check if the value exists in the set of specified values
+            return typeof value === "number" && filter.values.includes(value);
+          } else {
+            // Default "range" behavior for histograms
+            return (
+              typeof value === "number" &&
+              value >= filter.range.min &&
+              value <= filter.range.max
+            );
+          }
         },
       );
       if (!matchesProperties) {
