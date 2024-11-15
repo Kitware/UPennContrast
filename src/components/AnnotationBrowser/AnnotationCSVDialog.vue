@@ -166,17 +166,20 @@ export default class AnnotationCsvDialog extends Vue {
   selectedPropertyPaths: PropertyPathItem[] = [];
 
   get filteredPropertyItems() {
-    return this.propertyPaths
-      .filter((path) => {
-        if (!this.propertyFilter) return true;
-        const name = this.propertyStore.getFullNameFromPath(path);
-        return name?.toLowerCase().includes(this.propertyFilter.toLowerCase());
-      })
-      .map((path) => ({
-        name: this.propertyStore.getFullNameFromPath(path) || "",
-        path: path,
-        pathString: path.join("."),
-      }));
+    return (
+      this.propertyFilter
+        ? this.propertyPaths
+        : this.propertyPaths.filter((path) => {
+            const name = this.propertyStore.getFullNameFromPath(path);
+            return name
+              ?.toLowerCase()
+              .includes(this.propertyFilter.toLowerCase());
+          })
+    ).map((path) => ({
+      name: this.propertyStore.getFullNameFromPath(path) || "",
+      path: path,
+      pathString: path.join("."),
+    }));
   }
 
   async generateCSVStringForAnnotations() {
@@ -196,19 +199,7 @@ export default class AnnotationCsvDialog extends Vue {
 
     for (const path of this.propertyPaths) {
       const pathName = this.propertyStore.getFullNameFromPath(path);
-      if (
-        pathName &&
-        (this.propertyExportMode === "all" ||
-          (this.propertyExportMode === "listed" &&
-            this.displayedPropertyPaths.some(
-              (displayPath) => displayPath.join(".") === path.join("."),
-            )) ||
-          (this.propertyExportMode === "selected" &&
-            this.selectedPropertyPaths.some(
-              (selectedPath: PropertyPathItem) =>
-                selectedPath.pathString === path.join("."),
-            )))
-      ) {
+      if (pathName && this.shouldIncludePropertyPath(path)) {
         fields.push(pathName);
         quotes.push(false);
         usedPaths.push(path);
@@ -276,6 +267,21 @@ export default class AnnotationCsvDialog extends Vue {
 
   get displayedPropertyPaths() {
     return this.propertyStore.displayedPropertyPaths;
+  }
+
+  shouldIncludePropertyPath(path: string[]) {
+    const pathString = path.join(".");
+    return (
+      this.propertyExportMode === "all" ||
+      (this.propertyExportMode === "listed" &&
+        this.displayedPropertyPaths.some(
+          (displayPath: string[]) => displayPath.join(".") === pathString,
+        )) ||
+      (this.propertyExportMode === "selected" &&
+        this.selectedPropertyPaths.some(
+          (selectedPath) => selectedPath.pathString === pathString,
+        ))
+    );
   }
 }
 </script>
