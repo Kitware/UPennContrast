@@ -100,6 +100,10 @@ export function geojsAnnotationFactory(
       newGeoJSAnnotation = geojs.annotation.lineAnnotation(options);
       newGeoJSAnnotation!.options("vertices", coordinates);
       break;
+    case AnnotationShape.Rectangle:
+      newGeoJSAnnotation = geojs.annotation.rectangleAnnotation(options);
+      newGeoJSAnnotation!.options("corners", coordinates);
+      break;
     default:
       logError(`Unsupported annotation shape: ${shape}`);
   }
@@ -147,9 +151,11 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
   if (
     (a.shape === AnnotationShape.Point &&
       (b.shape === AnnotationShape.Polygon ||
-        b.shape === AnnotationShape.Line)) ||
+        b.shape === AnnotationShape.Line ||
+        b.shape === AnnotationShape.Rectangle)) ||
     ((a.shape === AnnotationShape.Polygon ||
-      b.shape === AnnotationShape.Line) &&
+      a.shape === AnnotationShape.Line ||
+      a.shape === AnnotationShape.Rectangle) &&
       b.shape === AnnotationShape.Point)
   ) {
     const point = a.shape === AnnotationShape.Point ? a : b;
@@ -163,6 +169,7 @@ export function annotationDistance(a: IAnnotation, b: IAnnotation) {
   }
 
   // Poly to poly
+  // TODO: add support for rectangle
   if (
     (a.shape === AnnotationShape.Polygon || b.shape === AnnotationShape.Line) &&
     (b.shape === AnnotationShape.Polygon || b.shape === AnnotationShape.Line)

@@ -39,7 +39,10 @@ class AnnotationSchema:
         },
     }
 
-    shapeSchema = {"type": "string", "enum": ["point", "line", "polygon"]}
+    shapeSchema = {
+        "type": "string",
+        "enum": ["point", "line", "polygon", "rectangle"],
+    }
 
     annotationSchema = {
         "$schema": "http://json-schema.org/draft-04/schema",

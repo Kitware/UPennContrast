@@ -193,6 +193,10 @@ export class Main extends VuexModule {
       text: AnnotationNames[AnnotationShape.Line],
       value: AnnotationShape.Line,
     },
+    {
+      text: AnnotationNames[AnnotationShape.Rectangle],
+      value: AnnotationShape.Rectangle,
+    },
   ];
 
   get tools() {

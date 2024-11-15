@@ -1065,12 +1065,14 @@ export enum AnnotationShape {
   Point = "point",
   Line = "line",
   Polygon = "polygon",
+  Rectangle = "rectangle",
 }
 
 export const AnnotationNames = {
   [AnnotationShape.Point]: "Point",
   [AnnotationShape.Line]: "Line",
   [AnnotationShape.Polygon]: "Blob",
+  [AnnotationShape.Rectangle]: "Rectangle",
 };
 
 export interface IAnnotationLocation {
