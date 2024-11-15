@@ -17,6 +17,12 @@
       <v-icon left small>mdi-palette</v-icon>
       Color Selected
     </v-btn>
+    <v-btn small class="ma-1" @click="copyAnnotationIds">
+      <v-icon left small :color="copySuccess ? 'success' : undefined">
+        {{ copySuccess ? "mdi-check" : "mdi-content-copy" }}
+      </v-icon>
+      Copy Selected IDs
+    </v-btn>
     <v-btn small class="ma-1" @click="$emit('deselect-all')">
       <v-icon left small>mdi-select-off</v-icon>
       Deselect All
@@ -26,11 +32,31 @@
 
 <script lang="ts">
 import { Vue, Component, Prop } from "vue-property-decorator";
+import { logError } from "@/utils/log";
+import annotationStore from "@/store/annotation";
 
 @Component
 export default class AnnotationActionPanel extends Vue {
+  readonly annotationStore = annotationStore;
+
   @Prop({ required: true })
   selectedCount!: number;
+
+  copySuccess = false;
+
+  async copyAnnotationIds() {
+    try {
+      await navigator.clipboard.writeText(
+        this.annotationStore.selectedAnnotationIds.join("\n"),
+      );
+      this.copySuccess = true;
+      setTimeout(() => {
+        this.copySuccess = false;
+      }, 1000);
+    } catch (err) {
+      logError("Failed to copy annotation IDs:", err);
+    }
+  }
 }
 </script>
 
