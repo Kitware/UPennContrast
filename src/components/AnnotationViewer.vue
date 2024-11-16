@@ -1024,10 +1024,13 @@ export default class AnnotationViewer extends Vue {
     }
 
     const anyImage = this.store.dataset.anyImage();
+    if (!anyImage) {
+      return null;
+    }
     const coordinates = this.unrolledCoordinates(
       annotation.coordinates,
       annotation.location,
-      anyImage
+      anyImage,
     );
 
     // Consolidate all options into a single object
@@ -1036,7 +1039,7 @@ export default class AnnotationViewer extends Vue {
     const style = this.getAnnotationStyle(
       annotation.id,
       customColor,
-      layer?.color
+      layer?.color,
     );
 
     const options = {
@@ -1048,13 +1051,13 @@ export default class AnnotationViewer extends Vue {
       color: annotation.color,
       layerId,
       customColor,
-      style
+      style,
     };
 
     const newGeoJSAnnotation = geojsAnnotationFactory(
       annotation.shape,
       coordinates,
-      options
+      options,
     );
 
     return newGeoJSAnnotation;
