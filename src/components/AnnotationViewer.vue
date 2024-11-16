@@ -1019,62 +1019,43 @@ export default class AnnotationViewer extends Vue {
   }
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
-    if (!this.store.dataset) {
+    if (!this.store.dataset || !this.store.dataset.anyImage()) {
       return null;
     }
 
-    const anyImage = this.store.dataset?.anyImage();
-    if (!anyImage) {
-      return null;
-    }
-    const girderOptions = {
-      girderId: annotation.id,
-      isHovered: annotation.id === this.hoveredAnnotationId,
-      location: annotation.location,
-      channel: annotation.channel,
-      color: annotation.color,
-      isSelected: false,
-      layerId,
-    };
-
+    const anyImage = this.store.dataset.anyImage();
     const coordinates = this.unrolledCoordinates(
       annotation.coordinates,
       annotation.location,
-      anyImage,
+      anyImage
     );
+
+    // Consolidate all options into a single object
+    const layer = this.store.getLayerFromId(layerId);
+    const customColor = annotation.color;
+    const style = this.getAnnotationStyle(
+      annotation.id,
+      customColor,
+      layer?.color
+    );
+
+    const options = {
+      girderId: annotation.id,
+      isHovered: annotation.id === this.hoveredAnnotationId,
+      isSelected: this.isAnnotationSelected(annotation.id),
+      location: annotation.location,
+      channel: annotation.channel,
+      color: annotation.color,
+      layerId,
+      customColor,
+      style
+    };
 
     const newGeoJSAnnotation = geojsAnnotationFactory(
       annotation.shape,
       coordinates,
-      girderOptions,
+      options
     );
-    if (!newGeoJSAnnotation) {
-      return null;
-    }
-
-    newGeoJSAnnotation.options("girderId", annotation.id);
-
-    if (annotation.id === this.hoveredAnnotationId) {
-      newGeoJSAnnotation.options("isHovered", true);
-    }
-
-    if (this.isAnnotationSelected(annotation.id)) {
-      newGeoJSAnnotation.options("isSelected", true);
-    }
-
-    const customColor = annotation.color;
-    if (customColor) {
-      newGeoJSAnnotation.options("customColor", customColor);
-    }
-
-    const style = newGeoJSAnnotation.options("style");
-    const layer = this.store.getLayerFromId(layerId);
-    const newStyle = this.getAnnotationStyle(
-      annotation.id,
-      customColor,
-      layer?.color,
-    );
-    newGeoJSAnnotation.options("style", Object.assign({}, style, newStyle));
 
     return newGeoJSAnnotation;
   }

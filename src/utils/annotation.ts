@@ -86,28 +86,29 @@ export function geojsAnnotationFactory(
   coordinates: IGeoJSPosition[],
   options: any,
 ) {
-  let newGeoJSAnnotation: IGeoJSAnnotation | null = null;
+  let annotationOptions = { ...options };
+
   switch (shape) {
     case AnnotationShape.Point:
-      newGeoJSAnnotation = geojs.annotation.pointAnnotation(options);
-      newGeoJSAnnotation!.options("position", coordinates[0]);
-      break;
+      annotationOptions.position = coordinates[0];
+      return geojs.annotation.pointAnnotation(annotationOptions);
+
     case AnnotationShape.Polygon:
-      newGeoJSAnnotation = geojs.annotation.polygonAnnotation(options);
-      newGeoJSAnnotation!.options("vertices", coordinates);
-      break;
+      annotationOptions.vertices = coordinates;
+      return geojs.annotation.polygonAnnotation(annotationOptions);
+
     case AnnotationShape.Line:
-      newGeoJSAnnotation = geojs.annotation.lineAnnotation(options);
-      newGeoJSAnnotation!.options("vertices", coordinates);
-      break;
+      annotationOptions.vertices = coordinates;
+      return geojs.annotation.lineAnnotation(annotationOptions);
+
     case AnnotationShape.Rectangle:
-      newGeoJSAnnotation = geojs.annotation.rectangleAnnotation(options);
-      newGeoJSAnnotation!.options("corners", coordinates);
-      break;
+      annotationOptions.corners = coordinates;
+      return geojs.annotation.rectangleAnnotation(annotationOptions);
+
     default:
       logError(`Unsupported annotation shape: ${shape}`);
+      return null;
   }
-  return newGeoJSAnnotation;
 }
 
 export function simpleCentroid(coordinates: IGeoJSPosition[]): IGeoJSPosition {
