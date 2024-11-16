@@ -4,7 +4,6 @@ import {
   IGeoJSPosition,
   AnnotationShape,
   IAnnotationProperty,
-  IGeoJSAnnotation,
   TGeoJSColor,
   IGeoJSLineFeatureStyle,
   IGeoJSPointFeatureStyle,
@@ -86,7 +85,7 @@ export function geojsAnnotationFactory(
   coordinates: IGeoJSPosition[],
   options: any,
 ) {
-  let annotationOptions = { ...options };
+  const annotationOptions = { ...options };
 
   switch (shape) {
     case AnnotationShape.Point:
