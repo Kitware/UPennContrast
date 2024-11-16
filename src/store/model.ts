@@ -1158,6 +1158,18 @@ export interface IAnnotationProperty extends IAnnotationPropertyConfiguration {
   id: string;
 }
 
+export interface IFetchingProgress {
+  annotationProgress: number;
+  annotationTotal: number;
+  annotationDone: boolean;
+  connectionProgress: number;
+  connectionTotal: number;
+  connectionDone: boolean;
+  drawProgress: number;
+  drawTotal: number;
+  drawDone: boolean;
+}
+
 export type TNestedValues<T> = T | { [pathName: string]: TNestedValues<T> };
 
 // Can't be an object

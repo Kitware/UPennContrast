@@ -68,6 +68,7 @@ import {
   samPromptToAnnotation,
 } from "@/pipelines/samPipeline";
 import { NoOutput } from "@/pipelines/computePipeline";
+import { IFetchingProgress } from "@/store/model";
 
 import ColorPickerMenu from "@/components/ColorPickerMenu.vue";
 import AnnotationContextMenu from "@/components/AnnotationContextMenu.vue";
@@ -943,52 +944,103 @@ export default class AnnotationViewer extends Vue {
 
   // Add to the layer annotations that should be rendered and have not already been added.
   drawNewAnnotations(drawnGeoJSAnnotations: Map<string, IGeoJSAnnotation[]>) {
-    for (const [layerId, annotationMap] of this.layerAnnotations) {
-      const layer = this.store.getLayerFromId(layerId);
-      if (layer) {
-        for (const [annotationId, annotation] of annotationMap) {
-          const excluded = drawnGeoJSAnnotations
-            .get(annotationId)
-            ?.some(
-              (geoJSAnnotation) =>
-                geoJSAnnotation.options("layerId") === layer.id,
-            );
-          if (!excluded) {
-            const geoJSAnnotation = this.createGeoJSAnnotation(
-              annotation,
-              layerId,
-            );
-            if (geoJSAnnotation) {
-              this.annotationLayer.addAnnotation(
-                geoJSAnnotation,
-                undefined,
-                false,
+    const BATCH_SIZE = 1000; // Process annotations in batches
+    let totalAnnotations = 0;
+    let processedAnnotations = 0;
+
+    // Count total annotations to draw
+    for (const [, annotationMap] of this.layerAnnotations) {
+      totalAnnotations += annotationMap.size;
+    }
+
+    // Only create progress if we have many annotations
+    let progressObj: IFetchingProgress | null = null;
+    if (totalAnnotations > 20000) {
+      const { progress } = this.annotationStore.createProgresses();
+      progressObj = progress;
+      if (progressObj) {
+        progressObj.drawTotal = totalAnnotations;
+        progressObj.drawProgress = 0;
+        progressObj.drawDone = false;
+      }
+    }
+
+    // Process annotations in batches
+    const processAnnotationBatch = async () => {
+      for (const [layerId, annotationMap] of this.layerAnnotations) {
+        const layer = this.store.getLayerFromId(layerId);
+        if (layer) {
+          let batchCount = 0;
+          
+          for (const [annotationId, annotation] of annotationMap) {
+            const excluded = drawnGeoJSAnnotations
+              .get(annotationId)
+              ?.some(
+                (geoJSAnnotation) =>
+                  geoJSAnnotation.options("layerId") === layer.id,
               );
+            
+            if (!excluded) {
+              const geoJSAnnotation = this.createGeoJSAnnotation(
+                annotation,
+                layerId,
+              );
+              if (geoJSAnnotation) {
+                this.annotationLayer.addAnnotation(
+                  geoJSAnnotation,
+                  undefined,
+                  false,
+                );
+              }
+            }
+
+            processedAnnotations++;
+            batchCount++;
+
+            // Update progress
+            if (progressObj) {
+              progressObj.drawProgress = processedAnnotations;
+            }
+
+            // Process in batches to avoid blocking UI
+            if (batchCount >= BATCH_SIZE) {
+              batchCount = 0;
+              await new Promise(resolve => setTimeout(resolve, 0));
             }
           }
         }
       }
-    }
-    for (const [annotationId, geoJSAnnotationList] of drawnGeoJSAnnotations) {
-      const isHoveredGT = annotationId === this.hoveredAnnotationId;
-      const isSelectedGT = this.isAnnotationSelected(annotationId);
-      for (const geoJSAnnotation of geoJSAnnotationList) {
-        const { layerId, isHovered, isSelected, style, customColor } =
-          geoJSAnnotation.options();
-        // If hover or select changed, update style
-        if (isHovered != isHoveredGT || isSelected != isSelectedGT) {
-          const layer = this.store.getLayerFromId(layerId);
-          const newStyle = this.getAnnotationStyle(
-            annotationId,
-            customColor,
-            layer?.color,
-          );
-          geoJSAnnotation.options("style", { ...style, ...newStyle });
-          geoJSAnnotation.options("isHovered", isHoveredGT);
-          geoJSAnnotation.options("isSelected", isSelectedGT);
+
+      // Update existing annotations
+      for (const [annotationId, geoJSAnnotationList] of drawnGeoJSAnnotations) {
+        const isHoveredGT = annotationId === this.hoveredAnnotationId;
+        const isSelectedGT = this.isAnnotationSelected(annotationId);
+        for (const geoJSAnnotation of geoJSAnnotationList) {
+          const { layerId, isHovered, isSelected, style, customColor } =
+            geoJSAnnotation.options();
+          if (isHovered != isHoveredGT || isSelected != isSelectedGT) {
+            const layer = this.store.getLayerFromId(layerId);
+            const newStyle = this.getAnnotationStyle(
+              annotationId,
+              customColor,
+              layer?.color,
+            );
+            geoJSAnnotation.options("style", { ...style, ...newStyle });
+            geoJSAnnotation.options("isHovered", isHoveredGT);
+            geoJSAnnotation.options("isSelected", isSelectedGT);
+          }
         }
       }
-    }
+
+      // Cleanup
+      if (progressObj) {
+        progressObj.drawDone = true;
+        this.annotationStore.removeProgress(progressObj);
+      }
+    };
+
+    // Start processing
+    processAnnotationBatch();
   }
 
   drawNewConnections(drawnGeoJSAnnotations: Map<string, IGeoJSAnnotation[]>) {

@@ -25,21 +25,13 @@ import {
   IAnnotationComputeJob,
   IProgressInfo,
   IErrorInfoList,
+  IFetchingProgress,
 } from "./model";
 
 import Vue, { markRaw } from "vue";
 import { simpleCentroid } from "@/utils/annotation";
 import { logError } from "@/utils/log";
 import { IAnnotationSetup } from "@/tools/creation/templates/AnnotationConfiguration.vue";
-
-interface IFetchingProgress {
-  annotationProgress: number;
-  annotationTotal: number;
-  annotationDone: boolean;
-  connectionProgress: number;
-  connectionTotal: number;
-  connectionDone: boolean;
-}
 
 @Module({ dynamic: true, store, name: "annotation" })
 export class Annotations extends VuexModule {
@@ -760,6 +752,9 @@ export class Annotations extends VuexModule {
       connectionProgress: 0,
       connectionTotal: 0,
       connectionDone: false,
+      drawProgress: 0,
+      drawTotal: 0,
+      drawDone: false,
     };
     const annotationCallback = (progress: number, total: number) => {
       progressObj.annotationProgress = progress;
