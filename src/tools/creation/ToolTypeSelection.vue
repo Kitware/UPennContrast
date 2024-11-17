@@ -72,7 +72,7 @@ export interface TReturnType {
 
 const hiddenToolTexts = new Set<string>([
   '"Snap to" manual annotation tools',
-  "Annotation edit tools",
+  //"Object edit tools",
 ]);
 
 @Component({

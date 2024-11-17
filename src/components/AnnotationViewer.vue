@@ -1592,6 +1592,15 @@ export default class AnnotationViewer extends Vue {
             : "polygon";
         this.annotationLayer.mode(selectionType);
         break;
+      case "edit":
+        if (
+          this.selectedToolConfiguration.values.editionType.value === "edit"
+        ) {
+          this.annotationLayer.mode("point"); // For selection
+        } else {
+          this.annotationLayer.mode(null);
+        }
+        break;
       case "samAnnotation":
       case null:
       case undefined:
@@ -1687,6 +1696,10 @@ export default class AnnotationViewer extends Vue {
             break;
           case "select":
             this.selectAnnotations(evt.annotation);
+            break;
+          case "edit":
+            console.log("handleAnnotationChange edit", evt);
+            this.handleEditClick(evt.annotation);
             break;
           case "connection":
             this.handleAnnotationConnections(evt.annotation);
@@ -1936,6 +1949,41 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.removeAnnotation(annotation);
   }
 
+  private handleEditClick(annotation: IGeoJSAnnotation) {
+    if (!annotation) {
+      return;
+    }
+
+    console.log("handleEditClick", annotation);
+
+    // Find which annotation was clicked using the same logic as other click handlers
+    const selectedAnnotations =
+      this.getSelectedAnnotationsFromAnnotation(annotation);
+
+    if (selectedAnnotations.length === 1) {
+      console.log("selectedAnnotations", selectedAnnotations);
+
+      // Get the GeoJS annotation object for the selected annotation
+      const geoAnnotations = this.annotationLayer.annotations();
+      const geoAnnotation = geoAnnotations.find(
+        (a) => a.options("girderId") === selectedAnnotations[0].id,
+      );
+
+      console.log("geoAnnotation", geoAnnotation);
+      console.log("geoAnnotation.state()", geoAnnotation?.state());
+
+      if (geoAnnotation) {
+        if (geoAnnotation.state() === "done") {
+          console.log(
+            "Setting edit mode for annotation:",
+            selectedAnnotations[0].id,
+          );
+          this.annotationLayer.mode("edit", geoAnnotation);
+        }
+      }
+    }
+  }
+
   private handleTaggingClick = (evt: any) => {
     if (
       !this.selectedToolConfiguration ||
@@ -1977,7 +2025,7 @@ export default class AnnotationViewer extends Vue {
   ) {
     await this.annotationStore.updateAnnotationsPerId({
       annotationIds,
-      editFunction: (annotation: IAnnotation) => {
+      editFunction: (annotation: IAnnotation): void => {
         if (action.startsWith("untag")) {
           // Remove specified tags if they exist
           annotation.tags = annotation.tags.filter(
@@ -2055,6 +2103,40 @@ export default class AnnotationViewer extends Vue {
     }
     this.showContextMenu = false;
     this.rightClickedAnnotation = null;
+  }
+
+  // Add this helper method to handle annotation edits
+  private handleAnnotationEdit(evt: any) {
+    if (!evt.annotation) {
+      return;
+    }
+
+    // Only process completed edits
+    // GeoJS annotation states are: 0=create, 1=done, 2=edit
+    if (evt.annotation.state() !== 1) {
+      // 1 is the "done" state
+      return;
+    }
+
+    const id = evt.annotation.options("girderId");
+    if (!id) {
+      return;
+    }
+
+    const annotation = this.getAnnotationFromId(id);
+    if (!annotation) {
+      return;
+    }
+
+    // Update the annotation coordinates in our data model
+    const editFunction = (annotation: IAnnotation): void => {
+      annotation.coordinates = evt.annotation.coordinates();
+    };
+
+    this.annotationStore.updateAnnotationsPerId({
+      annotationIds: [id],
+      editFunction,
+    });
   }
 }
 </script>

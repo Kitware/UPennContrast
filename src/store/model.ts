@@ -789,6 +789,7 @@ export interface IGeoJSAnnotation {
   geojson: () => any;
   type: () => AnnotationShape;
   layer: ((arg: IGeoJSLayer) => IGeoJSAnnotation) & (() => IGeoJSLayer);
+  state: () => number;
 }
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.html#.mouseState
