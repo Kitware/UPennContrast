@@ -8,6 +8,7 @@ import {
   IGeoJSLineFeatureStyle,
   IGeoJSPointFeatureStyle,
   IGeoJSPolygonFeatureStyle,
+  FeatureShape,
 } from "@/store/model";
 import geojs from "geojs";
 import { logError } from "@/utils/log";
