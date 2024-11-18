@@ -1028,28 +1028,92 @@ export default class AnnotationViewer extends Vue {
     });
   }
 
-  drawTimelapseConnections() {
-    // Collect all connected annotations
-    // Probably also need to have a timelapseFeature base type that provides a time property
-    // That will make it a lot easier to decide what to draw or not. But redraws are probably not that expensive.
-    const connectedAnnotations = new Set<IAnnotation>();
+  // Helper function to find connected components using Union-Find
+  private findConnectedComponents(
+    connections: IAnnotationConnection[],
+  ): Set<string>[] {
+    // Simple Union-Find implementation
+    const parent = new Map<string, string>();
 
-    this.annotationConnections.forEach((connection: IAnnotationConnection) => {
-      const childAnnotation = this.getAnnotationFromId(connection.childId);
-      const parentAnnotation = this.getAnnotationFromId(connection.parentId);
+    // Find with path compression
+    function find(x: string): string {
+      if (!parent.has(x)) {
+        parent.set(x, x);
+      }
+      if (parent.get(x) !== x) {
+        parent.set(x, find(parent.get(x)!));
+      }
+      return parent.get(x)!;
+    }
 
-      if (childAnnotation) connectedAnnotations.add(childAnnotation);
-      if (parentAnnotation) connectedAnnotations.add(parentAnnotation);
+    // Union operation
+    function union(x: string, y: string): void {
+      parent.set(find(x), find(y));
+    }
+
+    // Process all connections
+    connections.forEach((conn) => {
+      union(conn.parentId, conn.childId);
     });
 
-    // Draw all centroids at once
-    this.drawAnnotationCentroids(Array.from(connectedAnnotations));
-    this.drawTimelapseTrack(Array.from(connectedAnnotations));
+    // Group by root to get components
+    const components = new Map<string, Set<string>>();
+    parent.forEach((_, node) => {
+      const root = find(node);
+      if (!components.has(root)) {
+        components.set(root, new Set());
+      }
+      components.get(root)!.add(node);
+    });
+
+    return Array.from(components.values());
   }
 
-  drawTimelapseTrack(annotations: IAnnotation[]) {
+  drawTimelapseConnections() {
+    // Get connected components
+    const components = this.findConnectedComponents(this.annotationConnections);
+
+    // Draw each component separately
+    components.forEach((component) => {
+      const componentAnnotations: IAnnotation[] = [];
+      component.forEach((id) => {
+        const annotation = this.getAnnotationFromId(id);
+        if (annotation) {
+          componentAnnotations.push(annotation);
+        }
+      });
+
+      if (componentAnnotations.length > 0) {
+        // Draw track for this component
+        this.drawTimelapseTrack(componentAnnotations, true);
+      }
+    });
+
+    // Draw all centroids at once (we can still do this as a single operation)
+    const allAnnotations = components.flatMap((component) =>
+      Array.from(component)
+        .map((id) => this.getAnnotationFromId(id))
+        .filter((a): a is IAnnotation => !!a),
+    );
+    this.drawAnnotationCentroids(allAnnotations);
+  }
+
+  drawTimelapseTrack(
+    annotations: IAnnotation[],
+    randomizeColor = false,
+    color?: string,
+  ) {
     // Sort annotations by time
     annotations.sort((a, b) => a.location.Time - b.location.Time);
+
+    if (randomizeColor && !color) {
+      //pick a random color based on the id of the first annotation
+      // Use hash function to convert id string to a number, then convert to hex color
+      const hash = annotations[0].id.split("").reduce((acc, char) => {
+        return char.charCodeAt(0) + ((acc << 5) - acc);
+      }, 0);
+      color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
+    }
 
     // Create array of points from centroids
     const points = annotations.map(
@@ -1061,7 +1125,7 @@ export default class AnnotationViewer extends Vue {
       .createFeature("line")
       .data([points]) // Wrap points in array as it's a single line
       .style({
-        strokeColor: "red",
+        strokeColor: color,
         strokeWidth: 2,
         strokeOpacity: 1,
       });
