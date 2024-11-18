@@ -92,6 +92,9 @@ function filterAnnotations(
   return output;
 }
 
+// TODO: Not sure this is in the right place. Probably belongs in models.ts
+type ConnectedGroup = Set<string>;
+
 // Draws annotations on the given layer, and provides functionality for the user selected tool.
 @Component({
   components: { ColorPickerMenu, AnnotationContextMenu },
@@ -1025,6 +1028,69 @@ export default class AnnotationViewer extends Vue {
     });
   }
 
+  drawTimelapseConnections() {
+    // Collect all connected annotations
+    // Probably also need to have a timelapseFeature base type that provides a time property
+    // That will make it a lot easier to decide what to draw or not. But redraws are probably not that expensive.
+    const connectedAnnotations = new Set<IAnnotation>();
+
+    this.annotationConnections.forEach((connection: IAnnotationConnection) => {
+      const childAnnotation = this.getAnnotationFromId(connection.childId);
+      const parentAnnotation = this.getAnnotationFromId(connection.parentId);
+
+      if (childAnnotation) connectedAnnotations.add(childAnnotation);
+      if (parentAnnotation) connectedAnnotations.add(parentAnnotation);
+    });
+
+    // Draw all centroids at once
+    this.drawAnnotationCentroids(Array.from(connectedAnnotations));
+    this.drawTimelapseTrack(Array.from(connectedAnnotations));
+  }
+
+  drawTimelapseTrack(annotations: IAnnotation[]) {
+    // Sort annotations by time
+    annotations.sort((a, b) => a.location.Time - b.location.Time);
+
+    // Create array of points from centroids
+    const points = annotations.map(
+      (annotation) => this.unrolledCentroidCoordinates[annotation.id],
+    );
+
+    // Create line features for all connections at once
+    this.timelapseLayer
+      .createFeature("line")
+      .data([points]) // Wrap points in array as it's a single line
+      .style({
+        strokeColor: "red",
+        strokeWidth: 2,
+        strokeOpacity: 1,
+      });
+  }
+
+  drawAnnotationCentroids(annotations: IAnnotation[]) {
+    // Create point features for all centroids at once
+    this.timelapseLayer
+      .createFeature("point")
+      .data(annotations)
+      .position((annotation: IAnnotation) => {
+        // Probably need to make an extension of geogsfeature (like text) for geometry elements
+        // That will resolve the .position typescript error
+        return this.unrolledCentroidCoordinates[annotation.id];
+      })
+      .style({
+        fill: true,
+        fillColor: "red",
+        fillOpacity: 1,
+        stroke: true,
+        strokeColor: "black",
+        strokeWidth: 2,
+        strokeOpacity: 1,
+        radius: 5,
+      });
+
+    this.timelapseLayer.draw();
+  }
+
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
     if (!this.store.dataset) {
       return null;
@@ -1728,6 +1794,10 @@ export default class AnnotationViewer extends Vue {
     // Set flag before triggering redraw
     this.handlingPrimaryChange = true;
     this.drawAnnotationsAndTooltips();
+    if (this.showTimelapseMode) {
+      // Should I put this into the drawAnnotationsAndTooltips call?
+      this.drawTimelapseConnections();
+    }
     // Clear flag after a tick to allow Vue to process all watchers
     Vue.nextTick(() => {
       this.handlingPrimaryChange = false;

@@ -1068,6 +1068,13 @@ export enum AnnotationShape {
   Rectangle = "rectangle",
 }
 
+export enum FeatureShape {
+  Point = "point",
+  Line = "line",
+  Polygon = "polygon",
+  Rectangle = "rectangle",
+}
+
 export const AnnotationNames = {
   [AnnotationShape.Point]: "Point",
   [AnnotationShape.Line]: "Line",
