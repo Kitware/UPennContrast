@@ -1116,7 +1116,6 @@ export default class AnnotationViewer extends Vue {
       color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
     }
 
-    // Get current time from store
     const currentTime = this.time;
 
     // Split points into before and after current time
@@ -1128,23 +1127,69 @@ export default class AnnotationViewer extends Vue {
       .filter((a) => a.location.Time >= currentTime)
       .map((a) => this.unrolledCentroidCoordinates[a.id]);
 
-    // Draw line for past points (thinner)
+    // Draw lines
     if (beforePoints.length > 1) {
       this.timelapseLayer.createFeature("line").data([beforePoints]).style({
         strokeColor: color,
-        strokeWidth: 3,
-        strokeOpacity: 0.5,
-      });
-    }
-
-    // Draw line for future points (thicker)
-    if (afterPoints.length > 1) {
-      this.timelapseLayer.createFeature("line").data([afterPoints]).style({
-        strokeColor: color,
-        strokeWidth: 5,
+        strokeWidth: 1,
         strokeOpacity: 1,
       });
     }
+
+    if (afterPoints.length > 1) {
+      this.timelapseLayer.createFeature("line").data([afterPoints]).style({
+        strokeColor: color,
+        strokeWidth: 3,
+        strokeOpacity: 1,
+      });
+    }
+
+    // Add time labels for start and end points
+    const textPoints: IGeoJSPosition[] = [];
+    const textLabels: string[] = [];
+    const textStyles: { fontSize?: string }[] = []; // Add array for individual text styles
+
+    if (annotations.length > 0) {
+      // Start point
+      const firstAnnotation = annotations[0];
+      textPoints.push(this.unrolledCentroidCoordinates[firstAnnotation.id]);
+      textLabels.push(`T=${firstAnnotation.location.Time + 1}`);
+      textStyles.push({}); // default style
+
+      // Current time point (if it exists in the sequence)
+      const currentPoint = annotations.find(
+        (a) => a.location.Time === currentTime,
+      );
+      if (currentPoint) {
+        textPoints.push(this.unrolledCentroidCoordinates[currentPoint.id]);
+        textLabels.push(`Curr T=${currentTime + 1}`);
+        textStyles.push({ fontSize: "16px" }); // larger font for current time
+      }
+
+      // End point
+      const lastAnnotation = annotations[annotations.length - 1];
+      textPoints.push(this.unrolledCentroidCoordinates[lastAnnotation.id]);
+      textLabels.push(`T=${lastAnnotation.location.Time + 1}`);
+      textStyles.push({}); // default style
+    }
+
+    // Draw text labels
+    this.timelapseTextLayer
+      .createFeature("text")
+      .data(textPoints)
+      .position((d: IGeoJSPosition) => d)
+      .style({
+        text: (d: IGeoJSPosition, i: number) => textLabels[i],
+        fontSize: (d: IGeoJSPosition, i: number) =>
+          textStyles[i].fontSize || "12px",
+        fontFamily: "sans-serif",
+        textAlign: "center",
+        textBaseline: "bottom",
+        color: "#DDDDDD",
+        textStrokeColor: "black",
+        textStrokeWidth: 2,
+        offset: { x: 0, y: -10 }, // Offset text above the points
+      });
   }
 
   drawAnnotationCentroids(annotations: IAnnotation[]) {
@@ -1163,9 +1208,9 @@ export default class AnnotationViewer extends Vue {
         fillOpacity: 1,
         stroke: true,
         strokeColor: "black",
-        strokeWidth: 2,
+        strokeWidth: 1,
         strokeOpacity: 1,
-        radius: 5,
+        radius: 3,
       });
 
     this.timelapseLayer.draw();
