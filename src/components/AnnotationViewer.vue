@@ -1107,28 +1107,41 @@ export default class AnnotationViewer extends Vue {
     annotations.sort((a, b) => a.location.Time - b.location.Time);
 
     if (randomizeColor && !color) {
-      //pick a random color based on the id of the first annotation
-      // Use hash function to convert id string to a number, then convert to hex color
       const hash = annotations[0].id.split("").reduce((acc, char) => {
         return char.charCodeAt(0) + ((acc << 5) - acc);
       }, 0);
       color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
     }
 
-    // Create array of points from centroids
-    const points = annotations.map(
-      (annotation) => this.unrolledCentroidCoordinates[annotation.id],
-    );
+    // Get current time from store
+    const currentTime = this.time;
 
-    // Create line features for all connections at once
-    this.timelapseLayer
-      .createFeature("line")
-      .data([points]) // Wrap points in array as it's a single line
-      .style({
+    // Split points into before and after current time
+    const beforePoints = annotations
+      .filter((a) => a.location.Time <= currentTime)
+      .map((a) => this.unrolledCentroidCoordinates[a.id]);
+
+    const afterPoints = annotations
+      .filter((a) => a.location.Time >= currentTime)
+      .map((a) => this.unrolledCentroidCoordinates[a.id]);
+
+    // Draw line for past points (thinner)
+    if (beforePoints.length > 1) {
+      this.timelapseLayer.createFeature("line").data([beforePoints]).style({
         strokeColor: color,
-        strokeWidth: 2,
+        strokeWidth: 3,
+        strokeOpacity: 0.5,
+      });
+    }
+
+    // Draw line for future points (thicker)
+    if (afterPoints.length > 1) {
+      this.timelapseLayer.createFeature("line").data([afterPoints]).style({
+        strokeColor: color,
+        strokeWidth: 5,
         strokeOpacity: 1,
       });
+    }
   }
 
   drawAnnotationCentroids(annotations: IAnnotation[]) {
