@@ -27,6 +27,7 @@
       :annotationLayer="mapentry.annotationLayer"
       :textLayer="mapentry.textLayer"
       :timelapseLayer="mapentry.timelapseLayer"
+      :timelapseTextLayer="mapentry.timelapseTextLayer"
       :workerPreviewFeature="mapentry.workerPreviewFeature"
       :maps="maps"
       :unrollH="unrollH"
@@ -852,11 +853,15 @@ export default class ImageViewer extends Vue {
       const timelapseLayer = map.createLayer("feature", {
         features: ["point", "line", "polygon"],
       });
+      const timelapseTextLayer = map.createLayer("feature", {
+        features: ["text"],
+      });
 
       annotationLayer.node().css({ "mix-blend-mode": "unset" });
       workerPreviewLayer.node().css({ "mix-blend-mode": "unset" });
       textLayer.node().css({ "mix-blend-mode": "unset" });
       timelapseLayer.node().css({ "mix-blend-mode": "unset" });
+      timelapseTextLayer.node().css({ "mix-blend-mode": "unset" });
 
       const mapentry: IMapEntry = {
         map,
@@ -867,6 +872,7 @@ export default class ImageViewer extends Vue {
         workerPreviewLayer,
         textLayer,
         timelapseLayer,
+        timelapseTextLayer,
         workerPreviewFeature,
       };
       Vue.set(this.maps, mllidx, mapentry);
@@ -1294,12 +1300,14 @@ export default class ImageViewer extends Vue {
         mapentry.annotationLayer.zIndex() !== mll.length * 2 + 1 ||
         mapentry.textLayer.zIndex() !== mll.length * 2 + 2 ||
         mapentry.timelapseLayer.zIndex() !== mll.length * 2 + 3 ||
-        (mapentry.uiLayer && mapentry.uiLayer.zIndex() !== mll.length * 2 + 4)
+        mapentry.timelapseTextLayer.zIndex() !== mll.length * 2 + 4 ||
+        (mapentry.uiLayer && mapentry.uiLayer.zIndex() !== mll.length * 2 + 5)
       ) {
         mapentry.workerPreviewLayer.moveToTop();
         mapentry.annotationLayer.moveToTop();
         mapentry.textLayer.moveToTop();
         mapentry.timelapseLayer.moveToTop();
+        mapentry.timelapseTextLayer.moveToTop();
         if (mapentry.uiLayer) {
           mapentry.uiLayer.moveToTop();
         }
