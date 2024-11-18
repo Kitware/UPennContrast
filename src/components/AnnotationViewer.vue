@@ -188,6 +188,9 @@ export default class AnnotationViewer extends Vue {
   readonly timelapseLayer!: IGeoJSFeatureLayer;
 
   @Prop()
+  readonly timelapseTextLayer!: IGeoJSFeatureLayer;
+
+  @Prop()
   readonly unrollH!: number;
 
   @Prop()

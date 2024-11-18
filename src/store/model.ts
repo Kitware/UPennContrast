@@ -1284,6 +1284,7 @@ export interface IMapEntry {
   workerPreviewFeature: IGeoJSFeature;
   textLayer: IGeoJSFeatureLayer;
   timelapseLayer: IGeoJSFeatureLayer;
+  timelapseTextLayer: IGeoJSFeatureLayer;
   uiLayer?: IGeoJSUiLayer;
   lowestLayer?: number;
 }
