@@ -452,6 +452,7 @@ export default class AnnotationList extends Vue {
       ...this.store.cameraInfo,
       center: simpleCentroid(annotation.coordinates),
     });
+    this.annotationStore.setHoveredAnnotationId(annotationId);
   }
 
   get hoveredId() {
@@ -530,7 +531,12 @@ export default class AnnotationList extends Vue {
   }
 
   hover(annotationId: string | null) {
-    this.annotationStore.setHoveredAnnotationId(annotationId);
+    // Only update the hover if the total number of annotations is less than 5000
+    // Otherwise the update will be too slow for the UI to be responsive
+    // TODO: This could probably be relaxed by conditioning on the number of displayedAnnotations
+    if (this.annotationStore.annotations.length < 5000) {
+      this.annotationStore.setHoveredAnnotationId(annotationId);
+    }
   }
 
   showAddRemoveTagsSelectedDialog: boolean = false;
