@@ -586,6 +586,11 @@ export default class AnnotationViewer extends Vue {
     return this.store.showTimelapseMode;
   }
 
+  // TODO: Placeholder for interface value
+  get timelapseModeWindow(): number {
+    return 4; // this.store.timelapseModeWindow;
+  }
+
   get filteredAnnotationTooltips(): boolean {
     return this.store.filteredAnnotationTooltips;
   }
@@ -1101,7 +1106,11 @@ export default class AnnotationViewer extends Vue {
     return Array.from(components.values());
   }
 
+  // TODO: Rename this function to match final functionality
   drawTimelapseConnections() {
+    // Only render tracks and annotations within this window
+    const timelapseModeWindow = this.timelapseModeWindow;
+    const currentTime = this.time;
     // Get connected components
     const components = this.findConnectedComponents(this.annotationConnections);
 
@@ -1111,39 +1120,41 @@ export default class AnnotationViewer extends Vue {
       component.forEach((id) => {
         const annotation = this.getAnnotationFromId(id);
         if (annotation) {
-          componentAnnotations.push(annotation);
+          if (
+            annotation.location.Time >= currentTime - timelapseModeWindow &&
+            annotation.location.Time <= currentTime + timelapseModeWindow
+          ) {
+            componentAnnotations.push(annotation);
+          }
         }
       });
 
       if (componentAnnotations.length > 0) {
         // Draw track for this component
-        this.drawTimelapseTrack(componentAnnotations, true);
+        // We assign a color based on the first annotation in the component so that it stays the same even if the window changes.
+        const hash = componentAnnotations[0].id
+          .split("")
+          .reduce((acc, char) => {
+            return char.charCodeAt(0) + ((acc << 5) - acc);
+          }, 0);
+        const color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
+        this.drawTimelapseTrack(componentAnnotations, color);
+        this.drawAnnotationCentroids(componentAnnotations);
       }
     });
 
     // Draw all centroids at once (we can still do this as a single operation)
-    const allAnnotations = components.flatMap((component) =>
-      Array.from(component)
-        .map((id) => this.getAnnotationFromId(id))
-        .filter((a): a is IAnnotation => !!a),
-    );
-    this.drawAnnotationCentroids(allAnnotations);
+    // const allAnnotations = components.flatMap((component) =>
+    //   Array.from(component)
+    //     .map((id) => this.getAnnotationFromId(id))
+    //     .filter((a): a is IAnnotation => !!a),
+    // );
+    // this.drawAnnotationCentroids(allAnnotations);
   }
 
-  drawTimelapseTrack(
-    annotations: IAnnotation[],
-    randomizeColor = false,
-    color?: string,
-  ) {
+  drawTimelapseTrack(annotations: IAnnotation[], color?: string) {
     // Sort annotations by time
     annotations.sort((a, b) => a.location.Time - b.location.Time);
-
-    if (randomizeColor && !color) {
-      const hash = annotations[0].id.split("").reduce((acc, char) => {
-        return char.charCodeAt(0) + ((acc << 5) - acc);
-      }, 0);
-      color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
-    }
 
     const currentTime = this.time;
 
@@ -1162,6 +1173,7 @@ export default class AnnotationViewer extends Vue {
         strokeColor: color,
         strokeWidth: 1,
         strokeOpacity: 1,
+        //strokeDasharray: "1,1", // TODO: Add dashed line for timelapse
       });
     }
 
@@ -1222,24 +1234,37 @@ export default class AnnotationViewer extends Vue {
   }
 
   drawAnnotationCentroids(annotations: IAnnotation[]) {
+    const currentTime = this.time;
+
     // Create point features for all centroids at once
     this.timelapseLayer
       .createFeature("point")
       .data(annotations)
       .position((annotation: IAnnotation) => {
-        // Probably need to make an extension of geogsfeature (like text) for geometry elements
-        // That will resolve the .position typescript error
         return this.unrolledCentroidCoordinates[annotation.id];
       })
+      // .options(
+      //   // Keep the time for later if we need to capture clicks
+      //   "time",
+      //   annotations.map((a) => a.location.Time),
+      // )
       .style({
         fill: true,
-        fillColor: "red",
-        fillOpacity: 1,
+        fillColor: (annotation: IAnnotation) => {
+          return annotation.location.Time <= currentTime ? "cyan" : "orange";
+        },
+        fillOpacity: (annotation: IAnnotation) => {
+          return annotation.location.Time < currentTime ? 0.5 : 1;
+        },
         stroke: true,
         strokeColor: "black",
         strokeWidth: 1,
-        strokeOpacity: 1,
-        radius: 3,
+        strokeOpacity: (annotation: IAnnotation) => {
+          return annotation.location.Time < currentTime ? 0.5 : 1;
+        },
+        radius: (annotation: IAnnotation) => {
+          return annotation.location.Time === currentTime ? 5 : 3;
+        },
       });
 
     this.timelapseLayer.draw();
@@ -2159,7 +2184,6 @@ export default class AnnotationViewer extends Vue {
     ) {
       return;
     }
-
     const selectedAnnotations = this.getSelectedAnnotationsFromAnnotation({
       type: () => AnnotationShape.Point,
       coordinates: () => [evt.geo],
