@@ -1214,15 +1214,10 @@ export default class AnnotationViewer extends Vue {
       .position((annotation: IAnnotation) => {
         return this.unrolledCentroidCoordinates[annotation.id];
       })
-      // .options(
-      //   // Keep the time for later if we need to capture clicks
-      //   "time",
-      //   annotations.map((a) => a.location.Time),
-      // )
       .style({
         fill: true,
         fillColor: (annotation: IAnnotation) => {
-          return annotation.location.Time <= currentTime ? "cyan" : "orange";
+          return annotation.location.Time < currentTime ? "cyan" : "orange";
         },
         fillOpacity: (annotation: IAnnotation) => {
           return annotation.location.Time < currentTime ? 0.5 : 1;
@@ -1237,6 +1232,12 @@ export default class AnnotationViewer extends Vue {
           return annotation.location.Time === currentTime ? 5 : 3;
         },
       });
+
+    // .options(
+    //   // Keep the time for later if we need to capture clicks
+    //   "time",
+    //   annotations.map((a) => a.location.Time),
+    // );
 
     this.timelapseLayer.draw();
   }
