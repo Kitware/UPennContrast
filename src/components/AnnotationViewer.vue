@@ -1251,11 +1251,17 @@ export default class AnnotationViewer extends Vue {
           girderId: annotation.id,
           isTimelapsePoint: true,
         });
+        // TODO: Remove this line, doesn't work.
+        // pointAnnotation.mouseClick(this.timelapseMouseClick);
         this.timelapseLayer.addAnnotation(pointAnnotation);
       }
     });
 
     this.timelapseLayer.draw();
+  }
+
+  timelapseMouseClick(evt: IGeoJSMouseState) {
+    console.log("timelapseMouseClick", evt);
   }
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
@@ -1867,6 +1873,7 @@ export default class AnnotationViewer extends Vue {
     const geoAnnotations: IGeoJSAnnotation[] =
       this.annotationLayer.annotations();
     let annotationToToggle: IAnnotation | null = null;
+    // TODO (performance): use a spatial index or something else to speed this up
     for (let i = 0; i < geoAnnotations.length; ++i) {
       const geoAnnotation = geoAnnotations[i];
       const id = geoAnnotation.options("girderId");
@@ -1935,6 +1942,59 @@ export default class AnnotationViewer extends Vue {
       } else {
         this.handleNewROIFilter(evt.annotation);
       }
+    }
+  }
+
+  handleTimelapseAnnotationClick(evt: IGeoJSMouseState) {
+    if (!evt?.geo) {
+      return;
+    }
+
+    const geoAnnotations: IGeoJSAnnotation[] =
+      this.timelapseLayer.annotations();
+
+    console.log("geoAnnotations", geoAnnotations);
+    let timeToSet: number | null = null;
+
+    console.log("time", this.time);
+
+    // TODO (performance): use a spatial index or something else to speed this up
+    for (let i = 0; i < geoAnnotations.length; ++i) {
+      const geoAnnotation = geoAnnotations[i];
+      // const time = geoAnnotation.options("time");
+      // if (time === undefined) {
+      //   continue;
+      // }
+
+      const id = geoAnnotation.options("girderId");
+      if (!id) {
+        continue;
+      }
+
+      // TODO: This is doesn't work because we don't have an IAnnotation object corresponding.
+      // We need to make a shouldSelectGeoJSAnnotation function (if we want to do it this way).
+      const annotation = this.getAnnotationFromId(id);
+      if (!annotation) {
+        continue;
+      }
+
+      const unitsPerPixel = this.getMapUnitsPerPixel();
+      const shouldSelect = this.shouldSelectAnnotation(
+        AnnotationShape.Point,
+        [evt.geo],
+        annotation,
+        geoAnnotation.style(),
+        unitsPerPixel,
+      );
+
+      if (shouldSelect) {
+        timeToSet = annotation.location.Time;
+        break;
+      }
+    }
+
+    if (timeToSet !== null && this.time !== timeToSet) {
+      this.store.setTime(timeToSet);
     }
   }
 
@@ -2072,6 +2132,7 @@ export default class AnnotationViewer extends Vue {
       this.handleAnnotationChange,
     );
     this.drawAnnotationsAndTooltips();
+    // TODO: Can this be moved up above the drawAnnotationsAndTooltips call?
     this.annotationLayer.geoOn(
       geojs.event.mouseclick,
       (evt: IGeoJSMouseState) => {
@@ -2080,6 +2141,24 @@ export default class AnnotationViewer extends Vue {
         }
       },
     );
+    this.timelapseLayer.geoOn(
+      // geojs.event.annotation.cursor_click, // TODO: This worked as a mouseclick, but not as a cursor_click. Maybe I need to enable something?
+      geojs.event.mouseclick,
+      this.handleTimelapseAnnotationClick,
+    );
+    // TODO: I'm not sure this is in the right place
+    // this.timelapseLayer.geoOn(
+    //   geojs.event.mouseclick,
+    //   (evt: IGeoJSMouseState) => {
+    //     const annotation = evt.annotation;
+    //     if (annotation && annotation.options("isTimelapsePoint")) {
+    //       const time = annotation.options("time");
+    //       if (time !== undefined) {
+    //         this.store.setTime(time);
+    //       }
+    //     }
+    //   },
+    // );
   }
 
   @Watch("annotationLayer")

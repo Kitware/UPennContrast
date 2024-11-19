@@ -787,6 +787,8 @@ export interface IGeoJSAnnotation {
   coordinates: () => IGeoJSPosition[];
   _coordinates: (coordinates?: IGeoJSPosition[]) => IGeoJSPosition[];
   geojson: () => any;
+  mouseClick: ((handler: (evt: IGeoJSMouseState) => void) => IGeoJSAnnotation) &
+    ((handler: (evt: IGeoJSMouseState) => void) => void);
   type: () => AnnotationShape;
   layer: ((arg: IGeoJSLayer) => IGeoJSAnnotation) & (() => IGeoJSLayer);
 }
