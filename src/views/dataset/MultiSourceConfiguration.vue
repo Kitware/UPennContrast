@@ -489,10 +489,31 @@ export default class MultiSourceConfiguration extends Vue {
       );
     }
 
+    let retries = 0;
+
     // Get info from file
-    this.tilesMetadata = await Promise.all(
-      items.map((item) => this.store.api.getTiles(item)),
-    );
+    // The getTiles API from large_image expects the field large_image to be set when recovering the tiles,
+    // but due to the S3 assetstore, that field can take a bit of time to be set.
+    // Retry that function a few times (10) if it fails to wait for that field to be set.
+    while (retries < 10) {
+      try {
+        this.tilesMetadata = await Promise.all(
+          items.map((item) => this.store.api.getTiles(item)),
+        );
+        break;
+      } catch (error: any) {
+        if (
+          error?.response?.data?.message != "No large image file in this item."
+        ) {
+          throw error;
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+        retries++;
+      }
+    }
+    if (!this.tilesMetadata) {
+      throw "Could not retrieve tiles from Girder ";
+    }
     this.tilesInternalMetadata = await Promise.all(
       items.map((item) => this.store.api.getTilesInternalMetadata(item)),
     );
