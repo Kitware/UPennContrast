@@ -951,6 +951,12 @@ export interface IGeoJSColorObject {
 // https://opengeoscience.github.io/geojs/apidocs/geo.html#.geoColor
 export type TGeoJSColor = string | number | IGeoJSColorObject;
 
+export interface ITimelapseAnnotationOptions {
+  time: number;
+  girderId?: string;
+  isTimelapseAnnotation: true;
+}
+
 export interface ICommonWorkerInterfaceElement {
   displayOrder?: number;
   noCache?: boolean;
@@ -1283,7 +1289,7 @@ export interface IMapEntry {
   workerPreviewLayer: IGeoJSFeatureLayer;
   workerPreviewFeature: IGeoJSFeature;
   textLayer: IGeoJSFeatureLayer;
-  timelapseLayer: IGeoJSFeatureLayer;
+  timelapseLayer: IGeoJSAnnotationLayer;
   timelapseTextLayer: IGeoJSFeatureLayer;
   uiLayer?: IGeoJSUiLayer;
   lowestLayer?: number;

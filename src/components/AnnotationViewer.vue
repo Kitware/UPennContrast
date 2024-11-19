@@ -185,7 +185,7 @@ export default class AnnotationViewer extends Vue {
   readonly workerPreviewFeature!: IGeoJSFeature;
 
   @Prop()
-  readonly timelapseLayer!: IGeoJSFeatureLayer;
+  readonly timelapseLayer!: IGeoJSAnnotationLayer;
 
   @Prop()
   readonly timelapseTextLayer!: IGeoJSFeatureLayer;
@@ -1169,20 +1169,36 @@ export default class AnnotationViewer extends Vue {
 
     // Draw lines
     if (beforePoints.length > 1) {
-      this.timelapseLayer.createFeature("line").data([beforePoints]).style({
-        strokeColor: color,
-        strokeWidth: 1,
-        strokeOpacity: 1,
-        //strokeDasharray: "1,1", // TODO: Add dashed line for timelapse
-      });
+      const beforeLine = geojsAnnotationFactory(
+        AnnotationShape.Line,
+        beforePoints,
+        {
+          style: {
+            strokeColor: color,
+            strokeWidth: 3,
+            strokeOpacity: 1,
+          },
+        },
+      );
+      if (beforeLine) {
+        this.timelapseLayer.addAnnotation(beforeLine);
+      }
     }
-
     if (afterPoints.length > 1) {
-      this.timelapseLayer.createFeature("line").data([afterPoints]).style({
-        strokeColor: color,
-        strokeWidth: 3,
-        strokeOpacity: 1,
-      });
+      const afterLine = geojsAnnotationFactory(
+        AnnotationShape.Line,
+        afterPoints,
+        {
+          style: {
+            strokeColor: color,
+            strokeWidth: 6,
+            strokeOpacity: 1,
+          },
+        },
+      );
+      if (afterLine) {
+        this.timelapseLayer.addAnnotation(afterLine);
+      }
     }
 
     // Add time labels for start and end points
@@ -1236,37 +1252,37 @@ export default class AnnotationViewer extends Vue {
   drawAnnotationCentroids(annotations: IAnnotation[]) {
     const currentTime = this.time;
 
-    // Create point features for all centroids at once
-    this.timelapseLayer
-      .createFeature("point")
-      .data(annotations)
-      .position((annotation: IAnnotation) => {
-        return this.unrolledCentroidCoordinates[annotation.id];
-      })
-      .style({
-        fill: true,
-        fillColor: (annotation: IAnnotation) => {
-          return annotation.location.Time < currentTime ? "cyan" : "orange";
+    // Create point annotations for each centroid
+    annotations.forEach((annotation) => {
+      const pointAnnotation = geojsAnnotationFactory(
+        AnnotationShape.Point,
+        [this.unrolledCentroidCoordinates[annotation.id]],
+        {
+          style: {
+            scaled: 1, // Fixed size in image coordinates
+            fill: true,
+            fillColor:
+              annotation.location.Time < currentTime ? "white" : "white",
+            fillOpacity: annotation.location.Time < currentTime ? 0.5 : 1,
+            stroke: true,
+            strokeColor: "black",
+            strokeWidth: 1,
+            strokeOpacity: annotation.location.Time < currentTime ? 0.5 : 1,
+            radius: annotation.location.Time === currentTime ? 0.16 : 0.09,
+          },
         },
-        fillOpacity: (annotation: IAnnotation) => {
-          return annotation.location.Time < currentTime ? 0.5 : 1;
-        },
-        stroke: true,
-        strokeColor: "black",
-        strokeWidth: 1,
-        strokeOpacity: (annotation: IAnnotation) => {
-          return annotation.location.Time < currentTime ? 0.5 : 1;
-        },
-        radius: (annotation: IAnnotation) => {
-          return annotation.location.Time === currentTime ? 5 : 3;
-        },
-      });
+      );
 
-    // .options(
-    //   // Keep the time for later if we need to capture clicks
-    //   "time",
-    //   annotations.map((a) => a.location.Time),
-    // );
+      if (pointAnnotation) {
+        // Add metadata for click handling
+        pointAnnotation.options({
+          time: annotation.location.Time,
+          girderId: annotation.id,
+          isTimelapsePoint: true,
+        });
+        this.timelapseLayer.addAnnotation(pointAnnotation);
+      }
+    });
 
     this.timelapseLayer.draw();
   }
