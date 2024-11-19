@@ -531,7 +531,7 @@ export default class AnnotationList extends Vue {
   }
 
   hover(annotationId: string | null) {
-    // Only update the hover if the total number of annotations is less than 1000
+    // Only update the hover if the total number of annotations is less than 5000
     // Otherwise the update will be too slow for the UI to be responsive
     // TODO: This could probably be relaxed by conditioning on the number of displayedAnnotations
     if (this.annotationStore.annotations.length < 5000) {
