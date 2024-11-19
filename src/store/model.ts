@@ -787,6 +787,8 @@ export interface IGeoJSAnnotation {
   coordinates: () => IGeoJSPosition[];
   _coordinates: (coordinates?: IGeoJSPosition[]) => IGeoJSPosition[];
   geojson: () => any;
+  mouseClick: ((handler: (evt: IGeoJSMouseState) => void) => IGeoJSAnnotation) &
+    ((handler: (evt: IGeoJSMouseState) => void) => void);
   type: () => AnnotationShape;
   layer: ((arg: IGeoJSLayer) => IGeoJSAnnotation) & (() => IGeoJSLayer);
 }
@@ -950,6 +952,12 @@ export interface IGeoJSColorObject {
 
 // https://opengeoscience.github.io/geojs/apidocs/geo.html#.geoColor
 export type TGeoJSColor = string | number | IGeoJSColorObject;
+
+export interface ITimelapseAnnotationOptions {
+  time: number;
+  girderId?: string;
+  isTimelapseAnnotation: true;
+}
 
 export interface ICommonWorkerInterfaceElement {
   displayOrder?: number;
@@ -1283,7 +1291,7 @@ export interface IMapEntry {
   workerPreviewLayer: IGeoJSFeatureLayer;
   workerPreviewFeature: IGeoJSFeature;
   textLayer: IGeoJSFeatureLayer;
-  timelapseLayer: IGeoJSFeatureLayer;
+  timelapseLayer: IGeoJSAnnotationLayer;
   timelapseTextLayer: IGeoJSFeatureLayer;
   uiLayer?: IGeoJSUiLayer;
   lowestLayer?: number;

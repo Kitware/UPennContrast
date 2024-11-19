@@ -185,7 +185,7 @@ export default class AnnotationViewer extends Vue {
   readonly workerPreviewFeature!: IGeoJSFeature;
 
   @Prop()
-  readonly timelapseLayer!: IGeoJSFeatureLayer;
+  readonly timelapseLayer!: IGeoJSAnnotationLayer;
 
   @Prop()
   readonly timelapseTextLayer!: IGeoJSFeatureLayer;
@@ -1139,7 +1139,7 @@ export default class AnnotationViewer extends Vue {
           }, 0);
         const color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
         this.drawTimelapseTrack(componentAnnotations, color);
-        this.drawAnnotationCentroids(componentAnnotations);
+        this.drawTimelapseAnnotationCentroids(componentAnnotations);
       }
     });
 
@@ -1149,7 +1149,7 @@ export default class AnnotationViewer extends Vue {
     //     .map((id) => this.getAnnotationFromId(id))
     //     .filter((a): a is IAnnotation => !!a),
     // );
-    // this.drawAnnotationCentroids(allAnnotations);
+    // this.drawTimelapseAnnotationCentroids(allAnnotations);
   }
 
   drawTimelapseTrack(annotations: IAnnotation[], color?: string) {
@@ -1169,20 +1169,36 @@ export default class AnnotationViewer extends Vue {
 
     // Draw lines
     if (beforePoints.length > 1) {
-      this.timelapseLayer.createFeature("line").data([beforePoints]).style({
-        strokeColor: color,
-        strokeWidth: 1,
-        strokeOpacity: 1,
-        //strokeDasharray: "1,1", // TODO: Add dashed line for timelapse
-      });
+      const beforeLine = geojsAnnotationFactory(
+        AnnotationShape.Line,
+        beforePoints,
+        {
+          style: {
+            strokeColor: color,
+            strokeWidth: 3,
+            strokeOpacity: 1,
+          },
+        },
+      );
+      if (beforeLine) {
+        this.timelapseLayer.addAnnotation(beforeLine);
+      }
     }
-
     if (afterPoints.length > 1) {
-      this.timelapseLayer.createFeature("line").data([afterPoints]).style({
-        strokeColor: color,
-        strokeWidth: 3,
-        strokeOpacity: 1,
-      });
+      const afterLine = geojsAnnotationFactory(
+        AnnotationShape.Line,
+        afterPoints,
+        {
+          style: {
+            strokeColor: color,
+            strokeWidth: 6,
+            strokeOpacity: 1,
+          },
+        },
+      );
+      if (afterLine) {
+        this.timelapseLayer.addAnnotation(afterLine);
+      }
     }
 
     // Add time labels for start and end points
@@ -1233,42 +1249,49 @@ export default class AnnotationViewer extends Vue {
       });
   }
 
-  drawAnnotationCentroids(annotations: IAnnotation[]) {
+  drawTimelapseAnnotationCentroids(annotations: IAnnotation[]) {
     const currentTime = this.time;
 
-    // Create point features for all centroids at once
-    this.timelapseLayer
-      .createFeature("point")
-      .data(annotations)
-      .position((annotation: IAnnotation) => {
-        return this.unrolledCentroidCoordinates[annotation.id];
-      })
-      .style({
-        fill: true,
-        fillColor: (annotation: IAnnotation) => {
-          return annotation.location.Time < currentTime ? "cyan" : "orange";
+    // Create point annotations for each centroid
+    annotations.forEach((annotation) => {
+      const pointAnnotation = geojsAnnotationFactory(
+        AnnotationShape.Point,
+        [this.unrolledCentroidCoordinates[annotation.id]],
+        {
+          style: {
+            scaled: 1, // Fixed size in image coordinates
+            fill: true,
+            fillColor:
+              annotation.location.Time < currentTime ? "white" : "white",
+            fillOpacity: annotation.location.Time < currentTime ? 0.5 : 1,
+            stroke: true,
+            strokeColor: "black",
+            strokeWidth: 1,
+            strokeOpacity: annotation.location.Time < currentTime ? 0.5 : 1,
+            radius: annotation.location.Time === currentTime ? 0.16 : 0.09,
+          },
         },
-        fillOpacity: (annotation: IAnnotation) => {
-          return annotation.location.Time < currentTime ? 0.5 : 1;
-        },
-        stroke: true,
-        strokeColor: "black",
-        strokeWidth: 1,
-        strokeOpacity: (annotation: IAnnotation) => {
-          return annotation.location.Time < currentTime ? 0.5 : 1;
-        },
-        radius: (annotation: IAnnotation) => {
-          return annotation.location.Time === currentTime ? 5 : 3;
-        },
-      });
+      );
 
-    // .options(
-    //   // Keep the time for later if we need to capture clicks
-    //   "time",
-    //   annotations.map((a) => a.location.Time),
-    // );
+      if (pointAnnotation) {
+        // Add metadata for click handling
+        pointAnnotation.options({
+          time: annotation.location.Time,
+          girderId: annotation.id,
+          isTimelapsePoint: true,
+        });
+        // TODO: Remove this line, doesn't work.
+        // pointAnnotation.mouseClick(this.timelapseMouseClick);
+        this.timelapseLayer.addAnnotation(pointAnnotation);
+      }
+    });
 
     this.timelapseLayer.draw();
+  }
+
+  // TODO: This should probably be removed, it was temporary.
+  timelapseMouseClick(evt: IGeoJSMouseState) {
+    console.log("timelapseMouseClick", evt);
   }
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
@@ -1864,6 +1887,7 @@ export default class AnnotationViewer extends Vue {
     const geoAnnotations: IGeoJSAnnotation[] =
       this.annotationLayer.annotations();
     let annotationToToggle: IAnnotation | null = null;
+    // TODO (performance): use a spatial index or something else to speed this up
     for (let i = 0; i < geoAnnotations.length; ++i) {
       const geoAnnotation = geoAnnotations[i];
       const id = geoAnnotation.options("girderId");
@@ -1935,6 +1959,59 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
+  handleTimelapseAnnotationClick(evt: IGeoJSMouseState) {
+    if (!evt?.geo) {
+      return;
+    }
+
+    const geoAnnotations: IGeoJSAnnotation[] =
+      this.timelapseLayer.annotations();
+
+    console.log("geoAnnotations", geoAnnotations);
+    let timeToSet: number | null = null;
+
+    console.log("time", this.time);
+
+    // TODO (performance): use a spatial index or something else to speed this up
+    for (let i = 0; i < geoAnnotations.length; ++i) {
+      const geoAnnotation = geoAnnotations[i];
+      // const time = geoAnnotation.options("time");
+      // if (time === undefined) {
+      //   continue;
+      // }
+
+      const id = geoAnnotation.options("girderId");
+      if (!id) {
+        continue;
+      }
+
+      // TODO: This is doesn't work because we don't have an IAnnotation object corresponding.
+      // We need to make a shouldSelectGeoJSAnnotation function (if we want to do it this way).
+      const annotation = this.getAnnotationFromId(id);
+      if (!annotation) {
+        continue;
+      }
+
+      const unitsPerPixel = this.getMapUnitsPerPixel();
+      const shouldSelect = this.shouldSelectAnnotation(
+        AnnotationShape.Point,
+        [evt.geo],
+        annotation,
+        geoAnnotation.style(),
+        unitsPerPixel,
+      );
+
+      if (shouldSelect) {
+        timeToSet = annotation.location.Time;
+        break;
+      }
+    }
+
+    if (timeToSet !== null && this.time !== timeToSet) {
+      this.store.setTime(timeToSet);
+    }
+  }
+
   // AR: I added some code here to prevent duplicate redraws. I found that when e.g. xy changes, then the watcher for displayedAnnotations also changed.
   // This caused a double redraw. But the problem is that if you remove the watcher for displayedAnnotations, then the annotations are not redrawn when the user for instance deletes an annotation.
   // The solution implemented here is to have a flag that is set when any of the primary watchers are triggered, and then unset when the drawAnnotationsAndTooltips is called.
@@ -1961,6 +2038,8 @@ export default class AnnotationViewer extends Vue {
     if (this.showTimelapseMode) {
       // Should I put this into the drawAnnotationsAndTooltips call?
       this.drawTimelapseConnections();
+      // TODO: This should definitely be moved, just a hack for now
+      this.timelapseLayer.mode("point");
     }
     // Clear flag after a tick to allow Vue to process all watchers
     Vue.nextTick(() => {
@@ -2069,6 +2148,7 @@ export default class AnnotationViewer extends Vue {
       this.handleAnnotationChange,
     );
     this.drawAnnotationsAndTooltips();
+    // TODO: Can this be moved up above the drawAnnotationsAndTooltips call?
     this.annotationLayer.geoOn(
       geojs.event.mouseclick,
       (evt: IGeoJSMouseState) => {
@@ -2077,6 +2157,24 @@ export default class AnnotationViewer extends Vue {
         }
       },
     );
+    this.timelapseLayer.geoOn(
+      // geojs.event.annotation.cursor_click, // TODO: This worked as a mouseclick, but not as a cursor_click. Maybe I need to enable something?
+      geojs.event.mouseclick,
+      this.handleTimelapseAnnotationClick,
+    );
+    // TODO: I'm not sure this is in the right place
+    // this.timelapseLayer.geoOn(
+    //   geojs.event.mouseclick,
+    //   (evt: IGeoJSMouseState) => {
+    //     const annotation = evt.annotation;
+    //     if (annotation && annotation.options("isTimelapsePoint")) {
+    //       const time = annotation.options("time");
+    //       if (time !== undefined) {
+    //         this.store.setTime(time);
+    //       }
+    //     }
+    //   },
+    // );
   }
 
   @Watch("annotationLayer")
