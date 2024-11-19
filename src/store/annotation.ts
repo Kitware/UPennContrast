@@ -908,6 +908,11 @@ export class Annotations extends VuexModule {
     }
     return { channel, location };
   }
+
+  @Action
+  public clearSelectedAnnotations() {
+    this.setSelected([]);
+  }
 }
 
 export default getModule(Annotations);

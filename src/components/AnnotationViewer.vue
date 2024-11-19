@@ -8,8 +8,28 @@
       @save="handleContextMenuSave"
       @cancel="handleContextMenuCancel"
     />
+    <annotation-action-panel
+      v-if="selectedAnnotations.length > 0"
+      :selected-count="selectedAnnotations.length"
+      @delete-selected="annotationStore.deleteSelectedAnnotations"
+      @delete-unselected="annotationStore.deleteUnselectedAnnotations"
+      @tag-selected="showTagDialog = true"
+      @color-selected="showColorDialog = true"
+      @deselect-all="handleDeselectAll"
+    />
+
+    <tag-selection-dialog
+      :show.sync="showTagDialog"
+      @submit="handleTagSubmit"
+    />
+
+    <color-selection-dialog
+      :show.sync="showColorDialog"
+      @submit="handleColorSubmit"
+    />
   </div>
 </template>
+
 <script lang="ts">
 import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
@@ -71,6 +91,9 @@ import { NoOutput } from "@/pipelines/computePipeline";
 
 import ColorPickerMenu from "@/components/ColorPickerMenu.vue";
 import AnnotationContextMenu from "@/components/AnnotationContextMenu.vue";
+import AnnotationActionPanel from "@/components/AnnotationActionPanel.vue";
+import TagSelectionDialog from "@/components/TagSelectionDialog.vue";
+import ColorSelectionDialog from "@/components/ColorSelectionDialog.vue";
 
 function filterAnnotations(
   annotations: IAnnotation[],
@@ -94,7 +117,13 @@ function filterAnnotations(
 
 // Draws annotations on the given layer, and provides functionnality for the user selected tool.
 @Component({
-  components: { ColorPickerMenu, AnnotationContextMenu },
+  components: {
+    ColorPickerMenu,
+    AnnotationContextMenu,
+    AnnotationActionPanel,
+    TagSelectionDialog,
+    ColorSelectionDialog,
+  },
 })
 export default class AnnotationViewer extends Vue {
   readonly store = store;
@@ -2039,6 +2068,43 @@ export default class AnnotationViewer extends Vue {
     }
     this.showContextMenu = false;
     this.rightClickedAnnotation = null;
+  }
+
+  handleDeselectAll() {
+    this.annotationStore.clearSelectedAnnotations();
+  }
+
+  showTagDialog = false;
+  showColorDialog = false;
+
+  handleTagSubmit({
+    tags,
+    addOrRemove,
+    replaceExisting,
+  }: {
+    tags: string[];
+    addOrRemove: "add" | "remove";
+    replaceExisting: boolean;
+  }) {
+    if (addOrRemove === "add") {
+      this.annotationStore.tagSelectedAnnotations({
+        tags,
+        replace: replaceExisting,
+      });
+    } else {
+      this.annotationStore.removeTagsFromSelectedAnnotations(tags);
+    }
+  }
+
+  handleColorSubmit({
+    useColorFromLayer,
+    color,
+  }: {
+    useColorFromLayer: boolean;
+    color: string;
+  }) {
+    const newColor = useColorFromLayer ? null : color;
+    this.annotationStore.colorSelectedAnnotations(newColor);
   }
 }
 </script>
