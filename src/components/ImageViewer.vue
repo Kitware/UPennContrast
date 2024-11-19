@@ -850,8 +850,11 @@ export default class ImageViewer extends Vue {
       });
       const workerPreviewFeature = workerPreviewLayer.createFeature("quad");
       const textLayer = map.createLayer("feature", { features: ["text"] });
-      const timelapseLayer = map.createLayer("feature", {
-        features: ["point", "line", "polygon"],
+      const timelapseLayer = map.createLayer("annotation", {
+        annotations: [], // TODO: not sure if this should be empty or what
+        autoshareRenderer: false,
+        continuousCloseProximity: true,
+        showLabels: false,
       });
       const timelapseTextLayer = map.createLayer("feature", {
         features: ["text"],
