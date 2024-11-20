@@ -55,11 +55,14 @@
         <v-row>
           <v-btn @click="preview" v-if="hasPreview">Preview</v-btn>
           <v-spacer></v-spacer>
-          <v-btn @click="compute" :disabled="running">
-            <v-progress-circular size="16" v-if="running" indeterminate />
+          <v-btn @click="compute" v-if="!running">
             <v-icon v-if="previousRunStatus === false">mdi-close</v-icon>
             <v-icon v-if="previousRunStatus === true">mdi-check</v-icon>
             <span>Compute</span>
+          </v-btn>
+          <v-btn v-else @click="cancel" color="orange" :disabled="!currentJob">
+            <v-progress-circular size="16" indeterminate />
+            <span>Cancel</span>
           </v-btn>
         </v-row>
         <v-row>
@@ -79,6 +82,7 @@ import { Vue, Component, Watch, Prop } from "vue-property-decorator";
 import store from "@/store";
 import annotationsStore from "@/store/annotation";
 import {
+  IComputeJob,
   IProgressInfo,
   IToolConfiguration,
   IWorkerInterfaceValues,
@@ -104,6 +108,7 @@ export default class AnnotationWorkerMenu extends Vue {
 
   fetchingWorkerInterface: boolean = false;
   running: boolean = false;
+  currentJob: IComputeJob | null = null;
   previousRunStatus: boolean | null = null;
   progressInfo: IProgressInfo = {};
   errorInfo: IErrorInfoList = { errors: [] };
@@ -137,13 +142,14 @@ export default class AnnotationWorkerMenu extends Vue {
     this.propertyStore.setDisplayWorkerPreview(value);
   }
 
-  compute() {
+  async compute() {
     if (this.running) {
       return;
     }
     this.running = true;
+    this.currentJob = null;
     this.previousRunStatus = null;
-    this.annotationsStore.computeAnnotationsWithWorker({
+    this.currentJob = await this.annotationsStore.computeAnnotationsWithWorker({
       tool: this.tool,
       workerInterface: this.interfaceValues,
       progress: this.progressInfo,
@@ -154,6 +160,14 @@ export default class AnnotationWorkerMenu extends Vue {
         this.progressInfo = {};
       },
     });
+  }
+
+  cancel() {
+    const jobId = this.currentJob?.jobId;
+    if (!jobId) {
+      return;
+    }
+    this.store.api.cancelJob(jobId);
   }
 
   preview() {
