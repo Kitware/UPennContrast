@@ -3,7 +3,7 @@ services:
     build:
       context: ./devops/girder
     privileged: true
-    command: -c "python3 /src/provision.py && girder mount /mnt/fuse && girder serve"
+    command: -c "python3 /src/provision.py && python3 /src/provision-prod.py && girder mount /mnt/fuse && girder serve"
     ports:
       - "${GIRDER_PORT-8080}:8080"
     links:
