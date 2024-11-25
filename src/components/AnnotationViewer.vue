@@ -1110,7 +1110,7 @@ export default class AnnotationViewer extends Vue {
           }, 0);
         const color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
         this.drawTimelapseTrack(componentAnnotations, color);
-        this.drawAnnotationCentroids(componentAnnotations);
+        this.drawTimelapseAnnotationCentroids(componentAnnotations);
       }
     });
 
@@ -1120,7 +1120,7 @@ export default class AnnotationViewer extends Vue {
     //     .map((id) => this.getAnnotationFromId(id))
     //     .filter((a): a is IAnnotation => !!a),
     // );
-    // this.drawAnnotationCentroids(allAnnotations);
+    // this.drawTimelapseAnnotationCentroids(allAnnotations);
   }
 
   drawTimelapseTrack(annotations: IAnnotation[], color?: string) {
@@ -1220,7 +1220,7 @@ export default class AnnotationViewer extends Vue {
       });
   }
 
-  drawAnnotationCentroids(annotations: IAnnotation[]) {
+  drawTimelapseAnnotationCentroids(annotations: IAnnotation[]) {
     const currentTime = this.time;
 
     // Create point annotations for each centroid
@@ -1260,6 +1260,7 @@ export default class AnnotationViewer extends Vue {
     this.timelapseLayer.draw();
   }
 
+  // TODO: This should probably be removed, it was temporary.
   timelapseMouseClick(evt: IGeoJSMouseState) {
     console.log("timelapseMouseClick", evt);
   }
