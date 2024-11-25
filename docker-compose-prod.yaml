@@ -18,8 +18,6 @@ services:
     env_file:
       - "./docker.env"
       - "./docker-prod.env"
-    environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     container_name: "girder"
 
   memcached:
