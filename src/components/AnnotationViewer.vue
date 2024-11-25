@@ -2037,6 +2037,8 @@ export default class AnnotationViewer extends Vue {
     if (this.showTimelapseMode) {
       // Should I put this into the drawAnnotationsAndTooltips call?
       this.drawTimelapseConnections();
+      // TODO: This should definitely be moved, just a hack for now
+      this.timelapseLayer.mode("point");
     }
     // Clear flag after a tick to allow Vue to process all watchers
     Vue.nextTick(() => {
