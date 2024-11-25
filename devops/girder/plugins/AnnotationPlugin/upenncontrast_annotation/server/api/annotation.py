@@ -1,6 +1,8 @@
+import orjson
+
 from girder.api import access
 from girder.api.describe import Description, describeRoute, autoDescribeRoute
-from girder.api.rest import Resource, loadmodel
+from girder.api.rest import Resource, loadmodel, setResponseHeader
 from girder.constants import AccessType
 from girder.exceptions import AccessException, RestException
 from ..helpers.proxiedModel import recordable, memoizeBodyJson
@@ -209,14 +211,42 @@ class Annotation(Resource):
             query["shape"] = params["shape"]
         if params["tags"] is not None and len(params["tags"]) > 0:
             query["tags"] = {"$all": params["tags"]}
-        return self._annotationModel.findWithPermissions(
-            query,
-            sort=sort,
-            user=self.getCurrentUser(),
-            level=AccessType.READ,
-            limit=limit,
-            offset=offset,
-        )
+
+        def generateResult():
+            cursor = self._annotationModel.findWithPermissions(
+                query,
+                sort=sort,
+                user=self.getCurrentUser(),
+                level=AccessType.READ,
+                limit=limit,
+                offset=offset,
+            )
+            chunk = [b"["]
+            first = True
+            for annotation in cursor:
+                if not first:
+                    chunk.append(b",")
+                # orjson and base json won't serialize ObjectIds
+                annotation["_id"] = str(annotation["_id"])
+                # We don't need to transmit the access control for
+                # annotations
+                annotation.pop("access")
+                # Otherwise, we can use json
+                # chunk.append(json.dumps(annotation, allow_nan=False,
+                #             cls=JsonEncoder, separators=(",", ":")).encode())
+                # If we got rid of ObjectIds, using the json defaults is faster
+                # chunk.append(json.dumps(annotation).encode())
+                # But orjson is faster yet
+                chunk.append(orjson.dumps(annotation))
+                first = False
+                if len(chunk) > 1000:
+                    yield b"".join(chunk)
+                    chunk = []
+            chunk.append(b"]")
+            yield b"".join(chunk)
+
+        setResponseHeader("Content-Type", "application/json")
+        return generateResult
 
     @access.user
     @describeRoute(
