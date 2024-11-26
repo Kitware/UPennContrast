@@ -94,9 +94,8 @@ export function geojsAnnotationFactory(
       newGeoJSAnnotation!.options("position", coordinates[0]);
       break;
     case AnnotationShape.Polygon:
-      options.vertices = coordinates;
       newGeoJSAnnotation = geojs.annotation.polygonAnnotation(options);
-      //newGeoJSAnnotation!.options("vertices", coordinates);
+      newGeoJSAnnotation!.options("vertices", coordinates);
       break;
     case AnnotationShape.Line:
       newGeoJSAnnotation = geojs.annotation.lineAnnotation(options);
@@ -110,20 +109,6 @@ export function geojsAnnotationFactory(
       logError(`Unsupported annotation shape: ${shape}`);
   }
   return newGeoJSAnnotation;
-}
-
-export function geojsFeatureFactory(
-  shape: string,
-  coordinates: IGeoJSPosition[],
-  options: any,
-) {
-  let newGeoJSFeature: IGeoJSFeature | null = null;
-  switch (shape) {
-    case FeatureShape.Point:
-      newGeoJSFeature = geojs.feature.pointFeature(options);
-      break;
-  }
-  return newGeoJSFeature;
 }
 
 export function simpleCentroid(coordinates: IGeoJSPosition[]): IGeoJSPosition {
