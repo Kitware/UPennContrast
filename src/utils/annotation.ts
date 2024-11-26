@@ -93,9 +93,9 @@ export function geojsAnnotationFactory(
       return geojs.annotation.pointAnnotation(annotationOptions);
 
     case AnnotationShape.Polygon:
-      newGeoJSAnnotation = geojs.annotation.polygonAnnotation(options);
-      newGeoJSAnnotation!.options("vertices", coordinates);
-      break;
+      annotationOptions.vertices = coordinates;
+      return geojs.annotation.polygonAnnotation(annotationOptions);
+
     case AnnotationShape.Line:
       annotationOptions.vertices = coordinates;
       return geojs.annotation.lineAnnotation(annotationOptions);
