@@ -693,9 +693,11 @@ export default class AnnotationViewer extends Vue {
 
   drawTooltips = throttle(this.drawTooltipsNoThrottle, THROTTLE).bind(this);
   drawTooltipsNoThrottle() {
+    // TODO: I should be able to replace the below with the single call to features([]) below. However, when I do so, it doesn't seem to get rid of the text features. Hmm...
     this.textLayer.features().forEach((feature: IGeoJSFeature) => {
       this.textLayer.deleteFeature(feature);
     });
+    // this.timelapseTextLayer.features([]);
 
     if (this.showTooltips) {
       // One text feature per line as in https://opengeoscience.github.io/geojs/tutorials/text/
@@ -1079,7 +1081,14 @@ export default class AnnotationViewer extends Vue {
 
   // TODO: Rename this function to match final functionality
   drawTimelapseConnections() {
-    // Only render tracks and annotations within this window
+    // Only render tracks and annotations within this time window
+    this.timelapseLayer.removeAllAnnotations();
+    // TODO: Surely there is a way to remove all features at once. I should also do this for textLayer, where a similar pattern is used.
+    // TODO: Figured it out. Should use this same pattern for textLayer.
+    // this.timelapseTextLayer.features().forEach((feature: IGeoJSFeature) => {
+    //   this.timelapseTextLayer.deleteFeature(feature);
+    // });
+    this.timelapseTextLayer.features([]);
     const timelapseModeWindow = this.timelapseModeWindow;
     const currentTime = this.time;
     // Get connected components
@@ -2060,10 +2069,9 @@ export default class AnnotationViewer extends Vue {
       return;
     }
 
-    const geoAnnotations: IGeoJSAnnotation[] =
-      this.timelapseLayer.annotations();
+    // const geoAnnotations: IGeoJSAnnotation[] =
+    //   this.timelapseLayer.annotations();
 
-    console.log("geoAnnotations", geoAnnotations);
     let timeToSet: number | null = null;
 
     // Create a temporary point annotation from the click
@@ -2079,10 +2087,6 @@ export default class AnnotationViewer extends Vue {
 
     const selectedTimelapseAnnotations =
       this.getTimelapseAnnotationsFromAnnotation(clickAnnotation);
-
-    console.log("selectedTimelapseAnnotations", selectedTimelapseAnnotations);
-
-    console.log(selectedTimelapseAnnotations[0].options("time"));
 
     timeToSet = selectedTimelapseAnnotations[0].options("time");
 
