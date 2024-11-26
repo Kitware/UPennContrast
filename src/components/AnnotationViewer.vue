@@ -583,9 +583,8 @@ export default class AnnotationViewer extends Vue {
     return this.store.showTimelapseMode;
   }
 
-  // TODO: Placeholder for interface value
   get timelapseModeWindow(): number {
-    return 4; // this.store.timelapseModeWindow;
+    return this.store.timelapseModeWindow;
   }
 
   get filteredAnnotationTooltips(): boolean {
@@ -1110,11 +1109,16 @@ export default class AnnotationViewer extends Vue {
     return Array.from(components.values());
   }
 
-  // TODO: Rename this function to match final functionality
   drawTimelapseConnectionsAndCentroids() {
     // Remove all previous tracks and centroids
     this.timelapseLayer.removeAllAnnotations();
     this.timelapseTextLayer.features([]);
+
+    if (!this.showTimelapseMode) {
+      this.timelapseLayer.draw();
+      this.timelapseTextLayer.draw();
+      return;
+    }
 
     // Only render tracks and annotations within this time window
     const timelapseModeWindow = this.timelapseModeWindow;
@@ -1151,6 +1155,9 @@ export default class AnnotationViewer extends Vue {
         this.drawTimelapseAnnotationCentroids(componentAnnotations);
       }
     });
+
+    this.timelapseLayer.draw();
+    this.timelapseTextLayer.draw();
   }
 
   drawTimelapseTrack(annotations: IAnnotation[], color?: string) {
@@ -1285,7 +1292,7 @@ export default class AnnotationViewer extends Vue {
       }
     });
 
-    this.timelapseLayer.draw();
+    // this.timelapseLayer.draw();
   }
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
@@ -2127,6 +2134,12 @@ export default class AnnotationViewer extends Vue {
     Vue.nextTick(() => {
       this.handlingPrimaryChange = false;
     });
+  }
+
+  @Watch("showTimelapseMode")
+  @Watch("timelapseModeWindow")
+  onTimelapseModeChanged() {
+    this.drawTimelapseConnectionsAndCentroids();
   }
 
   @Watch("displayedAnnotations")
