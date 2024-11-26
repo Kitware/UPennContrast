@@ -583,9 +583,8 @@ export default class AnnotationViewer extends Vue {
     return this.store.showTimelapseMode;
   }
 
-  // TODO: Placeholder for interface value
   get timelapseModeWindow(): number {
-    return 4; // this.store.timelapseModeWindow;
+    return this.store.timelapseModeWindow;
   }
 
   get filteredAnnotationTooltips(): boolean {
@@ -1110,7 +1109,6 @@ export default class AnnotationViewer extends Vue {
     return Array.from(components.values());
   }
 
-  // TODO: Rename this function to match final functionality
   drawTimelapseConnectionsAndCentroids() {
     // Remove all previous tracks and centroids
     this.timelapseLayer.removeAllAnnotations();
@@ -2127,6 +2125,12 @@ export default class AnnotationViewer extends Vue {
     Vue.nextTick(() => {
       this.handlingPrimaryChange = false;
     });
+  }
+
+  @Watch("showTimelapseMode")
+  @Watch("timelapseModeWindow")
+  onTimelapseModeChanged() {
+    this.drawTimelapseConnectionsAndCentroids();
   }
 
   @Watch("displayedAnnotations")

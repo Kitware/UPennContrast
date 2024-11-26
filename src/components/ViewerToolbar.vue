@@ -49,6 +49,21 @@
           :disabled="!(maxTime > 0 || unrollT)"
         />
       </v-layout>
+      <v-layout v-if="maxTime > 0 && !unrollT">
+        <v-checkbox
+          class="ml-3 my-checkbox"
+          v-model="timelapseMode"
+          label="Time lapse mode"
+        />
+        <value-slider
+          v-if="timelapseMode"
+          v-model="timelapseModeWindow"
+          label="Track window"
+          :min="3"
+          :max="100"
+          :title="'Track window size'"
+        />
+      </v-layout>
     </div>
     <toolset></toolset>
     <v-radio-group
@@ -187,6 +202,22 @@ export default class ViewerToolbar extends Vue {
 
   get maxTime() {
     return this.store.dataset ? this.store.dataset.time.length - 1 : this.time;
+  }
+
+  get timelapseMode() {
+    return this.store.showTimelapseMode;
+  }
+
+  set timelapseMode(value: boolean) {
+    this.store.setShowTimelapseMode(value);
+  }
+
+  get timelapseModeWindow() {
+    return this.store.timelapseModeWindow;
+  }
+
+  set timelapseModeWindow(value: number) {
+    this.store.setTimelapseModeWindow(value);
   }
 
   set layerMode(value: TLayerMode) {
