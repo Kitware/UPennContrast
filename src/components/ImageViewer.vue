@@ -851,7 +851,7 @@ export default class ImageViewer extends Vue {
       const workerPreviewFeature = workerPreviewLayer.createFeature("quad");
       const textLayer = map.createLayer("feature", { features: ["text"] });
       const timelapseLayer = map.createLayer("annotation", {
-        annotations: [], // TODO: not sure if this should be empty or what
+        annotations: [], // Set to empty because we anyway render it fresh every time
         autoshareRenderer: false,
         continuousCloseProximity: true,
         showLabels: false,

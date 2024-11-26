@@ -681,6 +681,11 @@ export default class AnnotationViewer extends Vue {
   drawAnnotationsAndTooltips() {
     this.drawAnnotations();
     this.drawTooltips();
+    if (this.showTimelapseMode) {
+      // AR: The call to drawTimelapseConnectionsAndCentroids should be fine here, but if in testing we see
+      // that it is missing some updates, it may be that we need to call it elsewhere as well.
+      this.drawTimelapseConnectionsAndCentroids();
+    }
   }
 
   drawAnnotations = throttle(this.drawAnnotationsNoThrottle, THROTTLE).bind(
@@ -722,11 +727,11 @@ export default class AnnotationViewer extends Vue {
 
   drawTooltips = throttle(this.drawTooltipsNoThrottle, THROTTLE).bind(this);
   drawTooltipsNoThrottle() {
-    // TODO: I should be able to replace the below with the single call to features([]) below. However, when I do so, it doesn't seem to get rid of the text features. Hmm...
+    // TODO: AR: I should be able to replace the below with the single call to features([]) below. However, when I do so, it doesn't seem to get rid of the text features. Hmm...
+    // this.timelapseTextLayer.features([]);
     this.textLayer.features().forEach((feature: IGeoJSFeature) => {
       this.textLayer.deleteFeature(feature);
     });
-    // this.timelapseTextLayer.features([]);
 
     if (this.showTooltips) {
       // One text feature per line as in https://opengeoscience.github.io/geojs/tutorials/text/
@@ -1109,18 +1114,16 @@ export default class AnnotationViewer extends Vue {
   }
 
   // TODO: Rename this function to match final functionality
-  drawTimelapseConnections() {
-    // Only render tracks and annotations within this time window
+  drawTimelapseConnectionsAndCentroids() {
+    // Remove all previous tracks and centroids
     this.timelapseLayer.removeAllAnnotations();
-    // TODO: Surely there is a way to remove all features at once. I should also do this for textLayer, where a similar pattern is used.
-    // TODO: Figured it out. Should use this same pattern for textLayer.
-    // this.timelapseTextLayer.features().forEach((feature: IGeoJSFeature) => {
-    //   this.timelapseTextLayer.deleteFeature(feature);
-    // });
     this.timelapseTextLayer.features([]);
+
+    // Only render tracks and annotations within this time window
     const timelapseModeWindow = this.timelapseModeWindow;
     const currentTime = this.time;
-    // Get connected components
+
+    // Get connected components to find each individual track
     const components = this.findConnectedComponents(this.annotationConnections);
 
     // Draw each component separately
@@ -1151,14 +1154,6 @@ export default class AnnotationViewer extends Vue {
         this.drawTimelapseAnnotationCentroids(componentAnnotations);
       }
     });
-
-    // Draw all centroids at once (we can still do this as a single operation)
-    // const allAnnotations = components.flatMap((component) =>
-    //   Array.from(component)
-    //     .map((id) => this.getAnnotationFromId(id))
-    //     .filter((a): a is IAnnotation => !!a),
-    // );
-    // this.drawTimelapseAnnotationCentroids(allAnnotations);
   }
 
   drawTimelapseTrack(annotations: IAnnotation[], color?: string) {
@@ -1283,24 +1278,17 @@ export default class AnnotationViewer extends Vue {
       );
 
       if (pointAnnotation) {
-        // Add metadata for click handling
+        // Add metadata for click and connection handling
         pointAnnotation.options({
           time: annotation.location.Time,
           girderId: annotation.id,
           isTimelapsePoint: true,
         });
-        // TODO: Remove this line, doesn't work.
-        // pointAnnotation.mouseClick(this.timelapseMouseClick);
         this.timelapseLayer.addAnnotation(pointAnnotation);
       }
     });
 
     this.timelapseLayer.draw();
-  }
-
-  // TODO: This should probably be removed, it was temporary.
-  timelapseMouseClick(evt: IGeoJSMouseState) {
-    console.log("timelapseMouseClick", evt);
   }
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
@@ -1528,13 +1516,14 @@ export default class AnnotationViewer extends Vue {
     const annotationStyle = geoJSAnnotation.style();
 
     if (selectionAnnotationType === AnnotationShape.Point) {
-      // TODO: This should be factorized with shouldSelectAnnotation because the logic is the same
+      // TODO: This should be factorized with shouldSelectAnnotation because the logic is the same.
+      // Only difference is the radius code, which is currently specific to this function.
       const selectionPosition = selectionAnnotationCoordinates[0];
-      //const { radius, strokeWidth } = annotationStyle; // TODO: Perhaps there is a better way to make this code
       if (!radius) {
         radius = annotationStyle.radius;
       }
       const strokeWidth = annotationStyle.strokeWidth;
+
       if (geoJSAnnotation.type() === AnnotationShape.Point) {
         const annotationRadius =
           ((radius as number) + (strokeWidth as number)) * unitsPerPixel;
@@ -1594,16 +1583,9 @@ export default class AnnotationViewer extends Vue {
           selectedAnnotations: IGeoJSAnnotation[],
           geoJSAnnotation: IGeoJSAnnotation,
         ) => {
-          // Skip if it's not a timelapse point or already selected (TODO: haven't implemented already selected)
+          // Skip if it's not a timelapse point. Could also skip if already selected, but not implemented yet.
           const { isTimelapsePoint } = geoJSAnnotation.options();
-          if (
-            !isTimelapsePoint //||
-            // selectedAnnotations.some(
-            //   (selectedAnnotation) =>
-            //     selectedAnnotation.options("girderId") ===
-            //     geoJSAnnotation.options("girderId"),
-            // )
-          ) {
+          if (!isTimelapsePoint) {
             return selectedAnnotations;
           }
 
@@ -2082,9 +2064,6 @@ export default class AnnotationViewer extends Vue {
       return;
     }
 
-    // const geoAnnotations: IGeoJSAnnotation[] =
-    //   this.timelapseLayer.annotations();
-
     let timeToSet: number | null = null;
 
     // Create a temporary point annotation from the click
@@ -2102,43 +2081,6 @@ export default class AnnotationViewer extends Vue {
       this.getTimelapseAnnotationsFromAnnotation(clickAnnotation);
 
     timeToSet = selectedTimelapseAnnotations[0].options("time");
-
-    // TODO (performance): use a spatial index or something else to speed this up
-    // for (let i = 0; i < geoAnnotations.length; ++i) {
-    //   const geoAnnotation = geoAnnotations[i];
-    //   // const time = geoAnnotation.options("time");
-    //   // if (time === undefined) {
-    //   //   continue;
-    //   // }
-
-    //   // const id = geoAnnotation.options("girderId");
-    //   // if (!id) {
-    //   //   continue;
-    //   // }
-
-    //   // // TODO: This is doesn't work because we don't have an IAnnotation object corresponding.
-    //   // // We need to make a shouldSelectGeoJSAnnotation function (if we want to do it this way).
-    //   // const annotation = this.getAnnotationFromId(id);
-    //   // if (!annotation) {
-    //   //   continue;
-    //   // }
-
-    //   // const unitsPerPixel = this.getMapUnitsPerPixel();
-    //   // const shouldSelect = this.shouldSelectAnnotation(
-    //   //   AnnotationShape.Point,
-    //   //   [evt.geo],
-    //   //   annotation,
-    //   //   geoAnnotation.style(),
-    //   //   unitsPerPixel,
-    //   // );
-
-    //   // console.log("Time to switch to", annotation.location.Time);
-
-    //   // if (shouldSelect) {
-    //   //   timeToSet = annotation.location.Time;
-    //   //   break;
-    //   // }
-    // }
 
     if (timeToSet !== null && this.time !== timeToSet) {
       this.store.setTime(timeToSet);
@@ -2168,13 +2110,7 @@ export default class AnnotationViewer extends Vue {
     // Set flag before triggering redraw
     this.handlingPrimaryChange = true;
     this.drawAnnotationsAndTooltips();
-    if (this.showTimelapseMode) {
-      // Should I put this into the drawAnnotationsAndTooltips call?
-      // TODO: Figure out where to make the following call
-      this.drawTimelapseConnections();
-      // TODO: This should definitely be removed. Need to figure out how to capture the clicks otherwise
-      // this.timelapseLayer.mode("point");
-    }
+
     // Clear flag after a tick to allow Vue to process all watchers
     Vue.nextTick(() => {
       this.handlingPrimaryChange = false;
@@ -2281,8 +2217,6 @@ export default class AnnotationViewer extends Vue {
       geojs.event.annotation.state,
       this.handleAnnotationChange,
     );
-    this.drawAnnotationsAndTooltips();
-    // TODO: Can this be moved up above the drawAnnotationsAndTooltips line that is right above it?
     this.annotationLayer.geoOn(
       geojs.event.mouseclick,
       (evt: IGeoJSMouseState) => {
@@ -2292,23 +2226,10 @@ export default class AnnotationViewer extends Vue {
       },
     );
     this.timelapseLayer.geoOn(
-      // geojs.event.annotation.cursor_click, // TODO: This worked as a mouseclick, but not as a cursor_click. Maybe I need to enable something?
       geojs.event.mouseclick,
       this.handleTimelapseAnnotationClick,
     );
-    // TODO: I'm not sure this is in the right place
-    // this.timelapseLayer.geoOn(
-    //   geojs.event.mouseclick,
-    //   (evt: IGeoJSMouseState) => {
-    //     const annotation = evt.annotation;
-    //     if (annotation && annotation.options("isTimelapsePoint")) {
-    //       const time = annotation.options("time");
-    //       if (time !== undefined) {
-    //         this.store.setTime(time);
-    //       }
-    //     }
-    //   },
-    // );
+    this.drawAnnotationsAndTooltips();
   }
 
   @Watch("annotationLayer")
