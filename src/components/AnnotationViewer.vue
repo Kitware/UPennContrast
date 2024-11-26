@@ -1500,7 +1500,7 @@ export default class AnnotationViewer extends Vue {
     selectionAnnotationCoordinates: IGeoJSPosition[],
     geoJSAnnotation: IGeoJSAnnotation,
     unitsPerPixel: number,
-    radius?: number,
+    radius?: number, // Optional radius to use instead of the ones derives from the annotation style
   ) {
     const annotationCoordinates = geoJSAnnotation.coordinates();
     const annotationStyle = geoJSAnnotation.style();
@@ -1508,11 +1508,11 @@ export default class AnnotationViewer extends Vue {
     if (selectionAnnotationType === AnnotationShape.Point) {
       // TODO: This should be factorized with shouldSelectAnnotation because the logic is the same
       const selectionPosition = selectionAnnotationCoordinates[0];
-      const { radius, strokeWidth } = annotationStyle;
-      
-      console.log("radius", radius);
-      console.log("strokeWidth", strokeWidth);
-
+      //const { radius, strokeWidth } = annotationStyle; // TODO: Perhaps there is a better way to make this code
+      if (!radius) {
+        radius = annotationStyle.radius;
+      }
+      const strokeWidth = annotationStyle.strokeWidth;
       if (geoJSAnnotation.type() === AnnotationShape.Point) {
         const annotationRadius =
           ((radius as number) + (strokeWidth as number)) * unitsPerPixel;
@@ -1591,6 +1591,7 @@ export default class AnnotationViewer extends Vue {
               coordinates,
               geoJSAnnotation,
               unitsPerPixel,
+              5, // Radius for selection to allow for clicking on small points.
             )
           ) {
             return selectedAnnotations;
