@@ -8,7 +8,6 @@ import {
   IGeoJSLineFeatureStyle,
   IGeoJSPointFeatureStyle,
   IGeoJSPolygonFeatureStyle,
-  FeatureShape,
 } from "@/store/model";
 import geojs from "geojs";
 import { logError } from "@/utils/log";
@@ -109,20 +108,6 @@ export function geojsAnnotationFactory(
       logError(`Unsupported annotation shape: ${shape}`);
       return null;
   }
-}
-
-export function geojsFeatureFactory(
-  shape: string,
-  coordinates: IGeoJSPosition[],
-  options: any,
-) {
-  let newGeoJSFeature: IGeoJSFeature | null = null;
-  switch (shape) {
-    case FeatureShape.Point:
-      newGeoJSFeature = geojs.feature.pointFeature(options);
-      break;
-  }
-  return newGeoJSFeature;
 }
 
 export function simpleCentroid(coordinates: IGeoJSPosition[]): IGeoJSPosition {

@@ -115,9 +115,6 @@ function filterAnnotations(
   return output;
 }
 
-// TODO: Not sure this is in the right place. Probably belongs in models.ts
-type ConnectedGroup = Set<string>;
-
 // Draws annotations on the given layer, and provides functionality for the user selected tool.
 @Component({
   components: {
@@ -1240,8 +1237,8 @@ export default class AnnotationViewer extends Vue {
       .data(textPoints)
       .position((d: IGeoJSPosition) => d)
       .style({
-        text: (d: IGeoJSPosition, i: number) => textLabels[i],
-        fontSize: (d: IGeoJSPosition, i: number) =>
+        text: (_: IGeoJSPosition, i: number) => textLabels[i],
+        fontSize: (_: IGeoJSPosition, i: number) =>
           textStyles[i].fontSize || "12px",
         fontFamily: "sans-serif",
         textAlign: "center",
