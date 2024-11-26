@@ -1115,6 +1115,7 @@ export default class AnnotationViewer extends Vue {
     this.timelapseTextLayer.features([]);
 
     if (!this.showTimelapseMode) {
+      // Redraw to ensure we clear the layers. I found that this was necessary for the timelapseTextLayer to clear.
       this.timelapseLayer.draw();
       this.timelapseTextLayer.draw();
       return;
@@ -1217,9 +1218,19 @@ export default class AnnotationViewer extends Vue {
     if (annotations.length > 0) {
       // Start point
       const firstAnnotation = annotations[0];
-      textPoints.push(this.unrolledCentroidCoordinates[firstAnnotation.id]);
-      textLabels.push(`T=${firstAnnotation.location.Time + 1}`);
-      textStyles.push({}); // default style
+      if (firstAnnotation.location.Time !== currentTime) {
+        textPoints.push(this.unrolledCentroidCoordinates[firstAnnotation.id]);
+        textLabels.push(`T=${firstAnnotation.location.Time + 1}`);
+        textStyles.push({}); // default style
+      }
+
+      // End point
+      const lastAnnotation = annotations[annotations.length - 1];
+      if (lastAnnotation.location.Time !== currentTime) {
+        textPoints.push(this.unrolledCentroidCoordinates[lastAnnotation.id]);
+        textLabels.push(`T=${lastAnnotation.location.Time + 1}`);
+        textStyles.push({}); // default style
+      }
 
       // Current time point (if it exists in the sequence)
       const currentPoint = annotations.find(
@@ -1230,12 +1241,6 @@ export default class AnnotationViewer extends Vue {
         textLabels.push(`Curr T=${currentTime + 1}`);
         textStyles.push({ fontSize: "16px" }); // larger font for current time
       }
-
-      // End point
-      const lastAnnotation = annotations[annotations.length - 1];
-      textPoints.push(this.unrolledCentroidCoordinates[lastAnnotation.id]);
-      textLabels.push(`T=${lastAnnotation.location.Time + 1}`);
-      textStyles.push({}); // default style
     }
 
     // Draw text labels
@@ -1291,8 +1296,6 @@ export default class AnnotationViewer extends Vue {
         this.timelapseLayer.addAnnotation(pointAnnotation);
       }
     });
-
-    // this.timelapseLayer.draw();
   }
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
