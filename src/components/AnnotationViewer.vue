@@ -1114,6 +1114,12 @@ export default class AnnotationViewer extends Vue {
     this.timelapseLayer.removeAllAnnotations();
     this.timelapseTextLayer.features([]);
 
+    if (!this.showTimelapseMode) {
+      this.timelapseLayer.draw();
+      this.timelapseTextLayer.draw();
+      return;
+    }
+
     // Only render tracks and annotations within this time window
     const timelapseModeWindow = this.timelapseModeWindow;
     const currentTime = this.time;
@@ -1149,6 +1155,9 @@ export default class AnnotationViewer extends Vue {
         this.drawTimelapseAnnotationCentroids(componentAnnotations);
       }
     });
+
+    this.timelapseLayer.draw();
+    this.timelapseTextLayer.draw();
   }
 
   drawTimelapseTrack(annotations: IAnnotation[], color?: string) {
@@ -1283,7 +1292,7 @@ export default class AnnotationViewer extends Vue {
       }
     });
 
-    this.timelapseLayer.draw();
+    // this.timelapseLayer.draw();
   }
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
