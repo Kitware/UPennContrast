@@ -115,9 +115,6 @@ function filterAnnotations(
   return output;
 }
 
-// TODO: Not sure this is in the right place. Probably belongs in models.ts
-type ConnectedGroup = Set<string>;
-
 // Draws annotations on the given layer, and provides functionality for the user selected tool.
 @Component({
   components: {
