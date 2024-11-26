@@ -1115,6 +1115,7 @@ export default class AnnotationViewer extends Vue {
     this.timelapseTextLayer.features([]);
 
     if (!this.showTimelapseMode) {
+      // Redraw to ensure we clear the layers. I found that this was necessary for the timelapseTextLayer to clear.
       this.timelapseLayer.draw();
       this.timelapseTextLayer.draw();
       return;
@@ -1130,6 +1131,17 @@ export default class AnnotationViewer extends Vue {
     // Draw each component separately
     components.forEach((component) => {
       const componentAnnotations: IAnnotation[] = [];
+      let color: string = "#FFFFFF";
+      if (component.size > 0) {
+        // Use the first GeoJSAnnotation ID to generate a color that is unique for the component irrespective
+        // of the timelapse window.
+        const hash = Array.from(component)[0]
+          .split("")
+          .reduce((acc, char) => {
+            return char.charCodeAt(0) + ((acc << 5) - acc);
+          }, 0);
+        color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
+      }
       component.forEach((id) => {
         const annotation = this.getAnnotationFromId(id);
         if (annotation) {
@@ -1143,14 +1155,6 @@ export default class AnnotationViewer extends Vue {
       });
 
       if (componentAnnotations.length > 0) {
-        // Draw track for this component
-        // We assign a color based on the first annotation in the component so that it stays the same even if the window changes.
-        const hash = componentAnnotations[0].id
-          .split("")
-          .reduce((acc, char) => {
-            return char.charCodeAt(0) + ((acc << 5) - acc);
-          }, 0);
-        const color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
         this.drawTimelapseTrack(componentAnnotations, color);
         this.drawTimelapseAnnotationCentroids(componentAnnotations);
       }
@@ -1217,11 +1221,23 @@ export default class AnnotationViewer extends Vue {
     if (annotations.length > 0) {
       // Start point
       const firstAnnotation = annotations[0];
-      textPoints.push(this.unrolledCentroidCoordinates[firstAnnotation.id]);
-      textLabels.push(`T=${firstAnnotation.location.Time + 1}`);
-      textStyles.push({}); // default style
+      if (firstAnnotation.location.Time !== currentTime) {
+        textPoints.push(this.unrolledCentroidCoordinates[firstAnnotation.id]);
+        textLabels.push(`T=${firstAnnotation.location.Time + 1}`);
+        textStyles.push({}); // default style
+      }
+
+      // End point
+      const lastAnnotation = annotations[annotations.length - 1];
+      if (lastAnnotation.location.Time !== currentTime) {
+        textPoints.push(this.unrolledCentroidCoordinates[lastAnnotation.id]);
+        textLabels.push(`T=${lastAnnotation.location.Time + 1}`);
+        textStyles.push({}); // default style
+      }
 
       // Current time point (if it exists in the sequence)
+      // Adding this last so that it is drawn on top of the other points
+      // This could be improved by ensuring it draws on top of ALL tracks, not just the current one
       const currentPoint = annotations.find(
         (a) => a.location.Time === currentTime,
       );
@@ -1230,12 +1246,6 @@ export default class AnnotationViewer extends Vue {
         textLabels.push(`Curr T=${currentTime + 1}`);
         textStyles.push({ fontSize: "16px" }); // larger font for current time
       }
-
-      // End point
-      const lastAnnotation = annotations[annotations.length - 1];
-      textPoints.push(this.unrolledCentroidCoordinates[lastAnnotation.id]);
-      textLabels.push(`T=${lastAnnotation.location.Time + 1}`);
-      textStyles.push({}); // default style
     }
 
     // Draw text labels
@@ -1291,8 +1301,6 @@ export default class AnnotationViewer extends Vue {
         this.timelapseLayer.addAnnotation(pointAnnotation);
       }
     });
-
-    // this.timelapseLayer.draw();
   }
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
