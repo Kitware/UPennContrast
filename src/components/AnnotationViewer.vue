@@ -1495,6 +1495,114 @@ export default class AnnotationViewer extends Vue {
     return selectedAnnotations;
   }
 
+  private shouldSelectGeoJSAnnotation(
+    selectionAnnotationType: AnnotationShape,
+    selectionAnnotationCoordinates: IGeoJSPosition[],
+    geoJSAnnotation: IGeoJSAnnotation,
+    unitsPerPixel: number,
+    radius?: number,
+  ) {
+    const annotationCoordinates = geoJSAnnotation.coordinates();
+    const annotationStyle = geoJSAnnotation.style();
+
+    if (selectionAnnotationType === AnnotationShape.Point) {
+      // TODO: This should be factorized with shouldSelectAnnotation because the logic is the same
+      const selectionPosition = selectionAnnotationCoordinates[0];
+      const { radius, strokeWidth } = annotationStyle;
+      
+      console.log("radius", radius);
+      console.log("strokeWidth", strokeWidth);
+
+      if (geoJSAnnotation.type() === AnnotationShape.Point) {
+        const annotationRadius =
+          ((radius as number) + (strokeWidth as number)) * unitsPerPixel;
+        const annotationPosition = annotationCoordinates[0];
+        return (
+          pointDistance(selectionPosition, annotationPosition) <
+          annotationRadius
+        );
+      } else if (geoJSAnnotation.type() === AnnotationShape.Line) {
+        const width = (strokeWidth as number) * unitsPerPixel;
+        return annotationCoordinates.reduce(
+          (isIn: boolean, point: IGeoJSPosition, index: number) => {
+            let isPointInLine = false;
+            if (index === annotationCoordinates.length - 1) {
+              isPointInLine = pointDistance(point, selectionPosition) < width;
+            } else {
+              isPointInLine =
+                geojs.util.distance2dToLineSquared(
+                  selectionPosition,
+                  point,
+                  annotationCoordinates[index + 1],
+                ) < width;
+            }
+            return isIn || isPointInLine;
+          },
+          false,
+        );
+      } else {
+        return geojs.util.pointInPolygon(
+          selectionPosition,
+          annotationCoordinates,
+        );
+      }
+    } else {
+      return annotationCoordinates.some((point: IGeoJSPosition) => {
+        return geojs.util.pointInPolygon(point, selectionAnnotationCoordinates);
+      });
+    }
+  }
+
+  private getTimelapseAnnotationsFromAnnotation(
+    selectAnnotation: IGeoJSAnnotation,
+  ) {
+    const coordinates = selectAnnotation.coordinates();
+    const type = selectAnnotation.type();
+
+    // Get general information from the map.
+    // When working with pointAnnotation, unitsPerPixels is necessary to
+    // compute the right value of the radius.
+    const unitsPerPixel = this.getMapUnitsPerPixel();
+
+    // Get selected annotations from the timelapse layer
+    const selectedAnnotations: IGeoJSAnnotation[] = this.timelapseLayer
+      .annotations()
+      .reduce(
+        (
+          selectedAnnotations: IGeoJSAnnotation[],
+          geoJSAnnotation: IGeoJSAnnotation,
+        ) => {
+          // Skip if it's not a timelapse point or already selected (TODO: haven't implemented already selected)
+          const { isTimelapsePoint } = geoJSAnnotation.options();
+          if (
+            !isTimelapsePoint //||
+            // selectedAnnotations.some(
+            //   (selectedAnnotation) =>
+            //     selectedAnnotation.options("girderId") ===
+            //     geoJSAnnotation.options("girderId"),
+            // )
+          ) {
+            return selectedAnnotations;
+          }
+
+          if (
+            !this.shouldSelectGeoJSAnnotation(
+              type,
+              coordinates,
+              geoJSAnnotation,
+              unitsPerPixel,
+            )
+          ) {
+            return selectedAnnotations;
+          }
+
+          return [...selectedAnnotations, geoJSAnnotation];
+        },
+        [],
+      );
+    return selectedAnnotations;
+  }
+
   private selectAnnotations(selectAnnotation: IGeoJSAnnotation) {
     if (!selectAnnotation) {
       return;
@@ -1957,42 +2065,62 @@ export default class AnnotationViewer extends Vue {
     console.log("geoAnnotations", geoAnnotations);
     let timeToSet: number | null = null;
 
-    console.log("time", this.time);
+    // Create a temporary point annotation from the click
+    const clickAnnotation = {
+      type: () => AnnotationShape.Point,
+      coordinates: () => [evt.geo],
+      style: () => ({
+        radius: 10, // Matches the radius used for current time points
+        //strokeWidth: 1, // Add some padding for easier clicking
+        //scaled: 0, // Fixed size in image coordinates
+      }),
+    } as IGeoJSAnnotation;
+
+    const selectedTimelapseAnnotations =
+      this.getTimelapseAnnotationsFromAnnotation(clickAnnotation);
+
+    console.log("selectedTimelapseAnnotations", selectedTimelapseAnnotations);
+
+    console.log(selectedTimelapseAnnotations[0].options("time"));
+
+    timeToSet = selectedTimelapseAnnotations[0].options("time");
 
     // TODO (performance): use a spatial index or something else to speed this up
-    for (let i = 0; i < geoAnnotations.length; ++i) {
-      const geoAnnotation = geoAnnotations[i];
-      // const time = geoAnnotation.options("time");
-      // if (time === undefined) {
-      //   continue;
-      // }
+    // for (let i = 0; i < geoAnnotations.length; ++i) {
+    //   const geoAnnotation = geoAnnotations[i];
+    //   // const time = geoAnnotation.options("time");
+    //   // if (time === undefined) {
+    //   //   continue;
+    //   // }
 
-      const id = geoAnnotation.options("girderId");
-      if (!id) {
-        continue;
-      }
+    //   // const id = geoAnnotation.options("girderId");
+    //   // if (!id) {
+    //   //   continue;
+    //   // }
 
-      // TODO: This is doesn't work because we don't have an IAnnotation object corresponding.
-      // We need to make a shouldSelectGeoJSAnnotation function (if we want to do it this way).
-      const annotation = this.getAnnotationFromId(id);
-      if (!annotation) {
-        continue;
-      }
+    //   // // TODO: This is doesn't work because we don't have an IAnnotation object corresponding.
+    //   // // We need to make a shouldSelectGeoJSAnnotation function (if we want to do it this way).
+    //   // const annotation = this.getAnnotationFromId(id);
+    //   // if (!annotation) {
+    //   //   continue;
+    //   // }
 
-      const unitsPerPixel = this.getMapUnitsPerPixel();
-      const shouldSelect = this.shouldSelectAnnotation(
-        AnnotationShape.Point,
-        [evt.geo],
-        annotation,
-        geoAnnotation.style(),
-        unitsPerPixel,
-      );
+    //   // const unitsPerPixel = this.getMapUnitsPerPixel();
+    //   // const shouldSelect = this.shouldSelectAnnotation(
+    //   //   AnnotationShape.Point,
+    //   //   [evt.geo],
+    //   //   annotation,
+    //   //   geoAnnotation.style(),
+    //   //   unitsPerPixel,
+    //   // );
 
-      if (shouldSelect) {
-        timeToSet = annotation.location.Time;
-        break;
-      }
-    }
+    //   // console.log("Time to switch to", annotation.location.Time);
+
+    //   // if (shouldSelect) {
+    //   //   timeToSet = annotation.location.Time;
+    //   //   break;
+    //   // }
+    // }
 
     if (timeToSet !== null && this.time !== timeToSet) {
       this.store.setTime(timeToSet);
@@ -2024,9 +2152,10 @@ export default class AnnotationViewer extends Vue {
     this.drawAnnotationsAndTooltips();
     if (this.showTimelapseMode) {
       // Should I put this into the drawAnnotationsAndTooltips call?
+      // TODO: Figure out where to make the following call
       this.drawTimelapseConnections();
-      // TODO: This should definitely be moved, just a hack for now
-      this.timelapseLayer.mode("point");
+      // TODO: This should definitely be removed. Need to figure out how to capture the clicks otherwise
+      // this.timelapseLayer.mode("point");
     }
     // Clear flag after a tick to allow Vue to process all watchers
     Vue.nextTick(() => {
@@ -2135,7 +2264,7 @@ export default class AnnotationViewer extends Vue {
       this.handleAnnotationChange,
     );
     this.drawAnnotationsAndTooltips();
-    // TODO: Can this be moved up above the drawAnnotationsAndTooltips call?
+    // TODO: Can this be moved up above the drawAnnotationsAndTooltips line that is right above it?
     this.annotationLayer.geoOn(
       geojs.event.mouseclick,
       (evt: IGeoJSMouseState) => {
