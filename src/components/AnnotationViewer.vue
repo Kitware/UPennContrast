@@ -1375,6 +1375,46 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.draw();
   }
 
+  private pointNearPoint(
+    selectionPosition: IGeoJSPosition,
+    annotationPosition: IGeoJSPosition,
+    radius: number,
+    strokeWidth: number,
+    unitsPerPixel: number,
+  ): boolean {
+    const annotationRadius =
+      ((radius as number) + (strokeWidth as number)) * unitsPerPixel;
+    return (
+      pointDistance(selectionPosition, annotationPosition) < annotationRadius
+    );
+  }
+
+  private pointNearLine(
+    selectionPosition: IGeoJSPosition,
+    linePoints: IGeoJSPosition[],
+    strokeWidth: number,
+    unitsPerPixel: number,
+  ): boolean {
+    const width = (strokeWidth as number) * unitsPerPixel;
+    return linePoints.reduce(
+      (isIn: boolean, point: IGeoJSPosition, index: number) => {
+        if (index === linePoints.length - 1) {
+          // Specific case for the last point that does not have a next point
+          return isIn || pointDistance(point, selectionPosition) < width;
+        }
+        return (
+          isIn ||
+          geojs.util.distance2dToLineSquared(
+            selectionPosition,
+            point,
+            linePoints[index + 1],
+          ) < width
+        );
+      },
+      false,
+    );
+  }
+
   private shouldSelectAnnotation(
     selectionAnnotationType: AnnotationShape,
     selectionAnnotationCoordinates: IGeoJSPosition[],
@@ -1399,33 +1439,20 @@ export default class AnnotationViewer extends Vue {
       const { radius, strokeWidth } = annotationStyle;
 
       if (annotation.shape === AnnotationShape.Point) {
-        const annotationRadius =
-          ((radius as number) + (strokeWidth as number)) * unitsPerPixel;
-        const annotationPosition = annotationCoordinates[0];
-        return (
-          pointDistance(selectionPosition, annotationPosition) <
-          annotationRadius
+        return this.pointNearPoint(
+          selectionPosition,
+          annotationCoordinates[0],
+          radius as number,
+          strokeWidth as number,
+          unitsPerPixel,
         );
       } else if (annotation.shape === AnnotationShape.Line) {
         // Check if click on points of the line, or on the line directly
-        const width = (strokeWidth as number) * unitsPerPixel;
-        return annotationCoordinates.reduce(
-          (isIn: boolean, point: IGeoJSPosition, index: number) => {
-            let isPointInLine = false;
-            if (index === annotationCoordinates.length - 1) {
-              // Specific case for the last point that does not have a next point
-              isPointInLine = pointDistance(point, selectionPosition) < width;
-            } else {
-              isPointInLine =
-                geojs.util.distance2dToLineSquared(
-                  selectionPosition,
-                  point,
-                  annotationCoordinates[index + 1],
-                ) < width;
-            }
-            return isIn || isPointInLine;
-          },
-          false,
+        return this.pointNearLine(
+          selectionPosition,
+          annotationCoordinates,
+          strokeWidth as number,
+          unitsPerPixel,
         );
       } else {
         return geojs.util.pointInPolygon(
@@ -1512,31 +1539,19 @@ export default class AnnotationViewer extends Vue {
       const strokeWidth = annotationStyle.strokeWidth;
 
       if (geoJSAnnotation.type() === AnnotationShape.Point) {
-        const annotationRadius =
-          ((radius as number) + (strokeWidth as number)) * unitsPerPixel;
-        const annotationPosition = annotationCoordinates[0];
-        return (
-          pointDistance(selectionPosition, annotationPosition) <
-          annotationRadius
+        return this.pointNearPoint(
+          selectionPosition,
+          annotationCoordinates[0],
+          radius as number,
+          strokeWidth as number,
+          unitsPerPixel,
         );
       } else if (geoJSAnnotation.type() === AnnotationShape.Line) {
-        const width = (strokeWidth as number) * unitsPerPixel;
-        return annotationCoordinates.reduce(
-          (isIn: boolean, point: IGeoJSPosition, index: number) => {
-            let isPointInLine = false;
-            if (index === annotationCoordinates.length - 1) {
-              isPointInLine = pointDistance(point, selectionPosition) < width;
-            } else {
-              isPointInLine =
-                geojs.util.distance2dToLineSquared(
-                  selectionPosition,
-                  point,
-                  annotationCoordinates[index + 1],
-                ) < width;
-            }
-            return isIn || isPointInLine;
-          },
-          false,
+        return this.pointNearLine(
+          selectionPosition,
+          annotationCoordinates,
+          strokeWidth as number,
+          unitsPerPixel,
         );
       } else {
         return geojs.util.pointInPolygon(
