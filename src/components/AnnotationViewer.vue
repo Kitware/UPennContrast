@@ -1131,6 +1131,17 @@ export default class AnnotationViewer extends Vue {
     // Draw each component separately
     components.forEach((component) => {
       const componentAnnotations: IAnnotation[] = [];
+      let color: string = "#FFFFFF";
+      if (component.size > 0) {
+        // Use the first GeoJSAnnotation ID to generate a color that is unique for the component irrespective
+        // of the timelapse window.
+        const hash = Array.from(component)[0]
+          .split("")
+          .reduce((acc, char) => {
+            return char.charCodeAt(0) + ((acc << 5) - acc);
+          }, 0);
+        color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
+      }
       component.forEach((id) => {
         const annotation = this.getAnnotationFromId(id);
         if (annotation) {
@@ -1144,14 +1155,6 @@ export default class AnnotationViewer extends Vue {
       });
 
       if (componentAnnotations.length > 0) {
-        // Draw track for this component
-        // We assign a color based on the first annotation in the component so that it stays the same even if the window changes.
-        const hash = componentAnnotations[0].id
-          .split("")
-          .reduce((acc, char) => {
-            return char.charCodeAt(0) + ((acc << 5) - acc);
-          }, 0);
-        const color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
         this.drawTimelapseTrack(componentAnnotations, color);
         this.drawTimelapseAnnotationCentroids(componentAnnotations);
       }
@@ -1233,6 +1236,8 @@ export default class AnnotationViewer extends Vue {
       }
 
       // Current time point (if it exists in the sequence)
+      // Adding this last so that it is drawn on top of the other points
+      // This could be improved by ensuring it draws on top of ALL tracks, not just the current one
       const currentPoint = annotations.find(
         (a) => a.location.Time === currentTime,
       );
