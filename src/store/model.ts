@@ -1112,6 +1112,18 @@ export interface IAnnotation extends IAnnotationBase {
   name: string | null;
 }
 
+export enum TrackPositionType {
+  INTERIOR = "interior",
+  START = "start",
+  END = "end",
+  ORPHAN = "orphan",
+  CURRENT = "current",
+}
+
+export interface ITimelapseAnnotation extends IAnnotation {
+  trackPositionType: TrackPositionType;
+}
+
 export interface IAnnotationConnectionBase {
   label: string;
   tags: string[];
