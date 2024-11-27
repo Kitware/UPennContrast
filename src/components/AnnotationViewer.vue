@@ -47,6 +47,7 @@ import {
   AnnotationSelectionTypes,
   AnnotationShape,
   IAnnotation,
+  ITimelapseAnnotation,
   IAnnotationConnection,
   IAnnotationLocation,
   IDisplayLayer,
@@ -71,6 +72,7 @@ import {
   TToolState,
   ConnectionToolStateSymbol,
   IGeoJSMouseState,
+  TrackPositionType,
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -1130,7 +1132,7 @@ export default class AnnotationViewer extends Vue {
 
     // Draw each component separately
     components.forEach((component) => {
-      const componentAnnotations: IAnnotation[] = [];
+      const componentAnnotations: ITimelapseAnnotation[] = [];
       let color: string = "#FFFFFF";
       if (component.size > 0) {
         // Use the first GeoJSAnnotation ID to generate a color that is unique for the component irrespective
@@ -1142,17 +1144,45 @@ export default class AnnotationViewer extends Vue {
           }, 0);
         color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
       }
+
+      // Initialize min and max times to 0; we will update them as we process each component
+      let minTime = Number.MAX_SAFE_INTEGER;
+      let maxTime = 0;
       component.forEach((id) => {
         const annotation = this.getAnnotationFromId(id);
+        const timelapseAnnotation: ITimelapseAnnotation = {
+          // Cast to IAnnotation to access the common properties
+          ...(annotation as IAnnotation),
+          trackPositionType: TrackPositionType.INTERIOR,
+        };
         if (annotation) {
+          // First, update the min and max times for the component
+          minTime = Math.min(minTime, annotation.location.Time);
+          maxTime = Math.max(maxTime, annotation.location.Time);
           if (
             annotation.location.Time >= currentTime - timelapseModeWindow &&
             annotation.location.Time <= currentTime + timelapseModeWindow
           ) {
-            componentAnnotations.push(annotation);
+            if (annotation.location.Time === currentTime) {
+              timelapseAnnotation.trackPositionType = TrackPositionType.CURRENT;
+            }
+            componentAnnotations.push(timelapseAnnotation);
           }
         }
       });
+      // Set the trackPositionType for the start and end annotations
+      const startAnnotations = componentAnnotations.filter(
+        (a) => a.location.Time === minTime,
+      );
+      const endAnnotations = componentAnnotations.filter(
+        (a) => a.location.Time === maxTime,
+      );
+      for (const startAnnotation of startAnnotations) {
+        startAnnotation.trackPositionType = TrackPositionType.START;
+      }
+      for (const endAnnotation of endAnnotations) {
+        endAnnotation.trackPositionType = TrackPositionType.END;
+      }
 
       if (componentAnnotations.length > 0) {
         this.drawTimelapseTrack(componentAnnotations, color);
@@ -1164,7 +1194,7 @@ export default class AnnotationViewer extends Vue {
     this.timelapseTextLayer.draw();
   }
 
-  drawTimelapseTrack(annotations: IAnnotation[], color?: string) {
+  drawTimelapseTrack(annotations: ITimelapseAnnotation[], color?: string) {
     // Sort annotations by time
     annotations.sort((a, b) => a.location.Time - b.location.Time);
 
@@ -1220,29 +1250,39 @@ export default class AnnotationViewer extends Vue {
 
     if (annotations.length > 0) {
       // Start point
-      const firstAnnotation = annotations[0];
-      if (firstAnnotation.location.Time !== currentTime) {
-        textPoints.push(this.unrolledCentroidCoordinates[firstAnnotation.id]);
-        textLabels.push(`T=${firstAnnotation.location.Time + 1}`);
-        textStyles.push({}); // default style
+      // For all annotations whose .trackPositionType is START, draw a text label
+      const startAnnotations = annotations.filter(
+        (a) => a.trackPositionType === TrackPositionType.START,
+      );
+      for (const startAnnotation of startAnnotations) {
+        if (startAnnotation.location.Time !== currentTime) {
+          textPoints.push(this.unrolledCentroidCoordinates[startAnnotation.id]);
+          textLabels.push(`T=${startAnnotation.location.Time + 1}`);
+          textStyles.push({}); // default style
+        }
       }
 
       // End point
-      const lastAnnotation = annotations[annotations.length - 1];
-      if (lastAnnotation.location.Time !== currentTime) {
-        textPoints.push(this.unrolledCentroidCoordinates[lastAnnotation.id]);
-        textLabels.push(`T=${lastAnnotation.location.Time + 1}`);
-        textStyles.push({}); // default style
+      // For all annotations whose .trackPositionType is END, draw a text label
+      const endAnnotations = annotations.filter(
+        (a) => a.trackPositionType === TrackPositionType.END,
+      );
+      for (const endAnnotation of endAnnotations) {
+        if (endAnnotation.location.Time !== currentTime) {
+          textPoints.push(this.unrolledCentroidCoordinates[endAnnotation.id]);
+          textLabels.push(`T=${endAnnotation.location.Time + 1}`);
+          textStyles.push({}); // default style
+        }
       }
 
       // Current time point (if it exists in the sequence)
       // Adding this last so that it is drawn on top of the other points
       // This could be improved by ensuring it draws on top of ALL tracks, not just the current one
-      const currentPoint = annotations.find(
+      const currentAnnotations = annotations.filter(
         (a) => a.location.Time === currentTime,
       );
-      if (currentPoint) {
-        textPoints.push(this.unrolledCentroidCoordinates[currentPoint.id]);
+      for (const currentAnnotation of currentAnnotations) {
+        textPoints.push(this.unrolledCentroidCoordinates[currentAnnotation.id]);
         textLabels.push(`Curr T=${currentTime + 1}`);
         textStyles.push({ fontSize: "16px" }); // larger font for current time
       }
