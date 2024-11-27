@@ -1213,6 +1213,8 @@ export default class AnnotationViewer extends Vue {
 
     this.annotationStore.annotations.forEach((annotation: IAnnotation) => {
       if (
+        // If the annotation is not in the connected set, it is orphaned
+        // provided it is within the timelapse window and has a tag in the timelapseTags list
         !connectedIds.has(annotation.id) &&
         annotation.location.Time >= currentTime - timelapseModeWindow &&
         annotation.location.Time <= currentTime + timelapseModeWindow &&
