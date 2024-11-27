@@ -1199,15 +1199,26 @@ export default class AnnotationViewer extends Vue {
       // TODO: We need to deal with branches. Probably the right algorithm is to
       // define START as annotations with no connection to an earlier point, and
       // END as annotations with no connection to a later point.
-      const startAnnotations = componentAnnotations.filter(
-        (a) => a.location.Time === minTime,
-      );
-      const endAnnotations = componentAnnotations.filter(
-        (a) => a.location.Time === maxTime,
-      );
+      const startAnnotations = componentAnnotations.filter((annotation) => {
+        // Check if there are no connections where this annotation is a child
+        return !component.connections.some(
+          (conn) =>
+            conn.childId === annotation.id && conn.parentId !== annotation.id,
+        );
+      });
+
+      const endAnnotations = componentAnnotations.filter((annotation) => {
+        // Check if there are no connections where this annotation is a parent
+        return !component.connections.some(
+          (conn) =>
+            conn.parentId === annotation.id && conn.childId !== annotation.id,
+        );
+      });
+
       for (const startAnnotation of startAnnotations) {
         startAnnotation.trackPositionType = TrackPositionType.START;
       }
+
       for (const endAnnotation of endAnnotations) {
         endAnnotation.trackPositionType = TrackPositionType.END;
       }
