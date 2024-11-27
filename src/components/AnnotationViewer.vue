@@ -1323,7 +1323,7 @@ export default class AnnotationViewer extends Vue {
       }
     });
 
-    // Add time labels for start and end points
+    // Add time labels for the different categories of points
     const textPoints: IGeoJSPosition[] = [];
     const textLabels: string[] = [];
     const textStyles: { fontSize?: string }[] = []; // Add array for individual text styles
@@ -1764,8 +1764,24 @@ export default class AnnotationViewer extends Vue {
     if (!selectAnnotation || !datasetId || !this.selectedToolConfiguration) {
       return;
     }
-    const selectedAnnotations =
-      this.getSelectedAnnotationsFromAnnotation(selectAnnotation);
+
+    let selectedAnnotations: IAnnotation[];
+    if (this.showTimelapseMode) {
+      // In the timelapse mode, we can use the same selection logic,
+      // but the getTimelapseAnnotationsFromAnnotation returns GeoJS annotations,
+      // so we need to map them to the corresponding annotations in the annotation store
+      // using the girderId (filtering out undefined).
+      const selectedGeoJSAnnotations =
+        this.getTimelapseAnnotationsFromAnnotation(selectAnnotation);
+      selectedAnnotations = selectedGeoJSAnnotations
+        .map((a) => this.getAnnotationFromId(a.options().girderId))
+        .filter((a): a is IAnnotation => a !== undefined);
+      console.log("Selected annotations (timelapse):", selectedAnnotations);
+    } else {
+      selectedAnnotations =
+        this.getSelectedAnnotationsFromAnnotation(selectAnnotation);
+      console.log("Selected annotations (non-timelapse):", selectedAnnotations);
+    }
 
     const parentTemplate = this.selectedToolConfiguration.values
       ?.parentAnnotation as IRestrictTagsAndLayer;
@@ -1795,22 +1811,41 @@ export default class AnnotationViewer extends Vue {
           this.selectedToolState.selectedAnnotationId
         ) {
           // Connect to selected
-          this.annotationStore.createConnection({
-            parentId: this.selectedToolState.selectedAnnotationId,
-            childId: clickedAnnotation.id,
-            datasetId,
+          if (this.showTimelapseMode) {
+            this.annotationStore.createTimelapseConnection({
+              parentId: this.selectedToolState.selectedAnnotationId,
+              childId: clickedAnnotation.id,
+              datasetId,
+              label: this.selectedToolConfiguration.name,
+              tags: [...parentTemplate.tags, ...childTemplate.tags],
+            });
+          } else {
+            this.annotationStore.createConnection({
+              parentId: this.selectedToolState.selectedAnnotationId,
+              childId: clickedAnnotation.id,
+              datasetId,
+              label: this.selectedToolConfiguration.name,
+              tags: [...parentTemplate.tags, ...childTemplate.tags],
+            });
+          }
+        }
+      } else {
+        // Add all connections between parents and children
+        if (this.showTimelapseMode) {
+          await this.annotationStore.createAllTimelapseConnections({
+            parentIds,
+            childIds,
+            label: this.selectedToolConfiguration.name,
+            tags: [...parentTemplate.tags, ...childTemplate.tags],
+          });
+        } else {
+          await this.annotationStore.createAllConnections({
+            parentIds,
+            childIds,
             label: this.selectedToolConfiguration.name,
             tags: [...parentTemplate.tags, ...childTemplate.tags],
           });
         }
-      } else {
-        // Add all connections between a parent and a child
-        await this.annotationStore.createAllConnections({
-          parentIds,
-          childIds,
-          label: this.selectedToolConfiguration.name,
-          tags: [...parentTemplate.tags, ...childTemplate.tags],
-        });
       }
     } else {
       if (clickAction) {
@@ -2331,7 +2366,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   @Watch("annotationLayer")
-  bind() {
+  bindAnnotationEvents() {
     this.annotationLayer.geoOn(
       geojs.event.annotation.mode,
       this.handleModeChange,
@@ -2360,11 +2395,18 @@ export default class AnnotationViewer extends Vue {
         }
       },
     );
+    this.drawAnnotationsAndTooltips(); // TODO: Does this lead to the double redraw upon initial load?
+  }
+
+  @Watch("timelapseLayer")
+  bindTimelapseEvents() {
     this.timelapseLayer.geoOn(
       geojs.event.mouseclick,
       this.handleTimelapseAnnotationClick,
     );
-    this.drawAnnotationsAndTooltips();
+    // TODO: Not sure this next line is necessary. It seems to draw just fine, so I'm leaving it out for now.
+    // But if some drawing is not happening, this might be something to check.
+    // this.drawTimelapseConnectionsAndCentroids();
   }
 
   @Watch("annotationLayer")
@@ -2421,7 +2463,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   mounted() {
-    this.bind();
+    this.bindAnnotationEvents();
     this.updateValueOnHover();
 
     this.filterStore.updateHistograms();

@@ -524,6 +524,71 @@ export class Annotations extends VuexModule {
     return newConnection;
   }
 
+  @Action
+  public async createTimelapseConnection(
+    annotationConnectionBase: IAnnotationConnectionBase,
+  ): Promise<IAnnotationConnection | null> {
+    sync.setSaving(true);
+    const parentAnnotation = this.getAnnotationFromId(
+      annotationConnectionBase.parentId,
+    );
+    const childAnnotation = this.getAnnotationFromId(
+      annotationConnectionBase.childId,
+    );
+    // Make sure that the parentAnnotation.location.Time is less than the childAnnotation.location.Time
+    if (parentAnnotation && childAnnotation) {
+      if (parentAnnotation.location.Time > childAnnotation.location.Time) {
+        [annotationConnectionBase.parentId, annotationConnectionBase.childId] =
+          [annotationConnectionBase.childId, annotationConnectionBase.parentId];
+      }
+    }
+    // TODO: Perhaps we want to delete any existing connections between these two annotations?
+    const newConnection: IAnnotationConnection | null =
+      await this.annotationsAPI.createConnection(annotationConnectionBase);
+    if (newConnection) {
+      this.addMultipleConnections([newConnection]);
+    }
+    sync.setSaving(false);
+    return newConnection;
+  }
+
+  @Action
+  public async createAllTimelapseConnections({
+    parentIds,
+    childIds,
+    label,
+    tags,
+  }: {
+    parentIds: string[];
+    childIds: string[];
+    label: string;
+    tags: string[];
+  }) {
+    if (!main.dataset) {
+      return [];
+    }
+    sync.setSaving(true);
+    const connectionBases: IAnnotationConnectionBase[] = [];
+    for (const parentId of parentIds) {
+      for (const childId of childIds) {
+        connectionBases.push({
+          label,
+          tags,
+          parentId,
+          childId,
+          datasetId: main.dataset.id,
+        });
+      }
+    }
+    const connections =
+      await this.annotationsAPI.createMultipleConnections(connectionBases);
+    if (connections) {
+      this.addMultipleConnections(connections);
+    }
+    sync.setSaving(false);
+    return connections || [];
+  }
+
   @Mutation
   public addMultipleConnections(value: IAnnotationConnection[]) {
     this.annotationConnections.push(...value);
