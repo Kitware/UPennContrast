@@ -1179,6 +1179,9 @@ export default class AnnotationViewer extends Vue {
         }
       });
       // Set the trackPositionType for the start and end annotations
+      // TODO: We need to deal with branches. Probably the right algorithm is to 
+      // define START as annotations with no connection to an earlier point, and
+      // END as annotations with no connection to a later point.
       const startAnnotations = componentAnnotations.filter(
         (a) => a.location.Time === minTime,
       );
