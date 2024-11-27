@@ -1776,11 +1776,9 @@ export default class AnnotationViewer extends Vue {
       selectedAnnotations = selectedGeoJSAnnotations
         .map((a) => this.getAnnotationFromId(a.options().girderId))
         .filter((a): a is IAnnotation => a !== undefined);
-      console.log("Selected annotations (timelapse):", selectedAnnotations);
     } else {
       selectedAnnotations =
         this.getSelectedAnnotationsFromAnnotation(selectAnnotation);
-      console.log("Selected annotations (non-timelapse):", selectedAnnotations);
     }
 
     const parentTemplate = this.selectedToolConfiguration.values
