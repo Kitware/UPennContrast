@@ -1174,9 +1174,6 @@ export default class AnnotationViewer extends Vue {
             annotation.location.Time >= currentTime - timelapseModeWindow &&
             annotation.location.Time <= currentTime + timelapseModeWindow
           ) {
-            if (annotation.location.Time === currentTime) {
-              timelapseAnnotation.trackPositionType = TrackPositionType.CURRENT;
-            }
             componentAnnotations.push(timelapseAnnotation);
           }
         }
@@ -1193,6 +1190,13 @@ export default class AnnotationViewer extends Vue {
       }
       for (const endAnnotation of endAnnotations) {
         endAnnotation.trackPositionType = TrackPositionType.END;
+      }
+      // Do CURRENT last to override START and END if they exist
+      const currentAnnotations = componentAnnotations.filter(
+        (a) => a.location.Time === currentTime,
+      );
+      for (const currentAnnotation of currentAnnotations) {
+        currentAnnotation.trackPositionType = TrackPositionType.CURRENT;
       }
 
       if (componentAnnotations.length > 0) {
@@ -1290,7 +1294,7 @@ export default class AnnotationViewer extends Vue {
       // Adding this last so that it is drawn on top of the other points
       // This could be improved by ensuring it draws on top of ALL tracks, not just the current one
       const currentAnnotations = annotations.filter(
-        (a) => a.location.Time === currentTime,
+        (a) => a.trackPositionType === TrackPositionType.CURRENT,
       );
       for (const currentAnnotation of currentAnnotations) {
         textPoints.push(this.unrolledCentroidCoordinates[currentAnnotation.id]);
