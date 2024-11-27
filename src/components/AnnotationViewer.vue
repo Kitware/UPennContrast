@@ -1126,6 +1126,7 @@ export default class AnnotationViewer extends Vue {
     // Only render tracks and annotations within this time window
     const timelapseModeWindow = this.timelapseModeWindow;
     const currentTime = this.time;
+    const timelapseTags = this.store.timelapseTags;
 
     // Get connected components to find each individual track
     const components = this.findConnectedComponents(this.annotationConnections);
@@ -1150,6 +1151,16 @@ export default class AnnotationViewer extends Vue {
       let maxTime = 0;
       component.forEach((id) => {
         const annotation = this.getAnnotationFromId(id);
+        if (annotation) {
+          // If the annotation doesn't have a tag in the timelapseTags list, skip it
+          // If the timelapseTags list is empty, include all annotations
+          if (
+            timelapseTags.length > 0 &&
+            !annotation.tags.some((tag: string) => timelapseTags.includes(tag))
+          ) {
+            return;
+          }
+        }
         const timelapseAnnotation: ITimelapseAnnotation = {
           // Cast to IAnnotation to access the common properties
           ...(annotation as IAnnotation),
@@ -2147,10 +2158,12 @@ export default class AnnotationViewer extends Vue {
     const selectedTimelapseAnnotations =
       this.getTimelapseAnnotationsFromAnnotation(clickAnnotation);
 
-    timeToSet = selectedTimelapseAnnotations[0].options("time");
+    if (selectedTimelapseAnnotations.length > 0) {
+      timeToSet = selectedTimelapseAnnotations[0].options("time");
 
-    if (timeToSet !== null && this.time !== timeToSet) {
-      this.store.setTime(timeToSet);
+      if (timeToSet !== null && this.time !== timeToSet) {
+        this.store.setTime(timeToSet);
+      }
     }
   }
 
@@ -2186,6 +2199,7 @@ export default class AnnotationViewer extends Vue {
 
   @Watch("showTimelapseMode")
   @Watch("timelapseModeWindow")
+  @Watch("timelapseTags")
   onTimelapseModeChanged() {
     this.drawTimelapseConnectionsAndCentroids();
   }
