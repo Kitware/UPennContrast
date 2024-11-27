@@ -1297,7 +1297,9 @@ export default class AnnotationViewer extends Vue {
             scaled: 1, // Fixed size in image coordinates
             fill: true,
             fillColor:
-              annotation.location.Time < currentTime ? "white" : "white",
+              annotation.trackPositionType === TrackPositionType.ORPHAN
+                ? "gray"
+                : "white",
             fillOpacity: annotation.location.Time < currentTime ? 0.5 : 1,
             stroke: true,
             strokeColor: "black",
@@ -1334,7 +1336,7 @@ export default class AnnotationViewer extends Vue {
         textPoints.push(this.unrolledCentroidCoordinates[orphanAnnotation.id]);
         textLabels.push(`t=${orphanAnnotation.location.Time + 1}`);
         textStyles.push({}); // default style
-        textColors.push("red");
+        textColors.push("gray");
       }
 
       // Start point
