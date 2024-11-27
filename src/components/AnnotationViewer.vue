@@ -1073,7 +1073,7 @@ export default class AnnotationViewer extends Vue {
   // Helper function to find connected components using Union-Find
   private findConnectedComponents(
     connections: IAnnotationConnection[],
-  ): Set<string>[] {
+  ): { annotations: Set<string>; connections: IAnnotationConnection[] }[] {
     // Simple Union-Find implementation
     const parent = new Map<string, string>();
 
@@ -1098,14 +1098,31 @@ export default class AnnotationViewer extends Vue {
       union(conn.parentId, conn.childId);
     });
 
-    // Group by root to get components
-    const components = new Map<string, Set<string>>();
+    // Group annotations and their connections by root
+    const components = new Map<
+      string,
+      {
+        annotations: Set<string>;
+        connections: IAnnotationConnection[];
+      }
+    >();
+
+    // Initialize components with annotations
     parent.forEach((_, node) => {
       const root = find(node);
       if (!components.has(root)) {
-        components.set(root, new Set());
+        components.set(root, {
+          annotations: new Set(),
+          connections: [],
+        });
       }
-      components.get(root)!.add(node);
+      components.get(root)!.annotations.add(node);
+    });
+
+    // Add connections to their respective components
+    connections.forEach((conn) => {
+      const root = find(conn.parentId); // Could use either parent or child
+      components.get(root)!.connections.push(conn);
     });
 
     return Array.from(components.values());
@@ -1135,10 +1152,10 @@ export default class AnnotationViewer extends Vue {
     components.forEach((component) => {
       const componentAnnotations: ITimelapseAnnotation[] = [];
       let color: string = "#FFFFFF";
-      if (component.size > 0) {
+      if (component.annotations.size > 0) {
         // Use the first GeoJSAnnotation ID to generate a color that is unique for the component irrespective
         // of the timelapse window.
-        const hash = Array.from(component)[0]
+        const hash = Array.from(component.annotations)[0]
           .split("")
           .reduce((acc, char) => {
             return char.charCodeAt(0) + ((acc << 5) - acc);
@@ -1149,7 +1166,7 @@ export default class AnnotationViewer extends Vue {
       // Initialize min and max times to 0; we will update them as we process each component
       let minTime = Number.MAX_SAFE_INTEGER;
       let maxTime = 0;
-      component.forEach((id) => {
+      component.annotations.forEach((id) => {
         const annotation = this.getAnnotationFromId(id);
         if (annotation) {
           // If the annotation doesn't have a tag in the timelapseTags list, skip it
@@ -1179,7 +1196,7 @@ export default class AnnotationViewer extends Vue {
         }
       });
       // Set the trackPositionType for the start and end annotations
-      // TODO: We need to deal with branches. Probably the right algorithm is to 
+      // TODO: We need to deal with branches. Probably the right algorithm is to
       // define START as annotations with no connection to an earlier point, and
       // END as annotations with no connection to a later point.
       const startAnnotations = componentAnnotations.filter(
@@ -1203,7 +1220,11 @@ export default class AnnotationViewer extends Vue {
       }
 
       if (componentAnnotations.length > 0) {
-        this.drawTimelapseTrack(componentAnnotations, color);
+        this.drawTimelapseTrack(
+          componentAnnotations,
+          component.connections,
+          color,
+        );
         this.drawTimelapseAnnotationCentroids(componentAnnotations);
       }
     });
@@ -1211,7 +1232,9 @@ export default class AnnotationViewer extends Vue {
     // Find orphaned annotations
     const orphanAnnotations: ITimelapseAnnotation[] = [];
     const connectedIds = new Set<string>(
-      Array.from(components).flatMap((set) => Array.from(set)),
+      Array.from(components).flatMap((component) =>
+        Array.from(component.annotations),
+      ),
     );
 
     this.annotationStore.annotations.forEach((annotation: IAnnotation) => {
@@ -1239,52 +1262,63 @@ export default class AnnotationViewer extends Vue {
     this.timelapseTextLayer.draw();
   }
 
-  drawTimelapseTrack(annotations: ITimelapseAnnotation[], color?: string) {
-    // Sort annotations by time
-    annotations.sort((a, b) => a.location.Time - b.location.Time);
+  drawTimelapseTrack(
+    annotations: ITimelapseAnnotation[],
+    connections: IAnnotationConnection[],
+    color?: string,
+  ) {
+    // Sort annotations by time, latest first
+    annotations.sort((a, b) => b.location.Time - a.location.Time);
 
     const currentTime = this.time;
+    const drawnLines = new Set<string>(); // To avoid drawing duplicate lines
 
-    // Split points into before and after current time
-    const beforePoints = annotations
-      .filter((a) => a.location.Time <= currentTime)
-      .map((a) => this.unrolledCentroidCoordinates[a.id]);
+    // For each annotation, draw lines to its connected annotations in previous frames
+    for (const annotation of annotations) {
+      // Find all connections where this annotation is either parent or child
+      const relevantConnections = connections.filter(
+        (conn) =>
+          conn.parentId === annotation.id || conn.childId === annotation.id,
+      );
 
-    const afterPoints = annotations
-      .filter((a) => a.location.Time >= currentTime)
-      .map((a) => this.unrolledCentroidCoordinates[a.id]);
+      for (const connection of relevantConnections) {
+        // Get the ID of the other annotation in the connection
+        const otherId =
+          connection.parentId === annotation.id
+            ? connection.childId
+            : connection.parentId;
 
-    // Draw lines
-    if (beforePoints.length > 1) {
-      const beforeLine = geojsAnnotationFactory(
-        AnnotationShape.Line,
-        beforePoints,
-        {
+        const otherAnnotation = annotations.find((a) => a.id === otherId);
+        if (
+          !otherAnnotation ||
+          otherAnnotation.location.Time >= annotation.location.Time
+        ) {
+          continue; // Skip if connecting to future frames
+        }
+
+        // Create unique line ID to avoid duplicates
+        const lineId = [annotation.id, otherId].sort().join("-");
+        if (drawnLines.has(lineId)) continue;
+        drawnLines.add(lineId);
+
+        const points = [
+          this.unrolledCentroidCoordinates[annotation.id],
+          this.unrolledCentroidCoordinates[otherId],
+        ];
+
+        // Determine if line is before or after current time
+        const isBeforeCurrent = annotation.location.Time <= currentTime;
+        const line = geojsAnnotationFactory(AnnotationShape.Line, points, {
           style: {
             strokeColor: color,
-            strokeWidth: 3,
+            strokeWidth: isBeforeCurrent ? 3 : 6,
             strokeOpacity: 1,
           },
-        },
-      );
-      if (beforeLine) {
-        this.timelapseLayer.addAnnotation(beforeLine);
-      }
-    }
-    if (afterPoints.length > 1) {
-      const afterLine = geojsAnnotationFactory(
-        AnnotationShape.Line,
-        afterPoints,
-        {
-          style: {
-            strokeColor: color,
-            strokeWidth: 6,
-            strokeOpacity: 1,
-          },
-        },
-      );
-      if (afterLine) {
-        this.timelapseLayer.addAnnotation(afterLine);
+        });
+
+        if (line) {
+          this.timelapseLayer.addAnnotation(line);
+        }
       }
     }
   }
