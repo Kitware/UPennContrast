@@ -1226,7 +1226,9 @@ export default class AnnotationViewer extends Vue {
       }
     });
 
-    console.log("Orphaned annotations:", orphanAnnotations);
+    if (orphanAnnotations.length > 0) {
+      this.drawTimelapseAnnotationCentroids(orphanAnnotations);
+    }
 
     this.timelapseLayer.draw();
     this.timelapseTextLayer.draw();
@@ -1280,69 +1282,6 @@ export default class AnnotationViewer extends Vue {
         this.timelapseLayer.addAnnotation(afterLine);
       }
     }
-
-    // Add time labels for start and end points
-    const textPoints: IGeoJSPosition[] = [];
-    const textLabels: string[] = [];
-    const textStyles: { fontSize?: string }[] = []; // Add array for individual text styles
-
-    if (annotations.length > 0) {
-      // Start point
-      // For all annotations whose .trackPositionType is START, draw a text label
-      const startAnnotations = annotations.filter(
-        (a) => a.trackPositionType === TrackPositionType.START,
-      );
-      for (const startAnnotation of startAnnotations) {
-        if (startAnnotation.location.Time !== currentTime) {
-          textPoints.push(this.unrolledCentroidCoordinates[startAnnotation.id]);
-          textLabels.push(`T=${startAnnotation.location.Time + 1}`);
-          textStyles.push({}); // default style
-        }
-      }
-
-      // End point
-      // For all annotations whose .trackPositionType is END, draw a text label
-      const endAnnotations = annotations.filter(
-        (a) => a.trackPositionType === TrackPositionType.END,
-      );
-      for (const endAnnotation of endAnnotations) {
-        if (endAnnotation.location.Time !== currentTime) {
-          textPoints.push(this.unrolledCentroidCoordinates[endAnnotation.id]);
-          textLabels.push(`T=${endAnnotation.location.Time + 1}`);
-          textStyles.push({}); // default style
-        }
-      }
-
-      // Current time point (if it exists in the sequence)
-      // Adding this last so that it is drawn on top of the other points
-      // This could be improved by ensuring it draws on top of ALL tracks, not just the current one
-      const currentAnnotations = annotations.filter(
-        (a) => a.trackPositionType === TrackPositionType.CURRENT,
-      );
-      for (const currentAnnotation of currentAnnotations) {
-        textPoints.push(this.unrolledCentroidCoordinates[currentAnnotation.id]);
-        textLabels.push(`Curr T=${currentTime + 1}`);
-        textStyles.push({ fontSize: "16px" }); // larger font for current time
-      }
-    }
-
-    // Draw text labels
-    this.timelapseTextLayer
-      .createFeature("text")
-      .data(textPoints)
-      .position((d: IGeoJSPosition) => d)
-      .style({
-        text: (_: IGeoJSPosition, i: number) => textLabels[i],
-        fontSize: (_: IGeoJSPosition, i: number) =>
-          textStyles[i].fontSize || "12px",
-        fontFamily: "sans-serif",
-        textAlign: "center",
-        textBaseline: "bottom",
-        color: "#DDDDDD",
-        textStrokeColor: "black",
-        textStrokeWidth: 2,
-        offset: { x: 0, y: -10 }, // Offset text above the points
-      });
   }
 
   drawTimelapseAnnotationCentroids(annotations: ITimelapseAnnotation[]) {
@@ -1379,6 +1318,84 @@ export default class AnnotationViewer extends Vue {
         this.timelapseLayer.addAnnotation(pointAnnotation);
       }
     });
+
+    // Add time labels for start and end points
+    const textPoints: IGeoJSPosition[] = [];
+    const textLabels: string[] = [];
+    const textStyles: { fontSize?: string }[] = []; // Add array for individual text styles
+    const textColors: string[] = [];
+
+    if (annotations.length > 0) {
+      // Orphan annotations
+      const orphanAnnotations = annotations.filter(
+        (a) => a.trackPositionType === TrackPositionType.ORPHAN,
+      );
+      for (const orphanAnnotation of orphanAnnotations) {
+        textPoints.push(this.unrolledCentroidCoordinates[orphanAnnotation.id]);
+        textLabels.push(`t=${orphanAnnotation.location.Time + 1}`);
+        textStyles.push({}); // default style
+        textColors.push("red");
+      }
+
+      // Start point
+      // For all annotations whose .trackPositionType is START, draw a text label
+      const startAnnotations = annotations.filter(
+        (a) => a.trackPositionType === TrackPositionType.START,
+      );
+      for (const startAnnotation of startAnnotations) {
+        if (startAnnotation.location.Time !== currentTime) {
+          textPoints.push(this.unrolledCentroidCoordinates[startAnnotation.id]);
+          textLabels.push(`T=${startAnnotation.location.Time + 1}`);
+          textStyles.push({}); // default style
+          textColors.push("white");
+        }
+      }
+
+      // End point
+      // For all annotations whose .trackPositionType is END, draw a text label
+      const endAnnotations = annotations.filter(
+        (a) => a.trackPositionType === TrackPositionType.END,
+      );
+      for (const endAnnotation of endAnnotations) {
+        if (endAnnotation.location.Time !== currentTime) {
+          textPoints.push(this.unrolledCentroidCoordinates[endAnnotation.id]);
+          textLabels.push(`T=${endAnnotation.location.Time + 1}`);
+          textStyles.push({}); // default style
+          textColors.push("white");
+        }
+      }
+
+      // Current time point (if it exists in the sequence)
+      // Adding this last so that it is drawn on top of the other points
+      // This could be improved by ensuring it draws on top of ALL tracks, not just the current one
+      const currentAnnotations = annotations.filter(
+        (a) => a.trackPositionType === TrackPositionType.CURRENT,
+      );
+      for (const currentAnnotation of currentAnnotations) {
+        textPoints.push(this.unrolledCentroidCoordinates[currentAnnotation.id]);
+        textLabels.push(`Curr T=${currentTime + 1}`);
+        textStyles.push({ fontSize: "16px" }); // larger font for current time
+        textColors.push("white");
+      }
+    }
+
+    // Draw text labels
+    this.timelapseTextLayer
+      .createFeature("text")
+      .data(textPoints)
+      .position((d: IGeoJSPosition) => d)
+      .style({
+        text: (_: IGeoJSPosition, i: number) => textLabels[i],
+        fontSize: (_: IGeoJSPosition, i: number) =>
+          textStyles[i].fontSize || "12px",
+        fontFamily: "sans-serif",
+        textAlign: "center",
+        textBaseline: "bottom",
+        color: (_: IGeoJSPosition, i: number) => textColors[i],
+        textStrokeColor: "black",
+        textStrokeWidth: 2,
+        offset: { x: 0, y: -10 }, // Offset text above the points
+      });
   }
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
