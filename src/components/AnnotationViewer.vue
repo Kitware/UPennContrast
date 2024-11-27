@@ -1213,6 +1213,8 @@ export default class AnnotationViewer extends Vue {
 
     this.annotationStore.annotations.forEach((annotation: IAnnotation) => {
       if (
+        // If the annotation is not in the connected set, it is orphaned
+        // provided it is within the timelapse window and has a tag in the timelapseTags list
         !connectedIds.has(annotation.id) &&
         annotation.location.Time >= currentTime - timelapseModeWindow &&
         annotation.location.Time <= currentTime + timelapseModeWindow &&
@@ -1297,7 +1299,9 @@ export default class AnnotationViewer extends Vue {
             scaled: 1, // Fixed size in image coordinates
             fill: true,
             fillColor:
-              annotation.location.Time < currentTime ? "white" : "white",
+              annotation.trackPositionType === TrackPositionType.ORPHAN
+                ? "gray"
+                : "white",
             fillOpacity: annotation.location.Time < currentTime ? 0.5 : 1,
             stroke: true,
             strokeColor: "black",
@@ -1334,7 +1338,7 @@ export default class AnnotationViewer extends Vue {
         textPoints.push(this.unrolledCentroidCoordinates[orphanAnnotation.id]);
         textLabels.push(`t=${orphanAnnotation.location.Time + 1}`);
         textStyles.push({}); // default style
-        textColors.push("red");
+        textColors.push("gray");
       }
 
       // Start point
