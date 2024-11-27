@@ -1323,7 +1323,7 @@ export default class AnnotationViewer extends Vue {
       }
     });
 
-    // Add time labels for start and end points
+    // Add time labels for the different categories of points
     const textPoints: IGeoJSPosition[] = [];
     const textLabels: string[] = [];
     const textStyles: { fontSize?: string }[] = []; // Add array for individual text styles
@@ -2331,7 +2331,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   @Watch("annotationLayer")
-  bind() {
+  bindAnnotationEvents() {
     this.annotationLayer.geoOn(
       geojs.event.annotation.mode,
       this.handleModeChange,
@@ -2360,11 +2360,18 @@ export default class AnnotationViewer extends Vue {
         }
       },
     );
+    this.drawAnnotationsAndTooltips(); // TODO: Does this lead to the double redraw upon initial load?
+  }
+
+  @Watch("timelapseLayer")
+  bindTimelapseEvents() {
     this.timelapseLayer.geoOn(
       geojs.event.mouseclick,
       this.handleTimelapseAnnotationClick,
     );
-    this.drawAnnotationsAndTooltips();
+    // TODO: Not sure this next line is necessary. It seems to draw just fine, so I'm leaving it out for now.
+    // But if some drawing is not happening, this might be something to check.
+    // this.drawTimelapseConnectionsAndCentroids();
   }
 
   @Watch("annotationLayer")
@@ -2421,7 +2428,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   mounted() {
-    this.bind();
+    this.bindAnnotationEvents();
     this.updateValueOnHover();
 
     this.filterStore.updateHistograms();
