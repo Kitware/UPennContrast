@@ -64,6 +64,13 @@
           :title="'Track window size'"
         />
       </v-layout>
+      <v-layout v-if="timelapseMode">
+        <tag-picker
+          class="ml-3"
+          v-model="timelapseTags"
+          style="max-width: 300px"
+        />
+      </v-layout>
     </div>
     <toolset></toolset>
     <v-radio-group
@@ -218,6 +225,14 @@ export default class ViewerToolbar extends Vue {
 
   set timelapseModeWindow(value: number) {
     this.store.setTimelapseModeWindow(value);
+  }
+
+  get timelapseTags() {
+    return this.store.timelapseTags;
+  }
+
+  set timelapseTags(value: string[]) {
+    this.store.setTimelapseTags(value);
   }
 
   set layerMode(value: TLayerMode) {
