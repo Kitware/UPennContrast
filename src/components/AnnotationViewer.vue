@@ -1196,8 +1196,7 @@ export default class AnnotationViewer extends Vue {
         }
       });
       // Set the trackPositionType for the start and end annotations
-      // TODO: We need to deal with branches. Probably the right algorithm is to
-      // define START as annotations with no connection to an earlier point, and
+      // We define START as annotations with no connection to an earlier point, and
       // END as annotations with no connection to a later point.
       const startAnnotations = componentAnnotations.filter((annotation) => {
         // Check if there are no connections where this annotation is a child
@@ -1317,13 +1316,18 @@ export default class AnnotationViewer extends Vue {
           this.unrolledCentroidCoordinates[otherId],
         ];
 
+        // Calculate time difference
+        const timeDiff = annotation.location.Time - otherAnnotation.location.Time;
+        const isTimeJump = timeDiff > 1;
+
         // Determine if line is before or after current time
         const isBeforeCurrent = annotation.location.Time <= currentTime;
         const line = geojsAnnotationFactory(AnnotationShape.Line, points, {
           style: {
-            strokeColor: color,
+            strokeColor: isTimeJump ? '#ff6b6b' : color, // Use a warning color for time jumps
             strokeWidth: isBeforeCurrent ? 3 : 6,
-            strokeOpacity: 1,
+            strokeOpacity: isTimeJump ? 0.7 : 1, // Slightly more transparent for time jumps
+            lineDash: isTimeJump ? [5, 5] : undefined, // Add dashed style for time jumps
           },
         });
 
@@ -1702,8 +1706,6 @@ export default class AnnotationViewer extends Vue {
     const annotationStyle = geoJSAnnotation.style();
 
     if (selectionAnnotationType === AnnotationShape.Point) {
-      // TODO: This should be factorized with shouldSelectAnnotation because the logic is the same.
-      // Only difference is the radius code, which is currently specific to this function.
       const selectionPosition = selectionAnnotationCoordinates[0];
       if (!radius) {
         radius = annotationStyle.radius;
