@@ -1317,14 +1317,15 @@ export default class AnnotationViewer extends Vue {
         ];
 
         // Calculate time difference
-        const timeDiff = annotation.location.Time - otherAnnotation.location.Time;
+        const timeDiff =
+          annotation.location.Time - otherAnnotation.location.Time;
         const isTimeJump = timeDiff > 1;
 
         // Determine if line is before or after current time
         const isBeforeCurrent = annotation.location.Time <= currentTime;
         const line = geojsAnnotationFactory(AnnotationShape.Line, points, {
           style: {
-            strokeColor: isTimeJump ? '#ff6b6b' : color, // Use a warning color for time jumps
+            strokeColor: isTimeJump ? "#ff6b6b" : color, // Use a warning color for time jumps
             strokeWidth: isBeforeCurrent ? 3 : 6,
             strokeOpacity: isTimeJump ? 0.7 : 1, // Slightly more transparent for time jumps
             lineDash: isTimeJump ? [5, 5] : undefined, // Add dashed style for time jumps
