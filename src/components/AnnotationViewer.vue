@@ -1767,6 +1767,10 @@ export default class AnnotationViewer extends Vue {
 
     let selectedAnnotations: IAnnotation[];
     if (this.showTimelapseMode) {
+      // In the timelapse mode, we can use the same selection logic,
+      // but the getTimelapseAnnotationsFromAnnotation returns GeoJS annotations,
+      // so we need to map them to the corresponding annotations in the annotation store
+      // using the girderId (filtering out undefined).
       const selectedGeoJSAnnotations =
         this.getTimelapseAnnotationsFromAnnotation(selectAnnotation);
       selectedAnnotations = selectedGeoJSAnnotations
@@ -1807,22 +1811,41 @@ export default class AnnotationViewer extends Vue {
           this.selectedToolState.selectedAnnotationId
         ) {
           // Connect to selected
-          this.annotationStore.createConnection({
-            parentId: this.selectedToolState.selectedAnnotationId,
-            childId: clickedAnnotation.id,
-            datasetId,
+          if (this.showTimelapseMode) {
+            this.annotationStore.createTimelapseConnection({
+              parentId: this.selectedToolState.selectedAnnotationId,
+              childId: clickedAnnotation.id,
+              datasetId,
+              label: this.selectedToolConfiguration.name,
+              tags: [...parentTemplate.tags, ...childTemplate.tags],
+            });
+          } else {
+            this.annotationStore.createConnection({
+              parentId: this.selectedToolState.selectedAnnotationId,
+              childId: clickedAnnotation.id,
+              datasetId,
+              label: this.selectedToolConfiguration.name,
+              tags: [...parentTemplate.tags, ...childTemplate.tags],
+            });
+          }
+        }
+      } else {
+        // Add all connections between parents and children
+        if (this.showTimelapseMode) {
+          await this.annotationStore.createAllTimelapseConnections({
+            parentIds,
+            childIds,
+            label: this.selectedToolConfiguration.name,
+            tags: [...parentTemplate.tags, ...childTemplate.tags],
+          });
+        } else {
+          await this.annotationStore.createAllConnections({
+            parentIds,
+            childIds,
             label: this.selectedToolConfiguration.name,
             tags: [...parentTemplate.tags, ...childTemplate.tags],
           });
         }
-      } else {
-        // Add all connections between a parent and a child
-        await this.annotationStore.createAllConnections({
-          parentIds,
-          childIds,
-          label: this.selectedToolConfiguration.name,
-          tags: [...parentTemplate.tags, ...childTemplate.tags],
-        });
       }
     } else {
       if (clickAction) {
