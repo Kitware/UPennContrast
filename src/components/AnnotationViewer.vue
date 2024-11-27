@@ -1205,6 +1205,29 @@ export default class AnnotationViewer extends Vue {
       }
     });
 
+    // Find orphaned annotations
+    const orphanAnnotations: ITimelapseAnnotation[] = [];
+    const connectedIds = new Set<string>(
+      Array.from(components).flatMap((set) => Array.from(set)),
+    );
+
+    this.annotationStore.annotations.forEach((annotation: IAnnotation) => {
+      if (
+        !connectedIds.has(annotation.id) &&
+        annotation.location.Time >= currentTime - timelapseModeWindow &&
+        annotation.location.Time <= currentTime + timelapseModeWindow &&
+        (timelapseTags.length === 0 ||
+          annotation.tags.some((tag: string) => timelapseTags.includes(tag)))
+      ) {
+        orphanAnnotations.push({
+          ...(annotation as IAnnotation),
+          trackPositionType: TrackPositionType.ORPHAN,
+        });
+      }
+    });
+
+    console.log("Orphaned annotations:", orphanAnnotations);
+
     this.timelapseLayer.draw();
     this.timelapseTextLayer.draw();
   }
@@ -1322,7 +1345,7 @@ export default class AnnotationViewer extends Vue {
       });
   }
 
-  drawTimelapseAnnotationCentroids(annotations: IAnnotation[]) {
+  drawTimelapseAnnotationCentroids(annotations: ITimelapseAnnotation[]) {
     const currentTime = this.time;
 
     // Create point annotations for each centroid
