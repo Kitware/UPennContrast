@@ -1764,8 +1764,20 @@ export default class AnnotationViewer extends Vue {
     if (!selectAnnotation || !datasetId || !this.selectedToolConfiguration) {
       return;
     }
-    const selectedAnnotations =
-      this.getSelectedAnnotationsFromAnnotation(selectAnnotation);
+
+    let selectedAnnotations: IAnnotation[];
+    if (this.showTimelapseMode) {
+      const selectedGeoJSAnnotations =
+        this.getTimelapseAnnotationsFromAnnotation(selectAnnotation);
+      selectedAnnotations = selectedGeoJSAnnotations
+        .map((a) => this.getAnnotationFromId(a.options().girderId))
+        .filter((a): a is IAnnotation => a !== undefined);
+      console.log("Selected annotations (timelapse):", selectedAnnotations);
+    } else {
+      selectedAnnotations =
+        this.getSelectedAnnotationsFromAnnotation(selectAnnotation);
+      console.log("Selected annotations (non-timelapse):", selectedAnnotations);
+    }
 
     const parentTemplate = this.selectedToolConfiguration.values
       ?.parentAnnotation as IRestrictTagsAndLayer;
