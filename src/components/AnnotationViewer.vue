@@ -1128,6 +1128,41 @@ export default class AnnotationViewer extends Vue {
     return Array.from(components.values());
   }
 
+  // This helper function collects just the annotations that are displayed
+  // but across all time, which is important for timelapse mode.
+  getDisplayedAnnotationIdsAcrossTime(): Set<string> {
+    const totalAnnotationIdsSet: Set<string> = new Set();
+    for (const layer of this.validLayers) {
+      if (layer.visible || this.showAnnotationsFromHiddenLayers) {
+        for (const annotation of this.displayableAnnotations) {
+          if (annotation.channel === layer.channel) {
+            const sliceIndexes = this.store.layerSliceIndexes(layer);
+            if (
+              (this.store.unrollXY ||
+                annotation.location.XY === sliceIndexes?.xyIndex) &&
+              (this.store.unrollZ ||
+                annotation.location.Z === sliceIndexes?.zIndex)
+            ) {
+              totalAnnotationIdsSet.add(annotation.id);
+            }
+          }
+        }
+      }
+    }
+    return totalAnnotationIdsSet;
+  }
+
+  // Another helper function that uses the IDs collected across time
+  // and returns a set of annotations.
+  getDisplayedAnnotationsAcrossTime(): Set<IAnnotation> {
+    const displayedAnnotationIds = this.getDisplayedAnnotationIdsAcrossTime();
+    return new Set(
+      Array.from(displayedAnnotationIds)
+        .map((id) => this.getAnnotationFromId(id))
+        .filter((a): a is IAnnotation => a !== undefined),
+    );
+  }
+
   drawTimelapseConnectionsAndCentroids() {
     // Remove all previous tracks and centroids
     this.timelapseLayer.removeAllAnnotations();
@@ -1145,8 +1180,17 @@ export default class AnnotationViewer extends Vue {
     const currentTime = this.time;
     const timelapseTags = this.store.timelapseTags;
 
+    // First, let's only keep the connections corresponding to annotations
+    // that are being displayed
+    const displayedAnnotationIds = this.getDisplayedAnnotationIdsAcrossTime();
+    const filteredConnections = this.annotationConnections.filter(
+      (conn: IAnnotationConnection) =>
+        displayedAnnotationIds.has(conn.parentId) &&
+        displayedAnnotationIds.has(conn.childId),
+    );
+
     // Get connected components to find each individual track
-    const components = this.findConnectedComponents(this.annotationConnections);
+    const components = this.findConnectedComponents(filteredConnections);
 
     // Draw each component separately
     components.forEach((component) => {
@@ -1163,9 +1207,6 @@ export default class AnnotationViewer extends Vue {
         color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
       }
 
-      // Initialize min and max times to 0; we will update them as we process each component
-      let minTime = Number.MAX_SAFE_INTEGER;
-      let maxTime = 0;
       component.annotations.forEach((id) => {
         const annotation = this.getAnnotationFromId(id);
         if (annotation) {
@@ -1184,9 +1225,6 @@ export default class AnnotationViewer extends Vue {
           trackPositionType: TrackPositionType.INTERIOR,
         };
         if (annotation) {
-          // First, update the min and max times for the component
-          minTime = Math.min(minTime, annotation.location.Time);
-          maxTime = Math.max(maxTime, annotation.location.Time);
           if (
             annotation.location.Time >= currentTime - timelapseModeWindow &&
             annotation.location.Time <= currentTime + timelapseModeWindow
@@ -1235,7 +1273,7 @@ export default class AnnotationViewer extends Vue {
           component.connections,
           color,
         );
-        this.drawTimelapseAnnotationCentroids(componentAnnotations);
+        this.drawTimelapseAnnotationCentroidsAndLabels(componentAnnotations);
       }
     });
 
@@ -1247,7 +1285,9 @@ export default class AnnotationViewer extends Vue {
       ),
     );
 
-    this.annotationStore.annotations.forEach((annotation: IAnnotation) => {
+    const displayedAnnotations = this.getDisplayedAnnotationsAcrossTime();
+
+    displayedAnnotations.forEach((annotation: IAnnotation) => {
       if (
         // If the annotation is not in the connected set, it is orphaned
         // provided it is within the timelapse window and has a tag in the timelapseTags list
@@ -1265,7 +1305,7 @@ export default class AnnotationViewer extends Vue {
     });
 
     if (orphanAnnotations.length > 0) {
-      this.drawTimelapseAnnotationCentroids(orphanAnnotations);
+      this.drawTimelapseAnnotationCentroidsAndLabels(orphanAnnotations);
     }
 
     this.timelapseLayer.draw();
@@ -1339,7 +1379,9 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
-  drawTimelapseAnnotationCentroids(annotations: ITimelapseAnnotation[]) {
+  drawTimelapseAnnotationCentroidsAndLabels(
+    annotations: ITimelapseAnnotation[],
+  ) {
     const currentTime = this.time;
 
     // Create point annotations for each centroid
