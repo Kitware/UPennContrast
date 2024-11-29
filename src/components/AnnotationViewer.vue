@@ -1373,7 +1373,7 @@ export default class AnnotationViewer extends Vue {
         });
 
         if (line) {
-          this.timelapseLayer.addAnnotation(line);
+          this.timelapseLayer.addAnnotation(line, undefined, false);
         }
       }
     }
@@ -1414,7 +1414,7 @@ export default class AnnotationViewer extends Vue {
           girderId: annotation.id,
           isTimelapsePoint: true,
         });
-        this.timelapseLayer.addAnnotation(pointAnnotation);
+        this.timelapseLayer.addAnnotation(pointAnnotation, undefined, false);
       }
     });
 
