@@ -2555,6 +2555,8 @@ export default class AnnotationViewer extends Vue {
 
   mounted() {
     this.bindAnnotationEvents();
+    this.bindTimelapseEvents();
+
     this.updateValueOnHover();
 
     this.filterStore.updateHistograms();
