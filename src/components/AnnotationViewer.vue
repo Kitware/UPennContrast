@@ -117,6 +117,31 @@ function filterAnnotations(
   return output;
 }
 
+// Custom class to ensure type safety for the parent map
+class ParentMap {
+  private map = new Map<string, string>();
+
+  set(key: string, value: string) {
+    this.map.set(key, value);
+  }
+
+  get(key: string): string {
+    const value = this.map.get(key);
+    if (value === undefined) {
+      throw new Error(`Key not found in ParentMap: ${key}`);
+    }
+    return value;
+  }
+
+  has(key: string): boolean {
+    return this.map.has(key);
+  }
+
+  forEach(callback: (value: string, key: string) => void) {
+    this.map.forEach(callback);
+  }
+}
+
 // Draws annotations on the given layer, and provides functionality for the user selected tool.
 @Component({
   components: {
@@ -1075,17 +1100,15 @@ export default class AnnotationViewer extends Vue {
     connections: IAnnotationConnection[],
   ): { annotations: Set<string>; connections: IAnnotationConnection[] }[] {
     // Simple Union-Find implementation
-    const parent = new Map<string, string>();
+    // Use our custom ParentMap instead of Map to ensure type safety
+    const parent = new ParentMap();
 
     // Find with path compression
     function find(x: string): string {
       if (!parent.has(x)) {
         parent.set(x, x);
       }
-      if (parent.get(x) !== x) {
-        parent.set(x, find(parent.get(x)!));
-      }
-      return parent.get(x)!;
+      return parent.get(x) === x ? x : find(parent.get(x));
     }
 
     // Union operation
@@ -1209,30 +1232,34 @@ export default class AnnotationViewer extends Vue {
 
       component.annotations.forEach((id) => {
         const annotation = this.getAnnotationFromId(id);
-        if (annotation) {
-          // If the annotation doesn't have a tag in the timelapseTags list, skip it
-          // If the timelapseTags list is empty, include all annotations
-          if (
-            timelapseTags.length > 0 &&
-            !annotation.tags.some((tag: string) => timelapseTags.includes(tag))
-          ) {
-            return;
-          }
+        if (!annotation) {
+          return;
+        }
+        // If the annotation doesn't have a tag in the timelapseTags list, skip it
+        // If the timelapseTags list is empty, include all annotations
+        if (
+          timelapseTags.length > 0 &&
+          !annotation.tags.some((tag: string) => timelapseTags.includes(tag))
+        ) {
+          return;
         }
         const timelapseAnnotation: ITimelapseAnnotation = {
           // Cast to IAnnotation to access the common properties
           ...(annotation as IAnnotation),
           trackPositionType: TrackPositionType.INTERIOR,
         };
-        if (annotation) {
-          if (
-            annotation.location.Time >= currentTime - timelapseModeWindow &&
-            annotation.location.Time <= currentTime + timelapseModeWindow
-          ) {
-            componentAnnotations.push(timelapseAnnotation);
-          }
+        if (
+          annotation.location.Time >= currentTime - timelapseModeWindow &&
+          annotation.location.Time <= currentTime + timelapseModeWindow
+        ) {
+          componentAnnotations.push(timelapseAnnotation);
         }
       });
+
+      if (componentAnnotations.length === 0) {
+        return;
+      }
+
       // Set the trackPositionType for the start and end annotations
       // We define START as annotations with no connection to an earlier point, and
       // END as annotations with no connection to a later point.
@@ -1267,14 +1294,12 @@ export default class AnnotationViewer extends Vue {
         currentAnnotation.trackPositionType = TrackPositionType.CURRENT;
       }
 
-      if (componentAnnotations.length > 0) {
-        this.drawTimelapseTrack(
-          componentAnnotations,
-          component.connections,
-          color,
-        );
-        this.drawTimelapseAnnotationCentroidsAndLabels(componentAnnotations);
-      }
+      this.drawTimelapseTrack(
+        componentAnnotations,
+        component.connections,
+        color,
+      );
+      this.drawTimelapseAnnotationCentroidsAndLabels(componentAnnotations);
     });
 
     // Find orphaned annotations
