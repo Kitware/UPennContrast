@@ -618,7 +618,7 @@ export class Annotations extends VuexModule {
     const allIds = new Set([...parentIds, ...childIds]);
     const annotations = Array.from(allIds)
       .map((id) => this.annotations.find((a) => a.id === id))
-      .filter((a): a is IAnnotation => a !== undefined);
+      .filter((a): a is IAnnotation => !!a);
 
     // 2. Find closest temporal parent for each annotation
     const connectionBases: IAnnotationConnectionBase[] = [];
