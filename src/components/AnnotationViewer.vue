@@ -1407,6 +1407,10 @@ export default class AnnotationViewer extends Vue {
         AnnotationShape.Point,
         [this.unrolledCentroidCoordinates[annotation.id]],
         {
+          // Add metadata for click and connection handling
+          time: annotation.location.Time,
+          girderId: annotation.id,
+          isTimelapsePoint: true,
           style: {
             scaled: 1, // Fixed size in image coordinates
             fill: true,
@@ -1425,12 +1429,6 @@ export default class AnnotationViewer extends Vue {
       );
 
       if (pointAnnotation) {
-        // Add metadata for click and connection handling
-        pointAnnotation.options({
-          time: annotation.location.Time,
-          girderId: annotation.id,
-          isTimelapsePoint: true,
-        });
         this.timelapseLayer.addAnnotation(pointAnnotation, undefined, false);
       }
     });
