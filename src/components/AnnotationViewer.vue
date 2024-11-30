@@ -1263,35 +1263,27 @@ export default class AnnotationViewer extends Vue {
       // Set the trackPositionType for the start and end annotations
       // We define START as annotations with no connection to an earlier point, and
       // END as annotations with no connection to a later point.
-      const startAnnotations = componentAnnotations.filter((annotation) => {
-        // Check if there are no connections where this annotation is a child
-        return !component.connections.some(
+      for (const annotation of componentAnnotations) {
+        // Check if it's a start annotation (no incoming connections)
+        const isStart = !component.connections.some(
           (conn) =>
             conn.childId === annotation.id && conn.parentId !== annotation.id,
         );
-      });
 
-      const endAnnotations = componentAnnotations.filter((annotation) => {
-        // Check if there are no connections where this annotation is a parent
-        return !component.connections.some(
+        // Check if it's an end annotation (no outgoing connections)
+        const isEnd = !component.connections.some(
           (conn) =>
             conn.parentId === annotation.id && conn.childId !== annotation.id,
         );
-      });
 
-      for (const startAnnotation of startAnnotations) {
-        startAnnotation.trackPositionType = TrackPositionType.START;
-      }
-
-      for (const endAnnotation of endAnnotations) {
-        endAnnotation.trackPositionType = TrackPositionType.END;
-      }
-      // Do CURRENT last to override START and END if they exist
-      const currentAnnotations = componentAnnotations.filter(
-        (a) => a.location.Time === currentTime,
-      );
-      for (const currentAnnotation of currentAnnotations) {
-        currentAnnotation.trackPositionType = TrackPositionType.CURRENT;
+        // Set position type, with CURRENT taking precedence
+        if (annotation.location.Time === currentTime) {
+          annotation.trackPositionType = TrackPositionType.CURRENT;
+        } else if (isStart) {
+          annotation.trackPositionType = TrackPositionType.START;
+        } else if (isEnd) {
+          annotation.trackPositionType = TrackPositionType.END;
+        }
       }
 
       this.drawTimelapseTrack(
