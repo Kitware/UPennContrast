@@ -71,6 +71,13 @@
           style="max-width: 300px"
         />
       </v-layout>
+      <v-layout v-if="timelapseMode">
+        <v-checkbox
+          class="ml-3 my-checkbox"
+          v-model="showTimelapseLabels"
+          label="Show labels"
+        />
+      </v-layout>
     </div>
     <toolset></toolset>
     <v-radio-group
@@ -233,6 +240,14 @@ export default class ViewerToolbar extends Vue {
 
   set timelapseTags(value: string[]) {
     this.store.setTimelapseTags(value);
+  }
+
+  get showTimelapseLabels() {
+    return this.store.showTimelapseLabels;
+  }
+
+  set showTimelapseLabels(value: boolean) {
+    this.store.setShowTimelapseLabels(value);
   }
 
   set layerMode(value: TLayerMode) {

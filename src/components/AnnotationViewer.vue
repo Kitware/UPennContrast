@@ -614,6 +614,10 @@ export default class AnnotationViewer extends Vue {
     return this.store.timelapseModeWindow;
   }
 
+  get showTimelapseLabels(): boolean {
+    return this.store.showTimelapseLabels;
+  }
+
   get filteredAnnotationTooltips(): boolean {
     return this.store.filteredAnnotationTooltips;
   }
@@ -1434,12 +1438,14 @@ export default class AnnotationViewer extends Vue {
     });
 
     // Add time labels for the different categories of points
-    const textPoints: IGeoJSPosition[] = [];
-    const textLabels: string[] = [];
-    const textStyles: { fontSize?: string }[] = []; // Add array for individual text styles
-    const textColors: string[] = [];
+    // Only draw labels if showTimelapseLabels is true
+    if (this.showTimelapseLabels) {
+      // Add time labels for the different categories of points
+      const textPoints: IGeoJSPosition[] = [];
+      const textLabels: string[] = [];
+      const textStyles: { fontSize?: string }[] = [];
+      const textColors: string[] = [];
 
-    if (annotations.length > 0) {
       // Orphan annotations
       const orphanAnnotations = annotations.filter(
         (a) => a.trackPositionType === TrackPositionType.ORPHAN,
@@ -1491,25 +1497,25 @@ export default class AnnotationViewer extends Vue {
         textStyles.push({ fontSize: "16px" }); // larger font for current time
         textColors.push("white");
       }
-    }
 
-    // Draw text labels
-    this.timelapseTextLayer
-      .createFeature("text")
-      .data(textPoints)
-      .position((d: IGeoJSPosition) => d)
-      .style({
-        text: (_: IGeoJSPosition, i: number) => textLabels[i],
-        fontSize: (_: IGeoJSPosition, i: number) =>
-          textStyles[i].fontSize || "12px",
-        fontFamily: "sans-serif",
-        textAlign: "center",
-        textBaseline: "bottom",
-        color: (_: IGeoJSPosition, i: number) => textColors[i],
-        textStrokeColor: "black",
-        textStrokeWidth: 2,
-        offset: { x: 0, y: -10 }, // Offset text above the points
-      });
+      // Draw text labels
+      this.timelapseTextLayer
+        .createFeature("text")
+        .data(textPoints)
+        .position((d: IGeoJSPosition) => d)
+        .style({
+          text: (_: IGeoJSPosition, i: number) => textLabels[i],
+          fontSize: (_: IGeoJSPosition, i: number) =>
+            textStyles[i].fontSize || "12px",
+          fontFamily: "sans-serif",
+          textAlign: "center",
+          textBaseline: "bottom",
+          color: (_: IGeoJSPosition, i: number) => textColors[i],
+          textStrokeColor: "black",
+          textStrokeWidth: 2,
+          offset: { x: 0, y: -10 }, // Offset text above the points
+        });
+    }
   }
 
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
@@ -2389,6 +2395,7 @@ export default class AnnotationViewer extends Vue {
   @Watch("showTimelapseMode")
   @Watch("timelapseModeWindow")
   @Watch("timelapseTags")
+  @Watch("showTimelapseLabels")
   onTimelapseModeChanged() {
     this.drawTimelapseConnectionsAndCentroids();
   }

@@ -175,6 +175,8 @@ export class Main extends VuexModule {
   showTimelapseMode: boolean = false;
   timelapseModeWindow: number = 10;
   timelapseTags: string[] = [];
+  showTimelapseLabels: boolean = true;
+
   maps: IMapEntry[] = [];
 
   isAnnotationPanelOpen: boolean = false;
@@ -313,6 +315,11 @@ export class Main extends VuexModule {
   @Mutation
   public setTimelapseTags(value: string[]) {
     this.timelapseTags = value;
+  }
+
+  @Mutation
+  public setShowTimelapseLabels(value: boolean) {
+    this.showTimelapseLabels = value;
   }
 
   @Mutation
