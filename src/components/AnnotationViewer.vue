@@ -1929,7 +1929,7 @@ export default class AnnotationViewer extends Vue {
               childId: clickedAnnotation.id,
               datasetId,
               label: this.selectedToolConfiguration.name,
-              tags: [...parentTemplate.tags, ...childTemplate.tags],
+              tags: ["Time lapse connection"],
             });
           } else {
             this.annotationStore.createConnection({
@@ -1948,7 +1948,7 @@ export default class AnnotationViewer extends Vue {
             parentIds,
             childIds,
             label: this.selectedToolConfiguration.name,
-            tags: [...parentTemplate.tags, ...childTemplate.tags],
+            tags: ["Time lapse connection"],
           });
         } else {
           await this.annotationStore.createAllConnections({

@@ -511,6 +511,14 @@ export class Annotations extends VuexModule {
   }
 
   @Action
+  public async deleteAllTimelapseConnections() {
+    const connectionsToDelete = this.annotationConnections.filter(
+      (connection) => connection.tags.includes("Time lapse connection"),
+    );
+    await this.deleteConnections(connectionsToDelete.map(({ id }) => id));
+  }
+
+  @Action
   public async createConnection(
     annotationConnectionBase: IAnnotationConnectionBase,
   ): Promise<IAnnotationConnection | null> {
