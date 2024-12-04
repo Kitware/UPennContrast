@@ -171,3 +171,7 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
 
 [github-actions-image]: https://github.com/Kitware/UPennContrast/workflows/node/badge.svg
 [github-actions-url]: https://github.com/Kitware/UPennContrast/actions
+
+## Credits
+
+NimbusImage has been developed by the [lab of Arjun Raj at the University of Pennsylvania](https://rajlab.seas.upenn.edu/) and [Kitware](https://www.kitware.com). NimbusImage relies on [Girder](https://girder.readthedocs.io/en/latest/), an open-source content management system developed by Kitware, and its [large_image plugin](https://girder.github.io/large_image/), which enables Girder to read, process, and serve image datasets at scale.
