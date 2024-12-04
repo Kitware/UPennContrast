@@ -12,7 +12,7 @@ See this [gitbook](https://arjun-raj-lab.gitbook.io/nimbusimage) for documentati
 
 You can run the server yourself on most reasonably new computers (Mac, Linux, PC). The GPU workers (e.g. Cellpose, Piscis) only work on Linux and possibly Windows, but will fall back to CPU if no GPU is (properly) installed.
 
-Tye typical install time is probably around 1-2 hours.
+The typical install time is probably around 1-2 hours.
 
 Software requirements:
 Docker (latest version) (be sure to follow the post install instructions for Linux, and 
