@@ -51,6 +51,11 @@ export default class Viewer extends Vue {
   datasetChanged() {
     this.annotationStore.fetchAnnotations();
     this.propertyStore.fetchPropertyValues();
+
+    // Disable timelapse mode if dataset doesn't support it
+    if (this.dataset && this.dataset.time.length <= 1) {
+      this.store.setShowTimelapseMode(false);
+    }
   }
 
   @Watch("configuration")
