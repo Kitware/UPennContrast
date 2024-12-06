@@ -215,6 +215,9 @@ export default class AnnotationViewer extends Vue {
   readonly timelapseTextLayer!: IGeoJSFeatureLayer;
 
   @Prop()
+  readonly interactionLayer!: IGeoJSAnnotationLayer;
+
+  @Prop()
   readonly unrollH!: number;
 
   @Prop()
@@ -455,7 +458,7 @@ export default class AnnotationViewer extends Vue {
 
   previewMouseState(mouseState: IMouseState | null) {
     if (this.selectionAnnotation) {
-      this.annotationLayer.removeAnnotation(this.selectionAnnotation);
+      this.interactionLayer.removeAnnotation(this.selectionAnnotation);
     }
 
     const baseStyle = {
@@ -497,13 +500,13 @@ export default class AnnotationViewer extends Vue {
 
     if (this.selectionAnnotation) {
       this.selectionAnnotation.options("specialAnnotation", true);
-      this.annotationLayer.addAnnotation(this.selectionAnnotation);
+      this.interactionLayer.addAnnotation(this.selectionAnnotation);
     }
   }
 
   consumeMouseState(mouseState: IMouseState) {
     if (this.selectionAnnotation) {
-      this.annotationLayer.removeAnnotation(this.selectionAnnotation);
+      this.interactionLayer.removeAnnotation(this.selectionAnnotation);
       this.selectionAnnotation = null;
     }
     const mousePath = mouseState.path;

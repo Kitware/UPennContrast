@@ -1306,6 +1306,7 @@ export interface IMapEntry {
   textLayer: IGeoJSFeatureLayer;
   timelapseLayer: IGeoJSAnnotationLayer;
   timelapseTextLayer: IGeoJSFeatureLayer;
+  interactionLayer: IGeoJSAnnotationLayer;
   uiLayer?: IGeoJSUiLayer;
   lowestLayer?: number;
 }
