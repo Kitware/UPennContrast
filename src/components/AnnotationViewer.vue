@@ -47,6 +47,7 @@ import {
   AnnotationSelectionTypes,
   AnnotationShape,
   IAnnotation,
+  ITimelapseAnnotation,
   IAnnotationConnection,
   IAnnotationLocation,
   IDisplayLayer,
@@ -71,6 +72,7 @@ import {
   TToolState,
   ConnectionToolStateSymbol,
   IGeoJSMouseState,
+  TrackPositionType,
 } from "../store/model";
 
 import { logError, logWarning } from "@/utils/log";
@@ -115,7 +117,32 @@ function filterAnnotations(
   return output;
 }
 
-// Draws annotations on the given layer, and provides functionnality for the user selected tool.
+// Custom class to ensure type safety for the parent map
+class ParentMap {
+  private map = new Map<string, string>();
+
+  set(key: string, value: string) {
+    this.map.set(key, value);
+  }
+
+  get(key: string): string {
+    const value = this.map.get(key);
+    if (value === undefined) {
+      throw new Error(`Key not found in ParentMap: ${key}`);
+    }
+    return value;
+  }
+
+  has(key: string): boolean {
+    return this.map.has(key);
+  }
+
+  forEach(callback: (value: string, key: string) => void) {
+    this.map.forEach(callback);
+  }
+}
+
+// Draws annotations on the given layer, and provides functionality for the user selected tool.
 @Component({
   components: {
     ColorPickerMenu,
@@ -180,6 +207,12 @@ export default class AnnotationViewer extends Vue {
 
   @Prop()
   readonly workerPreviewFeature!: IGeoJSFeature;
+
+  @Prop()
+  readonly timelapseLayer!: IGeoJSAnnotationLayer;
+
+  @Prop()
+  readonly timelapseTextLayer!: IGeoJSFeatureLayer;
 
   @Prop()
   readonly unrollH!: number;
@@ -573,6 +606,18 @@ export default class AnnotationViewer extends Vue {
     return this.store.showTooltips;
   }
 
+  get showTimelapseMode(): boolean {
+    return this.store.showTimelapseMode;
+  }
+
+  get timelapseModeWindow(): number {
+    return this.store.timelapseModeWindow;
+  }
+
+  get showTimelapseLabels(): boolean {
+    return this.store.showTimelapseLabels;
+  }
+
   get filteredAnnotationTooltips(): boolean {
     return this.store.filteredAnnotationTooltips;
   }
@@ -663,6 +708,11 @@ export default class AnnotationViewer extends Vue {
   drawAnnotationsAndTooltips() {
     this.drawAnnotations();
     this.drawTooltips();
+    if (this.showTimelapseMode) {
+      // AR: The call to drawTimelapseConnectionsAndCentroids should be fine here, but if in testing we see
+      // that it is missing some updates, it may be that we need to call it elsewhere as well.
+      this.drawTimelapseConnectionsAndCentroids();
+    }
   }
 
   drawAnnotations = throttle(this.drawAnnotationsNoThrottle, THROTTLE).bind(
@@ -704,6 +754,8 @@ export default class AnnotationViewer extends Vue {
 
   drawTooltips = throttle(this.drawTooltipsNoThrottle, THROTTLE).bind(this);
   drawTooltipsNoThrottle() {
+    // TODO: AR: I should be able to replace the below with the single call to features([]) below. However, when I do so, it doesn't seem to get rid of the text features. Hmm...
+    // this.timelapseTextLayer.features([]);
     this.textLayer.features().forEach((feature: IGeoJSFeature) => {
       this.textLayer.deleteFeature(feature);
     });
@@ -1047,6 +1099,425 @@ export default class AnnotationViewer extends Vue {
     });
   }
 
+  // Helper function to find connected components using Union-Find
+  private findConnectedComponents(
+    connections: IAnnotationConnection[],
+  ): { annotations: Set<string>; connections: IAnnotationConnection[] }[] {
+    // Simple Union-Find implementation
+    // Use our custom ParentMap instead of Map to ensure type safety
+    const parent = new ParentMap();
+
+    // Find with path compression
+    function find(x: string): string {
+      if (!parent.has(x)) {
+        parent.set(x, x);
+      }
+      return parent.get(x) === x ? x : find(parent.get(x));
+    }
+
+    // Union operation
+    function union(x: string, y: string): void {
+      parent.set(find(x), find(y));
+    }
+
+    // Process all connections
+    connections.forEach((conn) => {
+      union(conn.parentId, conn.childId);
+    });
+
+    // Group annotations and their connections by root
+    const components = new Map<
+      string,
+      {
+        annotations: Set<string>;
+        connections: IAnnotationConnection[];
+      }
+    >();
+
+    // Initialize components with annotations
+    parent.forEach((_, node) => {
+      const root = find(node);
+      if (!components.has(root)) {
+        components.set(root, {
+          annotations: new Set(),
+          connections: [],
+        });
+      }
+      components.get(root)!.annotations.add(node);
+    });
+
+    // Add connections to their respective components
+    connections.forEach((conn) => {
+      const root = find(conn.parentId); // Could use either parent or child
+      components.get(root)!.connections.push(conn);
+    });
+
+    return Array.from(components.values());
+  }
+
+  // This helper function collects just the annotations that are displayed
+  // but across all time, which is important for timelapse mode.
+  getDisplayedAnnotationIdsAcrossTime(): Set<string> {
+    const totalAnnotationIdsSet: Set<string> = new Set();
+    for (const layer of this.validLayers) {
+      if (layer.visible || this.showAnnotationsFromHiddenLayers) {
+        for (const annotation of this.displayableAnnotations) {
+          if (annotation.channel === layer.channel) {
+            const sliceIndexes = this.store.layerSliceIndexes(layer);
+            if (
+              (this.store.unrollXY ||
+                annotation.location.XY === sliceIndexes?.xyIndex) &&
+              (this.store.unrollZ ||
+                annotation.location.Z === sliceIndexes?.zIndex)
+            ) {
+              totalAnnotationIdsSet.add(annotation.id);
+            }
+          }
+        }
+      }
+    }
+    return totalAnnotationIdsSet;
+  }
+
+  // Another helper function that uses the IDs collected across time
+  // and returns a set of annotations.
+  getDisplayedAnnotationsAcrossTime(): Set<IAnnotation> {
+    const displayedAnnotationIds = this.getDisplayedAnnotationIdsAcrossTime();
+    return new Set(
+      Array.from(displayedAnnotationIds)
+        .map((id) => this.getAnnotationFromId(id))
+        .filter((a): a is IAnnotation => a !== undefined),
+    );
+  }
+
+  drawTimelapseConnectionsAndCentroids() {
+    // Remove all previous tracks and centroids
+    this.timelapseLayer.removeAllAnnotations();
+    this.timelapseTextLayer.features([]);
+
+    if (!this.showTimelapseMode) {
+      // Redraw to ensure we clear the layers. I found that this was necessary for the timelapseTextLayer to clear.
+      this.timelapseLayer.draw();
+      this.timelapseTextLayer.draw();
+      return;
+    }
+
+    // Only render tracks and annotations within this time window
+    const timelapseModeWindow = this.timelapseModeWindow;
+    const currentTime = this.time;
+    const timelapseTags = this.store.timelapseTags;
+
+    // First, let's only keep the connections corresponding to annotations
+    // that are being displayed
+    const displayedAnnotationIds = this.getDisplayedAnnotationIdsAcrossTime();
+    const filteredConnections = this.annotationConnections.filter(
+      (conn: IAnnotationConnection) =>
+        displayedAnnotationIds.has(conn.parentId) &&
+        displayedAnnotationIds.has(conn.childId),
+    );
+
+    // Get connected components to find each individual track
+    const components = this.findConnectedComponents(filteredConnections);
+
+    // Draw each component separately
+    components.forEach((component) => {
+      const componentAnnotations: ITimelapseAnnotation[] = [];
+      let color: string = "#FFFFFF";
+      if (component.annotations.size > 0) {
+        // Use the first GeoJSAnnotation ID to generate a color that is unique for the component irrespective
+        // of the timelapse window.
+        const hash = Array.from(component.annotations)[0]
+          .split("")
+          .reduce((acc, char) => {
+            return char.charCodeAt(0) + ((acc << 5) - acc);
+          }, 0);
+        color = `#${Math.abs(hash).toString(16).slice(0, 6).padEnd(6, "0")}`;
+      }
+
+      component.annotations.forEach((id) => {
+        const annotation = this.getAnnotationFromId(id);
+        if (!annotation) {
+          return;
+        }
+        // If the annotation doesn't have a tag in the timelapseTags list, skip it
+        // If the timelapseTags list is empty, include all annotations
+        if (
+          timelapseTags.length > 0 &&
+          !annotation.tags.some((tag: string) => timelapseTags.includes(tag))
+        ) {
+          return;
+        }
+        const timelapseAnnotation: ITimelapseAnnotation = {
+          // Cast to IAnnotation to access the common properties
+          ...(annotation as IAnnotation),
+          trackPositionType: TrackPositionType.INTERIOR,
+        };
+        if (
+          annotation.location.Time >= currentTime - timelapseModeWindow &&
+          annotation.location.Time <= currentTime + timelapseModeWindow
+        ) {
+          componentAnnotations.push(timelapseAnnotation);
+        }
+      });
+
+      if (componentAnnotations.length === 0) {
+        return;
+      }
+
+      // Set the trackPositionType for the start and end annotations
+      // We define START as annotations with no connection to an earlier point, and
+      // END as annotations with no connection to a later point.
+      for (const annotation of componentAnnotations) {
+        // Check if it's a start annotation (no incoming connections)
+        const isStart = !component.connections.some(
+          (conn) =>
+            conn.childId === annotation.id && conn.parentId !== annotation.id,
+        );
+
+        // Check if it's an end annotation (no outgoing connections)
+        const isEnd = !component.connections.some(
+          (conn) =>
+            conn.parentId === annotation.id && conn.childId !== annotation.id,
+        );
+
+        // Set position type, with CURRENT taking precedence
+        if (annotation.location.Time === currentTime) {
+          annotation.trackPositionType = TrackPositionType.CURRENT;
+        } else if (isStart) {
+          annotation.trackPositionType = TrackPositionType.START;
+        } else if (isEnd) {
+          annotation.trackPositionType = TrackPositionType.END;
+        }
+      }
+
+      this.drawTimelapseTrack(
+        componentAnnotations,
+        component.connections,
+        color,
+      );
+      this.drawTimelapseAnnotationCentroidsAndLabels(componentAnnotations);
+    });
+
+    // Find orphaned annotations
+    const orphanAnnotations: ITimelapseAnnotation[] = [];
+    const connectedIds = new Set<string>(
+      Array.from(components).flatMap((component) =>
+        Array.from(component.annotations),
+      ),
+    );
+
+    const displayedAnnotations = this.getDisplayedAnnotationsAcrossTime();
+
+    displayedAnnotations.forEach((annotation: IAnnotation) => {
+      if (
+        // If the annotation is not in the connected set, it is orphaned
+        // provided it is within the timelapse window and has a tag in the timelapseTags list
+        !connectedIds.has(annotation.id) &&
+        annotation.location.Time >= currentTime - timelapseModeWindow &&
+        annotation.location.Time <= currentTime + timelapseModeWindow &&
+        (timelapseTags.length === 0 ||
+          annotation.tags.some((tag: string) => timelapseTags.includes(tag)))
+      ) {
+        orphanAnnotations.push({
+          ...(annotation as IAnnotation),
+          trackPositionType: TrackPositionType.ORPHAN,
+        });
+      }
+    });
+
+    if (orphanAnnotations.length > 0) {
+      this.drawTimelapseAnnotationCentroidsAndLabels(orphanAnnotations);
+    }
+
+    this.timelapseLayer.draw();
+    this.timelapseTextLayer.draw();
+  }
+
+  drawTimelapseTrack(
+    annotations: ITimelapseAnnotation[],
+    connections: IAnnotationConnection[],
+    color?: string,
+  ) {
+    // Sort annotations by time, latest first
+    annotations.sort((a, b) => b.location.Time - a.location.Time);
+
+    const currentTime = this.time;
+    const drawnLines = new Set<string>(); // To avoid drawing duplicate lines
+
+    // For each annotation, draw lines to its connected annotations in previous frames
+    for (const annotation of annotations) {
+      // Find all connections where this annotation is either parent or child
+      const relevantConnections = connections.filter(
+        (conn) =>
+          conn.parentId === annotation.id || conn.childId === annotation.id,
+      );
+
+      for (const connection of relevantConnections) {
+        // Get the ID of the other annotation in the connection
+        const otherId =
+          connection.parentId === annotation.id
+            ? connection.childId
+            : connection.parentId;
+
+        const otherAnnotation = annotations.find((a) => a.id === otherId);
+        if (
+          !otherAnnotation ||
+          otherAnnotation.location.Time >= annotation.location.Time
+        ) {
+          continue; // Skip if connecting to future frames
+        }
+
+        // Create unique line ID to avoid duplicates
+        const lineId = [annotation.id, otherId].sort().join("-");
+        if (drawnLines.has(lineId)) continue;
+        drawnLines.add(lineId);
+
+        const points = [
+          this.unrolledCentroidCoordinates[annotation.id],
+          this.unrolledCentroidCoordinates[otherId],
+        ];
+
+        // Calculate time difference
+        const timeDiff =
+          annotation.location.Time - otherAnnotation.location.Time;
+        const isTimeJump = timeDiff > 1;
+
+        // Determine if line is before or after current time
+        const isBeforeCurrent = annotation.location.Time <= currentTime;
+        const line = geojsAnnotationFactory(AnnotationShape.Line, points, {
+          style: {
+            strokeColor: isTimeJump ? "#ff6b6b" : color, // Use a warning color for time jumps
+            strokeWidth: isBeforeCurrent ? 3 : 6,
+            strokeOpacity: isTimeJump ? 0.7 : 1, // Slightly more transparent for time jumps
+            lineDash: isTimeJump ? [5, 5] : undefined, // Add dashed style for time jumps
+          },
+        });
+
+        if (line) {
+          this.timelapseLayer.addAnnotation(line, undefined, false);
+        }
+      }
+    }
+  }
+
+  drawTimelapseAnnotationCentroidsAndLabels(
+    annotations: ITimelapseAnnotation[],
+  ) {
+    const currentTime = this.time;
+
+    // Create point annotations for each centroid
+    annotations.forEach((annotation) => {
+      const pointAnnotation = geojsAnnotationFactory(
+        AnnotationShape.Point,
+        [this.unrolledCentroidCoordinates[annotation.id]],
+        {
+          // Add metadata for click and connection handling
+          time: annotation.location.Time,
+          girderId: annotation.id,
+          isTimelapsePoint: true,
+          style: {
+            scaled: 1, // Fixed size in image coordinates
+            fill: true,
+            fillColor:
+              annotation.trackPositionType === TrackPositionType.ORPHAN
+                ? "gray"
+                : "white",
+            fillOpacity: annotation.location.Time < currentTime ? 0.5 : 1,
+            stroke: true,
+            strokeColor: "black",
+            strokeWidth: 1,
+            strokeOpacity: annotation.location.Time < currentTime ? 0.5 : 1,
+            radius: annotation.location.Time === currentTime ? 0.16 : 0.09,
+          },
+        },
+      );
+
+      if (pointAnnotation) {
+        this.timelapseLayer.addAnnotation(pointAnnotation, undefined, false);
+      }
+    });
+
+    // Add time labels for the different categories of points
+    // Only draw labels if showTimelapseLabels is true
+    if (this.showTimelapseLabels) {
+      // Add time labels for the different categories of points
+      const textPoints: IGeoJSPosition[] = [];
+      const textLabels: string[] = [];
+      const textStyles: { fontSize?: string }[] = [];
+      const textColors: string[] = [];
+
+      // Orphan annotations
+      const orphanAnnotations = annotations.filter(
+        (a) => a.trackPositionType === TrackPositionType.ORPHAN,
+      );
+      for (const orphanAnnotation of orphanAnnotations) {
+        textPoints.push(this.unrolledCentroidCoordinates[orphanAnnotation.id]);
+        textLabels.push(`t=${orphanAnnotation.location.Time + 1}`);
+        textStyles.push({}); // default style
+        textColors.push("gray");
+      }
+
+      // Start point
+      // For all annotations whose .trackPositionType is START, draw a text label
+      const startAnnotations = annotations.filter(
+        (a) => a.trackPositionType === TrackPositionType.START,
+      );
+      for (const startAnnotation of startAnnotations) {
+        if (startAnnotation.location.Time !== currentTime) {
+          textPoints.push(this.unrolledCentroidCoordinates[startAnnotation.id]);
+          textLabels.push(`T=${startAnnotation.location.Time + 1}`);
+          textStyles.push({}); // default style
+          textColors.push("white");
+        }
+      }
+
+      // End point
+      // For all annotations whose .trackPositionType is END, draw a text label
+      const endAnnotations = annotations.filter(
+        (a) => a.trackPositionType === TrackPositionType.END,
+      );
+      for (const endAnnotation of endAnnotations) {
+        if (endAnnotation.location.Time !== currentTime) {
+          textPoints.push(this.unrolledCentroidCoordinates[endAnnotation.id]);
+          textLabels.push(`T=${endAnnotation.location.Time + 1}`);
+          textStyles.push({}); // default style
+          textColors.push("white");
+        }
+      }
+
+      // Current time point (if it exists in the sequence)
+      // Adding this last so that it is drawn on top of the other points
+      // This could be improved by ensuring it draws on top of ALL tracks, not just the current one
+      const currentAnnotations = annotations.filter(
+        (a) => a.trackPositionType === TrackPositionType.CURRENT,
+      );
+      for (const currentAnnotation of currentAnnotations) {
+        textPoints.push(this.unrolledCentroidCoordinates[currentAnnotation.id]);
+        textLabels.push(`Curr T=${currentTime + 1}`);
+        textStyles.push({ fontSize: "16px" }); // larger font for current time
+        textColors.push("white");
+      }
+
+      // Draw text labels
+      this.timelapseTextLayer
+        .createFeature("text")
+        .data(textPoints)
+        .position((d: IGeoJSPosition) => d)
+        .style({
+          text: (_: IGeoJSPosition, i: number) => textLabels[i],
+          fontSize: (_: IGeoJSPosition, i: number) =>
+            textStyles[i].fontSize || "12px",
+          fontFamily: "sans-serif",
+          textAlign: "center",
+          textBaseline: "bottom",
+          color: (_: IGeoJSPosition, i: number) => textColors[i],
+          textStrokeColor: "black",
+          textStrokeWidth: 2,
+          offset: { x: 0, y: -10 }, // Offset text above the points
+        });
+    }
+  }
+
   createGeoJSAnnotation(annotation: IAnnotation, layerId?: string) {
     if (!this.store.dataset || !this.store.dataset.anyImage()) {
       return null;
@@ -1144,6 +1615,46 @@ export default class AnnotationViewer extends Vue {
     this.annotationLayer.draw();
   }
 
+  private pointNearPoint(
+    selectionPosition: IGeoJSPosition,
+    annotationPosition: IGeoJSPosition,
+    radius: number,
+    strokeWidth: number,
+    unitsPerPixel: number,
+  ): boolean {
+    const annotationRadius =
+      ((radius as number) + (strokeWidth as number)) * unitsPerPixel;
+    return (
+      pointDistance(selectionPosition, annotationPosition) < annotationRadius
+    );
+  }
+
+  private pointNearLine(
+    selectionPosition: IGeoJSPosition,
+    linePoints: IGeoJSPosition[],
+    strokeWidth: number,
+    unitsPerPixel: number,
+  ): boolean {
+    const width = (strokeWidth as number) * unitsPerPixel;
+    return linePoints.reduce(
+      (isIn: boolean, point: IGeoJSPosition, index: number) => {
+        if (index === linePoints.length - 1) {
+          // Specific case for the last point that does not have a next point
+          return isIn || pointDistance(point, selectionPosition) < width;
+        }
+        return (
+          isIn ||
+          geojs.util.distance2dToLineSquared(
+            selectionPosition,
+            point,
+            linePoints[index + 1],
+          ) < width
+        );
+      },
+      false,
+    );
+  }
+
   private shouldSelectAnnotation(
     selectionAnnotationType: AnnotationShape,
     selectionAnnotationCoordinates: IGeoJSPosition[],
@@ -1168,33 +1679,20 @@ export default class AnnotationViewer extends Vue {
       const { radius, strokeWidth } = annotationStyle;
 
       if (annotation.shape === AnnotationShape.Point) {
-        const annotationRadius =
-          ((radius as number) + (strokeWidth as number)) * unitsPerPixel;
-        const annotationPosition = annotationCoordinates[0];
-        return (
-          pointDistance(selectionPosition, annotationPosition) <
-          annotationRadius
+        return this.pointNearPoint(
+          selectionPosition,
+          annotationCoordinates[0],
+          radius as number,
+          strokeWidth as number,
+          unitsPerPixel,
         );
       } else if (annotation.shape === AnnotationShape.Line) {
         // Check if click on points of the line, or on the line directly
-        const width = (strokeWidth as number) * unitsPerPixel;
-        return annotationCoordinates.reduce(
-          (isIn: boolean, point: IGeoJSPosition, index: number) => {
-            let isPointInLine = false;
-            if (index === annotationCoordinates.length - 1) {
-              // Specific case for the last point that does not have a next point
-              isPointInLine = pointDistance(point, selectionPosition) < width;
-            } else {
-              isPointInLine =
-                geojs.util.distance2dToLineSquared(
-                  selectionPosition,
-                  point,
-                  annotationCoordinates[index + 1],
-                ) < width;
-            }
-            return isIn || isPointInLine;
-          },
-          false,
+        return this.pointNearLine(
+          selectionPosition,
+          annotationCoordinates,
+          strokeWidth as number,
+          unitsPerPixel,
         );
       } else {
         return geojs.util.pointInPolygon(
@@ -1261,6 +1759,95 @@ export default class AnnotationViewer extends Vue {
     return selectedAnnotations;
   }
 
+  private shouldSelectGeoJSAnnotation(
+    selectionAnnotationType: AnnotationShape,
+    selectionAnnotationCoordinates: IGeoJSPosition[],
+    geoJSAnnotation: IGeoJSAnnotation,
+    unitsPerPixel: number,
+    radius?: number, // Optional radius to use instead of the ones derives from the annotation style
+  ) {
+    const annotationCoordinates = geoJSAnnotation.coordinates();
+    const annotationStyle = geoJSAnnotation.style();
+
+    if (selectionAnnotationType === AnnotationShape.Point) {
+      const selectionPosition = selectionAnnotationCoordinates[0];
+      if (!radius) {
+        radius = annotationStyle.radius;
+      }
+      const strokeWidth = annotationStyle.strokeWidth;
+
+      if (geoJSAnnotation.type() === AnnotationShape.Point) {
+        return this.pointNearPoint(
+          selectionPosition,
+          annotationCoordinates[0],
+          radius as number,
+          strokeWidth as number,
+          unitsPerPixel,
+        );
+      } else if (geoJSAnnotation.type() === AnnotationShape.Line) {
+        return this.pointNearLine(
+          selectionPosition,
+          annotationCoordinates,
+          strokeWidth as number,
+          unitsPerPixel,
+        );
+      } else {
+        return geojs.util.pointInPolygon(
+          selectionPosition,
+          annotationCoordinates,
+        );
+      }
+    } else {
+      return annotationCoordinates.some((point: IGeoJSPosition) => {
+        return geojs.util.pointInPolygon(point, selectionAnnotationCoordinates);
+      });
+    }
+  }
+
+  private getTimelapseAnnotationsFromAnnotation(
+    selectAnnotation: IGeoJSAnnotation,
+  ) {
+    const coordinates = selectAnnotation.coordinates();
+    const type = selectAnnotation.type();
+
+    // Get general information from the map.
+    // When working with pointAnnotation, unitsPerPixels is necessary to
+    // compute the right value of the radius.
+    const unitsPerPixel = this.getMapUnitsPerPixel();
+
+    // Get selected annotations from the timelapse layer
+    const selectedAnnotations: IGeoJSAnnotation[] = this.timelapseLayer
+      .annotations()
+      .reduce(
+        (
+          selectedAnnotations: IGeoJSAnnotation[],
+          geoJSAnnotation: IGeoJSAnnotation,
+        ) => {
+          // Skip if it's not a timelapse point. Could also skip if already selected, but not implemented yet.
+          const { isTimelapsePoint } = geoJSAnnotation.options();
+          if (!isTimelapsePoint) {
+            return selectedAnnotations;
+          }
+
+          if (
+            !this.shouldSelectGeoJSAnnotation(
+              type,
+              coordinates,
+              geoJSAnnotation,
+              unitsPerPixel,
+              5, // Radius for selection to allow for clicking on small points.
+            )
+          ) {
+            return selectedAnnotations;
+          }
+
+          return [...selectedAnnotations, geoJSAnnotation];
+        },
+        [],
+      );
+    return selectedAnnotations;
+  }
+
   private selectAnnotations(selectAnnotation: IGeoJSAnnotation) {
     if (!selectAnnotation) {
       return;
@@ -1291,8 +1878,22 @@ export default class AnnotationViewer extends Vue {
     if (!selectAnnotation || !datasetId || !this.selectedToolConfiguration) {
       return;
     }
-    const selectedAnnotations =
-      this.getSelectedAnnotationsFromAnnotation(selectAnnotation);
+
+    let selectedAnnotations: IAnnotation[];
+    if (this.showTimelapseMode) {
+      // In the timelapse mode, we can use the same selection logic,
+      // but the getTimelapseAnnotationsFromAnnotation returns GeoJS annotations,
+      // so we need to map them to the corresponding annotations in the annotation store
+      // using the girderId (filtering out undefined).
+      const selectedGeoJSAnnotations =
+        this.getTimelapseAnnotationsFromAnnotation(selectAnnotation);
+      selectedAnnotations = selectedGeoJSAnnotations
+        .map((a) => this.getAnnotationFromId(a.options().girderId))
+        .filter((a): a is IAnnotation => a !== undefined);
+    } else {
+      selectedAnnotations =
+        this.getSelectedAnnotationsFromAnnotation(selectAnnotation);
+    }
 
     const parentTemplate = this.selectedToolConfiguration.values
       ?.parentAnnotation as IRestrictTagsAndLayer;
@@ -1322,22 +1923,41 @@ export default class AnnotationViewer extends Vue {
           this.selectedToolState.selectedAnnotationId
         ) {
           // Connect to selected
-          this.annotationStore.createConnection({
-            parentId: this.selectedToolState.selectedAnnotationId,
-            childId: clickedAnnotation.id,
-            datasetId,
+          if (this.showTimelapseMode) {
+            this.annotationStore.createTimelapseConnection({
+              parentId: this.selectedToolState.selectedAnnotationId,
+              childId: clickedAnnotation.id,
+              datasetId,
+              label: this.selectedToolConfiguration.name,
+              tags: ["Time lapse connection"],
+            });
+          } else {
+            this.annotationStore.createConnection({
+              parentId: this.selectedToolState.selectedAnnotationId,
+              childId: clickedAnnotation.id,
+              datasetId,
+              label: this.selectedToolConfiguration.name,
+              tags: [...parentTemplate.tags, ...childTemplate.tags],
+            });
+          }
+        }
+      } else {
+        // Add all connections between parents and children
+        if (this.showTimelapseMode) {
+          await this.annotationStore.createAllTimelapseConnections({
+            parentIds,
+            childIds,
+            label: this.selectedToolConfiguration.name,
+            tags: ["Time lapse connection"],
+          });
+        } else {
+          await this.annotationStore.createAllConnections({
+            parentIds,
+            childIds,
             label: this.selectedToolConfiguration.name,
             tags: [...parentTemplate.tags, ...childTemplate.tags],
           });
         }
-      } else {
-        // Add all connections between a parent and a child
-        await this.annotationStore.createAllConnections({
-          parentIds,
-          childIds,
-          label: this.selectedToolConfiguration.name,
-          tags: [...parentTemplate.tags, ...childTemplate.tags],
-        });
       }
     } else {
       if (clickAction) {
@@ -1640,6 +2260,7 @@ export default class AnnotationViewer extends Vue {
     const geoAnnotations: IGeoJSAnnotation[] =
       this.annotationLayer.annotations();
     let annotationToToggle: IAnnotation | null = null;
+    // TODO (performance): use a spatial index or something else to speed this up
     for (let i = 0; i < geoAnnotations.length; ++i) {
       const geoAnnotation = geoAnnotations[i];
       const id = geoAnnotation.options("girderId");
@@ -1711,6 +2332,36 @@ export default class AnnotationViewer extends Vue {
     }
   }
 
+  handleTimelapseAnnotationClick(evt: IGeoJSMouseState) {
+    if (!evt?.geo) {
+      return;
+    }
+
+    let timeToSet: number | null = null;
+
+    // Create a temporary point annotation from the click
+    const clickAnnotation = {
+      type: () => AnnotationShape.Point,
+      coordinates: () => [evt.geo],
+      style: () => ({
+        radius: 10, // Matches the radius used for current time points
+        //strokeWidth: 1, // Add some padding for easier clicking
+        //scaled: 0, // Fixed size in image coordinates
+      }),
+    } as IGeoJSAnnotation;
+
+    const selectedTimelapseAnnotations =
+      this.getTimelapseAnnotationsFromAnnotation(clickAnnotation);
+
+    if (selectedTimelapseAnnotations.length > 0) {
+      timeToSet = selectedTimelapseAnnotations[0].options("time");
+
+      if (timeToSet !== null && this.time !== timeToSet) {
+        this.store.setTime(timeToSet);
+      }
+    }
+  }
+
   // AR: I added some code here to prevent duplicate redraws. I found that when e.g. xy changes, then the watcher for displayedAnnotations also changed.
   // This caused a double redraw. But the problem is that if you remove the watcher for displayedAnnotations, then the annotations are not redrawn when the user for instance deletes an annotation.
   // The solution implemented here is to have a flag that is set when any of the primary watchers are triggered, and then unset when the drawAnnotationsAndTooltips is called.
@@ -1734,10 +2385,19 @@ export default class AnnotationViewer extends Vue {
     // Set flag before triggering redraw
     this.handlingPrimaryChange = true;
     this.drawAnnotationsAndTooltips();
+
     // Clear flag after a tick to allow Vue to process all watchers
     Vue.nextTick(() => {
       this.handlingPrimaryChange = false;
     });
+  }
+
+  @Watch("showTimelapseMode")
+  @Watch("timelapseModeWindow")
+  @Watch("timelapseTags")
+  @Watch("showTimelapseLabels")
+  onTimelapseModeChanged() {
+    this.drawTimelapseConnectionsAndCentroids();
   }
 
   @Watch("displayedAnnotations")
@@ -1819,7 +2479,7 @@ export default class AnnotationViewer extends Vue {
   }
 
   @Watch("annotationLayer")
-  bind() {
+  bindAnnotationEvents() {
     this.annotationLayer.geoOn(
       geojs.event.annotation.mode,
       this.handleModeChange,
@@ -1840,7 +2500,6 @@ export default class AnnotationViewer extends Vue {
       geojs.event.annotation.state,
       this.handleAnnotationChange,
     );
-    this.drawAnnotationsAndTooltips();
     this.annotationLayer.geoOn(
       geojs.event.mouseclick,
       (evt: IGeoJSMouseState) => {
@@ -1849,6 +2508,18 @@ export default class AnnotationViewer extends Vue {
         }
       },
     );
+    this.drawAnnotationsAndTooltips(); // TODO: Does this lead to the double redraw upon initial load?
+  }
+
+  @Watch("timelapseLayer")
+  bindTimelapseEvents() {
+    this.timelapseLayer.geoOn(
+      geojs.event.mouseclick,
+      this.handleTimelapseAnnotationClick,
+    );
+    // TODO: Not sure this next line is necessary. It seems to draw just fine, so I'm leaving it out for now.
+    // But if some drawing is not happening, this might be something to check.
+    // this.drawTimelapseConnectionsAndCentroids();
   }
 
   @Watch("annotationLayer")
@@ -1905,7 +2576,9 @@ export default class AnnotationViewer extends Vue {
   }
 
   mounted() {
-    this.bind();
+    this.bindAnnotationEvents();
+    this.bindTimelapseEvents();
+
     this.updateValueOnHover();
 
     this.filterStore.updateHistograms();
@@ -1957,7 +2630,6 @@ export default class AnnotationViewer extends Vue {
     ) {
       return;
     }
-
     const selectedAnnotations = this.getSelectedAnnotationsFromAnnotation({
       type: () => AnnotationShape.Point,
       coordinates: () => [evt.geo],

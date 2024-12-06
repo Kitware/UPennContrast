@@ -620,6 +620,7 @@ export interface IGeoJSAnnotationLayer extends IGeoJSLayer {
     update?: boolean,
   ) => IGeoJSAnnotationLayer;
   removeAnnotation: (annotation: IGeoJSAnnotation, update?: boolean) => boolean;
+  removeAllAnnotations: (skipCreating?: boolean, update?: boolean) => number;
   annotations: () => IGeoJSAnnotation[];
   mode: (
     arg?: string | null,
@@ -787,6 +788,8 @@ export interface IGeoJSAnnotation {
   coordinates: () => IGeoJSPosition[];
   _coordinates: (coordinates?: IGeoJSPosition[]) => IGeoJSPosition[];
   geojson: () => any;
+  mouseClick: ((handler: (evt: IGeoJSMouseState) => void) => IGeoJSAnnotation) &
+    ((handler: (evt: IGeoJSMouseState) => void) => void);
   type: () => AnnotationShape;
   layer: ((arg: IGeoJSLayer) => IGeoJSAnnotation) & (() => IGeoJSLayer);
 }
@@ -951,6 +954,12 @@ export interface IGeoJSColorObject {
 // https://opengeoscience.github.io/geojs/apidocs/geo.html#.geoColor
 export type TGeoJSColor = string | number | IGeoJSColorObject;
 
+export interface ITimelapseAnnotationOptions {
+  time: number;
+  girderId?: string;
+  isTimelapseAnnotation: true;
+}
+
 export interface ICommonWorkerInterfaceElement {
   displayOrder?: number;
   noCache?: boolean;
@@ -1068,6 +1077,13 @@ export enum AnnotationShape {
   Rectangle = "rectangle",
 }
 
+export enum FeatureShape {
+  Point = "point",
+  Line = "line",
+  Polygon = "polygon",
+  Rectangle = "rectangle",
+}
+
 export const AnnotationNames = {
   [AnnotationShape.Point]: "Point",
   [AnnotationShape.Line]: "Line",
@@ -1094,6 +1110,18 @@ export interface IAnnotationBase {
 export interface IAnnotation extends IAnnotationBase {
   id: string;
   name: string | null;
+}
+
+export enum TrackPositionType {
+  INTERIOR = "interior",
+  START = "start",
+  END = "end",
+  ORPHAN = "orphan",
+  CURRENT = "current",
+}
+
+export interface ITimelapseAnnotation extends IAnnotation {
+  trackPositionType: TrackPositionType;
 }
 
 export interface IAnnotationConnectionBase {
@@ -1276,6 +1304,8 @@ export interface IMapEntry {
   workerPreviewLayer: IGeoJSFeatureLayer;
   workerPreviewFeature: IGeoJSFeature;
   textLayer: IGeoJSFeatureLayer;
+  timelapseLayer: IGeoJSAnnotationLayer;
+  timelapseTextLayer: IGeoJSFeatureLayer;
   uiLayer?: IGeoJSUiLayer;
   lowestLayer?: number;
 }

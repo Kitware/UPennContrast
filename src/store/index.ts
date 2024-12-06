@@ -172,6 +172,11 @@ export class Main extends VuexModule {
   unrollZ: boolean = false;
   unrollT: boolean = false;
 
+  showTimelapseMode: boolean = false;
+  timelapseModeWindow: number = 10;
+  timelapseTags: string[] = [];
+  showTimelapseLabels: boolean = true;
+
   maps: IMapEntry[] = [];
 
   isAnnotationPanelOpen: boolean = false;
@@ -295,6 +300,26 @@ export class Main extends VuexModule {
   @Mutation
   public setShowTooltips(value: boolean) {
     this.showTooltips = value;
+  }
+
+  @Mutation
+  public setShowTimelapseMode(value: boolean) {
+    this.showTimelapseMode = value;
+  }
+
+  @Mutation
+  public setTimelapseModeWindow(value: number) {
+    this.timelapseModeWindow = value;
+  }
+
+  @Mutation
+  public setTimelapseTags(value: string[]) {
+    this.timelapseTags = value;
+  }
+
+  @Mutation
+  public setShowTimelapseLabels(value: boolean) {
+    this.showTimelapseLabels = value;
   }
 
   @Mutation

@@ -49,6 +49,44 @@
           :disabled="!(maxTime > 0 || unrollT)"
         />
       </v-layout>
+      <v-layout v-if="maxTime > 0 && !unrollT">
+        <v-checkbox
+          class="ml-3 my-checkbox"
+          v-model="timelapseMode"
+          label="Time lapse mode"
+        />
+        <value-slider
+          v-if="timelapseMode"
+          v-model="timelapseModeWindow"
+          label="Track window"
+          :min="3"
+          :max="100"
+          :title="'Track window size'"
+        />
+      </v-layout>
+      <v-layout v-if="timelapseMode">
+        <tag-picker
+          class="ml-3"
+          v-model="timelapseTags"
+          style="max-width: 300px"
+        />
+      </v-layout>
+      <v-layout v-if="timelapseMode">
+        <v-checkbox
+          class="ml-3 my-checkbox"
+          v-model="showTimelapseLabels"
+          label="Show labels"
+        />
+      </v-layout>
+      <v-layout v-if="timelapseMode">
+        <v-btn
+          class="ml-3"
+          small
+          @click="annotationStore.deleteAllTimelapseConnections"
+        >
+          Delete all timelapse connections
+        </v-btn>
+      </v-layout>
     </div>
     <toolset></toolset>
     <v-radio-group
@@ -100,6 +138,7 @@ import SwitchToggle from "./SwitchToggle.vue";
 import Toolset from "@/tools/toolsets/Toolset.vue";
 import store from "@/store";
 import filterStore from "@/store/filters";
+import annotationStore from "@/store/annotation";
 import { ITagAnnotationFilter, TLayerMode } from "@/store/model";
 import { IHotkey } from "@/utils/v-mousetrap";
 
@@ -113,6 +152,7 @@ import { IHotkey } from "@/utils/v-mousetrap";
 export default class ViewerToolbar extends Vue {
   readonly store = store;
   readonly filterStore = filterStore;
+  readonly annotationStore = annotationStore;
 
   get xy() {
     return this.store.xy;
@@ -187,6 +227,38 @@ export default class ViewerToolbar extends Vue {
 
   get maxTime() {
     return this.store.dataset ? this.store.dataset.time.length - 1 : this.time;
+  }
+
+  get timelapseMode() {
+    return this.store.showTimelapseMode;
+  }
+
+  set timelapseMode(value: boolean) {
+    this.store.setShowTimelapseMode(value);
+  }
+
+  get timelapseModeWindow() {
+    return this.store.timelapseModeWindow;
+  }
+
+  set timelapseModeWindow(value: number) {
+    this.store.setTimelapseModeWindow(value);
+  }
+
+  get timelapseTags() {
+    return this.store.timelapseTags;
+  }
+
+  set timelapseTags(value: string[]) {
+    this.store.setTimelapseTags(value);
+  }
+
+  get showTimelapseLabels() {
+    return this.store.showTimelapseLabels;
+  }
+
+  set showTimelapseLabels(value: boolean) {
+    this.store.setShowTimelapseLabels(value);
   }
 
   set layerMode(value: TLayerMode) {
@@ -274,5 +346,9 @@ export default class ViewerToolbar extends Vue {
       },
     },
   ];
+
+  deleteAllTimelapseConnections() {
+    this.store.setTimelapseTags([]);
+  }
 }
 </script>

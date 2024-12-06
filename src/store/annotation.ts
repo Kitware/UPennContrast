@@ -511,6 +511,14 @@ export class Annotations extends VuexModule {
   }
 
   @Action
+  public async deleteAllTimelapseConnections() {
+    const connectionsToDelete = this.annotationConnections.filter(
+      (connection) => connection.tags.includes("Time lapse connection"),
+    );
+    await this.deleteConnections(connectionsToDelete.map(({ id }) => id));
+  }
+
+  @Action
   public async createConnection(
     annotationConnectionBase: IAnnotationConnectionBase,
   ): Promise<IAnnotationConnection | null> {
@@ -522,6 +530,152 @@ export class Annotations extends VuexModule {
     }
     sync.setSaving(false);
     return newConnection;
+  }
+
+  @Action
+  public async createTimelapseConnection(
+    annotationConnectionBase: IAnnotationConnectionBase,
+  ): Promise<IAnnotationConnection | null> {
+    sync.setSaving(true);
+    const parentAnnotation = this.getAnnotationFromId(
+      annotationConnectionBase.parentId,
+    );
+    const childAnnotation = this.getAnnotationFromId(
+      annotationConnectionBase.childId,
+    );
+    // Make sure that the parentAnnotation.location.Time is less than the childAnnotation.location.Time
+    if (parentAnnotation && childAnnotation) {
+      if (parentAnnotation.location.Time > childAnnotation.location.Time) {
+        [annotationConnectionBase.parentId, annotationConnectionBase.childId] =
+          [annotationConnectionBase.childId, annotationConnectionBase.parentId];
+      }
+    }
+    // TODO: Perhaps we want to delete any existing connections between these two annotations?
+    const newConnection: IAnnotationConnection | null =
+      await this.annotationsAPI.createConnection(annotationConnectionBase);
+    if (newConnection) {
+      this.addMultipleConnections([newConnection]);
+    }
+    sync.setSaving(false);
+    return newConnection;
+  }
+
+  @Action
+  public async createAllTimelapseConnections({
+    parentIds,
+    childIds,
+    label,
+    tags,
+  }: {
+    parentIds: string[];
+    childIds: string[];
+    label: string;
+    tags: string[];
+  }) {
+    if (!main.dataset) {
+      return [];
+    }
+    sync.setSaving(true);
+
+    // Helper functions to calculate distance between annotations
+    const getDistanceBetweenAnnotations = (
+      a1: IAnnotation,
+      a2: IAnnotation,
+    ): number => {
+      const centroid1 = getAnnotationCentroid(a1);
+      const centroid2 = getAnnotationCentroid(a2);
+
+      if (!centroid1 || !centroid2) {
+        return Infinity; // Return a large number if centroids can't be calculated
+      }
+
+      // Calculate Euclidean distance
+      const dx = centroid1.x - centroid2.x;
+      const dy = centroid1.y - centroid2.y;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    // This calculates the "centroid", but is not the actual centroid;
+    // instead, it just averages the coordinates. Fine enough for our purposes for now.
+    // TODO: Use the actual centroid instead.
+    const getAnnotationCentroid = (
+      annotation: IAnnotation,
+    ): { x: number; y: number } | null => {
+      if (annotation.coordinates.length === 0) {
+        return null;
+      }
+
+      let sumX = 0;
+      let sumY = 0;
+
+      for (const coord of annotation.coordinates) {
+        sumX += coord.x;
+        sumY += coord.y;
+      }
+
+      return {
+        x: sumX / annotation.coordinates.length,
+        y: sumY / annotation.coordinates.length,
+      };
+    };
+
+    // 0. Remove all existing connections between the parent and child annotations
+    await this.deleteAllConnections({ parentIds, childIds });
+
+    // 1. Collect all annotations into a single set
+    const allIds = new Set([...parentIds, ...childIds]);
+    const annotations = Array.from(allIds)
+      .map((id) => this.annotations.find((a) => a.id === id))
+      .filter((a): a is IAnnotation => !!a);
+
+    // 2. Find closest temporal parent for each annotation
+    const connectionBases: IAnnotationConnectionBase[] = [];
+
+    for (const annotation of annotations) {
+      const potentialParents = annotations.filter(
+        (a) => a.location.Time < annotation.location.Time,
+      );
+
+      if (potentialParents.length > 0) {
+        // Find max time among potential parents
+        const maxParentTime = Math.max(
+          ...potentialParents.map((a) => a.location.Time),
+        );
+        const parentsAtMaxTime = potentialParents.filter(
+          (a) => a.location.Time === maxParentTime,
+        );
+
+        if (parentsAtMaxTime.length > 0) {
+          // Find closest parent by centroid distance
+          const parent = parentsAtMaxTime.reduce((closest, current) => {
+            const closestDist = getDistanceBetweenAnnotations(
+              closest,
+              annotation,
+            );
+            const currentDist = getDistanceBetweenAnnotations(
+              current,
+              annotation,
+            );
+            return currentDist < closestDist ? current : closest;
+          }, parentsAtMaxTime[0]);
+
+          connectionBases.push({
+            label,
+            tags,
+            parentId: parent.id,
+            childId: annotation.id,
+            datasetId: main.dataset.id,
+          });
+        }
+      }
+    }
+    const connections =
+      await this.annotationsAPI.createMultipleConnections(connectionBases);
+    if (connections) {
+      this.addMultipleConnections(connections);
+    }
+    sync.setSaving(false);
+    return connections || [];
   }
 
   @Mutation

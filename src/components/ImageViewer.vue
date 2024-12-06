@@ -26,6 +26,8 @@
       "
       :annotationLayer="mapentry.annotationLayer"
       :textLayer="mapentry.textLayer"
+      :timelapseLayer="mapentry.timelapseLayer"
+      :timelapseTextLayer="mapentry.timelapseTextLayer"
       :workerPreviewFeature="mapentry.workerPreviewFeature"
       :maps="maps"
       :unrollH="unrollH"
@@ -848,10 +850,21 @@ export default class ImageViewer extends Vue {
       });
       const workerPreviewFeature = workerPreviewLayer.createFeature("quad");
       const textLayer = map.createLayer("feature", { features: ["text"] });
+      const timelapseLayer = map.createLayer("annotation", {
+        annotations: [], // Set to empty because we anyway render it fresh every time
+        autoshareRenderer: false,
+        continuousCloseProximity: true,
+        showLabels: false,
+      });
+      const timelapseTextLayer = map.createLayer("feature", {
+        features: ["text"],
+      });
 
       annotationLayer.node().css({ "mix-blend-mode": "unset" });
       workerPreviewLayer.node().css({ "mix-blend-mode": "unset" });
       textLayer.node().css({ "mix-blend-mode": "unset" });
+      timelapseLayer.node().css({ "mix-blend-mode": "unset" });
+      timelapseTextLayer.node().css({ "mix-blend-mode": "unset" });
 
       const mapentry: IMapEntry = {
         map,
@@ -861,6 +874,8 @@ export default class ImageViewer extends Vue {
         annotationLayer,
         workerPreviewLayer,
         textLayer,
+        timelapseLayer,
+        timelapseTextLayer,
         workerPreviewFeature,
       };
       Vue.set(this.maps, mllidx, mapentry);
@@ -1287,11 +1302,15 @@ export default class ImageViewer extends Vue {
         mapentry.workerPreviewLayer.zIndex() !== mll.length * 2 ||
         mapentry.annotationLayer.zIndex() !== mll.length * 2 + 1 ||
         mapentry.textLayer.zIndex() !== mll.length * 2 + 2 ||
-        (mapentry.uiLayer && mapentry.uiLayer.zIndex() !== mll.length * 2 + 3)
+        mapentry.timelapseLayer.zIndex() !== mll.length * 2 + 3 ||
+        mapentry.timelapseTextLayer.zIndex() !== mll.length * 2 + 4 ||
+        (mapentry.uiLayer && mapentry.uiLayer.zIndex() !== mll.length * 2 + 5)
       ) {
         mapentry.workerPreviewLayer.moveToTop();
         mapentry.annotationLayer.moveToTop();
         mapentry.textLayer.moveToTop();
+        mapentry.timelapseLayer.moveToTop();
+        mapentry.timelapseTextLayer.moveToTop();
         if (mapentry.uiLayer) {
           mapentry.uiLayer.moveToTop();
         }
