@@ -1032,7 +1032,7 @@ export default class AnnotationViewer extends Vue {
         });
     }
     if (redraw) {
-        this.annotationLayer.draw();
+      this.annotationLayer.draw();
     }
   }
 
