@@ -29,6 +29,7 @@
       :timelapseLayer="mapentry.timelapseLayer"
       :timelapseTextLayer="mapentry.timelapseTextLayer"
       :workerPreviewFeature="mapentry.workerPreviewFeature"
+      :interactionLayer="mapentry.interactionLayer"
       :maps="maps"
       :unrollH="unrollH"
       :unrollW="unrollW"
@@ -859,12 +860,19 @@ export default class ImageViewer extends Vue {
       const timelapseTextLayer = map.createLayer("feature", {
         features: ["text"],
       });
+      const interactionLayer = map.createLayer("annotation", {
+        annotations: [],
+        autoshareRenderer: false,
+        continuousCloseProximity: true,
+        showLabels: false,
+      });
 
       annotationLayer.node().css({ "mix-blend-mode": "unset" });
       workerPreviewLayer.node().css({ "mix-blend-mode": "unset" });
       textLayer.node().css({ "mix-blend-mode": "unset" });
       timelapseLayer.node().css({ "mix-blend-mode": "unset" });
       timelapseTextLayer.node().css({ "mix-blend-mode": "unset" });
+      interactionLayer.node().css({ "mix-blend-mode": "unset" });
 
       const mapentry: IMapEntry = {
         map,
@@ -877,6 +885,7 @@ export default class ImageViewer extends Vue {
         timelapseLayer,
         timelapseTextLayer,
         workerPreviewFeature,
+        interactionLayer,
       };
       Vue.set(this.maps, mllidx, mapentry);
     } else {
@@ -1304,13 +1313,15 @@ export default class ImageViewer extends Vue {
         mapentry.textLayer.zIndex() !== mll.length * 2 + 2 ||
         mapentry.timelapseLayer.zIndex() !== mll.length * 2 + 3 ||
         mapentry.timelapseTextLayer.zIndex() !== mll.length * 2 + 4 ||
-        (mapentry.uiLayer && mapentry.uiLayer.zIndex() !== mll.length * 2 + 5)
+        mapentry.interactionLayer.zIndex() !== mll.length * 2 + 5 ||
+        (mapentry.uiLayer && mapentry.uiLayer.zIndex() !== mll.length * 2 + 6)
       ) {
         mapentry.workerPreviewLayer.moveToTop();
         mapentry.annotationLayer.moveToTop();
         mapentry.textLayer.moveToTop();
         mapentry.timelapseLayer.moveToTop();
         mapentry.timelapseTextLayer.moveToTop();
+        mapentry.interactionLayer.moveToTop();
         if (mapentry.uiLayer) {
           mapentry.uiLayer.moveToTop();
         }
