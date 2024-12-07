@@ -356,7 +356,7 @@ export default class AnnotationViewer extends Vue {
   @Watch("pendingStoreAnnotation")
   pendingAnnotationChanged() {
     if (this.pendingAnnotation) {
-      this.annotationLayer.removeAnnotation(this.pendingAnnotation);
+      this.interactionLayer.removeAnnotation(this.pendingAnnotation);
       this.pendingAnnotation = null;
     }
     if (this.pendingStoreAnnotation) {
@@ -366,7 +366,7 @@ export default class AnnotationViewer extends Vue {
     }
     if (this.pendingAnnotation) {
       this.pendingAnnotation.options("specialAnnotation", true);
-      this.annotationLayer.addAnnotation(this.pendingAnnotation);
+      this.interactionLayer.addAnnotation(this.pendingAnnotation);
     }
   }
 
