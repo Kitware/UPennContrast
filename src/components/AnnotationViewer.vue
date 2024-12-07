@@ -2001,7 +2001,7 @@ export default class AnnotationViewer extends Vue {
     }
 
     // Remove the selection annotation from layer (do not show the annotation used to select)
-    this.annotationLayer.removeAnnotation(selectAnnotation);
+    this.interactionLayer.removeAnnotation(selectAnnotation);
   }
 
   private async addAnnotationFromGeoJsAnnotation(annotation: IGeoJSAnnotation) {
@@ -2010,7 +2010,7 @@ export default class AnnotationViewer extends Vue {
     }
 
     const coordinates = annotation.coordinates();
-    this.annotationLayer.removeAnnotation(annotation);
+    this.interactionLayer.removeAnnotation(annotation);
 
     // Create the new annotation
     await this.createAnnotationFromTool(
@@ -2025,7 +2025,7 @@ export default class AnnotationViewer extends Vue {
     }
     const mapentry = this.maps[0];
     const coordinates = annotation.coordinates();
-    this.annotationLayer.removeAnnotation(annotation);
+    this.interactionLayer.removeAnnotation(annotation);
     if (!this.selectedToolConfiguration) {
       return;
     }
@@ -2074,7 +2074,7 @@ export default class AnnotationViewer extends Vue {
       return;
     }
     this.filterStore.validateNewROIFilter(geojsAnnotation.coordinates());
-    this.annotationLayer.removeAnnotation(geojsAnnotation);
+    this.interactionLayer.removeAnnotation(geojsAnnotation);
   }
 
   get selectedToolRadius(): number | undefined {
@@ -2127,13 +2127,13 @@ export default class AnnotationViewer extends Vue {
       return;
     }
     this.cursorAnnotation = geojs.createAnnotation("circle");
-    this.cursorAnnotation.layer(this.annotationLayer);
-    this.annotationLayer.addAnnotation(this.cursorAnnotation);
-    this.annotationLayer.geoOn(
+    this.cursorAnnotation.layer(this.interactionLayer);
+    this.interactionLayer.addAnnotation(this.cursorAnnotation);
+    this.interactionLayer.geoOn(
       geojs.event.mousemove,
       this.updateCursorAnnotation,
     );
-    this.annotationLayer.geoOn(geojs.event.zoom, this.updateCursorAnnotation);
+    this.interactionLayer.geoOn(geojs.event.zoom, this.updateCursorAnnotation);
     this.cursorAnnotation.style({
       fill: true,
       fillColor: "white",
@@ -2152,12 +2152,12 @@ export default class AnnotationViewer extends Vue {
   clearAnnotationMode() {
     // Remove cursor annotation if there is one
     if (this.cursorAnnotation) {
-      this.annotationLayer.removeAnnotation(this.cursorAnnotation);
-      this.annotationLayer.geoOff(
+      this.interactionLayer.removeAnnotation(this.cursorAnnotation);
+      this.interactionLayer.geoOff(
         geojs.event.mousemove,
         this.updateCursorAnnotation,
       );
-      this.annotationLayer.geoOff(
+      this.interactionLayer.geoOff(
         geojs.event.zoom,
         this.updateCursorAnnotation,
       );
@@ -2167,7 +2167,7 @@ export default class AnnotationViewer extends Vue {
 
   setNewAnnotationMode() {
     if (this.unrolling) {
-      this.annotationLayer.mode(null);
+      this.interactionLayer.mode(null);
       return;
     }
 
@@ -2175,14 +2175,14 @@ export default class AnnotationViewer extends Vue {
       if (this.selectedToolConfiguration) {
         this.store.setSelectedToolId(null);
       }
-      this.annotationLayer.mode("polygon");
+      this.interactionLayer.mode("polygon");
       return;
     }
 
     switch (this.selectedToolConfiguration?.type) {
       case "create":
         const annotation = this.selectedToolConfiguration.values.annotation;
-        this.annotationLayer.mode(annotation?.shape);
+        this.interactionLayer.mode(annotation?.shape);
         break;
       case "tagging":
         if (
@@ -2190,9 +2190,9 @@ export default class AnnotationViewer extends Vue {
             this.selectedToolConfiguration.values.action.value,
           )
         ) {
-          this.annotationLayer.mode("point");
+          this.interactionLayer.mode("point");
         } else {
-          this.annotationLayer.mode("polygon");
+          this.interactionLayer.mode("polygon");
         }
         break;
       case "snap":
@@ -2200,9 +2200,9 @@ export default class AnnotationViewer extends Vue {
           this.selectedToolConfiguration.values.snapTo.value === "circleToDot"
         ) {
           this.addCursorAnnotation();
-          this.annotationLayer.mode("point");
+          this.interactionLayer.mode("point");
         } else {
-          this.annotationLayer.mode("polygon");
+          this.interactionLayer.mode("polygon");
         }
         break;
       case "segmentation":
@@ -2210,14 +2210,16 @@ export default class AnnotationViewer extends Vue {
         // TODO: otherwise, trigger computation here
         // TODO: when computation is triggered, toggle a bool that enables a v-menu
         // TODO: for now with just a compute button, but later previews, custom forms served from the started worker ?
+        // If needed, set mode or handle segmentation differently
+        this.interactionLayer.mode(null);
         break;
       case "connection":
         if (
           this.selectedToolConfiguration.values.action.value.endsWith("click")
         ) {
-          this.annotationLayer.mode("point");
+          this.interactionLayer.mode("point");
         } else {
-          this.annotationLayer.mode("polygon");
+          this.interactionLayer.mode("polygon");
         }
         break;
       case "select":
@@ -2226,34 +2228,28 @@ export default class AnnotationViewer extends Vue {
           "pointer"
             ? "point"
             : "polygon";
-        this.annotationLayer.mode(selectionType);
+        this.interactionLayer.mode(selectionType);
         break;
       case "samAnnotation":
       case null:
       case undefined:
-        this.annotationLayer.mode(null);
+        this.interactionLayer.mode(null);
         break;
       default:
         logWarning(
           `${this.selectedToolConfiguration?.type} tools are not supported yet`,
         );
-        this.annotationLayer.mode(null);
-    }
-
-    if (this.selectedToolConfiguration?.type === "tagging") {
-      this.annotationLayer.geoOn(
-        geojs.event.mouseclick,
-        this.handleTaggingClick,
-      );
-    } else {
-      this.annotationLayer.geoOff(
-        geojs.event.mouseclick,
-        this.handleTaggingClick,
-      );
+        this.interactionLayer.mode(null);
     }
   }
 
   handleModeChange(evt: any) {
+    if (evt.mode === null) {
+      this.refreshAnnotationMode();
+    }
+  }
+
+  handleInteractionModeChange(evt: any) {
     if (evt.mode === null) {
       this.refreshAnnotationMode();
     }
@@ -2302,14 +2298,14 @@ export default class AnnotationViewer extends Vue {
     return map.unitsPerPixel(map.zoom());
   }
 
-  handleAnnotationChange(evt: any) {
+  handleInteractionAnnotationChange(evt: any) {
     if (!this.selectedToolConfiguration && !this.roiFilter) {
       return;
     }
 
     if (
       evt.event === "geo_annotation_state" &&
-      evt.annotation?.layer() === this.annotationLayer
+      evt.annotation?.layer() === this.interactionLayer
     ) {
       if (this.selectedToolConfiguration) {
         switch (this.selectedToolConfiguration.type) {
@@ -2483,26 +2479,8 @@ export default class AnnotationViewer extends Vue {
 
   @Watch("annotationLayer")
   bindAnnotationEvents() {
-    this.annotationLayer.geoOn(
-      geojs.event.annotation.mode,
-      this.handleModeChange,
-    );
-    this.annotationLayer.geoOn(
-      geojs.event.annotation.mode,
-      this.handleAnnotationChange,
-    );
-    this.annotationLayer.geoOn(
-      geojs.event.annotation.add,
-      this.handleAnnotationChange,
-    );
-    this.annotationLayer.geoOn(
-      geojs.event.annotation.update,
-      this.handleAnnotationChange,
-    );
-    this.annotationLayer.geoOn(
-      geojs.event.annotation.state,
-      this.handleAnnotationChange,
-    );
+    // TODO: We could move the click handler for hover here instead of having its own
+    // separate handler. But not sure if there was a reason for keeping it separate.
     this.annotationLayer.geoOn(
       geojs.event.mouseclick,
       (evt: IGeoJSMouseState) => {
@@ -2511,7 +2489,38 @@ export default class AnnotationViewer extends Vue {
         }
       },
     );
-    this.drawAnnotationsAndTooltips(); // TODO: Does this lead to the double redraw upon initial load?
+    this.drawAnnotationsAndTooltips();
+  }
+
+  @Watch("interactionLayer")
+  bindInteractionEvents() {
+    if (!this.interactionLayer) {
+      return;
+    }
+    // Handle annotation changes (creation, tagging, snapping, selection, connection) on the interactionLayer
+    this.interactionLayer.geoOn(
+      geojs.event.annotation.mode,
+      this.handleInteractionModeChange,
+    );
+    this.interactionLayer.geoOn(
+      geojs.event.annotation.add,
+      this.handleInteractionAnnotationChange,
+    );
+    this.interactionLayer.geoOn(
+      geojs.event.annotation.update,
+      this.handleInteractionAnnotationChange,
+    );
+    this.interactionLayer.geoOn(
+      geojs.event.annotation.state,
+      this.handleInteractionAnnotationChange,
+    );
+    if (this.selectedToolConfiguration?.type === "tagging") {
+      this.interactionLayer.geoOn(
+        geojs.event.mouseclick,
+        this.handleTaggingClick,
+      );
+    }
+    this.refreshAnnotationMode();
   }
 
   @Watch("timelapseLayer")
@@ -2581,6 +2590,7 @@ export default class AnnotationViewer extends Vue {
   mounted() {
     this.bindAnnotationEvents();
     this.bindTimelapseEvents();
+    this.bindInteractionEvents();
 
     this.updateValueOnHover();
 
@@ -2622,7 +2632,7 @@ export default class AnnotationViewer extends Vue {
         this.annotationStore.setHoveredAnnotationId(selectedAnnotations[0].id);
       }
     }
-    this.annotationLayer.removeAnnotation(annotation);
+    this.interactionLayer.removeAnnotation(annotation);
   }
 
   private handleTaggingClick = (evt: any) => {
