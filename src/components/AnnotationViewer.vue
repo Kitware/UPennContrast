@@ -757,11 +757,7 @@ export default class AnnotationViewer extends Vue {
 
   drawTooltips = throttle(this.drawTooltipsNoThrottle, THROTTLE).bind(this);
   drawTooltipsNoThrottle() {
-    // TODO: AR: I should be able to replace the below with the single call to features([]) below. However, when I do so, it doesn't seem to get rid of the text features. Hmm...
-    // this.timelapseTextLayer.features([]);
-    this.textLayer.features().forEach((feature: IGeoJSFeature) => {
-      this.textLayer.deleteFeature(feature);
-    });
+    this.textLayer.clear();
 
     if (this.showTooltips) {
       // One text feature per line as in https://opengeoscience.github.io/geojs/tutorials/text/
