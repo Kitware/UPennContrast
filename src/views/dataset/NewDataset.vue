@@ -13,6 +13,7 @@
       ref="form"
       v-model="valid"
       :disabled="quickupload && !pipelineError"
+      @submit.prevent="valid && filesSelected && !uploading && submit()"
     >
       <girder-upload
         v-if="path && !hideUploader"
