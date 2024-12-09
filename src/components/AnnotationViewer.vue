@@ -963,7 +963,7 @@ export default class AnnotationViewer extends Vue {
   // Remove from the layer annotations that should no longer be renderered (index change, layer change...)
   clearOldAnnotations(clearAll = false, redraw = true) {
     if (clearAll) {
-      this.annotationLayer.removeAllAnnotations();
+      this.annotationLayer.removeAllAnnotations(undefined, undefined, false);
       this.annotationLayer.modified();
     } else {
       this.annotationLayer
@@ -1214,7 +1214,7 @@ export default class AnnotationViewer extends Vue {
 
   drawTimelapseConnectionsAndCentroids() {
     // Remove all previous tracks and centroids
-    this.timelapseLayer.removeAllAnnotations();
+    this.timelapseLayer.removeAllAnnotations(undefined, undefined, false);
     this.timelapseTextLayer.features([]);
 
     if (!this.showTimelapseMode) {
