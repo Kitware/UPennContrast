@@ -1041,6 +1041,7 @@ export default class AnnotationViewer extends Vue {
     for (const [layerId, annotationMap] of this.layerAnnotations) {
       const layer = this.store.getLayerFromId(layerId);
       if (layer) {
+        let newAnnotations: IGeoJSAnnotation[] = [];
         for (const [annotationId, annotation] of annotationMap) {
           const excluded = drawnGeoJSAnnotations
             .get(annotationId)
@@ -1054,13 +1055,16 @@ export default class AnnotationViewer extends Vue {
               layerId,
             );
             if (geoJSAnnotation) {
-              this.annotationLayer.addAnnotation(
-                geoJSAnnotation,
-                undefined,
-                false,
-              );
+              newAnnotations.push(geoJSAnnotation);
             }
           }
+        }
+        if (newAnnotations.length > 0) {
+          this.annotationLayer.addMultipleAnnotations(
+            newAnnotations,
+            undefined,
+            false,
+          );
         }
       }
     }
@@ -1378,6 +1382,7 @@ export default class AnnotationViewer extends Vue {
     const drawnLines = new Set<string>(); // To avoid drawing duplicate lines
 
     // For each annotation, draw lines to its connected annotations in previous frames
+    let lines: IGeoJSAnnotation[] = [];
     for (const annotation of annotations) {
       // Find all connections where this annotation is either parent or child
       const len = connections.length;
@@ -1431,10 +1436,11 @@ export default class AnnotationViewer extends Vue {
         });
 
         if (line) {
-          this.timelapseLayer.addAnnotation(line, undefined, false);
+          lines.push(line);
         }
       }
     }
+    this.timelapseLayer.addMultipleAnnotations(lines, undefined, false);
   }
 
   drawTimelapseAnnotationCentroidsAndLabels(
@@ -1454,6 +1460,7 @@ export default class AnnotationViewer extends Vue {
       strokeOpacity: 1,
       radius: 0.09,
     };
+    let points: IGeoJSAnnotation[] = [];
     const len = annotations.length;
     for (let i = 0; i < len; i++) {
       const annotation = annotations[i];
@@ -1480,9 +1487,10 @@ export default class AnnotationViewer extends Vue {
       );
 
       if (pointAnnotation) {
-        this.timelapseLayer.addAnnotation(pointAnnotation, undefined, false);
+        points.push(pointAnnotation);
       }
     }
+    this.timelapseLayer.addMultipleAnnotations(points, undefined, false);
 
     // Add time labels for the different categories of points
     // Only draw labels if showTimelapseLabels is true
@@ -1631,6 +1639,8 @@ export default class AnnotationViewer extends Vue {
   }
 
   // Draw lines as a way to show the connections
+  // TODO: This could be greatly improved by using addMultipleAnnotations
+  // and by adding the options before the creation of the annotation rather than after.
   drawGeoJSAnnotationFromConnection(
     connection: IAnnotationConnection,
     parent: IAnnotation,

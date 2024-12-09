@@ -618,6 +618,12 @@ export interface IGeoJSAnnotationLayer extends IGeoJSLayer {
     annotation: IGeoJSAnnotation,
     gcs?: string | null,
     update?: boolean,
+    trigger?: boolean,
+  ) => IGeoJSAnnotationLayer;
+  addMultipleAnnotations: (
+    annotations: IGeoJSAnnotation[],
+    gcs?: string | null,
+    update?: boolean,
   ) => IGeoJSAnnotationLayer;
   removeAnnotation: (annotation: IGeoJSAnnotation, update?: boolean) => boolean;
   removeAllAnnotations: (skipCreating?: boolean, update?: boolean) => number;
