@@ -726,6 +726,7 @@ export interface IGeoJSFeatureLayer extends IGeoJSLayer {
     arg?: IObject,
   ) => T extends "text" ? IGeoJSTextFeature : IGeoJSFeature;
   deleteFeature: (feature: IGeoJSFeature) => IGeoJSFeatureLayer;
+  clear: () => IGeoJSFeatureLayer;
   geoOn: (event: string, handler: Function) => IGeoJSFeatureLayer;
   geoOff: (
     event?: string | string[],
@@ -1306,6 +1307,7 @@ export interface IMapEntry {
   textLayer: IGeoJSFeatureLayer;
   timelapseLayer: IGeoJSAnnotationLayer;
   timelapseTextLayer: IGeoJSFeatureLayer;
+  interactionLayer: IGeoJSAnnotationLayer;
   uiLayer?: IGeoJSUiLayer;
   lowestLayer?: number;
 }
