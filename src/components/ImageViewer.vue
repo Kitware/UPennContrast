@@ -1,5 +1,6 @@
 <template>
   <div class="image" v-mousetrap="mousetrapAnnotations">
+    <progress-bar-group />
     <v-dialog v-model="scaleDialog">
       <v-card>
         <v-card-title> Scale settings </v-card-title>
@@ -165,6 +166,7 @@
 //  $('.geojs-map').data('data-geojs-map')
 import { Vue, Component, Watch } from "vue-property-decorator";
 import annotationStore from "@/store/annotation";
+import progressStore from "@/store/progress";
 import store from "@/store";
 import girderResources from "@/store/girderResources";
 import geojs from "geojs";
@@ -182,12 +184,14 @@ import {
   IMouseState,
   SamAnnotationToolStateSymbol,
   IGeoJSMap,
+  ProgressType,
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
 import AnnotationViewer from "@/components/AnnotationViewer.vue";
 import ImageOverview from "@/components/ImageOverview.vue";
 import ScaleSettings from "@/components/ScaleSettings.vue";
+import ProgressBarGroup from "@/components/ProgressBarGroup.vue";
 import LayerInfoGrid from "./LayerInfoGrid.vue";
 import { ITileHistogram } from "@/store/images";
 import { convertLength } from "@/utils/conversion";
@@ -254,7 +258,13 @@ function isMouseStartEvent(evt: MouseEvent): boolean {
 }
 
 @Component({
-  components: { AnnotationViewer, ImageOverview, ScaleSettings, LayerInfoGrid },
+  components: {
+    AnnotationViewer,
+    ImageOverview,
+    ScaleSettings,
+    LayerInfoGrid,
+    ProgressBarGroup,
+  },
 })
 export default class ImageViewer extends Vue {
   readonly store = store;

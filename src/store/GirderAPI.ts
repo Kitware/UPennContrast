@@ -26,6 +26,7 @@ import {
   newLayer,
   TJobType,
   IDatasetConfigurationCompatibility,
+  ProgressType,
 } from "@/store/model";
 import {
   toStyle,
@@ -33,6 +34,7 @@ import {
   mergeHistograms,
   ITileHistogram,
 } from "@/store/images";
+import progressStore from "@/store/progress";
 import { Promise as BluebirdPromise } from "bluebird";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { fetchAllPages } from "@/utils/fetch";
@@ -592,19 +594,40 @@ export default class GirderAPI {
   async scheduleHistogramCache(datasetId: string) {
     const largeImageItems = await this.getImages(datasetId);
     const responses = [];
-    // Don't use a Promise.all to avoid flooding the backend with requests
-    // Only send one cache request at a time
-    for (const imageItem of largeImageItems) {
-      const params: IHistogramOptions = {
-        ...this.baseHistogramOptions,
-        cache: "schedule",
-      };
-      const response = await this.client.get(
-        `item/${imageItem._id}/tiles/histogram`,
-        { params },
-      );
-      responses.push(response);
+
+    const progressId = await progressStore.create({
+      type: ProgressType.HISTOGRAM_SCHEDULE,
+    });
+
+    try {
+      // Don't use a Promise.all to avoid flooding the backend with requests
+      // Only send one cache request at a time
+      for (const [index, imageItem] of largeImageItems.entries()) {
+        const params: IHistogramOptions = {
+          ...this.baseHistogramOptions,
+          cache: "schedule",
+        };
+        const response = await this.client.get(
+          `item/${imageItem._id}/tiles/histogram`,
+          { params },
+        );
+        responses.push(response);
+
+        await progressStore.update({
+          id: progressId,
+          progress: index + 1,
+          total: largeImageItems.length,
+        });
+      }
+    } finally {
+      await progressStore.complete(progressId);
     }
+
+    // TODO: It may be important to run this over all responses, but it's
+    // probably not necessary, since if we have multiple large images, we'll
+    // have multiple jobs.
+    const jobId = responses[0].data.scheduledJob;
+    await progressStore.trackHistogramJob(jobId);
     return responses;
   }
 

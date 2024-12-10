@@ -1,4 +1,5 @@
 import { RestClientInstance } from "@/girder";
+import progressStore from "@/store/progress";
 import {
   IAnnotation,
   IAnnotationConnection,
@@ -10,6 +11,7 @@ import {
   IDisplayLayer,
   IScales,
   IDataset,
+  ProgressType,
 } from "./model";
 
 import { logError } from "@/utils/log";

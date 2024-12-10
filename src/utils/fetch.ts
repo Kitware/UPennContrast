@@ -1,4 +1,5 @@
 import { RestClientInstance } from "@/girder";
+import progressStore from "@/store/progress";
 import { logError } from "@/utils/log";
 import { AxiosRequestConfig } from "axios";
 
@@ -9,6 +10,8 @@ export async function fetchAllPages(
   firstPage?: number,
   progressCallback?: (fetched: number, total: number) => void,
 ) {
+  const progressId = await progressStore.create({ endpoint });
+
   const pages: any[] = [];
   let totalCount = -1;
   const baseParams = {
@@ -45,6 +48,11 @@ export async function fetchAllPages(
   try {
     // Fetch first page
     await fetchPage(0, firstPageSize);
+    await progressStore.update({
+      id: progressId,
+      progress: downloaded,
+      total: totalCount,
+    });
 
     // Fetch remaining pages if needed
     const promises: Promise<any>[] = [];
@@ -53,11 +61,24 @@ export async function fetchAllPages(
       offset < totalCount;
       offset += basePageSize
     ) {
-      promises.push(fetchPage(offset, basePageSize));
+      promises.push(
+        fetchPage(offset, basePageSize).then(() => {
+          // Update progress after each page
+          progressStore.update({
+            id: progressId,
+            progress: downloaded,
+            total: totalCount,
+          });
+        }),
+      );
     }
     await Promise.all(promises);
   } catch {
     return [];
+  } finally {
+    if (progressId) {
+      await progressStore.complete(progressId);
+    }
   }
 
   return pages;

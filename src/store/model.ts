@@ -187,6 +187,42 @@ export interface IActiveTool<T extends TToolType = TToolType> {
   state: TToolState<T>;
 }
 
+export enum ProgressType {
+  ANNOTATION_FETCH = "ANNOTATION_FETCH",
+  ANNOTATION_SAVE = "ANNOTATION_SAVE",
+  ANNOTATION_DELETE = "ANNOTATION_DELETE",
+  ANNOTATION_COMPUTE = "ANNOTATION_COMPUTE",
+  CONNECTION_FETCH = "CONNECTION_FETCH",
+  CONNECTION_SAVE = "CONNECTION_SAVE",
+  CONNECTION_DELETE = "CONNECTION_DELETE",
+  VIEW_FETCH = "VIEW_FETCH",
+  LAYER_CACHE = "LAYER_CACHE",
+  HISTOGRAM_CACHE = "HISTOGRAM_CACHE",
+  HISTOGRAM_SCHEDULE = "HISTOGRAM_SCHEDULE",
+  GENERIC = "GENERIC",
+}
+
+export interface IProgress {
+  id: string;
+  type: ProgressType;
+  progress: number;
+  total: number;
+  title: string;
+  metadata: Record<string, any>;
+}
+
+export interface IProgressGroup {
+  type: ProgressType;
+  display: "single" | "stacked";
+  title: string;
+  progress?: number;
+  total?: number;
+  value?: number;
+  indeterminate: boolean;
+  count: number;
+  items: IProgress[];
+}
+
 export interface IRestrictTagsAndLayer {
   tags: string[];
   tagsInclusive: boolean;
