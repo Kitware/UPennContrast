@@ -19,7 +19,7 @@
         <v-btn
           color="primary"
           class="ml-4"
-          :to="{ name: 'newdataset' }"
+          @click="goToNewDataset"
           :disabled="!store.isLoggedIn"
         >
           Upload Data
@@ -289,6 +289,33 @@ export default class App extends Vue {
   datasetChanged() {
     if (this.routeName !== "datasetview") {
       this.toggleRightPanel(null);
+    }
+  }
+
+  async goToNewDataset() {
+    try {
+      // Ensure we have a valid user and location before proceeding
+      if (!this.store.girderUser || !this.store.isLoggedIn) {
+        throw new Error("User must be logged in");
+      }
+
+      // Get the user's private folder
+      const privateFolder = await this.store.api.getUserPrivateFolder();
+      if (!privateFolder) {
+        throw new Error("Could not access private folder");
+      }
+
+      this.$router.push({
+        name: "newdataset",
+        params: {
+          quickupload: false,
+          defaultFiles: [],
+          initialUploadLocation: privateFolder,
+        } as any,
+      });
+    } catch (error) {
+      logError(error);
+      // Optionally show error to user
     }
   }
 }
