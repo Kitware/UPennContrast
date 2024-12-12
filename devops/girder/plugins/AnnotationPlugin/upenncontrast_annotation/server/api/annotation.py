@@ -1,5 +1,6 @@
 import orjson
 
+import cherrypy
 from girder.api import access
 from girder.api.describe import Description, describeRoute, autoDescribeRoute
 from girder.api.rest import Resource, loadmodel, setResponseHeader
@@ -211,16 +212,16 @@ class Annotation(Resource):
             query["shape"] = params["shape"]
         if params["tags"] is not None and len(params["tags"]) > 0:
             query["tags"] = {"$all": params["tags"]}
+        cursor = self._annotationModel.findWithPermissions(
+            query,
+            sort=sort,
+            user=self.getCurrentUser(),
+            level=AccessType.READ,
+            limit=limit,
+            offset=offset,
+        )
 
         def generateResult():
-            cursor = self._annotationModel.findWithPermissions(
-                query,
-                sort=sort,
-                user=self.getCurrentUser(),
-                level=AccessType.READ,
-                limit=limit,
-                offset=offset,
-            )
             chunk = [b"["]
             first = True
             for annotation in cursor:
@@ -246,6 +247,8 @@ class Annotation(Resource):
             yield b"".join(chunk)
 
         setResponseHeader("Content-Type", "application/json")
+        if callable(getattr(cursor, 'count', None)):
+            cherrypy.response.headers['Girder-Total-Count'] = cursor.count()
         return generateResult
 
     @access.user
