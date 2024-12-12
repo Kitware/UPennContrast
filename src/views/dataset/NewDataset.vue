@@ -12,8 +12,10 @@
     <v-form
       ref="form"
       v-model="valid"
-      :disabled="quickupload && !pipelineError"
-      @submit.prevent="valid && filesSelected && !uploading && submit()"
+      :disabled="
+        quickupload && !pipelineError && valid && filesSelected && !uploading
+      "
+      @submit.prevent="submit()"
     >
       <girder-upload
         v-if="path && !hideUploader"

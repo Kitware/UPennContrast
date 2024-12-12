@@ -20,7 +20,8 @@
           color="primary"
           class="ml-4"
           @click="goToNewDataset"
-          :disabled="!store.isLoggedIn"
+          :disabled="!store.isLoggedIn || !store.girderUser"
+          :loading="isUploadLoading"
         >
           Upload Data
         </v-btn>
@@ -164,6 +165,7 @@ import propertyStore from "@/store/properties";
 import { logError } from "@/utils/log";
 import { IHotkey } from "@/utils/v-mousetrap";
 import ChatComponent from "@/components/ChatComponent.vue";
+import { IGirderFolder } from "@/girder";
 
 @Component({
   components: {
@@ -211,6 +213,8 @@ export default class App extends Vue {
   chatbotOpen = false;
 
   lastModifiedRightPanel: string | null = null;
+
+  isUploadLoading = false;
 
   fetchConfig() {
     // Fetch the list of available tool templates
@@ -293,18 +297,20 @@ export default class App extends Vue {
   }
 
   async goToNewDataset() {
-    try {
-      // Ensure we have a valid user and location before proceeding
-      if (!this.store.girderUser || !this.store.isLoggedIn) {
-        throw new Error("User must be logged in");
-      }
+    if (this.isUploadLoading) return;
 
+    this.isUploadLoading = true;
+
+    let privateFolder: IGirderFolder | null = null;
+    try {
       // Get the user's private folder
-      const privateFolder = await this.store.api.getUserPrivateFolder();
+      privateFolder = await this.store.api.getUserPrivateFolder();
       if (!privateFolder) {
         throw new Error("Could not access private folder");
       }
-
+    } catch (error) {
+      logError(error);
+    } finally {
       this.$router.push({
         name: "newdataset",
         params: {
@@ -313,9 +319,7 @@ export default class App extends Vue {
           initialUploadLocation: privateFolder,
         } as any,
       });
-    } catch (error) {
-      logError(error);
-      // Optionally show error to user
+      this.isUploadLoading = false;
     }
   }
 }
