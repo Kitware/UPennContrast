@@ -20,6 +20,7 @@ export interface IFrameInfo {
   IndexZ?: number;
   IndexC?: number;
   IndexT?: number;
+  Channel?: string;
 }
 
 export interface IImage {
@@ -197,6 +198,7 @@ export enum ProgressType {
   CONNECTION_DELETE = "CONNECTION_DELETE",
   VIEW_FETCH = "VIEW_FETCH",
   LAYER_CACHE = "LAYER_CACHE",
+  QUADTILE_CACHE = "QUADTILE_CACHE",
   HISTOGRAM_CACHE = "HISTOGRAM_CACHE",
   HISTOGRAM_SCHEDULE = "HISTOGRAM_SCHEDULE",
   GENERIC = "GENERIC",

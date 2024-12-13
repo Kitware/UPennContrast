@@ -24,6 +24,7 @@ const ENDPOINT_MAPPINGS: Record<string, { type: ProgressType; title: string }> =
       type: ProgressType.CONNECTION_FETCH,
       title: "Fetching Connections",
     },
+    // TODO: Remove this once because I don't think we need to track it.
     dataset_view: {
       type: ProgressType.VIEW_FETCH,
       title: "Fetching Dataset View",
