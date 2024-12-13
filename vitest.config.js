@@ -4,19 +4,13 @@ import viteConfig from "./vite.config";
 
 // We have to put the "@/test" alias BEFORE the "@" alias from viteConfig
 // Otherwise, "@/test" is resolved to the folder "test" in the alias "@", instead of the alias "@/test"
-const tweakedViteConfig = mergeConfig(
-  {
-    resolve: {
-      alias: {
-        "@/test": fileURLToPath(new URL("./test", import.meta.url)),
-      },
-    },
-  },
-  viteConfig,
-);
+viteConfig.resolve.alias.unshift({
+  find: "@/test",
+  replacement: fileURLToPath(new URL("./test", import.meta.url)),
+});
 
 export default mergeConfig(
-  tweakedViteConfig,
+  viteConfig,
   defineConfig({
     test: {
       globals: true,

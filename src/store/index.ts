@@ -690,7 +690,9 @@ export class Main extends VuexModule {
 
   @Action
   async initialize() {
-    if (!this.girderRest.token) {
+    // The Girder client may set the token to the path of the API, but this actually means that we
+    // have no token, hence we are disconnected.
+    if (!this.girderRest.token || this.girderRest.token === "#/") {
       return;
     }
     try {
