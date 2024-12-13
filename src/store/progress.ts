@@ -24,6 +24,7 @@ const ENDPOINT_MAPPINGS: Record<string, { type: ProgressType; title: string }> =
       type: ProgressType.CONNECTION_FETCH,
       title: "Fetching Connections",
     },
+    // TODO: Remove this once because I don't think we need to track it.
     dataset_view: {
       type: ProgressType.VIEW_FETCH,
       title: "Fetching Dataset View",
@@ -45,15 +46,20 @@ class Progress extends VuexModule {
     id,
     progress,
     total,
+    title,
   }: {
     id: string;
     progress: number;
     total: number;
+    title?: string;
   }) {
     const item = this.items.find((p) => p.id === id);
     if (item) {
       item.progress = progress;
       item.total = total;
+      if (title) {
+        item.title = title;
+      }
     }
   }
 
@@ -106,6 +112,9 @@ class Progress extends VuexModule {
         case ProgressType.HISTOGRAM_SCHEDULE:
           title = "Scheduling Histogram Cache";
           break;
+        case ProgressType.MAXMERGE_CACHE:
+          title = "Caching MaxMerge";
+          break;
         default:
           title = "Operation in Progress";
       }
@@ -130,7 +139,7 @@ class Progress extends VuexModule {
   async trackHistogramJob(jobId: string) {
     const progressId = await this.create({
       type: ProgressType.HISTOGRAM_CACHE,
-      title: "Computing histograms",
+      title: "Computing histograms", // TODO: I think this string is redundant
     });
 
     const datasetId = main.dataset?.id;
@@ -175,7 +184,67 @@ class Progress extends VuexModule {
   }
 
   @Action
-  update(payload: { id: string; progress: number; total: number }) {
+  async trackMaxMergeJob(jobId: string) {
+    const progressId = await this.create({
+      type: ProgressType.MAXMERGE_CACHE,
+      title: "Caching Max-Merge",
+    });
+
+    const datasetId = main.dataset?.id;
+    if (!datasetId) {
+      return;
+    }
+
+    await jobs.addJob({
+      jobId,
+      datasetId,
+      eventCallback: (jobInfo) => {
+        // Check for completion
+        if (
+          [jobStates.success, jobStates.error].includes(jobInfo.status || 0)
+        ) {
+          this.complete(progressId);
+          return;
+        }
+
+        // jobInfo.title comes when the job starts.
+        // Title will be e.g. "Large Image Conversion: multi-source2.json_maxmerge_z.yaml"
+        // From which we want to extract the type of the job, which could be z, t, or zt
+        const typeMatch = jobInfo.title?.match(/_([zt])/);
+        if (typeMatch) {
+          const type = typeMatch[1];
+          this.update({
+            id: progressId,
+            progress: 0,
+            total: 0,
+            title: `Max-Merging ${type}`,
+          });
+        }
+
+        // jobInfo.text comes when the job updates (and a few other instances)
+        // For instance: "Processing frame 1/4"
+        // We can use this to update the progress
+        const frameMatch = jobInfo.text?.match(/Processing frame (\d+)\/(\d+)/);
+        if (frameMatch) {
+          const currentFrame = parseInt(frameMatch[1]);
+          const totalFrames = parseInt(frameMatch[2]);
+          this.update({
+            id: progressId,
+            progress: currentFrame,
+            total: totalFrames,
+          });
+        }
+      },
+    });
+  }
+
+  @Action
+  update(payload: {
+    id: string;
+    progress: number;
+    total: number;
+    title?: string;
+  }) {
     this.UPDATE_PROGRESS(payload);
   }
 

@@ -108,6 +108,7 @@ def cacheMaxMerge(self, item):
     if "IndexRange" not in metadata or "IndexStride" not in metadata:
         raise Exception("Specified item is not multi-frame")
     sample = ts.getSingleTile()
+    jobs = []
     for axis in ["Z", "T", "ZT"]:
         if axis != "ZT":
             stride = metadata["IndexStride"].get(f"Index{axis}", 1)
@@ -180,6 +181,7 @@ def cacheMaxMerge(self, item):
                 localJob=True,
                 tileSize=max(ts.tileWidth, ts.tileHeight),
             )
+            jobs.append(str(job["_id"]))
             subs = {}
             for idx, frame in enumerate(multi["sources"][0]["frames"]):
                 framelist = [
@@ -195,6 +197,7 @@ def cacheMaxMerge(self, item):
                 "user": user["_id"],
                 "merge_substitutes": subs,
             }
+    return {"scheduledJobs": jobs}
 
 
 def _updateJob(event):
