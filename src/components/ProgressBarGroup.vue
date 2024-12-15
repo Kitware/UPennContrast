@@ -11,7 +11,7 @@
           :indeterminate="group.indeterminate"
           :value="group.value"
           color="primary"
-          height="20"
+          height="16"
         >
           <strong>
             {{ group.title }}
@@ -36,7 +36,7 @@
               progress.total ? (100 * progress.progress) / progress.total : 0
             "
             color="primary"
-            height="12"
+            height="10"
             class="mb-1"
           >
             <strong class="caption">
@@ -141,7 +141,8 @@ export default class ProgressBarGroup extends Vue {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 300px;
+  min-width: 250px;
+  max-width: 250px;
 }
 
 .progress-group {
@@ -157,11 +158,11 @@ export default class ProgressBarGroup extends Vue {
   gap: 2px;
 
   :deep(.v-progress-linear) {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
   }
 }
 
 :deep(.v-progress-linear) {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
 }
 </style>
