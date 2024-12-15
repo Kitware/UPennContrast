@@ -410,6 +410,17 @@ export default class ImageViewer extends Vue {
 
   // Logic to show the progress bars
 
+  @Watch("readyLayersCount")
+  @Watch("readyLayersTotal")
+  onReadyLayersChange() {
+    progressStore.updateReactiveProgress({
+      type: ProgressType.LAYER_CACHE,
+      progress: this.readyLayersCount,
+      total: this.readyLayersTotal,
+      title: "Preparing layers",
+    });
+  }
+
   get progresses() {
     // Merge caching and downloading of annotations and connections
     const progresses: {

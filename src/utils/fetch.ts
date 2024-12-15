@@ -10,7 +10,16 @@ export async function fetchAllPages(
   firstPage?: number,
   progressCallback?: (fetched: number, total: number) => void,
 ) {
-  const progressId = await progressStore.create({ endpoint });
+  // Only capture progress for these endpoints
+  const PROGRESS_ENDPOINTS = [
+    "upenn_annotation",
+    "annotation_connection",
+    "annotation_property_values",
+  ];
+
+  const progressId = PROGRESS_ENDPOINTS.includes(endpoint)
+    ? await progressStore.create({ endpoint })
+    : null;
 
   const pages: any[] = [];
   let totalCount = -1;
@@ -48,11 +57,13 @@ export async function fetchAllPages(
   try {
     // Fetch first page
     await fetchPage(0, firstPageSize);
-    await progressStore.update({
-      id: progressId,
-      progress: downloaded,
-      total: totalCount,
-    });
+    if (progressId) {
+      await progressStore.update({
+        id: progressId,
+        progress: downloaded,
+        total: totalCount,
+      });
+    }
 
     // Fetch remaining pages if needed
     const promises: Promise<any>[] = [];
@@ -64,11 +75,13 @@ export async function fetchAllPages(
       promises.push(
         fetchPage(offset, basePageSize).then(() => {
           // Update progress after each page
-          progressStore.update({
-            id: progressId,
-            progress: downloaded,
-            total: totalCount,
-          });
+          if (progressId) {
+            progressStore.update({
+              id: progressId,
+              progress: downloaded,
+              total: totalCount,
+            });
+          }
         }),
       );
     }

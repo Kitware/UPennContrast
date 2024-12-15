@@ -610,13 +610,6 @@ export default class GirderAPI {
     const largeImageItems = await this.getImages(datasetId);
     const responses = [];
 
-    // TODO: Decide whether we want to track this progress.
-    // This is just for scheduling the histogram jobs, so it's not
-    // very heavy, computationally. Might be better as a toast.
-    const progressId = await progressStore.create({
-      type: ProgressType.HISTOGRAM_SCHEDULE,
-    });
-
     try {
       // Don't use a Promise.all to avoid flooding the backend with requests
       // Only send one cache request at a time
@@ -634,11 +627,10 @@ export default class GirderAPI {
     } catch (error) {
       return null;
     }
-    await progressStore.complete(progressId);
 
     // TODO: It may be important to run this over all responses, but it's
-    // probably not necessary, since if we have multiple large images, we'll
-    // have multiple jobs.
+    // probably not necessary for now, since if we have multiple large images
+    // we'll have multiple jobs.
     const jobId = responses[0].data.scheduledJob;
     await progressStore.trackHistogramJob(jobId);
     return responses;

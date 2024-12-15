@@ -8,7 +8,7 @@ import {
 import store from "./root";
 import main from "./index";
 import jobs from "./jobs";
-import { ProgressType, IProgress } from "./model";
+import { ProgressType, PROGRESS_TYPE_ORDER, IProgress } from "./model";
 import { jobStates } from "./jobs";
 import { v4 as uuidv4 } from "uuid";
 
@@ -24,10 +24,9 @@ const ENDPOINT_MAPPINGS: Record<string, { type: ProgressType; title: string }> =
       type: ProgressType.CONNECTION_FETCH,
       title: "Fetching Connections",
     },
-    // TODO: Remove this once because I don't think we need to track it.
-    dataset_view: {
-      type: ProgressType.VIEW_FETCH,
-      title: "Fetching Dataset View",
+    annotation_property_values: {
+      type: ProgressType.PROPERTY_FETCH,
+      title: "Fetching Property Values",
     },
     // Can add other endpoint mappings as needed
   };
@@ -63,6 +62,36 @@ class Progress extends VuexModule {
     }
   }
 
+  // Reactive progresses are for fast updates that react to quick UI changes
+  // They are replaced on every update and are removed when the progress is complete
+  @Mutation
+  private ADD_REACTIVE_PROGRESS(progress: Omit<IProgress, "id">) {
+    // For reactive progress, we can use a predictable ID based on the type
+    const id = `reactive-${progress.type}`;
+    // Remove any existing reactive progress of this type and replace it
+    this.items = this.items.filter((p) => p.id !== id);
+    if (progress.progress < progress.total) {
+      this.items.push({ ...progress, id, isReactive: true });
+    }
+  }
+
+  @Action
+  updateReactiveProgress(payload: {
+    type: ProgressType;
+    progress: number;
+    total: number;
+    title: string;
+    metadata?: Record<string, any>;
+  }) {
+    this.ADD_REACTIVE_PROGRESS({
+      type: payload.type,
+      progress: payload.progress,
+      total: payload.total,
+      title: payload.title,
+      metadata: payload.metadata || {},
+    });
+  }
+
   @Mutation
   private REMOVE_PROGRESS(id: string) {
     this.items = this.items.filter((p) => p.id !== id);
@@ -80,7 +109,7 @@ class Progress extends VuexModule {
     let title: string;
 
     if (payload.title) {
-      // If title is provided, use it directly with a default type
+      // If title is provided, use it directly with the provided type (if any)
       type = payload.type || ProgressType.GENERIC;
       title = payload.title;
     } else if (payload.endpoint) {
@@ -103,6 +132,9 @@ class Progress extends VuexModule {
         case ProgressType.CONNECTION_FETCH:
           title = "Fetching Connections";
           break;
+        case ProgressType.PROPERTY_FETCH:
+          title = "Fetching Properties";
+          break;
         case ProgressType.VIEW_FETCH:
           title = "Fetching Dataset View";
           break;
@@ -113,7 +145,7 @@ class Progress extends VuexModule {
           title = "Scheduling Histogram Cache";
           break;
         case ProgressType.MAXMERGE_CACHE:
-          title = "Caching MaxMerge";
+          title = "Caching Max-Merge";
           break;
         default:
           title = "Operation in Progress";
@@ -132,6 +164,16 @@ class Progress extends VuexModule {
       title,
       metadata: payload.metadata || {},
     });
+
+    // For reactive progresses, we remove them after 1 second
+    // This is to prevent orphaned progresses from hanging around
+    setTimeout(() => {
+      const item = this.items.find((p) => p.id === id && p.isReactive);
+      if (item) {
+        this.REMOVE_PROGRESS(id);
+      }
+    }, 1000); // 1 second timeout
+
     return id;
   }
 
@@ -139,7 +181,7 @@ class Progress extends VuexModule {
   async trackHistogramJob(jobId: string) {
     const progressId = await this.create({
       type: ProgressType.HISTOGRAM_CACHE,
-      title: "Computing histograms", // TODO: I think this string is redundant
+      title: "Waiting for Histogram precomputation",
     });
 
     const datasetId = main.dataset?.id;
@@ -177,6 +219,7 @@ class Progress extends VuexModule {
             id: progressId,
             progress: currentFrame + 1,
             total: totalFrames,
+            title: "Precomputing Histograms",
           });
         }
       },
@@ -187,7 +230,7 @@ class Progress extends VuexModule {
   async trackMaxMergeJob(jobId: string) {
     const progressId = await this.create({
       type: ProgressType.MAXMERGE_CACHE,
-      title: "Caching Max-Merge",
+      title: "Waiting for Max-Merge precomputation",
     });
 
     const datasetId = main.dataset?.id;
@@ -254,7 +297,11 @@ class Progress extends VuexModule {
   }
 
   get activeProgresses() {
-    return this.items;
+    return [...this.items].sort((a, b) => {
+      const priorityA = PROGRESS_TYPE_ORDER.get(a.type) ?? Number.MAX_VALUE;
+      const priorityB = PROGRESS_TYPE_ORDER.get(b.type) ?? Number.MAX_VALUE;
+      return priorityA - priorityB;
+    });
   }
 
   get hasActiveProgresses() {

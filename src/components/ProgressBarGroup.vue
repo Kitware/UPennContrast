@@ -84,16 +84,20 @@ export default class ProgressBarGroup extends Vue {
       // Single progress case
       if (items.length === 1) {
         const progress = items[0];
+        const isIndeterminate = progress.total === 0;
         return {
           type,
           display: "single",
           title: progress.title,
-          progress: progress.progress,
-          total: progress.total,
-          value: progress.total
-            ? (100 * progress.progress) / progress.total
-            : 0,
-          indeterminate: progress.total === 0,
+          indeterminate: isIndeterminate,
+          // Only set total and progress if we actually have a total.
+          ...(isIndeterminate
+            ? {}
+            : {
+                progress: progress.progress,
+                total: progress.total,
+                value: (100 * progress.progress) / progress.total,
+              }),
           count: 1,
           items,
         };
