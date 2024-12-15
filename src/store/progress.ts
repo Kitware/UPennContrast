@@ -18,15 +18,15 @@ const ENDPOINT_MAPPINGS: Record<string, { type: ProgressType; title: string }> =
   {
     upenn_annotation: {
       type: ProgressType.ANNOTATION_FETCH,
-      title: "Fetching Annotations", // TODO: If we decide that this will always be the same for all progresses of this type, we can remove this title and just use the default
+      title: "Fetching annotations", // TODO: If we decide that this will always be the same for all progresses of this type, we can remove this title and just use the default
     },
     annotation_connection: {
       type: ProgressType.CONNECTION_FETCH,
-      title: "Fetching Connections",
+      title: "Fetching connections",
     },
     annotation_property_values: {
       type: ProgressType.PROPERTY_FETCH,
-      title: "Fetching Property Values",
+      title: "Fetching property values",
     },
     // Can add other endpoint mappings as needed
   };
@@ -127,33 +127,33 @@ class Progress extends VuexModule {
       type = payload.type;
       switch (type) {
         case ProgressType.ANNOTATION_FETCH:
-          title = "Fetching Annotations";
+          title = "Fetching annotations";
           break;
         case ProgressType.CONNECTION_FETCH:
-          title = "Fetching Connections";
+          title = "Fetching connections";
           break;
         case ProgressType.PROPERTY_FETCH:
-          title = "Fetching Properties";
+          title = "Fetching properties";
           break;
         case ProgressType.VIEW_FETCH:
-          title = "Fetching Dataset View";
+          title = "Fetching dataset view";
           break;
         case ProgressType.HISTOGRAM_CACHE:
-          title = "Computing Histograms";
+          title = "Computing histograms";
           break;
         case ProgressType.HISTOGRAM_SCHEDULE:
-          title = "Scheduling Histogram Cache";
+          title = "Scheduling histogram cache";
           break;
         case ProgressType.MAXMERGE_CACHE:
-          title = "Caching Max-Merge";
+          title = "Caching max-merge";
           break;
         default:
-          title = "Operation in Progress";
+          title = "Operation in progress";
       }
     } else {
       // Fallback
       type = ProgressType.GENERIC;
-      title = "Operation in Progress";
+      title = "Operation in progress";
     }
 
     this.ADD_PROGRESS({
@@ -181,7 +181,7 @@ class Progress extends VuexModule {
   async trackHistogramJob(jobId: string) {
     const progressId = await this.create({
       type: ProgressType.HISTOGRAM_CACHE,
-      title: "Waiting for Histogram precomputation",
+      title: "Waiting for histogram precomputation",
     });
 
     const datasetId = main.dataset?.id;
@@ -219,7 +219,7 @@ class Progress extends VuexModule {
             id: progressId,
             progress: currentFrame + 1,
             total: totalFrames,
-            title: "Precomputing Histograms",
+            title: "Precomputing histograms",
           });
         }
       },
@@ -230,7 +230,7 @@ class Progress extends VuexModule {
   async trackMaxMergeJob(jobId: string) {
     const progressId = await this.create({
       type: ProgressType.MAXMERGE_CACHE,
-      title: "Waiting for Max-Merge precomputation",
+      title: "Waiting for max-merge precomputation",
     });
 
     const datasetId = main.dataset?.id;

@@ -228,7 +228,6 @@ export const PROGRESS_TYPE_ORDER = new Map<ProgressType, number>([
   [ProgressType.GENERIC, 16],
 ]);
 
-
 export interface IProgress {
   id: string;
   type: ProgressType;

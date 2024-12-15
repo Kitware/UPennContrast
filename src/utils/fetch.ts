@@ -8,7 +8,6 @@ export async function fetchAllPages(
   endpoint: string,
   baseFormData?: AxiosRequestConfig,
   firstPage?: number,
-  progressCallback?: (fetched: number, total: number) => void,
 ) {
   // Only capture progress for these endpoints
   const PROGRESS_ENDPOINTS = [
@@ -47,7 +46,6 @@ export async function fetchAllPages(
       totalCount = Number(res.headers["girder-total-count"]);
       pages.push(res.data);
       downloaded += res.data.length;
-      progressCallback?.(downloaded, totalCount);
     } catch (err) {
       logError(`Could not get all ${endpoint} pages:\n${err}`);
       throw err;

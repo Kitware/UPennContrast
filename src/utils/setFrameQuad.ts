@@ -115,13 +115,6 @@ async function loadImages(
   status: ISetQuadStatus,
   layer: IGeoJSOsmLayer,
 ) {
-  // Helper arrow function to call the progress callback
-  const safeProgress = async () => {
-    try {
-      options.progress(status);
-    } catch {}
-  };
-
   // Get quad info and update status
   const data = await quadInformation.restRequest({
     type: "GET",
@@ -132,7 +125,6 @@ async function loadImages(
   status.frames = data.frames;
   status.framesToIdx = data.framesToIdx;
   status.totalToLoad = data.src.length;
-  safeProgress();
 
   let progressId: string | null = null;
   const channel = status.tileinfo.frames[status.frames[0]].Channel ?? "channel";
@@ -189,12 +181,10 @@ async function loadImages(
       progress: status.loadedCount,
       total: data.src.length,
     });
-    safeProgress();
   }
 
   // Done loading all images
   status.loaded = true;
-  safeProgress();
   if (progressId) {
     await progressStore.complete(progressId);
   }
