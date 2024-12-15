@@ -161,7 +161,6 @@ import ProgressBarGroup from "@/components/ProgressBarGroup.vue";
 import LayerInfoGrid from "./LayerInfoGrid.vue";
 import { ITileHistogram } from "@/store/images";
 import { convertLength } from "@/utils/conversion";
-import jobs, { jobStates } from "@/store/jobs";
 import { IHotkey } from "@/utils/v-mousetrap";
 import { NoOutput } from "@/pipelines/computePipeline";
 import { logWarning } from "@/utils/log";
