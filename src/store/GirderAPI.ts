@@ -26,7 +26,6 @@ import {
   newLayer,
   TJobType,
   IDatasetConfigurationCompatibility,
-  ProgressType,
 } from "@/store/model";
 import {
   toStyle,
