@@ -1944,7 +1944,7 @@ export default class AnnotationViewer extends Vue {
     }
 
     // Remove the selection annotation from layer (do not show the annotation used to select)
-    this.annotationLayer.removeAnnotation(selectAnnotation);
+    this.interactionLayer.removeAnnotation(selectAnnotation);
   }
 
   private async handleAnnotationConnections(
