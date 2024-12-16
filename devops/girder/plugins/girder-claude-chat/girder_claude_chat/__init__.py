@@ -8,7 +8,7 @@ from girder.api.describe import Description, autoDescribeRoute
 from girder.api.rest import Resource
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
