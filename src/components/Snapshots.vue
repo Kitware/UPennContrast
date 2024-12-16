@@ -346,7 +346,6 @@ import {
   ISnapshot,
   copyLayerWithoutPrivateAttributes,
 } from "@/store/model";
-import axios from "axios";
 import { DeflateOptions, Zip, ZipDeflate } from "fflate";
 import girderResources from "@/store/girderResources";
 import {
