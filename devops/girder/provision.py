@@ -1,13 +1,10 @@
 import argparse
-import os
 import sys
 
 from girder.models.assetstore import Assetstore
 from girder.models.setting import Setting
 from girder.models.user import User
 from girder.utility.server import configureServer
-
-assetstoreName = "Assetstore"
 
 
 def provision(opts):
@@ -36,20 +33,7 @@ def provision(opts):
 
     # Make sure we have an assetstore
     if Assetstore().findOne() is None:
-        if "S3_BUCKET_NAME" in os.environ:
-            if "S3_BUCKET_ACCESS_KEY" not in os.environ \
-                 or "S3_BUCKET_SECRET" not in os.environ:
-                raise ValueError(
-                    "Cannot create S3 assetstore: S3_BUCKET_ACCESS_KEY or "
-                    "S3_BUCKET_SECRET missing.")
-            Assetstore().createS3Assetstore(
-                assetstoreName, os.environ.get("S3_BUCKET_NAME"),
-                os.environ.get("S3_BUCKET_ACCESS_KEY"),
-                os.environ.get("S3_BUCKET_SECRET"), region="us-east-1",
-                serverSideEncryption=True)
-        else:
-            Assetstore().createFilesystemAssetstore(
-                assetstoreName, "/assetstore")
+        Assetstore().createFilesystemAssetstore("Assetstore", "/assetstore")
 
 
 if __name__ == "__main__":

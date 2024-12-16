@@ -7,6 +7,8 @@ multi_data
 # local env files
 *.local
 .venv
+.env
+.python-version
 
 #unplugin-vue-components plugin
 components.d.ts
