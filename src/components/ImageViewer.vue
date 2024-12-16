@@ -351,21 +351,6 @@ export default class ImageViewer extends Vue {
     }
   }
 
-  // // Logic to show an alert when the dataset is optimized
-  // showOptimizedAlert = false;
-
-  // get loadedAndOptimized() {
-  //   return this.cacheProgresses.length === 0 && this.histogramCaches <= 0;
-  // }
-
-  // @Watch("loadedAndOptimized")
-  // onOptimizedChanged() {
-  //   this.showOptimizedAlert = this.loadedAndOptimized;
-  //   if (this.showOptimizedAlert) {
-  //     setTimeout(() => (this.showOptimizedAlert = false), 3000);
-  //   }
-  // }
-
   // Logic to show the layer progress bars
   @Watch("readyLayersCount")
   @Watch("readyLayersTotal")
