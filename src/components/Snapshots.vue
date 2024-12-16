@@ -753,7 +753,7 @@ export default class Snapshots extends Vue {
     const filenames: Set<string> = new Set();
     const filesPushed = urls.map(async (url) => {
       // Fetch the file data
-      const { data } = await axios.get(url.href, {
+      const { data } = await store.girderRest.get(url.href, {
         responseType: "arraybuffer",
       });
       // Create a unique file name
