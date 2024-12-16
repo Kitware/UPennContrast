@@ -32,15 +32,6 @@ import { simpleCentroid } from "@/utils/annotation";
 import { logError } from "@/utils/log";
 import { IAnnotationSetup } from "@/tools/creation/templates/AnnotationConfiguration.vue";
 
-interface IFetchingProgress {
-  annotationProgress: number;
-  annotationTotal: number;
-  annotationDone: boolean;
-  connectionProgress: number;
-  connectionTotal: number;
-  connectionDone: boolean;
-}
-
 @Module({ dynamic: true, store, name: "annotation" })
 export class Annotations extends VuexModule {
   annotationsAPI = main.annotationsAPI;
@@ -55,8 +46,6 @@ export class Annotations extends VuexModule {
 
   selectedAnnotations: IAnnotation[] = [];
   activeAnnotationIds: string[] = [];
-
-  progresses: IFetchingProgress[] = [];
 
   pendingAnnotation: IAnnotation | null = null;
   submitPendingAnnotationTimeout: number = 1;
@@ -893,40 +882,6 @@ export class Annotations extends VuexModule {
     this.updateAnnotationsPerId({ annotationIds: [id], editFunction });
   }
 
-  @Mutation
-  addProgress(progressObj: IFetchingProgress) {
-    this.progresses.push(progressObj);
-  }
-
-  @Mutation
-  removeProgress(progress: IFetchingProgress) {
-    this.progresses = this.progresses.filter(
-      (otherProgress) => otherProgress !== progress,
-    );
-  }
-
-  @Action
-  createProgresses() {
-    const progressObj: IFetchingProgress = {
-      annotationProgress: 0,
-      annotationTotal: 0,
-      annotationDone: false,
-      connectionProgress: 0,
-      connectionTotal: 0,
-      connectionDone: false,
-    };
-    const annotationCallback = (progress: number, total: number) => {
-      progressObj.annotationProgress = progress;
-      progressObj.annotationTotal = total;
-    };
-    const connectionCallback = (progress: number, total: number) => {
-      progressObj.connectionProgress = progress;
-      progressObj.connectionTotal = total;
-    };
-    this.addProgress(progressObj);
-    return { progress: progressObj, annotationCallback, connectionCallback };
-  }
-
   @Action
   async fetchAnnotations() {
     this.setAnnotations([]);
@@ -934,19 +889,13 @@ export class Annotations extends VuexModule {
     if (!main.dataset || !main.configuration) {
       return;
     }
-    const { progress, annotationCallback, connectionCallback } =
-      await this.createProgresses();
     try {
       const annotationsPromise = this.annotationsAPI.getAnnotationsForDatasetId(
         main.dataset.id,
-        annotationCallback,
       );
       const connectionsPromise = this.annotationsAPI.getConnectionsForDatasetId(
         main.dataset.id,
-        connectionCallback,
       );
-      annotationsPromise.finally(() => (progress.annotationDone = true));
-      connectionsPromise.finally(() => (progress.connectionDone = true));
       const promises: [
         Promise<IAnnotation[]>,
         Promise<IAnnotationConnection[]>,
@@ -969,8 +918,6 @@ export class Annotations extends VuexModule {
       this.setAnnotations([]);
       this.setConnections([]);
       logError((error as Error).message);
-    } finally {
-      this.removeProgress(progress);
     }
   }
 

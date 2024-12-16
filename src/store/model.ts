@@ -20,6 +20,7 @@ export interface IFrameInfo {
   IndexZ?: number;
   IndexC?: number;
   IndexT?: number;
+  Channel?: string;
 }
 
 export interface IImage {
@@ -185,6 +186,68 @@ export type TToolState<T extends TToolType = TToolType> = TFullToolStateMap[T];
 export interface IActiveTool<T extends TToolType = TToolType> {
   configuration: IToolConfiguration<T>;
   state: TToolState<T>;
+}
+
+export enum ProgressType {
+  ANNOTATION_FETCH = "ANNOTATION_FETCH",
+  ANNOTATION_SAVE = "ANNOTATION_SAVE",
+  ANNOTATION_DELETE = "ANNOTATION_DELETE",
+  ANNOTATION_COMPUTE = "ANNOTATION_COMPUTE",
+  PROPERTY_FETCH = "PROPERTY_FETCH",
+  PROPERTY_COMPUTE = "PROPERTY_COMPUTE",
+  CONNECTION_FETCH = "CONNECTION_FETCH",
+  CONNECTION_SAVE = "CONNECTION_SAVE",
+  CONNECTION_DELETE = "CONNECTION_DELETE",
+  VIEW_FETCH = "VIEW_FETCH",
+  LAYER_CACHE = "LAYER_CACHE",
+  QUADTILE_CACHE = "QUADTILE_CACHE",
+  MAXMERGE_SCHEDULE = "MAXMERGE_SCHEDULE",
+  MAXMERGE_CACHE = "MAXMERGE_CACHE",
+  HISTOGRAM_SCHEDULE = "HISTOGRAM_SCHEDULE",
+  HISTOGRAM_CACHE = "HISTOGRAM_CACHE",
+  GENERIC = "GENERIC",
+}
+
+export const PROGRESS_TYPE_ORDER = new Map<ProgressType, number>([
+  [ProgressType.ANNOTATION_FETCH, 0],
+  [ProgressType.ANNOTATION_SAVE, 1],
+  [ProgressType.ANNOTATION_DELETE, 2],
+  [ProgressType.ANNOTATION_COMPUTE, 3],
+  [ProgressType.PROPERTY_FETCH, 4],
+  [ProgressType.PROPERTY_COMPUTE, 5],
+  [ProgressType.CONNECTION_FETCH, 6],
+  [ProgressType.CONNECTION_SAVE, 7],
+  [ProgressType.CONNECTION_DELETE, 8],
+  [ProgressType.VIEW_FETCH, 9],
+  [ProgressType.LAYER_CACHE, 10],
+  [ProgressType.QUADTILE_CACHE, 11],
+  [ProgressType.MAXMERGE_SCHEDULE, 12],
+  [ProgressType.MAXMERGE_CACHE, 13],
+  [ProgressType.HISTOGRAM_SCHEDULE, 14],
+  [ProgressType.HISTOGRAM_CACHE, 15],
+  [ProgressType.GENERIC, 16],
+]);
+
+export interface IProgress {
+  id: string;
+  type: ProgressType;
+  progress: number;
+  total: number;
+  title: string;
+  metadata: Record<string, any>;
+  isReactive?: boolean;
+}
+
+export interface IProgressGroup {
+  type: ProgressType;
+  display: "single" | "stacked";
+  title: string;
+  progress?: number;
+  total?: number;
+  value?: number;
+  indeterminate: boolean;
+  count: number;
+  items: IProgress[];
 }
 
 export interface IRestrictTagsAndLayer {

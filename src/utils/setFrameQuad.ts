@@ -1,5 +1,11 @@
 import { ITileMeta } from "@/store/GirderAPI";
-import { IGeoJSOsmLayer, IGeoJSQuad, IQuadInformation } from "@/store/model";
+import {
+  IGeoJSOsmLayer,
+  IGeoJSQuad,
+  IQuadInformation,
+  ProgressType,
+} from "@/store/model";
+import progressStore from "@/store/progress";
 
 export interface ISetQuadStatusOptions {
   progress: (status: ISetQuadStatus) => void;
@@ -109,13 +115,6 @@ async function loadImages(
   status: ISetQuadStatus,
   layer: IGeoJSOsmLayer,
 ) {
-  // Helper arrow function to call the progress callback
-  const safeProgress = () => {
-    try {
-      options.progress(status);
-    } catch {}
-  };
-
   // Get quad info and update status
   const data = await quadInformation.restRequest({
     type: "GET",
@@ -126,7 +125,18 @@ async function loadImages(
   status.frames = data.frames;
   status.framesToIdx = data.framesToIdx;
   status.totalToLoad = data.src.length;
-  safeProgress();
+
+  let progressId: string | null = null;
+  const channel = status.tileinfo.frames[status.frames[0]].Channel ?? "channel";
+  progressId = await progressStore.create({
+    type: ProgressType.QUADTILE_CACHE,
+    title: `Optimizing ${channel}`,
+  });
+  await progressStore.update({
+    id: progressId,
+    progress: 0,
+    total: data.src.length,
+  });
 
   // Create an Image element for each src in the quad info
   for (let idx = 0; idx < data.src.length; idx++) {
@@ -166,12 +176,18 @@ async function loadImages(
       img.onerror = voidResolve;
     });
     status.loadedCount += 1;
-    safeProgress();
+    await progressStore.update({
+      id: progressId,
+      progress: status.loadedCount,
+      total: data.src.length,
+    });
   }
 
   // Done loading all images
   status.loaded = true;
-  safeProgress();
+  if (progressId) {
+    await progressStore.complete(progressId);
+  }
 
   // Adjust min level of the layer
   if (

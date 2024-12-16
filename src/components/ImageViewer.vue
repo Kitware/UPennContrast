@@ -1,5 +1,6 @@
 <template>
   <div class="image" v-mousetrap="mousetrapAnnotations">
+    <progress-bar-group />
     <v-dialog v-model="scaleDialog">
       <v-card>
         <v-card-title> Scale settings </v-card-title>
@@ -66,16 +67,6 @@
       @cornersChange="setCorners"
     />
     <v-alert
-      v-model="showOptimizedAlert"
-      class="viewer-alert"
-      type="success"
-      dense
-      dismissible
-      transition="slide-x-transition"
-    >
-      Dataset fully loaded and optimized
-    </v-alert>
-    <v-alert
       v-model="showSamToolHelpAlert"
       class="viewer-alert"
       type="info"
@@ -88,30 +79,6 @@
       Shift + click + drag to add box
     </v-alert>
     <div class="bottom-right-container">
-      <div
-        class="progress"
-        v-for="(cacheObj, cacheIdx) in progresses"
-        :key="'cache-' + cacheIdx"
-      >
-        <v-progress-linear
-          :indeterminate="cacheObj.total === 0"
-          :value="
-            cacheObj.total ? (100 * cacheObj.progress) / cacheObj.total : 0
-          "
-          color="#CCC"
-          background-color="blue-grey"
-          style="height: 100%; z-index: inherit"
-        >
-          <strong class="text-center ma-1">
-            {{ cacheObj.title }}
-            <template v-if="cacheObj.total !== 0">
-              {{ ((100 * cacheObj.progress) / cacheObj.total).toFixed(1) }}% ({{
-                cacheObj.progress
-              }}&nbsp;/&nbsp;{{ cacheObj.total }})
-            </template>
-          </strong>
-        </v-progress-linear>
-      </div>
       <v-btn
         v-if="submitPendingAnnotation"
         @click.capture.stop="
@@ -174,6 +141,7 @@
 //  $('.geojs-map').data('data-geojs-map')
 import { Vue, Component, Watch } from "vue-property-decorator";
 import annotationStore from "@/store/annotation";
+import progressStore from "@/store/progress";
 import store from "@/store";
 import girderResources from "@/store/girderResources";
 import geojs from "geojs";
@@ -191,16 +159,17 @@ import {
   IMouseState,
   SamAnnotationToolStateSymbol,
   IGeoJSMap,
+  ProgressType,
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
 import AnnotationViewer from "@/components/AnnotationViewer.vue";
 import ImageOverview from "@/components/ImageOverview.vue";
 import ScaleSettings from "@/components/ScaleSettings.vue";
+import ProgressBarGroup from "@/components/ProgressBarGroup.vue";
 import LayerInfoGrid from "./LayerInfoGrid.vue";
 import { ITileHistogram } from "@/store/images";
 import { convertLength } from "@/utils/conversion";
-import jobs, { jobStates } from "@/store/jobs";
 import { IHotkey } from "@/utils/v-mousetrap";
 import { NoOutput } from "@/pipelines/computePipeline";
 import { logWarning } from "@/utils/log";
@@ -263,7 +232,13 @@ function isMouseStartEvent(evt: MouseEvent): boolean {
 }
 
 @Component({
-  components: { AnnotationViewer, ImageOverview, ScaleSettings, LayerInfoGrid },
+  components: {
+    AnnotationViewer,
+    ImageOverview,
+    ScaleSettings,
+    LayerInfoGrid,
+    ProgressBarGroup,
+  },
 })
 export default class ImageViewer extends Vue {
   readonly store = store;
@@ -365,8 +340,6 @@ export default class ImageViewer extends Vue {
 
   mapSynchronizationCallbacks: Map<IGeoJSMap, () => void> = new Map();
 
-  histogramCaches: number = 0;
-  cacheProgresses: { progress: number; total: number }[] = [];
   scaleWidget: IGeoJSScaleWidget | null = null;
   scalePixelWidget: IGeoJSScaleWidget | null = null;
 
@@ -387,69 +360,16 @@ export default class ImageViewer extends Vue {
     }
   }
 
-  // Logic to show an alert when the dataset is optimized
-
-  showOptimizedAlert = false;
-
-  get loadedAndOptimized() {
-    return (
-      this.cacheProgresses.length === 0 &&
-      this.annotationStore.progresses.length === 0 &&
-      this.histogramCaches <= 0
-    );
-  }
-
-  @Watch("loadedAndOptimized")
-  onOptimizedChanged() {
-    this.showOptimizedAlert = this.loadedAndOptimized;
-    if (this.showOptimizedAlert) {
-      setTimeout(() => (this.showOptimizedAlert = false), 3000);
-    }
-  }
-
-  // Logic to show the progress bars
-
-  get progresses() {
-    // Merge caching and downloading of annotations and connections
-    const progresses: {
-      progress: number;
-      total: number;
-      title: string;
-    }[] = [];
-    if (!this.layersReady) {
-      progresses.push({
-        progress: this.readyLayersCount,
-        total: this.readyLayersTotal,
-        title: "Preparing layers",
-      });
-    }
-    if (this.histogramCaches > 0) {
-      progresses.push({
-        progress: 0,
-        total: 0,
-        title: "Computing histograms",
-      });
-    }
-    for (const progress of this.cacheProgresses) {
-      progresses.push({ ...progress, title: "Optimizing performance" });
-    }
-    for (const progress of this.annotationStore.progresses) {
-      if (!progress.annotationDone) {
-        progresses.push({
-          progress: progress.annotationProgress,
-          total: progress.annotationTotal,
-          title: "Downloading annotations",
-        });
-      }
-      if (!progress.connectionDone) {
-        progresses.push({
-          progress: progress.connectionProgress,
-          total: progress.connectionTotal,
-          title: "Downloading connections",
-        });
-      }
-    }
-    return progresses;
+  // Logic to show the layer progress bars
+  @Watch("readyLayersCount")
+  @Watch("readyLayersTotal")
+  onReadyLayersChange() {
+    progressStore.updateReactiveProgress({
+      type: ProgressType.LAYER_CACHE,
+      progress: this.readyLayersCount,
+      total: this.readyLayersTotal,
+      title: "Preparing layers",
+    });
   }
 
   get readyLayersCount() {
@@ -577,50 +497,15 @@ export default class ImageViewer extends Vue {
     return llist;
   }
 
+  // TODO: This currently does nothing. However, this used to be where the
+  // histogram cachine was reloaded based on the running jobs. We could implement
+  // something like that again if we want to show the progress bars for the
+  // various caching processes (histograms, annotations, quad frames, etc.).
   async datasetReset() {
-    // Get histogram progresses
-    this.histogramCaches = 0;
     const datasetId = this.dataset?.id;
     if (!datasetId) {
       return;
     }
-    const girderJobs = await this.store.api.findJobs(
-      "large_image_cache_histograms",
-      [jobStates.inactive, jobStates.queued, jobStates.running],
-    );
-    const validityPromises = girderJobs.map(async (girderJob: any) => {
-      const largeImageId = girderJob?.kwargs?.itemId;
-      if (!largeImageId) {
-        return false;
-      }
-      const largeImageItem = await this.girderResources.getItem(largeImageId);
-      return !!largeImageItem && datasetId === largeImageItem.folderId;
-    });
-    const validityArray = await Promise.all(validityPromises);
-    const filteredJobs = girderJobs.filter((_, i) => validityArray[i]);
-    filteredJobs.forEach((girderJob: any) => {
-      const jobId = girderJob._id;
-      let cacheIncreased = false;
-      // Increase number of caching histograms when running
-      const eventCallback = (jobInfo: any) => {
-        const newStatus = jobInfo.status;
-        if (
-          !cacheIncreased &&
-          typeof newStatus === "number" &&
-          newStatus === jobStates.running
-        ) {
-          ++this.histogramCaches;
-          cacheIncreased = true;
-        }
-      };
-      eventCallback(girderJob);
-      jobs.addJob({ jobId, datasetId, eventCallback }).then(() => {
-        // Decrease number of caching histograms if it has been increased
-        if (cacheIncreased) {
-          --this.histogramCaches;
-        }
-      });
-    });
   }
 
   mouseState: IMouseState | null = null;
@@ -1214,16 +1099,10 @@ export default class ImageViewer extends Vue {
           } else {
             if (!fullLayer.setFrameQuad) {
               const progessObject = { progress: 0, total: 0 };
-              this.cacheProgresses.push(progessObject);
               setFrameQuad(someImage.tileinfo, fullLayer, baseQuadOptions, {
                 progress: (status: ISetQuadStatus) => {
                   progessObject.progress = status.loadedCount;
                   progessObject.total = status.totalToLoad;
-                  if (progessObject.progress >= progessObject.total) {
-                    this.cacheProgresses = this.cacheProgresses.filter(
-                      (obj) => obj !== progessObject,
-                    );
-                  }
                 },
               });
             }

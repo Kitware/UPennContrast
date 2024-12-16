@@ -83,10 +83,7 @@ export default class AnnotationsAPI {
       });
   }
 
-  async getAnnotationsForDatasetId(
-    datasetId: string,
-    progressCallback?: (fetched: number, total: number) => void,
-  ): Promise<IAnnotation[]> {
+  async getAnnotationsForDatasetId(datasetId: string): Promise<IAnnotation[]> {
     const annotations: IAnnotation[] = [];
     const pages = await fetchAllPages(
       this.client,
@@ -95,7 +92,6 @@ export default class AnnotationsAPI {
         params: { datasetId, sort: "_id" },
       },
       undefined,
-      progressCallback,
     );
     for (const page of pages) {
       const newAnnotations = page.map(this.toAnnotation);
@@ -190,7 +186,6 @@ export default class AnnotationsAPI {
 
   async getConnectionsForDatasetId(
     datasetId: string,
-    progressCallback?: (fetched: number, total: number) => void,
   ): Promise<IAnnotationConnection[]> {
     const connections: IAnnotationConnection[] = [];
     const pages = await fetchAllPages(
@@ -200,7 +195,6 @@ export default class AnnotationsAPI {
         params: { datasetId, sort: "_id" },
       },
       undefined,
-      progressCallback,
     );
     for (const page of pages) {
       const newConnections = page.map(this.toConnection);

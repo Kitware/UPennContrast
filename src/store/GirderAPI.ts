@@ -33,6 +33,7 @@ import {
   mergeHistograms,
   ITileHistogram,
 } from "@/store/images";
+import progressStore from "@/store/progress";
 import { Promise as BluebirdPromise } from "bluebird";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { fetchAllPages } from "@/utils/fetch";
@@ -581,30 +582,56 @@ export default class GirderAPI {
     });
   }
 
-  scheduleMaxMergeCache(datasetId: string) {
-    return this.getImages(datasetId).then((items: IGirderItem[]) => {
-      return items.map((item: IGirderItem) => {
-        return this.client.put(`/item/${item._id}/cache_maxmerge`);
-      });
-    });
+  async scheduleMaxMergeCache(datasetId: string) {
+    const items = await this.getImages(datasetId);
+    try {
+      // Don't use Promise.all to avoid flooding the backend with requests
+      // Process one item at a time
+      const responses = [];
+      for (const item of items) {
+        const response = await this.client.put(
+          `/item/${item._id}/cache_maxmerge`,
+        );
+        responses.push(response);
+      }
+      for (const response of responses) {
+        for (const jobId of response.data.scheduledJobs) {
+          await progressStore.trackMaxMergeJob(jobId);
+        }
+      }
+      return responses;
+    } catch (error) {
+      return null;
+    }
   }
 
   async scheduleHistogramCache(datasetId: string) {
     const largeImageItems = await this.getImages(datasetId);
     const responses = [];
-    // Don't use a Promise.all to avoid flooding the backend with requests
-    // Only send one cache request at a time
-    for (const imageItem of largeImageItems) {
-      const params: IHistogramOptions = {
-        ...this.baseHistogramOptions,
-        cache: "schedule",
-      };
-      const response = await this.client.get(
-        `item/${imageItem._id}/tiles/histogram`,
-        { params },
-      );
-      responses.push(response);
+
+    try {
+      // Don't use a Promise.all to avoid flooding the backend with requests
+      // Only send one cache request at a time
+      for (const imageItem of largeImageItems) {
+        const params: IHistogramOptions = {
+          ...this.baseHistogramOptions,
+          cache: "schedule",
+        };
+        const response = await this.client.get(
+          `item/${imageItem._id}/tiles/histogram`,
+          { params },
+        );
+        responses.push(response);
+      }
+    } catch (error) {
+      return null;
     }
+
+    // TODO: It may be important to run this over all responses, but it's
+    // probably not necessary for now, since if we have multiple large images
+    // we'll have multiple jobs.
+    const jobId = responses[0].data.scheduledJob;
+    await progressStore.trackHistogramJob(jobId);
     return responses;
   }
 

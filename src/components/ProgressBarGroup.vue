@@ -1,0 +1,168 @@
+<template>
+  <div class="progress-container" v-if="hasActiveProgresses">
+    <div
+      v-for="group in progressGroups"
+      :key="group.type"
+      class="progress-group"
+    >
+      <!-- Single progress or multiple indeterminate with same title -->
+      <template v-if="group.display === 'single'">
+        <v-progress-linear
+          :indeterminate="group.indeterminate"
+          :value="group.value"
+          color="primary"
+          height="16"
+        >
+          <strong>
+            {{ group.title }}
+            <template v-if="group.total !== undefined">
+              ({{ group.progress }}/{{ group.total }})
+            </template>
+            <template v-if="group.count > 1">
+              ({{ group.count }} remaining)
+            </template>
+          </strong>
+        </v-progress-linear>
+      </template>
+
+      <!-- Multiple progresses that need individual display -->
+      <template v-else>
+        <div class="stacked-progress">
+          <v-progress-linear
+            v-for="progress in group.items"
+            :key="progress.id"
+            :indeterminate="progress.total === 0"
+            :value="
+              progress.total ? (100 * progress.progress) / progress.total : 0
+            "
+            color="primary"
+            height="10"
+            class="mb-1"
+          >
+            <strong class="caption">
+              {{ progress.title }}
+              <template v-if="progress.total > 0">
+                ({{ progress.progress }}/{{ progress.total }})
+              </template>
+            </strong>
+          </v-progress-linear>
+        </div>
+      </template>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import { Vue, Component } from "vue-property-decorator";
+import progressStore from "@/store/progress";
+import { ProgressType, IProgress, IProgressGroup } from "@/store/model";
+
+@Component({})
+export default class ProgressBarGroup extends Vue {
+  readonly progressStore = progressStore;
+
+  get activeProgresses() {
+    return this.progressStore.activeProgresses;
+  }
+
+  get hasActiveProgresses() {
+    return this.progressStore.hasActiveProgresses;
+  }
+
+  get progressGroups(): IProgressGroup[] {
+    // Group progresses by type
+    const groupedByType = new Map<ProgressType, IProgress[]>();
+
+    for (const progress of this.activeProgresses) {
+      if (!groupedByType.has(progress.type)) {
+        groupedByType.set(progress.type, []);
+      }
+      groupedByType.get(progress.type)!.push(progress);
+    }
+
+    return Array.from(groupedByType.entries()).map(([type, items]) => {
+      // Single progress case
+      if (items.length === 1) {
+        const progress = items[0];
+        const isIndeterminate = progress.total === 0;
+        return {
+          type,
+          display: "single",
+          title: progress.title,
+          indeterminate: isIndeterminate,
+          // Only set total and progress if we actually have a total.
+          ...(isIndeterminate
+            ? {}
+            : {
+                progress: progress.progress,
+                total: progress.total,
+                value: (100 * progress.progress) / progress.total,
+              }),
+          count: 1,
+          items,
+        };
+      }
+
+      // Check if all items are indeterminate and have the same title
+      const allIndeterminate = items.every((p) => p.total === 0);
+      const allSameTitle = items.every((p) => p.title === items[0].title);
+
+      if (allIndeterminate && allSameTitle) {
+        return {
+          type,
+          display: "single",
+          title: items[0].title,
+          indeterminate: true,
+          count: items.length,
+          items,
+        };
+      }
+
+      // Multiple different progresses case
+      return {
+        type,
+        display: "stacked",
+        title: "", // Not used in stacked display
+        indeterminate: false,
+        count: items.length,
+        items,
+      };
+    });
+  }
+}
+</script>
+
+<style lang="scss" scoped>
+.progress-container {
+  position: absolute;
+  bottom: 40px;
+  left: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 250px;
+  max-width: 250px;
+}
+
+.progress-group {
+  background: rgba(0, 0, 0, 0.7);
+  padding: 4px;
+  border-radius: 4px;
+  color: white;
+}
+
+.stacked-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  :deep(.v-progress-linear) {
+    font-size: 0.7rem;
+  }
+}
+
+:deep(.v-progress-linear) {
+  font-size: 0.75rem;
+}
+</style>
