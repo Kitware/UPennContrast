@@ -135,7 +135,7 @@ export default class ProgressBarGroup extends Vue {
 <style lang="scss" scoped>
 .progress-container {
   position: absolute;
-  bottom: 40px;
+  bottom: 50px;
   left: 20px;
   z-index: 2000;
   display: flex;

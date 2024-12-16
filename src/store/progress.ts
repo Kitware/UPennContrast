@@ -31,6 +31,73 @@ const ENDPOINT_MAPPINGS: Record<string, { type: ProgressType; title: string }> =
     // Can add other endpoint mappings as needed
   };
 
+function determineTypeAndTitle(payload: {
+  type?: ProgressType;
+  endpoint?: string;
+  title?: string;
+}): { type: ProgressType; title: string } {
+  if (payload.title) {
+    // If title is provided, use it directly with the provided type (if any)
+    return {
+      type: payload.type || ProgressType.GENERIC,
+      title: payload.title,
+    };
+  }
+
+  if (payload.endpoint) {
+    // If endpoint is provided, look up the mapping
+    const mapping = ENDPOINT_MAPPINGS[payload.endpoint];
+    if (!mapping) {
+      return {
+        type: ProgressType.GENERIC,
+        title: `Fetching ${payload.endpoint}`,
+      };
+    }
+    return {
+      type: mapping.type,
+      title: mapping.title,
+    };
+  }
+
+  if (payload.type) {
+    // If only type is provided, use a default title for that type
+    const type = payload.type;
+    let title: string;
+    switch (type) {
+      case ProgressType.ANNOTATION_FETCH:
+        title = "Fetching annotations";
+        break;
+      case ProgressType.CONNECTION_FETCH:
+        title = "Fetching connections";
+        break;
+      case ProgressType.PROPERTY_FETCH:
+        title = "Fetching properties";
+        break;
+      case ProgressType.VIEW_FETCH:
+        title = "Fetching dataset view";
+        break;
+      case ProgressType.HISTOGRAM_CACHE:
+        title = "Computing histograms";
+        break;
+      case ProgressType.HISTOGRAM_SCHEDULE:
+        title = "Scheduling histogram cache";
+        break;
+      case ProgressType.MAXMERGE_CACHE:
+        title = "Caching max-merge";
+        break;
+      default:
+        title = "Operation in progress";
+    }
+    return { type, title };
+  }
+
+  // Fallback
+  return {
+    type: ProgressType.GENERIC,
+    title: "Operation in progress",
+  };
+}
+
 @Module({ dynamic: true, store, name: "progress" })
 class Progress extends VuexModule {
   items: IProgress[] = [];
@@ -105,56 +172,7 @@ class Progress extends VuexModule {
     metadata?: Record<string, any>;
   }) {
     const id = uuidv4();
-    let type: ProgressType;
-    let title: string;
-
-    if (payload.title) {
-      // If title is provided, use it directly with the provided type (if any)
-      type = payload.type || ProgressType.GENERIC;
-      title = payload.title;
-    } else if (payload.endpoint) {
-      // If endpoint is provided, look up the mapping
-      const mapping = ENDPOINT_MAPPINGS[payload.endpoint];
-      if (!mapping) {
-        type = ProgressType.GENERIC;
-        title = `Fetching ${payload.endpoint}`;
-      } else {
-        type = mapping.type;
-        title = mapping.title;
-      }
-    } else if (payload.type) {
-      // If only type is provided, use a default title for that type
-      type = payload.type;
-      switch (type) {
-        case ProgressType.ANNOTATION_FETCH:
-          title = "Fetching annotations";
-          break;
-        case ProgressType.CONNECTION_FETCH:
-          title = "Fetching connections";
-          break;
-        case ProgressType.PROPERTY_FETCH:
-          title = "Fetching properties";
-          break;
-        case ProgressType.VIEW_FETCH:
-          title = "Fetching dataset view";
-          break;
-        case ProgressType.HISTOGRAM_CACHE:
-          title = "Computing histograms";
-          break;
-        case ProgressType.HISTOGRAM_SCHEDULE:
-          title = "Scheduling histogram cache";
-          break;
-        case ProgressType.MAXMERGE_CACHE:
-          title = "Caching max-merge";
-          break;
-        default:
-          title = "Operation in progress";
-      }
-    } else {
-      // Fallback
-      type = ProgressType.GENERIC;
-      title = "Operation in progress";
-    }
+    const { type, title } = determineTypeAndTitle(payload);
 
     this.ADD_PROGRESS({
       id,
