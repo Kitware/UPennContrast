@@ -153,11 +153,20 @@
           color="primary"
           v-if="store.layers.length > 0"
         >
-          <v-icon>mdi-palette</v-icon>
+          <v-icon size="38">mdi-palette</v-icon>
         </v-btn>
       </template>
       <layer-info-grid :layers="store.layers" />
     </v-menu>
+    <v-btn
+      icon
+      class="reset-rotation-btn"
+      color="primary"
+      @click="resetRotation"
+      v-if="cameraInfo.rotate !== 0"
+    >
+      <v-icon size="38">mdi-rotate-left</v-icon>
+    </v-btn>
   </div>
 </template>
 <script lang="ts">
@@ -690,6 +699,14 @@ export default class ImageViewer extends Vue {
     }
     map.center(center);
     this.synchroniseCameraFromMap(map);
+  }
+
+  public resetRotation() {
+    const map = this.maps[0]?.map;
+    if (!map) {
+      return;
+    }
+    map.rotation(0);
   }
 
   setCorners(evt: any) {
@@ -1484,5 +1501,11 @@ export default class ImageViewer extends Vue {
   overflow-y: auto;
   background-color: rgba(0, 0, 0, 0.7);
   border-radius: 4px;
+}
+.reset-rotation-btn {
+  position: absolute;
+  left: 45px;
+  bottom: 10px;
+  z-index: 1001;
 }
 </style>
