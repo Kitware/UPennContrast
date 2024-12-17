@@ -90,7 +90,8 @@
       exists. Please update the dataset name field and try again.
     </v-alert>
     <v-alert v-if="fileSizeExceeded" text type="error">
-      {{ fileSizeExceededMessage }}
+      Total file size ({{ totalSizeMB }} MB) exceeds the maximum allowed size of
+      {{ maxTotalFileSize }} MB
     </v-alert>
     <template v-if="quickupload">
       <template v-if="configuring">
@@ -340,6 +341,15 @@ export default class NewDataset extends Vue {
     }
   }
 
+  get totalSizeMB() {
+    if (!this.uploadedFiles) return 0;
+    const totalBytes = this.uploadedFiles.reduce(
+      (sum, file) => sum + file.size,
+      0,
+    );
+    return (totalBytes / 1024 / 1024).toFixed(1);
+  }
+
   async mounted() {
     this.path = this.initialUploadLocation;
   }
@@ -387,11 +397,10 @@ export default class NewDataset extends Vue {
 
   filesChanged(files: FileUpload[]) {
     const totalSize = files.reduce((sum, { file }) => sum + file.size, 0);
-    const maxSizeBytes = this.maxTotalFileSize * 1024 * 1024; // Convert MB to bytes
+    const maxSizeBytes = this.maxTotalFileSize * 1024 * 1024;
 
     if (totalSize > maxSizeBytes) {
       this.fileSizeExceeded = true;
-      this.fileSizeExceededMessage = `Total file size (${(totalSize / 1024 / 1024).toFixed(1)} MB) exceeds the maximum allowed size of ${this.maxTotalFileSize} MB`;
       this.uploadedFiles = null;
       if (this.quickupload) {
         this.pipelineError = true;
@@ -401,7 +410,6 @@ export default class NewDataset extends Vue {
     }
 
     this.fileSizeExceeded = false;
-    this.fileSizeExceededMessage = "";
     this.uploadedFiles = files.map(({ file }) => file);
 
     if (this.name === "" && files.length > 0) {
