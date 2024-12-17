@@ -74,7 +74,7 @@
 
       <div class="button-bar" v-if="!quickupload || pipelineError">
         <v-btn
-          :disabled="!valid || !filesSelected || uploading"
+          :disabled="!valid || !filesSelected || uploading || fileSizeExceeded"
           color="success"
           class="mr-4"
           @click="submit"
@@ -88,6 +88,9 @@
       Could not create dataset <strong>{{ failedDataset }}</strong
       >. This might happen, for instance, if a dataset by that name already
       exists. Please update the dataset name field and try again.
+    </v-alert>
+    <v-alert v-if="fileSizeExceeded" text type="error">
+      {{ fileSizeExceededMessage }}
     </v-alert>
     <template v-if="quickupload">
       <template v-if="configuring">
@@ -240,6 +243,11 @@ export default class NewDataset extends Vue {
 
   pipelineError = false;
 
+  maxTotalFileSize =
+    Number(import.meta.env.VITE_MAX_TOTAL_FILE_SIZE) || Infinity;
+  fileSizeExceeded = false;
+  fileSizeExceededMessage = "";
+
   get datasetId() {
     return this.dataset?.id || null;
   }
@@ -351,6 +359,12 @@ export default class NewDataset extends Vue {
       return;
     }
 
+    if (this.fileSizeExceeded) {
+      logError("Maximum total file size exceeded");
+      this.pipelineError = true;
+      return;
+    }
+
     this.dataset = await this.store.createDataset({
       name: this.name,
       description: this.description,
@@ -372,6 +386,22 @@ export default class NewDataset extends Vue {
   }
 
   filesChanged(files: FileUpload[]) {
+    const totalSize = files.reduce((sum, { file }) => sum + file.size, 0);
+    const maxSizeBytes = this.maxTotalFileSize * 1024 * 1024; // Convert MB to bytes
+
+    if (totalSize > maxSizeBytes) {
+      this.fileSizeExceeded = true;
+      this.fileSizeExceededMessage = `Total file size (${(totalSize / 1024 / 1024).toFixed(1)} MB) exceeds the maximum allowed size of ${this.maxTotalFileSize} MB`;
+      this.uploadedFiles = null;
+      if (this.quickupload) {
+        this.pipelineError = true;
+        return;
+      }
+      return;
+    }
+
+    this.fileSizeExceeded = false;
+    this.fileSizeExceededMessage = "";
     this.uploadedFiles = files.map(({ file }) => file);
 
     if (this.name === "" && files.length > 0) {
