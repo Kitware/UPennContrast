@@ -99,6 +99,7 @@ export default class AnnotationContextMenu extends Vue {
       this.useLayerColor = this.annotation.color === null;
       this.selectedColor = this.annotation.color || "#FFFFFF";
       this.selectedTags = [...this.annotation.tags];
+      this.applyToSameTags = false;
     }
   }
 
