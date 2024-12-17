@@ -35,7 +35,7 @@ declare module "@girder/components/src/rest" {
 
   export interface RestClientInstance
     extends AxiosInstance,
-      Readonly<IRestClientOptions> {
+      IRestClientOptions {
     readonly user: Readonly<IGirderUser> | null;
 
     login(username: string, password: string, otp?: string): Promise<any>;
