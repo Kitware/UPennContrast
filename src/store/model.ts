@@ -1453,6 +1453,9 @@ const channelColors: { [key: string]: string } = {
   MORANGE: "#C9FF00",
   MKATE: "#FF3900",
   CFP: "#00C0FF",
+  RED: "#FF0000",
+  GREEN: "#00FF00",
+  BLUE: "#0000FF",
 };
 
 import { v4 as uuidv4 } from "uuid";
