@@ -1482,16 +1482,43 @@ const colors = [
   "#40C0FF",
 ];
 
-// keys should be all uppercase.  Values should have the same case as the
+// Keys should be all uppercase.  Values should have the same case as the
 // `colors` list.
 const channelColors: { [key: string]: string } = {
   BRIGHTFIELD: "#FFFFFF",
-  DAPI: "#0000FF",
-  A594: "#FF0000",
-  CY3: "#FF8000", // orange
-  CY5: "#FF00FF",
-  YFP: "#00FF00",
-  GFP: "#00FF00",
+  DIC: "#FFFFFF",
+  PHASE: "#FFFFFF",
+  TRANSMISSION: "#FFFFFF",
+  TRANS: "#FFFFFF",
+  DAPI: "#007FFF",
+  CY3: "#FFEE00", // Pure wavelength here would be yellow, but that's a little loud, so I made it a bit more orange
+  TMR: "#FFEE00",
+  TAMRA: "#FFEE00",
+  A594: "#FF9933", // I slightly redshifted this from the actual value for discrimination from Cy3
+  ALEXA594: "#FF9933", // I slightly redshifted this from the actual value for discrimination from Cy3
+  CY5: "#FF0000",
+  ATTO647: "#FF0000",
+  ATTO647N: "#FF0000",
+  CY7: "#FF33CC", // I made this more purple to allow discrimination from ALEXA594
+  ATTO700: "#FF33CC",
+  A700: "#FF33CC",
+  YFP: "#52FF00",
+  GFP: "#00FF28",
+  DEFAULT: "#FFFFFF",
+  MCHERRY: "#FFAD00",
+  CHERRY: "#FFAD00",
+  A488: "#4AFF00",
+  ATTO488: "#4AFF00",
+  ALEXA488: "#4AFF00",
+  FITC: "#4AFF00",
+  TRITC: "#FFFF00",
+  BFP: "#0000FF",
+  MORANGE: "#C9FF00",
+  MKATE: "#FF3900",
+  CFP: "#00C0FF",
+  RED: "#FF0000",
+  GREEN: "#00FF00",
+  BLUE: "#0000FF",
 };
 
 import { v4 as uuidv4 } from "uuid";
