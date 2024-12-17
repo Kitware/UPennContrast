@@ -1425,6 +1425,8 @@ const channelColors: { [key: string]: string } = {
   BRIGHTFIELD: "#FFFFFF",
   DIC: "#FFFFFF",
   PHASE: "#FFFFFF",
+  TRANSMISSION: "#FFFFFF",
+  TRANS: "#FFFFFF",
   DAPI: "#007FFF",
   CY3: "#FFEE00", // Pure wavelength here would be yellow, but that's a little loud, so I made it a bit more orange
   TMR: "#FFEE00",
