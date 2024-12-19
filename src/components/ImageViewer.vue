@@ -134,6 +134,21 @@
     >
       <v-icon size="38">mdi-rotate-left</v-icon>
     </v-btn>
+    <v-btn
+      icon
+      class="lock-view-btn"
+      color="primary"
+      @click="toggleViewLock"
+      v-description="{
+        section: 'View',
+        title: 'Lock View',
+        description: 'Toggle pan and zoom lock (L)',
+      }"
+    >
+      <v-icon size="38">{{
+        isViewLocked ? "mdi-lock" : "mdi-lock-open"
+      }}</v-icon>
+    </v-btn>
   </div>
 </template>
 <script lang="ts">
@@ -160,6 +175,7 @@ import {
   SamAnnotationToolStateSymbol,
   IGeoJSMap,
   ProgressType,
+  IGeoJSActionRecord,
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
@@ -302,6 +318,16 @@ export default class ImageViewer extends Vue {
         description: "Redo last action",
       },
     },
+    {
+      bind: "l",
+      handler: () => {
+        this.toggleViewLock();
+      },
+      data: {
+        section: "View",
+        description: "Lock/unlock view pan and zoom",
+      },
+    },
   ];
 
   private refsMounted = false;
@@ -309,6 +335,8 @@ export default class ImageViewer extends Vue {
   private readyLayers: boolean[] = [];
 
   private resetMapsOnDraw = false;
+
+  private isViewLocked = false;
 
   scaleDialog = false;
 
@@ -1264,6 +1292,34 @@ export default class ImageViewer extends Vue {
       this.maps = [];
     }
   }
+
+  // Add new method to toggle view lock
+  toggleViewLock() {
+    this.isViewLocked = !this.isViewLocked;
+
+    this.maps.forEach((mapentry) => {
+      const interactor = mapentry.map.interactor();
+
+      if (this.isViewLocked) {
+        // Add blocking actions that capture but don't do anything
+        interactor.addAction({
+          action: "pan",
+          input: "left",
+          name: "lockPan",
+        } as IGeoJSActionRecord);
+
+        interactor.addAction({
+          action: "zoom",
+          input: "wheel",
+          name: "lockZoom",
+        } as IGeoJSActionRecord);
+      } else {
+        // Remove our blocking actions to restore default behavior
+        interactor.removeAction("pan", "lockPan");
+        interactor.removeAction("zoom", "lockZoom");
+      }
+    });
+  }
 }
 </script>
 
@@ -1384,6 +1440,12 @@ export default class ImageViewer extends Vue {
 .reset-rotation-btn {
   position: absolute;
   left: 45px;
+  bottom: 10px;
+  z-index: 1001;
+}
+.lock-view-btn {
+  position: absolute;
+  left: 80px;
   bottom: 10px;
   z-index: 1001;
 }
