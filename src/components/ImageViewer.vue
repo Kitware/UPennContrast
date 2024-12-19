@@ -336,7 +336,7 @@ export default class ImageViewer extends Vue {
 
   private resetMapsOnDraw = false;
 
-  private isViewLocked = false;
+  isViewLocked = false;
 
   scaleDialog = false;
 
