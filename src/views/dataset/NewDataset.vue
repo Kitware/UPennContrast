@@ -29,9 +29,6 @@
         @error="interruptedUpload"
         @hook:mounted="uploadMounted"
       >
-        <template #dropzone="{ inputFilesChanged }">
-          <file-dropzone @input="inputFilesChanged" style="height: 260px" />
-        </template>
         <template #files="{ files }" v-if="quickupload && !pipelineError">
           <v-card>
             <v-card-text>
@@ -40,6 +37,18 @@
           </v-card>
         </template>
       </girder-upload>
+
+      <file-dropzone
+        v-if="(!quickupload || pipelineError) && files.length > 0"
+        @input="addMoreFiles"
+        style="height: 150px"
+        class="mb-2"
+      >
+        <template #default>
+          <v-icon size="50px">$vuetify.icons.fileUpload</v-icon>
+          <div class="title mt-3">Add more files to this dataset</div>
+        </template>
+      </file-dropzone>
 
       <v-text-field
         v-model="name"
@@ -249,6 +258,8 @@ export default class NewDataset extends Vue {
   fileSizeExceeded = false;
   fileSizeExceededMessage = "";
 
+  allFiles: File[] = [];
+
   get datasetId() {
     return this.dataset?.id || null;
   }
@@ -395,8 +406,17 @@ export default class NewDataset extends Vue {
     this.$refs.uploader!.startUpload();
   }
 
-  filesChanged(files: FileUpload[]) {
-    const totalSize = files.reduce((sum, { file }) => sum + file.size, 0);
+  filesChanged(files: FileUpload[] | File[]) {
+    // Convert to FileUpload[] format if necessary
+    const fileUploads: FileUpload[] = Array.isArray(files)
+      ? files.map((file) => {
+          return typeof file === "object" && "file" in file
+            ? (file as FileUpload)
+            : { file: file as File };
+        })
+      : [];
+
+    const totalSize = fileUploads.reduce((sum, { file }) => sum + file.size, 0);
     const maxSizeBytes = this.maxTotalFileSize * 1024 * 1024;
 
     if (totalSize > maxSizeBytes) {
@@ -410,10 +430,21 @@ export default class NewDataset extends Vue {
     }
 
     this.fileSizeExceeded = false;
-    this.uploadedFiles = files.map(({ file }) => file);
+    this.uploadedFiles = fileUploads.map(({ file }) => file);
+    this.allFiles = this.uploadedFiles;
 
-    if (this.name === "" && files.length > 0) {
+    if (this.name === "" && fileUploads.length > 0) {
       this.name = this.recommendedName;
+    }
+  }
+
+  addMoreFiles(newFiles: File[]) {
+    const merged = [...this.allFiles, ...newFiles];
+    this.allFiles = merged;
+
+    // Update girder-upload's internal state
+    if (this.$refs.uploader) {
+      this.$refs.uploader.inputFilesChanged(merged);
     }
   }
 
