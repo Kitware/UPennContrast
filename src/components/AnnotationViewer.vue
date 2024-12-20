@@ -422,6 +422,23 @@ export default class AnnotationViewer extends Vue {
     if (!vertices) {
       return;
     }
+
+    // Get the current screenshot dimensions
+    const viewBounds = this.map.bounds();
+    const srcWidth = viewBounds.right - viewBounds.left;
+    const srcHeight = viewBounds.bottom - viewBounds.top;
+
+    // Check if annotation takes up too much of viewport
+    const xs = vertices.map((v) => v.x);
+    const ys = vertices.map((v) => v.y);
+    const width = Math.max(...xs) - Math.min(...xs);
+    const height = Math.max(...ys) - Math.min(...ys);
+
+    // If annotation takes up more than 70% of source area in either dimension, skip it
+    if (width > srcWidth * 0.7 || height > srcHeight * 0.7) {
+      return;
+    }
+
     const style = {
       fillOpacity: 0.1,
       fillColor: "blue",
