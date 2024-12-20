@@ -127,6 +127,21 @@
     </v-menu>
     <v-btn
       icon
+      class="lock-view-btn"
+      :color="isViewLocked ? 'error' : 'primary'"
+      @click="toggleViewLock"
+      v-description="{
+        section: 'View',
+        title: 'Lock View',
+        description: 'Toggle pan and zoom lock (L)',
+      }"
+    >
+      <v-icon size="38">{{
+        isViewLocked ? "mdi-lock" : "mdi-lock-open"
+      }}</v-icon>
+    </v-btn>
+    <v-btn
+      icon
       class="reset-rotation-btn"
       color="primary"
       @click="resetRotation"
@@ -160,6 +175,7 @@ import {
   SamAnnotationToolStateSymbol,
   IGeoJSMap,
   ProgressType,
+  IGeoJSActionRecord,
 } from "../store/model";
 import setFrameQuad, { ISetQuadStatus } from "@/utils/setFrameQuad";
 
@@ -302,6 +318,16 @@ export default class ImageViewer extends Vue {
         description: "Redo last action",
       },
     },
+    {
+      bind: "l",
+      handler: () => {
+        this.toggleViewLock();
+      },
+      data: {
+        section: "View",
+        description: "Lock/unlock view pan and zoom",
+      },
+    },
   ];
 
   private refsMounted = false;
@@ -310,7 +336,11 @@ export default class ImageViewer extends Vue {
 
   private resetMapsOnDraw = false;
 
+  isViewLocked = false;
+
   scaleDialog = false;
+
+  defaultActions: IGeoJSActionRecord[] | undefined = undefined;
 
   get maps() {
     return this.store.maps;
@@ -1264,6 +1294,30 @@ export default class ImageViewer extends Vue {
       this.maps = [];
     }
   }
+
+  toggleViewLock() {
+    this.isViewLocked = !this.isViewLocked;
+
+    this.maps.forEach((mapentry) => {
+      const interactor = mapentry.map.interactor();
+
+      if (this.isViewLocked) {
+        // Store the current actions before clearing them
+        if (!this.defaultActions) {
+          this.defaultActions = interactor.options().actions;
+        }
+        // Clear all actions to disable all navigation interactions
+        interactor.options({
+          actions: [],
+        });
+      } else {
+        // Restore the default actions to reenable all navigation interactions
+        interactor.options({
+          actions: this.defaultActions,
+        });
+      }
+    });
+  }
 }
 </script>
 
@@ -1381,9 +1435,15 @@ export default class ImageViewer extends Vue {
   background-color: rgba(0, 0, 0, 0.7);
   border-radius: 4px;
 }
-.reset-rotation-btn {
+.lock-view-btn {
   position: absolute;
   left: 45px;
+  bottom: 10px;
+  z-index: 1001;
+}
+.reset-rotation-btn {
+  position: absolute;
+  left: 80px;
   bottom: 10px;
   z-index: 1001;
 }
