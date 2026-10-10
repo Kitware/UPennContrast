@@ -55,4 +55,14 @@ describe("clampLocationToDataset", () => {
       time: 17,
     });
   });
+
+  it("leaves unrolled axes alone, since unrolling collapses them to one entry", () => {
+    expect(
+      clampLocationToDataset({ xy: 12, z: 3, time: 50 }, dataset, {
+        unrollXY: false,
+        unrollZ: true,
+        unrollT: false,
+      }),
+    ).toEqual({ xy: 0, z: 3, time: 41 });
+  });
 });

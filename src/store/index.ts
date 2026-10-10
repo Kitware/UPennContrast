@@ -1733,6 +1733,7 @@ export class Main extends VuexModule {
     const location = clampLocationToDataset(
       { xy: this.xy, z: this.z, time: this.time },
       this.dataset,
+      { unrollXY: this.unrollXY, unrollZ: this.unrollZ, unrollT: this.unrollT },
     );
     this.xy = location.xy;
     this.z = location.z;
@@ -2702,7 +2703,11 @@ export class Main extends VuexModule {
     if (!datasetView || !dataset || dataset.id !== datasetView.datasetId) {
       return;
     }
-    const location = clampLocationToDataset(this.currentLocation, dataset);
+    const location = clampLocationToDataset(this.currentLocation, dataset, {
+      unrollXY: this.unrollXY,
+      unrollZ: this.unrollZ,
+      unrollT: this.unrollT,
+    });
     if (isEqual(datasetView.lastLocation, location)) {
       return;
     }
@@ -2715,8 +2720,11 @@ export class Main extends VuexModule {
   @Action
   async setXY(value: number) {
     const dataset = this.locationDataset;
+    // An unrolled axis has one entry; see clampLocationToDataset.
     this.setXYImpl(
-      dataset ? clampLocationIndex(value, dataset.xy.length) : value,
+      dataset && !this.unrollXY
+        ? clampLocationIndex(value, dataset.xy.length)
+        : value,
     );
     this.updateLastLocationInDatasetView();
   }
@@ -2729,8 +2737,11 @@ export class Main extends VuexModule {
   @Action
   async setZ(value: number) {
     const dataset = this.locationDataset;
+    // An unrolled axis has one entry; see clampLocationToDataset.
     this.setZImpl(
-      dataset ? clampLocationIndex(value, dataset.z.length) : value,
+      dataset && !this.unrollZ
+        ? clampLocationIndex(value, dataset.z.length)
+        : value,
     );
     this.updateLastLocationInDatasetView();
   }
@@ -2743,8 +2754,11 @@ export class Main extends VuexModule {
   @Action
   async setTime(value: number) {
     const dataset = this.locationDataset;
+    // An unrolled axis has one entry; see clampLocationToDataset.
     this.setTimeImpl(
-      dataset ? clampLocationIndex(value, dataset.time.length) : value,
+      dataset && !this.unrollT
+        ? clampLocationIndex(value, dataset.time.length)
+        : value,
     );
     this.updateLastLocationInDatasetView();
   }

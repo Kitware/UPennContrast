@@ -87,6 +87,9 @@ beforeEach(() => {
     xy: 0,
     z: 0,
     time: 0,
+    unrollXY: false,
+    unrollZ: false,
+    unrollT: false,
   });
   sync.setDatasetLoading(false);
 });
@@ -221,7 +224,8 @@ describe("dataset location clamp", () => {
     await vi.runAllTimersAsync();
     updateDatasetView.mockClear();
 
-    // Unrolling Z collapses the axis to one entry and reloads the dataset.
+    // Switching the large image to one with fewer Z slices reloads the
+    // dataset without going through a view load.
     datasets.ds = makeDataset("ds", 1, 1, 1);
     await main.refreshDataset();
     await vi.runAllTimersAsync();
@@ -230,6 +234,23 @@ describe("dataset location clamp", () => {
     expect(savedLocations()).toEqual([
       { id: "v", lastLocation: { xy: 0, z: 0, time: 0 } },
     ]);
+  });
+
+  it("keeps a target set on an unrolled axis through the roll-up", async () => {
+    // Unrolled, the Z axis collapses to one entry; the full dataset has 10.
+    datasets.ds = makeDataset("ds", 1, 1, 1);
+    views.v = makeView("v", "ds");
+    main.setUnrollZ(true);
+    await main.setDatasetViewId({ id: "v" });
+
+    // Clicking a grid cell sets its frame, then clears the unroll flag,
+    // which reloads the dataset with its real dimensions.
+    await main.setZ(3);
+    main.setUnrollZ(false);
+    datasets.ds = makeDataset("ds", 1, 10, 1);
+    await main.refreshDataset();
+
+    expect(main.z).toBe(3);
   });
 
   it("does not save a location while the dataset is still loading", async () => {

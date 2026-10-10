@@ -260,15 +260,19 @@ the location is clamped where the dataset lands (`clampLocationToDatasetImpl`
 in `setSelectedDataset` and at the end of `setDatasetViewId`). Per-feature
 guards in consumers are not needed. Each clamp site must also schedule
 `updateLastLocationInDatasetView`, or the view reopens at the old saved
-location. The first cut missed this in `setSelectedDataset`, which unroll
-toggles and large-image refreshes reach without going through a view load.
+location. The first cut missed this in `setSelectedDataset`, which
+large-image refreshes reach without going through a view load. Do not clamp an
+UNROLLED axis: `parseTiles` collapses it to one entry, so the clamp sends a
+grid-cell click (which sets the frame, then clears the flag) to frame 0. The
+roll-up reload clamps it against the real dimensions.
 The pending save is the reverse problem: it is only accepted while
 `this.dataset` matches `datasetView.datasetId`, so whatever replaces EITHER one
 must flush it first. `setDatasetViewId` flushes before replacing the view, and
 `setSelectedDataset` before replacing the dataset (`Dataset.vue` switches
 datasets with the old view still loaded). Out-of-range indices also travel in
 URLs: the breadcrumb view switcher keeps the current query when it moves to
-another dataset. See `src/store/__tests__/datasetLocationClamp.test.ts`.
+another dataset. See `codebaseDocumentation/DATASET_LOCATION.md` and its
+regression checklist.
 
 ### Every `throttle`/`debounce` needs a `cancel()` in `onBeforeUnmount`
 
