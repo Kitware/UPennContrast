@@ -261,7 +261,12 @@ in `setSelectedDataset` and at the end of `setDatasetViewId`). Per-feature
 guards in consumers are not needed. Each clamp site must also schedule
 `updateLastLocationInDatasetView`, or the view reopens at the old saved
 location. The first cut missed this in `setSelectedDataset`, which unroll
-toggles and large-image refreshes reach without going through a view load. Out-of-range indices also travel in
+toggles and large-image refreshes reach without going through a view load.
+The pending save is the reverse problem: it is only accepted while
+`this.dataset` matches `datasetView.datasetId`, so whatever replaces EITHER one
+must flush it first. `setDatasetViewId` flushes before replacing the view, and
+`setSelectedDataset` before replacing the dataset (`Dataset.vue` switches
+datasets with the old view still loaded). Out-of-range indices also travel in
 URLs: the breadcrumb view switcher keeps the current query when it moves to
 another dataset. See `src/store/__tests__/datasetLocationClamp.test.ts`.
 

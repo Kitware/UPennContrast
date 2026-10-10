@@ -194,6 +194,23 @@ describe("dataset location clamp", () => {
     expect(main.xy).toBe(2);
   });
 
+  it("saves a pending location before a direct dataset switch replaces the dataset", async () => {
+    datasets.a = makeDataset("a", 10, 1, 1);
+    datasets.b = makeDataset("b", 10, 1, 1);
+    views.vA = makeView("vA", "a");
+    await main.setDatasetViewId({ id: "vA" });
+    await main.setXY(7);
+    updateDatasetView.mockClear();
+
+    // The dataset info page switches datasets without changing the view.
+    await main.setSelectedDataset("b");
+    await vi.runAllTimersAsync();
+
+    expect(savedLocations()).toEqual([
+      { id: "vA", lastLocation: { xy: 7, z: 0, time: 0 } },
+    ]);
+  });
+
   it("persists a location clamped by a dataset refresh outside a view load", async () => {
     datasets.ds = makeDataset("ds", 1, 10, 1);
     views.v = makeView("v", "ds", { xy: 0, z: 5, time: 0 });

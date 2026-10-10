@@ -2124,6 +2124,13 @@ export class Main extends VuexModule {
     // this.dataset still holds the previously selected dataset here (setDataset
     // runs later), so this detects a genuine switch vs. a same-dataset refresh.
     const datasetChanged = id !== this.dataset?.id;
+    if (datasetChanged) {
+      // Save the pending location while this.dataset still matches the view.
+      // Callers like Dataset.vue switch datasets without replacing the view,
+      // and once the new dataset lands the save is rejected as a mismatch.
+      // Not awaited: its state reads and commit run synchronously here.
+      this.flushLastLocationInDatasetView();
+    }
     // Persist any pending annotation-browser change before the resets below
     // wipe the state it would capture.
     await this.flushAnnotationBrowserSave();
