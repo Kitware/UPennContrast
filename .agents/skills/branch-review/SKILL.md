@@ -26,6 +26,7 @@ Review code changes on a feature branch, checking for:
 - Lossy change-identity signatures and derived state that outlives its inputs
 - Hidden-but-mounted palette work and overlay stacking combinations
 - Regressions introduced by earlier review-round fixes on the same branch
+- Changed shared contracts (setters, actions, save paths) with callers nobody read
 
 ## Usage
 
@@ -124,7 +125,7 @@ This keeps every actionable item discoverable from the Findings Summary table by
 
 ## Cross-Cutting Checks
 
-These apply to the whole diff, frontend and backend alike. All three shapes recurred across the multi-round reviews of PRs #1279, #1288 and #1298.
+These apply to the whole diff, frontend and backend alike. The first three shapes recurred across the multi-round reviews of PRs #1279, #1288 and #1298; the fourth across PR #1389.
 
 ### 1. Symmetric-Path Twin Sweep
 The most repeated finding shape in this repo: a rule applied to one of two symmetric paths. For every behavior the diff adds or changes, name its twin and check the twin — the two implementations rarely share a name, so search by concept:
@@ -148,6 +149,14 @@ When the branch contains commits addressing earlier review rounds, review those 
 - **Does it interact with a sibling fix?** "Leave ids alone when the fetch fails" × "drop old ids only when the gate is null" = a failure right after re-lassoing strands the stale constraint permanently.
 - **Does it guard call sites when the invariant belongs at the boundary?** An invariant like "never POST an empty constraint" belongs in the API client or the store action every caller funnels through. Round 2 guarded the two page fetches; round 3 found the sibling `fetchMatchingIds` still posting the rejected payload. A diff adding the same guard at two call sites is a finding even when no bug is visible yet.
 - **Did it fix half the problem?** Allowing two palettes to be open together (eviction) without adding the pair to the stacking layout (geometry) left the second palette covered.
+
+### 4. Changed Shared Contracts: Read Every Caller
+When the diff changes what a widely used function, setter, action or save path does, the branch is only as correct as its least-considered caller. On PR #1389 the location setters started clamping and the location save started requiring a matching dataset. Each of three Codex rounds then found one caller nobody had read: a dataset refresh that never saved, a dataset switch that left the old view loaded, an unrolled grid-cell click whose target frame was clamped away before the roll-up. An independent pass then found two more. Run this as its own pass, and **before every push** of a behavior change, not only when asked for a review:
+- Write each changed behavior as *"on master X; now Y"*, including the review-fix commits.
+- Grep **every** caller and consumer of each, and read them. A grep count is not a review.
+- For each caller ask: does it set a value and then change what that value is checked against (toggle a mode, switch a dataset or view, restore a snapshot)? Does it start async work that can overlap another call? Does it rely on an intermediate or out-of-range value surviving?
+- Check against the object's actual state, not the intent that will produce it (Cross-Cutting check 1's twin: live flags ↔ loaded data). See `fixing-review-findings`, row "A check reads intent, not the object it checks".
+- Report the callers you checked and found SAFE, one line each, so coverage is visible. When reviewing your own branch, have a fresh-context subagent do this pass: it does not share your assumptions about which callers matter.
 
 ## Backend-Specific Checks
 

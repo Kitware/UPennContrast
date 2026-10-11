@@ -282,7 +282,7 @@ JobModel().scheduleJob(job)
 
 ### Turn review findings into durable artifacts, not one-off fixes
 
-A reviewer flags **one instance** of a pattern per round. Fixing only that instance means the next round flags the next instance — a ten-round review of one feature here produced roughly twenty findings that reduced to **two underlying shapes**. Three obligations follow, and they apply to every branch, not just large ones.
+A reviewer flags **one instance** of a pattern per round. Fixing only that instance means the next round flags the next instance — a ten-round review of one feature here produced roughly twenty findings that reduced to **two underlying shapes**. Four obligations follow, and they apply to every branch, not just large ones.
 
 **1. Generalize the finding, then sweep the branch.** Before fixing, name the shape ("a rule applied to one of two symmetric paths", "expensive work before the cheap guard that would skip it"). Then grep the whole diff for other instances and fix those in the same pass. If a sweep comes back clean, ask what the query structurally cannot see — a grep for `throw` once found every deliberate thrower and missed every silent propagator.
 
@@ -293,6 +293,8 @@ The single most repeated shape in this repo is **one of two symmetric paths**. W
 Making a function `await` anything is the sharpest version: it inserts a suspension point into every caller, so anything read before it and acted on after it is now a race. Prefer confirming the effect landed (*"is my item actually in the list?"*) over re-reading the precondition, which is the same check-then-act one tick later.
 
 **3. Write the lesson into a skill.** If the finding would recur in *other* features, it belongs in `.claude/skills/` — `fixing-review-findings` for review patterns, `nimbus-frontend` / `nimbus-geojs` / `nimbus-backend` for domain traps. Skills are the mechanism by which a review round improves the next feature instead of only this one. Skills live in two trees and CI enforces parity, so run `python3 plugins/nimbusimage/scripts/sync_skills.py --write` after editing (see *Editing skills* below).
+
+**4. Run a regression pass before every push of a behavior change.** Obligations 1–3 react to a finding; this one runs before the reviewer has anything to find. List every behavior the branch changes as *"on master X; now Y"* (original commits and review fixes alike), then grep and **read** every caller of each. Look hardest at callers that set a value and then change what it is checked against, and at overlapping async calls. When it is your own branch, give the diff to a fresh-context subagent for an independent pass, verify what it reports, and push only after. On PR #1389, three Codex rounds each found one caller of a changed setter that nobody had read, one of them a regression created by an earlier round's fix; the independent pass then found two more. Also check a finding's *proposed* behavior against callers that need the opposite, not just whether the bug is real. Details: `branch-review` Cross-Cutting check 4, `fixing-review-findings` step 5.
 
 Record test-harness traps too, not just product bugs. A shared mock returning a fixed value silently defeats new tests: `distance2dToLineSquared` returns `100`, `pointDistance` returns `undefined`, `geojsAnnotationFactory` drops its options. Each caused a test that passed **before** its fix — worse than no test at all.
 

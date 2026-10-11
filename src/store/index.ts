@@ -89,7 +89,7 @@ import {
   buildAnnotationBrowserConfig,
   resolveAnnotationBrowserConfig,
 } from "@/utils/annotationBrowserConfig";
-import { IUnrollGrid, unrollGridSize } from "@/utils/unroll";
+import { IUnrollFlags, IUnrollGrid, unrollGridSize } from "@/utils/unroll";
 import {
   storageSeverityFromPercentage,
   TStorageSeverity,
@@ -103,6 +103,10 @@ export { default as store } from "./root";
 // NOTE: router is imported lazily where needed to avoid circular dependency with main.ts
 
 import { Debounce } from "@/utils/debounce";
+import {
+  clampLocationIndex,
+  clampLocationToDataset,
+} from "@/utils/datasetLocation";
 import { quotaExceededMessage } from "@/utils/quota";
 import { memDiag } from "@/utils/memoryDiagnostics";
 import { TCompositionMode } from "@/utils/compositionModes";
@@ -251,6 +255,12 @@ let recentDatasetViewsRequestId = 0;
 // Annotation-browser persistence bookkeeping. Module-level rather than Vuex
 // state because the debounce timer is never read by the UI.
 let annotationBrowserSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Pending save of the current location into the dataset view. A module-level
+// timer (not lodash's @Debounce) so setDatasetViewId can flush it before
+// switching views; otherwise a view left within the delay lost its save.
+let lastLocationSaveTimer: ReturnType<typeof setTimeout> | null = null;
+const LAST_LOCATION_SAVE_DELAY_MS = 5000;
 
 /** The module's current girderRest (falls back to the construction-time
  * instance before the module is registered). */
@@ -752,6 +762,15 @@ export class Main extends VuexModule {
   unrollXY: boolean = false;
   unrollZ: boolean = false;
   unrollT: boolean = false;
+  // The unroll flags this.dataset was FETCHED with, i.e. which of its axes
+  // are collapsed to one entry. The flags above change as soon as the user
+  // clicks, while the dataset only follows once its refresh lands, so
+  // location clamps read these instead.
+  datasetUnroll: IUnrollFlags = {
+    unrollXY: false,
+    unrollZ: false,
+    unrollT: false,
+  };
 
   // Timelapse mode's state lives in `src/store/timelapse.ts`.
 
@@ -1519,12 +1538,15 @@ export class Main extends VuexModule {
   protected setDataset({
     id,
     data,
+    unroll = { unrollXY: false, unrollZ: false, unrollT: false },
   }: {
     id: string | null;
     data: IDataset | null;
+    unroll?: IUnrollFlags;
   }) {
     this.selectedDatasetId = id;
     this.dataset = data;
+    this.datasetUnroll = unroll;
   }
 
   @Mutation
@@ -1709,6 +1731,25 @@ export class Main extends VuexModule {
   @Mutation
   private setTimeImpl(value: number) {
     this.time = value;
+  }
+
+  // Pull xy/z/time back inside the loaded dataset's dimensions. A location
+  // can arrive out of range from a ?xy=&z=&time= query or a saved lastLocation
+  // that was set before the dataset was known (or carried over from another
+  // dataset), and every dataset.images() lookup at it would then miss.
+  @Mutation
+  private clampLocationToDatasetImpl() {
+    if (!this.dataset) {
+      return;
+    }
+    const location = clampLocationToDataset(
+      { xy: this.xy, z: this.z, time: this.time },
+      this.dataset,
+      this.datasetUnroll,
+    );
+    this.xy = location.xy;
+    this.z = location.z;
+    this.time = location.time;
   }
 
   @Mutation
@@ -2096,6 +2137,13 @@ export class Main extends VuexModule {
     // this.dataset still holds the previously selected dataset here (setDataset
     // runs later), so this detects a genuine switch vs. a same-dataset refresh.
     const datasetChanged = id !== this.dataset?.id;
+    if (datasetChanged) {
+      // Save the pending location while this.dataset still matches the view.
+      // Callers like Dataset.vue switch datasets without replacing the view,
+      // and once the new dataset lands the save is rejected as a mismatch.
+      // Not awaited: its state reads and commit run synchronously here.
+      this.flushLastLocationInDatasetView();
+    }
     // Persist any pending annotation-browser change before the resets below
     // wipe the state it would capture.
     await this.flushAnnotationBrowserSave();
@@ -2127,13 +2175,17 @@ export class Main extends VuexModule {
     try {
       sync.setLoading(true); // For the Girder activity indicator
       sync.setDatasetLoading(true); // For the dataset loading overlay
-      const r = await this.context.dispatch("getDataset", {
-        id,
+      const unroll = {
         unrollXY: this.unrollXY,
         unrollZ: this.unrollZ,
         unrollT: this.unrollT,
-      });
-      this.setDataset({ id, data: r });
+      };
+      const r = await this.context.dispatch("getDataset", { id, ...unroll });
+      this.setDataset({ id, data: r, unroll });
+      // Before datasetLoading clears: location setters skip their own clamp
+      // while it is set (see locationDataset), so this is where a location
+      // requested for this dataset first meets its dimensions.
+      this.clampLocationToDatasetImpl();
       await this.loadLargeImages();
       // setConfiguration only re-fires when the configuration changes; on a
       // same-dataset refresh (unroll toggles) or a switch that keeps the same
@@ -2146,6 +2198,11 @@ export class Main extends VuexModule {
       sync.setLoading(error as Error);
       sync.setDatasetLoading(false);
     }
+    // Persist a location the clamp above corrected. Refreshes outside a view
+    // load (unroll toggles, large-image changes) have no other save; a save
+    // that came due mid-load was dropped by its loading guard. A no-op when
+    // the location equals the saved lastLocation.
+    this.updateLastLocationInDatasetView();
     memDiag.autoSnapshot(`setSelectedDataset:exit id=${id}`);
   }
 
@@ -2187,6 +2244,10 @@ export class Main extends VuexModule {
     id: string | null;
     routeQuery?: Record<string, string | null | (string | null)[]>;
   }) {
+    // Save the outgoing view's pending location while this.datasetView and
+    // this.dataset still describe it. Not awaited: its state reads and commit
+    // run synchronously here, and datasetLoading must be set before any await.
+    this.flushLastLocationInDatasetView();
     if (!id) {
       this.setDatasetViewImpl(null);
     } else {
@@ -2236,9 +2297,19 @@ export class Main extends VuexModule {
         );
       }
       await Promise.all(promises);
+      // setSelectedDataset clamps the location when it loads a new dataset,
+      // but it is skipped when the dataset is unchanged, so clamp here too.
+      // Only against the view's own dataset: if its load failed, this.dataset
+      // is still the previous one.
+      if (this.dataset?.id === datasetView.datasetId) {
+        this.clampLocationToDatasetImpl();
+      }
       // Ensure datasetLoading is cleared even if setSelectedDataset wasn't called
       // (e.g., same dataset, different config/view settings)
       sync.setDatasetLoading(false);
+      // Persist a location the clamp corrected, so the view stops reopening
+      // out of range. A no-op when it equals the saved lastLocation.
+      this.updateLastLocationInDatasetView();
     }
   }
 
@@ -2608,22 +2679,69 @@ export class Main extends VuexModule {
     this.datasetView.lastLocation = location;
   }
 
+  // The dataset to clamp a location setter against, or null to skip the
+  // clamp. While a dataset view is loading, this.dataset is still the previous
+  // dataset, and clamping against it would truncate a deep link meant for the
+  // incoming one; setSelectedDataset and setDatasetViewId clamp once it lands.
+  get locationDataset(): IDataset | null {
+    return sync.datasetLoading ? null : this.dataset;
+  }
+
+  // Debounced: scrubbing a slider would otherwise PUT the view on every tick.
   @Action
-  @Debounce(5000, { leading: false, trailing: true })
-  async updateLastLocationInDatasetView() {
-    const location = this.currentLocation;
-    if (!this.datasetView || isEqual(this.datasetView.lastLocation, location)) {
+  updateLastLocationInDatasetView() {
+    if (lastLocationSaveTimer !== null) {
+      clearTimeout(lastLocationSaveTimer);
+    }
+    lastLocationSaveTimer = setTimeout(() => {
+      lastLocationSaveTimer = null;
+      this.saveLastLocationInDatasetView();
+    }, LAST_LOCATION_SAVE_DELAY_MS);
+  }
+
+  @Action
+  async flushLastLocationInDatasetView() {
+    if (lastLocationSaveTimer === null) {
+      return;
+    }
+    clearTimeout(lastLocationSaveTimer);
+    lastLocationSaveTimer = null;
+    await this.saveLastLocationInDatasetView();
+  }
+
+  @Action
+  private async saveLastLocationInDatasetView() {
+    const datasetView = this.datasetView;
+    const dataset = this.locationDataset;
+    // Only save a location that was checked against the view's own dataset.
+    // Mid-load, the location may still be an unclamped query value or the
+    // previous dataset's.
+    if (!datasetView || !dataset || dataset.id !== datasetView.datasetId) {
+      return;
+    }
+    const location = clampLocationToDataset(
+      this.currentLocation,
+      dataset,
+      this.datasetUnroll,
+    );
+    if (isEqual(datasetView.lastLocation, location)) {
       return;
     }
     this.setLastLocationInDatasetView(location);
     if (this.canEditDatasetView) {
-      await this.api.updateDatasetView(this.datasetView);
+      await this.api.updateDatasetView(datasetView);
     }
   }
 
   @Action
   async setXY(value: number) {
-    this.setXYImpl(value);
+    const dataset = this.locationDataset;
+    // An unrolled axis has one entry; see clampLocationToDataset.
+    this.setXYImpl(
+      dataset && !this.datasetUnroll.unrollXY
+        ? clampLocationIndex(value, dataset.xy.length)
+        : value,
+    );
     this.updateLastLocationInDatasetView();
   }
 
@@ -2634,7 +2752,13 @@ export class Main extends VuexModule {
 
   @Action
   async setZ(value: number) {
-    this.setZImpl(value);
+    const dataset = this.locationDataset;
+    // An unrolled axis has one entry; see clampLocationToDataset.
+    this.setZImpl(
+      dataset && !this.datasetUnroll.unrollZ
+        ? clampLocationIndex(value, dataset.z.length)
+        : value,
+    );
     this.updateLastLocationInDatasetView();
   }
 
@@ -2645,7 +2769,13 @@ export class Main extends VuexModule {
 
   @Action
   async setTime(value: number) {
-    this.setTimeImpl(value);
+    const dataset = this.locationDataset;
+    // An unrolled axis has one entry; see clampLocationToDataset.
+    this.setTimeImpl(
+      dataset && !this.datasetUnroll.unrollT
+        ? clampLocationIndex(value, dataset.time.length)
+        : value,
+    );
     this.updateLastLocationInDatasetView();
   }
 
