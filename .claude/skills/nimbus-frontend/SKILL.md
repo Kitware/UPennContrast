@@ -264,7 +264,9 @@ location. The first cut missed this in `setSelectedDataset`, which
 large-image refreshes reach without going through a view load. Do not clamp an
 UNROLLED axis: `parseTiles` collapses it to one entry, so the clamp sends a
 grid-cell click (which sets the frame, then clears the flag) to frame 0. The
-roll-up reload clamps it against the real dimensions.
+roll-up reload clamps it against the real dimensions. And "unrolled" must mean
+the shape `this.dataset` was FETCHED with (`datasetUnroll`), not the live
+`unrollZ` flag: a refresh started before a toggle can land after it.
 The pending save is the reverse problem: it is only accepted while
 `this.dataset` matches `datasetView.datasetId`, so whatever replaces EITHER one
 must flush it first. `setDatasetViewId` flushes before replacing the view, and

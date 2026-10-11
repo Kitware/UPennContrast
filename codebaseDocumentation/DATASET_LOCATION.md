@@ -28,6 +28,13 @@ export then failed with "Image not found for channel …" (issue #1388, PR #1389
   frame to return to: a grid cell (and snapshot restore) sets it just before
   clearing the unroll flag, and the reload that rolls the axis up clamps it
   against the real dimensions.
+- **"Unrolled" means the loaded dataset's shape, not the live flags.**
+  `store.unrollZ` changes on click, but `this.dataset` only follows when its
+  refresh lands, and a stale refresh can land after the flag has flipped back.
+  `setSelectedDataset` records the flags each dataset was fetched with in
+  `datasetUnroll`, and every clamp reads that.
+- **The view-switch clamp only runs against the view's own dataset.** If the
+  new dataset fails to load, `this.dataset` is still the previous one.
 - **Saves are debounced, checked and flushed.** `updateLastLocationInDatasetView`
   schedules a save 5 s out. `saveLastLocationInDatasetView` only writes when
   the loaded dataset matches `datasetView.datasetId` and nothing is loading, and
@@ -47,6 +54,9 @@ Run `pnpm test src/utils/datasetLocation.test.ts src/store/__tests__/datasetLoca
 - [ ] **Setters clamp once the dataset is settled**, including NaN and negative input. — *"clamps setXY/setZ/setTime once the dataset is loaded"*
 - [ ] **Unrolled axes keep their target through the roll-up.** Clamping them against the collapsed one-entry axis sent every grid-cell click and rolled-up snapshot restore to frame 0 (Codex round 3). — *"keeps a target set on an unrolled axis through the roll-up"*, *"leaves unrolled axes alone, since unrolling collapses them to one entry"*
 
+- [ ] **Clamps follow the loaded dataset's shape, not the live unroll flags.** Toggling unroll on then off before the first refresh landed reset z to 0 (regression review). — *"keeps the location when a stale unrolled refresh lands after unroll is turned off"*
+- [ ] **A failed load does not clamp against the previous dataset.** — *"does not clamp against the previous dataset when the new one fails to load"*
+
 ### Persistence
 
 - [ ] **The clamped value is what gets saved**, so a view stops reopening out of range. — *"persists the clamped location, not the out-of-range one"*
@@ -55,6 +65,15 @@ Run `pnpm test src/utils/datasetLocation.test.ts src/store/__tests__/datasetLoca
 - [ ] **Replacing the dataset flushes too.** `Dataset.vue` switches datasets with the old view still loaded, and the save was then rejected as a mismatch (Codex round 2). — *"saves a pending location before a direct dataset switch replaces the dataset"*
 - [ ] **Nothing is saved mid-load**, when the location may still be an unchecked query value. — *"does not save a location while the dataset is still loading"*
 
+### Known limitation
+
+A clamp that runs inside a URL→store sync (a deep link like `?time=99` on a
+10-frame dataset) is not written back to the URL: the route mapper suppresses
+store→URL writes while it applies the URL. The URL keeps 99 while the store
+holds 9, and a later route change re-applies 99, which clamps to 9 again. If
+the dataset later gains frames (a large-image switch), that re-application
+lands on frame 99. On master the store held the out-of-range 99 throughout.
+
 ### Test traps this feature proved
 
 - A save scheduled by the view load stands in for the one under test. Drain the
@@ -62,6 +81,9 @@ Run `pnpm test src/utils/datasetLocation.test.ts src/store/__tests__/datasetLoca
   unfixed code.
 - The save clamps its own value, which can mask a missing guard. Use an
   in-range location when testing a guard, so only the guard can stop the save.
+- `setSelectedDataset` reads the unroll flags after its first `await`. Two
+  refreshes started in the same tick both see the final flags, so a test of a
+  stale refresh must let the first fetch start before flipping the flag.
 - lodash `debounce` captures the real `setTimeout` at import and ignores vitest
   fake timers, which is why the save delay is a plain module-level timer.
 

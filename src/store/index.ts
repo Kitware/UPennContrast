@@ -89,7 +89,7 @@ import {
   buildAnnotationBrowserConfig,
   resolveAnnotationBrowserConfig,
 } from "@/utils/annotationBrowserConfig";
-import { IUnrollGrid, unrollGridSize } from "@/utils/unroll";
+import { IUnrollFlags, IUnrollGrid, unrollGridSize } from "@/utils/unroll";
 import {
   storageSeverityFromPercentage,
   TStorageSeverity,
@@ -762,6 +762,15 @@ export class Main extends VuexModule {
   unrollXY: boolean = false;
   unrollZ: boolean = false;
   unrollT: boolean = false;
+  // The unroll flags this.dataset was FETCHED with, i.e. which of its axes
+  // are collapsed to one entry. The flags above change as soon as the user
+  // clicks, while the dataset only follows once its refresh lands, so
+  // location clamps read these instead.
+  datasetUnroll: IUnrollFlags = {
+    unrollXY: false,
+    unrollZ: false,
+    unrollT: false,
+  };
 
   // Timelapse mode's state lives in `src/store/timelapse.ts`.
 
@@ -1529,12 +1538,15 @@ export class Main extends VuexModule {
   protected setDataset({
     id,
     data,
+    unroll = { unrollXY: false, unrollZ: false, unrollT: false },
   }: {
     id: string | null;
     data: IDataset | null;
+    unroll?: IUnrollFlags;
   }) {
     this.selectedDatasetId = id;
     this.dataset = data;
+    this.datasetUnroll = unroll;
   }
 
   @Mutation
@@ -1733,7 +1745,7 @@ export class Main extends VuexModule {
     const location = clampLocationToDataset(
       { xy: this.xy, z: this.z, time: this.time },
       this.dataset,
-      { unrollXY: this.unrollXY, unrollZ: this.unrollZ, unrollT: this.unrollT },
+      this.datasetUnroll,
     );
     this.xy = location.xy;
     this.z = location.z;
@@ -2163,13 +2175,13 @@ export class Main extends VuexModule {
     try {
       sync.setLoading(true); // For the Girder activity indicator
       sync.setDatasetLoading(true); // For the dataset loading overlay
-      const r = await this.context.dispatch("getDataset", {
-        id,
+      const unroll = {
         unrollXY: this.unrollXY,
         unrollZ: this.unrollZ,
         unrollT: this.unrollT,
-      });
-      this.setDataset({ id, data: r });
+      };
+      const r = await this.context.dispatch("getDataset", { id, ...unroll });
+      this.setDataset({ id, data: r, unroll });
       // Before datasetLoading clears: location setters skip their own clamp
       // while it is set (see locationDataset), so this is where a location
       // requested for this dataset first meets its dimensions.
@@ -2287,7 +2299,11 @@ export class Main extends VuexModule {
       await Promise.all(promises);
       // setSelectedDataset clamps the location when it loads a new dataset,
       // but it is skipped when the dataset is unchanged, so clamp here too.
-      this.clampLocationToDatasetImpl();
+      // Only against the view's own dataset: if its load failed, this.dataset
+      // is still the previous one.
+      if (this.dataset?.id === datasetView.datasetId) {
+        this.clampLocationToDatasetImpl();
+      }
       // Ensure datasetLoading is cleared even if setSelectedDataset wasn't called
       // (e.g., same dataset, different config/view settings)
       sync.setDatasetLoading(false);
@@ -2703,11 +2719,11 @@ export class Main extends VuexModule {
     if (!datasetView || !dataset || dataset.id !== datasetView.datasetId) {
       return;
     }
-    const location = clampLocationToDataset(this.currentLocation, dataset, {
-      unrollXY: this.unrollXY,
-      unrollZ: this.unrollZ,
-      unrollT: this.unrollT,
-    });
+    const location = clampLocationToDataset(
+      this.currentLocation,
+      dataset,
+      this.datasetUnroll,
+    );
     if (isEqual(datasetView.lastLocation, location)) {
       return;
     }
@@ -2722,7 +2738,7 @@ export class Main extends VuexModule {
     const dataset = this.locationDataset;
     // An unrolled axis has one entry; see clampLocationToDataset.
     this.setXYImpl(
-      dataset && !this.unrollXY
+      dataset && !this.datasetUnroll.unrollXY
         ? clampLocationIndex(value, dataset.xy.length)
         : value,
     );
@@ -2739,7 +2755,7 @@ export class Main extends VuexModule {
     const dataset = this.locationDataset;
     // An unrolled axis has one entry; see clampLocationToDataset.
     this.setZImpl(
-      dataset && !this.unrollZ
+      dataset && !this.datasetUnroll.unrollZ
         ? clampLocationIndex(value, dataset.z.length)
         : value,
     );
@@ -2756,7 +2772,7 @@ export class Main extends VuexModule {
     const dataset = this.locationDataset;
     // An unrolled axis has one entry; see clampLocationToDataset.
     this.setTimeImpl(
-      dataset && !this.unrollT
+      dataset && !this.datasetUnroll.unrollT
         ? clampLocationIndex(value, dataset.time.length)
         : value,
     );

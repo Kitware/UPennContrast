@@ -90,6 +90,7 @@ beforeEach(() => {
     unrollXY: false,
     unrollZ: false,
     unrollT: false,
+    datasetUnroll: { unrollXY: false, unrollZ: false, unrollT: false },
   });
   sync.setDatasetLoading(false);
 });
@@ -251,6 +252,57 @@ describe("dataset location clamp", () => {
     await main.refreshDataset();
 
     expect(main.z).toBe(3);
+  });
+
+  it("keeps the location when a stale unrolled refresh lands after unroll is turned off", async () => {
+    datasets.ds = makeDataset("ds", 1, 10, 1);
+    views.v = makeView("v", "ds", { xy: 0, z: 5, time: 0 });
+    await main.setDatasetViewId({ id: "v" });
+
+    // Each unroll toggle starts a refresh with the flags of that moment.
+    const pending: Array<{ unrollZ: boolean; resolve: () => void }> = [];
+    stubAction(
+      "getDataset",
+      ({ unrollZ }) =>
+        new Promise((resolve) =>
+          pending.push({
+            unrollZ,
+            resolve: () => resolve(makeDataset("ds", 1, unrollZ ? 1 : 10, 1)),
+          }),
+        ),
+    );
+    main.setUnrollZ(true);
+    const unrolled = main.refreshDataset();
+    // Separate clicks: the first fetch has started before the second toggle.
+    await vi.waitFor(() => expect(pending).toHaveLength(1));
+    main.setUnrollZ(false);
+    const rolledUp = main.refreshDataset();
+    await vi.waitFor(() => expect(pending).toHaveLength(2));
+    expect(pending.map((p) => p.unrollZ)).toEqual([true, false]);
+
+    // The unrolled response lands after the flag is already off.
+    pending[0].resolve();
+    await unrolled;
+    pending[1].resolve();
+    await rolledUp;
+
+    expect(main.z).toBe(5);
+  });
+
+  it("does not clamp against the previous dataset when the new one fails to load", async () => {
+    datasets.small = makeDataset("small", 1, 1, 1);
+    views.vSmall = makeView("vSmall", "small");
+    views.vBroken = makeView("vBroken", "broken", { xy: 12, z: 0, time: 0 });
+    await main.setDatasetViewId({ id: "vSmall" });
+    stubAction("getDataset", ({ id }) => {
+      if (id === "broken") throw new Error("fetch failed");
+      return datasets[id] ?? null;
+    });
+
+    await main.setDatasetViewId({ id: "vBroken" });
+
+    expect(main.dataset?.id).toBe("small");
+    expect(main.xy).toBe(12);
   });
 
   it("does not save a location while the dataset is still loading", async () => {
