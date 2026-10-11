@@ -337,11 +337,12 @@ class Export(Resource):
                     for pid in config['meta']['propertyIds']:
                         propertyIds.add(ObjectId(pid))
 
-        if propertyIds:
-            return list(self._propertyModel.find(
+        return [
+            self._propertyModel.filter(prop, user)
+            for prop in self._propertyModel.find(
                 {"_id": {"$in": list(propertyIds)}}
-            ))
-        return []
+            )
+        ] if propertyIds else []
 
     def _getPropertyValues(self, datasetId):
         """

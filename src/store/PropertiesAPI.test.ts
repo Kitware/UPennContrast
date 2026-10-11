@@ -57,3 +57,65 @@ describe("PropertiesAPI.getUncomputedCounts", () => {
     expect(post).not.toHaveBeenCalled();
   });
 });
+
+describe("PropertiesAPI.getProperties", () => {
+  it("fetches every property in one batch request", async () => {
+    const post = vi.fn().mockResolvedValue({
+      data: [
+        {
+          _id: "p2",
+          name: "Area",
+          image: "img",
+          shape: "polygon",
+          tags: { tags: [], exclusive: false },
+          workerInterface: { units: "um" },
+          _accessLevel: 0,
+          _modelType: "annotation_property",
+        },
+        {
+          _id: "p1",
+          name: "Count",
+          image: "img",
+          shape: "point",
+          tags: { tags: ["cell"], exclusive: true },
+        },
+      ],
+    });
+    const get = vi.fn();
+    const api = new PropertiesAPI({ post, get } as any);
+
+    const result = await api.getProperties(["p2", "missing", "p1"]);
+
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post).toHaveBeenCalledWith("annotation_property/batch", {
+      ids: ["p2", "missing", "p1"],
+    });
+    expect(get).not.toHaveBeenCalled();
+    expect(result).toEqual([
+      {
+        id: "p2",
+        name: "Area",
+        image: "img",
+        shape: "polygon",
+        tags: { tags: [], exclusive: false },
+        workerInterface: { units: "um" },
+      },
+      {
+        id: "p1",
+        name: "Count",
+        image: "img",
+        shape: "point",
+        tags: { tags: ["cell"], exclusive: true },
+        workerInterface: {},
+      },
+    ]);
+  });
+
+  it("skips the request for an empty configuration", async () => {
+    const post = vi.fn();
+    const api = new PropertiesAPI({ post } as any);
+
+    expect(await api.getProperties([])).toEqual([]);
+    expect(post).not.toHaveBeenCalled();
+  });
+});

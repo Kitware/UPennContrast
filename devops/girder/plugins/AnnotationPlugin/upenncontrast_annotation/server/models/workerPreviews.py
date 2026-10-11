@@ -43,6 +43,9 @@ class WorkerPreviewModel(ProxiedModel):
 
     def initialize(self):
         self.name = "worker_preview"
+        # filter() exposes only these; the `access` ACL names the site admin
+        # (or worker token user) who posted the preview.
+        self.exposeFields(AccessType.READ, ("_id", "name", "image", "preview"))
 
     def validate(self, document):
         try:

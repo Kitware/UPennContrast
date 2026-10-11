@@ -75,6 +75,10 @@ MAX_SUMMARY_PROPERTY_PATHS = 200
 MAX_DISTINCT_VALUES = 20_000
 MAX_DISTINCT_SEARCH_LENGTH = 200
 
+# Property ids one POST /annotation_property/batch request may resolve. A
+# configuration holds a few dozen properties at most.
+MAX_PROPERTY_IDS = 10_000
+
 
 def requireCountWithin(count, limit, name):
     """Raise RestException(400) if `count` exceeds `limit`."""
@@ -639,3 +643,39 @@ def validateListInputs(filters, sort=None, propertyPaths=None):
             )
     if propertyPaths is not None:
         validatePropertyPaths(propertyPaths)
+
+
+# Logical operators a caller-supplied find query may combine clauses with.
+# Every other top-level operator is refused: $expr, $where and $jsonSchema
+# can each read any field of the document.
+QUERY_LOGICAL_OPERATORS = ("$and", "$or", "$nor")
+
+
+def requireQueryOnFields(query, allowedFields, name="query"):
+    """Raise RestException(400) unless every field `query` matches on is one
+    of `allowedFields` (or a subfield of one).
+
+    A find query evaluates against the raw document, so a match on a field
+    the response filter hides still reveals its value through which
+    documents come back: {"access.users.id": X} lists every readable folder
+    shared with user X. Restricting queries to the fields the caller would
+    see closes that oracle. Values are not inspected: operators inside a
+    field's value ($in, $elemMatch, ...) only reach that field's subtree."""
+    if not isinstance(query, dict):
+        raise RestException("%s must be a JSON object" % name, code=400)
+    for key, value in query.items():
+        if key in QUERY_LOGICAL_OPERATORS:
+            if not isinstance(value, list):
+                raise RestException(
+                    "%s.%s must be a list" % (name, key), code=400
+                )
+            for clause in value:
+                requireQueryOnFields(clause, allowedFields, name)
+        elif key.startswith("$"):
+            raise RestException(
+                "%s may not use the %s operator" % (name, key), code=400
+            )
+        elif key.split(".", 1)[0] not in allowedFields:
+            raise RestException(
+                "%s may not match on the field %s" % (name, key), code=400
+            )

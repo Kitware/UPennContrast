@@ -44,6 +44,26 @@ class AnnotationProperty(ProxiedModel):
 
     def initialize(self):
         self.name = "annotation_property"
+        # filter() exposes only these. The document's `access` ACL names the
+        # creator, and readers reach a property through a configuration's
+        # meta.propertyIds rather than through that ACL.
+        self.exposeFields(AccessType.READ, (
+            "_id", "name", "image", "tags", "shape", "workerInterface",
+        ))
+
+    def filter(self, doc, user, additionalKeys=None):
+        """Filter like any access-controlled model, but report at least READ.
+
+        _accessLevel comes from the property's own ACL, which only names its
+        creator, so a reader who reaches the property through a
+        configuration's meta.propertyIds would see -1. Every endpoint that
+        returns properties has already established that read access."""
+        filtered = super().filter(doc, user, additionalKeys)
+        if filtered is not None:
+            filtered["_accessLevel"] = max(
+                filtered["_accessLevel"], AccessType.READ
+            )
+        return filtered
 
     def validate(self, document):
         try:
