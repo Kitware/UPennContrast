@@ -70,10 +70,10 @@ All models have `to_dict()` / `from_dict()` for serialization.
 
 | Method | Signature | Returns |
 |--------|-----------|---------|
-| `get` | `(xy=0, z=0, time=0, channel=0, crop?)` | `np.ndarray` (2D) |
+| `get` | `(xy=0, z=0, time=0, channel=0, crop?, max_size?)` | `np.ndarray` (2D); `max_size` downsamples on the server |
 | `get_all_channels` | `(xy=0, z=0, time=0)` | `list[np.ndarray]` |
 | `get_stack` | `(channel=0, axis="z", ...)` | `np.ndarray` (3D) |
-| `get_composite` | `(xy=0, z=0, time=0, mode="lighten", dtype?)` | `np.ndarray` (H,W,3) |
+| `get_composite` | `(xy=0, z=0, time=0, mode="lighten", dtype?, max_size?, crop?)` | `np.ndarray` (H,W,3), drawn as the app draws it |
 | `iter_frames` | `()` | `Iterator[(FrameInfo, np.ndarray)]` |
 | `new_writer` | `(copy_metadata=True)` | `ImageWriter` |
 
