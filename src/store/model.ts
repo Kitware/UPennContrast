@@ -2963,7 +2963,9 @@ export function exampleConfigurationBase(): IDatasetConfigurationBase {
     pipelines: [],
     scales: {
       pixelSize: unknownPixelSize(),
-      zStep: { value: 1, unit: "m" },
+      // A typical confocal step. The old 1 m was only harmless because the
+      // volume viewer rejects z steps of 1e6 µm or more as implausible.
+      zStep: { value: 1, unit: "µm" },
       tStep: { value: 1, unit: "s" },
     },
     visibilityConfig: resolveVisibilityConfig(),

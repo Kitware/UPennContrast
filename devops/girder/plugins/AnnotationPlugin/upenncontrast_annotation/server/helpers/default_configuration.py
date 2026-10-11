@@ -86,7 +86,7 @@ CHANNEL_COLORS = {
 # src/utils/scales.ts); a 1 m default drew a kilometer-long scale bar.
 _DEFAULT_SCALES = {
     "pixelSize": {"value": 0, "unit": "mm"},
-    "zStep": {"value": 1, "unit": "m"},
+    "zStep": {"value": 1, "unit": "\u00b5m"},
     "tStep": {"value": 1, "unit": "s"},
 }
 

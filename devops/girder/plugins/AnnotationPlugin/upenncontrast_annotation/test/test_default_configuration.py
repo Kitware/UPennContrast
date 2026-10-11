@@ -169,7 +169,7 @@ class TestCompatibilityAndScales:
 
     def testZStepIgnoredWhenLabelsAreNotLengths(self):
         scales = build_scales(None, None, {"z": ["1", "2", "3"]})
-        assert scales["zStep"] == {"value": 1, "unit": "m"}
+        assert scales["zStep"] == {"value": 1, "unit": "\u00b5m"}
 
     def testMutatingScalesDoesNotLeakIntoTheNextCall(self):
         first = build_scales(None, None, None)

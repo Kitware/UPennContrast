@@ -55,3 +55,23 @@ describe("getDatasetScales pixel size", () => {
     });
   });
 });
+
+describe("getDatasetScales z step", () => {
+  it("defaults to 1 µm, not 1 m, when the z labels give no spacing", () => {
+    expect(getDatasetScales(datasetWithTileInfo({})).zStep).toEqual({
+      value: 1,
+      unit: "µm",
+    });
+  });
+
+  it("uses the spacing of length-valued z labels", () => {
+    const dataset = {
+      ...datasetWithTileInfo({}),
+      dimensionLabels: { z: ["0 µm", "0.5 µm", "1 µm"] },
+    } as unknown as IDataset;
+    expect(getDatasetScales(dataset).zStep).toEqual({
+      value: 0.5,
+      unit: "µm",
+    });
+  });
+});
