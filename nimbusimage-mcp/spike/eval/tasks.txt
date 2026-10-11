@@ -1,0 +1,12 @@
+How many NimbusImage datasets do I have access to?
+How many cells are annotated in the "Xenium Human Kidney RCC (XOA 4.0, protein)" dataset?
+Which annotation tags are used in the "Xenium Human Kidney RCC (XOA 4.0, protein)" dataset, and how many annotations have each?
+Show me the image for the dataset "Xenium tiny - Human Ovary (XOA 4.0)". Briefly describe what you see.
+How many z-slices and channels does dataset 6a76214b90dec97a5ccd18a3 have, and what are the channel names?
+Show me z-slice 5 of dataset 6a76214b90dec97a5ccd18a3 and tell me whether you can see spots.
+How many spot (point) annotations are in the "OPS DM1 Well1 Phenotyping 3x3 (genotype property)" dataset?
+Of my datasets with "kidney" in the name, which one has the most annotations?
+What is the pixel size, in microns, of the "Asmus unstitched ND2 (illum test)" dataset?
+List the annotation tags in the dataset "spotcheck-nd2-220135".
+Among my datasets with "OPS" in the name, which ones have any point annotations?
+How many nuclei are segmented in dataset 6a76214b90dec97a5ccd18a3?

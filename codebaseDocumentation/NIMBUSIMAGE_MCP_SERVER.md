@@ -1,6 +1,8 @@
 # NimbusImage MCP Server: Architecture and Implementation Plan
 
-**Status:** Proposal. Nothing is built yet.
+**Status:** Phase 0 spike built and measured (placement decision still open); see
+[`nimbusimage-mcp/spike/RESULTS.md`](../nimbusimage-mcp/spike/RESULTS.md).
+Phases 1 onward are proposals.
 **Last reviewed:** 2026-10-11, against NimbusImage `82a746f`, the AWSDeploy HAProxy
 template and deploy playbook, and the current Claude and MCP documentation listed in
 [References](#13-references).
@@ -423,11 +425,12 @@ the composite for z=3", "which datasets have spot annotations"):
 
 **Exit criteria:**
 
-- [ ] Claude Code completes most tasks without hand-holding.
-- [ ] No single tool response is larger than about 2K tokens, except images.
-- [ ] A written list of tools to add, rename, or drop.
+- [x] Claude Code completes most tasks without hand-holding.
+- [x] No single tool response is larger than about 2K tokens, except images.
+- [x] A written list of tools to add, rename, or drop.
 - [ ] A decision on the open placement question in [11](#11-open-decisions), informed by
-      how heavy the server process is.
+      how heavy the server process is. (Spike input: light, ~100 to 230 MB; the decision
+      still needs the in-process option tried.)
 
 ### Phase 1: Production-shape server with API-key auth (local)
 
