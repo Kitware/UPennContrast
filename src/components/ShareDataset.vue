@@ -613,7 +613,7 @@ async function removeUser() {
     const response = await store.api.shareDatasetView(
       selectedViews,
       user.login,
-      -1, // -1 to remove access (Girder convention)
+      -1, // -1 = remove; the server deletes the ACL entry
     );
 
     if (typeof response === "string") {

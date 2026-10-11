@@ -15,7 +15,7 @@ from girder.models.folder import Folder
 from girder.models.user import User
 
 from upenncontrast_annotation.server.helpers.access_helpers import (
-    formatAccessList
+    formatAccessList, parseShareAccessType
 )
 from upenncontrast_annotation.server.models.project import (
     Project as ProjectModel
@@ -279,6 +279,7 @@ class Project(Resource):
             Set accessType to:
             - 0 (READ) for view-only access
             - 1 (WRITE) for edit access
+            - 2 (ADMIN) for owner access
             - -1 to remove user's access entirely
         """)
         .modelParam(
@@ -294,7 +295,7 @@ class Project(Resource):
         .param(
             'accessType',
             'Access level: -1 (remove), 0 (READ), '
-            '1 (WRITE).',
+            '1 (WRITE), 2 (ADMIN).',
             dataType='integer', required=True
         )
         .errorResponse()
@@ -311,7 +312,7 @@ class Project(Resource):
         # can grant others access via project sharing.
         # For now, the project-level ADMIN check
         # (above) is the only gate.
-        accessType = AccessType().validate(accessType)
+        accessType = parseShareAccessType(accessType)
 
         targetUser = User().findOne(
             {"$or": [

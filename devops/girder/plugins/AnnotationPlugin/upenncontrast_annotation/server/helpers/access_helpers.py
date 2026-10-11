@@ -7,6 +7,33 @@ from girder.models.user import User
 
 from ..models.annotation import Annotation
 from ..models.propertyValues import MAX_IDS_PER_QUERY
+from .validation import requireInt
+
+SHARE_ACCESS_TYPES = (
+    AccessType.NONE, AccessType.READ, AccessType.WRITE, AccessType.ADMIN
+)
+
+
+def parseShareAccessType(accessType):
+    """Convert a share request's accessType to a setUserAccess level.
+
+    The share endpoints take -1 (AccessType.NONE) to mean "remove access",
+    but Girder's setUserAccess only removes the entry when the level is None;
+    any other value, -1 included, is stored as an inert {id, level: -1}
+    entry that keeps the user listed in the access table.
+
+    AccessType.validate would also accept SITE_ADMIN (100) and raises
+    ValueError (a 500) on bad input, so the allowed set is checked here.
+
+    :param accessType: -1 (remove), 0 (READ), 1 (WRITE) or 2 (ADMIN).
+    :returns: The AccessType level, or None to remove access.
+    :raises RestException: 400 if accessType is not one of those levels.
+    """
+    level = requireInt(accessType, "accessType")
+    if level not in SHARE_ACCESS_TYPES:
+        raise RestException(
+            "accessType must be one of %s" % (SHARE_ACCESS_TYPES,), code=400)
+    return None if level == AccessType.NONE else level
 
 
 def requireDatasetsAccess(datasetIds, user, level=AccessType.WRITE):
@@ -89,6 +116,9 @@ def formatAccessList(model, document):
     Returns dict with 'public', 'users', and 'groups' keys.
     Users include id, login, name, email, and level. Share-link principals
     are managed only through the link list, never the named sharing table.
+    Entries with a negative level grant nothing; they are leftovers from
+    share endpoints that stored -1 instead of removing the user, so they
+    are dropped rather than listed as a user with access.
 
     :param model: The Girder model instance.
     :param document: The document to get access for.
@@ -112,7 +142,7 @@ def formatAccessList(model, document):
                 'level': u['level'],
             }
             for u in accessList.get('users', [])
-            if u['id'] in userEmails
+            if u['id'] in userEmails and u['level'] >= AccessType.READ
         ],
         'groups': accessList.get('groups', []),
     }

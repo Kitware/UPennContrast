@@ -134,7 +134,11 @@ Returns the current access list for a configuration and its associated datasets.
 
 Grants, modifies, or revokes user access.
 
-**Required permission:** WRITE access to the dataset and configurations
+**Required permission:** ADMIN on the dataset folder, and WRITE on every listed DatasetView and
+its configuration. All `datasetViewIds` must belong to one dataset (400 otherwise). Before
+2026-10-11 WRITE on the folder sufficed, which let a collaborator grant themselves ADMIN or
+remove the owner. *"testShareEndpointRequiresDatasetAdmin"*,
+*"testShareEndpointRejectsViewsOfSeveralDatasets"*
 
 **Request body:**
 ```json
@@ -148,12 +152,21 @@ Grants, modifies, or revokes user access.
 **Access type values:**
 - `0` - READ access
 - `1` - WRITE access
-- `null` - Remove access entirely
+- `2` - ADMIN (owner) access
+- `-1` - Remove access entirely
+- Anything else (including `100`, SITE_ADMIN) is a 400 — *"testShareEndpointRejectsInvalidAccessType"*
 
 **Behavior:**
 - Sets permissions on all specified DatasetViews
 - Also sets permissions on the parent Dataset folder
 - Also sets permissions on associated Configurations
+- `-1` is mapped to `None` (`parseShareAccessType` in `server/helpers/access_helpers.py`)
+  before `setUserAccess`, which deletes the user's entry from each ACL. Girder removes an
+  entry only for `None`; passing `-1` through would store an inert `level: -1` entry that
+  grants nothing but kept the user in the sharing table (fixed 2026-10-11).
+  `formatAccessList` drops negative entries, so leftovers from before the fix stay hidden.
+  Tests: *"testShareEndpointRemoveDropsAclEntries"*, *"testAccessListHidesLegacyNegativeEntries"*,
+  *"test_remove_drops_entries_everywhere"* (project), *"test_legacy_negative_entry_not_propagated"*.
 
 #### `POST /dataset_view/set_public`
 
@@ -315,11 +328,11 @@ Located in `src/store/GirderAPI.ts`:
 // Fetch current access list
 async getDatasetAccess(datasetId: string): Promise<IDatasetAccessList>
 
-// Share with a user (or revoke with accessType: null)
+// Share with a user (or revoke with accessType: -1)
 async shareDatasetView(
   datasetViews: IDatasetView[],
   userMailOrUsername: string,
-  accessType: number | null
+  accessType: number
 ): Promise<true | string>
 
 // Toggle public access

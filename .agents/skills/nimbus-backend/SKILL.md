@@ -18,7 +18,7 @@ description: "Use when writing or modifying Python code in the Girder backend pl
 
 **Important:** `AccessType.ADMIN` means **owner of that document**, not a site-wide admin. The creator of a project/dataset gets ADMIN on it and can share it with others.
 
-Use `-1` (not `null`) to remove a user's access.
+**Removing access:** the share endpoints take `-1` on the wire, but Girder's `setUserAccess(doc, user, level)` deletes the entry **only when `level is None`**. Pass `-1` and Girder stores an inert `{id, level: -1}` entry: the user can't read anything, yet still shows up in access lists. Convert at the API boundary with `parseShareAccessType()` (`server/helpers/access_helpers.py`). A test that checks only "user can no longer read" passes with the bug present, so assert the user has **no entry** in `doc['access']['users']`.
 
 ### Access Decorators (Endpoint-Level)
 

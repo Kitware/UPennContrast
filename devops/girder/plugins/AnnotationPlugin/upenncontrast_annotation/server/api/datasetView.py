@@ -12,7 +12,7 @@ from girder.models.folder import Folder
 from girder.models.user import User
 
 from upenncontrast_annotation.server.helpers.access_helpers import (
-    formatAccessList
+    formatAccessList, parseShareAccessType
 )
 from upenncontrast_annotation.server.helpers.params import getBooleanParam
 from upenncontrast_annotation.server.models.datasetView import \
@@ -248,7 +248,11 @@ class DatasetView(Resource):
             Set accessType to:
             - 0 (READ) for view-only access
             - 1 (WRITE) for edit access
+            - 2 (ADMIN) for owner access
             - -1 to remove user's access entirely
+
+            Requires ADMIN on the dataset and WRITE on every view and
+            configuration; all views must belong to one dataset.
         """)
         .jsonParam(
             "body",
@@ -281,17 +285,27 @@ class DatasetView(Resource):
             logger.error(f"Cannot find user {body['userMailOrUsername']}")
             raise RestException("badEmailOrUsername")
 
-        # Will raise if accessType is a bad value
-        # -1 means remove access (Girder convention), 0=READ, 1=WRITE, 2=ADMIN
-        accessType = AccessType().validate(body["accessType"])
+        # Will raise if accessType is a bad value; -1 (remove) becomes None
+        accessType = parseShareAccessType(body["accessType"])
 
         # Will raise if user has not WRITE permissions on a datasetView
         datasetViews = [
             loadDocument(DatasetViewModel(), datasetViewId)
             for datasetViewId in body["datasetViewIds"]]
 
-        # Will raise if user has not WRITE permissions on the dataset
-        dataset = loadDocument(Folder(), datasetViews[0]["datasetId"])
+        # The ADMIN check below covers one dataset, so every view must
+        # belong to it; otherwise views of another dataset would be shared
+        # on the strength of WRITE alone.
+        if len({view["datasetId"] for view in datasetViews}) != 1:
+            raise RestException(
+                "datasetViewIds must all belong to one dataset", code=400)
+
+        # Only the dataset's owners (ADMIN) may change who has access;
+        # with WRITE alone a collaborator could grant themselves ADMIN or
+        # remove the owner.
+        dataset = Folder().load(
+            datasetViews[0]["datasetId"], level=AccessType.ADMIN, user=user,
+            exc=True)
 
         # Will raise if user has not WRITE permissions on a configuration
         for datasetView in datasetViews:
