@@ -1811,6 +1811,7 @@ export interface IAnnotationSummary {
   total: number;
   tags: { tag: string; count: number }[];
   shapes: { shape: AnnotationShape; count: number }[];
+  channels: { channel: number; count: number }[];
   properties: IAnnotationSummaryPropertyStats[];
 }
 

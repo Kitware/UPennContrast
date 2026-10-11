@@ -43,6 +43,7 @@ Response:
   "total": 289469,
   "tags": [{"tag": "cell", "count": 289469}, {"tag": "Endothelial Cell", "count": 62098}],
   "shapes": [{"shape": "polygon", "count": 289469}],
+  "channels": [{"channel": 0, "count": 289469}],
   "properties": [
     {"path": ["<propId>", "CD3E"], "count": 289469, "mean": 1.23, "std": 1.69, "min": 0, "max": 26}
   ]
@@ -51,10 +52,13 @@ Response:
 
 Semantics:
 
-- `tags` is sorted by count descending, then tag name. `shapes` is sorted the same way and
-  shares the tag facet's scan; per-shape `GET /upenn_annotation/count` calls would each
-  re-read the whole dataset, since there is no `datasetId`+`shape` index (measured 0.25 to
-  0.9 s each on a 465K-annotation dataset, against 0.6 s for the whole summary).
+- `tags` is sorted by count descending, then tag name. `shapes` and `channels` are sorted
+  the same way and share the tag facet's scan; per-shape `GET /upenn_annotation/count` calls
+  would each re-read the whole dataset, since there is no `datasetId`+`shape` index (measured
+  0.25 to 0.9 s each on a 465K-annotation dataset, against 0.6 s for the whole summary).
+- `channels` is the annotation's `channel` field (the channel it was drawn or computed on).
+  The dialog does not show it; the AI panel's `get_annotation_summary` reports it as
+  `byChannel`.
 - A property `count` is the number of matching annotations holding a **numeric** value at
   the path. Strings, nested objects, missing values, and **NaN** are skipped (NaN would
   poison a mean); **Infinity is a number and is kept**. `mean/min/max` are null at count 0;
@@ -66,7 +70,7 @@ Semantics:
   value document orphaned by a deleted annotation counts until the removal hook cleans it.
   Excluding them would cost a second full scan per request (measured +2.6 s for an id set
   difference, +7.4 s for a `$lookup`, against a 1.5 s query), so this is accepted.
-- An empty match is `total: 0`, `tags: []`, `shapes: []`, zeroed property entries — not an error. The
+- An empty match is `total: 0`, `tags: []`, `shapes: []`, `channels: []`, zeroed property entries — not an error. The
   client short-circuits an empty id constraint locally (`filtersMatchNothing`), as the
   other list calls do.
 
@@ -77,7 +81,7 @@ Property filters need the property-value join (or the PV-driven scan `listIds` u
 first version ran that join for the tag facet and again for the statistics and took 21.6 s
 on 709K cells. Now:
 
-| Filters | Facet (total + tags + shapes) | Statistics |
+| Filters | Facet (total + tags + shapes + channels) | Statistics |
 |---|---|---|
 | none | annotation scan | PV scan on `datasetId` |
 | annotation fields only (tags, shape, location, ids, gates) | annotation scan with the match | PV `$in` / `$nin` from the selector |
@@ -115,6 +119,7 @@ Each line names the test that holds it.
 - Shape composition, sorted the same way and narrowed by the same filters —
   *"testShapeComposition"*; on the property-filter and mixed (id clause) paths too —
   *"testShapesFollowPropertyAndMixedFilters"*.
+- Channel composition, sorted and narrowed the same way — *"testChannelComposition"*.
 - Non-numeric and missing values are excluded from every statistic and from `count`; single
   values have null std — *"testPropertyStatsSkipNonNumericAndMissing"*.
 - Annotation-field filters narrow both the facet and the statistics —
@@ -148,6 +153,14 @@ Each line names the test that holds it.
 - Server error messages surface in the dialog — *"shows the server's message when the request fails"*.
 - CSV sections and the download call — *"downloads a CSV with total, tag, shape and property sections"*.
 - The dialog shows the shape breakdown — *"shows composition by shape next to composition by tag"*.
+
+**AI panel (`src/agent/executors.test.ts`)**
+- `get_annotation_summary` reports the server summary, not the loaded annotations (empty in
+  stub-only mode) — *"reports the server summary, not the loaded annotations"*.
+- It drops an answer for a dataset the user switched away from —
+  *"aborts when the dataset changes during the request"*.
+- The interface-state total counts stubs in stub-only mode —
+  *"reports the dataset's annotation count in stub-only mode"*.
 
 **Process**
 - Verify from a fresh page load on a dataset that actually has tags and property values

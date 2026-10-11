@@ -186,6 +186,7 @@ describe("AnnotationsAPI.fetchAnnotationSummary", () => {
       total: 0,
       tags: [],
       shapes: [],
+      channels: [],
       properties: [
         {
           path: ["p", "Area"],
