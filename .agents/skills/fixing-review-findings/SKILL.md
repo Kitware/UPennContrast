@@ -28,6 +28,8 @@ Findings are frequently stale (already fixed in a prior round) or describe a del
 
 Never blindly implement a finding just because a reviewer asserted it. Reviewers are sometimes wrong; the user has overruled findings (rate limiting → "handled by the proxy", tag index → "want direct evidence of slow queries first").
 
+**The finding's idea of correct behavior is a claim too, separate from the bug.** A finding can be right that something is broken and still take for granted, in passing, what the right behavior is. Before building on that, look for callers that depend on the opposite. On PR #1389, round 1 correctly found a missing save. In passing it described "unrolling at z=5 resets z to 0" as the intended outcome, because the branch's own PR text said so, and the fix made that reset persistent. Round 3 then found that unrolled grid-cell clicks and snapshot restore depend on z *surviving* unroll. One grep for callers that set a location and then change the unroll flags would have caught it in round 1.
+
 ### 3. Fix one at a time, with TDD
 
 For each `fix` finding: write the failing test first (backend: `test/test_*.py` via tox; frontend: vitest `*.test.ts`), then the fix, then update the doc's Status line. Don't batch five findings into one sweep — interleaved fixes make it impossible to tell which change broke what.
@@ -50,6 +52,7 @@ A reviewer flags **one instance** of a pattern per round. After fixing it, grep 
 | **Failed refresh retains state derived from different inputs** | Cached filters, search results, gates, projections | Record the exact derivation-input identity on successful commit. A failed identical retry may retain the result; if dataset/population/revision changed, invalidate before awaiting so failure cannot strand stale state. When active/filtering and visible-disabled consumers materialize different subsets, track their validity separately: a null active signature does not mean no visible derived state exists, and invalidating visible-only state must not drop still-valid active constraints. |
 | **Correctness work coupled to display-only data** | Hidden panels whose data also powers filters/exports | Compute mandatory and visible-only input scopes separately. Hidden mode requests only mandatory inputs; failure of an optional widened fetch must not block correctness work that can use local fields or a cached mandatory subset. On that failure path, derive the resolution subset from the paths actually retained — do not feed a broad visible scope a narrow cache and publish plausible empty output for its missing inputs. Sign the actual required input set, not the visibility flag, and reuse a cached superset. |
 | **Disabled work still treated as mandatory** | Persisted gates, filters, pipeline steps, hidden panels | Name each consumer's scope explicitly: hidden/filtering work may use the enabled subset, while visible counts/highlights may still materialize disabled entries and therefore must sign their inputs. Sweep fetch scope, derived-state resolution, and downstream query signatures. If disabled inputs are omitted, omit their derived outputs too; resolving them from a narrower active-only projection can publish plausible but false empty state. Re-enable/open transitions must wake the work when it becomes necessary. |
+| **A check reads intent, not the object it checks** | Anything validated against data that loads asynchronously: unroll flags vs the loaded dataset, a selected id vs the fetched record, a requested page size vs the returned page | The flag or request changes on click; the data follows only when its fetch lands, and a stale fetch can land after the flag flips back. Validate against what the loaded object actually is: record the inputs it was fetched with, next to it, when it commits. Clamping against the live unroll flags reset the location to 0 when unroll was toggled on and off quickly (PR #1389, `datasetUnroll`). |
 | **Cost before the guard** | Getters/handlers with a cheap precondition and expensive body | Does the cheap check run FIRST, in every consumer? A cap that filters or hashes 700K annotations to discover the limit was exceeded is doing the work it exists to prevent. Use a bounded walk (`limit + 1` as an overflow bit), then share that bounded result across the watcher, action, and renderer; checking `.length` after building the full collection is not a guard. |
 | **A signature hashes values but not their structure** | Incremental hashes over nested rows, fields, or variable-length lists | Feed field/record boundaries into the hash, not only value separators and a final count; test two inputs with the same flattened values redistributed across records |
 | **A derived-data identity is lossy** | Staleness checks, incremental recompute, deduplication | Sums, moments, rounded coordinates, or sampled fields are summaries, not identities. Persist a canonical cryptographic hash at the write boundary, backfill legacy rows once, and test a collision pair that the tempting summary cannot distinguish. |
@@ -355,6 +358,28 @@ grep -rn "<phrase from the old invariant>" src/ codebaseDocumentation/
 If the fix made anything `async`, additionally walk its call sites for a value
 read before the new await and acted on after it.
 
+**Then, before pushing, run one regression pass over the whole branch, not
+just this fix.** The per-fix sweep above only sees what this fix changed. On
+PR #1389 the original commit changed shared setters (`setXY`/`setZ`/`setTime`
+started clamping) and the save path. No one listed their callers, so Codex
+found one missed caller per round for three rounds. The third was a
+regression that the round-1 fix had introduced. A single pass would have found
+all of them. The pass:
+
+1. List every behavior the branch changes against the base, one line each:
+   *"on master X; now Y"*. This covers the original commits as well as the
+   review fixes.
+2. For each line, grep for **every** caller and consumer, and **read** each
+   one. Look hardest at callers that set a value and then change what it is
+   checked against (set a target, then toggle a mode or switch a dataset), and
+   at callers that start overlapping async work.
+3. Give the diff and steps 1–2 to a **fresh-context subagent** (general-purpose,
+   read-only, "find regressions vs master, list what you checked as SAFE").
+   It does not share your assumptions about which callers matter. On #1389 it
+   found two more real regressions after three Codex rounds.
+4. Verify each finding yourself, write a test that fails first, and only then
+   push. See `branch-review` Cross-Cutting check 4.
+
 - Frontend: `pnpm tsc`, `pnpm lint:ci`, `pnpm test` (ignore failures under `.tox/**` paths — vitest glob artifact, see nimbus-frontend skill).
 - Backend: `tox` (includes flake8) **and** `docker compose build girder && docker compose up -d girder` before any curl/browser verification — `restart` does NOT load plugin code changes; tox passes against source even when the live API is stale.
 - User-facing changes: verify in the browser (see in-browser-testing skill) — unit tests green ≠ working UI.
@@ -460,6 +485,14 @@ Two more from the same round:
   `propertyValuesRevision` was wired to the reactivity signal and
   `contentRevision`, on the adjacent line of the same signature, was a plain
   constant — so half the signature was untestable and nobody noticed.
+
+- **Overlapping async work started in the same tick sees the same state.**
+  A Vuex action runs synchronously only up to its first `await`, so two
+  refreshes started back to back both read the *final* flags after that await,
+  and a test of a stale response passes against the bug. Start the second one
+  only after the first has made its request (`vi.waitFor` on the stub's call
+  count), the way two real clicks would (PR #1389, *"keeps the location when a
+  stale unrolled refresh lands after unroll is turned off"*).
 
 Mechanically: after writing the test, restore the pre-fix behaviour (`git
 stash`, or a scripted edit you undo from a backup) and **watch it fail**.
