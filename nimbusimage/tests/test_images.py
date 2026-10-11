@@ -46,8 +46,9 @@ class TestFrameIndexResolution:
 
 class TestImageGet:
     def test_get_returns_squeezed_2d(self, mock_gc, sample_tiles_metadata):
-        # Mock getRegion to return a 3D array (with singleton dimension)
-        img_3d = np.random.randint(0, 1000, (1, 768, 1024), dtype=np.uint16)
+        # large_image returns single-band regions as (H, W, 1)
+        # (utilities._imageToNumpy reshapes 2D images that way).
+        img_3d = np.random.randint(0, 1000, (768, 1024, 1), dtype=np.uint16)
         mock_response = MagicMock()
         mock_response.content = pickle.dumps(img_3d)
         mock_gc.get.return_value = mock_response
@@ -371,6 +372,21 @@ class TestGetComposite:
         ).shape
         assert shape == (1, 64, 3)  # 10 x 999 scaled to fit 64
 
+    def test_one_pixel_crop_composite_keeps_its_shape(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """Full-resolution (exact) path: (1, 100) and 1x1 crops stay
+        (1, 100, 3) and (1, 1, 3)."""
+        for shape in ((1, 100, 1), (1, 1, 1)):
+            ds, _ = _composite_dataset(
+                mock_gc, sample_tiles_metadata, [_layer(0)],
+                {0: np.arange(np.prod(shape), dtype=np.uint16).reshape(shape)},
+            )
+            result = ds.images.get_composite(
+                dtype="float64", crop=(0, 0, shape[1], 1)
+            )
+            assert result.shape == (*shape[:2], 3)
+
     def test_percentile_bounds_round_like_the_app(
         self, mock_gc, sample_tiles_metadata,
     ):
@@ -507,6 +523,18 @@ class TestGetMaxSize:
             for c in mock_gc.get.call_args_list
         ]
         assert widths == [100] * 4  # 2 z-planes, then 2 channels
+
+    def test_one_pixel_crops_keep_both_spatial_axes(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """A 1-pixel-high or 1x1 crop stays 2D (squeeze() dropped the
+        spatial axis: (1, 100, 1) became (100,))."""
+        ds = _make_dataset(mock_gc, sample_tiles_metadata)
+        for shape in ((1, 100, 1), (1, 1, 1)):
+            response = MagicMock()
+            response.content = pickle.dumps(np.ones(shape, dtype=np.uint16))
+            mock_gc.get.return_value = response
+            assert ds.images.get(crop=(0, 0, shape[1], 1)).shape == shape[:2]
 
     def test_rejects_non_positive_max_size(
         self, mock_gc, sample_tiles_metadata,

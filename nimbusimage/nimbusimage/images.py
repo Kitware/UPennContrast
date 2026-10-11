@@ -87,7 +87,8 @@ class ImageAccessor:
     ) -> np.ndarray:
         """Get a single image frame as a 2D numpy array.
 
-        Always returns a squeezed 2D array.
+        Always returns a 2D (height, width) array for a single-band image,
+        including for a one-pixel-high or -wide crop.
 
         Args:
             xy, z, time, channel: Coordinates.
@@ -101,9 +102,9 @@ class ImageAccessor:
             2D numpy array.
         """
         frame = self._frame_index(channel, time, z, xy)
-        return self._get_region(
+        return _drop_single_band(self._get_region(
             frame, **self._region_params(crop, max_size)
-        ).squeeze()
+        ))
 
     def get_all_channels(
         self,
@@ -239,9 +240,9 @@ class ImageAccessor:
                 img = self._styled(frames, contrast_range, region)
             else:
                 # Full resolution, one frame: exact, in float.
-                img = self._get_region(
-                    frames[0], **region
-                ).squeeze().astype(np.float64)
+                img = _drop_single_band(
+                    self._get_region(frames[0], **region)
+                ).astype(np.float64)
                 cmin, cmax = contrast_range or (img.min(), img.max())
                 # large_image's band styling (what the app renders through):
                 # equal bounds scale by 1, so a flat frame comes out black.
@@ -522,7 +523,7 @@ class ImageAccessor:
         if scale < 1.0:
             kwargs["width"] = round(region_width * scale)
             kwargs["height"] = round(region_height * scale)
-        region = self._get_region(frame, **kwargs).squeeze()
+        region = _drop_single_band(self._get_region(frame, **kwargs))
         # The server preserves the aspect ratio, so the effective scale can
         # differ slightly from the requested one — use the returned size
         return (
@@ -609,6 +610,15 @@ _HISTOGRAM_PARAMS = {
     "resample": "false",
     "cache": "none",
 }
+
+
+def _drop_single_band(region: np.ndarray) -> np.ndarray:
+    """(H, W) from a region of shape (H, W, 1). Unlike squeeze(), never
+    drops a spatial axis: a 1-pixel-high crop stays (1, W). Multi-band
+    regions keep their band axis."""
+    if region.ndim == 3 and region.shape[-1] == 1:
+        return region[..., 0]
+    return region
 
 
 def _round_half_up(value: float) -> float:
