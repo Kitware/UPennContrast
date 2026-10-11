@@ -1104,7 +1104,7 @@ class Annotation(AccessControlMixin, ProxiedModel):
         """Aggregate statistics over the annotations matching `filters`.
 
         Returns {total, tags: [{tag, count}], shapes: [{shape, count}] and
-        channels: [{channel, count}] (each count desc, then name), and
+        channels: [{channel, count}] (each count desc, then key), and
         properties: [{path, count, mean, std, min, max}]} — one entry per
         requested path, in request order. `count` is the number of matching
         annotations holding a NUMERIC value at the path; non-numeric, NaN
