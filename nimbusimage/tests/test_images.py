@@ -333,6 +333,44 @@ class TestGetComposite:
         ds.images.get_composite(max_size=2000, crop=(0, 0, 5000, 5000))
         assert "width" not in regions[0]
 
+    def test_equal_contrast_bounds_scale_by_one_like_large_image(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """large_image styles min == max with a delta of 1, so a flat frame
+        renders black (not raw values clipped to white), and one count
+        above it renders full."""
+        img = np.array([[100, 100], [100, 101]], dtype=np.uint16)
+        ds, _ = _composite_dataset(
+            mock_gc, sample_tiles_metadata,
+            [_layer(contrast={
+                "mode": "absolute", "blackPoint": 100, "whitePoint": 100,
+            })],
+            {0: img},
+        )
+        result = ds.images.get_composite(dtype="float64")
+        assert result[0, 0, 0] == 0.0
+        assert result[1, 1, 0] == 1.0
+
+    def test_negative_crop_edges_count_from_the_far_edge(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """large_image reads a negative edge as an offset from the right or
+        bottom: (-1000, 0, -1, 10) on a 1024-wide image is 999 x 10, so a
+        64 px cap is sent and an empty composite has that aspect."""
+        img = np.arange(16, dtype=np.uint16).reshape(4, 4)
+        ds, regions = _composite_dataset(
+            mock_gc, sample_tiles_metadata, [_layer(0)], {0: img},
+        )
+        ds.images.get_composite(max_size=64, crop=(-1000, 0, -1, 10))
+        assert regions[0]["width"] == 64
+        empty, _ = _composite_dataset(
+            mock_gc, sample_tiles_metadata, [], {},
+        )
+        shape = empty.images.get_composite(
+            max_size=64, crop=(-1000, 0, -1, 10)
+        ).shape
+        assert shape == (1, 64, 3)  # 10 x 999 scaled to fit 64
+
     def test_percentile_bounds_round_like_the_app(
         self, mock_gc, sample_tiles_metadata,
     ):

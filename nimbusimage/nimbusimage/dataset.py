@@ -147,9 +147,12 @@ class Dataset:
         """
         try:
             configured = self.collections.scales.get("pixelSize") or {}
-        except girder_client.HttpError:
-            # The view is readable but its configuration is not: use the
-            # file's calibration, as before configurations were consulted.
+        except girder_client.HttpError as error:
+            # The view is readable but its configuration is not (or is
+            # gone): use the file's calibration. Anything else, such as a
+            # server error, must not silently swap in different units.
+            if error.status not in (403, 404):
+                raise
             configured = {}
         value, unit = configured.get("value"), configured.get("unit")
         # A file without mm_x makes the app store 0, or null (NaN), and a

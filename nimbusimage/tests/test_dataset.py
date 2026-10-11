@@ -458,6 +458,8 @@ class TestDatasetUpload:
             ds.upload(tmp_path)
         assert ds._tiles is None
 
+
+class TestDatasetScalesAndCaches:
     def test_unreadable_configuration_falls_back_to_the_file(
         self, mock_gc, sample_tiles_metadata,
     ):
@@ -476,6 +478,27 @@ class TestDatasetUpload:
         mock_gc.get.side_effect = get
         ps = Dataset(mock_gc, "folder_123").pixel_size
         assert ps.unit == "mm"
+
+    def test_server_errors_reading_scales_propagate(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """Only an inaccessible or missing configuration falls back to the
+        file; a server error must not silently swap in other units."""
+        import girder_client
+
+        server = _fake_server(
+            sample_tiles_metadata,
+            own_views=[{"_id": "v1", "configurationId": "c1"}],
+        )
+
+        def get(path, parameters=None, **kwargs):
+            if path.startswith("upenn_collection/"):
+                raise girder_client.HttpError(500, "boom", path, "GET")
+            return server(path, parameters, **kwargs)
+
+        mock_gc.get.side_effect = get
+        with pytest.raises(girder_client.HttpError):
+            Dataset(mock_gc, "folder_123").pixel_size
 
     def test_invalidation_drops_view_configuration_and_frame_map(
         self, mock_gc, sample_tiles_metadata,

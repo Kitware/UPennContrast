@@ -2,6 +2,7 @@
 
 import json
 import os
+import uuid
 
 import pytest
 
@@ -50,7 +51,10 @@ def test_dataset(client):
         parameters={
             "parentType": "folder",
             "parentId": public_folder["_id"],
-            "name": "nimbusimage_test_dataset",
+            # Unique per fixture: a fixed name collides ("A folder with
+            # that name already exists here") whenever an earlier test's
+            # folder is still present, e.g. another run on the same server.
+            "name": f"nimbusimage_test_dataset_{uuid.uuid4().hex[:8]}",
             "metadata": json.dumps({"subtype": "contrastDataset"}),
         },
     )

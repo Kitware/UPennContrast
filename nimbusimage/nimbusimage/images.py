@@ -240,8 +240,9 @@ class ImageAccessor:
                     frames[0], **region
                 ).squeeze().astype(np.float64)
                 cmin, cmax = contrast_range or (img.min(), img.max())
-                if cmax > cmin:
-                    img = (img - cmin) / (cmax - cmin)
+                # large_image's band styling (what the app renders through):
+                # equal bounds scale by 1, so a flat frame comes out black.
+                img = (img - cmin) / ((cmax - cmin) if cmax != cmin else 1)
                 img = np.clip(img, 0.0, 1.0)
 
             r, g, b = _parse_color(layer.get("color", "white"))
@@ -355,17 +356,22 @@ class ImageAccessor:
         gray = styled[..., 0] if styled.ndim == 3 else styled
         return gray.astype(np.float64) / 255.0
 
-    def _region_size(self, crop) -> tuple[float, float]:
-        """(height, width) of the requested region at full resolution,
-        clipped to the image as large_image clips it."""
+    def _region_size(self, crop) -> tuple[int, int]:
+        """(height, width) of the requested region at full resolution, as
+        large_image resolves it (_getRegionBounds): a negative edge counts
+        from the right/bottom, then edges are rounded and clamped."""
         height, width = self._dataset.shape
         if crop is None:
             return height, width
         left, top, right, bottom = crop
-        return (
-            max(0, min(bottom, height) - max(top, 0)),
-            max(0, min(right, width) - max(left, 0)),
-        )
+
+        def resolve(low, high, size):
+            low, high = (v + size if v < 0 else v for v in (low, high))
+            low = min(size, max(0, round(low)))
+            high = min(size, max(low, round(high)))
+            return high - low
+
+        return resolve(top, bottom, height), resolve(left, right, width)
 
     def _region_params(
         self,
