@@ -54,7 +54,10 @@ Semantics:
 - `tags` is sorted by count descending, then tag name. `shapes` is sorted the same way and
   shares the tag facet's scan; per-shape `GET /upenn_annotation/count` calls would each
   re-read the whole dataset, since there is no `datasetId`+`shape` index (measured 0.25 to
-  0.9 s each on a 465K-annotation dataset, against 0.6 s for the whole summary).
+  0.9 s each on a 465K-annotation dataset, against 0.6 s for the whole summary). `total` is
+  the sum of the shape counts, replacing a separate `$count` facet. Measured (median of 7,
+  interleaved) against the previous total + tags facet: +52 ms on 465K annotations
+  (514 → 566 ms), +54 ms on 709K (847 → 901 ms), +35 ms on 709K with a tag filter.
 - A property `count` is the number of matching annotations holding a **numeric** value at
   the path. Strings, nested objects, missing values, and **NaN** are skipped (NaN would
   poison a mean); **Infinity is a number and is kept**. `mean/min/max` are null at count 0;
@@ -77,7 +80,7 @@ Property filters need the property-value join (or the PV-driven scan `listIds` u
 first version ran that join for the tag facet and again for the statistics and took 21.6 s
 on 709K cells. Now:
 
-| Filters | Facet (total + tags + shapes) | Statistics |
+| Filters | Facet (tags + shapes; total = sum of shapes) | Statistics |
 |---|---|---|
 | none | annotation scan | PV scan on `datasetId` |
 | annotation fields only (tags, shape, location, ids, gates) | annotation scan with the match | PV `$in` / `$nin` from the selector |
