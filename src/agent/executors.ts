@@ -609,7 +609,7 @@ export function buildInterfaceState() {
       // stub-only mode (large datasets), where the stubs hold the population.
       total: annotationStore.annotationCount,
       filtered: filterStore.filteredAnnotations.length,
-      selected: annotationStore.selectedAnnotationIds.size,
+      selected: annotationStore.resolvedSelectedAnnotationIds.length,
       tags: [...annotationStore.annotationTags],
     },
     // Analysis-panel gates narrow the SAME `filtered` count above, so
@@ -1319,8 +1319,10 @@ const registry: { [name: string]: IAgentToolEntry } = {
     // and selected counts are client state.
     execute: async (_input, context) => {
       const dataset = requireDataset();
+      // Read before the await, so they describe the dataset the request is
+      // for. The resolved selection drops ids a delete or undo left behind.
       const filtered = filterStore.filteredAnnotations.length;
-      const selected = annotationStore.selectedAnnotationIds.size;
+      const selected = annotationStore.resolvedSelectedAnnotationIds.length;
       const summary = await main.annotationsAPI.fetchAnnotationSummary(
         dataset.id,
         {},

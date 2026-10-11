@@ -136,6 +136,7 @@ vi.mock("@/store/annotation", () => ({
     annotations: [],
     annotationCount: 0,
     selectedAnnotationIds: new Set<string>(),
+    resolvedSelectedAnnotationIds: [] as string[],
     annotationTags: new Set<string>(),
     setSelected: vi.fn(),
     selectAnnotations: vi.fn(),
@@ -276,6 +277,7 @@ beforeEach(() => {
   mockAnnotations.annotations = [];
   mockAnnotations.annotationCount = 0;
   mockAnnotations.selectedAnnotationIds = new Set();
+  mockAnnotations.resolvedSelectedAnnotationIds = [];
   mockFilters.filteredAnnotations = [];
   mockJobs.jobIdForToolId = {};
   mockJobs.jobIdForPropertyId = {};
@@ -497,7 +499,9 @@ describe("executeAgentTool", () => {
         properties: [],
       });
       mockFilters.filteredAnnotations = [makeAnnotation({ id: "a1" })];
-      mockAnnotations.selectedAnnotationIds = new Set(["a1", "a2"]);
+      // "gone" is a stale id a delete left in the selection.
+      mockAnnotations.selectedAnnotationIds = new Set(["a1", "a2", "gone"]);
+      mockAnnotations.resolvedSelectedAnnotationIds = ["a1", "a2"];
 
       const { result } = await executeAgentTool(
         "get_annotation_summary",
@@ -520,18 +524,26 @@ describe("executeAgentTool", () => {
     });
 
     it("aborts when the dataset changes during the request", async () => {
-      mockMain.annotationsAPI.fetchAnnotationSummary.mockResolvedValue({
-        total: 1,
-        tags: [],
-        shapes: [],
-        channels: [],
-        properties: [],
-      });
+      // The switch happens while the request is in flight, so only a check
+      // after the await can catch it.
+      let switched = false;
+      mockMain.annotationsAPI.fetchAnnotationSummary.mockImplementation(
+        async () => {
+          switched = true;
+          return {
+            total: 1,
+            tags: [],
+            shapes: [],
+            channels: [],
+            properties: [],
+          };
+        },
+      );
       await expect(
         executeAgentTool(
           "get_annotation_summary",
           {},
-          { ...context, hasViewIdentityChanged: () => true },
+          { ...context, hasViewIdentityChanged: () => switched },
         ),
       ).rejects.toThrow(/dataset changed/);
     });

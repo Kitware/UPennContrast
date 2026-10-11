@@ -492,7 +492,10 @@ the girder container (§6 note). On
    devtools network tab: tool_result for the plot is just the small JSON).
 4. "Compare <property> across tags" → box plot.
 5. Restriction: "…only for the spot-tagged annotations" → point count in
-   the tool card matches the tag count from `get_annotation_summary`.
+   the tool card matches the tag count from `get_annotation_summary`. Use a
+   dataset below `stubThreshold`: in stub-only mode the summary counts the
+   whole dataset server-side but the analysis tools still see no loaded
+   annotations (AI_PANEL_SPEC.md §4).
 6. Reload the page → conversation restores, plots re-render from
    IndexedDB (and a >12-plots session shows placeholders for the oldest).
 7. Clear conversation → plots gone; switch user → gone.

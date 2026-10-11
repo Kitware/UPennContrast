@@ -1160,8 +1160,7 @@ class Annotation(Resource):
         .notes(
             "Total count, tag/shape/channel composition, and per-property-"
             "path count/mean/std/min/max over the annotations matching the "
-            "same "
-            "`filters` object the list endpoints accept (including "
+            "same `filters` object the list endpoints accept (including "
             "analysis gate definitions). Non-numeric property values are "
             "skipped. Body: {datasetId, filters, propertyPaths}."
         )

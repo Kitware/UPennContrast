@@ -332,7 +332,10 @@ never enters the model's context**, even for datasets with millions of objects:
 browser memory. Above the stub threshold (`stubThreshold`, 100K by default) the
 store loads stubs only and `annotations` is empty, so the query-based tools
 see nothing there. `get_annotation_summary` already avoids this by asking the
-server; the query/mutation tools below do not yet.
+server. The query/mutation tools, the analysis tools (`get_property_values`,
+histograms, plots and sample values, which intersect with the loaded ids), and
+`set_location`'s `fit` do not yet, so in stub-only mode they can report zero
+while the summary reports the whole dataset.
 
 **Future (defer until there is real demand):** when datasets genuinely outgrow
 the in-memory set, query/mutation resolution must move **server-side** — a
