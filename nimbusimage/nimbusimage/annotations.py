@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from nimbusimage._workers import ANNOTATION_ROLE_LABEL, check_worker_role
 from nimbusimage.jobs import Job
-from nimbusimage.models import Annotation, Location
+from nimbusimage.models import Annotation, AnnotationSummary, Location
 
 if TYPE_CHECKING:
     import girder_client
@@ -168,6 +168,86 @@ class AnnotationAccessor:
         if tags:
             url += f"&tags={_quote_json(tags)}"
         return self._gc.get(url)["count"]
+
+    def summary(
+        self,
+        shape: str | None = None,
+        tags: list[str] | None = None,
+        exclusive: bool = False,
+        property_paths: list[list[str]] | None = None,
+        filters: dict | None = None,
+    ) -> AnnotationSummary:
+        """Count annotations by tag and shape, and summarize property values,
+        in one server-side aggregation (no annotations are downloaded).
+
+        Example::
+
+            s = ds.annotations.summary(tags=["cell"])
+            s.total, s.tags, s.shapes
+            s = ds.annotations.summary(property_paths=[[prop.id, "Area"]])
+            s.properties[0].mean
+
+        Args:
+            shape: Only annotations of this shape ('point', 'polygon',
+                'line', 'rectangle').
+            tags: Only annotations with any of these tags, or with exactly
+                these tags when ``exclusive`` is True (the same rule as
+                ``filter_by_tags`` and the app's tag filter). Note that
+                ``count(tags=...)`` instead requires *all* the given tags.
+            exclusive: See ``tags``.
+            property_paths: Property value paths to summarize, each a list
+                of keys, e.g. ``[property_id, "Area"]``.
+            filters: Further filters in the server's list-filter format:
+                ``location`` (``{"XY": 0, "Z": 3, "Time": 0}``, any subset),
+                ``idSubstring``, ``propertyFilters``, ``idConstraints``,
+                ``analysisGates``. Use ``shape`` and ``tags`` above rather
+                than their keys here.
+
+        Returns:
+            AnnotationSummary with ``total``, ``tags``, ``shapes``, and one
+            ``properties`` entry per requested path, in order.
+
+        Raises:
+            girder_client.HttpError: 400 for what the server refuses: more
+                than 200 property paths, a path key that is not a string or
+                contains ``.`` or ``$``, malformed filters, or property
+                filters matching more ids than the server summarizes.
+        """
+        # A bare string would be split into characters below and silently
+        # match the wrong thing; property paths are key lists, not the
+        # dotted strings histogram() takes.
+        if isinstance(tags, str):
+            raise TypeError("tags must be a list of tag names, not a string")
+        for path in property_paths or []:
+            if isinstance(path, str):
+                raise TypeError(
+                    f"property path {path!r} must be a list of keys, e.g. "
+                    "[property_id, 'Area'], not a dotted string"
+                )
+        if exclusive and tags is None:
+            raise ValueError("exclusive=True needs tags")
+        body_filters = dict(filters or {})
+        for key, given in (("shape", shape), ("tags", tags)):
+            if given is not None and key in body_filters:
+                raise ValueError(
+                    f"Pass {key!r} either as an argument or in filters, "
+                    "not both."
+                )
+        if shape is not None:
+            body_filters["shape"] = shape
+        if tags is not None:
+            # Deduplicated: the server's exclusive match compares the set
+            # size with len(values), so ["a", "a"] would never match.
+            body_filters["tags"] = {
+                "values": list(dict.fromkeys(tags)), "exclusive": exclusive,
+            }
+        return AnnotationSummary.from_dict(self._gc.post(
+            "upenn_annotation/summary", json={
+                "datasetId": self._dataset_id,
+                "filters": body_filters,
+                "propertyPaths": [list(p) for p in property_paths or []],
+            },
+        ))
 
     def create(self, annotation: Annotation) -> Annotation:
         """Create a single annotation."""
