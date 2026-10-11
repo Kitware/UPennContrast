@@ -983,3 +983,51 @@ describe("tool job outcome scoping", () => {
     expect(jobs.toolJobOutcome("tool-1")).toBe(true);
   });
 });
+
+describe("scales getters normalize an unknown pixel size", () => {
+  afterEach(() => {
+    (rootStore.state as any).main.configuration = null;
+    (rootStore.state as any).main.datasetView = null;
+  });
+
+  const otherAxes = {
+    zStep: { value: 2, unit: "µm" },
+    tStep: { value: 10, unit: "s" },
+  };
+
+  it("reads a stored null or legacy 1 m pixel size as the unknown marker", () => {
+    const state = (rootStore.state as any).main;
+    for (const pixelSize of [
+      { value: null, unit: "mm" },
+      { value: 1, unit: "m" },
+    ]) {
+      state.configuration = { id: "c", scales: { ...otherAxes, pixelSize } };
+      // Workers receive main.scales: null crashed blob_metrics and 1 m was
+      // used as a real size.
+      expect(main.scales.pixelSize).toEqual({ value: 0, unit: "mm" });
+      expect(main.configurationScales.pixelSize).toEqual({
+        value: 0,
+        unit: "mm",
+      });
+      expect(main.scales.zStep).toEqual(otherAxes.zStep);
+    }
+  });
+
+  it("falls back to the unknown marker, not 1 m, with no configuration", () => {
+    expect(main.scales.pixelSize).toEqual({ value: 0, unit: "mm" });
+  });
+
+  it("keeps a real size and lets a view override win", () => {
+    const state = (rootStore.state as any).main;
+    state.configuration = {
+      id: "c",
+      scales: { ...otherAxes, pixelSize: { value: 0.65, unit: "µm" } },
+    };
+    expect(main.scales.pixelSize).toEqual({ value: 0.65, unit: "µm" });
+    state.datasetView = {
+      id: "v",
+      scales: { pixelSize: { value: 0.3, unit: "µm" } },
+    };
+    expect(main.scales.pixelSize).toEqual({ value: 0.3, unit: "µm" });
+  });
+});

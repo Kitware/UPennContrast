@@ -2877,6 +2877,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ISetQuadStatus } from "@/utils/setFrameQuad";
 import type { ITileMeta } from "./GirderAPI";
 import { isEqual } from "lodash";
+import { unknownPixelSize } from "@/utils/scales";
 import type { TSamNodes } from "@/pipelines/samPipeline";
 import type { TObjectSegmentationNodes } from "@/pipelines/objectSegmentationPipeline";
 
@@ -2962,8 +2963,10 @@ export function exampleConfigurationBase(): IDatasetConfigurationBase {
     propertyIds: [],
     pipelines: [],
     scales: {
-      pixelSize: { value: 1, unit: "m" },
-      zStep: { value: 1, unit: "m" },
+      pixelSize: unknownPixelSize(),
+      // A typical confocal step. The old 1 m was only harmless because the
+      // volume viewer rejects z steps of 1e6 µm or more as implausible.
+      zStep: { value: 1, unit: "µm" },
       tStep: { value: 1, unit: "s" },
     },
     visibilityConfig: resolveVisibilityConfig(),

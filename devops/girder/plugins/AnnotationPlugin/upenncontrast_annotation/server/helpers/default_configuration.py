@@ -18,6 +18,7 @@ JSON-compatible values and raises ``ValueError`` at most, never
 ``RestException``.
 """
 
+import math
 import re
 import uuid
 
@@ -81,9 +82,11 @@ CHANNEL_COLORS = {
     "BLUE": "#0000FF",
 }
 
+# pixelSize {0, "mm"} is the "unknown" marker (port of unknownPixelSize in
+# src/utils/scales.ts); a 1 m default drew a kilometer-long scale bar.
 _DEFAULT_SCALES = {
-    "pixelSize": {"value": 1, "unit": "m"},
-    "zStep": {"value": 1, "unit": "m"},
+    "pixelSize": {"value": 0, "unit": "mm"},
+    "zStep": {"value": 1, "unit": "\u00b5m"},
     "tStep": {"value": 1, "unit": "s"},
 }
 
@@ -209,21 +212,31 @@ def build_compatibility(channel_names, xy_count, z_count, t_count):
     }
 
 
-def build_scales(mm_x, mm_y, dimension_labels, has_tile_metadata=True):
+def _pixel_size_from_tile_info(mm_x, mm_y):
+    """Port of ``pixelSizeFromTileInfo``: the mean of the calibrated axes
+    (finite and positive), or the unknown marker when there are none. A
+    missing axis is skipped rather than averaged in as 0, which halved the
+    size of a source calibrated on one axis only.
+    """
+    axes = [
+        mm for mm in (mm_x, mm_y)
+        if isinstance(mm, (int, float)) and not isinstance(mm, bool)
+        and math.isfinite(mm) and mm > 0
+    ]
+    if not axes:
+        return _DEFAULT_SCALES["pixelSize"].copy()
+    return {"value": sum(axes) / len(axes), "unit": "mm"}
+
+
+def build_scales(mm_x, mm_y, dimension_labels):
     """Port of ``getDatasetScales``.
 
-    The frontend gates only on *having* tile info -- ``if (tileInfo)`` --
-    and then takes ``(mm_x + mm_y) / 2`` unconditionally, so a source with
-    no physical pixel size records ``{value: 0, unit: "mm"}``. Keeping the
-    1 m/pixel default instead would be a visible divergence: the viewer
-    renders a distance scale bar from it and claims a 7920 px image is
-    kilometres across.
+    A source with no physical pixel size records the unknown marker
+    ``{value: 0, unit: "mm"}``, which the viewer renders no distance scale
+    bar from and workers skip physical units for.
     """
     scales = {key: value.copy() for key, value in _DEFAULT_SCALES.items()}
-    if has_tile_metadata:
-        scales["pixelSize"] = {
-            "value": ((mm_x or 0) + (mm_y or 0)) / 2, "unit": "mm",
-        }
+    scales["pixelSize"] = _pixel_size_from_tile_info(mm_x, mm_y)
     z_step_um = infer_z_step_um(dimension_labels)
     if z_step_um is not None and z_step_um > 0:
         scales["zStep"] = {"value": z_step_um, "unit": "\u00b5m"}

@@ -10,6 +10,7 @@ import main from "./index";
 import { ISpatialInfo } from "./model";
 import { logError } from "@/utils/log";
 import { createSequenceGuard } from "@/utils/sequenceGuard";
+import { isKnownPixelSize } from "@/utils/scales";
 
 // Only the latest refreshInfo may commit: a refresh after a table activation
 // or recompute can overlap an older one for the same dataset.
@@ -131,7 +132,7 @@ export class Spatial extends VuexModule {
       return;
     }
     // Already set (including by a previous call) — never overwrite.
-    if ((main.configuration.scales?.pixelSize?.value ?? 0) > 0) {
+    if (isKnownPixelSize(main.configuration.scales?.pixelSize)) {
       return;
     }
     // The write targets whatever configuration is open now, so a dataset
