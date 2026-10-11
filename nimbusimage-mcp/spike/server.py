@@ -238,16 +238,12 @@ def ni_annotations_summary(dataset_id: str, max_tags: int = 30) -> dict:
     or filtering. An annotation with several tags counts once per tag.
     """
     # One server-side aggregation; no annotation rows reach this process.
-    summary = _client().girder.post(
-        "upenn_annotation/summary",
-        json={"datasetId": dataset_id, "filters": {}, "propertyPaths": []},
-    )
-    tags = summary["tags"]
+    summary = _client().dataset(dataset_id).annotations.summary()
     return {
-        "total": summary["total"],
-        "by_tag": {t["tag"]: t["count"] for t in tags[:max(1, max_tags)]},
-        "distinct_tags": len(tags),
-        "by_shape": {s["shape"]: s["count"] for s in summary["shapes"]},
+        "total": summary.total,
+        "by_tag": dict(list(summary.tags.items())[:max(1, max_tags)]),
+        "distinct_tags": len(summary.tags),
+        "by_shape": summary.shapes,
     }
 
 

@@ -1,15 +1,15 @@
 # Phase 0 spike: results
 
 **Plan:** [`NIMBUSIMAGE_MCP_SERVER.md`](../../codebaseDocumentation/NIMBUSIMAGE_MCP_SERVER.md), Phase 0.
-**SDK:** `mcp==2.3.0` (`mcp-types==2.3.0`), Python 3.14. **Package:** `nimbusimage` 0.4.1.
+**SDK:** `mcp==2.3.0` (`mcp-types==2.3.0`), Python 3.14. **Package:** `nimbusimage` 0.5.0.
 **Data:** local compose stack built from master (95 datasets, up to 709K annotations each).
-**First run:** 2026-10-11 on master before #1390/#1391. **Latest run:** 2026-10-11 after merging both.
+**First run:** 2026-10-11 on master before #1390/#1391. **Latest run:** 2026-10-11 on master with #1390, #1391 and #1407 (13/13 tasks, 49 calls, 0 errors, 267 MB peak).
 
 ## What was built
 
 | File | Purpose |
 |---|---|
-| `server.py` | Five read-only tools (plan §5.3) as stateless streamable HTTP on `127.0.0.1:8000/mcp`. Single-user auth from `NI_API_URL` / `NI_API_KEY`. Each call is logged (tool, args, seconds, wire bytes, error) to `calls.jsonl` or `NI_MCP_CALL_LOG`. The tools call `nimbusimage` directly; the only raw REST call is the annotation summary. |
+| `server.py` | Five read-only tools (plan §5.3) as stateless streamable HTTP on `127.0.0.1:8000/mcp`. Single-user auth from `NI_API_URL` / `NI_API_KEY`. Each call is logged (tool, args, seconds, wire bytes, error) to `calls.jsonl` or `NI_MCP_CALL_LOG`. Every tool calls the public `nimbusimage` API; there are no raw REST calls. |
 | `test_server.py` | Unit tests for the helpers: logged size versus the SDK's wire format, scale placeholders, crop clipping. |
 | `smoke_test.py` | Calls every tool over real HTTP with the SDK client, including a zoomed crop and the error paths. Composites are saved to `out/`. The dataset ids are local. |
 | `eval/` | Runs 13 real tasks through headless Claude Code (Opus 5.5), restricted to these tools, in parallel; `summarize.py` reports tool choice, turns, cost and answers. |
@@ -33,7 +33,7 @@ claude mcp add --transport http --scope local nimbus-local http://127.0.0.1:8000
 | `ni_datasets_list(name_contains?, limit)` | `client.list_datasets()` (one batched request) | `{total, returned, datasets: [{id, name}]}`, capped at 200 |
 | `ni_dataset_info(dataset_id)` | `Dataset` metadata, `pixel_size`, `collections.scales` | Size, channels, z/time/xy counts, `pixel_size_um`, `z_step` (null when unknown) |
 | `ni_annotations_count(dataset_id, shape?, tags?)` | `ds.annotations.count` | One number |
-| `ni_annotations_summary(dataset_id, max_tags)` | `POST upenn_annotation/summary` | Total, tag counts and shape counts in one server-side aggregation |
+| `ni_annotations_summary(dataset_id, max_tags)` | `ds.annotations.summary()` (#1407) | Total, tag counts and shape counts in one server-side aggregation |
 | `ni_image_get_composite(dataset_id, xy, z, time, max_size, crop?)` | `ds.images.get_composite(max_size, crop)` | JPEG drawn the way the app draws it; `crop` zooms in |
 
 ## Exit criteria
@@ -95,7 +95,7 @@ Claude Code loaded the tools through tool search, by name, and its first real to
   - compact JSON (the SDK indents dict results, about a third more bytes)
 
 **`nimbusimage` package:**
-- `ds.annotations.summary(filters=..., property_paths=...)`, so the summary tool and Phase 1's filtered summaries stop building the request by hand.
+- Done: `ds.annotations.summary(shape, tags, exclusive, property_paths, filters)` (#1407, 0.5.0). Phase 1's filtered summaries and `ni_property_values_summary` build on it.
 - Fix sharing (issue #1404) before any sharing tool is exposed.
 
 **Later phases (plan §6–7, unchanged):**
