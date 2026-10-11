@@ -3,6 +3,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
+from nimbusimage._access import refuse_self_target as _refuse_self_target
 from nimbusimage._access import resolve_access as _resolve_access
 from nimbusimage.urls import DEFAULT_FRONTEND_URL, project_url, open_url
 
@@ -64,7 +65,7 @@ class Project:
     def add_dataset(self, dataset_id: str) -> None:
         self._gc.post(
             f"project/{self.id}/dataset",
-            json={"datasetId": dataset_id},
+            parameters={"datasetId": dataset_id},
         )
 
     def remove_dataset(self, dataset_id: str) -> None:
@@ -73,7 +74,7 @@ class Project:
     def add_configuration(self, config_id: str) -> None:
         self._gc.post(
             f"project/{self.id}/collection",
-            json={"collectionId": config_id},
+            parameters={"collectionId": config_id},
         )
 
     def remove_configuration(self, config_id: str) -> None:
@@ -94,7 +95,7 @@ class Project:
     def set_status(self, status: str) -> None:
         self._gc.put(
             f"project/{self.id}/status",
-            json={"status": status},
+            parameters={"status": status},
         )
 
     def update_metadata(self, metadata: dict) -> None:
@@ -105,18 +106,38 @@ class Project:
     def share(
         self, user_email_or_name: str, access: str = "read"
     ) -> None:
+        """Share this project, and every resource in it, with a user.
+
+        Requires ADMIN (owner) access on the project.
+
+        Args:
+            user_email_or_name: User's email or username.
+            access: 'read', 'write', 'admin', or 'remove'.
+
+        Raises:
+            ValueError: If ``user_email_or_name`` is the calling user.
+        """
+        access_type = _resolve_access(access)
+        _refuse_self_target(self._gc, user_email_or_name)
         self._gc.post(
             f"project/{self.id}/share",
-            json={
+            parameters={
                 "userMailOrUsername": user_email_or_name,
-                "accessType": _resolve_access(access),
+                "accessType": access_type,
             },
         )
 
-    def set_public(self, public: bool = True) -> None:
-        self._gc.post(
+    def set_public(self, public: bool = True) -> dict:
+        """Set whether this project and all its resources are public.
+
+        Requires ADMIN (owner) access on the project.
+
+        Returns:
+            The server's summary: ``projectId`` and ``public``.
+        """
+        return self._gc.post(
             f"project/{self.id}/set_public",
-            json={"public": public},
+            parameters={"public": "true" if public else "false"},
         )
 
     def get_access(self) -> dict:

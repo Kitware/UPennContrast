@@ -288,10 +288,12 @@ ds.history.redo()
 ### SharingAccessor — `ds.sharing`
 
 ```python
-ds.sharing.share(user_email_or_name, access='read')    # 'read', 'write', 'remove'
-ds.sharing.set_public(True)
+ds.sharing.share(user_email_or_name, access='read')    # 'read', 'write', 'admin', 'remove'
+ds.sharing.set_public(True)                             # → dict (counts updated)
 ds.sharing.get_access()                                 # → dict
 ```
+
+`share()` covers the dataset folder, all its dataset views and their collections (like the web Share dialog) and refuses to target the calling user, since "remove" on yourself would lock you out. `project.share()` likewise refuses self-targeting.
 
 ### URLs — `ds` methods
 

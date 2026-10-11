@@ -164,7 +164,7 @@ ds.sharing.set_public(False)
 access = ds.sharing.get_access()
 ```
 
-Access levels: `read`, `write`, `admin`, `remove`.
+Access levels: `read`, `write`, `admin`, `remove`. A share applies to the dataset folder, every dataset view of it and each view's collection (what the web app's Share dialog does by default), so the user can open the dataset with its configuration. You need WRITE access on all of them. `share()` refuses to target yourself (removing yourself would lock you out of your own dataset), and `set_public` needs owner (ADMIN) access.
 
 > **⚠️ Never call the raw Girder access endpoint.** `ds.sharing` is the **only** safe way to change access. Specifically: **do not** call `client._gc.put(f"folder/{id}/access", ...)`. The raw endpoint replaces the entire ACL, and if the new list omits the dataset creator, the owner is silently locked out (`_accessLevel` becomes `-1`, only a site admin can recover). `ds.sharing.share()` is incremental — it can't make that mistake. If you find yourself wanting to bulk-replace an ACL, stop and ask the user; the accessor methods cover every legitimate sharing operation. See also `references/gotchas.md`.
 

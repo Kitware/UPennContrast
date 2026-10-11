@@ -139,7 +139,7 @@ ds.sharing.share("former_member@example.com", access="remove")
 ds.sharing.set_public(True)
 ```
 
-The backend now enforces this invariant (a `model.folder.save` listener rejects `contrastDataset` saves that omit the creator at ADMIN). **Don't go around `ds.sharing`.** If you think you need to, ask the user — there's almost always a safer path.
+The backend does **not** guard the raw endpoint, so a bad PUT really does lock the owner out. **Don't go around `ds.sharing`.** If you think you need to, ask the user — there's almost always a safer path.
 
 ## Generally: avoid dropping to `client._gc` (raw girder-client)
 
