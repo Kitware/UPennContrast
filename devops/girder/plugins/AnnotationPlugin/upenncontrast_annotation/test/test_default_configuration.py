@@ -143,12 +143,22 @@ class TestCompatibilityAndScales:
             "value": 0, "unit": "mm",
         }
 
-    def testNoTileMetadataAtAllKeepsTheDefault(self):
-        """The frontend's `if (tileInfo)` guard: with no tile info the
-        example default survives untouched."""
-        assert build_scales(
-            None, None, None, has_tile_metadata=False,
-        )["pixelSize"] == {"value": 1, "unit": "m"}
+    @pytest.mark.parametrize("mm_x,mm_y", [
+        (0, 0), (float("nan"), None), (-0.1, float("inf")),
+    ])
+    def testUncalibratedAxesRecordTheUnknownMarker(self, mm_x, mm_y):
+        assert build_scales(mm_x, mm_y, None)["pixelSize"] == {
+            "value": 0, "unit": "mm",
+        }
+
+    def testOneCalibratedAxisIsNotHalved(self):
+        """(mm_x + 0) / 2 used to halve a size calibrated on one axis."""
+        assert build_scales(0.0004, None, None)["pixelSize"] == {
+            "value": 0.0004, "unit": "mm",
+        }
+        assert build_scales(None, 0.0004, None)["pixelSize"] == {
+            "value": 0.0004, "unit": "mm",
+        }
 
     def testZStepInferredFromDimensionLabels(self):
         scales = build_scales(None, None, {

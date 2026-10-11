@@ -55,6 +55,13 @@
           </div>
         </template>
       </span>
+      <div
+        v-if="item.key === 'pixelSize' && !pixelSizeKnown"
+        class="text-caption text-medium-emphasis mt-1 unknown-pixel-size-hint"
+      >
+        Pixel size unknown: the image file has no calibration. Enter it to show
+        a distance scale bar and measure in physical units.
+      </div>
     </v-list-item>
     <v-list-item>
       <pixel-scale-bar-setting class="mx-2" />
@@ -83,6 +90,7 @@ import {
 
 import { convertLength, convertTime } from "@/utils/conversion";
 import { getDatasetScales } from "@/store/GirderAPI";
+import { isKnownPixelSize } from "@/utils/scales";
 
 import ColorPickerMenu from "@/components/ColorPickerMenu.vue";
 import PixelScaleBarSetting from "@/components/PixelScaleBarSetting.vue";
@@ -108,6 +116,8 @@ const scales = computed(() => {
   }
   return { ...store.configurationScales, ...viewScales.value };
 });
+
+const pixelSizeKnown = computed(() => isKnownPixelSize(scales.value.pixelSize));
 
 const scaleItems = computed<IScaleItem[]>(() => {
   const items: IScaleItem[] = [];
@@ -220,6 +230,7 @@ function getUnitValues(unit: IScaleItem["unit"]) {
 
 defineExpose({
   scales,
+  pixelSizeKnown,
   scaleItems,
   scalebarColor,
   defaultSaveScale,

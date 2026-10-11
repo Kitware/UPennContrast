@@ -2876,6 +2876,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ISetQuadStatus } from "@/utils/setFrameQuad";
 import type { ITileMeta } from "./GirderAPI";
 import { isEqual } from "lodash";
+import { unknownPixelSize } from "@/utils/scales";
 import type { TSamNodes } from "@/pipelines/samPipeline";
 import type { TObjectSegmentationNodes } from "@/pipelines/objectSegmentationPipeline";
 
@@ -2961,7 +2962,7 @@ export function exampleConfigurationBase(): IDatasetConfigurationBase {
     propertyIds: [],
     pipelines: [],
     scales: {
-      pixelSize: { value: 1, unit: "m" },
+      pixelSize: unknownPixelSize(),
       zStep: { value: 1, unit: "m" },
       tStep: { value: 1, unit: "s" },
     },

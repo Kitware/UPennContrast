@@ -147,4 +147,24 @@ describe("ScaleSettings", () => {
     vm.resetFromDataset("pixelSize");
     expect(getDatasetScales).not.toHaveBeenCalled();
   });
+
+  it("hints that the pixel size is unknown only when it is", () => {
+    (store as any).configurationScales = {
+      pixelSize: { value: 0, unit: "mm" },
+      zStep: { value: 1, unit: "nm" },
+      tStep: { value: 1, unit: "s" },
+    };
+    const unknown = mountComponent();
+    expect((unknown.vm as any).pixelSizeKnown).toBe(false);
+    expect(unknown.find(".unknown-pixel-size-hint").exists()).toBe(true);
+
+    (store as any).configurationScales = {
+      pixelSize: { value: 0.65, unit: "µm" },
+      zStep: { value: 1, unit: "nm" },
+      tStep: { value: 1, unit: "s" },
+    };
+    const known = mountComponent();
+    expect((known.vm as any).pixelSizeKnown).toBe(true);
+    expect(known.find(".unknown-pixel-size-hint").exists()).toBe(false);
+  });
 });
