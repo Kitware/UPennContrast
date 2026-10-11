@@ -63,8 +63,8 @@ MAX_HISTOGRAM_BINS = 512
 MAX_LIST_LIMIT = 10_000
 
 # Ids one POST /resource/batch request may resolve, across all kinds. An abuse
-# guard: the largest real caller (the datasets behind a page of collections)
-# sends a few hundred.
+# guard: the frontend splits larger lookups into requests of
+# BATCH_RESOURCES_CHUNK_SIZE (src/store/constants.ts), so keep that below this.
 MAX_BATCH_RESOURCE_IDS = 10_000
 
 # Property paths one selection-summary request may aggregate. Each path adds
