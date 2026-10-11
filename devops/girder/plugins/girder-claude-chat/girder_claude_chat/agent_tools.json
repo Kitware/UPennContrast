@@ -29,7 +29,7 @@
   },
   {
     "name": "get_annotation_summary",
-    "description": "Get the total annotation count and counts grouped by tag, shape and channel, computed on the server over the whole dataset (current filters do not narrow them), plus the count of currently filtered and selected annotations. Read-only.",
+    "description": "Get the total annotation count and counts grouped by tag, shape and channel, computed on the server over the whole dataset (current filters do not narrow them), plus the count of currently filtered and selected annotations. The query, selection and property/analysis tools see this same population. Read-only.",
     "input_schema": {
       "type": "object",
       "properties": {},
@@ -38,7 +38,7 @@
   },
   {
     "name": "list_annotations",
-    "description": "List annotations matching a query, with id, name, shape, tags, channel, location, color and centroid. Use this to inspect specific annotations, not to enumerate a whole dataset: for counts or a breakdown by tag/shape/channel, prefer get_annotation_summary. Results are paged (default 50, max 200); the result reports totalMatching, hasMore and nextOffset, so page further only when you need those specific items. Read-only.",
+    "description": "List annotations matching a query, with id, name, shape, tags, channel, location, color and centroid. Use this to inspect specific annotations, not to enumerate a whole dataset: for counts or a breakdown by tag/shape/channel, prefer get_annotation_summary. Queries cover every annotation in the dataset at any size, the same population get_annotation_summary counts. Results are paged (default 50, max 200); the result reports totalMatching, hasMore and nextOffset, so page further only when you need those specific items. Read-only.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -902,7 +902,7 @@
   },
   {
     "name": "get_property_values",
-    "description": "Read computed property values as summary statistics (count, mean, std, min, max, median, p25, p75) per property value path \u2014 not a per-annotation dump. Optionally restrict to one propertyId and/or filter the annotations with a query (same shape as list_annotations). Read-only. Use to answer questions like 'what's the mean intensity of my nuclei?'.",
+    "description": "Read computed property values as summary statistics (count, mean, std, min, max, median, p25, p75) per property value path \u2014 not a per-annotation dump. Optionally restrict to one propertyId and/or filter the annotations with a query (same shape as list_annotations). Statistics cover every matching annotation in the dataset at any size; count is how many of them have a numeric value on that path, so a count below get_annotation_summary's total means the rest have no value there (not computed, or not applicable), and a path that is absent has no values at all. On very large datasets the values are fetched from the server and can take a few seconds. Read-only. Use to answer questions like 'what's the mean intensity of my nuclei?'.",
     "input_schema": {
       "type": "object",
       "properties": {

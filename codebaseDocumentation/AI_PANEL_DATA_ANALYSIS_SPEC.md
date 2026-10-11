@@ -71,6 +71,12 @@ per-annotation property values in memory**:
   `annotation_property_values` endpoint (uncapped, `markRaw`).
 - `propertyStore.computedPropertyPaths` — every computed value path.
 - `annotationStore.annotations` — tags/shape per annotation (for grouping).
+
+That held below `stubThreshold` when this was written. Above it the store is
+in stub-only mode: `annotations` is empty and `propertyValues` holds only the
+rendered annotations' values for the displayed columns. The executors now read
+stubs there and fetch the analyzed paths from the server (see
+AI_PANEL_SPEC.md §4.1 "Stub-only mode").
 - `queryAnnotations` + `validateAnnotationQuery` in
   `src/agent/executors.ts` — the shared annotation-query resolver every
   targeting tool already uses.
@@ -108,7 +114,8 @@ frontend memory — see `AI_PANEL_SPEC.md` §4.1. The tool *semantics* here
 are chosen to survive that migration (aggregates in, aggregates out).
 
 Scope of "the annotations": analysis is restricted to annotations that
-currently exist (the live in-memory set), not to every property-value document.
+currently exist (the live set: full annotations, or stubs in stub-only mode),
+not to every property-value document.
 The two can diverge — the backend leaves property values orphaned after
 annotation deletion (issue #1243) — and analysis must reflect real objects, so
 the tools intersect with the live set (§5.1). A query narrows within that set;
@@ -289,13 +296,15 @@ export function computeStats(values: number[]): IPathStats; // mean/std/median/p
 export function uniformHistogram(values: number[], buckets: number): IHistogramBucket[];
 ```
 
-Plus a `collectPathValues(path, allowedIds)` helper in `executors.ts`
-(needs the stores): returns `[annotationId, number][]` by walking a set of
-annotation ids and reading `propertyStore.propertyValues[id]`. **It iterates
-the query's matches when a query was given (`queryAnnotations`, already
-restricted to live annotations), else every id in the live annotation set
-(`liveAnnotationIdSet()` = `annotationStore.annotations` ids) — never the raw
-`propertyValues` keys.** This matters: property-value documents can outlive
+Plus a `collectPathValues(path, allowedIds, valuesOf)` helper in
+`executors.ts` (needs the stores): returns `[annotationId, number][]` by
+walking a set of annotation ids and reading each id's values through
+`valuesOf`. `loadAnalysisValues` supplies that lookup: `propertyStore.propertyValues`
+when fully loaded, or one projected batch fetch in stub-only mode. **It
+iterates the query's matches when a query was given (`queryAnnotations`,
+already restricted to live annotations), else every id in the live annotation
+set (`liveAnnotationIdSet()` = `annotationStore.allAnnotationIds`, stub ids in
+stub-only mode) — never the raw value keys.** This matters: property-value documents can outlive
 their annotation (a backend cleanup gap leaves values orphaned after
 deletion — tracked in
 [issue #1243](https://github.com/arjunrajlaboratory/NimbusImage/issues/1243)),
@@ -492,10 +501,12 @@ the girder container (§6 note). On
    devtools network tab: tool_result for the plot is just the small JSON).
 4. "Compare <property> across tags" → box plot.
 5. Restriction: "…only for the spot-tagged annotations" → point count in
-   the tool card matches the tag count from `get_annotation_summary`. Use a
-   dataset below `stubThreshold`: in stub-only mode the summary counts the
-   whole dataset server-side but the analysis tools still see no loaded
-   annotations (AI_PANEL_SPEC.md §4).
+   the tool card matches the tag count from `get_annotation_summary` (fewer
+   only if some spots lack a value on the path). Run this on a dataset below
+   `stubThreshold` AND on one above it. In stub-only mode the analysis tools
+   fetch values server-side (AI_PANEL_SPEC.md §4.1 "Stub-only mode"), so the
+   counts must still agree with the summary. Check the network tab for a single
+   `annotation_property_values/batch` request with `propertyPaths` set.
 6. Reload the page → conversation restores, plots re-render from
    IndexedDB (and a >12-plots session shows placeholders for the oldest).
 7. Clear conversation → plots gone; switch user → gone.
