@@ -10,6 +10,7 @@ from `GET user` listings; they are plumbing, not people.
 """
 
 from girder import events
+from girder.api import access
 from girder.api.rest import getCurrentUser
 from girder.constants import AccessType
 from girder.exceptions import AccessException
@@ -33,6 +34,11 @@ def isLinkUser(user):
     return bool(user and user.get("shareLink"))
 
 
+# Girder runs each `rest.*.before` handler behind Resource._defaultAccess,
+# which demands a site admin unless the handler declares an access level.
+# Undecorated, this guard refused every non-admin user, not just link users.
+# `public` grants nothing: the route's own handler still enforces its level.
+@access.public
 def refuseDownloadForLinkUsers(event):
     if isLinkUser(getCurrentUser()):
         raise AccessException(

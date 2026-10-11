@@ -127,19 +127,22 @@ class TestShareLink:
         ), 401)
         # ...nor download the dataset's files, although its READ ACL would
         # otherwise allow it (Girder has no view-only scope).
-        assertStatus(request(
-            server, "GET", "/folder/%s/download" % dataset["_id"], token=token
-        ), 403)
-        assertStatus(request(
-            server, "GET", "/export/json", token=token,
-            params={"datasetId": str(dataset["_id"])},
-        ), 403)
-        # Every export format, not only JSON.
-        for route in ("/export/csv", "/export/geojson"):
-            assertStatus(request(
-                server, "POST", route, token=token,
-                body={"datasetId": str(dataset["_id"])},
-            ), 403)
+        # Assert the guard's own message: a bare 403 also passed while the
+        # guard refused every non-admin user.
+        refusals = [
+            request(server, "GET", "/folder/%s/download" % dataset["_id"],
+                    token=token),
+            request(server, "GET", "/export/json", token=token,
+                    params={"datasetId": str(dataset["_id"])}),
+        ] + [
+            # Every export format, not only JSON.
+            request(server, "POST", route, token=token,
+                    body={"datasetId": str(dataset["_id"])})
+            for route in ("/export/csv", "/export/geojson")
+        ]
+        for resp in refusals:
+            assertStatus(resp, 403)
+            assert "Share links show a view" in resp.json["message"]
         # The owner still can.
         assertStatusOk(server.request(
             path="/folder/%s/download" % dataset["_id"], method="GET",
@@ -284,6 +287,28 @@ class TestShareLink:
             server, "GET", "/share_link/me", token=kept["token"]
         ))
         assert User().find({"login": {"$regex": "^share-"}}).count() == 1
+
+    def testNonAdminUsersCanStillDownloadAndExport(self, user, server):
+        """The guard refuses link users only. A regular user who can read a
+        dataset downloads and exports it; this broke when the guard's
+        `before` handler had no access level and Girder demanded admin."""
+        dataset, _, _ = privateDatasetWithView(user)
+        datasetId = str(dataset["_id"])
+
+        assertStatusOk(server.request(
+            path="/folder/%s/download" % datasetId, method="GET",
+            user=user, isJson=False,
+        ))
+        assertStatusOk(server.request(
+            path="/export/json", method="GET", user=user,
+            params={"datasetId": datasetId}, isJson=False,
+        ))
+        for route in ("/export/csv", "/export/geojson"):
+            assertStatusOk(server.request(
+                path=route, method="POST", user=user,
+                body=json.dumps({"datasetId": datasetId}),
+                type="application/json", isJson=False,
+            ))
 
     def testOrdinaryLoginIsNotALink(self, admin, server):
         resp = request(server, "GET", "/share_link/me", user=admin)

@@ -583,6 +583,23 @@ virtual paths explicitly — the six existing consumers are listed in
   already exists" warnings in the test log are the annotation plugin's handlers being
   bound once per plugin load and are harmless.
 
+## `rest.*.before` Event Handlers Need an Access Decorator
+
+Girder triggers `rest.<method>.<route>.before` with
+`pre=Resource._defaultAccess`, which calls `requireAdmin` for any bound
+handler that has no `accessLevel` attribute. An undecorated hook therefore
+makes the route **site-admin-only for everyone**, whatever the route's own
+decorator says. `shareLinkGuards.refuseDownloadForLinkUsers` shipped this
+way: meant to refuse share-link users, it 403'd every non-admin download and
+export (`Administrator access required.`).
+
+- Decorate every `before` handler, usually `@access.public`. That grants
+  nothing: the route's own handler still runs `_defaultAccess` with its level.
+- Test a hook with a **non-admin** caller who should pass. The original test
+  checked "the owner still can" with the `admin` fixture, which passes
+  through the bug; and its 403 assertions for link users passed for the
+  wrong reason. Assert the hook's own message, not just the status.
+
 ## Loading Plugin Changes Into the Running Backend
 
 The `girder` container bakes the plugin into its image (no source mount). After editing backend plugin code:

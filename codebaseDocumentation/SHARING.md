@@ -167,8 +167,16 @@ Makes a dataset and all associated resources public or private.
 
 **Affected resources:**
 - Dataset folder
-- All DatasetViews for the dataset
-- All Configurations used by those DatasetViews
+- The DatasetViews for the dataset that the caller administers
+- The Configurations used by those DatasetViews that the caller administers
+
+Other users can open a dataset they may read with their own configuration,
+creating their own view. Owning the dataset does not let the caller publish
+(or unpublish) those: setting `public` is an ADMIN operation on each
+document. They are left unchanged and counted in the response's
+`datasetViewsSkipped` / `configurationsSkipped` (beside
+`datasetViewsUpdated` / `configurationsUpdated`). A site admin administers
+everything, so nothing is skipped for them.
 
 ## Share links (share a view without making the dataset public)
 
@@ -186,7 +194,9 @@ exactly this dataset (ACL) and cannot write (scope: write endpoints answer 401).
 view-only scope — `DATA_READ` would also open `folder/{id}/download`, `item/{id}/download`,
 `file/{id}/download`, `resource/download` and the plugin's `/export` routes — so
 `server/helpers/shareLinkGuards.py` binds `rest.<method>.<route>.before` on those routes and
-refuses a link user (403) before the handler runs; the same module drops link users from
+refuses a link user (403) before the handler runs. The guard is decorated `@access.public`:
+Girder demands a site admin for any `before` handler without an access level, which
+had silently made every download and export admin-only. The same module drops link users from
 `GET user` listings. The shared access-list formatter also excludes link principals
 from dataset, configuration, and project named-user tables without changing their ACLs.
 Manage those principals through the Share links list instead. Tiles, annotations,

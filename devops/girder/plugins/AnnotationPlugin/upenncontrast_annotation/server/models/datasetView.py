@@ -46,6 +46,10 @@ class DatasetViewSchema:
                 "type": "object",
                 "additionalProperties": contrastSchema,
             },
+            # Per-user scale overrides and last-opened time (epoch ms),
+            # written by the client on every view save.
+            "scales": {"type": "object"},
+            "lastViewed": {"type": "number"},
         },
         "required": [
             "datasetId",
