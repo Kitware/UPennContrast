@@ -10,3 +10,4 @@ What is the pixel size, in microns, of the "Asmus unstitched ND2 (illum test)" d
 List the annotation tags in the dataset "spotcheck-nd2-220135".
 Among my datasets with "OPS" in the name, which ones have any point annotations?
 How many nuclei are segmented in dataset 6a76214b90dec97a5ccd18a3?
+Zoom in on the tissue in the "Xenium tiny - Human Ovary (XOA 4.0)" dataset and describe what the cells look like.

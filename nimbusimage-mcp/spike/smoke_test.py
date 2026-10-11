@@ -34,7 +34,8 @@ async def call(client, name, args):
             data = base64.b64decode(block.data)
             size += len(block.data)
             OUT.mkdir(exist_ok=True)
-            path = OUT / f"{args['dataset_id']}_z{args.get('z', 0)}.jpg"
+            crop = "_crop" if "crop" in args else ""
+            path = OUT / f"{args['dataset_id']}_z{args.get('z', 0)}{crop}.jpg"
             path.write_bytes(data)
             summary = f"<image {block.mime_type} {len(data)} bytes -> {path}>"
     flag = "ERROR " if result.is_error else ""
@@ -73,6 +74,11 @@ async def main():
                    {"dataset_id": "6ab80e9d423f14002252944d"})
         await call(client, "ni_image_get_composite",
                    {"dataset_id": "6ab80e9d423f14002252944d"})
+        # Zoom into the left tissue patch (the first eval could not).
+        await call(client, "ni_image_get_composite", {
+            "dataset_id": "6ab80e9d423f14002252944d",
+            "crop": [1200, 1430, 1760, 2090],
+        })
 
         # Error paths: must come back as tool errors, not stack traces.
         await call(client, "ni_dataset_info",

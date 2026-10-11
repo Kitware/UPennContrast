@@ -33,17 +33,10 @@ from mcp_types import ToolAnnotations
 from PIL import Image as PILImage
 
 import nimbusimage as ni
-from nimbusimage.images import _parse_color
 
 MAX_DATASETS = 200
 DEFAULT_MAX_SIZE = 1024
 MAX_IMAGE_SIZE = 2048
-# The frontend's histogram request (GirderAPI.baseHistogramOptions); its
-# min/max are what percentile contrast is a percentage of.
-HISTOGRAM_PARAMS = {
-    "bins": 4096, "width": 2048, "height": 2048,
-    "resample": "false", "cache": "none",
-}
 
 LOG_PATH = Path(
     os.environ.get("NI_MCP_CALL_LOG", Path(__file__).parent / "calls.jsonl")
@@ -162,22 +155,6 @@ def instrumented(fn):
     return wrapper
 
 
-def _view_and_configuration(dataset_id: str) -> tuple[dict, dict]:
-    """The caller's own dataset view and the meta of the configuration it
-    points at, which together hold what the app shows them: layers,
-    contrast overrides, and scales. Falls back to any readable view (a
-    dataset shared with the caller that they have not opened yet)."""
-    gc = _client().girder
-    views = gc.get(
-        "dataset_view",
-        parameters={"datasetId": dataset_id, "currentUserOnly": "true"},
-    ) or gc.get("dataset_view", parameters={"datasetId": dataset_id})
-    if not views:
-        return {}, {}
-    configuration = gc.get(f"upenn_collection/{views[0]['configurationId']}")
-    return views[0], configuration.get("meta", {})
-
-
 @mcp.tool(annotations=READ_ONLY)
 @instrumented
 def ni_datasets_list(
@@ -189,8 +166,6 @@ def ni_datasets_list(
     Results are capped at `limit` (max 200).
     """
     limit = max(1, min(limit, MAX_DATASETS))
-    # Spike: list_datasets() finds datasets through their views and fetches
-    # each folder separately (one request per dataset). See RESULTS.md.
     folders = _client().list_datasets()
     if name_contains:
         needle = name_contains.lower()
@@ -209,18 +184,12 @@ def ni_datasets_list(
 def ni_dataset_info(dataset_id: str) -> dict:
     """Describe one dataset: name, image size, channels, and how many
     z-slices, time points, and XY positions (fields of view) it has, plus
-    pixel size, z step, and bit depth. pixel_size is null when unknown.
+    pixel size (µm), z step, and bit depth; either is null when unknown.
     Use this before fetching images.
     """
     ds = _client().dataset(dataset_id)
     height, width = ds.shape
-    view, configuration = _view_and_configuration(dataset_id)
-    # The app's precedence: the user's view scales over the configuration's
-    # (store getter `scales`). Neither set: the file's own calibration.
-    scales = {**configuration.get("scales", {}), **view.get("scales", {})}
-    pixel_size = scales.get("pixelSize")
-    if pixel_size is None and ds.mm_x is not None:
-        pixel_size = {"value": ds.mm_x * 1000, "unit": "µm"}
+    pixel = ds.pixel_size  # the app's scales; None when unknown
     return {
         "id": ds.id,
         "name": ds.name,
@@ -233,8 +202,10 @@ def ni_dataset_info(dataset_id: str) -> dict:
         "num_z": ds.num_z,
         "num_time": ds.num_time,
         "num_xy": ds.num_xy,
-        "pixel_size": pixel_size,
-        "z_step": scales.get("zStep"),
+        # One unit for every dataset (files calibrate in mm, configurations
+        # often in µm), so sizes compare without per-dataset conversion.
+        "pixel_size_um": pixel.to("um").value if pixel else None,
+        "z_step": _known_scale(ds.collections.scales.get("zStep")),
         "magnification": ds.magnification,
     }
 
@@ -252,16 +223,9 @@ def ni_annotations_count(
     line, rectangle) and by tags (an annotation must have all the given
     tags). Returns one number. Use this before listing annotations.
     """
-    # Not ds.annotations.count(): it builds the query string by hand, so a
-    # tag like "CD8+" reaches the server as "CD8 ". parameters= encodes.
-    parameters = {"datasetId": dataset_id}
-    if shape:
-        parameters["shape"] = shape
-    if tags:
-        parameters["tags"] = json.dumps(tags)
-    count = _client().girder.get(
-        "upenn_annotation/count", parameters=parameters
-    )["count"]
+    count = _client().dataset(dataset_id).annotations.count(
+        shape=shape, tags=tags
+    )
     return {"count": count, "shape": shape, "tags": tags or []}
 
 
@@ -273,40 +237,49 @@ def ni_annotations_summary(dataset_id: str, max_tags: int = 30) -> dict:
     learn which tags exist (e.g. "nucleus", "spot", "cell") before counting
     or filtering. An annotation with several tags counts once per tag.
     """
-    # One server-side aggregation (POST upenn_annotation/summary): no
-    # annotation rows reach this process. `shapes` arrives with the
-    # annotation-summary-shapes branch; an older server omits it, and
-    # by_shape is left out rather than paying a full scan per shape.
+    # One server-side aggregation; no annotation rows reach this process.
     summary = _client().girder.post(
         "upenn_annotation/summary",
         json={"datasetId": dataset_id, "filters": {}, "propertyPaths": []},
     )
     tags = summary["tags"]
-    result = {
+    return {
         "total": summary["total"],
         "by_tag": {t["tag"]: t["count"] for t in tags[:max(1, max_tags)]},
         "distinct_tags": len(tags),
+        "by_shape": {s["shape"]: s["count"] for s in summary["shapes"]},
     }
-    if "shapes" in summary:
-        result["by_shape"] = {
-            entry["shape"]: entry["count"] for entry in summary["shapes"]
-        }
-    return result
 
 
-def _slice_indexes(slice_setting: dict | None, current: int, size: int):
-    """The indexes a layer reads on one axis, mirroring the frontend's
-    resolveSlice / getLayerSliceIndexes: every index for max-merge, else
-    one index; None when the layer resolves outside the axis (the app does
-    not draw it then)."""
-    kind = (slice_setting or {}).get("type", "current")
-    value = (slice_setting or {}).get("value") or 0
-    if size <= 1:
-        return [0]
-    if kind == "max-merge":
-        return list(range(size))
-    index = {"constant": value, "offset": current + value}.get(kind, current)
-    return [index] if 0 <= index < size else None
+# exampleConfigurationBase().scales in src/store/model.ts: the app's
+# placeholder for a scale nobody set.
+_PLACEHOLDER_SCALE = {"value": 1, "unit": "m"}
+
+
+def _known_scale(scale: dict | None) -> dict | None:
+    """A configured scale, or None for the app's placeholder or a
+    non-positive value (an uncalibrated file)."""
+    if not scale or scale == _PLACEHOLDER_SCALE:
+        return None
+    value = scale.get("value")
+    if not isinstance(value, (int, float)) or value <= 0:
+        return None
+    return scale
+
+
+def _check_crop(crop, width: int, height: int) -> tuple[int, int, int, int]:
+    """The crop, clipped to the image; ValueError (shown to the model)
+    when it is empty or entirely outside the image."""
+    left, top, right, bottom = crop
+    left, right = max(0, left), min(width, right)
+    top, bottom = max(0, top), min(height, bottom)
+    if right <= left or bottom <= top:
+        raise ValueError(
+            f"crop {tuple(crop)} is empty or outside the image "
+            f"(width {width}, height {height}); use "
+            "left < right and top < bottom within those bounds."
+        )
+    return left, top, right, bottom
 
 
 def _encode_jpeg(rgb: np.ndarray) -> bytes:
@@ -325,93 +298,40 @@ def ni_image_get_composite(
     z: int = 0,
     time: int = 0,
     max_size: int = DEFAULT_MAX_SIZE,
+    crop: tuple[int, int, int, int] | None = None,
 ) -> Image:
     """Show the image: a color composite of the dataset's visible channels
     at one XY position, z-slice, and time point, rendered the way the user
     sees it in NimbusImage (their channel colors, contrast, and layer
-    settings such as max projections). Returns a JPEG downsampled so its
-    longer side is at most max_size pixels (default 1024, max 2048).
+    settings such as max projections). Returns a JPEG whose longer side is
+    at most max_size pixels (default 1024, max 2048). To zoom in, pass
+    crop=(left, top, right, bottom) in full-resolution image pixels (see
+    width/height from ni_dataset_info).
     """
     max_size = max(64, min(max_size, MAX_IMAGE_SIZE))
     ds = _client().dataset(dataset_id)
     sizes = {"xy": ds.num_xy, "z": ds.num_z, "time": ds.num_time}
-    current = {"xy": xy, "z": z, "time": time}
-    for axis, value in current.items():
+    for axis, value in {"xy": xy, "z": z, "time": time}.items():
         if not 0 <= value < sizes[axis]:
             raise ValueError(
                 f"{axis}={value} is out of range (0..{sizes[axis] - 1})"
             )
-    view, configuration = _view_and_configuration(dataset_id)
-    overrides = view.get("layerContrasts") or {}
-    images = ds.images
-    images._ensure_frame_map()
-    frame_map = images._frame_map
-    gc = _client().girder
-
-    # Spike: reimplements nimbusimage's get_composite, which fetches full
-    # resolution and reads percentile contrast as quantiles (the app reads
-    # it as a percent of the histogram's min..max). See RESULTS.md.
-    composite = None
-    for layer in configuration.get("layers", []):
-        if not layer.get("visible", True):
-            continue
-        indexes = {
-            axis: _slice_indexes(layer.get(axis), current[axis], sizes[axis])
-            for axis in sizes
-        }
-        if any(v is None for v in indexes.values()):
-            continue
-        by_time = frame_map.get(layer.get("channel", 0), {})
-        frames = [
-            by_time[t][zi][xyi]
-            for t in indexes["time"] for zi in indexes["z"]
-            for xyi in indexes["xy"]
-            if xyi in by_time.get(t, {}).get(zi, {})
-        ]
-        if not frames:
-            continue  # channel absent at this location: the app skips it
-
-        # Downsample on the server: large_image's region endpoint scales to
-        # fit width x height, so full-resolution frames never cross the
-        # wire. A max-merge layer is the per-pixel max over its frames.
-        img = np.max([
-            images._get_region(f, width=max_size, height=max_size).squeeze()
-            for f in frames
-        ], axis=0).astype(np.float64)
-
-        contrast = overrides.get(layer.get("id")) or layer.get("contrast", {})
-        black = contrast.get("blackPoint", 0)
-        white = contrast.get("whitePoint", 100)
-        if contrast.get("mode") == "absolute":
-            cmin, cmax = float(black), float(white)
-        else:
-            # Percentile mode (the default): a linear percent of the
-            # frames' histogram range, as in the frontend's toStyle().
-            histograms = [
-                gc.get(
-                    f"item/{ds._item_id}/tiles/histogram",
-                    parameters={**HISTOGRAM_PARAMS, "frame": f},
-                )[0]
-                for f in frames
-            ]
-            lo = min(h["min"] for h in histograms)
-            hi = max(h["max"] for h in histograms)
-            cmin = lo + black / 100 * (hi - lo)
-            cmax = lo + white / 100 * (hi - lo)
-        if cmax > cmin:
-            img = (img - cmin) / (cmax - cmin)
-        img = np.clip(img, 0.0, 1.0)
-        r, g, b = _parse_color(layer.get("color", "white"))
-        rgb = np.stack([img * r, img * g, img * b], axis=-1)
-        composite = rgb if composite is None else np.maximum(composite, rgb)
-
-    if composite is None:
+    if crop is not None:
+        height, width = ds.shape
+        crop = _check_crop(crop, width, height)
+    if not any(layer.get("visible", True) for layer in ds.collections.layers):
+        raise ValueError("This dataset has no visible layers to show.")
+    rgb = ds.images.get_composite(
+        xy=xy, z=z, time=time, dtype="uint8", max_size=max_size, crop=crop
+    )
+    if not rgb.any():
+        # get_composite returns black when no layer draws here (e.g. an
+        # offset slice out of range); say so rather than show a black image.
         raise ValueError(
-            "Nothing to show: no visible layer has an image at this "
-            "location."
+            "Nothing is drawn at this location: every visible layer is "
+            "empty or not shown at this xy/z/time."
         )
-    rgb8 = (np.clip(composite, 0.0, 1.0) * 255).astype(np.uint8)
-    return Image(data=_encode_jpeg(rgb8), format="jpeg")
+    return Image(data=_encode_jpeg(rgb), format="jpeg")
 
 
 if __name__ == "__main__":

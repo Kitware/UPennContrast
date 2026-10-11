@@ -92,7 +92,7 @@ const TEST_ROOTS = [
   {
     dir: resolve(__dirname, "../../nimbusimage-mcp"),
     matches: PYTEST,
-    knownTest: "test_slice_indexes_match_frontend_resolve_slice",
+    knownTest: "test_result_size_matches_sdk_wire_format",
   },
   // Repo tooling, e.g. the skills-mirror sync script.
   {
