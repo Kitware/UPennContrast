@@ -197,15 +197,35 @@ class AnnotationAccessor:
             exclusive: See ``tags``.
             property_paths: Property value paths to summarize, each a list
                 of keys, e.g. ``[property_id, "Area"]``.
-            filters: Further filters in the server's list-filter format
-                (``location``, ``idSubstring``, ``propertyFilters``,
-                ``idConstraints``, ``analysisGates``). Use ``shape`` and
-                ``tags`` above rather than their keys here.
+            filters: Further filters in the server's list-filter format:
+                ``location`` (``{"XY": 0, "Z": 3, "Time": 0}``, any subset),
+                ``idSubstring``, ``propertyFilters``, ``idConstraints``,
+                ``analysisGates``. Use ``shape`` and ``tags`` above rather
+                than their keys here.
 
         Returns:
             AnnotationSummary with ``total``, ``tags``, ``shapes``, and one
             ``properties`` entry per requested path, in order.
+
+        Raises:
+            girder_client.HttpError: 400 for what the server refuses: more
+                than 200 property paths, a path key that is not a string or
+                contains ``.`` or ``$``, malformed filters, or property
+                filters matching more ids than the server summarizes.
         """
+        # A bare string would be split into characters below and silently
+        # match the wrong thing; property paths are key lists, not the
+        # dotted strings histogram() takes.
+        if isinstance(tags, str):
+            raise TypeError("tags must be a list of tag names, not a string")
+        for path in property_paths or []:
+            if isinstance(path, str):
+                raise TypeError(
+                    f"property path {path!r} must be a list of keys, e.g. "
+                    "[property_id, 'Area'], not a dotted string"
+                )
+        if exclusive and tags is None:
+            raise ValueError("exclusive=True needs tags")
         body_filters = dict(filters or {})
         for key, given in (("shape", shape), ("tags", tags)):
             if given is not None and key in body_filters:
@@ -216,15 +236,18 @@ class AnnotationAccessor:
         if shape is not None:
             body_filters["shape"] = shape
         if tags is not None:
+            # Deduplicated: the server's exclusive match compares the set
+            # size with len(values), so ["a", "a"] would never match.
             body_filters["tags"] = {
-                "values": list(tags), "exclusive": exclusive,
+                "values": list(dict.fromkeys(tags)), "exclusive": exclusive,
             }
-        data = self._gc.post("upenn_annotation/summary", json={
-            "datasetId": self._dataset_id,
-            "filters": body_filters,
-            "propertyPaths": [list(path) for path in property_paths or []],
-        })
-        return AnnotationSummary.from_response(data)
+        return AnnotationSummary.from_dict(self._gc.post(
+            "upenn_annotation/summary", json={
+                "datasetId": self._dataset_id,
+                "filters": body_filters,
+                "propertyPaths": [list(p) for p in property_paths or []],
+            },
+        ))
 
     def create(self, annotation: Annotation) -> Annotation:
         """Create a single annotation."""

@@ -177,8 +177,9 @@ class PropertyStats(BaseModel):
 
     ``count`` is the number of annotations with a numeric value at the
     path (strings, NaN, and missing values are skipped); the statistics are
-    None when ``count`` is 0, and ``std`` (the sample standard deviation)
-    also below two values.
+    None when ``count`` is 0, ``std`` (the sample standard deviation) also
+    below two values, and any statistic that is not finite (an Infinity
+    value is counted but makes mean/min/max infinite) is None too.
     """
 
     path: list[str]
@@ -204,7 +205,7 @@ class AnnotationSummary(BaseModel):
     properties: list[PropertyStats] = []
 
     @classmethod
-    def from_response(cls, data: dict) -> "AnnotationSummary":
+    def from_dict(cls, data: dict) -> "AnnotationSummary":
         """Build from the POST upenn_annotation/summary response."""
         shapes = data.get("shapes")
         return cls(

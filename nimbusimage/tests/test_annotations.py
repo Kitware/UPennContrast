@@ -369,18 +369,18 @@ class TestAnnotationSummary:
     def test_shape_and_tags_become_list_filters(self, mock_gc):
         mock_gc.post.return_value = self.RESPONSE
         accessor = AnnotationAccessor(mock_gc, "ds_001")
-        extra = {"location": {"z": 0}}
+        extra = {"location": {"Z": 0}}
 
         accessor.summary(
             shape="point", tags=["CD8+"], exclusive=True, filters=extra,
         )
 
         assert mock_gc.post.call_args.kwargs["json"]["filters"] == {
-            "location": {"z": 0},
+            "location": {"Z": 0},
             "shape": "point",
             "tags": {"values": ["CD8+"], "exclusive": True},
         }
-        assert extra == {"location": {"z": 0}}  # caller's dict untouched
+        assert extra == {"location": {"Z": 0}}  # caller's dict untouched
 
     @pytest.mark.parametrize("kwargs", [
         {"shape": "point", "filters": {"shape": "polygon"}},
@@ -390,6 +390,29 @@ class TestAnnotationSummary:
         with pytest.raises(ValueError, match="not both"):
             AnnotationAccessor(mock_gc, "ds_001").summary(**kwargs)
         mock_gc.post.assert_not_called()
+
+    @pytest.mark.parametrize("kwargs, error", [
+        ({"tags": "cell"}, TypeError),
+        ({"property_paths": ["prop.Area"]}, TypeError),
+        ({"exclusive": True}, ValueError),
+    ])
+    def test_rejects_misshapen_arguments(self, mock_gc, kwargs, error):
+        """A bare string would be split into characters and silently match
+        the wrong thing; exclusive without tags would be ignored."""
+        with pytest.raises(error):
+            AnnotationAccessor(mock_gc, "ds_001").summary(**kwargs)
+        mock_gc.post.assert_not_called()
+
+    def test_duplicate_tags_are_sent_once(self, mock_gc):
+        """The server's exclusive match compares the tag-set size with
+        len(values); a duplicate would make it match nothing."""
+        mock_gc.post.return_value = self.RESPONSE
+        AnnotationAccessor(mock_gc, "ds_001").summary(
+            tags=["a", "b", "a"], exclusive=True,
+        )
+        assert mock_gc.post.call_args.kwargs["json"]["filters"]["tags"] == {
+            "values": ["a", "b"], "exclusive": True,
+        }
 
     def test_empty_tag_list_is_a_filter_not_absent(self, mock_gc):
         """tags=[] is sent (the server reads empty values as no tag
