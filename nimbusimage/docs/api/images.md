@@ -23,7 +23,9 @@ scan.values      # (N,) intensities; NaN where the line leaves the image
 scan.points      # (N, 2) sampled (x, y) coordinates
 
 # Distances in physical units
-microns = scan.distances * ds.pixel_size.to("um").value  # pixel_size is None if unknown
+pixel_size = ds.pixel_size  # None when the size is unknown
+if pixel_size is not None:
+    microns = scan.distances * pixel_size.to("um").value
 ```
 
 ::: nimbusimage.images.ImageAccessor

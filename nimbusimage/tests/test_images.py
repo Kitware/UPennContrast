@@ -1,5 +1,6 @@
 """Tests for ImageAccessor."""
 
+import json
 import pickle
 from unittest.mock import MagicMock
 
@@ -99,7 +100,12 @@ def _composite_dataset(mock_gc, tiles, layers, images, overrides=None):
         if path.endswith("/tiles/region"):
             regions.append(parameters)
             response = MagicMock()
-            response.content = pickle.dumps(images[parameters["frame"]])
+            if "style" in parameters:
+                response.content = pickle.dumps(_styled(
+                    json.loads(parameters["style"]), images
+                ))
+            else:
+                response.content = pickle.dumps(images[parameters["frame"]])
             return response
         if path.endswith("/tiles/histogram"):
             img = images[parameters["frame"]]
@@ -108,6 +114,20 @@ def _composite_dataset(mock_gc, tiles, layers, images, overrides=None):
 
     mock_gc.get.side_effect = get
     return ds, regions
+
+
+def _styled(style, images):
+    """What large_image returns for a band style with a black-to-white
+    palette: the per-pixel max ("lighten") of the windowed bands, 8-bit,
+    as RGBA."""
+    windowed = []
+    for band in style["bands"]:
+        img = images[band["frame"]].astype(np.float64)
+        low = img.min() if band["min"] == "min" else band["min"]
+        high = img.max() if band["max"] == "max" else band["max"]
+        windowed.append(np.clip((img - low) / (high - low), 0, 1))
+    gray = np.round(np.max(windowed, axis=0) * 255).astype(np.uint8)
+    return np.stack([gray, gray, gray, np.full_like(gray, 255)], axis=-1)
 
 
 def _layer(channel=0, color="#FF0000", contrast=None, **extra):
@@ -229,12 +249,13 @@ class TestGetComposite:
         assert result.shape == (768, 1024, 3)
         assert result.max() == 0.0
 
-    def test_max_merge_projects_but_contrast_uses_the_current_frame(
+    def test_max_merge_is_one_server_side_projection(
         self, mock_gc, sample_tiles_metadata,
     ):
-        """The drawn image is the max over z, but the app's histogram is of
-        the layer's image at the current z (resolveSlice maps max-merge to
-        the current index), so contrast comes from that frame alone."""
+        """One styled region request composites every projected frame on
+        the server (as the app's banded tiles do), instead of fetching and
+        holding each frame; contrast comes from the current frame's
+        histogram (resolveSlice maps max-merge to the current index)."""
         low = np.zeros((2, 2), dtype=np.uint16)
         low[0, 0] = 400
         high = np.zeros((2, 2), dtype=np.uint16)
@@ -244,17 +265,21 @@ class TestGetComposite:
             [_layer(0, z={"type": "max-merge", "value": None})],
             {0: low, 2: high},
         )
-        result = ds.images.get_composite(z=0, dtype="float64")
-        assert sorted(r["frame"] for r in regions) == [0, 2]
+        result = ds.images.get_composite(z=0, dtype="float64", max_size=64)
+        assert len(regions) == 1
+        style = json.loads(regions[0]["style"])
+        assert [band["frame"] for band in style["bands"]] == [0, 2]
+        # Range 0..400 from the z=0 frame's histogram only.
+        assert {(b["min"], b["max"]) for b in style["bands"]} == {(0, 400)}
         histogram_frames = [
             c.kwargs["parameters"]["frame"]
             for c in mock_gc.get.call_args_list
             if c.args[0].endswith("/tiles/histogram")
         ]
         assert histogram_frames == [0]
-        # Range 0..400 from the z=0 frame: 400 is full, 800 clips.
-        assert result[0, 0, 0] == 1.0
-        assert result[1, 1, 0] == 1.0
+        assert result[0, 0, 0] == 1.0  # 400 of 0..400
+        assert result[1, 1, 0] == 1.0  # 800 clips
+        assert result[0, 1, 0] == 0.0
 
     def test_max_merge_layer_without_a_current_frame_is_not_drawn(
         self, mock_gc, sample_tiles_metadata,

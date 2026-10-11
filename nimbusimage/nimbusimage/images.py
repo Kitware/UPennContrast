@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import pickle
 from typing import TYPE_CHECKING, Iterator, NamedTuple, Sequence
@@ -225,21 +226,23 @@ class ImageAccessor:
                 # No image of this channel at the current location: the
                 # app draws nothing for the layer (getLayerImages is empty).
                 continue
-            # A max-merge layer is the per-pixel maximum of its frames.
-            img = np.max(
-                [self._get_region(f, **region).squeeze() for f in frames],
-                axis=0,
-            ).astype(np.float64)
-
             contrast = (
                 overrides.get(layer.get("id")) or layer.get("contrast", {})
             )
-            cmin, cmax = self._contrast_range(
-                contrast, histogram_frames, img
-            )
-            if cmax > cmin:
-                img = (img - cmin) / (cmax - cmin)
-            img = np.clip(img, 0.0, 1.0)
+            contrast_range = self._contrast_range(contrast, histogram_frames)
+            if len(frames) > 1:
+                # A max-merge projection, composited on the server in one
+                # request (as the app's banded tiles are), not one
+                # full-size fetch per projected frame.
+                img = self._projection(frames, contrast_range, region)
+            else:
+                img = self._get_region(
+                    frames[0], **region
+                ).squeeze().astype(np.float64)
+                cmin, cmax = contrast_range or (img.min(), img.max())
+                if cmax > cmin:
+                    img = (img - cmin) / (cmax - cmin)
+                img = np.clip(img, 0.0, 1.0)
 
             r, g, b = _parse_color(layer.get("color", "white"))
             channel_rgb = np.stack([img * r, img * g, img * b], axis=-1)
@@ -298,8 +301,10 @@ class ImageAccessor:
         ]
 
     def _contrast_range(
-        self, contrast: dict, frames: list[int], img: np.ndarray
-    ) -> tuple[float, float]:
+        self, contrast: dict, frames: list[int]
+    ) -> tuple[float, float] | None:
+        """The layer's (black, white) intensities, or None when there is
+        no histogram: the app then styles with the image's own min/max."""
         black = contrast.get("blackPoint", 0)
         white = contrast.get("whitePoint", 100)
         if contrast.get("mode") == "absolute":
@@ -313,17 +318,42 @@ class ImageAccessor:
             )
             for frame in frames
         ]
-        if all(histograms):
-            lo = min(h[0]["min"] for h in histograms)
-            hi = max(h[0]["max"] for h in histograms)
-        else:
-            # No histogram: the app styles the tile with "min"/"max", the
-            # image's own range.
-            lo, hi = float(img.min()), float(img.max())
+        if not all(histograms):
+            return None
+        lo = min(h[0]["min"] for h in histograms)
+        hi = max(h[0]["max"] for h in histograms)
         return (
             _round_half_up(lo + black / 100 * (hi - lo)),
             _round_half_up(lo + white / 100 * (hi - lo)),
         )
+
+    def _projection(
+        self,
+        frames: list[int],
+        contrast_range: tuple[float, float] | None,
+        region: dict,
+    ) -> np.ndarray:
+        """Maximum projection over `frames`, contrast applied, in [0, 1].
+
+        Uses large_image's band style, which composites the frames with
+        "lighten" (a per-pixel maximum) on the server, the way the app
+        draws a max-merge layer. The result is 8-bit. At full resolution
+        it equals the per-frame maximum exactly; downsampled, contrast is
+        applied before averaging (as in the app's tiles), so saturated
+        spots are not spread into their dark neighbors.
+        """
+        low, high = contrast_range or ("min", "max")
+        style = {"bands": [
+            {"frame": frame, "min": low, "max": high,
+             "palette": ["#000000", "#ffffff"]}
+            for frame in frames
+        ]}
+        styled = self._get_region(
+            frames[0], style=json.dumps(style), **region
+        )
+        # Grayscale palette: every color band holds the intensity.
+        gray = styled[..., 0] if styled.ndim == 3 else styled
+        return gray.astype(np.float64) / 255.0
 
     def _region_size(self, crop) -> tuple[float, float]:
         """(height, width) of the requested region at full resolution,
