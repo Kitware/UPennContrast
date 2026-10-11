@@ -83,7 +83,7 @@ CHANNEL_COLORS = {
 }
 
 # pixelSize {0, "mm"} is the "unknown" marker (port of unknownPixelSize in
-# src/utils/scales.ts); a 1 m default drew a kilometre-long scale bar.
+# src/utils/scales.ts); a 1 m default drew a kilometer-long scale bar.
 _DEFAULT_SCALES = {
     "pixelSize": {"value": 0, "unit": "mm"},
     "zStep": {"value": 1, "unit": "m"},

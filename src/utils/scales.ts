@@ -6,10 +6,10 @@ import {
 } from "@/store/model";
 
 // The single representation of "this dataset has no physical pixel size".
-// Zero is what the scale bar, Snapshots, the neighbourhood dialog, the
+// Zero is what the scale bar, Snapshots, the neighborhood dialog, the
 // spatial pixel-size adoption and the blob-metrics worker already read as
 // unknown, and what the backend's build_scales port records. The old 1 m
-// default instead drew a kilometre-long scale bar and fed workers a real
+// default instead drew a kilometer-long scale bar and fed workers a real
 // (absurd) size.
 export function unknownPixelSize(): IScaleInformation<TUnitLength> {
   return { value: 0, unit: "mm" };
