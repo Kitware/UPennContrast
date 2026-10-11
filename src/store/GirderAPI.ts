@@ -52,6 +52,7 @@ import { stringify } from "qs";
 import { logError, logWarning } from "@/utils/log";
 import { markRaw } from "vue";
 import { inferZStepFromDimensionLabelsUm } from "@/utils/dimensionLabels";
+import { pixelSizeFromTileInfo } from "@/utils/scales";
 import { IRawImageData, parseRawTiff } from "@/utils/tiff";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
@@ -338,6 +339,7 @@ export default class GirderAPI {
     hist: any,
     layer: IDisplayLayer | null,
     ds: IDataset | null,
+    authToken?: string | null,
   ): string | undefined {
     if (hist === null) {
       return;
@@ -358,6 +360,9 @@ export default class GirderAPI {
     }
     url.searchParams.set("style", JSON.stringify(style));
     url.searchParams.set("edge", "crop");
+    if (authToken) {
+      url.searchParams.set("token", authToken);
+    }
     return url.href.replace("tiles/zxy", "tiles/zxy/{z}/{x}/{y}");
   }
 
@@ -365,9 +370,16 @@ export default class GirderAPI {
     return this.client.get(`item/${toId(item)}/tiles`).then((r) => r.data);
   }
 
-  getTilesInternalMetadata(item: string | IGirderItem): Promise<any> {
+  // Tile metadata plus slim internal metadata for up to 100 items of a
+  // dataset folder in one request; see `dataset/:id/source_metadata`.
+  getSourceMetadata(
+    datasetId: string,
+    itemIds: string[],
+  ): Promise<ISourceMetadataEntry[]> {
     return this.client
-      .get(`item/${toId(item)}/tiles/internal_metadata`)
+      .get(`dataset/${datasetId}/source_metadata`, {
+        params: { itemIds: JSON.stringify(itemIds) },
+      })
       .then((r) => r.data);
   }
 
@@ -508,9 +520,10 @@ export default class GirderAPI {
       .then((r) => asDatasetView(r.data));
   }
 
-  async getSnapshotImage(url: URL): Promise<ArrayBuffer> {
+  async getSnapshotImage(url: URL, signal?: AbortSignal): Promise<ArrayBuffer> {
     const response = await this.client.get<ArrayBuffer>(url.href, {
       responseType: "arraybuffer",
+      signal,
     });
     if (response.data.byteLength === 0) {
       throw new Error("Snapshot crop contains no image data.");
@@ -840,7 +853,16 @@ export default class GirderAPI {
   }
 
   deleteDataset(dataset: IDataset): Promise<IDataset> {
-    return this.client.delete(`/folder/${dataset.id}`).then(() => dataset);
+    // DELETE /resource, not DELETE /folder/:id. Since Girder 5.0.11 the folder
+    // endpoint hands deletion to a Celery task on the "local" queue and returns
+    // 503 when no worker consumes it; /resource removes the folder in-request
+    // through the same Folder().remove(), as the dataset browser (deleteItems)
+    // already does.
+    return this.client
+      .delete("resource", {
+        params: { resources: JSON.stringify({ folder: [dataset.id] }) },
+      })
+      .then(() => dataset);
   }
 
   async createConfigurationFromBase(
@@ -1083,6 +1105,20 @@ export default class GirderAPI {
     return responses;
   }
 
+  // The large-image transcode job started for `itemId`, if any, among the
+  // most recent ones; throws if the jobs cannot be listed.
+  async findTranscodeJob(itemId: string): Promise<IJob | undefined> {
+    const response = await this.client.get("job", {
+      params: {
+        types: JSON.stringify(["large_image_tiff"]),
+        limit: 10,
+        sort: "created",
+        sortdir: -1,
+      },
+    });
+    return (response.data as IJob[]).find((job) => job.meta?.itemId === itemId);
+  }
+
   async findJobs(type: TJobType, statuses: number[]): Promise<any[]> {
     const params = {
       types: JSON.stringify([type]),
@@ -1255,12 +1291,7 @@ export function getDatasetCompatibility(
 export function getDatasetScales(dataset: IDataset): IScales {
   const scales = exampleConfigurationBase().scales;
   const tileInfo = dataset.anyImage()?.tileinfo;
-  if (tileInfo) {
-    scales.pixelSize = {
-      value: (tileInfo.mm_x + tileInfo.mm_y) / 2,
-      unit: "mm",
-    };
-  }
+  scales.pixelSize = pixelSizeFromTileInfo(tileInfo?.mm_x, tileInfo?.mm_y);
   const zStepUm = inferZStepFromDimensionLabelsUm(dataset.dimensionLabels);
   if (zStepUm !== null && zStepUm > 0) {
     scales.zStep = {
@@ -1359,6 +1390,17 @@ export interface IHistogramOptions {
   height: number;
   resample: boolean;
   cache: "schedule" | "report" | "none";
+}
+
+// One item's entry from `getSourceMetadata`: its metadata, or the reason
+// it has none (`notReady` when it is still being marked or converted, so
+// worth retrying).
+export interface ISourceMetadataEntry {
+  itemId: string;
+  tiles?: ITileMeta;
+  internalMetadata?: { [key: string]: any };
+  error?: string;
+  notReady?: boolean;
 }
 
 export interface ITileMeta {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import urllib.parse
 import warnings
 from typing import TYPE_CHECKING
 
@@ -178,7 +179,8 @@ class PropertyAccessor:
         """Get histogram for a property across all annotations."""
         return self._gc.get(
             f"annotation_property_values/histogram"
-            f"?propertyPath={property_path}"
+            # Paths carry user-chosen names ("Mean Intensity", "CD8+").
+            f"?propertyPath={urllib.parse.quote(property_path, safe='')}"
             f"&datasetId={self._dataset_id}"
             f"&buckets={buckets}"
         )

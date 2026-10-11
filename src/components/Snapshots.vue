@@ -673,6 +673,7 @@ import progress from "@/store/progress";
 import geojs from "geojs";
 import { formatDate } from "@/utils/date";
 import { downloadToClient } from "@/utils/download";
+import { buildSnapshotFilename } from "@/utils/snapshotFilename";
 import GIF from "gif.js";
 import { cloneDeep } from "lodash";
 import {
@@ -689,6 +690,7 @@ import {
   IGeoJSMap,
   ISnapshot,
   copyLayerWithoutPrivateAttributes,
+  NotificationType,
   ProgressType,
   TUnitLength,
 } from "@/store/model";
@@ -701,6 +703,9 @@ import {
   getBaseURLFromDownloadParameters,
 } from "@/utils/screenshot";
 import { logError } from "@/utils/log";
+import { snapshotLoadRequest } from "@/commands/requests";
+import { snapshotKey } from "@/utils/snapshotKey";
+import { isKnownPixelSize } from "@/utils/scales";
 
 interface ISnapshotItem {
   name: string;
@@ -708,10 +713,6 @@ interface ISnapshotItem {
   key: string;
   record: ISnapshot;
   modified: string;
-}
-
-function snapshotKey(snapshot: ISnapshot) {
-  return `${snapshot.datasetViewId}:${snapshot.name}`;
 }
 
 interface IGifOptions extends GIF.Options {
@@ -898,6 +899,10 @@ function sanitizeSnapshotFilename(name: string | null): string {
   return sanitized || "snapshot";
 }
 
+// Download URLs whose filename buildSnapshotFilename had to shorten, so the
+// download that eventually consumes them can tell the user.
+const shortenedFilenameUrls = new WeakSet<URL>();
+
 function getUniqueZipEntryName(name: string | null, filenames: Set<string>) {
   const sanitizedName = sanitizeSnapshotFilename(name);
   const pointIdx = sanitizedName.lastIndexOf(".");
@@ -1030,10 +1035,7 @@ const manualPixelSizeUnit = computed({
 
 const configurationPixelSize = computed((): IScalebarSettings => {
   const scale = store.configuration?.scales.pixelSize;
-  if (!scale) {
-    return { length: 1.0, unit: TScalebarUnit.PX };
-  }
-  if (scale.value === 0) {
+  if (!isKnownPixelSize(scale)) {
     return { length: 1.0, unit: TScalebarUnit.PX };
   }
   return { length: scale.value, unit: scale.unit as TScalebarUnit };
@@ -1673,7 +1675,12 @@ function overwriteConfigurationLayers() {
 }
 
 async function loadSnapshot(_event: Event, { item }: { item: ISnapshotItem }) {
-  const snapshot = item.record;
+  await applySnapshot(item.record);
+}
+
+// Restore a snapshot's view: dataset view, layers, location and viewport.
+// Called for a row click and for a command-palette request.
+async function applySnapshot(snapshot: ISnapshot) {
   if (
     snapshot.datasetViewId &&
     snapshot.datasetViewId !== store.datasetView?.id
@@ -2102,8 +2109,17 @@ async function getUrlsForSnapshot(
       for (const { url, channel } of channelUrls) {
         const channelName =
           dataset.channelNames.get(channel) ?? "Unknown channel";
-        const fileName = `${name} - ${channelName} - ${dataset.name} - ${configurationName} - ${dateStr}${coordinateSuffix}.${extension}`;
+        const { fileName, shortened } = buildSnapshotFilename({
+          snapshotName: name,
+          label: channelName,
+          datasetName: dataset.name,
+          configurationName,
+          dateStr,
+          coordinateSuffix,
+          extension,
+        });
         url.searchParams.set("contentDispositionFilename", fileName);
+        if (shortened) shortenedFilenameUrls.add(url);
         urls.push(url);
       }
     } else {
@@ -2121,8 +2137,17 @@ async function getUrlsForSnapshot(
             layers.find((layer) => layer.id === layerId)?.name ??
             "Unknown layer",
         );
-        const fileName = `${name} - ${layerNames.join(" ")} - ${dataset.name} - ${configurationName} - ${dateStr}${coordinateSuffix}.${extension}`;
+        const { fileName, shortened } = buildSnapshotFilename({
+          snapshotName: name,
+          label: layerNames.join(" "),
+          datasetName: dataset.name,
+          configurationName,
+          dateStr,
+          coordinateSuffix,
+          extension,
+        });
         url.searchParams.set("contentDispositionFilename", fileName);
+        if (shortened) shortenedFilenameUrls.add(url);
         urls.push(url);
       }
     }
@@ -2172,6 +2197,17 @@ async function downloadUrls(
   if (urls.length <= 0) {
     return;
   }
+  const shortenedNames = urls.some(({ url }) => shortenedFilenameUrls.has(url));
+  const warnShortenedNames = () => {
+    if (!shortenedNames) return;
+    progress.createNotification({
+      type: NotificationType.WARNING,
+      title: "File names shortened",
+      message:
+        'Some file names were too long to save or unzip reliably, so their longest parts (collection and dataset names first) were shortened with "...". XY/T/Z positions are always kept.',
+      timeout: 10,
+    });
+  };
 
   if (urls.length === 1) {
     const { url, scalebarSpec } = urls[0];
@@ -2192,6 +2228,7 @@ async function downloadUrls(
     } finally {
       URL.revokeObjectURL(objectUrl);
     }
+    warnShortenedNames();
     return;
   }
 
@@ -2265,6 +2302,7 @@ async function downloadUrls(
     };
     downloadToClient(params);
     URL.revokeObjectURL(dataURL);
+    warnShortenedNames();
   } finally {
     zip.terminate();
     if (!batchProgressId) progress.complete(progressId);
@@ -2984,6 +3022,20 @@ function drawScalebarOnCanvas(
 }
 
 // --- Watchers ---
+
+// "Go to snapshot: …" from the command palette: load it exactly as clicking
+// its row does. Cleared once taken, so asking twice is still a change.
+watch(snapshotLoadRequest, (snapshot) => {
+  if (!snapshot) {
+    return;
+  }
+  snapshotLoadRequest.value = null;
+  // A row click's rejection is caught by Vue's event-handler wrapper; a
+  // watcher callback has no such cover.
+  applySnapshot(snapshot).catch((error) => {
+    logError("Failed to load the snapshot from the command palette", error);
+  });
+});
 
 watch(
   () => props.snapshotVisible,

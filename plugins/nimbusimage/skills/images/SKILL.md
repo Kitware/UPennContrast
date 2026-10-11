@@ -68,7 +68,7 @@ rgb_f = ds.images.get_composite(dtype="float64")  # [0.0, 1.0]
 rgb = ds.images.get_composite(z=3, time=0, dtype="uint8")
 ```
 
-The composite uses layer settings from `ds.collections.layers` — channel visibility, contrast (percentile-based blackPoint/whitePoint), and pseudocolor. It blends with "lighten" mode by default.
+The composite is drawn the way the app draws it for you: layer settings from `ds.collections.layers` (your own view's configuration) — channel visibility, pseudocolor, contrast with your per-view overrides (percentile blackPoint/whitePoint are percents of the frame histogram's min..max, not quantiles), and each layer's z/time/xy slice setting, including max projections. It blends with "lighten" mode by default. Pass `max_size=1024` for large slides (downsampled on the server) and `crop=(left, top, right, bottom)` to zoom in.
 
 ## Iterating all frames
 

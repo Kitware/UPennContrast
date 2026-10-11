@@ -19,10 +19,12 @@ import {
   Mutation,
   VuexModule,
 } from "vuex-module-decorators";
-import { markRaw } from "vue";
+import { markRaw, toRaw } from "vue";
 import { v4 as uuidv4 } from "uuid";
 
 import AnnotationsAPI from "./AnnotationsAPI";
+import SpatialAPI from "./SpatialAPI";
+import ShareLinkAPI from "./ShareLinkAPI";
 import PropertiesAPI from "./PropertiesAPI";
 import ToolSuggestionsAPI from "./ToolSuggestionsAPI";
 import AgentAPI from "./AgentAPI";
@@ -34,6 +36,7 @@ import girderResources from "./girderResources";
 
 import { getLayerImages, getLayerSliceIndexes } from "./images";
 import jobs from "./jobs";
+import { jobStates } from "./jobConstants";
 import progress from "./progress";
 
 import {
@@ -56,6 +59,7 @@ import {
   IContrast,
   IMapEntry,
   IHistoryEntry,
+  IJob,
   IJobEventData,
   IScales,
   TUnitLength,
@@ -79,12 +83,13 @@ import {
   IUserStorageQuota,
   TAnnotationBrowserTab,
   TRequestablePalette,
+  IShareLink,
 } from "./model";
 import {
   buildAnnotationBrowserConfig,
   resolveAnnotationBrowserConfig,
 } from "@/utils/annotationBrowserConfig";
-import { IUnrollGrid, unrollGridSize } from "@/utils/unroll";
+import { IUnrollFlags, IUnrollGrid, unrollGridSize } from "@/utils/unroll";
 import {
   storageSeverityFromPercentage,
   TStorageSeverity,
@@ -98,7 +103,12 @@ export { default as store } from "./root";
 // NOTE: router is imported lazily where needed to avoid circular dependency with main.ts
 
 import { Debounce } from "@/utils/debounce";
+import {
+  clampLocationIndex,
+  clampLocationToDataset,
+} from "@/utils/datasetLocation";
 import { quotaExceededMessage } from "@/utils/quota";
+import { normalizeScales } from "@/utils/scales";
 import { memDiag } from "@/utils/memoryDiagnostics";
 import { TCompositionMode } from "@/utils/compositionModes";
 import {
@@ -179,6 +189,16 @@ function storeToken(apiRoot: string, token: string) {
   localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(value));
 }
 
+let shareBootstrapSequence = 0;
+// The session a share link replaced, restored when the viewer leaves the
+// shared route (leaveShareLink). The link's client lives in memory only, so
+// without this a signed-in user who navigates back from a share link stays
+// the read-only link user until a reload.
+let shareLinkSession: {
+  linkClient: RestClientInstance;
+  previousClient: RestClientInstance;
+} | null = null;
+
 function clearStoredToken() {
   localStorage.removeItem(TOKEN_STORAGE_KEY);
 }
@@ -237,22 +257,353 @@ let recentDatasetViewsRequestId = 0;
 // state because the debounce timer is never read by the UI.
 let annotationBrowserSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Pending save of the current location into the dataset view. A module-level
+// timer (not lodash's @Debounce) so setDatasetViewId can flush it before
+// switching views; otherwise a view left within the delay lost its save.
+let lastLocationSaveTimer: ReturnType<typeof setTimeout> | null = null;
+const LAST_LOCATION_SAVE_DELAY_MS = 5000;
+
+/** The module's current girderRest (falls back to the construction-time
+ * instance before the module is registered). */
+function liveGirderRest(instance: Main): RestClientInstance {
+  return (
+    (store.state as { main?: Pick<Main, "girderRest"> }).main?.girderRest ??
+    instance.girderRest
+  );
+}
+
+const FINISHED_JOB_STATUSES: number[] = [
+  jobStates.success,
+  jobStates.error,
+  jobStates.cancelled,
+];
+// How long the notification stream gets to deliver a job's end after the
+// request that ran it returned, before the job is read instead: a healthy
+// stream can trail the HTTP response by a moment.
+const STREAM_GRACE_MS = 2000;
+const STREAM_GRACE_CHECK_MS = 100;
+// Reading the job after a dropped stream: retried with backoff (2, 4, 8,
+// 16 s), since the drop may be a server restart still finishing.
+const JOB_READ_ATTEMPTS = 5;
+const JOB_READ_RETRY_MS = 2000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Whether the notification stream has buffered this job's end.
+function streamDeliveredEnd(jobId: string): boolean {
+  return (jobs.messageStore[jobId] ?? []).some(
+    (event: IJobEventData) =>
+      event.status !== undefined &&
+      FINISHED_JOB_STATUSES.includes(event.status),
+  );
+}
+
+// Waits up to `ms` for the stream to buffer this job's end; true if it did.
+// Measured on the clock, not in iterations: a background tab throttles
+// timers, which would otherwise stretch the wait to minutes.
+async function waitForStreamEnd(jobId: string, ms: number): Promise<boolean> {
+  const deadline = Date.now() + ms;
+  while (!streamDeliveredEnd(jobId)) {
+    if (Date.now() >= deadline) {
+      return false;
+    }
+    await sleep(STREAM_GRACE_CHECK_MS);
+  }
+  return true;
+}
+
+// One read of the job, or null as soon as the stream delivers the end
+// while the read is still in flight (a read stalled by the same outage
+// would otherwise hold everything up until the request times out).
+function readJobUnlessStreamEnds(
+  getJobInfo: (jobId: string) => Promise<IJob | null>,
+  jobId: string,
+  onCheck?: () => void,
+): Promise<IJob | null> {
+  let readDone = false;
+  const read = getJobInfo(jobId).finally(() => {
+    readDone = true;
+  });
+  const streamEnd = (async () => {
+    while (!readDone && !streamDeliveredEnd(jobId)) {
+      onCheck?.();
+      await sleep(STREAM_GRACE_CHECK_MS);
+    }
+    return null;
+  })();
+  return Promise.race([read, streamEnd]);
+}
+
+// The job document, retrying a failed read (getJobInfo returns null) with
+// backoff; null if every attempt failed or the stream delivered the end
+// meanwhile (it may reconnect while a read or the retries wait).
+async function readJobWithRetries(
+  getJobInfo: (jobId: string) => Promise<IJob | null>,
+  jobId: string,
+): Promise<IJob | null> {
+  for (let attempt = 1; ; ++attempt) {
+    const job = await readJobUnlessStreamEnds(getJobInfo, jobId);
+    if (job || attempt >= JOB_READ_ATTEMPTS) {
+      return job;
+    }
+    if (await waitForStreamEnd(jobId, JOB_READ_RETRY_MS * 2 ** (attempt - 1))) {
+      return null;
+    }
+  }
+}
+
+// The request that ran `jobId` in-process has returned, so the job has
+// finished and its events should be buffered from the notification stream,
+// for addJob to replay. If the stream was down meanwhile (a server
+// restart, a network drop) its end never arrives: read the job and buffer
+// the missing events -- the log entries the stream did not carry, then the
+// final status -- with the jobs store's storeMessage, so addJob replays
+// them exactly as if the stream had: progress per entry, toasts, quota
+// message and cleanup included.
+//
+// Known limits: if the server kept only the tail of a very long log, or
+// the stream had a gap mid-job, some log lines may be shown twice, and a
+// quota line lost in such a gap (with the end delivered) is not recovered.
+// A stream more than the grace period late can repeat a toast, and its
+// late events stay buffered in the jobs store.
+async function supplyMissedJobEnd(
+  getJobInfo: (jobId: string) => Promise<IJob | null>,
+  jobId: string,
+) {
+  if (await waitForStreamEnd(jobId, STREAM_GRACE_MS)) {
+    return; // the usual case: nothing to supply, nothing to read
+  }
+  const job = await readJobWithRetries(getJobInfo, jobId);
+  if (
+    !job ||
+    !FINISHED_JOB_STATUSES.includes(job.status) ||
+    streamDeliveredEnd(jobId)
+  ) {
+    return; // unreadable or unfinished: wait on the stream as before
+  }
+  supplyJobEnd(jobId, job);
+}
+
+// Buffers what the stream has not delivered of a finished job -- the log
+// entries it did not carry, then the final status -- for addJob to replay.
+function supplyJobEnd(jobId: string, job: IJob) {
+  // GET job/:id returns the log as a list of chunks, though IJob declares
+  // a string; accept either.
+  const log: unknown = job.log;
+  const entries: string[] = Array.isArray(log)
+    ? log.map(String)
+    : typeof log === "string" && log
+      ? [log]
+      : [];
+  // Entries the stream already delivered form a prefix of the log; supply
+  // the rest.
+  const seen = (jobs.messageStore[jobId] ?? [])
+    .map((event: IJobEventData) =>
+      typeof event.text === "string" ? event.text : "",
+    )
+    .join("");
+  let delivered = 0;
+  let offset = 0;
+  while (
+    delivered < entries.length &&
+    seen.startsWith(entries[delivered], offset)
+  ) {
+    offset += entries[delivered].length;
+    delivered += 1;
+  }
+  for (const text of entries.slice(delivered)) {
+    jobs.storeMessage({ jobId, event: { _id: jobId, text } });
+  }
+  jobs.storeMessage({
+    jobId,
+    event: { _id: jobId, status: job.status, title: job.title },
+  });
+}
+
+// While a transcode runs, how often the stream's buffer is checked for its
+// events (to show progress before the request that runs it returns).
+const TRANSCODE_PROGRESS_CHECK_MS = 250;
+// After a gateway timeout cut the request off: how long the stream may go
+// quiet before the job is read instead, and how long the job may go without
+// any update (or cannot be read) before it is given up on: its server
+// process died with it.
+const TRANSCODE_QUIET_READ_MS = 30000;
+const TRANSCODE_STALL_MS = 60 * 60 * 1000;
+
+// The transcode job of `itemId` whose events the stream has buffered, if
+// any: its status events carry the job's type and meta.itemId.
+function bufferedTranscodeJobId(itemId: string): string | undefined {
+  return Object.keys(jobs.messageStore).find((jobId) =>
+    jobs.messageStore[jobId].some(
+      (event: IJobEventData) =>
+        event.type === "large_image_tiff" && event.meta?.itemId === itemId,
+    ),
+  );
+}
+
+// Transcodes `itemId`. Resolves once the job has finished -- with its end
+// buffered for addJob to replay, unless neither the stream nor a read of
+// the job supplied it, in which case addJob waits on the stream as before --
+// with the job's id and the buffered events already passed to `onEvent`,
+// which the replay should skip.
+//
+// The request runs the job in-process and returns only when it is done
+// (Girder 5 runs local jobs synchronously), so the page cannot track the
+// job by id while it runs. Its events reach the stream's buffer meanwhile:
+// they are found by item and passed to `onEvent` as they arrive, so the
+// progress shows live.
+//
+// A proxy in front of Girder (HAProxy's `timeout server` in production) can
+// answer a long request with a 504 while the job carries on. The job is
+// then found -- in the buffer, or by listing transcode jobs -- and followed
+// to its end, instead of failing an upload that will succeed.
+async function transcodeItem(
+  api: GirderAPI,
+  itemId: string,
+  onEvent: (event: IJobEventData) => void,
+): Promise<{ jobId: string; delivered: Set<IJobEventData> }> {
+  const delivered = new Set<IJobEventData>();
+  let jobId: string | undefined;
+  // Passes on the job's newly buffered events; returns how many.
+  const forward = () => {
+    jobId ??= bufferedTranscodeJobId(itemId);
+    let count = 0;
+    for (const event of jobId ? jobs.messageStore[jobId] ?? [] : []) {
+      if (!delivered.has(event)) {
+        delivered.add(event);
+        onEvent(event);
+        count += 1;
+      }
+    }
+    return count;
+  };
+
+  // Reopen a stream that has closed (e.g. a server restart) -- the check
+  // addJob makes, made before the job starts so its events arrive live.
+  const source = jobs.notificationSource;
+  if (
+    !source ||
+    source.readyState === WebSocket.CLOSED ||
+    source.readyState === WebSocket.CLOSING
+  ) {
+    await jobs.initializeNotificationSubscription();
+  }
+
+  let outcome: { jobId?: string; error?: unknown } | undefined;
+  const request = api.generateTiles(itemId, true, true).then(
+    (response) => {
+      outcome = { jobId: response.data?._id };
+    },
+    (error) => {
+      outcome = { error };
+    },
+  );
+  while (!outcome) {
+    forward();
+    await Promise.race([request, sleep(TRANSCODE_PROGRESS_CHECK_MS)]);
+  }
+
+  if (!outcome.error) {
+    if (!outcome.jobId) {
+      throw new Error("Failed to transcode the large image: no job received");
+    }
+    // The job has finished; supply its end if the stream missed it.
+    await supplyMissedJobEnd((id) => api.getJobInfo(id), outcome.jobId);
+    return { jobId: outcome.jobId, delivered };
+  }
+  if ((outcome.error as AxiosError)?.response?.status !== 504) {
+    throw outcome.error;
+  }
+  forward();
+  if (!jobId) {
+    try {
+      jobId = (
+        await pRetry(() => api.findTranscodeJob(itemId), {
+          retries: 2,
+          minTimeout: 2000,
+        })
+      )?._id;
+    } catch {
+      // Report the request's failure, not the listing's.
+    }
+  }
+  if (!jobId) {
+    throw outcome.error; // the job never started, or cannot be found
+  }
+  await followJobToEnd(api, jobId, forward);
+  return { jobId, delivered };
+}
+
+// Follows a running job until its end is buffered: passing on its events
+// with `forward`, and reading the job whenever the stream has been quiet a
+// while (it may have dropped too), to supply an end the stream missed.
+async function followJobToEnd(
+  api: GirderAPI,
+  jobId: string,
+  forward: () => number,
+) {
+  let quietSince = Date.now();
+  let lastUpdated: string | undefined;
+  let lastUpdatedAt = Date.now();
+  while (!streamDeliveredEnd(jobId)) {
+    if (forward() > 0) {
+      quietSince = Date.now();
+    }
+    if (Date.now() - quietSince < TRANSCODE_QUIET_READ_MS) {
+      await sleep(TRANSCODE_PROGRESS_CHECK_MS);
+      continue;
+    }
+    // Raced against the stream: a read stalled by the same trouble that cut
+    // the request off must not hold up an end the stream delivers.
+    const job = await readJobUnlessStreamEnds(
+      (id) => api.getJobInfo(id),
+      jobId,
+      forward,
+    );
+    quietSince = Date.now();
+    if (streamDeliveredEnd(jobId)) {
+      break;
+    }
+    if (job && FINISHED_JOB_STATUSES.includes(job.status)) {
+      supplyJobEnd(jobId, job);
+      break;
+    }
+    if (job && job.updated !== lastUpdated) {
+      lastUpdated = job.updated;
+      lastUpdatedAt = Date.now();
+    } else if (Date.now() - lastUpdatedAt >= TRANSCODE_STALL_MS) {
+      throw new Error(
+        job
+          ? "Failed to transcode the large image: the transcoding job " +
+            "stopped responding. See the transcoding log for details."
+          : "Failed to transcode the large image: lost contact with the " +
+            "server while the transcoding job ran.",
+      );
+    }
+  }
+}
+
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
   girderRest = createGirderRestClient({
     apiRoot: apiRootFromGirderUrl(persister.get("girderUrl", defaultGirderUrl)),
   });
 
-  // Use a proxy to dynamically resolve to the right girderRest client
+  // Use a proxy to dynamically resolve to the right girderRest client. It
+  // must read the LIVE module state: `obj` is the instance the decorators
+  // built the initial state from, and a mutation that replaces `girderRest`
+  // (openShareLink commits the link's own client) never reaches it — every
+  // API class would keep sending the boot client's token, i.e. the stored
+  // login, or no token at all for a recipient without one.
   girderRestProxy = new Proxy(this, {
     get(obj: Main, prop: keyof RestClientInstance) {
-      return obj.girderRest[prop];
+      return liveGirderRest(obj)[prop];
     },
     set(target: Main, p: keyof RestClientInstance, newValue: any) {
       if (p != "token") {
         throw "Can only set token to RestClient";
       }
-      target.girderRest[p] = newValue;
+      liveGirderRest(target)[p] = newValue;
       return true;
     },
   }) as unknown as RestClientInstance;
@@ -266,6 +617,8 @@ export class Main extends VuexModule {
   // without breaking field-level reactivity on the API instance itself.
   api = new GirderAPI(this.girderRestProxy);
   annotationsAPI = new AnnotationsAPI(this.girderRestProxy);
+  spatialAPI = new SpatialAPI(this.girderRestProxy);
+  shareLinkAPI = new ShareLinkAPI(this.girderRestProxy);
   propertiesAPI = new PropertiesAPI(this.girderRestProxy);
   toolSuggestionsAPI = new ToolSuggestionsAPI(this.girderRestProxy);
   agentAPI = new AgentAPI(this.girderRestProxy);
@@ -282,6 +635,10 @@ export class Main extends VuexModule {
   userStorageInfo: IUserStorageQuota | null = null;
 
   history: IHistoryEntry[] = [];
+
+  get shareLinkTileToken(): string | null {
+    return this.girderUser?.shareLink ? this.girderRest.token || null : null;
+  }
 
   selectedDatasetId: string | null = null;
   dataset: IDataset | null = null;
@@ -406,6 +763,15 @@ export class Main extends VuexModule {
   unrollXY: boolean = false;
   unrollZ: boolean = false;
   unrollT: boolean = false;
+  // The unroll flags this.dataset was FETCHED with, i.e. which of its axes
+  // are collapsed to one entry. The flags above change as soon as the user
+  // clicks, while the dataset only follows once its refresh lands, so
+  // location clamps read these instead.
+  datasetUnroll: IUnrollFlags = {
+    unrollXY: false,
+    unrollZ: false,
+    unrollT: false,
+  };
 
   // Timelapse mode's state lives in `src/store/timelapse.ts`.
 
@@ -580,8 +946,12 @@ export class Main extends VuexModule {
     return this.girderUser?.meta?.channelColors || {};
   }
 
+  // Scales are normalized so an unknown pixel size reads as the single
+  // unknown marker (0) whatever form it was stored in; workers receive these.
   get configurationScales() {
-    return this.configuration?.scales || exampleConfigurationBase().scales;
+    return normalizeScales(
+      this.configuration?.scales || exampleConfigurationBase().scales,
+    );
   }
 
   get viewScales() {
@@ -589,7 +959,7 @@ export class Main extends VuexModule {
   }
 
   get scales() {
-    return { ...this.configurationScales, ...this.viewScales };
+    return normalizeScales({ ...this.configurationScales, ...this.viewScales });
   }
 
   // Upload workflow getters
@@ -1013,11 +1383,61 @@ export class Main extends VuexModule {
     if (toolIdx < 0) {
       return;
     }
-    configurationTools.splice(toolIdx, 1, tool);
+    // The pin is owned by setToolPinned. Editors can hand in a copy taken
+    // before a pin toggle (AnnotationWorkerMenu debounces its save of
+    // props.tool), so keep the stored pin rather than let a late edit undo it.
+    const { pinned } = configurationTools[toolIdx];
+    const editedTool = tool.pinned === pinned ? tool : { ...tool, pinned };
+    configurationTools.splice(toolIdx, 1, editedTool);
     if (this.selectedTool?.configuration.id === tool.id) {
-      this.setSelectedToolImpl(tool);
+      this.setSelectedToolImpl(editedTool);
     }
     this.syncConfiguration("tools");
+  }
+
+  // Pinning only changes where the Tools palette lists a tool: one write of
+  // the tools key, and a selected tool keeps its state (setSelectedToolImpl
+  // only swaps the configuration for the same id).
+  @Action
+  async setToolPinned({ toolId, pinned }: { toolId: string; pinned: boolean }) {
+    const tool = this.tools.find((t) => t?.id === toolId);
+    if (!this.configuration || !tool || !!tool.pinned === pinned) {
+      return;
+    }
+    const pinnedTool = { ...tool, pinned };
+    this.setConfigurationTools(
+      this.tools.map((t) => (t?.id === toolId ? pinnedTool : t)),
+    );
+    if (this.selectedTool?.configuration.id === toolId) {
+      this.setSelectedToolImpl(pinnedTool);
+    }
+    await this.syncConfiguration("tools");
+  }
+
+  // Reorder the toolset to `toolIds`. The ids must be exactly the current
+  // tools: a list computed before a tool was added or removed is dropped
+  // rather than applied, so a stale drag can never delete or resurrect a
+  // tool. The current tool objects are reused, never the caller's copies.
+  @Action
+  async setToolOrder(toolIds: string[]) {
+    if (!this.configuration) {
+      return;
+    }
+    const currentTools = this.tools.filter(Boolean);
+    const toolsById = new Map(currentTools.map((tool) => [tool.id, tool]));
+    if (
+      toolIds.length !== toolsById.size ||
+      new Set(toolIds).size !== toolIds.length ||
+      toolIds.some((id) => !toolsById.has(id))
+    ) {
+      return;
+    }
+    const reorderedTools = toolIds.map((id) => toolsById.get(id)!);
+    if (reorderedTools.every((tool, index) => tool === currentTools[index])) {
+      return;
+    }
+    this.setConfigurationTools(reorderedTools);
+    await this.syncConfiguration("tools");
   }
 
   @Action
@@ -1043,8 +1463,13 @@ export class Main extends VuexModule {
         this.loadUserColors().catch((error) => {
           logError("Failed to load user colors during login:", error);
         }),
-        this.fetchUserStorageInfo(),
       );
+      // A share link's bearer has no storage and runs no jobs: skip the
+      // quota lookup (a logged error otherwise) and the notification socket
+      // (which its read-only token cannot open).
+      if (!user.shareLink) {
+        promises.push(this.fetchUserStorageInfo());
+      }
     } else {
       this.setAssetstores([]);
     }
@@ -1055,7 +1480,9 @@ export class Main extends VuexModule {
     );
     // Initialize notification websocket as soon as the user has logged in because
     // any notification sent without would be lost.
-    jobs.initializeNotificationSubscription();
+    if (!user?.shareLink) {
+      jobs.initializeNotificationSubscription();
+    }
     await Promise.allSettled(promises);
   }
 
@@ -1116,12 +1543,15 @@ export class Main extends VuexModule {
   protected setDataset({
     id,
     data,
+    unroll = { unrollXY: false, unrollZ: false, unrollT: false },
   }: {
     id: string | null;
     data: IDataset | null;
+    unroll?: IUnrollFlags;
   }) {
     this.selectedDatasetId = id;
     this.dataset = data;
+    this.datasetUnroll = unroll;
   }
 
   @Mutation
@@ -1308,6 +1738,25 @@ export class Main extends VuexModule {
     this.time = value;
   }
 
+  // Pull xy/z/time back inside the loaded dataset's dimensions. A location
+  // can arrive out of range from a ?xy=&z=&time= query or a saved lastLocation
+  // that was set before the dataset was known (or carried over from another
+  // dataset), and every dataset.images() lookup at it would then miss.
+  @Mutation
+  private clampLocationToDatasetImpl() {
+    if (!this.dataset) {
+      return;
+    }
+    const location = clampLocationToDataset(
+      { xy: this.xy, z: this.z, time: this.time },
+      this.dataset,
+      this.datasetUnroll,
+    );
+    this.xy = location.xy;
+    this.z = location.z;
+    this.time = location.time;
+  }
+
   @Mutation
   private setCameraInfoImpl(value: ICameraInfo) {
     this.cameraInfo = value;
@@ -1459,6 +1908,85 @@ export class Main extends VuexModule {
       }
       this.setRecentDatasetViewsImpl([]);
     }
+  }
+
+  /**
+   * Open the app as the bearer of a share link (SHARING.md "Share links").
+   * The token is set on the REST client in memory only: the client persists
+   * a token solely on its own login event, so a user who is signed in on this
+   * browser keeps their stored login for the next reload.
+   */
+  @Action({ rawError: true })
+  async openShareLink({
+    token,
+    signal,
+  }: {
+    token: string;
+    signal?: AbortSignal;
+  }): Promise<IShareLink> {
+    const sequence = ++shareBootstrapSequence;
+    const previousClient = this.girderRest;
+    const previousToken = previousClient.token;
+    // Validate on an isolated client with no persisted-login handlers. Even
+    // a successful user/me followed by a failed link/me must not change the
+    // current token, Vuex identity, or user-dependent state.
+    const candidate = new RestClient({ apiRoot: previousClient.apiRoot });
+    candidate.token = token;
+    if (!(await candidate.fetchUser())) {
+      throw new Error("This share link is no longer valid.");
+    }
+    const link = await new ShareLinkAPI(candidate).me();
+    // The view owns this attempt. Leaving its route cancels the commit even
+    // when no newer login or share-link request has changed the session.
+    if (signal?.aborted) {
+      throw new Error("Share-link request was cancelled.");
+    }
+    if (
+      sequence !== shareBootstrapSequence ||
+      this.girderRest !== previousClient ||
+      previousClient.token !== previousToken
+    ) {
+      throw new Error("A newer session has replaced this share-link request.");
+    }
+    // Switching straight from one link to another restores the session from
+    // before the first, not the first link's client.
+    // Compared raw: Vuex state hands clients back as reactive proxies.
+    shareLinkSession = {
+      linkClient: candidate,
+      previousClient:
+        shareLinkSession?.linkClient === toRaw(previousClient)
+          ? shareLinkSession.previousClient
+          : toRaw(previousClient),
+    };
+    await this.loggedIn(candidate);
+    return link;
+  }
+
+  /** Leaving a shared route: give back the session the link replaced, unless
+   * something else (a login, a logout) has replaced the link's since. */
+  @Action({ rawError: true })
+  async leaveShareLink() {
+    const session = shareLinkSession;
+    shareLinkSession = null;
+    if (!session || toRaw(this.girderRest) !== session.linkClient) {
+      return;
+    }
+    // A shared URL opened directly skips initialize(), so the saved login's
+    // client holds a token but has never fetched its user; restoring it
+    // as-is would show the owner as logged out until a reload.
+    const previous = session.previousClient;
+    if (previous.token && !previous.user) {
+      try {
+        await previous.fetchUser();
+      } catch (error) {
+        logError("Could not restore the saved login:", error);
+      }
+      // A login or another link may have taken over during the fetch.
+      if (toRaw(this.girderRest) !== session.linkClient) {
+        return;
+      }
+    }
+    await this.loggedIn(previous);
   }
 
   @Action
@@ -1614,6 +2142,13 @@ export class Main extends VuexModule {
     // this.dataset still holds the previously selected dataset here (setDataset
     // runs later), so this detects a genuine switch vs. a same-dataset refresh.
     const datasetChanged = id !== this.dataset?.id;
+    if (datasetChanged) {
+      // Save the pending location while this.dataset still matches the view.
+      // Callers like Dataset.vue switch datasets without replacing the view,
+      // and once the new dataset lands the save is rejected as a mismatch.
+      // Not awaited: its state reads and commit run synchronously here.
+      this.flushLastLocationInDatasetView();
+    }
     // Persist any pending annotation-browser change before the resets below
     // wipe the state it would capture.
     await this.flushAnnotationBrowserSave();
@@ -1645,13 +2180,17 @@ export class Main extends VuexModule {
     try {
       sync.setLoading(true); // For the Girder activity indicator
       sync.setDatasetLoading(true); // For the dataset loading overlay
-      const r = await this.context.dispatch("getDataset", {
-        id,
+      const unroll = {
         unrollXY: this.unrollXY,
         unrollZ: this.unrollZ,
         unrollT: this.unrollT,
-      });
-      this.setDataset({ id, data: r });
+      };
+      const r = await this.context.dispatch("getDataset", { id, ...unroll });
+      this.setDataset({ id, data: r, unroll });
+      // Before datasetLoading clears: location setters skip their own clamp
+      // while it is set (see locationDataset), so this is where a location
+      // requested for this dataset first meets its dimensions.
+      this.clampLocationToDatasetImpl();
       await this.loadLargeImages();
       // setConfiguration only re-fires when the configuration changes; on a
       // same-dataset refresh (unroll toggles) or a switch that keeps the same
@@ -1664,6 +2203,11 @@ export class Main extends VuexModule {
       sync.setLoading(error as Error);
       sync.setDatasetLoading(false);
     }
+    // Persist a location the clamp above corrected. Refreshes outside a view
+    // load (unroll toggles, large-image changes) have no other save; a save
+    // that came due mid-load was dropped by its loading guard. A no-op when
+    // the location equals the saved lastLocation.
+    this.updateLastLocationInDatasetView();
     memDiag.autoSnapshot(`setSelectedDataset:exit id=${id}`);
   }
 
@@ -1705,6 +2249,10 @@ export class Main extends VuexModule {
     id: string | null;
     routeQuery?: Record<string, string | null | (string | null)[]>;
   }) {
+    // Save the outgoing view's pending location while this.datasetView and
+    // this.dataset still describe it. Not awaited: its state reads and commit
+    // run synchronously here, and datasetLoading must be set before any await.
+    this.flushLastLocationInDatasetView();
     if (!id) {
       this.setDatasetViewImpl(null);
     } else {
@@ -1754,9 +2302,19 @@ export class Main extends VuexModule {
         );
       }
       await Promise.all(promises);
+      // setSelectedDataset clamps the location when it loads a new dataset,
+      // but it is skipped when the dataset is unchanged, so clamp here too.
+      // Only against the view's own dataset: if its load failed, this.dataset
+      // is still the previous one.
+      if (this.dataset?.id === datasetView.datasetId) {
+        this.clampLocationToDatasetImpl();
+      }
       // Ensure datasetLoading is cleared even if setSelectedDataset wasn't called
       // (e.g., same dataset, different config/view settings)
       sync.setDatasetLoading(false);
+      // Persist a location the clamp corrected, so the view stops reopening
+      // out of range. A no-op when it equals the saved lastLocation.
+      this.updateLastLocationInDatasetView();
     }
   }
 
@@ -1992,25 +2550,29 @@ export class Main extends VuexModule {
 
       // When transcoding, force the regeneration of large image for the new file
       if (transcode) {
-        const response = await this.api.generateTiles(itemId, true, true);
-        const jobId = response.data?._id;
-        if (!jobId) {
-          throw new Error(
-            "Failed to transcode the large image: no job received",
-          );
-        }
         // Accumulate the job log so that on failure we can tell the user
         // why the job failed (e.g. a storage quota breach during the
         // server-side upload of the transcoded file).
         let jobLog = "";
+        const onEvent = (jobData: IJobEventData) => {
+          if (typeof jobData.text === "string") {
+            jobLog += jobData.text;
+          }
+          eventCallback?.(jobData);
+        };
+        const { jobId, delivered } = await transcodeItem(
+          this.api,
+          itemId,
+          onEvent,
+        );
         const success = await jobs.addJob({
           jobId,
           datasetId: parentId,
+          // The replay includes the events shown while the job ran.
           eventCallback: (jobData: IJobEventData) => {
-            if (typeof jobData.text === "string") {
-              jobLog += jobData.text;
+            if (!delivered.has(jobData)) {
+              onEvent(jobData);
             }
-            eventCallback?.(jobData);
           },
         });
         if (!success) {
@@ -2122,22 +2684,69 @@ export class Main extends VuexModule {
     this.datasetView.lastLocation = location;
   }
 
+  // The dataset to clamp a location setter against, or null to skip the
+  // clamp. While a dataset view is loading, this.dataset is still the previous
+  // dataset, and clamping against it would truncate a deep link meant for the
+  // incoming one; setSelectedDataset and setDatasetViewId clamp once it lands.
+  get locationDataset(): IDataset | null {
+    return sync.datasetLoading ? null : this.dataset;
+  }
+
+  // Debounced: scrubbing a slider would otherwise PUT the view on every tick.
   @Action
-  @Debounce(5000, { leading: false, trailing: true })
-  async updateLastLocationInDatasetView() {
-    const location = this.currentLocation;
-    if (!this.datasetView || isEqual(this.datasetView.lastLocation, location)) {
+  updateLastLocationInDatasetView() {
+    if (lastLocationSaveTimer !== null) {
+      clearTimeout(lastLocationSaveTimer);
+    }
+    lastLocationSaveTimer = setTimeout(() => {
+      lastLocationSaveTimer = null;
+      this.saveLastLocationInDatasetView();
+    }, LAST_LOCATION_SAVE_DELAY_MS);
+  }
+
+  @Action
+  async flushLastLocationInDatasetView() {
+    if (lastLocationSaveTimer === null) {
+      return;
+    }
+    clearTimeout(lastLocationSaveTimer);
+    lastLocationSaveTimer = null;
+    await this.saveLastLocationInDatasetView();
+  }
+
+  @Action
+  private async saveLastLocationInDatasetView() {
+    const datasetView = this.datasetView;
+    const dataset = this.locationDataset;
+    // Only save a location that was checked against the view's own dataset.
+    // Mid-load, the location may still be an unclamped query value or the
+    // previous dataset's.
+    if (!datasetView || !dataset || dataset.id !== datasetView.datasetId) {
+      return;
+    }
+    const location = clampLocationToDataset(
+      this.currentLocation,
+      dataset,
+      this.datasetUnroll,
+    );
+    if (isEqual(datasetView.lastLocation, location)) {
       return;
     }
     this.setLastLocationInDatasetView(location);
     if (this.canEditDatasetView) {
-      await this.api.updateDatasetView(this.datasetView);
+      await this.api.updateDatasetView(datasetView);
     }
   }
 
   @Action
   async setXY(value: number) {
-    this.setXYImpl(value);
+    const dataset = this.locationDataset;
+    // An unrolled axis has one entry; see clampLocationToDataset.
+    this.setXYImpl(
+      dataset && !this.datasetUnroll.unrollXY
+        ? clampLocationIndex(value, dataset.xy.length)
+        : value,
+    );
     this.updateLastLocationInDatasetView();
   }
 
@@ -2148,7 +2757,13 @@ export class Main extends VuexModule {
 
   @Action
   async setZ(value: number) {
-    this.setZImpl(value);
+    const dataset = this.locationDataset;
+    // An unrolled axis has one entry; see clampLocationToDataset.
+    this.setZImpl(
+      dataset && !this.datasetUnroll.unrollZ
+        ? clampLocationIndex(value, dataset.z.length)
+        : value,
+    );
     this.updateLastLocationInDatasetView();
   }
 
@@ -2159,7 +2774,13 @@ export class Main extends VuexModule {
 
   @Action
   async setTime(value: number) {
-    this.setTimeImpl(value);
+    const dataset = this.locationDataset;
+    // An unrolled axis has one entry; see clampLocationToDataset.
+    this.setTimeImpl(
+      dataset && !this.datasetUnroll.unrollT
+        ? clampLocationIndex(value, dataset.time.length)
+        : value,
+    );
     this.updateLastLocationInDatasetView();
   }
 
@@ -3102,6 +3723,7 @@ export class Main extends VuexModule {
                 hist,
                 layer,
                 this.dataset,
+                this.shareLinkTileToken,
               )!,
             );
             results.fullUrls.push(
@@ -3116,6 +3738,7 @@ export class Main extends VuexModule {
                 hist,
                 layer,
                 this.dataset,
+                this.shareLinkTileToken,
               )!,
             );
           });
@@ -3155,6 +3778,7 @@ export class Main extends VuexModule {
             hist,
             layer,
             this.dataset,
+            this.shareLinkTileToken,
           ),
         ),
         fullUrls: images.map((image) =>
@@ -3169,6 +3793,7 @@ export class Main extends VuexModule {
             hist,
             layer,
             this.dataset,
+            this.shareLinkTileToken,
           ),
         ),
         hist,

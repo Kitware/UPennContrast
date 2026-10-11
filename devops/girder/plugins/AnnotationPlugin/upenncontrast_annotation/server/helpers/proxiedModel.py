@@ -40,7 +40,9 @@ class recordable:
     """
 
     def __init__(self, actionName, findDatasetIdFn):
-        self.historyModel: HistoryModel = HistoryModel()
+        # Don't cache HistoryModel() here: decorators run at import, and a
+        # cached instance outlives the singleton (the test suite resets it
+        # between tests). Look it up per call in wrapped_fun instead.
         self.actionName = actionName
         self.findDatasetIdFn = findDatasetIdFn
 
@@ -76,7 +78,7 @@ class recordable:
                 "isUndone": False,
                 "datasetId": ObjectId(datasetId),
             }
-            self.historyModel.create(user, document, record)
+            HistoryModel().create(user, document, record)
 
             return val
 
@@ -192,10 +194,19 @@ class ProxiedModel(CustomNimbusImageModel):
         return super().save(document, validate, triggerEvents)
 
     def saveMany(self, documents, validate=True, triggerEvents=True):
+        if not self.is_recording:
+            return super().saveMany(documents, validate, triggerEvents)
+        # saveMany replaces documents in place, so capture the versions it
+        # overwrites before writing.
+        replacedIds = [
+            ObjectId(document["_id"])
+            for document in documents
+            if "_id" in document
+        ]
+        if replacedIds:
+            for before in self.find({"_id": {"$in": replacedIds}}):
+                self.record.changeDocument(before, None)
         new_documents = super().saveMany(documents, validate, triggerEvents)
-        if self.is_recording:
-            # No need to record the removal of existing documents as
-            # saveMany() calls removeWithQuery() which records the removal
-            for after in new_documents:
-                self.record.changeDocument(None, after)
+        for after in new_documents:
+            self.record.changeDocument(None, after)
         return new_documents

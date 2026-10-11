@@ -7,8 +7,16 @@ from girder.constants import AccessType, TokenScope
 from girder.exceptions import RestException
 from girder.models.folder import Folder
 
-from ..helpers.access_helpers import requireDatasetsAccess
+from ..helpers.access_helpers import (
+    requireAnnotationsInDatasets,
+    requireDatasetsAccess,
+)
+from ..helpers.serialization import jsonSafe
 from ..helpers.validation import (
+    MAX_DISTINCT_SEARCH_LENGTH,
+    MAX_DISTINCT_VALUES,
+    isValidPropertyPath,
+    requireInt,
     requireList,
     requireObjectBody,
     requireObjectId,
@@ -33,6 +41,7 @@ class PropertyValues(Resource):
         self.route("GET", (), self.find)
         self.route("GET", ("count",), self.count)
         self.route("GET", ("histogram",), self.histogram)
+        self.route("GET", ("distinct",), self.distinct)
 
     # TODO: anytime a dataset is mentioned, load the dataset and check for
     #   existence and that the user has access to it
@@ -63,11 +72,12 @@ class PropertyValues(Resource):
             level=AccessType.WRITE,
             exc=True,
         )
-        return self._annotationPropertyValuesModel.appendValues(
+        requireAnnotationsInDatasets([params])
+        return jsonSafe(self._annotationPropertyValuesModel.appendValues(
             self.getBodyJson(),
             params["annotationId"],
             params["datasetId"],
-        )
+        ))
 
     @access.user(scope=TokenScope.DATA_WRITE)
     @describeRoute(
@@ -82,16 +92,22 @@ class PropertyValues(Resource):
         )
     )
     def addMultiple(self, params):
+        body = requireList(self.getBodyJson(), "Request body")
+        for entry in body:
+            requireObjectBody(entry, "Each property value entry")
         propertyValuesList = self._annotationPropertyValuesModel.\
-            convertIdsToObjectIds(self.getBodyJson())
+            convertIdsToObjectIds(body)
         datasetIds = {
             entry["datasetId"]
             for entry in propertyValuesList
             if "datasetId" in entry
         }
         requireDatasetsAccess(datasetIds, self.getCurrentUser())
-        return self._annotationPropertyValuesModel.appendMultipleValues(
-            propertyValuesList
+        requireAnnotationsInDatasets(propertyValuesList)
+        return jsonSafe(
+            self._annotationPropertyValuesModel.appendMultipleValues(
+                propertyValuesList
+            )
         )
 
     @describeRoute(
@@ -168,9 +184,13 @@ class PropertyValues(Resource):
             exc=True,
         )
         annotationIds = [requireObjectId(i, "annotationId") for i in rawIds]
-        return self._annotationPropertyValuesModel.findByAnnotationIds(
-            datasetId, annotationIds, propertyPaths
-        )
+        try:
+            return self._annotationPropertyValuesModel.findByAnnotationIds(
+                datasetId, annotationIds, propertyPaths
+            )
+        except ValueError as exc:
+            # A virtual path the provider cannot resolve (unknown key).
+            raise RestException(str(exc), code=400)
 
     @access.public(scope=TokenScope.DATA_READ)
     @describeRoute(
@@ -216,12 +236,12 @@ class PropertyValues(Resource):
             offset = 0  # Ignore offset when using cursor
 
         # Use regular find instead of findWithPermissions
-        return self._annotationPropertyValuesModel.find(
+        return jsonSafe(list(self._annotationPropertyValuesModel.find(
             query,
             sort=sort,
             limit=limit,
             offset=offset,
-        ).hint([("datasetId", 1), ("_id", 1)])
+        ).hint([("datasetId", 1), ("_id", 1)])))
 
     @access.public(scope=TokenScope.DATA_READ)
     @describeRoute(
@@ -271,12 +291,73 @@ class PropertyValues(Resource):
             exc=True,
         )
         if "buckets" in params:
-            return self._annotationPropertyValuesModel.histogram(
+            return jsonSafe(self._annotationPropertyValuesModel.histogram(
                 params["propertyPath"],
                 params["datasetId"],
                 int(params["buckets"]),
-            )
+            ))
         else:
-            return self._annotationPropertyValuesModel.histogram(
+            return jsonSafe(self._annotationPropertyValuesModel.histogram(
                 params["propertyPath"], params["datasetId"]
+            ))
+
+    @access.public(scope=TokenScope.DATA_READ)
+    @describeRoute(
+        Description(
+            "List the distinct string values of a property in a dataset"
+        )
+        .notes(
+            "Returns {values: [{value, count}], truncated}, most common "
+            "first. Only string values are listed (numeric properties "
+            "filter by range). truncated is true when more distinct values "
+            "exist than limit; narrow with search."
+        )
+        .param("datasetId", "The id of the dataset")
+        .param(
+            "propertyPath",
+            "The path to the property, keys separated with dots",
+        )
+        .param(
+            "search",
+            "Keep only values containing this text (case-insensitive)",
+            required=False,
+        )
+        .param(
+            "limit",
+            "Maximum number of values to return (default and maximum %d)"
+            % MAX_DISTINCT_VALUES,
+            required=False,
+            dataType="integer",
+        )
+        .errorResponse()
+    )
+    def distinct(self, params):
+        datasetId = requireObjectId(params.get("datasetId"), "datasetId")
+        propertyPath = (params.get("propertyPath") or "").split(".")
+        if not isValidPropertyPath(propertyPath):
+            raise RestException("propertyPath is not a valid path", code=400)
+        search = params.get("search") or ""
+        if len(search) > MAX_DISTINCT_SEARCH_LENGTH:
+            raise RestException(
+                "search must be at most %d characters"
+                % MAX_DISTINCT_SEARCH_LENGTH,
+                code=400,
             )
+        limit = MAX_DISTINCT_VALUES
+        if params.get("limit") is not None:
+            limit = min(
+                max(requireInt(params["limit"], "limit"), 1),
+                MAX_DISTINCT_VALUES,
+            )
+        Folder().load(
+            datasetId,
+            user=self.getCurrentUser(),
+            level=AccessType.READ,
+            exc=True,
+        )
+        values, truncated = (
+            self._annotationPropertyValuesModel.distinctStringValues(
+                datasetId, propertyPath, search, limit
+            )
+        )
+        return {"values": values, "truncated": truncated}

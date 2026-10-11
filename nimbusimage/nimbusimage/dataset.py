@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
+
+import girder_client
 
 from nimbusimage.annotations import AnnotationAccessor
 from nimbusimage.collections import CollectionAccessor
@@ -18,6 +19,7 @@ from nimbusimage.models import (
 )
 from nimbusimage.properties import PropertyAccessor
 from nimbusimage.sharing import SharingAccessor
+from nimbusimage.spatial import SpatialAccessor
 from nimbusimage.urls import (
     DEFAULT_FRONTEND_URL,
     dataset_info_url,
@@ -26,8 +28,10 @@ from nimbusimage.urls import (
     open_url,
 )
 
-if TYPE_CHECKING:
-    import girder_client
+# exampleConfigurationBase().scales.pixelSize in src/store/model.ts: the
+# app's default when a configuration has no scales.
+_PLACEHOLDER_PIXEL_SIZE = {"value": 1, "unit": "m"}
+_KNOWN_UNITS = {"m", "mm", "um", "µm", "micron", "microns", "nm"}
 
 
 class Dataset:
@@ -60,6 +64,7 @@ class Dataset:
         self.export = ExportAccessor(gc, dataset_id)
         self.history = HistoryAccessor(gc, dataset_id)
         self.sharing = SharingAccessor(gc, dataset_id)
+        self.spatial = SpatialAccessor(gc, dataset_id)
 
     def _ensure_metadata(self):
         """Fetch and cache metadata if not already loaded."""
@@ -130,12 +135,39 @@ class Dataset:
         return self._tiles.get("channels", [])
 
     @property
-    def pixel_size(self) -> PixelSize:
+    def pixel_size(self) -> PixelSize | None:
+        """Physical size of one pixel, or None when it is unknown.
+
+        Read the way the app reads it: the caller's view scales over the
+        dataset's configuration scales (``collections.scales``), which the
+        app seeds from the file's calibration and the user can edit. Without
+        a configuration, the file's own ``mm_x``. What the app stores for
+        "no calibration" counts as unknown: 0 or null (``getDatasetScales``
+        on a file without ``mm_x``) or its 1 m placeholder.
+        """
+        try:
+            configured = self.collections.scales.get("pixelSize") or {}
+        except girder_client.HttpError as error:
+            # The view is readable but its configuration is not (or is
+            # gone): use the file's calibration. Anything else, such as a
+            # server error, must not silently swap in different units.
+            if error.status not in (403, 404):
+                raise
+            configured = {}
+        value, unit = configured.get("value"), configured.get("unit")
+        # A file without mm_x makes the app store 0, or null (NaN), and a
+        # configuration without scales gets the 1 m placeholder.
+        if (
+            isinstance(value, (int, float)) and value > 0
+            and unit in _KNOWN_UNITS
+            and configured != _PLACEHOLDER_PIXEL_SIZE
+        ):
+            return PixelSize(value=value, unit=unit)
         self._ensure_metadata()
         mm_x = self._tiles.get("mm_x")
         if mm_x is not None:
             return PixelSize(value=mm_x, unit="mm")
-        return PixelSize(value=1.0, unit="um")
+        return None
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -276,7 +308,8 @@ class Dataset:
         This is the API equivalent of the web UI's dataset-configuration
         screen: it works out which filename tokens and file metadata map to
         XY / Z / Time / Channel, writes the multi-source configuration, and
-        (unless every file is ``.nd2``) schedules a transcode job.
+        (unless every file is ``.nd2`` and at most 16 tiles are composited)
+        schedules a transcode job.
 
         **Start with ``dry_run=True``.** It computes and returns everything
         without writing, including ``validation_error`` and ``variables``.
@@ -295,14 +328,28 @@ class Dataset:
                 ``None`` leaves a dimension unassigned, and omitted
                 dimensions keep their default.
             transcode: Convert to a single tiled TIFF. Defaults to the
-                same rule the UI uses (on unless every file is ``.nd2``).
+                same rule the UI uses: on unless every file is ``.nd2``,
+                and also on when compositing more than 16 tiles (stage
+                positions, from many files or one multi-position file; a
+                long job for thousands of tiles; pass ``False`` to skip).
             split_rgb_bands: Split an RGB image into three channels.
-            enable_compositing: Lay out a single multi-position ND2 by
-                stage coordinates instead of as separate XY positions. Only
-                takes effect for a single source with ND2 frame metadata --
-                check ``result.compositing`` for what actually happened,
-                and note that when it applies, XY collapses to one
-                position.
+            enable_compositing: Lay out ND2 files by their stage
+                positions instead of as separate XY positions. Takes effect
+                for one multi-position ND2, or for a folder of ND2 files
+                (e.g. one per tile) of the same tile size once the variable
+                that tells the files apart is assigned to ``XY`` -- the
+                filename parser often guesses a bare tile number as ``C``,
+                so dry-run first and pass an ``assignments`` override that
+                moves it to ``XY``. ``result.compositing`` says whether it
+                applies (XY then collapses to one position). A request that
+                cannot be honored -- files that cannot composite, or two
+                tiles at the same stage position -- shows up as the dry
+                run's ``validation_error`` and makes a real run fail rather
+                than fall back to separate positions.
+                ``result.compositing_check`` explains a duplicate or warns
+                about a sparse layout, and counts the composited tiles
+                (``tileCount``). Compositing more than
+                16 tiles transcodes by default.
             create_view: Also create the collection and dataset view the
                 web UI needs. On by default: without them the dataset is
                 readable through this API but has nothing to open in the
@@ -358,26 +405,26 @@ class Dataset:
         return MultiSourceConfiguration(**result)
 
     def _invalidate_cache(self) -> None:
-        """Drop the lazily-fetched metadata after the folder changes."""
+        """Drop the lazily-fetched metadata after the folder changes,
+        including the view/configuration and frame map derived from it."""
         self._tiles = None
         self._item_id = None
         self._folder_data = None
+        self.collections.refresh()
+        self.images._frame_map = None
 
     # --- URLs ---
 
     def _get_view_id(self) -> str | None:
-        """Get the first dataset view ID for this dataset."""
-        views = self.collections.list_views()
-        if views:
-            return views[0].get("_id")
-        return None
+        """The default view's ID (the caller's own view, if any), looked
+        up fresh so a view created since the settings were cached counts."""
+        view = self.collections.default_view()
+        return view.get("_id") if view else None
 
     def _get_config_id(self) -> str | None:
-        """Get the first configuration ID for this dataset."""
-        views = self.collections.list_views()
-        if views:
-            return views[0].get("configurationId")
-        return None
+        """The default view's configuration ID, looked up fresh."""
+        view = self.collections.default_view()
+        return view.get("configurationId") if view else None
 
     def info_url(self) -> str:
         """URL for the dataset info page."""

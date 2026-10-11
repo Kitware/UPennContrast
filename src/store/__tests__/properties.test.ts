@@ -1,16 +1,21 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Exercise the real properties module in isolation by mocking the stores and
 // utilities it reaches. ./root stays real — the dynamic module registers on it.
-const { getPropertyValuesForIds, annotationMock, scheduleBrowserSave } =
-  vi.hoisted(() => ({
-    getPropertyValuesForIds: vi.fn(),
-    scheduleBrowserSave: vi.fn(),
-    annotationMock: {
-      stubOnlyMode: true,
-      visibleAnnotationIds: new Set<string>(),
-    },
-  }));
+const {
+  getPropertyValuesForIds,
+  getPropertyValues,
+  annotationMock,
+  scheduleBrowserSave,
+} = vi.hoisted(() => ({
+  getPropertyValuesForIds: vi.fn(),
+  getPropertyValues: vi.fn(),
+  scheduleBrowserSave: vi.fn(),
+  annotationMock: {
+    stubOnlyMode: true,
+    visibleAnnotationIds: new Set<string>(),
+  },
+}));
 
 vi.mock("@/store/index", () => ({
   default: {
@@ -18,6 +23,7 @@ vi.mock("@/store/index", () => ({
     isLoggedIn: true,
     propertiesAPI: {
       getPropertyValuesForIds: (...a: any[]) => getPropertyValuesForIds(...a),
+      getPropertyValues: (...a: any[]) => getPropertyValues(...a),
       getPropertyValuesSample: async () => [],
     },
     scheduleAnnotationBrowserSave: scheduleBrowserSave,
@@ -48,6 +54,7 @@ vi.mock("geojs", () => ({
 }));
 
 import properties from "@/store/properties";
+import main from "@/store/index";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -203,5 +210,170 @@ describe("fetchPropertyValues readiness signal", () => {
     expect(properties.propertyValuesDatasetId).toBe("ds1");
     properties.resetPropertyState();
     expect(properties.propertyValuesDatasetId).toBeNull();
+  });
+});
+
+describe("virtual (spatial table) property paths", () => {
+  beforeEach(() => {
+    getPropertyValuesForIds.mockReset().mockResolvedValue([]);
+    properties.resetPropertyState();
+    properties.hydrateDisplayedPropertyPaths([]);
+    properties.setVirtualPropertyPaths([]);
+    annotationMock.stubOnlyMode = true;
+    (annotationMock as any).allAnnotationIds = ["a1", "a2"];
+  });
+
+  it("answers for the spatial pseudo-property and names its paths", () => {
+    const pseudo = properties.getPropertyById("spatial");
+    expect(pseudo?.name).toBe("Spatial table");
+    expect(properties.getFullNameFromPath(["spatial", "CD3E"])).toBe(
+      "Spatial table / CD3E",
+    );
+    expect(properties.getPropertyById("nope")).toBeNull();
+  });
+
+  it("adds live columns: shown, listed among computed paths, and fetched below the stub threshold", async () => {
+    annotationMock.stubOnlyMode = false;
+    getPropertyValuesForIds.mockResolvedValue([
+      { annotationId: "a1", values: { spatial: { CD3E: 3 } } },
+    ]);
+    await properties.addVirtualPropertyPaths([["spatial", "CD3E"]]);
+    expect(properties.displayedPropertyPaths).toEqual([["spatial", "CD3E"]]);
+    expect(properties.computedPropertyPaths).toContainEqual([
+      "spatial",
+      "CD3E",
+    ]);
+    expect(getPropertyValuesForIds).toHaveBeenCalledWith(
+      "ds1",
+      ["a1", "a2"],
+      [["spatial", "CD3E"]],
+    );
+    expect(properties.propertyValues.a1).toEqual({ spatial: { CD3E: 3 } });
+  });
+
+  it("keeps earlier live columns when a sibling column is fetched later", async () => {
+    annotationMock.stubOnlyMode = false;
+    getPropertyValuesForIds
+      .mockResolvedValueOnce([
+        { annotationId: "a1", values: { spatial: { CD3E: 3 } } },
+      ])
+      .mockResolvedValueOnce([
+        { annotationId: "a1", values: { spatial: { MS4A1: 5 } } },
+      ]);
+
+    await properties.addVirtualPropertyPaths([["spatial", "CD3E"]]);
+    await properties.addVirtualPropertyPaths([["spatial", "MS4A1"]]);
+
+    expect(properties.propertyValues.a1).toEqual({
+      spatial: { CD3E: 3, MS4A1: 5 },
+    });
+  });
+
+  it("does not fetch wholesale in stub-only mode (the visible fetch handles it)", async () => {
+    await properties.addVirtualPropertyPaths([["spatial", "MS4A1"]]);
+    expect(getPropertyValuesForIds).not.toHaveBeenCalled();
+    expect(properties.allVirtualPropertyPaths).toEqual([["spatial", "MS4A1"]]);
+  });
+
+  it("keeps a displayed virtual column across a reload and can remove it", async () => {
+    // A persisted configuration restores displayed paths; the virtual set
+    // starts empty but the union still lists the column.
+    properties.hydrateDisplayedPropertyPaths([["spatial", "CD19"]]);
+    expect(properties.allVirtualPropertyPaths).toEqual([["spatial", "CD19"]]);
+    expect(properties.computedPropertyPaths).toContainEqual([
+      "spatial",
+      "CD19",
+    ]);
+    properties.removeVirtualPropertyPath(["spatial", "CD19"]);
+    expect(properties.displayedPropertyPaths).toEqual([]);
+    expect(properties.allVirtualPropertyPaths).toEqual([]);
+  });
+});
+
+// Issue #1379 follow-up: a dataset switch can overlap two property-value
+// loads. The old dataset's load must not commit over the new dataset's, in
+// either load path (wholesale or visible-set), nor across the two.
+describe("property value loads across a dataset switch", () => {
+  const mainMock = main as any;
+
+  beforeEach(() => {
+    getPropertyValues.mockReset();
+    getPropertyValuesForIds.mockReset();
+    mainMock.dataset = { id: "ds1" };
+    properties.updatePropertyValues({});
+    properties.setDiscoveredPropertyPaths([]);
+    properties.hydrateDisplayedPropertyPaths([["propA"]]);
+  });
+
+  afterEach(() => {
+    mainMock.dataset = { id: "ds1" };
+    annotationMock.stubOnlyMode = true;
+  });
+
+  it("drops a wholesale load for the old dataset that resolves last", async () => {
+    annotationMock.stubOnlyMode = false;
+    const oldLoad = deferred<any>();
+    getPropertyValues.mockImplementation((datasetId: string) =>
+      datasetId === "ds1"
+        ? oldLoad.promise
+        : Promise.resolve({ b: { propA: 2 } }),
+    );
+
+    const first = properties.fetchAllPropertyValues();
+    mainMock.dataset = { id: "ds2" };
+    await properties.fetchAllPropertyValues();
+    oldLoad.resolve({ a: { propA: 1 } });
+    await first;
+
+    expect(properties.propertyValues).toEqual({ b: { propA: 2 } });
+  });
+
+  it("drops a wholesale load when the dataset changed with no newer load", async () => {
+    annotationMock.stubOnlyMode = false;
+    const oldLoad = deferred<any>();
+    getPropertyValues.mockReturnValue(oldLoad.promise);
+
+    const first = properties.fetchAllPropertyValues();
+    mainMock.dataset = { id: "ds2" };
+    oldLoad.resolve({ a: { propA: 1 } });
+    await first;
+
+    expect(properties.propertyValues).toEqual({});
+  });
+
+  it("drops a visible-set fetch for the old dataset after a switch to a wholesale one", async () => {
+    // ds1 is lazy: a visible-set fetch starts.
+    annotationMock.stubOnlyMode = true;
+    annotationMock.visibleAnnotationIds = new Set(["a"]);
+    const oldVisible = deferred<any[]>();
+    getPropertyValuesForIds.mockReturnValueOnce(oldVisible.promise);
+    properties.ensureVisiblePropertyValues();
+
+    // ds2 is wholesale and loads first.
+    mainMock.dataset = { id: "ds2" };
+    annotationMock.stubOnlyMode = false;
+    getPropertyValues.mockResolvedValue({ b: { propA: 2 } });
+    await properties.fetchAllPropertyValues();
+
+    // Without the guard this merges ds1's entry and prunes to {a}.
+    oldVisible.resolve([{ annotationId: "a", values: { propA: 1 } }]);
+    await flush();
+
+    expect(properties.propertyValues).toEqual({ b: { propA: 2 } });
+  });
+
+  it("a newer wholesale load of the same dataset wins over an older one", async () => {
+    annotationMock.stubOnlyMode = false;
+    const older = deferred<any>();
+    getPropertyValues
+      .mockReturnValueOnce(older.promise)
+      .mockResolvedValueOnce({ a: { propA: "new" } });
+
+    const first = properties.fetchAllPropertyValues();
+    await properties.fetchAllPropertyValues();
+    older.resolve({ a: { propA: "old" } });
+    await first;
+
+    expect(properties.propertyValues).toEqual({ a: { propA: "new" } });
   });
 });

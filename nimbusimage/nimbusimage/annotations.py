@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import urllib.parse
 from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,13 @@ from nimbusimage.models import Annotation, Location
 
 if TYPE_CHECKING:
     import girder_client
+
+
+def _quote_json(value) -> str:
+    """JSON-encode a query value and percent-encode it, so tags like
+    "CD8+" or "a&b" reach the server intact (an unencoded "+" decodes to
+    a space, and "&" splits the parameter)."""
+    return urllib.parse.quote(json.dumps(value), safe="")
 
 
 class AnnotationAccessor:
@@ -62,7 +70,7 @@ class AnnotationAccessor:
         if shape:
             url += f"&shape={shape}"
         if tags:
-            url += f"&tags={json.dumps(tags)}"
+            url += f"&tags={_quote_json(tags)}"
         if after_id:
             url += f"&afterId={after_id}"
         if sort:
@@ -128,6 +136,26 @@ class AnnotationAccessor:
         data = self._gc.get(f"upenn_annotation/{annotation_id}")
         return Annotation.from_dict(data)
 
+    def get_many(self, annotation_ids) -> list[Annotation]:
+        """Fetch this dataset's annotations by id in one request (``POST
+        upenn_annotation/hydrate``).
+
+        Scoped like every other method here: an id of another dataset is
+        dropped from the result, as is an id that does not exist, so
+        compare ids rather than lengths. Accepts any iterable of ids
+        (e.g. a numpy array). One request takes at most the server's
+        ``MAX_ANNOTATION_IDS``; chunk larger lists.
+        """
+        annotation_ids = [str(i) for i in annotation_ids]
+        if not annotation_ids:
+            return []
+        data = self._gc.post("upenn_annotation/hydrate", json=annotation_ids)
+        return [
+            annotation
+            for annotation in (Annotation.from_dict(d) for d in data)
+            if annotation.dataset_id == self._dataset_id
+        ]
+
     def count(
         self,
         shape: str | None = None,
@@ -138,7 +166,7 @@ class AnnotationAccessor:
         if shape:
             url += f"&shape={shape}"
         if tags:
-            url += f"&tags={json.dumps(tags)}"
+            url += f"&tags={_quote_json(tags)}"
         return self._gc.get(url)["count"]
 
     def create(self, annotation: Annotation) -> Annotation:
