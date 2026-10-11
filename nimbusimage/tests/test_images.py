@@ -229,9 +229,12 @@ class TestGetComposite:
         assert result.shape == (768, 1024, 3)
         assert result.max() == 0.0
 
-    def test_max_merge_is_a_projection_with_merged_histogram(
+    def test_max_merge_projects_but_contrast_uses_the_current_frame(
         self, mock_gc, sample_tiles_metadata,
     ):
+        """The drawn image is the max over z, but the app's histogram is of
+        the layer's image at the current z (resolveSlice maps max-merge to
+        the current index), so contrast comes from that frame alone."""
         low = np.zeros((2, 2), dtype=np.uint16)
         low[0, 0] = 400
         high = np.zeros((2, 2), dtype=np.uint16)
@@ -241,11 +244,33 @@ class TestGetComposite:
             [_layer(0, z={"type": "max-merge", "value": None})],
             {0: low, 2: high},
         )
-        result = ds.images.get_composite(dtype="float64")
+        result = ds.images.get_composite(z=0, dtype="float64")
         assert sorted(r["frame"] for r in regions) == [0, 2]
-        # Range is the merged 0..800, so 400 is half and 800 is full.
-        assert result[0, 0, 0] == pytest.approx(0.5)
+        histogram_frames = [
+            c.kwargs["parameters"]["frame"]
+            for c in mock_gc.get.call_args_list
+            if c.args[0].endswith("/tiles/histogram")
+        ]
+        assert histogram_frames == [0]
+        # Range 0..400 from the z=0 frame: 400 is full, 800 clips.
+        assert result[0, 0, 0] == 1.0
         assert result[1, 1, 0] == 1.0
+
+    def test_percentile_bounds_round_like_the_app(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """d3's rangeRound rounds the bounds to integers: on a 0..1 float
+        image a 50% white point becomes 1, not 0.5."""
+        img = np.array([[0.0, 0.25], [0.5, 1.0]], dtype=np.float32)
+        ds, _ = _composite_dataset(
+            mock_gc, sample_tiles_metadata,
+            [_layer(contrast={
+                "mode": "percentile", "blackPoint": 0, "whitePoint": 50,
+            })],
+            {0: img},
+        )
+        result = ds.images.get_composite(dtype="float64")
+        assert result[0, 1, 0] == pytest.approx(0.25)
 
     def test_max_size_and_crop_reach_the_region_request(
         self, mock_gc, sample_tiles_metadata,
@@ -321,6 +346,23 @@ class TestGetMaxSize:
         assert (params["frame"], params["width"], params["height"]) == (
             1, 512, 512,
         )
+
+    def test_stack_and_all_channels_pass_max_size(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        img = np.zeros((4, 4), dtype=np.uint16)
+        response = MagicMock()
+        response.content = pickle.dumps(img)
+        mock_gc.get.return_value = response
+        ds = _make_dataset(mock_gc, sample_tiles_metadata)
+
+        ds.images.get_stack(axis="z", max_size=100)
+        ds.images.get_all_channels(max_size=100)
+        widths = [
+            c.kwargs["parameters"].get("width")
+            for c in mock_gc.get.call_args_list
+        ]
+        assert widths == [100] * 4  # 2 z-planes, then 2 channels
 
     def test_rejects_non_positive_max_size(
         self, mock_gc, sample_tiles_metadata,

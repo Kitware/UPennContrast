@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import pickle
 from typing import TYPE_CHECKING, Iterator, NamedTuple, Sequence
 
@@ -104,13 +105,18 @@ class ImageAccessor:
         ).squeeze()
 
     def get_all_channels(
-        self, xy: int = 0, z: int = 0, time: int = 0
+        self,
+        xy: int = 0,
+        z: int = 0,
+        time: int = 0,
+        max_size: int | None = None,
     ) -> list[np.ndarray]:
-        """Get all channels at one location as a list of 2D arrays."""
+        """Get all channels at one location as a list of 2D arrays.
+        max_size: see get()."""
         self._dataset._ensure_metadata()
         n_ch = self._dataset.num_channels
         return [
-            self.get(xy=xy, z=z, time=time, channel=ch)
+            self.get(xy=xy, z=z, time=time, channel=ch, max_size=max_size)
             for ch in range(n_ch)
         ]
 
@@ -121,11 +127,13 @@ class ImageAccessor:
         time: int = 0,
         channel: int = 0,
         axis: str = "z",
+        max_size: int | None = None,
     ) -> np.ndarray:
         """Get a stack along one axis as a 3D array.
 
         Args:
             axis: 'z' or 'time'. The other coordinates are fixed.
+            max_size: Optional longest side of each plane; see get().
 
         Returns:
             3D numpy array: (N, H, W) where N is the axis size.
@@ -134,13 +142,15 @@ class ImageAccessor:
         if axis == "z":
             n = self._dataset.num_z
             images = [
-                self.get(xy=xy, z=i, time=time, channel=channel)
+                self.get(xy=xy, z=i, time=time, channel=channel,
+                         max_size=max_size)
                 for i in range(n)
             ]
         elif axis == "time":
             n = self._dataset.num_time
             images = [
-                self.get(xy=xy, z=z, time=i, channel=channel)
+                self.get(xy=xy, z=z, time=i, channel=channel,
+                         max_size=max_size)
                 for i in range(n)
             ]
         else:
@@ -205,6 +215,12 @@ class ImageAccessor:
             frames = self._layer_frames(layer, current, sizes)
             if not frames:
                 continue
+            # The app's histogram is of the layer's image at the current
+            # location (resolveSlice maps max-merge to the current index),
+            # even when the drawn tile is a projection over many frames.
+            histogram_frames = self._layer_frames(
+                layer, current, sizes, project=False
+            )
             # A max-merge layer is the per-pixel maximum of its frames.
             img = np.max(
                 [self._get_region(f, **region).squeeze() for f in frames],
@@ -214,7 +230,7 @@ class ImageAccessor:
             contrast = (
                 overrides.get(layer.get("id")) or layer.get("contrast", {})
             )
-            cmin, cmax = self._contrast_range(contrast, frames)
+            cmin, cmax = self._contrast_range(contrast, histogram_frames)
             if cmax > cmin:
                 img = (img - cmin) / (cmax - cmin)
             img = np.clip(img, 0.0, 1.0)
@@ -251,13 +267,18 @@ class ImageAccessor:
             return (composite * max_val).astype(dt)
 
     def _layer_frames(
-        self, layer: dict, current: dict, sizes: dict
+        self, layer: dict, current: dict, sizes: dict, project: bool = True
     ) -> list[int]:
         """Frame indexes a layer draws at `current`; [] when it draws
-        nothing there (mirrors getLayerSliceIndexes in the frontend)."""
+        nothing there (mirrors getLayerSliceIndexes in the frontend).
+        With project=False a max-merge axis resolves to the current index,
+        as the frontend's resolveSlice does for the layer's histogram."""
         indexes = {}
         for axis, size in sizes.items():
-            resolved = _slice_indexes(layer.get(axis), current[axis], size)
+            setting = layer.get(axis)
+            if not project and (setting or {}).get("type") == "max-merge":
+                setting = {"type": "current"}
+            resolved = _slice_indexes(setting, current[axis], size)
             if resolved is None:
                 return []
             indexes[axis] = resolved
@@ -278,7 +299,7 @@ class ImageAccessor:
         if contrast.get("mode") == "absolute":
             return float(black), float(white)
         # Percentile mode: a linear percent of the histogram's range,
-        # merged over the layer's frames like the app's mergeHistograms.
+        # rounded like the app's scaleLinear().rangeRound().
         histograms = [
             self._dataset._gc.get(
                 f"item/{self._dataset._item_id}/tiles/histogram",
@@ -288,7 +309,10 @@ class ImageAccessor:
         ]
         lo = min(h["min"] for h in histograms)
         hi = max(h["max"] for h in histograms)
-        return lo + black / 100 * (hi - lo), lo + white / 100 * (hi - lo)
+        return (
+            _round_half_up(lo + black / 100 * (hi - lo)),
+            _round_half_up(lo + white / 100 * (hi - lo)),
+        )
 
     def _region_size(self, crop) -> tuple[float, float]:
         """(height, width) of the requested region at full resolution."""
@@ -528,6 +552,11 @@ _HISTOGRAM_PARAMS = {
     "resample": "false",
     "cache": "none",
 }
+
+
+def _round_half_up(value: float) -> float:
+    """Math.round, as d3's rangeRound uses (Python's round() is half-even)."""
+    return float(math.floor(value + 0.5))
 
 
 def _slice_indexes(

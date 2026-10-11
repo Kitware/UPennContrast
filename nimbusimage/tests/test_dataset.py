@@ -89,6 +89,9 @@ class TestDatasetMetadata:
 
     @pytest.mark.parametrize("stored", [
         {"value": 0, "unit": "mm"},  # getDatasetScales without mm_x
+        {"value": None, "unit": "mm"},  # the same, NaN serialized as null
+        {"value": 0.2, "unit": "furlong"},  # not a length unit we know
+        {"value": 0.2},  # no unit
         {"value": 1, "unit": "m"},   # exampleConfigurationBase default
     ])
     def test_uncalibrated_configuration_falls_back_to_the_file(
@@ -454,6 +457,42 @@ class TestDatasetUpload:
         with pytest.raises(RuntimeError):
             ds.upload(tmp_path)
         assert ds._tiles is None
+
+    def test_unreadable_configuration_falls_back_to_the_file(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        import girder_client
+
+        server = _fake_server(
+            sample_tiles_metadata,
+            own_views=[{"_id": "v1", "configurationId": "c1"}],
+        )
+
+        def get(path, parameters=None, **kwargs):
+            if path.startswith("upenn_collection/"):
+                raise girder_client.HttpError(403, "denied", path, "GET")
+            return server(path, parameters, **kwargs)
+
+        mock_gc.get.side_effect = get
+        ps = Dataset(mock_gc, "folder_123").pixel_size
+        assert ps.unit == "mm"
+
+    def test_invalidation_drops_view_configuration_and_frame_map(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """configure()/upload() change the dataset; the cached view,
+        configuration (pixel size, layers) and frame map must not
+        outlive that."""
+        mock_gc.get.side_effect = _fake_server(sample_tiles_metadata)
+        ds = Dataset(mock_gc, "folder_123")
+        ds.pixel_size
+        ds.images._ensure_frame_map()
+        assert ds.collections._cache is not None
+
+        ds._invalidate_cache()
+        assert ds.collections._cache is None
+        assert ds.collections._view is None
+        assert ds.images._frame_map is None
 
 
 def _fake_server(

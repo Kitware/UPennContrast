@@ -91,7 +91,7 @@ class CollectionAccessor:
     datasets to collections. The default collection is the one the
     caller sees in the app: the configuration of their own view of the
     dataset (falling back to any view they can read, e.g. a dataset
-    shared with them that they have not opened yet).
+    shared with them that they have not opened yet). See default_view().
     """
 
     def __init__(
@@ -123,8 +123,10 @@ class CollectionAccessor:
         return self._gc.get("dataset_view", parameters=parameters)
 
     def default_view(self) -> dict | None:
-        """The view the app opens for the caller: their own view of this
-        dataset, else any view they can read. None when there is none."""
+        """The caller's own view of this dataset, else any view they can
+        read; None when there is none. A caller with several views of the
+        dataset gets one of them (the server's order); pass a collection
+        id to get()/get_raw() to choose."""
         views = (
             self.list_views(current_user_only=True) or self.list_views()
         )

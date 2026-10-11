@@ -225,6 +225,25 @@ class TestNimbusClientListDatasets:
             "resource/batch", json={"folder": ["f2", "f1"]}
         )
 
+    def test_list_datasets_keeps_only_the_public_folder_fields(
+        self, mock_gc,
+    ):
+        """resource/batch returns raw documents; the ACL (other users' ids
+        and levels) must not leak into the result."""
+        mock_gc.get.return_value = [{"_id": "v1", "datasetId": "f1"}]
+        mock_gc.post.return_value = {"folder": {"f1": {
+            "_id": "f1", "name": "A", "meta": {"subtype": "contrastDataset"},
+            "parentId": "p1", "lowerName": "a",
+            "access": {"users": [{"id": "someone", "level": 2}]},
+        }}}
+
+        [dataset] = _bare_client(mock_gc).list_datasets()
+        assert dataset == {
+            "_id": "f1", "name": "A",
+            "meta": {"subtype": "contrastDataset"}, "parentId": "p1",
+            "_modelType": "folder",
+        }
+
     def test_list_datasets_skips_unreadable_folders(self, mock_gc):
         """A view can be shared while its folder is not; resource/batch
         omits that folder and so does the result."""

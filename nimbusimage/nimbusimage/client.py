@@ -14,6 +14,15 @@ from nimbusimage.projects import Project
 from nimbusimage.urls import DEFAULT_FRONTEND_URL
 
 
+# Girder's Folder.exposeFields at READ level: what GET folder/{id} returns
+# (besides _accessLevel and _modelType).
+_FOLDER_READ_FIELDS = frozenset({
+    "_id", "name", "public", "publicFlags", "description", "created",
+    "updated", "size", "meta", "parentId", "parentCollection", "creatorId",
+    "baseParentType", "baseParentId",
+})
+
+
 class NimbusClient:
     """Authenticated session to a NimbusImage server.
 
@@ -188,7 +197,16 @@ class NimbusClient:
         folders = self._gc.post(
             "resource/batch", json={"folder": dataset_ids}
         ).get("folder", {})
-        return [folders[did] for did in dataset_ids if did in folders]
+        # resource/batch returns raw documents, including the ACL (other
+        # users' ids and levels); keep what GET folder/{id} exposes.
+        return [
+            {
+                **{k: v for k, v in folders[did].items()
+                   if k in _FOLDER_READ_FIELDS},
+                "_modelType": "folder",
+            }
+            for did in dataset_ids if did in folders
+        ]
 
     def _readable_folders_one_by_one(self, folder_ids: list[str]) -> list:
         folders = []
