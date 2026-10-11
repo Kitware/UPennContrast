@@ -130,10 +130,13 @@ class TestShareLink:
         assertStatus(request(
             server, "GET", "/folder/%s/download" % dataset["_id"], token=token
         ), 403)
-        assertStatus(request(
+        refused = request(
             server, "GET", "/export/json", token=token,
             params={"datasetId": str(dataset["_id"])},
-        ), 403)
+        )
+        assertStatus(refused, 403)
+        # Refused by the share-link guard, not by a blanket admin check.
+        assert "Share links show a view" in refused.json["message"]
         # Every export format, not only JSON.
         for route in ("/export/csv", "/export/geojson"):
             assertStatus(request(
@@ -154,6 +157,27 @@ class TestShareLink:
                          params={"text": "share-"})
         assertStatusOk(listed)
         assert not any(u["login"].startswith("share-") for u in listed.json)
+
+    def testGuardLeavesOrdinaryUsersDownloadsAlone(self, user, server):
+        """The guard is a `rest.*.before` listener; without an access level
+        of its own Girder demanded site-admin for every guarded route, so
+        non-admin users could not download or export their own datasets."""
+        assert not user["admin"]
+        dataset, _, _ = privateDatasetWithView(user)
+        assertStatusOk(server.request(
+            path="/folder/%s/download" % dataset["_id"], method="GET",
+            user=user, isJson=False,
+        ))
+        assertStatusOk(server.request(
+            path="/export/json", method="GET", user=user, isJson=False,
+            params={"datasetId": str(dataset["_id"])},
+        ))
+        for route in ("/export/csv", "/export/geojson"):
+            assertStatusOk(server.request(
+                path=route, method="POST", user=user, isJson=False,
+                type="application/json",
+                body=json.dumps({"datasetId": str(dataset["_id"])}),
+            ))
 
     def testCreateNeedsAdminAndValidInput(self, admin, user, server):
         dataset, config, view = privateDatasetWithView(admin)
