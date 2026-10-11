@@ -109,12 +109,13 @@ const props = withDefaults(
 
 const viewScales = computed(() => store.viewScales);
 
-const scales = computed(() => {
-  if (props.configurationOnly) {
-    return store.configurationScales;
-  }
-  return { ...store.configurationScales, ...viewScales.value };
-});
+// The store's normalized scales, so a legacy placeholder in a per-user view
+// override (e.g. {1, "m"} from an old Reset from dataset) is edited as the
+// unknown marker it is, not converted into a real size. The raw viewScales
+// only says whether an override exists.
+const scales = computed(() =>
+  props.configurationOnly ? store.configurationScales : store.scales,
+);
 
 const pixelSizeKnown = computed(() => isKnownPixelSize(scales.value.pixelSize));
 

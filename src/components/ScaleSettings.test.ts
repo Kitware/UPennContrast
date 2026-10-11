@@ -40,9 +40,11 @@ vi.mock("@/utils/conversion", () => ({
   convertTime: vi.fn().mockReturnValue(60),
 }));
 
+import { normalizeScales } from "@/utils/scales";
 import ScaleSettings from "./ScaleSettings.vue";
 import store from "@/store/index";
 import { getDatasetScales } from "@/store/GirderAPI";
+import { convertLength } from "@/utils/conversion";
 
 function mountComponent(props = {}) {
   return mount(ScaleSettings, {
@@ -72,6 +74,15 @@ describe("ScaleSettings", () => {
       zStep: { value: 1, unit: "nm" },
       tStep: { value: 1, unit: "s" },
     };
+    // Mirrors the real getter: view over configuration, normalized.
+    Object.defineProperty(store, "scales", {
+      configurable: true,
+      get: () =>
+        normalizeScales({
+          ...(store as any).configurationScales,
+          ...(store as any).viewScales,
+        }),
+    });
     (store as any).scalebarColor = "#ffffff";
     (getDatasetScales as any).mockReturnValue({
       pixelSize: { value: 0.5, unit: "mm" },
@@ -189,5 +200,18 @@ describe("ScaleSettings", () => {
     const vm = mountComponent({ configurationOnly: true }).vm as any;
     expect(vm.scales.pixelSize).toEqual({ value: 0, unit: "µm" });
     expect(vm.pixelSizeKnown).toBe(false);
+  });
+
+  it("edits a legacy 1 m view override as unknown instead of converting it", () => {
+    (store as any).viewScales = { pixelSize: { value: 1, unit: "m" } };
+    const vm = mountComponent().vm as any;
+    expect(vm.scales.pixelSize).toEqual({ value: 0, unit: "mm" });
+    expect(vm.pixelSizeKnown).toBe(false);
+
+    // Picking µm used to convert (and persist) the placeholder's 1 m as a
+    // real 1,000,000 µm; now it converts the unknown marker's 0.
+    // (convertLength is mocked, so assert its input, not its output.)
+    vm.setUnitValueForItem(vm.scaleItems[0], "µm");
+    expect(convertLength).toHaveBeenCalledWith(0, "mm", "µm");
   });
 });
