@@ -230,12 +230,15 @@ class ImageAccessor:
                 overrides.get(layer.get("id")) or layer.get("contrast", {})
             )
             contrast_range = self._contrast_range(contrast, histogram_frames)
-            if len(frames) > 1:
-                # A max-merge projection, composited on the server in one
-                # request (as the app's banded tiles are), not one
-                # full-size fetch per projected frame.
-                img = self._projection(frames, contrast_range, region)
+            if len(frames) > 1 or "width" in region:
+                # Drawn by the server's band styling, as the app's tiles
+                # are: a max-merge projection in one request (not one fetch
+                # per frame), and a downsampled layer windowed before the
+                # final resample, so saturated spots are not averaged
+                # with dark neighbors before clipping.
+                img = self._styled(frames, contrast_range, region)
             else:
+                # Full resolution, one frame: exact, in float.
                 img = self._get_region(
                     frames[0], **region
                 ).squeeze().astype(np.float64)
@@ -328,20 +331,20 @@ class ImageAccessor:
             _round_half_up(lo + white / 100 * (hi - lo)),
         )
 
-    def _projection(
+    def _styled(
         self,
         frames: list[int],
         contrast_range: tuple[float, float] | None,
         region: dict,
     ) -> np.ndarray:
-        """Maximum projection over `frames`, contrast applied, in [0, 1].
+        """A layer drawn by large_image's band styling, in [0, 1].
 
-        Uses large_image's band style, which composites the frames with
-        "lighten" (a per-pixel maximum) on the server, the way the app
-        draws a max-merge layer. The result is 8-bit. At full resolution
-        it equals the per-frame maximum exactly; downsampled, contrast is
-        applied before averaging (as in the app's tiles), so saturated
-        spots are not spread into their dark neighbors.
+        The style is the app's (toStyle): each frame a band windowed to
+        the contrast range, several frames composited with "lighten" (a
+        per-pixel maximum, i.e. a max-merge projection). The server
+        styles before its final resample, as for the app's tiles. The
+        result is 8-bit; at full resolution a projection equals the
+        per-frame maximum exactly.
         """
         low, high = contrast_range or ("min", "max")
         style = {"bands": [
@@ -352,9 +355,11 @@ class ImageAccessor:
         styled = self._get_region(
             frames[0], style=json.dumps(style), **region
         )
-        # Grayscale palette: every color band holds the intensity.
+        # Grayscale palette: every color band holds the intensity. At full
+        # resolution large_image leaves values past the white point above
+        # 255 (a display clamps them), so clamp here too.
         gray = styled[..., 0] if styled.ndim == 3 else styled
-        return gray.astype(np.float64) / 255.0
+        return np.clip(gray.astype(np.float64) / 255.0, 0.0, 1.0)
 
     def _region_size(self, crop) -> tuple[int, int]:
         """(height, width) of the requested region at full resolution, as

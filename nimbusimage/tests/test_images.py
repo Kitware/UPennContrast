@@ -395,11 +395,40 @@ class TestGetComposite:
             mock_gc, sample_tiles_metadata, [_layer(0)], {0: img},
         )
         ds.images.get_composite(max_size=64, crop=(10, 20, 110, 220))
-        assert regions[0] == {
+        request = dict(regions[0])
+        style = json.loads(request.pop("style"))
+        assert request == {
             "frame": 0, "encoding": "pickle:5",
             "left": 10, "top": 20, "right": 110, "bottom": 220,
             "width": 64, "height": 64,
         }
+        assert [band["frame"] for band in style["bands"]] == [0]
+
+    def test_downsampled_layer_is_windowed_by_the_server_like_the_app(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """When downsampling, the layer is drawn with the app's style (the
+        server windows before its final resample, as for the app's tiles);
+        at full resolution it is computed exactly in float, no style."""
+        img = np.array([[0, 400], [800, 1000]], dtype=np.uint16)
+        ds, regions = _composite_dataset(
+            mock_gc, sample_tiles_metadata,
+            [_layer(contrast={
+                "mode": "percentile", "blackPoint": 0, "whitePoint": 50,
+            })],
+            {0: img},
+        )
+        downsampled = ds.images.get_composite(max_size=64, dtype="float64")
+        style = json.loads(regions[-1]["style"])
+        assert style["bands"] == [{
+            "frame": 0, "min": 0, "max": 500,
+            "palette": ["#000000", "#ffffff"],
+        }]
+        assert downsampled[0, 1, 0] == pytest.approx(204 / 255)  # 400/500
+
+        full = ds.images.get_composite(dtype="float64")
+        assert "style" not in regions[-1]
+        assert full[0, 1, 0] == pytest.approx(0.8)
 
     def test_max_size_above_the_region_does_not_upsample(
         self, mock_gc, sample_tiles_metadata,
