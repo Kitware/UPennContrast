@@ -172,6 +172,52 @@ class PixelSize(BaseModel):
         return other * self.value
 
 
+class PropertyStats(BaseModel):
+    """Statistics of one property path over the summarized annotations.
+
+    ``count`` is the number of annotations with a numeric value at the
+    path (strings, NaN, and missing values are skipped); the statistics are
+    None when ``count`` is 0, and ``std`` (the sample standard deviation)
+    also below two values.
+    """
+
+    path: list[str]
+    count: int
+    mean: float | None = None
+    std: float | None = None
+    min: float | None = None
+    max: float | None = None
+
+
+class AnnotationSummary(BaseModel):
+    """Server-side aggregate over the annotations matching a filter.
+
+    ``tags`` and ``shapes`` map each tag or shape to its annotation count,
+    most common first (ties by name). An annotation with several tags
+    counts once per tag. ``shapes`` is None on servers that predate the
+    shape breakdown.
+    """
+
+    total: int
+    tags: dict[str, int]
+    shapes: dict[str, int] | None = None
+    properties: list[PropertyStats] = []
+
+    @classmethod
+    def from_response(cls, data: dict) -> "AnnotationSummary":
+        """Build from the POST upenn_annotation/summary response."""
+        shapes = data.get("shapes")
+        return cls(
+            total=data["total"],
+            tags={row["tag"]: row["count"] for row in data["tags"]},
+            shapes=(
+                None if shapes is None
+                else {row["shape"]: row["count"] for row in shapes}
+            ),
+            properties=data.get("properties", []),
+        )
+
+
 class MultiSourceConfiguration(BaseModel):
     """Result of configuring a folder of image files as a dataset.
 
