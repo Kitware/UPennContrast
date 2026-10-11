@@ -32,6 +32,8 @@ describe("getDatasetScales pixel size", () => {
     expect(pixelSize).toEqual({ value: 0, unit: "mm" });
   });
 
+  // (null + null) / 2 was already 0 on master; kept so the null spelling
+  // stays covered alongside the NaN one above.
   it("records the unknown marker when mm_x/mm_y are null", () => {
     expect(
       getDatasetScales(datasetWithTileInfo({ mm_x: null, mm_y: null }))

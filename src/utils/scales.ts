@@ -1,4 +1,9 @@
-import type { IScaleInformation, IScales, TUnitLength } from "@/store/model";
+import {
+  unitLengthOptions,
+  type IScaleInformation,
+  type IScales,
+  type TUnitLength,
+} from "@/store/model";
 
 // The single representation of "this dataset has no physical pixel size".
 // Zero is what the scale bar, Snapshots, the neighbourhood dialog, the
@@ -54,12 +59,22 @@ export function pixelSizeFromTileInfo(
 }
 
 /**
- * Scales with every unknown pixel-size representation folded to the single
- * unknown marker, so consumers (and the workers they forward scales to)
- * only ever see a real size or 0.
+ * Scales with every unknown pixel-size representation folded to value 0, so
+ * consumers (and the workers they forward scales to) only ever see a real
+ * size or 0. A valid stored unit is kept: the scale editor writes {0, "µm"}
+ * when the user picks a unit before typing a value, and replacing it would
+ * snap the unit selector back. The legacy 1 m placeholder's unit is not a
+ * choice anyone made, so it falls back to the default.
  */
 export function normalizeScales<T extends Partial<IScales>>(scales: T): T {
-  if (!("pixelSize" in scales) || isKnownPixelSize(scales.pixelSize)) {
+  const { pixelSize } = scales;
+  const isZeroWithValidUnit =
+    pixelSize?.value === 0 && unitLengthOptions.includes(pixelSize.unit);
+  if (
+    !("pixelSize" in scales) ||
+    isZeroWithValidUnit ||
+    isKnownPixelSize(pixelSize)
+  ) {
     return scales;
   }
   return { ...scales, pixelSize: unknownPixelSize() };

@@ -67,7 +67,8 @@ describe("normalizeScales", () => {
     for (const pixelSize of [
       { value: null as any, unit: "mm" },
       { value: 1, unit: "m" },
-      { value: 0, unit: "µm" },
+      { value: 0, unit: "furlong" },
+      { value: -2, unit: "µm" },
     ]) {
       expect(
         normalizeScales({ ...rest, pixelSize } as IScales).pixelSize,
@@ -83,6 +84,11 @@ describe("normalizeScales", () => {
       pixelSize: { value: 1, unit: "m" },
     } as IScales);
     expect(normalized.zStep).toEqual(rest.zStep);
+  });
+
+  it("keeps the unit of a zero size so the unit selector does not snap back", () => {
+    const scales = { ...rest, pixelSize: { value: 0, unit: "µm" } };
+    expect(normalizeScales(scales as IScales)).toBe(scales);
   });
 
   it("does not invent a pixel size for a partial (view) scales object", () => {

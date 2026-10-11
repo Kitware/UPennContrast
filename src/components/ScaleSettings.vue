@@ -59,8 +59,7 @@
         v-if="item.key === 'pixelSize' && !pixelSizeKnown"
         class="text-caption text-medium-emphasis mt-1 unknown-pixel-size-hint"
       >
-        Pixel size unknown: the image file has no calibration. Enter it to show
-        a distance scale bar and measure in physical units.
+        {{ unknownPixelSizeHint }}
       </div>
     </v-list-item>
     <v-list-item>
@@ -118,6 +117,17 @@ const scales = computed(() => {
 });
 
 const pixelSizeKnown = computed(() => isKnownPixelSize(scales.value.pixelSize));
+
+// "Unknown" also covers configurations created before the dataset's tile
+// metadata was read, so the file may be calibrated after all.
+const unknownPixelSizeHint = computed(
+  () =>
+    "No physical pixel size is set. Enter one to show a distance scale bar " +
+    "and measure in physical units" +
+    (props.configurationOnly
+      ? "."
+      : ", or use Reset from dataset if the image file is calibrated."),
+);
 
 const scaleItems = computed<IScaleItem[]>(() => {
   const items: IScaleItem[] = [];

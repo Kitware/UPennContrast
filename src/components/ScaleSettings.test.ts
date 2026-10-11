@@ -157,6 +157,15 @@ describe("ScaleSettings", () => {
     const unknown = mountComponent();
     expect((unknown.vm as any).pixelSizeKnown).toBe(false);
     expect(unknown.find(".unknown-pixel-size-hint").exists()).toBe(true);
+    expect(unknown.find(".unknown-pixel-size-hint").text()).toContain(
+      "Reset from dataset",
+    );
+    // The collection-only editor has no Reset from dataset button.
+    expect(
+      mountComponent({ configurationOnly: true })
+        .find(".unknown-pixel-size-hint")
+        .text(),
+    ).not.toContain("Reset from dataset");
 
     (store as any).configurationScales = {
       pixelSize: { value: 0.65, unit: "µm" },
@@ -166,5 +175,19 @@ describe("ScaleSettings", () => {
     const known = mountComponent();
     expect((known.vm as any).pixelSizeKnown).toBe(true);
     expect(known.find(".unknown-pixel-size-hint").exists()).toBe(false);
+  });
+
+  it("keeps a unit picked for an unknown pixel size in the collection editor", async () => {
+    // The real getter, not the mock: normalization used to replace
+    // {0, "µm"} with {0, "mm"}, snapping the unit selector back.
+    const { normalizeScales } = await import("@/utils/scales");
+    (store as any).configurationScales = normalizeScales({
+      pixelSize: { value: 0, unit: "µm" },
+      zStep: { value: 1, unit: "nm" },
+      tStep: { value: 1, unit: "s" },
+    });
+    const vm = mountComponent({ configurationOnly: true }).vm as any;
+    expect(vm.scales.pixelSize).toEqual({ value: 0, unit: "µm" });
+    expect(vm.pixelSizeKnown).toBe(false);
   });
 });
