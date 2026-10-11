@@ -201,15 +201,55 @@ def _bare_client(mock_gc):
     return client
 
 
+def _serve(mock_gc, views, me=None):
+    """Answer GET dataset_view and GET user/me by path."""
+    me = me or {"_id": "me", "admin": False, "groups": []}
+
+    def get(path, parameters=None, **kwargs):
+        if path == "dataset_view":
+            return views
+        if path == "user/me":
+            return me
+        raise AssertionError(f"unexpected GET {path}")
+
+    mock_gc.get.side_effect = get
+
+
+class TestAccessLevel:
+    """Mirrors Girder's AccessControlledModel.getAccessLevel for a
+    logged-in user, so batched results keep GET folder's _accessLevel."""
+
+    def test_access_level_follows_girder_rules(self):
+        from nimbusimage.client import _access_level
+
+        me = {"_id": "me", "admin": False, "groups": ["g1"]}
+        doc = {"access": {
+            "users": [{"id": "me", "level": 0}, {"id": "x", "level": 2}],
+            "groups": [{"id": "g1", "level": 1}, {"id": "g2", "level": 2}],
+        }}
+        assert _access_level(doc, me) == 1  # best of own and group grants
+        assert _access_level(doc, {**me, "admin": True}) == 2
+        # Public does not count for a logged-in user (Girder's rule).
+        assert _access_level({"public": True, "access": {}}, me) == -1
+
+    def test_server_provided_level_wins(self, mock_gc):
+        _serve(mock_gc, [{"_id": "v1", "datasetId": "f1"}])
+        mock_gc.post.return_value = {"folder": {"f1": {
+            "_id": "f1", "name": "A", "_accessLevel": 2, "access": {},
+        }}}
+        [dataset] = _bare_client(mock_gc).list_datasets()
+        assert dataset["_accessLevel"] == 2
+
+
 class TestNimbusClientListDatasets:
     def test_list_datasets_batches_the_folder_lookup(self, mock_gc):
         """One resource/batch call for every dataset, not a GET per folder;
         view order is kept and repeated datasets appear once."""
-        mock_gc.get.return_value = [
+        _serve(mock_gc, [
             {"_id": "v1", "datasetId": "f2", "configurationId": "c1"},
             {"_id": "v2", "datasetId": "f1", "configurationId": "c2"},
             {"_id": "v3", "datasetId": "f2", "configurationId": "c3"},
-        ]
+        ])
         mock_gc.post.return_value = {"folder": {
             "f1": {"_id": "f1", "name": "Dataset A"},
             "f2": {"_id": "f2", "name": "Dataset B"},
@@ -218,8 +258,10 @@ class TestNimbusClientListDatasets:
         datasets = _bare_client(mock_gc).list_datasets()
 
         assert [d["name"] for d in datasets] == ["Dataset B", "Dataset A"]
-        mock_gc.get.assert_called_once_with(
-            "dataset_view", parameters={"limit": 0}
+        mock_gc.get.assert_any_call("dataset_view", parameters={"limit": 0})
+        assert not any(
+            c.args[0].startswith("folder/")
+            for c in mock_gc.get.call_args_list
         )
         mock_gc.post.assert_called_once_with(
             "resource/batch", json={"folder": ["f2", "f1"]}
@@ -230,27 +272,29 @@ class TestNimbusClientListDatasets:
     ):
         """resource/batch returns raw documents; the ACL (other users' ids
         and levels) must not leak into the result."""
-        mock_gc.get.return_value = [{"_id": "v1", "datasetId": "f1"}]
+        _serve(mock_gc, [{"_id": "v1", "datasetId": "f1"}])
         mock_gc.post.return_value = {"folder": {"f1": {
             "_id": "f1", "name": "A", "meta": {"subtype": "contrastDataset"},
             "parentId": "p1", "lowerName": "a",
-            "access": {"users": [{"id": "someone", "level": 2}]},
+            "access": {"users": [
+                {"id": "someone", "level": 2}, {"id": "me", "level": 1},
+            ]},
         }}}
 
         [dataset] = _bare_client(mock_gc).list_datasets()
         assert dataset == {
             "_id": "f1", "name": "A",
             "meta": {"subtype": "contrastDataset"}, "parentId": "p1",
-            "_modelType": "folder",
+            "_accessLevel": 1, "_modelType": "folder",
         }
 
     def test_list_datasets_skips_unreadable_folders(self, mock_gc):
         """A view can be shared while its folder is not; resource/batch
         omits that folder and so does the result."""
-        mock_gc.get.return_value = [
+        _serve(mock_gc, [
             {"_id": "v1", "datasetId": "f1"},
             {"_id": "v2", "datasetId": "f2"},
-        ]
+        ])
         mock_gc.post.return_value = {"folder": {
             "f2": {"_id": "f2", "name": "Dataset B"},
         }}

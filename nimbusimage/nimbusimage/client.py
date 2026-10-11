@@ -23,6 +23,22 @@ _FOLDER_READ_FIELDS = frozenset({
 })
 
 
+def _access_level(doc: dict, user: dict) -> int:
+    """The caller's access level on a raw document, as Girder's
+    AccessControlledModel.getAccessLevel computes it for a logged-in user:
+    ADMIN (2) for a site admin, else the best of the user's own and their
+    groups' grants, else NONE (-1). ``public`` does not count here."""
+    if user.get("admin"):
+        return 2
+    access = doc.get("access") or {}
+    groups = set(user.get("groups") or [])
+    levels = [g["level"] for g in access.get("groups", [])
+              if g["id"] in groups]
+    levels += [u["level"] for u in access.get("users", [])
+               if u["id"] == user["_id"]]
+    return max(levels, default=-1)
+
+
 class NimbusClient:
     """Authenticated session to a NimbusImage server.
 
@@ -197,12 +213,17 @@ class NimbusClient:
         folders = self._gc.post(
             "resource/batch", json={"folder": dataset_ids}
         ).get("folder", {})
+        me = self._gc.get("user/me")
         # resource/batch returns raw documents, including the ACL (other
-        # users' ids and levels); keep what GET folder/{id} exposes.
+        # users' ids and levels); keep what GET folder/{id} exposes,
+        # including the caller's _accessLevel, computed from that ACL.
         return [
             {
                 **{k: v for k, v in folders[did].items()
                    if k in _FOLDER_READ_FIELDS},
+                "_accessLevel": folders[did].get(
+                    "_accessLevel", _access_level(folders[did], me)
+                ),
                 "_modelType": "folder",
             }
             for did in dataset_ids if did in folders
