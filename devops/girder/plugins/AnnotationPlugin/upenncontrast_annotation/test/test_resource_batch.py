@@ -161,11 +161,17 @@ class TestResourceBatch:
 
         assert result["folder"] == {}
 
-    def testNonListIdsAreRejected(self, user, server):
-        resp = postBatch(server, user, {"folder": "abc"})
+    @pytest.mark.parametrize("badValue", ["abc", 0, "", {}, False])
+    def testNonListIdsAreRejected(self, user, server, badValue):
+        resp = postBatch(server, user, {"folder": badValue})
 
         assertStatus(resp, 400)
         assert "folder must be a list" in resp.json["message"]
+
+    def testMissingNullAndEmptyKindsAreSkipped(self, user, server):
+        result = batch(server, user, {"folder": None, "item": []})
+
+        assert result == {}
 
     @pytest.mark.parametrize("badId", ["notanobjectid", 123])
     def testMalformedIdsAreRejected(self, user, server, badId):

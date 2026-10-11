@@ -109,10 +109,13 @@ class CustomResource(Resource):
 
         # Only allow known types
         allowed = ('folder', 'item', 'upenn_collection', 'user')
+        # A missing or null kind is not requested; any other value must be
+        # a list (validated before an empty list is skipped).
         idsByKind = {
             kind: requireList(body[kind], kind)
-            for kind in allowed if body.get(kind)
+            for kind in allowed if body.get(kind) is not None
         }
+        idsByKind = {kind: ids for kind, ids in idsByKind.items() if ids}
         validation.requireCountWithin(
             sum(len(ids) for ids in idsByKind.values()),
             validation.MAX_BATCH_RESOURCE_IDS, 'Resource ids')
