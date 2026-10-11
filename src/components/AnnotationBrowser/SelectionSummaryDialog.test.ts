@@ -104,6 +104,7 @@ const SUMMARY = {
     { tag: "A", count: 3 },
     { tag: "B", count: 1 },
   ],
+  shapes: [{ shape: "polygon", count: 4 }],
   properties: [
     {
       path: ["p", "Area"],

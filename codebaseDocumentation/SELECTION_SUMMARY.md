@@ -41,6 +41,7 @@ Response:
 {
   "total": 289469,
   "tags": [{"tag": "cell", "count": 289469}, {"tag": "Endothelial Cell", "count": 62098}],
+  "shapes": [{"shape": "polygon", "count": 289469}],
   "properties": [
     {"path": ["<propId>", "CD3E"], "count": 289469, "mean": 1.23, "std": 1.69, "min": 0, "max": 26}
   ]
@@ -49,7 +50,10 @@ Response:
 
 Semantics:
 
-- `tags` is sorted by count descending, then tag name.
+- `tags` is sorted by count descending, then tag name. `shapes` is sorted the same way and
+  shares the tag facet's scan; per-shape `GET /upenn_annotation/count` calls would each
+  re-read the whole dataset, since there is no `datasetId`+`shape` index (measured 0.25 to
+  0.9 s each on a 465K-annotation dataset, against 0.6 s for the whole summary).
 - A property `count` is the number of matching annotations holding a **numeric** value at
   the path. Strings, nested objects, missing values, and **NaN** are skipped (NaN would
   poison a mean); **Infinity is a number and is kept**. `mean/min/max` are null at count 0;
@@ -107,6 +111,8 @@ Each line names the test that holds it.
 
 **Backend (`test/test_summary.py`)**
 - Total and tag composition, sorted by count then name — *"testTotalAndTagComposition"*.
+- Shape composition, sorted the same way and narrowed by the same filters —
+  *"testShapeComposition"*.
 - Non-numeric and missing values are excluded from every statistic and from `count`; single
   values have null std — *"testPropertyStatsSkipNonNumericAndMissing"*.
 - Annotation-field filters narrow both the facet and the statistics —

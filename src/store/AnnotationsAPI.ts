@@ -246,6 +246,7 @@ export default class AnnotationsAPI {
       return {
         total: 0,
         tags: [],
+        shapes: [],
         properties: propertyPaths.map((path) => ({
           path,
           count: 0,

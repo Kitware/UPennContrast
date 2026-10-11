@@ -1103,7 +1103,8 @@ class Annotation(AccessControlMixin, ProxiedModel):
     def summarize(self, datasetId, filters, propertyPaths):
         """Aggregate statistics over the annotations matching `filters`.
 
-        Returns {total, tags: [{tag, count}] (count desc, then tag), and
+        Returns {total, tags: [{tag, count}] and shapes: [{shape, count}]
+        (each count desc, then name), and
         properties: [{path, count, mean, std, min, max}]} — one entry per
         requested path, in request order. `count` is the number of matching
         annotations holding a NUMERIC value at the path; non-numeric, NaN
@@ -1145,6 +1146,13 @@ class Annotation(AccessControlMixin, ProxiedModel):
                 {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
                 {"$sort": {"count": -1, "_id": 1}},
             ],
+            # Rides the same scan as the tags: separate count-by-shape
+            # queries would each re-read every annotation in the dataset
+            # (there is no datasetId+shape index).
+            "shapes": [
+                {"$group": {"_id": "$shape", "count": {"$sum": 1}}},
+                {"$sort": {"count": -1, "_id": 1}},
+            ],
         }})
         facets = next(self._aggregate(self.collection, pipeline))
         total = facets["total"][0]["count"] if facets["total"] else 0
@@ -1153,6 +1161,10 @@ class Annotation(AccessControlMixin, ProxiedModel):
             "tags": [
                 {"tag": doc["_id"], "count": doc["count"]}
                 for doc in facets["tags"]
+            ],
+            "shapes": [
+                {"shape": doc["_id"], "count": doc["count"]}
+                for doc in facets["shapes"]
             ],
             "properties": self._propertyStats(
                 datasetId, selector, matchingIds, propertyPaths, total

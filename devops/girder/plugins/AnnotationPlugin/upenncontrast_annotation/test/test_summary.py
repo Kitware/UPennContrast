@@ -66,7 +66,34 @@ class TestAnnotationSummary:
             {"tag": "B", "count": 1},
             {"tag": "C", "count": 1},
         ]
+        assert resp.json["shapes"] == [{"shape": "polygon", "count": 4}]
         assert resp.json["properties"] == []
+
+    def testShapeComposition(self, admin, server):
+        folder = self._setup(admin)
+        for shape in ("point", "point", "line"):
+            ann = upenn_utilities.getSampleAnnotation(folder["_id"])
+            ann["shape"] = shape
+            ann["tags"] = ["A"]
+            Annotation().create(ann)
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]), "filters": {},
+        })
+        assertStatusOk(resp)
+        # Sorted by count descending, then shape name.
+        assert resp.json["shapes"] == [
+            {"shape": "polygon", "count": 4},
+            {"shape": "point", "count": 2},
+            {"shape": "line", "count": 1},
+        ]
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]),
+            "filters": {"tags": {"values": ["B", "C"], "exclusive": False}},
+        })
+        assertStatusOk(resp)
+        assert resp.json["shapes"] == [{"shape": "polygon", "count": 2}]
 
     def testPropertyStatsSkipNonNumericAndMissing(self, admin, server):
         folder = self._setup(admin)
@@ -248,6 +275,7 @@ class TestAnnotationSummary:
         assertStatusOk(resp)
         assert resp.json["total"] == 0
         assert resp.json["tags"] == []
+        assert resp.json["shapes"] == []
         assert statsByPath(resp.json)["p.Area"] == {
             "path": ["p", "Area"], "count": 0,
             "mean": None, "std": None, "min": None, "max": None,

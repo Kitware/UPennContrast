@@ -1810,6 +1810,7 @@ export interface IAnnotationSummaryPropertyStats {
 export interface IAnnotationSummary {
   total: number;
   tags: { tag: string; count: number }[];
+  shapes: { shape: AnnotationShape; count: number }[];
   properties: IAnnotationSummaryPropertyStats[];
 }
 
