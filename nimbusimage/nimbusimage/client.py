@@ -172,19 +172,33 @@ class NimbusClient:
             List of dataset folder dicts with _id, name, meta.
         """
         views = self._gc.get("dataset_view", parameters={"limit": 0})
-        seen: set[str] = set()
-        datasets: list[dict] = []
-        for v in views:
-            did = v.get("datasetId")
-            if did and did not in seen:
-                seen.add(did)
-                try:
-                    datasets.append(self._gc.get(f"folder/{did}"))
-                except girder_client.HttpError:
-                    # A view can be shared while its dataset folder is not;
-                    # skip those. Anything else propagates.
-                    pass
-        return datasets
+        dataset_ids = list(dict.fromkeys(
+            v["datasetId"] for v in views if v.get("datasetId")
+        ))
+        if not dataset_ids:
+            return []
+        # A view can be shared while its dataset folder is not; those are
+        # left out.
+        if not self._gc.token:
+            # Anonymous: resource/batch requires a user, so fetch each
+            # public folder (public datasets are few).
+            return self._readable_folders_one_by_one(dataset_ids)
+        # One access-checked lookup for every folder, not a GET per
+        # dataset; the server omits folders the caller cannot read.
+        folders = self._gc.post(
+            "resource/batch", json={"folder": dataset_ids}
+        ).get("folder", {})
+        return [folders[did] for did in dataset_ids if did in folders]
+
+    def _readable_folders_one_by_one(self, folder_ids: list[str]) -> list:
+        folders = []
+        for folder_id in folder_ids:
+            try:
+                folders.append(self._gc.get(f"folder/{folder_id}"))
+            except girder_client.HttpError:
+                # Not readable; anything else propagates.
+                pass
+        return folders
 
     # --- Jobs ---
 

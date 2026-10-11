@@ -193,40 +193,63 @@ class TestNimbusClientCreateDataset:
             client.create_dataset("My Experiment")
 
 
+def _bare_client(mock_gc):
+    client = NimbusClient.__new__(NimbusClient)
+    client._gc = mock_gc
+    client._api_url = "http://localhost:8080/api/v1"
+    client._frontend_url = "http://localhost:5173"
+    return client
+
+
 class TestNimbusClientListDatasets:
-    def test_list_datasets(self, mock_gc):
-        # list_datasets now uses dataset_view to discover datasets
-        mock_gc.get.side_effect = [
-            # GET /dataset_view
-            [
-                {"_id": "v1", "datasetId": "f1", "configurationId": "c1"},
-                {"_id": "v2", "datasetId": "f2", "configurationId": "c2"},
-            ],
-            # GET folder/f1
-            {
-                "_id": "f1", "name": "Dataset A",
-                "meta": {"subtype": "contrastDataset"},
-            },
-            # GET folder/f2
-            {
-                "_id": "f2", "name": "Dataset B",
-                "meta": {"subtype": "contrastDataset"},
-            },
+    def test_list_datasets_batches_the_folder_lookup(self, mock_gc):
+        """One resource/batch call for every dataset, not a GET per folder;
+        view order is kept and repeated datasets appear once."""
+        mock_gc.get.return_value = [
+            {"_id": "v1", "datasetId": "f2", "configurationId": "c1"},
+            {"_id": "v2", "datasetId": "f1", "configurationId": "c2"},
+            {"_id": "v3", "datasetId": "f2", "configurationId": "c3"},
         ]
-        client = NimbusClient.__new__(NimbusClient)
-        client._gc = mock_gc
-        client._api_url = "http://localhost:8080/api/v1"
-        client._frontend_url = "http://localhost:5173"
+        mock_gc.post.return_value = {"folder": {
+            "f1": {"_id": "f1", "name": "Dataset A"},
+            "f2": {"_id": "f2", "name": "Dataset B"},
+        }}
 
-        datasets = client.list_datasets()
-        assert len(datasets) == 2
-        assert datasets[0]["name"] == "Dataset A"
+        datasets = _bare_client(mock_gc).list_datasets()
 
-    def test_list_datasets_skips_only_http_errors(self, mock_gc):
-        """A view whose folder 403s (shared view, private folder) is skipped;
-        anything else must propagate, not be silently swallowed."""
+        assert [d["name"] for d in datasets] == ["Dataset B", "Dataset A"]
+        mock_gc.get.assert_called_once_with(
+            "dataset_view", parameters={"limit": 0}
+        )
+        mock_gc.post.assert_called_once_with(
+            "resource/batch", json={"folder": ["f2", "f1"]}
+        )
+
+    def test_list_datasets_skips_unreadable_folders(self, mock_gc):
+        """A view can be shared while its folder is not; resource/batch
+        omits that folder and so does the result."""
+        mock_gc.get.return_value = [
+            {"_id": "v1", "datasetId": "f1"},
+            {"_id": "v2", "datasetId": "f2"},
+        ]
+        mock_gc.post.return_value = {"folder": {
+            "f2": {"_id": "f2", "name": "Dataset B"},
+        }}
+
+        datasets = _bare_client(mock_gc).list_datasets()
+        assert [d["name"] for d in datasets] == ["Dataset B"]
+
+    def test_list_datasets_without_views_makes_no_lookup(self, mock_gc):
+        mock_gc.get.return_value = []
+        assert _bare_client(mock_gc).list_datasets() == []
+        mock_gc.post.assert_not_called()
+
+    def test_anonymous_list_datasets_fetches_public_folders(self, mock_gc):
+        """resource/batch requires a user, so an anonymous client fetches
+        each folder and skips only the ones it cannot read."""
         import girder_client
 
+        mock_gc.token = ""
         mock_gc.get.side_effect = [
             [
                 {"_id": "v1", "datasetId": "f1"},
@@ -235,26 +258,21 @@ class TestNimbusClientListDatasets:
             girder_client.HttpError(403, "denied", "url", "GET"),
             {"_id": "f2", "name": "Dataset B", "meta": {}},
         ]
-        client = NimbusClient.__new__(NimbusClient)
-        client._gc = mock_gc
-        client._api_url = "http://localhost:8080/api/v1"
-        client._frontend_url = "http://localhost:5173"
 
-        datasets = client.list_datasets()
+        datasets = _bare_client(mock_gc).list_datasets()
         assert [d["name"] for d in datasets] == ["Dataset B"]
+        mock_gc.post.assert_not_called()
 
-    def test_list_datasets_propagates_unexpected_errors(self, mock_gc):
+    def test_anonymous_list_datasets_propagates_unexpected_errors(
+        self, mock_gc,
+    ):
+        mock_gc.token = ""
         mock_gc.get.side_effect = [
             [{"_id": "v1", "datasetId": "f1"}],
             RuntimeError("boom"),
         ]
-        client = NimbusClient.__new__(NimbusClient)
-        client._gc = mock_gc
-        client._api_url = "http://localhost:8080/api/v1"
-        client._frontend_url = "http://localhost:5173"
-
         with pytest.raises(RuntimeError, match="boom"):
-            client.list_datasets()
+            _bare_client(mock_gc).list_datasets()
 
 
 class TestJobLookup:

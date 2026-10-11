@@ -31,6 +31,11 @@ if TYPE_CHECKING:
     import girder_client
 
 
+# exampleConfigurationBase().scales.pixelSize in src/store/model.ts: the
+# app's default when a configuration has no scales.
+_PLACEHOLDER_PIXEL_SIZE = {"value": 1, "unit": "m"}
+
+
 class Dataset:
     """Access point for a single NimbusImage dataset.
 
@@ -132,12 +137,30 @@ class Dataset:
         return self._tiles.get("channels", [])
 
     @property
-    def pixel_size(self) -> PixelSize:
+    def pixel_size(self) -> PixelSize | None:
+        """Physical size of one pixel, or None when it is unknown.
+
+        Read the way the app reads it: the caller's view scales over the
+        dataset's configuration scales (``collections.scales``), which the
+        app seeds from the file's calibration and the user can edit. Without
+        a configuration, the file's own ``mm_x``. What the app stores for
+        "no calibration" counts as unknown: 0 (``getDatasetScales`` on a
+        file without ``mm_x``) or its 1 m placeholder.
+        """
+        configured = self.collections.scales.get("pixelSize")
+        if (
+            configured
+            and configured.get("value", 0) > 0
+            and configured != _PLACEHOLDER_PIXEL_SIZE
+        ):
+            return PixelSize(
+                value=configured["value"], unit=configured["unit"]
+            )
         self._ensure_metadata()
         mm_x = self._tiles.get("mm_x")
         if mm_x is not None:
             return PixelSize(value=mm_x, unit="mm")
-        return PixelSize(value=1.0, unit="um")
+        return None
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -383,18 +406,14 @@ class Dataset:
     # --- URLs ---
 
     def _get_view_id(self) -> str | None:
-        """Get the first dataset view ID for this dataset."""
-        views = self.collections.list_views()
-        if views:
-            return views[0].get("_id")
-        return None
+        """The default view's ID (the caller's own view, if any)."""
+        view = self.collections.default_view()
+        return view.get("_id") if view else None
 
     def _get_config_id(self) -> str | None:
-        """Get the first configuration ID for this dataset."""
-        views = self.collections.list_views()
-        if views:
-            return views[0].get("configurationId")
-        return None
+        """The default view's configuration ID."""
+        view = self.collections.default_view()
+        return view.get("configurationId") if view else None
 
     def info_url(self) -> str:
         """URL for the dataset info page."""

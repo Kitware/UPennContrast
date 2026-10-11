@@ -35,17 +35,74 @@ class TestDatasetMetadata:
         assert ds.shape == (768, 1024)
         assert ds.dtype == "uint16"
 
-    def test_pixel_size(self, mock_gc, sample_tiles_metadata):
-        mock_gc.get.side_effect = [
-            {"_id": "folder_123", "name": "Test", "meta": {}},
-            [{"_id": "item_456", "largeImage": {"fileId": "f1"}}],
-            sample_tiles_metadata,
-        ]
-        ds = Dataset(mock_gc, "folder_123")
-        ps = ds.pixel_size
+    def test_pixel_size_falls_back_to_file_calibration(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """No view or configuration: the file's own mm_x."""
+        mock_gc.get.side_effect = _fake_server(sample_tiles_metadata)
+        ps = Dataset(mock_gc, "folder_123").pixel_size
         assert isinstance(ps, PixelSize)
         assert ps.unit == "mm"
         assert ps.value == pytest.approx(0.000219)
+
+    def test_pixel_size_prefers_configuration_scales(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """Xenium-style: the calibration lives only in the configuration,
+        which wins over the file, as in the app."""
+        mock_gc.get.side_effect = _fake_server(
+            {**sample_tiles_metadata, "mm_x": None},
+            own_views=[{"_id": "v1", "configurationId": "c1"}],
+            configuration_scales={
+                "pixelSize": {"value": 0.2125, "unit": "µm"},
+            },
+        )
+        ps = Dataset(mock_gc, "folder_123").pixel_size
+        assert (ps.value, ps.unit) == (0.2125, "um")
+
+    def test_pixel_size_view_scales_override_configuration(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        mock_gc.get.side_effect = _fake_server(
+            sample_tiles_metadata,
+            own_views=[{
+                "_id": "v1", "configurationId": "c1",
+                "scales": {"pixelSize": {"value": 0.5, "unit": "µm"}},
+            }],
+            configuration_scales={
+                "pixelSize": {"value": 0.2125, "unit": "µm"},
+            },
+        )
+        assert Dataset(mock_gc, "folder_123").pixel_size.value == 0.5
+
+    def test_pixel_size_is_none_when_unknown(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """Not a made-up 1 µm: the app's 1 m placeholder and a missing
+        mm_x both mean the size is unknown."""
+        mock_gc.get.side_effect = _fake_server(
+            {**sample_tiles_metadata, "mm_x": None},
+            own_views=[{"_id": "v1", "configurationId": "c1"}],
+            configuration_scales={"pixelSize": {"value": 1, "unit": "m"}},
+        )
+        assert Dataset(mock_gc, "folder_123").pixel_size is None
+
+    @pytest.mark.parametrize("stored", [
+        {"value": 0, "unit": "mm"},  # getDatasetScales without mm_x
+        {"value": 1, "unit": "m"},   # exampleConfigurationBase default
+    ])
+    def test_uncalibrated_configuration_falls_back_to_the_file(
+        self, mock_gc, sample_tiles_metadata, stored,
+    ):
+        """What the app stores for "no calibration" is not a size; the
+        file's own mm_x is used instead (live: 52 configurations hold 0)."""
+        mock_gc.get.side_effect = _fake_server(
+            sample_tiles_metadata,
+            own_views=[{"_id": "v1", "configurationId": "c1"}],
+            configuration_scales={"pixelSize": stored},
+        )
+        ps = Dataset(mock_gc, "folder_123").pixel_size
+        assert (ps.value, ps.unit) == (pytest.approx(0.000219), "mm")
 
     def test_frames(self, mock_gc, sample_tiles_metadata):
         mock_gc.get.side_effect = [
@@ -397,3 +454,28 @@ class TestDatasetUpload:
         with pytest.raises(RuntimeError):
             ds.upload(tmp_path)
         assert ds._tiles is None
+
+
+def _fake_server(
+    tiles, own_views=(), other_views=(), configuration_scales=None,
+):
+    """A mock_gc.get side effect that answers by path, for tests that read
+    both the image metadata and the caller's view/configuration."""
+    def get(path, parameters=None, **kwargs):
+        if path == "dataset_view":
+            if (parameters or {}).get("currentUserOnly") == "true":
+                return list(own_views)
+            return list(own_views) + list(other_views)
+        if path.startswith("upenn_collection/"):
+            return {
+                "_id": path.split("/", 1)[1],
+                "meta": {"scales": configuration_scales or {}},
+            }
+        if path.startswith("folder/"):
+            return {"_id": "folder_123", "name": "Test", "meta": {}}
+        if path == "item":
+            return [{"_id": "item_456", "largeImage": {"fileId": "f1"}}]
+        if path.endswith("/tiles"):
+            return tiles
+        raise AssertionError(f"unexpected GET {path}")
+    return get

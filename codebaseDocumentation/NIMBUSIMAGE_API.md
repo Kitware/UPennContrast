@@ -23,7 +23,7 @@ A unified Python API package for programmatic access to NimbusImage. Replaces th
 - The `Collection` class represents a collection/configuration
 - `client.list_collections()` and `client.collection(id)` access them at the top level
 - `ds.collections.get()` and `ds.collections.list()` access them via a dataset
-- `ds.collections.layers` is a shortcut to the first collection's layer settings (used by `get_composite`)
+- `ds.collections.layers` is a shortcut to the default collection's layer settings (used by `get_composite`): the configuration of the caller's own view, else of any view they can read. `ds.collections.layer_contrasts` and `ds.collections.scales` give that view's contrast overrides and its scales over the configuration's, as the app uses them
 - Datasets and collections have a **many-to-many relationship** — one dataset can have multiple collections, and one collection can be shared across datasets. They are linked by `dataset_view` documents.
 
 ## Package Structure
@@ -137,7 +137,7 @@ ds = client.dataset(dataset_id)
 - `.id`, `.name` — str
 - `.num_channels`, `.num_z`, `.num_time`, `.num_xy` — int
 - `.channels` — list[str]
-- `.pixel_size` — PixelSize
+- `.pixel_size` — PixelSize | None (the app's scales: view over configuration, then the file's `mm_x`; None when unknown)
 - `.shape` — tuple[int, int] (height, width)
 - `.dtype` — str
 - `.mm_x`, `.mm_y`, `.magnification` — float | None
@@ -162,7 +162,9 @@ ds.images.get(xy=0, z=0, time=0, channel=0,
 ds.images.get_all_channels(xy=0, z=0, time=0)                   # → list[np.ndarray]
 ds.images.get_stack(xy=0, time=0, channel=0, axis='z')          # → np.ndarray (Z, H, W)
 ds.images.get_stack(xy=0, z=0, channel=0, axis='time')          # → np.ndarray (T, H, W)
+ds.images.get(xy=0, z=0, time=0, channel=0, max_size=1024)     # → downsampled on the server
 ds.images.get_composite(xy=0, z=0, time=0, mode='lighten')      # → np.ndarray (H, W, 3)
+ds.images.get_composite(max_size=1024, crop=(l, t, r, b))       # → downsampled / cropped
 ds.images.iter_frames()                                          # → Iterator[(FrameInfo, np.ndarray)]
 ds.images.new_writer(copy_metadata=True)                         # → ImageWriter (requires [worker])
 ```
@@ -172,6 +174,7 @@ ds.images.new_writer(copy_metadata=True)                         # → ImageWrit
 - `dtype='float64'` → [0, 1] range
 - `dtype='uint8'` → [0, 255] range
 - Contrast normalization and pseudocolor math happens in float64 internally, converts at the end
+- Drawn as the app draws it (`toStyle` in `src/store/images.ts`): percentile contrast is a percent of the frame histogram's min..max, the caller's per-view contrast overrides win, and layer slice settings (`constant`, `offset`, `max-merge`) are honored
 
 **Frame index resolution:** Builds `map[channel][time][z][xy] → frame_index` lazily from tiles metadata.
 

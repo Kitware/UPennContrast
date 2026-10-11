@@ -193,6 +193,23 @@ class TestAnnotationCount:
         assert result == 42
 
 
+class TestTagQueryEncoding:
+    """Tags are free text: "+" must not decode to a space and "&" must not
+    split the query string."""
+
+    @pytest.mark.parametrize("call", ["count", "list"])
+    def test_special_characters_survive(self, mock_gc, call):
+        from urllib.parse import parse_qs, urlsplit
+
+        mock_gc.get.return_value = {"count": 0} if call == "count" else []
+        accessor = AnnotationAccessor(mock_gc, "ds_001")
+
+        getattr(accessor, call)(tags=["CD8+", "a&b", "with space"])
+        query = parse_qs(urlsplit(mock_gc.get.call_args[0][0]).query)
+        assert query["tags"] == ['["CD8+", "a&b", "with space"]']
+        assert query["datasetId"] == ["ds_001"]
+
+
 class TestAnnotationCreate:
     def test_create_single(self, mock_gc, sample_annotation_dict):
         mock_gc.post.return_value = sample_annotation_dict

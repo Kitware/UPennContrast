@@ -4,6 +4,7 @@ import pickle
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 from nimbusimage.images import ImageAccessor, _parse_color
 from nimbusimage.models import FrameInfo
 
@@ -82,111 +83,251 @@ class TestImageGet:
         assert result.shape == (2, 768, 1024)
 
 
+def _composite_dataset(mock_gc, tiles, layers, images, overrides=None):
+    """A dataset whose fake server returns `images[frame]` for tiles/region
+    and that image's min/max for tiles/histogram. Returns the dataset and
+    the list of region requests' parameters."""
+    from nimbusimage.collections import CollectionAccessor
+
+    ds = _make_dataset(mock_gc, tiles)
+    ds.collections = CollectionAccessor(mock_gc, "folder_001")
+    ds.collections._cache = {"meta": {"layers": layers}}
+    ds.collections._view = {"layerContrasts": overrides or {}}
+    regions = []
+
+    def get(path, parameters=None, jsonResp=True):
+        if path.endswith("/tiles/region"):
+            regions.append(parameters)
+            response = MagicMock()
+            response.content = pickle.dumps(images[parameters["frame"]])
+            return response
+        if path.endswith("/tiles/histogram"):
+            img = images[parameters["frame"]]
+            return [{"min": float(img.min()), "max": float(img.max())}]
+        raise AssertionError(f"unexpected GET {path}")
+
+    mock_gc.get.side_effect = get
+    return ds, regions
+
+
+def _layer(channel=0, color="#FF0000", contrast=None, **extra):
+    return {
+        "id": f"layer_{channel}",
+        "channel": channel,
+        "color": color,
+        "visible": True,
+        "contrast": contrast or {
+            "mode": "percentile", "blackPoint": 0, "whitePoint": 100,
+        },
+        **extra,
+    }
+
+
+def _skewed():
+    """Mostly 100, with one 0 and one 1000: a quantile reading of the
+    contrast points and the app's linear reading disagree sharply."""
+    img = np.full((4, 4), 100, dtype=np.uint16)
+    img[0, 0] = 0
+    img[3, 3] = 1000
+    return img
+
+
 class TestGetComposite:
-    def test_composite_with_percentile_contrast(
+    def test_percentile_is_a_percent_of_the_histogram_range(
         self, mock_gc, sample_tiles_metadata,
     ):
-        """Test get_composite with percentile contrast."""
-        from nimbusimage.collections import CollectionAccessor
-
-        # Gradient image for percentile contrast
-        img = np.linspace(
-            0, 1000, 768 * 1024, dtype=np.uint16,
-        ).reshape(768, 1024)
-        mock_response = MagicMock()
-        mock_response.content = pickle.dumps(img)
-        mock_gc.get.return_value = mock_response
-
-        ds = _make_dataset(mock_gc, sample_tiles_metadata)
-
-        # Mock config with real layer format (hex color, percentile contrast)
-        ds.collections = CollectionAccessor.__new__(CollectionAccessor)
-        ds.collections._gc = mock_gc
-        ds.collections._dataset_id = "folder_001"
-        ds.collections._cache = {
-            "meta": {
-                "layers": [
-                    {
-                        "channel": 0,
-                        "color": "#FF0000",
-                        "visible": True,
-                        "contrast": {
-                            "blackPoint": 1,
-                            "whitePoint": 99,
-                            "mode": "percentile",
-                        },
-                    },
-                    {
-                        "channel": 1,
-                        "color": "#00FF00",
-                        "visible": True,
-                        "contrast": {
-                            "blackPoint": 0,
-                            "whitePoint": 100,
-                            "mode": "percentile",
-                        },
-                    },
-                ],
-                "propertyIds": [],
-            }
-        }
-
-        result = ds.images.get_composite(
-            xy=0, z=0, time=0, dtype="uint8",
+        """whitePoint=50 means halfway between the histogram's min and max
+        (0..1000 -> 500), as in the app; not the 50th-percentile value
+        (100), which would saturate every ordinary pixel."""
+        ds, _ = _composite_dataset(
+            mock_gc, sample_tiles_metadata,
+            [_layer(contrast={
+                "mode": "percentile", "blackPoint": 0, "whitePoint": 50,
+            })],
+            {0: _skewed()},
         )
-        assert result.shape == (768, 1024, 3)
-        assert result.dtype == np.uint8
-        # Should have red and green channels with non-zero values
-        assert result[:, :, 0].max() > 0  # red from channel 0
-        assert result[:, :, 1].max() > 0  # green from channel 1
+        result = ds.images.get_composite(dtype="float64")
+        assert result[1, 1, 0] == pytest.approx(100 / 500)
+        assert result[3, 3, 0] == 1.0
 
-    def test_composite_hidden_layer_excluded(
+    def test_view_contrast_override_wins(
         self, mock_gc, sample_tiles_metadata,
     ):
-        img = np.ones((768, 1024), dtype=np.uint16) * 500
-        mock_response = MagicMock()
-        mock_response.content = pickle.dumps(img)
-        mock_gc.get.return_value = mock_response
-
-        ds = _make_dataset(mock_gc, sample_tiles_metadata)
-
-        from nimbusimage.collections import CollectionAccessor
-        ds.collections = CollectionAccessor.__new__(CollectionAccessor)
-        ds.collections._gc = mock_gc
-        ds.collections._dataset_id = "folder_001"
-        ds.collections._cache = {
-            "meta": {
-                "layers": [
-                    {
-                        "channel": 0, "color": "#FF0000", "visible": True,
-                        "contrast": {
-                            "blackPoint": 0,
-                            "whitePoint": 100,
-                            "mode": "percentile",
-                        },
-                    },
-                    {
-                        "channel": 1,
-                        "color": "#00FF00",
-                        "visible": False,
-                        "contrast": {
-                            "blackPoint": 0,
-                            "whitePoint": 100,
-                            "mode": "percentile",
-                        },
-                    },
-                ],
-                "propertyIds": [],
-            }
-        }
-
-        result = ds.images.get_composite(
-            xy=0, z=0, time=0, dtype="float64",
+        ds, _ = _composite_dataset(
+            mock_gc, sample_tiles_metadata,
+            [_layer()],
+            {0: _skewed()},
+            overrides={"layer_0": {
+                "mode": "percentile", "blackPoint": 0, "whitePoint": 50,
+            }},
         )
-        # Green channel should be zero (layer hidden)
+        result = ds.images.get_composite(dtype="float64")
+        assert result[1, 1, 0] == pytest.approx(100 / 500)
+
+    def test_absolute_contrast_uses_raw_values(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """Including a white point at or below 1 on float data, which the
+        old code replaced with the image maximum."""
+        img = np.full((4, 4), 0.25, dtype=np.float32)
+        ds, _ = _composite_dataset(
+            mock_gc, sample_tiles_metadata,
+            [_layer(contrast={
+                "mode": "absolute", "blackPoint": 0, "whitePoint": 0.5,
+            })],
+            {0: img},
+        )
+        result = ds.images.get_composite(dtype="float64")
+        assert result[0, 0, 0] == pytest.approx(0.5)
+
+    def test_hidden_layer_excluded(self, mock_gc, sample_tiles_metadata):
+        img = np.arange(16, dtype=np.uint16).reshape(4, 4)
+        ds, regions = _composite_dataset(
+            mock_gc, sample_tiles_metadata,
+            [_layer(0), _layer(1, color="#00FF00", visible=False)],
+            {0: img, 1: img},
+        )
+        result = ds.images.get_composite(dtype="float64")
         assert result[:, :, 1].max() == 0.0
-        # Red should be non-zero
         assert result[:, :, 0].max() > 0.0
+        assert [r["frame"] for r in regions] == [0]
+
+    def test_offset_layer_reads_the_offset_slice(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        img = np.arange(16, dtype=np.uint16).reshape(4, 4)
+        ds, regions = _composite_dataset(
+            mock_gc, sample_tiles_metadata,
+            [_layer(0, z={"type": "offset", "value": 1})],
+            {2: img},  # channel 0 at z=1
+        )
+        ds.images.get_composite(z=0)
+        assert [r["frame"] for r in regions] == [2]
+
+    def test_constant_layer_ignores_the_current_slice(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        img = np.arange(16, dtype=np.uint16).reshape(4, 4)
+        ds, regions = _composite_dataset(
+            mock_gc, sample_tiles_metadata,
+            [_layer(0, z={"type": "constant", "value": 0})],
+            {0: img},
+        )
+        ds.images.get_composite(z=1)
+        assert [r["frame"] for r in regions] == [0]
+
+    def test_layer_offset_out_of_range_is_not_drawn(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        ds, regions = _composite_dataset(
+            mock_gc, sample_tiles_metadata,
+            [_layer(0, z={"type": "offset", "value": 1})],
+            {},
+        )
+        result = ds.images.get_composite(z=1, dtype="float64")
+        assert regions == []
+        assert result.shape == (768, 1024, 3)
+        assert result.max() == 0.0
+
+    def test_max_merge_is_a_projection_with_merged_histogram(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        low = np.zeros((2, 2), dtype=np.uint16)
+        low[0, 0] = 400
+        high = np.zeros((2, 2), dtype=np.uint16)
+        high[1, 1] = 800
+        ds, regions = _composite_dataset(
+            mock_gc, sample_tiles_metadata,
+            [_layer(0, z={"type": "max-merge", "value": None})],
+            {0: low, 2: high},
+        )
+        result = ds.images.get_composite(dtype="float64")
+        assert sorted(r["frame"] for r in regions) == [0, 2]
+        # Range is the merged 0..800, so 400 is half and 800 is full.
+        assert result[0, 0, 0] == pytest.approx(0.5)
+        assert result[1, 1, 0] == 1.0
+
+    def test_max_size_and_crop_reach_the_region_request(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        img = np.arange(16, dtype=np.uint16).reshape(4, 4)
+        ds, regions = _composite_dataset(
+            mock_gc, sample_tiles_metadata, [_layer(0)], {0: img},
+        )
+        ds.images.get_composite(max_size=64, crop=(10, 20, 110, 220))
+        assert regions[0] == {
+            "frame": 0, "encoding": "pickle:5",
+            "left": 10, "top": 20, "right": 110, "bottom": 220,
+            "width": 64, "height": 64,
+        }
+
+    def test_max_size_above_the_region_does_not_upsample(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """large_image scales to fit width x height, upsampling too, so a
+        cap at or above the region size must not be sent (live: a 2048^2
+        frame came back 4096^2)."""
+        img = np.arange(16, dtype=np.uint16).reshape(4, 4)
+        ds, regions = _composite_dataset(
+            mock_gc, sample_tiles_metadata, [_layer(0)], {0: img},
+        )
+        ds.images.get_composite(max_size=256, crop=(10, 20, 110, 220))
+        ds.images.get_composite(max_size=1024)  # the full 1024x768 image
+        for region in regions:
+            assert "width" not in region and "height" not in region
+
+    def test_empty_composite_has_the_downsampled_shape(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        ds, _ = _composite_dataset(mock_gc, sample_tiles_metadata, [], {})
+        result = ds.images.get_composite(max_size=256)
+        assert result.shape == (192, 256, 3)  # 1024x768 scaled to fit
+
+
+class TestSliceIndexes:
+    """Mirrors resolveSlice / getLayerSliceIndexes in src/store/images.ts."""
+
+    def test_current_constant_offset_max_merge(self):
+        from nimbusimage.images import _slice_indexes
+
+        assert _slice_indexes({"type": "current"}, 3, 11) == [3]
+        assert _slice_indexes(None, 3, 11) == [3]
+        assert _slice_indexes({"type": "constant", "value": 7}, 3, 11) == [7]
+        assert _slice_indexes(
+            {"type": "constant", "value": None}, 3, 11
+        ) == [0]
+        assert _slice_indexes({"type": "offset", "value": -1}, 3, 11) == [2]
+        assert _slice_indexes({"type": "max-merge"}, 3, 4) == [0, 1, 2, 3]
+
+    def test_out_of_range_is_none_and_single_entry_axis_is_zero(self):
+        from nimbusimage.images import _slice_indexes
+
+        assert _slice_indexes({"type": "offset", "value": 1}, 10, 11) is None
+        assert _slice_indexes({"type": "offset", "value": 5}, 0, 1) == [0]
+
+
+class TestGetMaxSize:
+    def test_get_passes_max_size_as_width_and_height(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        img = np.arange(16, dtype=np.uint16).reshape(4, 4)
+        response = MagicMock()
+        response.content = pickle.dumps(img)
+        mock_gc.get.return_value = response
+        ds = _make_dataset(mock_gc, sample_tiles_metadata)
+
+        ds.images.get(channel=1, max_size=512)
+        params = mock_gc.get.call_args.kwargs["parameters"]
+        assert (params["frame"], params["width"], params["height"]) == (
+            1, 512, 512,
+        )
+
+    def test_rejects_non_positive_max_size(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        ds = _make_dataset(mock_gc, sample_tiles_metadata)
+        with pytest.raises(ValueError, match="max_size"):
+            ds.images.get(max_size=0)
 
 
 class TestIterFrames:

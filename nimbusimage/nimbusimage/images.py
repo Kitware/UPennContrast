@@ -81,6 +81,7 @@ class ImageAccessor:
         time: int = 0,
         channel: int = 0,
         crop: tuple[float, float, float, float] | None = None,
+        max_size: int | None = None,
     ) -> np.ndarray:
         """Get a single image frame as a 2D numpy array.
 
@@ -89,20 +90,18 @@ class ImageAccessor:
         Args:
             xy, z, time, channel: Coordinates.
             crop: Optional (left, top, right, bottom) crop region.
+            max_size: Optional longest side of the result, in pixels.
+                The server downsamples (from the image pyramid), so a
+                large slide is never transferred at full resolution.
+                Never upsamples.
 
         Returns:
             2D numpy array.
         """
         frame = self._frame_index(channel, time, z, xy)
-        kwargs = {}
-        if crop is not None:
-            left, top, right, bottom = crop
-            kwargs.update({
-                "left": left, "top": top,
-                "right": right, "bottom": bottom,
-            })
-        img = self._get_region(frame, **kwargs)
-        return img.squeeze()
+        return self._get_region(
+            frame, **self._region_params(crop, max_size)
+        ).squeeze()
 
     def get_all_channels(
         self, xy: int = 0, z: int = 0, time: int = 0
@@ -155,62 +154,86 @@ class ImageAccessor:
         time: int = 0,
         mode: str = "lighten",
         dtype: str | None = None,
+        max_size: int | None = None,
+        crop: tuple[float, float, float, float] | None = None,
     ) -> np.ndarray:
-        """Get a composite RGB image merging visible channels.
+        """Get an RGB composite of the visible layers, as the app draws it.
 
-        Uses layer settings from ds.collections.layers for contrast and color.
+        Follows the caller's layer settings (``ds.collections``): color,
+        visibility, contrast with their per-view overrides, and each
+        layer's XY/Z/time slice setting (``current``, ``constant``,
+        ``offset``, or ``max-merge``, a maximum projection along the
+        axis). A layer whose slice falls outside the dataset, or whose
+        channel has no frame here, is left out, as in the app.
+
+        Contrast follows the app (``toStyle`` in src/store/images.ts):
+        ``absolute`` black/white points are raw intensities; ``percentile``
+        points are percents of the frame histogram's min..max range (the
+        same histogram request the app makes), not quantiles.
 
         Args:
-            mode: Blend mode ('lighten' default).
+            mode: 'lighten' (default, per-channel maximum, as in the app)
+                or 'add'.
             dtype: Output dtype. None = match source. 'float64' = [0,1].
                 'uint8' = [0,255].
+            max_size: Optional longest side of the result, in pixels; the
+                server downsamples. See get().
+            crop: Optional (left, top, right, bottom) region, in full
+                resolution pixels.
 
         Returns:
             (H, W, 3) numpy array.
         """
         self._dataset._ensure_metadata()
+        self._ensure_frame_map()
         source_dtype = self._dataset.dtype
         target_dtype = dtype or source_dtype
+        collections = self._dataset.collections
+        overrides = collections.layer_contrasts
+        sizes = {
+            "xy": self._dataset.num_xy,
+            "z": self._dataset.num_z,
+            "time": self._dataset.num_time,
+        }
+        current = {"xy": xy, "z": z, "time": time}
+        region = self._region_params(crop, max_size)
 
-        layers = self._dataset.collections.layers
-        h, w = self._dataset.shape
-        composite = np.zeros((h, w, 3), dtype=np.float64)
-
-        for layer in layers:
-            ch = layer.get("channel", 0)
+        composite = None
+        for layer in collections.layers:
             if not layer.get("visible", True):
                 continue
+            frames = self._layer_frames(layer, current, sizes)
+            if not frames:
+                continue
+            # A max-merge layer is the per-pixel maximum of its frames.
+            img = np.max(
+                [self._get_region(f, **region).squeeze() for f in frames],
+                axis=0,
+            ).astype(np.float64)
 
-            img = self.get(xy=xy, z=z, time=time, channel=ch).astype(
-                np.float64
+            contrast = (
+                overrides.get(layer.get("id")) or layer.get("contrast", {})
             )
-
-            # Apply contrast — percentile-based blackPoint/whitePoint
-            contrast = layer.get("contrast", {})
-            bp = contrast.get("blackPoint", 0)
-            wp = contrast.get("whitePoint", 100)
-            if contrast.get("mode") == "percentile":
-                cmin = float(np.percentile(img, bp))
-                cmax = float(np.percentile(img, wp))
-            else:
-                # Absolute values or fallback
-                cmin = float(bp)
-                cmax = float(wp) if wp > 1 else float(img.max() or 1)
+            cmin, cmax = self._contrast_range(contrast, frames)
             if cmax > cmin:
                 img = (img - cmin) / (cmax - cmin)
             img = np.clip(img, 0.0, 1.0)
 
-            # Apply pseudocolor
-            color = layer.get("color", "white")
-            r, g, b = _parse_color(color)
-
+            r, g, b = _parse_color(layer.get("color", "white"))
             channel_rgb = np.stack([img * r, img * g, img * b], axis=-1)
 
-            if mode == "lighten":
+            if composite is None:
+                composite = channel_rgb
+            elif mode == "lighten":
                 composite = np.maximum(composite, channel_rgb)
             else:
                 composite += channel_rgb
 
+        if composite is None:
+            # Nothing drawn: a black image of the size a fetch would have.
+            composite = np.zeros(
+                (*self._output_shape(crop, max_size), 3), dtype=np.float64
+            )
         composite = np.clip(composite, 0.0, 1.0)
 
         # Convert to target dtype
@@ -226,6 +249,83 @@ class ImageAccessor:
                 return composite.astype(dt)
             max_val = np.iinfo(dt).max
             return (composite * max_val).astype(dt)
+
+    def _layer_frames(
+        self, layer: dict, current: dict, sizes: dict
+    ) -> list[int]:
+        """Frame indexes a layer draws at `current`; [] when it draws
+        nothing there (mirrors getLayerSliceIndexes in the frontend)."""
+        indexes = {}
+        for axis, size in sizes.items():
+            resolved = _slice_indexes(layer.get(axis), current[axis], size)
+            if resolved is None:
+                return []
+            indexes[axis] = resolved
+        by_time = self._frame_map.get(layer.get("channel", 0), {})
+        return [
+            by_time[t][zi][xyi]
+            for t in indexes["time"]
+            for zi in indexes["z"]
+            for xyi in indexes["xy"]
+            if xyi in by_time.get(t, {}).get(zi, {})
+        ]
+
+    def _contrast_range(
+        self, contrast: dict, frames: list[int]
+    ) -> tuple[float, float]:
+        black = contrast.get("blackPoint", 0)
+        white = contrast.get("whitePoint", 100)
+        if contrast.get("mode") == "absolute":
+            return float(black), float(white)
+        # Percentile mode: a linear percent of the histogram's range,
+        # merged over the layer's frames like the app's mergeHistograms.
+        histograms = [
+            self._dataset._gc.get(
+                f"item/{self._dataset._item_id}/tiles/histogram",
+                parameters={**_HISTOGRAM_PARAMS, "frame": frame},
+            )[0]
+            for frame in frames
+        ]
+        lo = min(h["min"] for h in histograms)
+        hi = max(h["max"] for h in histograms)
+        return lo + black / 100 * (hi - lo), lo + white / 100 * (hi - lo)
+
+    def _region_size(self, crop) -> tuple[float, float]:
+        """(height, width) of the requested region at full resolution."""
+        if crop is None:
+            return self._dataset.shape
+        left, top, right, bottom = crop
+        return bottom - top, right - left
+
+    def _region_params(
+        self,
+        crop: tuple[float, float, float, float] | None,
+        max_size: int | None,
+    ) -> dict:
+        """tiles/region parameters for an optional crop and size cap.
+
+        large_image scales the region to fit width x height, upsampling
+        too, so the cap is only sent when it is smaller than the region.
+        """
+        params = {}
+        if crop is not None:
+            left, top, right, bottom = crop
+            params.update(left=left, top=top, right=right, bottom=bottom)
+        if max_size is not None:
+            if max_size < 1:
+                raise ValueError(
+                    f"max_size must be positive, got {max_size}"
+                )
+            if max_size < max(self._region_size(crop)):
+                params.update(width=max_size, height=max_size)
+        return params
+
+    def _output_shape(self, crop, max_size) -> tuple[int, int]:
+        height, width = self._region_size(crop)
+        scale = 1.0
+        if max_size is not None:
+            scale = min(1.0, max_size / max(width, height))
+        return max(1, round(height * scale)), max(1, round(width * scale))
 
     def line_scan(
         self,
@@ -417,6 +517,34 @@ def _bilinear_sample(
     )
     values[~inside] = np.nan
     return values
+
+
+# The app's histogram request (GirderAPI.baseHistogramOptions). Its min..max
+# is what percentile contrast is a percentage of.
+_HISTOGRAM_PARAMS = {
+    "bins": 4096,
+    "width": 2048,
+    "height": 2048,
+    "resample": "false",
+    "cache": "none",
+}
+
+
+def _slice_indexes(
+    slice_setting: dict | None, current: int, size: int
+) -> list[int] | None:
+    """Indexes a layer reads on one axis, as the frontend's resolveSlice /
+    getLayerSliceIndexes resolve them: every index for max-merge, else
+    one; None when the layer resolves outside the axis (it is not drawn).
+    A single-entry axis always reads index 0."""
+    kind = (slice_setting or {}).get("type", "current")
+    value = (slice_setting or {}).get("value") or 0
+    if size <= 1:
+        return [0]
+    if kind == "max-merge":
+        return list(range(size))
+    index = {"constant": value, "offset": current + value}.get(kind, current)
+    return [index] if 0 <= index < size else None
 
 
 def _parse_color(color: str) -> tuple[float, float, float]:

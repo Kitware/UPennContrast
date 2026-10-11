@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import urllib.parse
 from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,13 @@ from nimbusimage.models import Annotation, Location
 
 if TYPE_CHECKING:
     import girder_client
+
+
+def _quote_json(value) -> str:
+    """JSON-encode a query value and percent-encode it, so tags like
+    "CD8+" or "a&b" reach the server intact (an unencoded "+" decodes to
+    a space, and "&" splits the parameter)."""
+    return urllib.parse.quote(json.dumps(value), safe="")
 
 
 class AnnotationAccessor:
@@ -62,7 +70,7 @@ class AnnotationAccessor:
         if shape:
             url += f"&shape={shape}"
         if tags:
-            url += f"&tags={json.dumps(tags)}"
+            url += f"&tags={_quote_json(tags)}"
         if after_id:
             url += f"&afterId={after_id}"
         if sort:
@@ -158,7 +166,7 @@ class AnnotationAccessor:
         if shape:
             url += f"&shape={shape}"
         if tags:
-            url += f"&tags={json.dumps(tags)}"
+            url += f"&tags={_quote_json(tags)}"
         return self._gc.get(url)["count"]
 
     def create(self, annotation: Annotation) -> Annotation:
