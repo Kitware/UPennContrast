@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 
 // A timestamp from stored data may be missing (e.g. a dataset view created
 // through the REST API carries no lastViewed). date-fns `format` throws
@@ -7,7 +7,7 @@ import { format } from "date-fns";
 function toValidDate(timestamp: number | undefined | null): Date | null {
   if (timestamp == null) return null;
   const date = new Date(timestamp);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return isValid(date) ? date : null;
 }
 
 export function formatDate(d: Date): string {

@@ -11,7 +11,12 @@ import pytest
 
 from pytest_girder.assertions import assertStatusOk
 
+from girder.constants import AccessType
+
 from upenncontrast_annotation.server.models.collection import Collection
+from upenncontrast_annotation.server.models.datasetView import (
+    DatasetView as DatasetViewModel
+)
 
 from . import girder_utilities as utilities
 from . import upenn_testing_utilities as upenn_utilities
@@ -77,3 +82,39 @@ class TestDatasetViewLastViewed:
             "lastViewed": 1700000000000,
         })
         assert view["lastViewed"] == 1700000000000
+
+    def testCreateTreatsNullLastViewedAsMissing(self, server, admin):
+        dataset, config = _createDatasetAndConfig(admin)
+        view = _postView(server, admin, {
+            "datasetId": str(dataset["_id"]),
+            "configurationId": str(config["_id"]),
+            "layerContrasts": {},
+            "lastLocation": {"xy": 0, "z": 0, "time": 0},
+            "lastViewed": None,
+        })
+        assert isinstance(view["lastViewed"], int) and view["lastViewed"] > 0
+
+    def testRepostOntoAViewWithoutLastViewedStampsIt(self, server, admin):
+        # A view stored before create() defaulted lastViewed; POSTing the
+        # same pair again goes through updateDatasetView, not create().
+        dataset, config = _createDatasetAndConfig(admin)
+        body = {
+            "datasetId": dataset["_id"],
+            "configurationId": config["_id"],
+            "layerContrasts": {},
+            "lastLocation": {"xy": 0, "z": 0, "time": 0},
+        }
+        legacy = DatasetViewModel().setUserAccess(
+            body.copy(), user=admin, level=AccessType.ADMIN, save=False
+        )
+        legacy = DatasetViewModel().save(legacy)
+        assert "lastViewed" not in legacy
+
+        view = _postView(server, admin, {
+            "datasetId": str(dataset["_id"]),
+            "configurationId": str(config["_id"]),
+            "layerContrasts": {},
+            "lastLocation": {"xy": 1, "z": 0, "time": 0},
+        })
+        assert view["_id"] == str(legacy["_id"])
+        assert isinstance(view["lastViewed"], int) and view["lastViewed"] > 0
