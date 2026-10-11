@@ -198,7 +198,9 @@ writer.write(filename='output.tiff')    # writes TIFF + uploads to dataset folde
 ```python
 ds.annotations.list(shape='polygon', tags=['nucleus'], limit=0)           # → list[Annotation]
 ds.annotations.get(annotation_id)                                         # → Annotation
-ds.annotations.count(shape='polygon', tags=['nucleus'])                   # → int
+ds.annotations.count(shape='polygon', tags=['nucleus'])                   # → int (must have all tags)
+ds.annotations.summary(tags=['cell'], exclusive=False,
+                       property_paths=[[prop_id, 'Area']])               # → AnnotationSummary (server-side)
 ds.annotations.create(annotation)                                         # → Annotation (with id)
 ds.annotations.create_many(annotation_list)                               # → list[Annotation]
 ds.annotations.create_many(annotation_list,
@@ -595,6 +597,7 @@ ni_image_upload                → ds.images.new_writer(...)
 ni_annotations_list            → ds.annotations.list(...)
 ni_annotations_get             → ds.annotations.get(...)
 ni_annotations_count           → ds.annotations.count(...)
+ni_annotations_summary         → ds.annotations.summary(...)
 ni_annotations_create          → ds.annotations.create_many(...)
 ni_annotations_update          → ds.annotations.update(...)
 ni_annotations_update_many     → ds.annotations.update_many(...)
@@ -641,6 +644,14 @@ Rendering, query, and listing invariants established on PR #1390 across four rev
 - `max_size` and `crop` reach the region request — *"test_max_size_and_crop_reach_the_region_request"*; `get_stack`/`get_all_channels` pass `max_size` — *"test_stack_and_all_channels_pass_max_size"*.
 - `max_size` never upsamples, including for a crop past the image edge — *"test_max_size_above_the_region_does_not_upsample"*, *"test_crop_past_the_image_does_not_upsample"*; negative crop edges count from the far edge — *"test_negative_crop_edges_count_from_the_far_edge"*.
 - `list_datasets` is one `resource/batch` call, not a GET per dataset — *"test_list_datasets_batches_the_folder_lookup"*.
+
+**Annotation summary** (`ds.annotations.summary`, POST `upenn_annotation/summary`)
+- The request body and parsing, in the server's tag order — *"test_posts_the_summary_request_and_parses_it"*.
+- `shape`/`tags` become list filters (any of, or exactly with `exclusive`); the caller's `filters` dict is not mutated — *"test_shape_and_tags_become_list_filters"*; the same filter given twice is an error — *"test_rejects_the_same_filter_twice"*.
+- A bare-string `tags` or a dotted-string property path is an error, not split into characters; `exclusive` needs `tags` — *"test_rejects_misshapen_arguments"*.
+- Duplicate tags are sent once (an exclusive match compares set size) — *"test_duplicate_tags_are_sent_once"*.
+- `shapes` is None (not empty) on servers without the breakdown — *"test_shapes_is_none_on_servers_without_the_breakdown"*.
+- Live: counts, filters, `+` in tags, and property statistics — *"test_counts_by_tag_and_shape"*, *"test_filters_narrow_the_summary"*, *"test_property_statistics"*.
 
 **Query encoding**
 - Free-text tags survive `+`, `&` and spaces — *"test_special_characters_survive"*; live — *"test_tags_with_special_characters_round_trip"*.
