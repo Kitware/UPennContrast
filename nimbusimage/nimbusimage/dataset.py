@@ -413,13 +413,15 @@ class Dataset:
     # --- URLs ---
 
     def _get_view_id(self) -> str | None:
-        """The default view's ID (the caller's own view, if any); the
-        same view the layer and scale settings come from."""
-        return self.collections.view.get("_id")
+        """The default view's ID (the caller's own view, if any), looked
+        up fresh so a view created since the settings were cached counts."""
+        view = self.collections.default_view()
+        return view.get("_id") if view else None
 
     def _get_config_id(self) -> str | None:
-        """The default view's configuration ID."""
-        return self.collections.view.get("configurationId")
+        """The default view's configuration ID, looked up fresh."""
+        view = self.collections.default_view()
+        return view.get("configurationId") if view else None
 
     def info_url(self) -> str:
         """URL for the dataset info page."""

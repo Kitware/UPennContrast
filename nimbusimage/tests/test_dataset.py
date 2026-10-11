@@ -495,6 +495,23 @@ class TestDatasetUpload:
         assert ds.images._frame_map is None
 
 
+class TestDatasetViewUrls:
+    def test_view_url_sees_a_view_created_after_caching(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """Settings are cached, but the view id for URLs is looked up
+        fresh: a view created later (e.g. by opening the dataset in the
+        app) must be used."""
+        own_views = []
+        server = _fake_server(sample_tiles_metadata, own_views=own_views)
+        mock_gc.get.side_effect = server
+        ds = Dataset(mock_gc, "folder_123")
+        assert ds.collections.layers == []  # caches "no view"
+
+        own_views.append({"_id": "v_new", "configurationId": "c1"})
+        assert ds._get_view_id() == "v_new"
+
+
 def _fake_server(
     tiles, own_views=(), other_views=(), configuration_scales=None,
 ):

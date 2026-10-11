@@ -221,6 +221,10 @@ class ImageAccessor:
             histogram_frames = self._layer_frames(
                 layer, current, sizes, project=False
             )
+            if not histogram_frames:
+                # No image of this channel at the current location: the
+                # app draws nothing for the layer (getLayerImages is empty).
+                continue
             # A max-merge layer is the per-pixel maximum of its frames.
             img = np.max(
                 [self._get_region(f, **region).squeeze() for f in frames],
@@ -230,7 +234,9 @@ class ImageAccessor:
             contrast = (
                 overrides.get(layer.get("id")) or layer.get("contrast", {})
             )
-            cmin, cmax = self._contrast_range(contrast, histogram_frames)
+            cmin, cmax = self._contrast_range(
+                contrast, histogram_frames, img
+            )
             if cmax > cmin:
                 img = (img - cmin) / (cmax - cmin)
             img = np.clip(img, 0.0, 1.0)
@@ -292,7 +298,7 @@ class ImageAccessor:
         ]
 
     def _contrast_range(
-        self, contrast: dict, frames: list[int]
+        self, contrast: dict, frames: list[int], img: np.ndarray
     ) -> tuple[float, float]:
         black = contrast.get("blackPoint", 0)
         white = contrast.get("whitePoint", 100)
@@ -304,22 +310,32 @@ class ImageAccessor:
             self._dataset._gc.get(
                 f"item/{self._dataset._item_id}/tiles/histogram",
                 parameters={**_HISTOGRAM_PARAMS, "frame": frame},
-            )[0]
+            )
             for frame in frames
         ]
-        lo = min(h["min"] for h in histograms)
-        hi = max(h["max"] for h in histograms)
+        if all(histograms):
+            lo = min(h[0]["min"] for h in histograms)
+            hi = max(h[0]["max"] for h in histograms)
+        else:
+            # No histogram: the app styles the tile with "min"/"max", the
+            # image's own range.
+            lo, hi = float(img.min()), float(img.max())
         return (
             _round_half_up(lo + black / 100 * (hi - lo)),
             _round_half_up(lo + white / 100 * (hi - lo)),
         )
 
     def _region_size(self, crop) -> tuple[float, float]:
-        """(height, width) of the requested region at full resolution."""
+        """(height, width) of the requested region at full resolution,
+        clipped to the image as large_image clips it."""
+        height, width = self._dataset.shape
         if crop is None:
-            return self._dataset.shape
+            return height, width
         left, top, right, bottom = crop
-        return bottom - top, right - left
+        return (
+            max(0, min(bottom, height) - max(top, 0)),
+            max(0, min(right, width) - max(left, 0)),
+        )
 
     def _region_params(
         self,

@@ -188,10 +188,7 @@ class CollectionAccessor:
         if self._cache is None:
             self._view = self.default_view() or {}
             collection_id = self._view.get("configurationId")
-            self._cache = (
-                self._gc.get(f"upenn_collection/{collection_id}")
-                if collection_id else {}
-            )
+            self._cache = self.get_raw(collection_id) if collection_id else {}
 
     def refresh(self) -> None:
         """Clear cached collection. Next access will re-fetch from server."""

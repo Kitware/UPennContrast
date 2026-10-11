@@ -256,6 +256,58 @@ class TestGetComposite:
         assert result[0, 0, 0] == 1.0
         assert result[1, 1, 0] == 1.0
 
+    def test_max_merge_layer_without_a_current_frame_is_not_drawn(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """Sparse data: the channel exists at z=1 only. At z=0 the app has
+        no image for the layer (getLayerImages is empty), so it draws
+        nothing rather than failing on an empty histogram."""
+        tiles = {**sample_tiles_metadata, "frames": [
+            f for f in sample_tiles_metadata["frames"] if f["Frame"] != 0
+        ]}
+        img = np.arange(4, dtype=np.uint16).reshape(2, 2)
+        ds, regions = _composite_dataset(
+            mock_gc, tiles,
+            [_layer(0, z={"type": "max-merge", "value": None})],
+            {2: img},
+        )
+        result = ds.images.get_composite(z=0, dtype="float64")
+        assert regions == []
+        assert result.max() == 0.0
+
+    def test_missing_histogram_falls_back_to_the_image_range(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """The app styles a tile with min/max auto when it has no
+        histogram; an empty histogram response must not raise."""
+        img = np.array([[100, 200], [300, 500]], dtype=np.uint16)
+        ds, _ = _composite_dataset(
+            mock_gc, sample_tiles_metadata, [_layer(0)], {0: img},
+        )
+        region_get = mock_gc.get.side_effect
+
+        def get(path, parameters=None, jsonResp=True):
+            if path.endswith("/tiles/histogram"):
+                return []
+            return region_get(path, parameters, jsonResp)
+
+        mock_gc.get.side_effect = get
+        result = ds.images.get_composite(dtype="float64")
+        assert result[0, 0, 0] == 0.0
+        assert result[1, 1, 0] == 1.0
+
+    def test_crop_past_the_image_does_not_upsample(
+        self, mock_gc, sample_tiles_metadata,
+    ):
+        """large_image clips the crop to the 1024x768 image; a cap above
+        that clipped size must not be sent."""
+        img = np.arange(16, dtype=np.uint16).reshape(4, 4)
+        ds, regions = _composite_dataset(
+            mock_gc, sample_tiles_metadata, [_layer(0)], {0: img},
+        )
+        ds.images.get_composite(max_size=2000, crop=(0, 0, 5000, 5000))
+        assert "width" not in regions[0]
+
     def test_percentile_bounds_round_like_the_app(
         self, mock_gc, sample_tiles_metadata,
     ):
