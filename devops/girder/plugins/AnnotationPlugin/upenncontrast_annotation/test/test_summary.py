@@ -152,6 +152,46 @@ class TestAnnotationSummary:
         assert resp.json["tags"] == [{"tag": "A", "count": 1}]
         assert statsByPath(resp.json)["p.Area"]["mean"] == 5
 
+    def testShapesFollowPropertyAndMixedFilters(self, admin, server):
+        """The shape facet narrows on the gated paths too (property-only
+        and mixed filters go through an id clause, not the raw match)."""
+        folder = self._setup(admin)
+        ann = upenn_utilities.getSampleAnnotation(folder["_id"])
+        ann["shape"] = "point"
+        ann["coordinates"] = ann["coordinates"][:1]
+        ann["tags"] = ["A"]
+        point = Annotation().create(ann)
+        AnnotationPropertyValues().appendValues(
+            {"p": {"Area": 7}}, point["_id"], folder["_id"]
+        )
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]),
+            "filters": {"propertyFilters": [
+                {"path": ["p", "Area"], "mode": "range", "max": 10},
+            ]},
+        })
+        assertStatusOk(resp)
+        assert resp.json["shapes"] == [
+            {"shape": "point", "count": 1},
+            {"shape": "polygon", "count": 1},
+        ]
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]),
+            "filters": {
+                "tags": {"values": ["A"], "exclusive": False},
+                "propertyFilters": [
+                    {"path": ["p", "Area"], "mode": "range", "min": 0},
+                ],
+            },
+        })
+        assertStatusOk(resp)
+        assert resp.json["shapes"] == [
+            {"shape": "polygon", "count": 2},
+            {"shape": "point", "count": 1},
+        ]
+
     def testStatsFollowMixedFieldAndPropertyFilters(self, admin, server):
         """Tags + property range takes the annotation-driven join path; the
         orphan-free PV scan cannot apply once a tag narrows the population."""

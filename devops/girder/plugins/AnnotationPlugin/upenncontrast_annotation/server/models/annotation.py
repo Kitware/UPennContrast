@@ -1117,8 +1117,8 @@ class Annotation(AccessControlMixin, ProxiedModel):
         complement (`_idSelector`), as the gate resolver does: a broad
         filter that keeps most of a 700K dataset would otherwise ship a
         dataset-sized `$in` twice. Annotation-field-only filters skip the
-        property-value join, so the tag facet runs on them directly and only
-        the statistics need the ids.
+        property-value join, so the tag and shape facets run on them
+        directly and only the statistics need the ids.
 
         Without any filter the statistics run over every property-value
         document of the dataset, so a value document orphaned by a deleted

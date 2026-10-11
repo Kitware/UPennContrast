@@ -65,7 +65,7 @@ Semantics:
   value document orphaned by a deleted annotation counts until the removal hook cleans it.
   Excluding them would cost a second full scan per request (measured +2.6 s for an id set
   difference, +7.4 s for a `$lookup`, against a 1.5 s query), so this is accepted.
-- An empty match is `total: 0`, `tags: []`, zeroed property entries — not an error. The
+- An empty match is `total: 0`, `tags: []`, `shapes: []`, zeroed property entries — not an error. The
   client short-circuits an empty id constraint locally (`filtersMatchNothing`), as the
   other list calls do.
 
@@ -76,7 +76,7 @@ Property filters need the property-value join (or the PV-driven scan `listIds` u
 first version ran that join for the tag facet and again for the statistics and took 21.6 s
 on 709K cells. Now:
 
-| Filters | Facet (total + tags) | Statistics |
+| Filters | Facet (total + tags + shapes) | Statistics |
 |---|---|---|
 | none | annotation scan | PV scan on `datasetId` |
 | annotation fields only (tags, shape, location, ids, gates) | annotation scan with the match | PV `$in` / `$nin` from the selector |
@@ -112,7 +112,8 @@ Each line names the test that holds it.
 **Backend (`test/test_summary.py`)**
 - Total and tag composition, sorted by count then name — *"testTotalAndTagComposition"*.
 - Shape composition, sorted the same way and narrowed by the same filters —
-  *"testShapeComposition"*.
+  *"testShapeComposition"*; on the property-filter and mixed (id clause) paths too —
+  *"testShapesFollowPropertyAndMixedFilters"*.
 - Non-numeric and missing values are excluded from every statistic and from `count`; single
   values have null std — *"testPropertyStatsSkipNonNumericAndMissing"*.
 - Annotation-field filters narrow both the facet and the statistics —
