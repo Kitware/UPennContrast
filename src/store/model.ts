@@ -674,7 +674,8 @@ export interface IDatasetViewBase {
     [layerId: string]: IContrast;
   };
   scales: Partial<IScales>;
-  lastViewed: number;
+  // Absent on views created outside the app before the server defaulted it.
+  lastViewed?: number;
   lastLocation: {
     xy: number;
     z: number;

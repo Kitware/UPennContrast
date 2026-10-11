@@ -1,3 +1,5 @@
+import time
+
 from girder.constants import AccessType
 from girder.exceptions import ValidationException
 from ..helpers.proxiedModel import ProxiedModel
@@ -79,6 +81,11 @@ class DatasetView(ProxiedModel):
         return document
 
     def create(self, creator, dataset_view):
+        # The app stamps lastViewed (ms since epoch, like Date.now()) on the
+        # views it creates; views from the REST API or the multi_source
+        # endpoint (nimbusimage ds.configure()) would otherwise have none,
+        # sort last in the recent list, and show no date there.
+        dataset_view.setdefault("lastViewed", int(time.time() * 1000))
         self.setUserAccess(
             dataset_view, user=creator, level=AccessType.ADMIN, save=False
         )
