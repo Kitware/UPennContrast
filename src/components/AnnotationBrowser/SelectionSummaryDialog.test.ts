@@ -163,6 +163,22 @@ describe("SelectionSummaryDialog", () => {
     wrapper.unmount();
   });
 
+  it("shows composition by shape next to composition by tag", async () => {
+    const wrapper = shallowMount(SelectionSummaryDialog, {
+      global: { renderStubDefaultSlot: true },
+    });
+    (wrapper.vm as any).dialog = true;
+    await nextTick();
+    await nextTick();
+    await nextTick();
+    expect(wrapper.text()).toContain("Composition by shape");
+    const shapeRows = wrapper
+      .findAll("tr")
+      .filter((row) => row.text().startsWith("polygon"));
+    expect(shapeRows.map((row) => row.text())).toEqual(["polygon4100.0%"]);
+    wrapper.unmount();
+  });
+
   it("opens on the whole dataset with the displayed columns when nothing is selected or filtered", async () => {
     (filterStore as any).filteredAnnotations = new Array(10).fill({});
     const wrapper = await openDialog();
@@ -273,7 +289,7 @@ describe("SelectionSummaryDialog", () => {
     expect(vm.summary).toBeNull();
   });
 
-  it("downloads a CSV with total, tag and property sections", async () => {
+  it("downloads a CSV with total, tag, shape and property sections", async () => {
     (filterStore as any).filteredAnnotations = new Array(10).fill({});
     const wrapper = await openDialog();
     const vm = wrapper.vm as any;
@@ -283,6 +299,7 @@ describe("SelectionSummaryDialog", () => {
       "total,,4,1,,,,",
       "tag,A,3,0.75,,,,",
       "tag,B,1,0.25,,,,",
+      "shape,polygon,4,1,,,,",
       "property,Blob / Area,2,0.5,10,7.0710678,5,15",
     ]);
     vm.download();

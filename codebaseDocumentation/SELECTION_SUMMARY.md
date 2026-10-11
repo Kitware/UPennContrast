@@ -10,7 +10,8 @@ Import/export menu → *Selection summary*. A dialog that reports, for the whole
 the filtered objects, or the current selection:
 
 - the object count,
-- composition by tag (count and percentage per tag, sorted by count), and
+- composition by tag (count and percentage per tag, sorted by count),
+- composition by shape (point, polygon, line, rectangle; same layout), and
 - per-property statistics (n, mean, sample SD, min, max) for a picked set of property
   paths, defaulting to the columns shown in the Objects tab,
 
@@ -103,7 +104,7 @@ one property range 1.5 s (was 21.6 s); tag + property range 1.7 s.
 - One request per change of the request's inputs (open, scope, paths, and for "filtered"
   the filter signature). A sequence counter drops late answers from superseded requests.
 - Download: client-side CSV with `Section,Name,Count,Fraction,Mean,SD,Min,Max` rows for
-  `total`, each `tag`, and each `property`.
+  `total`, each `tag`, each `shape`, and each `property`.
 
 ## Regression checklist
 
@@ -145,7 +146,8 @@ Each line names the test that holds it.
   *"keeps the latest request's answer when an earlier one resolves late"*.
 - A bail-out retires the request in flight — *"retires an in-flight request when a bail-out clears the summary"*.
 - Server error messages surface in the dialog — *"shows the server's message when the request fails"*.
-- CSV sections and the download call — *"downloads a CSV with total, tag and property sections"*.
+- CSV sections and the download call — *"downloads a CSV with total, tag, shape and property sections"*.
+- The dialog shows the shape breakdown — *"shows composition by shape next to composition by tag"*.
 
 **Process**
 - Verify from a fresh page load on a dataset that actually has tags and property values

@@ -71,9 +71,10 @@ class TestAnnotationSummary:
 
     def testShapeComposition(self, admin, server):
         folder = self._setup(admin)
-        for shape in ("point", "point", "line"):
+        for shape, vertices in (("point", 1), ("point", 1), ("line", 2)):
             ann = upenn_utilities.getSampleAnnotation(folder["_id"])
             ann["shape"] = shape
+            ann["coordinates"] = ann["coordinates"][:vertices]
             ann["tags"] = ["A"]
             Annotation().create(ann)
 
