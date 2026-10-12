@@ -59,7 +59,7 @@ All models have `to_dict()` / `from_dict()` for serialization.
 | `iter_all` | `(shape?, tags?, page_size=1000)` | `Iterator[Annotation]` |
 | `get` | `(annotation_id)` | `Annotation` |
 | `count` | `(shape?, tags?)` | `int` (tags: must have all) |
-| `summary` | `(shape?, tags?, exclusive=False, property_paths?, filters?)` | `AnnotationSummary`: `total`, `tags` and `shapes` counts, per-path `properties` stats; one server-side aggregation (tags: any of, or exactly with `exclusive`) |
+| `summary` | `(shape?, tags?, exclusive=False, property_paths?, filters?)` | `AnnotationSummary`: `total`, `tags`, `shapes` and `channels` counts, per-path `properties` stats; one server-side aggregation (tags: any of, or exactly with `exclusive`) |
 | `create` | `(annotation)` | `Annotation` |
 | `create_many` | `(annotations, connect_to?)` | `list[Annotation]` |
 | `update` | `(annotation_id, updates)` | `Annotation` |
