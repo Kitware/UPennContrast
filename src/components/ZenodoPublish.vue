@@ -78,7 +78,8 @@
         </div>
       </div>
 
-      <!-- Request refused by the server (upload / discard) -->
+      <!-- Request refused by the server. Carries upload and discard errors,
+           and a publish error once its confirm dialog is closed. -->
       <v-alert
         v-if="!confirmPublish"
         v-model="showError"
@@ -239,6 +240,7 @@ import store from "@/store";
 import jobs from "@/store/jobs";
 import { logError } from "@/utils/log";
 import { extractErrorMessage } from "@/utils/errors";
+import { isAxiosError } from "axios";
 import { IProject, IJobEventData } from "@/store/model";
 import { jobStates } from "@/store/jobConstants";
 import ZenodoTokenDialog from "./ZenodoTokenDialog.vue";
@@ -323,15 +325,26 @@ const statusLabel = computed(() => {
 });
 
 // Methods
-function showRequestError(error: unknown) {
+const CONTENTS_ACCESS_HINT =
+  "Publishing to Zenodo requires owner access to every dataset and " +
+  "collection in the project. Ask their owners for owner access, or " +
+  "remove them from the project.";
+
+// Girder's AccessException names the model: "Admin access denied for
+// folder <id> (user <id>)." Only a dataset (folder) or collection refusal
+// gets the hint; a project-level refusal is explained by its own message.
+const CONTENTS_ACCESS_DENIED = /access denied for (folder|collection)\b/i;
+
+function showRequestError(error: unknown, { checksContents = false } = {}) {
   const message = extractErrorMessage(error);
-  // 403 from upload/publish: the caller must own the project and every
-  // dataset and collection in it, not just the project.
+  // Upload and publish (not discard) require ADMIN on every dataset and
+  // collection in the project, not just on the project.
   errorString.value =
-    (error as any)?.response?.status === 403
-      ? `${message.replace(/\.$/, "")}. Publishing to Zenodo requires owner access to every ` +
-        "dataset and collection in the project. Ask their owners to " +
-        "publish, or remove them from the project."
+    checksContents &&
+    isAxiosError(error) &&
+    error.response?.status === 403 &&
+    CONTENTS_ACCESS_DENIED.test(message)
+      ? `${message.replace(/\.$/, "")}. ${CONTENTS_ACCESS_HINT}`
       : message;
   showError.value = true;
 }
@@ -347,6 +360,8 @@ async function checkToken() {
 }
 
 function onTokenSaved() {
+  // A missing/invalid-token refusal no longer applies.
+  showError.value = false;
   checkToken();
 }
 
@@ -415,7 +430,12 @@ async function startUpload() {
   } catch (error) {
     localProgress.value = null;
     logError("Failed to start Zenodo upload", error);
-    showRequestError(error);
+    showRequestError(error, { checksContents: true });
+    // 409: another tab or session is already uploading. Refresh so the
+    // card shows that upload instead of offering this one again.
+    if (isAxiosError(error) && error.response?.status === 409) {
+      emit("updated");
+    }
   }
 }
 
@@ -433,7 +453,7 @@ async function doPublish() {
     emit("updated");
   } catch (error) {
     logError("Failed to publish to Zenodo", error);
-    showRequestError(error);
+    showRequestError(error, { checksContents: true });
   } finally {
     publishing.value = false;
   }

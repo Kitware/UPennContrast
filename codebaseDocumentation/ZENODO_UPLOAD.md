@@ -149,7 +149,7 @@ All paths relative to `devops/girder/plugins/AnnotationPlugin/upenncontrast_anno
 |------|---------|
 | `src/store/ZenodoAPI.ts` | API client (extends existing import API with publish methods) |
 | `src/store/model.ts` | `IProjectZenodo`, `TZenodoStatus`, `ProgressType.ZENODO_UPLOAD` |
-| `src/components/ZenodoPublish.vue` | Main card component in ProjectInfo (SSE-based progress) |
+| `src/components/ZenodoPublish.vue` | Main card component in ProjectInfo (SSE-based progress, server refusal messages) |
 | `src/components/ZenodoTokenDialog.vue` | Token entry/management dialog |
 
 ## Zenodo API Notes
@@ -311,6 +311,18 @@ curl -s -H "Girder-Token: $TOKEN" http://localhost:8080/api/v1/zenodo/status/PRO
 - **Missing dataset folder**: Job fails, status → `error` with message in `zenodo.error`
 - **Over 50GB / 100 files**: Upload returns 400 with size/count limit message
 - **Publish without draft**: Returns 400 "No draft deposition to publish"
+- **Not the owner of a dataset or collection in the project**: Upload and publish return
+  403 "Admin access denied for folder|collection ..." (the ownership check added by PR #1410,
+  `requireProjectContentsAccess`)
+
+In the UI, `ZenodoPublish.vue` shows the server's `response.data.message` for every
+refused request: upload and discard errors in an alert on the card, and publish errors
+inside the publish confirmation dialog, which stays open. A 403 naming a folder or
+collection on upload/publish also says that publishing needs owner access to every
+dataset and collection in the project; a project-level 403, and any discard error, is
+shown as the server sent it. A 409 also refreshes the project, so the card shows the
+upload that is already running. Saving a token or retrying clears the alert.
+Tests: `src/components/ZenodoPublish.test.ts`.
 
 ### curl Quick Reference
 
