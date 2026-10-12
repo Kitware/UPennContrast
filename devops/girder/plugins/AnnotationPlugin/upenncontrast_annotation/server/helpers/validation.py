@@ -37,6 +37,9 @@ MAX_COUNT_DATASETS = 100
 # Tag filters on the public counts endpoint: each tag is part of a $all
 # clause, so cap how many and how long (real filters are a few tags).
 MAX_FILTER_TAGS = 100
+# Longest datasetIds entry kept and echoed back as "not a valid id"; an
+# ObjectId is 24 characters, so anything far longer is refused (400).
+MAX_DATASET_ID_LENGTH = 64
 MAX_TAG_LENGTH = 1000
 
 # Analysis-gating request ceilings (SERVER_GATING.md "Limits"): abuse guards
@@ -146,8 +149,12 @@ def validateCountsRequest(body, shapes):
     body = requireObjectBody(body)
     rawIds = requireList(body.get("datasetIds"), "datasetIds")
     requireCountWithin(len(rawIds), MAX_COUNT_DATASETS, "datasetIds")
-    if not all(isinstance(value, str) for value in rawIds):
-        raise RestException("datasetIds must be a list of strings", code=400)
+    if not all(isinstance(value, str) and len(value) <= MAX_DATASET_ID_LENGTH
+               for value in rawIds):
+        raise RestException(
+            "datasetIds must be a list of strings of at most %d characters"
+            % MAX_DATASET_ID_LENGTH, code=400,
+        )
     datasetIds = []
     for value in dict.fromkeys(rawIds):
         try:

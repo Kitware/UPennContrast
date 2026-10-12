@@ -744,8 +744,8 @@ the local stack. Add an item whenever a review finds something this list missed.
       no tool arguments or error messages for handled errors (they quote user data);
       only the opt-in call log does. An unexpected crash is still logged with its
       traceback, for diagnosis. *"test_no_credentials_in_logs"*
-- [x] The batch count endpoint, which is public, accepts only the schema's shapes and a
-      bounded tag filter. An empty shape means no filter, as in GET count.
+- [x] The batch count endpoint, which is public, accepts only the schema's shapes, a
+      bounded tag filter, and dataset ids of bounded length. An empty shape means no filter, as in GET count.
       *"testMalformedBodiesAre400"*, *"testEmptyShapeMeansNoFilter"*
 
 ### Cost and context
@@ -802,6 +802,8 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"testUnreadableDatasetsGetAnErrorEntry"*
 - [x] No values in the path sample is reported as "not found in a sample", never as
       "not computed". *"test_values_summary_says_when_nothing_is_computed"*
+- [x] A dataset with no properties set up downloads no value sample.
+      *"test_no_properties_means_no_value_sampling"*
 
 ### Writes
 
@@ -810,7 +812,9 @@ the local stack. Add an item whenever a review finds something this list missed.
       so is marked non-destructive but not read-only.
       *"test_every_tool_is_registered_with_its_annotations"*
 - [x] Interface registration runs only for installed worker images (the server would
-      run any image name it is given).
+      run any image name it is given), and concurrent first requests for one image send
+      one registration (per server process; the server does not deduplicate).
+      *"test_concurrent_first_requests_register_an_interface_once"*,
       *"test_worker_interface_registers_only_installed_workers"*,
       *"test_worker_interface_checks_the_dataset_before_registering"*
 - [x] Tagging needs an explicit target (an empty id list is not "everything"), refuses

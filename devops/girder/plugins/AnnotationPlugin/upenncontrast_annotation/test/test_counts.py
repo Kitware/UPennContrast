@@ -406,6 +406,8 @@ class TestBatchAnnotationCounts:
         {"datasetIds": "abc"},
         {"datasetIds": [123]},
         {"datasetIds": [None]},
+        # Long junk is refused, not echoed back as an error entry.
+        {"datasetIds": ["x" * 65]},
         {"datasetIds": ["000000000000000000000000"] * 101},
         {"datasetIds": [], "shape": 3},
         {"datasetIds": [], "shape": "hexagon"},

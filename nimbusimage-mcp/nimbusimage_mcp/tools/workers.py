@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import time
+import weakref
 from typing import Literal
 
 import anyio
@@ -154,6 +156,53 @@ async def _before(deadline: float, fn, *args, **kwargs):
     return result
 
 
+# One registration at a time per image in this process: the server starts
+# a worker container for every request, so a burst of first calls would
+# otherwise start one each. Locks are per event loop (asyncio locks bind
+# to one) and exist only for installed images.
+_registration_locks: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+
+
+def _registration_lock(image: str) -> asyncio.Lock:
+    locks = _registration_locks.setdefault(asyncio.get_running_loop(), {})
+    return locks.setdefault(image, asyncio.Lock())
+
+
+async def _register_once(nc: ni.NimbusClient, image: str,
+                         deadline: float) -> dict | None:
+    """Register the image's interface unless a concurrent call did while
+    we waited, and return it."""
+    still_registering = ToolError(
+        f"{image} is still registering its parameters; try again in a "
+        "minute."
+    )
+    lock = _registration_lock(image)
+    with anyio.move_on_after(max(0.0, deadline - time.monotonic())):
+        async with lock:
+            # Recheck: the call holding the lock may have registered it.
+            interface = await _before(
+                deadline, nc.get_worker_interface, image,
+                request_if_missing=False,
+            )
+            if interface is not None:
+                return interface
+            response = await _before(
+                deadline, nc.girder.post, "worker_interface/request",
+                parameters={"image": image},
+            )
+            if isinstance(response, list) and response:
+                state = await poll_job(
+                    ni.Job(nc.girder, response[0]), deadline
+                )
+                if not (state and state["finished"]):
+                    raise still_registering
+            return await _before(
+                deadline, nc.get_worker_interface, image,
+                request_if_missing=False,
+            )
+    raise still_registering
+
+
 async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
     """The worker's parameter interface, asking the worker to register it
     (a short job) the first time. Bounded as a whole by the job-wait cap,
@@ -172,21 +221,7 @@ async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
             raise ToolError(
                 f"No worker image {image!r}; use ni_workers_list for names."
             )
-        response = await _before(
-            deadline, nc.girder.post, "worker_interface/request",
-            parameters={"image": image},
-        )
-        if isinstance(response, list) and response:
-            state = await poll_job(ni.Job(nc.girder, response[0]), deadline)
-            if not (state and state["finished"]):
-                raise ToolError(
-                    f"{image} is still registering its parameters; try "
-                    "again in a minute."
-                )
-        interface = await _before(
-            deadline, nc.get_worker_interface, image,
-            request_if_missing=False,
-        )
+        interface = await _register_once(nc, image, deadline)
     if not interface:
         raise ToolError(
             f"{image} has no parameter interface; check the image name "

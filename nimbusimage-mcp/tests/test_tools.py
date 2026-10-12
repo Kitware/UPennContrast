@@ -427,6 +427,18 @@ def test_properties_list_is_scoped_to_the_configuration(nc):
     assert sortdirs == [1, -1]
 
 
+def test_no_properties_means_no_value_sampling(nc):
+    ds = nc.dataset.return_value
+    ds.collections.property_ids = []
+    ds.properties.list.return_value = [_property("elsewhere")]
+    assert loads(properties.ni_properties_list(dataset_id="d")) == {
+        "properties": []}
+    with pytest.raises(ToolError, match="Found no values"):
+        properties.ni_property_values_summary(dataset_id="d")
+    nc.girder.get.assert_not_called()
+    nc.girder.post.assert_not_called()
+
+
 def test_values_summary_summarizes_discovered_paths(nc):
     ds = nc.dataset.return_value
     ds.collections.property_ids = ["p1"]
@@ -784,6 +796,32 @@ def test_tool_requests_time_out_once_without_retrying(monkeypatch):
         _close_listener(listener)
         for connection in accepted:
             connection.close()
+
+
+def test_concurrent_first_requests_register_an_interface_once(nc):
+    """Two calls for an unregistered worker at once: the server starts a
+    container per registration request, so only one may be sent."""
+    import threading
+    registered = threading.Event()
+    nc.list_workers.return_value = WORKERS
+    nc.get_worker_interface.side_effect = (
+        lambda *a, **k: INTERFACE if registered.is_set() else None)
+
+    def register(*args, **kwargs):
+        registered.set()
+        return []  # no job to wait on
+
+    nc.girder.post.side_effect = register
+
+    async def both():
+        return await asyncio.gather(
+            workers.ni_worker_interface(image=SEG),
+            workers.ni_worker_interface(image=SEG),
+        )
+
+    first, second = (loads(r) for r in asyncio.run(both()))
+    assert nc.girder.post.call_count == 1
+    assert first["parameters"] == second["parameters"]
 
 
 def test_worker_interface_checks_the_dataset_before_registering(nc):

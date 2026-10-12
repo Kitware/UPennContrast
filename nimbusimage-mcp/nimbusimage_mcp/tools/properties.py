@@ -91,6 +91,10 @@ def ni_properties_list(dataset_id: str) -> dict:
     nc = client()
     ds = nc.dataset(dataset_id)
     properties = dataset_properties(ds)
+    if not properties:
+        # Nothing to sample or count for; stored values of properties no
+        # longer set up would only be downloaded and dropped.
+        return {"properties": []}
     paths = discover_paths(nc, dataset_id)
     uncomputed = nc.girder.post("upenn_annotation/uncomputed_counts", json={
         "datasetId": dataset_id,
@@ -98,7 +102,7 @@ def ni_properties_list(dataset_id: str) -> dict:
             {"id": p.id, "shape": p.shape, "tags": p.tags}
             for p in properties
         ],
-    }) if properties else {}
+    })
     rows = []
     for p in properties:
         found = paths.get(p.id, [])
@@ -139,7 +143,8 @@ def ni_property_values_summary(
             "use ni_properties_list to find its id."
         )
     wanted = [property_id] if property_id else list(names)
-    discovered = discover_paths(nc, dataset_id)
+    # No property set up: nothing to sample (the error below says so).
+    discovered = discover_paths(nc, dataset_id) if wanted else {}
     paths = [path for pid in wanted for path in discovered.get(pid, [])]
     if not paths:
         # The sample can miss a property computed on only some
