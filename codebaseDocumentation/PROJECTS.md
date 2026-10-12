@@ -519,7 +519,8 @@ contained resource only as far as that user could share it directly
 left unchanged because the caller does not own them. Neither share endpoint lets the
 caller target themselves (400): an owner removing themselves would leave the project,
 or the dataset, with no owner. Zenodo upload/publish need ADMIN on every dataset and
-collection in the project (`codebaseDocumentation/ZENODO_UPLOAD.md`).
+collection in the project, and on every configuration its datasets' views use
+(`codebaseDocumentation/ZENODO_UPLOAD.md`). Invariants: "Regression checklist" below.
 
 Without this, adding a dataset you could only edit to a project you own copied the
 project's ACL -- where you are ADMIN -- onto the dataset, and `addCollection` reached
@@ -647,6 +648,69 @@ both flags defaulted to `false`.
 | `src/store/ProjectsAPI.ts` | `toProject()` maps `public` and `_accessLevel` |
 | `src/store/model.ts` | `IProject` includes `public?` and `_accessLevel?` |
 | `src/views/project/ProjectInfo.vue` | `isProjectPublic` / `isProjectShared` computed properties |
+
+---
+
+## Regression checklist
+
+Sharing limits (`server/helpers/aclLimits.py`, `test/test_share_escalation.py`). Each
+invariant names the test that holds it; re-check the group when you change any code
+that writes an ACL or a public flag, or that exports a project.
+
+**Direct sharing (`POST /dataset_view/share`)**
+- A WRITE collaborator cannot grant ADMIN, to themselves or another account —
+  *"testWriteCollaboratorCannotGrantThemselvesAdmin"*,
+  *"testWriteCollaboratorCannotGrantAdminToAnotherAccount"*.
+- Sharing at all needs ADMIN on the dataset — *"testWriteCollaboratorCannotShareWithOthers"*.
+- A non-owner cannot remove the owner — *"testWriteCollaboratorCannotRemoveOwner"*.
+- Owners can grant and remove ADMIN (nimbusimage `access="admin"`) —
+  *"testOwnerCanGrantAdmin"*, *"testOwnerCanRemoveAccess"*.
+- A configuration the owner can only edit is shared at no more than WRITE, and its
+  owner is never downgraded — *"testConfigurationIsSharedAtNoMoreThanCallersLevel"*,
+  *"testConfigurationOwnerIsNotDowngraded"*.
+- Views must belong to one dataset; an empty list is a 400, not a 500 —
+  *"testViewsMustShareOneDataset"*, *"testEmptyViewListIsRejected"*.
+- Callers cannot change their own entry (owner lockout) —
+  *"testOwnerCannotRemoveThemselves"*, *"testProjectOwnerCannotRemoveThemselves"*.
+
+**Project propagation**
+- Adding a dataset you can only edit to your own project does not make you its owner —
+  *"testAddingDatasetToOwnProjectDoesNotGrantAdmin"*.
+- `addCollection` does not reach datasets the caller cannot read —
+  *"testAddingCollectionDoesNotReachUnsharedDatasets"*.
+- Sharing a project skips datasets the caller does not own, with their views and
+  configurations, and collections the caller can only edit —
+  *"testSharingProjectSkipsDatasetsCallerDoesNotOwn"*,
+  *"testSharingProjectSkipsCollectionsCallerCanOnlyEdit"*.
+- Copying the project ACL never lowers an existing entry, so the adder stays owner
+  and a public project publishes all of their dataset —
+  *"testAddingOwnDatasetToProjectKeepsOwnership"*,
+  *"testAddingOwnDatasetToPublicProjectPublishesAllOfIt"*.
+- Revoking a project member leaves owners of contained datasets alone —
+  *"testRevokingProjectLeavesOwnerOfContainedDataset"*.
+- An owner sharing a project still grants ADMIN on its contents —
+  *"testOwnerSharingProjectGrantsAdmin"*.
+- `set_public` publishes only what the caller owns and reports the rest, and the
+  dialog shows that count — *"testPublishingProjectSkipsDatasetsCallerDoesNotOwn"*,
+  *"testPublishingProjectReportsSkippedResources"*,
+  *"reports contained resources set_public left unchanged"*,
+  *"shows no notice when set_public changed everything"*.
+
+**Publishing (Zenodo)**
+- Upload and publish need ADMIN on every dataset and collection in the project, and on
+  every configuration its datasets' views use (the export publishes their property
+  definitions) — *"testUploadRefusesDatasetsCallerDoesNotOwn"*,
+  *"testPublishRefusesDatasetsCallerDoesNotOwn"*,
+  *"testUploadRefusesConfigurationsReachedThroughViews"*,
+  *"testOwnerPassesTheOwnershipCheck"*.
+
+**Process rules this feature proved**
+- Test fixtures: Girder makes the first user in a fresh database a site admin, who holds
+  ADMIN on everything; create custom users after `admin` and never use `admin` as the
+  actor in a limits test.
+- When a container (project) grants or exports, check every path that reaches a
+  contained resource, including ones found indirectly (views, a collection's datasets,
+  a view's configuration).
 
 ---
 

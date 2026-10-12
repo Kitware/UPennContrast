@@ -145,8 +145,9 @@ class Zenodo(Resource):
             starts uploading all project data to Zenodo
             as a background job.
 
-            Requires ADMIN on the project and on every
-            dataset and collection in it.
+            Requires ADMIN on the project, on every dataset
+            and collection in it, and on every configuration
+            its datasets' views use.
 
             If the project was previously published, this
             creates a new version of the existing

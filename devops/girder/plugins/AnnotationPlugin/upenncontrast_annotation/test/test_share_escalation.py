@@ -447,6 +447,26 @@ class TestZenodoRequiresOwnership:
 
         assertStatus(resp, 403)
 
+    def testUploadRefusesConfigurationsReachedThroughViews(
+            self, server, owner, user):
+        """The export publishes the property definitions of every
+        configuration the project's datasets' views use, listed in the
+        project or not."""
+        dataset, _, _ = createDataset(user)
+        theirConfig = createConfiguration(owner, ownFolder(owner))
+        grant(theirConfig, Collection(), user, WRITE)
+        createView(user, dataset, theirConfig)
+        project = TestProjectShareLimits().createProject(server, user)
+        TestProjectShareLimits().addDataset(server, user, project, dataset)
+
+        resp = server.request(
+            path="/zenodo/upload", method="POST", user=user,
+            type="application/json",
+            body=json.dumps({"projectId": project["_id"]}))
+
+        assertStatus(resp, 403)
+        assert "Admin access denied" in resp.json["message"]
+
     def testOwnerPassesTheOwnershipCheck(self, server, owner):
         dataset, _, _ = createDataset(owner)
         project = TestProjectShareLimits().createProject(server, owner)

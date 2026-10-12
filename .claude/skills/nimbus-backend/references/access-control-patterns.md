@@ -97,7 +97,11 @@ Check every path that hands data *out* on a container's authority, not
 only the ones that write ACLs: a Zenodo upload of a project exported every
 dataset in it on project ADMIN alone, including datasets the caller could
 not read. Publishing or exporting a container needs ADMIN on each thing in
-it (`requireProjectContentsAccess`).
+it (`requireProjectContentsAccess`) -- including what the export finds
+indirectly: the Zenodo job publishes the property definitions of every
+configuration a project dataset's views use, listed in the project or not.
+Derive the checked set from what the export reads, not from the
+container's own list.
 
 ### Public Access Pattern
 

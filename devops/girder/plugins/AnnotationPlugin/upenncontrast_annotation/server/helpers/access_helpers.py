@@ -7,6 +7,7 @@ from girder.models.user import User
 
 from ..models.annotation import Annotation
 from ..models.collection import Collection
+from ..models.datasetView import DatasetView
 from ..models.propertyValues import MAX_IDS_PER_QUERY
 
 
@@ -36,21 +37,31 @@ def requireDatasetsAccess(datasetIds, user, level=AccessType.WRITE):
 
 
 def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
-    """Check access on every dataset and collection a project references.
+    """Check access on everything a project's export publishes.
 
     Project-level access says nothing about the resources in it: a dataset
     can be added by someone with only WRITE on it, and a project admin may
     not be able to read it at all. Publishing a project (Zenodo) is an owner
-    operation on each of them. References to deleted resources are ignored,
-    as the export skips them.
+    operation on each dataset and collection it lists, and on each
+    configuration its datasets' views use -- the export publishes those
+    configurations' property definitions whether or not the project lists
+    them. References to deleted resources are ignored, as the export skips
+    them.
 
     :raises AccessException: If user lacks access to any of them.
     """
     meta = project.get('meta', {})
+    datasetIds = [d['datasetId'] for d in meta.get('datasets', [])]
+    collectionIds = {c['collectionId'] for c in meta.get('collections', [])}
+    if datasetIds:
+        collectionIds.update(
+            view['configurationId'] for view in DatasetView().find(
+                {'datasetId': {'$in': datasetIds}},
+                fields=['configurationId'])
+        )
     for model, ids in (
-        (Folder(), [d['datasetId'] for d in meta.get('datasets', [])]),
-        (Collection(),
-         [c['collectionId'] for c in meta.get('collections', [])]),
+        (Folder(), datasetIds),
+        (Collection(), list(collectionIds)),
     ):
         if not ids:
             continue

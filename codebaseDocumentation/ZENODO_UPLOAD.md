@@ -66,13 +66,14 @@ Tokens are encrypted at rest using Fernet symmetric encryption. The encryption k
 
 | Method | Endpoint | Description | Access |
 |--------|----------|-------------|--------|
-| `POST` | `/api/v1/zenodo/upload` | Start uploading a project to Zenodo | ADMIN on the project and on every dataset and collection in it |
+| `POST` | `/api/v1/zenodo/upload` | Start uploading a project to Zenodo | ADMIN on the project, every dataset and collection in it, and every configuration its datasets' views use |
 | `GET` | `/api/v1/zenodo/status/:projectId` | Get upload progress (fallback for diagnostics) | READ |
-| `POST` | `/api/v1/zenodo/publish/:projectId` | Publish draft, mint DOI | ADMIN on the project and on every dataset and collection in it |
+| `POST` | `/api/v1/zenodo/publish/:projectId` | Publish draft, mint DOI | ADMIN on the project, every dataset and collection in it, and every configuration its datasets' views use |
 | `POST` | `/api/v1/zenodo/discard/:projectId` | Discard unpublished draft | ADMIN |
 
 Publishing hands out every file in the project, so upload and publish need ADMIN on
-each dataset and collection, not only on the project (`requireProjectContentsAccess` in
+each dataset and collection, and on each configuration the datasets' views use (the
+export publishes their property definitions), not only on the project (`requireProjectContentsAccess` in
 `server/helpers/access_helpers.py`). Project ADMIN alone is not enough: a dataset can be
 added to a project by someone with only WRITE on it, and a co-admin of the project may
 not be able to read it at all. Tests: `test/test_share_escalation.py`

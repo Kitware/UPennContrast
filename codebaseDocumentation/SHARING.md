@@ -168,7 +168,7 @@ configurations at all; project propagation applies the same precondition
 (`limitToShareable`), so a WRITE collaborator cannot re-share them through a project. Before this, a WRITE collaborator could grant themselves ADMIN
 (`accessType: 2` on their own login). The same rules limit project sharing and
 propagation (`codebaseDocumentation/PROJECTS.md`, "Permission Propagation"). Tests:
-`test/test_share_escalation.py`.
+`test/test_share_escalation.py`; invariants are in `PROJECTS.md` "Regression checklist".
 
 #### `POST /dataset_view/set_public`
 
