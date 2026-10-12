@@ -35,8 +35,13 @@ from mcp.server.auth.provider import AccessToken
 log = logging.getLogger(__name__)
 
 # Re-exchange this long before the session token expires, so a token
-# never lapses in the middle of a tool call.
+# never lapses in the middle of a tool call. Keys with short token
+# lifetimes use half their lifetime instead, so they still cache.
 REFRESH_MARGIN_SECONDS = 3600
+# Girder behind HAProxy answers these under normal load (NIM-006); the
+# per-request session check retries them rather than failing the call.
+TRANSIENT_STATUSES = (502, 503, 504)
+CHECK_ATTEMPTS = 3
 # Bounds memory if many distinct keys are seen; least recently used go.
 MAX_CACHED_KEYS = 10_000
 # Girder API keys are 40 alphanumeric characters; anything far outside
@@ -49,8 +54,14 @@ CLIENT_ID = "girder-api-key"
 class _Session:
     girder_token: str
     expires_at: float  # epoch seconds
+    lifetime: float  # seconds, as issued
     user_id: str
     login: str
+
+    def refresh_at(self) -> float:
+        return self.expires_at - min(
+            REFRESH_MARGIN_SECONDS, self.lifetime / 2
+        )
 
 
 def _key_hash(key: str) -> str:
@@ -80,8 +91,9 @@ class GirderApiKeyVerifier:
         self._resource_url = resource_url
         self._http = http or httpx.AsyncClient(timeout=30)
         self._cache: OrderedDict[str, _Session] = OrderedDict()
-        # Serializes exchanges only; the per-request check runs unlocked.
-        self._exchange_lock = asyncio.Lock()
+        # One exchange in flight per key: concurrent first uses of a key
+        # share it, and different keys never wait on each other.
+        self._inflight: dict[str, asyncio.Future] = {}
 
     async def verify_token(self, token: str) -> AccessToken | None:
         if not _plausible_key(token):
@@ -92,21 +104,35 @@ class GirderApiKeyVerifier:
             if await self._still_valid(session):
                 return self._access_token(key_hash, session)
             self._cache.pop(key_hash, None)
-        async with self._exchange_lock:
-            # Another request may have exchanged this key while we waited.
-            session = self._fresh(key_hash)
-            if session is None:
-                session = await self._exchange(token)
-                if session is None:
-                    return None
-                self._remember(key_hash, session)
+        session = await self._exchange_once(key_hash, token)
+        if session is None:
+            return None
         return self._access_token(key_hash, session)
+
+    async def _exchange_once(self, key_hash: str, key: str):
+        pending = self._inflight.get(key_hash)
+        if pending is not None:
+            return await asyncio.shield(pending)
+        future = asyncio.get_running_loop().create_future()
+        self._inflight[key_hash] = future
+        try:
+            session = await self._exchange(key)
+            if session is not None:
+                self._remember(key_hash, session)
+            future.set_result(session)
+            return session
+        except BaseException as e:
+            future.set_exception(e)
+            future.exception()  # retrieved: no "never retrieved" warning
+            raise
+        finally:
+            del self._inflight[key_hash]
 
     def _fresh(self, key_hash: str) -> _Session | None:
         session = self._cache.get(key_hash)
         if session is None:
             return None
-        if session.expires_at - REFRESH_MARGIN_SECONDS <= time.time():
+        if session.refresh_at() <= time.time():
             self._cache.pop(key_hash, None)
             return None
         self._cache.move_to_end(key_hash)
@@ -131,18 +157,24 @@ class GirderApiKeyVerifier:
         body = response.json()
         auth = body["authToken"]
         user = body.get("user") or {}
+        expires_at = datetime.fromisoformat(auth["expires"]).timestamp()
         return _Session(
             girder_token=auth["token"],
-            expires_at=datetime.fromisoformat(auth["expires"]).timestamp(),
+            expires_at=expires_at,
+            lifetime=max(0.0, expires_at - time.time()),
             user_id=str(user.get("_id", "")),
             login=str(user.get("login", "")),
         )
 
     async def _still_valid(self, session: _Session) -> bool:
-        response = await self._http.get(
-            f"{self._api_url}/token/current",
-            headers={"Girder-Token": session.girder_token},
-        )
+        for attempt in range(CHECK_ATTEMPTS):
+            response = await self._http.get(
+                f"{self._api_url}/token/current",
+                headers={"Girder-Token": session.girder_token},
+            )
+            if response.status_code not in TRANSIENT_STATUSES:
+                break
+            await asyncio.sleep(0.25 * 2 ** attempt)
         if response.status_code == 401:
             return False
         response.raise_for_status()

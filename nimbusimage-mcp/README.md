@@ -50,7 +50,13 @@ see the `nimbus-local-ops` skill):
 docker compose --profile mcp up -d mcp     # http://localhost:8001/mcp
 ```
 
-Plain `docker compose up` does not start it. Or run it on the host:
+Plain `docker compose up` does not start it. The image builds from two contexts
+(`nimbusimage-mcp/` and `nimbusimage/`); if the build sits with no output,
+Compose's bake builder is likely waiting to confirm read access to the second
+one, which never shows without a terminal. `COMPOSE_BAKE=false` builds with the
+classic builder instead (about a minute).
+
+Or run it on the host:
 
 ```bash
 python3 -m venv nimbusimage-mcp/.venv

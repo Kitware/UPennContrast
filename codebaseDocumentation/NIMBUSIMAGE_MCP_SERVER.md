@@ -306,7 +306,7 @@ JSON with no structured copy (the SDK's default indents dicts and duplicates the
 | `ni_annotations_list` | `ds.annotations.list(limit, offset)` + `count` | Max 200 rows; center and vertex count instead of coordinates |
 | `ni_annotations_tag` | `list`/`get_many` + `update_many` | **Destructive hint.** Query-based (`match_shape`, `match_tags`) or ids; a filter is required; max 10,000 annotations; undoable in the app |
 | `ni_image_get_channel` | `ds.images.get` | One channel, grayscale, 0.5–99.5 percentile stretch (spike wish list) |
-| `ni_properties_list` | configuration `propertyIds`, `uncomputed_counts`, a value sample | Value paths come from a bounded sample of value documents (both ends), as the app's lazy mode does |
+| `ni_properties_list` | configuration `propertyIds`, `uncomputed_counts`, a value sample | Properties of the caller's default view's configuration, as the app and `nimbusimage` resolve them. Uncomputed counts are exact; value paths come from a bounded sample of value documents (both ends), as the app's lazy mode does, so a sparsely computed property can show none |
 | `ni_property_values_summary` | `ds.annotations.summary(property_paths=…)` | count, mean, std, min, max per path; shape and tag filters |
 | `ni_property_histogram` | `ds.properties.histogram` | The server's bins hold equal counts; the description says so |
 | `ni_property_compute` | `ds.properties.compute` | **Destructive hint.** Not in the original list; without it a "measure X" request dead-ends |
@@ -347,6 +347,10 @@ Anything that fails both returns `None`, which the SDK turns into a 401.
   metric's documentation in `CLAUDE.md` when MCP ships.
 - **Token collection growth.** Uncached exchanges would mint one token per call. Caching
   is a requirement, not an optimization.
+- **Refused keys are not cached.** Each request with an unknown key costs Girder one
+  lookup (exchanges for different keys run in parallel, so a flood does not block other
+  users' sign-ins). Rate-limit 401s at HAProxy when the route goes public (Phase 4); a
+  negative cache in the sidecar would not survive round-robin across instances anyway.
 
 ### 6.3 Girder OAuth plugin
 
@@ -468,7 +472,7 @@ the composite for z=3", "which datasets have spot annotations"):
 - New package `nimbusimage-mcp/` with its own `pyproject.toml` (depends on `nimbusimage`
   and a pinned MCP SDK). Keeps the SDK out of `nimbusimage`'s dependencies.
 - Token verifier for API keys with the exchange cache ([6.1](#61-token-verifier-in-the-mcp-server)).
-- Phase 1 tools ([5.4](#54-phase-1-additions)), result caps, image downsampling, and
+- Phase 1 tools ([5.4](#54-phase-1-tool-set-built)), result caps, image downsampling, and
   `ni_job_wait` with a timeout.
 - Error mapping: `girder_client.HttpError` 401/403/404 become clear tool errors, never
   stack traces.
@@ -494,6 +498,16 @@ the composite for z=3", "which datasets have spot annotations"):
 - [x] The exchange cache is hit on repeat calls (token count in Mongo does not grow per
       call).
 - [x] All unit and integration tests pass.
+
+**Eval against the container (2026-10-11):** the 13 Phase 0 tasks plus 6 for the new tools
+(`nimbusimage-mcp/eval/tasks.txt`), headless Claude Code with only the MCP tools and a
+bearer key: 19 of 19 completed, 55 calls, 0 errors, and the first real call was the right
+tool every time. The "which kidney dataset has the most annotations" task took one
+multi-dataset count instead of 16. Text responses: median under 1 KB, largest 6.2 KB
+(`ni_workers_list`; a help article is 3 to 11 KB by design). A grayscale channel of a noisy
+frame can reach about 550 KB of JPEG even at 1024 px, since stretched camera noise
+compresses badly; the model's image cost depends on pixel size, not bytes. The container
+sat at about 240 MB.
 
 **What Phase 1 learned:**
 
@@ -711,7 +725,9 @@ the local stack. Add an item whenever a review finds something this list missed.
 ### Identity and access
 
 - [x] Every tool call runs as the caller: the per-request client carries the caller's
-      Girder session and nothing else. *"test_tools_run_as_the_callers_session"*
+      Girder session and nothing else, also when many callers' tool calls run at once in
+      worker threads. *"test_tools_run_as_the_callers_session"*,
+      *"test_concurrent_callers_each_get_their_own_session"*
 - [x] Two users each see exactly what Girder lets them read (integration).
       *"test_two_users_see_only_own_datasets"*
 - [x] Missing, malformed, invalid, and revoked credentials return 401 over HTTP.
@@ -730,27 +746,45 @@ the local stack. Add an item whenever a review finds something this list missed.
 
 - [x] Row-returning tools cap (200 annotations, 100 datasets) and say what is left.
       *"test_list_tools_enforce_cap"*
-- [x] Images are downsampled to `max_size` and crops are clipped.
-      *"test_composite_downsampled"*
+- [x] `max_size` is clamped and passed to the server's downsampling, and crops are
+      clipped. *"test_composite_downsampled"*
 - [x] Text results are compact JSON with no structured duplicate.
       *"test_result_size_matches_sdk_wire_format"*,
       *"test_every_tool_is_registered_with_its_annotations"*
 - [x] API-key exchanges are cached; repeat calls mint no new Girder tokens (unit, and
       integration via the Mongo token count). *"test_exchange_is_cached_and_rechecked"*,
       *"test_concurrent_first_use_exchanges_once"*, *"test_key_exchange_cached"*
+- [x] Keys whose tokens live under an hour still cache (the refresh margin is at most
+      half the lifetime). *"test_short_lived_tokens_are_still_cached"*
+- [x] Exchanges for different keys never wait on each other, and a transient 5xx on the
+      per-request check is retried. *"test_concurrent_different_keys_do_not_wait_on_each_other"*,
+      *"test_transient_check_failures_are_retried"*
 - [x] The server holds no per-session state between requests.
       *"test_stateless_requests_any_instance"*
-- [x] `ni_job_wait` never waits longer than the configured cap.
+- [x] `ni_job_wait` never waits longer than the configured cap, and waits on the event
+      loop rather than holding one of the worker threads all sync tools share.
       *"test_job_wait_clamps_and_reports_still_running"*
+
+### Right answers
+
+- [x] Channels are counted from `num_channels`; an image without channel names (a single
+      frame) still has channel 0 for workers and the channel view.
+      *"test_worker_tools_count_unnamed_channels"*
+- [x] A multi-dataset count says when a dataset could not be read instead of counting it
+      as 0. *"test_count_across_datasets_reports_each"*
+- [x] No values in the path sample is reported as "not found in a sample", never as
+      "not computed". *"test_values_summary_says_when_nothing_is_computed"*
 
 ### Writes
 
 - [x] Tools that change data carry `destructiveHint`; the rest are read-only.
       *"test_every_tool_is_registered_with_its_annotations"*
-- [x] Tagging needs an explicit target, refuses more than 10,000 annotations before
-      loading any, and sends only the annotations whose tags change.
-      *"test_tag_refuses_unbounded_or_ambiguous_targets"*,
-      *"test_tag_by_query_updates_only_changed"*
+- [x] Tagging needs an explicit target (an empty id list is not "everything"), refuses
+      more than 10,000 annotations before loading any, and sends only the annotations
+      whose tags change. *"test_tag_refuses_unbounded_or_ambiguous_targets"*,
+      *"test_tag_by_query_updates_only_changed"*, *"test_tag_by_ids"*
+- [x] A worker run checks channel and location before starting a job.
+      *"test_worker_run_checks_the_location_before_submitting"*
 - [x] Worker parameters are normalized like the app's (channel names, checkbox maps,
       strict numbers and booleans), and property workers are refused by `ni_worker_run`.
       *"test_channel_checkboxes_canonical_map"*, *"test_strict_scalars"*,

@@ -3,10 +3,13 @@ compact results, and the call log."""
 
 from __future__ import annotations
 
+import contextlib
 import functools
+import inspect
 import json
 import logging
 import math
+import threading
 import time
 
 import girder_client
@@ -106,54 +109,89 @@ def tool_error(e: girder_client.HttpError) -> ToolError:
     return ToolError(f"NimbusImage server error ({e.status}).")
 
 
+# Long list arguments (e.g. 10,000 annotation ids) are logged by size.
+MAX_LOGGED_LIST = 20
+
+
+def _loggable(kwargs: dict) -> dict:
+    return {
+        key: f"<{len(value)} items>"
+        if isinstance(value, list) and len(value) > MAX_LOGGED_LIST
+        else value
+        for key, value in kwargs.items()
+    }
+
+
+class _Call:
+    result = None
+
+
+@contextlib.contextmanager
+def _recorded(name: str, kwargs: dict):
+    """Map Girder errors to tool errors and log the call: tool, caller,
+    duration, wire size. Never logs credentials."""
+    call = _Call()
+    start = time.perf_counter()
+    error = None
+    succeeded = False
+    try:
+        yield call
+        succeeded = True
+    except ToolError as e:
+        error = str(e)
+        raise
+    except girder_client.HttpError as e:
+        error = f"HTTP {e.status}"
+        raise tool_error(e) from None
+    except requests.ConnectionError:
+        error = "connection"
+        raise ToolError("Could not reach the NimbusImage server.") from None
+    except (ValueError, PermissionError) as e:
+        # nimbusimage reports bad input as ValueError ("No large image
+        # found in dataset ...") and a key scope problem as
+        # PermissionError; both messages are meant for the user.
+        error = str(e)
+        raise ToolError(str(e)) from None
+    finally:
+        record = {
+            "ts": round(time.time(), 3),
+            "tool": name,
+            "user": caller_id(),
+            "args": _loggable(kwargs),
+            "seconds": round(time.perf_counter() - start, 3),
+            "bytes": result_size(call.result) if succeeded else None,
+            # "unhandled": not one of the mapped errors; the SDK reports
+            # it to the client.
+            "error": None if succeeded else (error or "unhandled"),
+        }
+        line = json.dumps(record, default=str)
+        log.info(line)
+        call_log = _settings.call_log if _settings else None
+        if call_log:
+            with _log_lock, open(call_log, "a") as f:
+                f.write(line + "\n")
+
+
+_log_lock = threading.Lock()
+
+
 def instrumented(fn):
-    """Map Girder errors to tool errors, return compact JSON, and log the
-    tool, caller, duration, and wire size. Never logs credentials."""
+    """Wrap a tool (sync or async): compact JSON result, mapped errors,
+    one log record per call."""
+    if inspect.iscoroutinefunction(fn):
+        @functools.wraps(fn)
+        async def async_wrapper(*args, **kwargs):
+            with _recorded(fn.__name__, kwargs) as call:
+                call.result = compact(await fn(*args, **kwargs))
+            return call.result
+
+        return async_wrapper
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
-        start = time.perf_counter()
-        error = None
-        result = None
-        succeeded = False
-        try:
-            result = compact(fn(*args, **kwargs))
-            succeeded = True
-            return result
-        except ToolError as e:
-            error = str(e)
-            raise
-        except girder_client.HttpError as e:
-            error = f"HTTP {e.status}"
-            raise tool_error(e) from None
-        except requests.ConnectionError:
-            error = "connection"
-            raise ToolError("Could not reach the NimbusImage server.") \
-                from None
-        except (ValueError, PermissionError) as e:
-            # nimbusimage reports bad input as ValueError ("No large image
-            # found in dataset ...") and a key scope problem as
-            # PermissionError; both messages are meant for the user.
-            error = str(e)
-            raise ToolError(str(e)) from None
-        finally:
-            record = {
-                "ts": round(time.time(), 3),
-                "tool": fn.__name__,
-                "user": caller_id(),
-                "args": kwargs,
-                "seconds": round(time.perf_counter() - start, 3),
-                "bytes": result_size(result) if succeeded else None,
-                # "unhandled": not one of the mapped errors; the SDK
-                # reports it to the client.
-                "error": None if succeeded else (error or "unhandled"),
-            }
-            line = json.dumps(record, default=str)
-            log.info(line)
-            call_log = _settings.call_log if _settings else None
-            if call_log:
-                with open(call_log, "a") as f:
-                    f.write(line + "\n")
+        with _recorded(fn.__name__, kwargs) as call:
+            call.result = compact(fn(*args, **kwargs))
+        return call.result
 
     return wrapper
 

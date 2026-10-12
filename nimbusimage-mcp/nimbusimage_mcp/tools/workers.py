@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import time
 from typing import Literal
+
+import anyio
 
 from mcp.server.mcpserver.exceptions import ToolError
 
@@ -16,6 +19,8 @@ from nimbusimage_mcp._common import (
     instrumented,
     settings,
 )
+from nimbusimage_mcp.tools.datasets import channel_list, channel_names
+from nimbusimage_mcp.tools.images import check_location
 
 # Docker marker labels: present means true, whatever the value (often "").
 ANNOTATION_LABEL = "isAnnotationWorker"
@@ -26,6 +31,7 @@ MAX_TOOLTIP = 200
 # interface the first time it is asked.
 INTERFACE_REQUEST_TIMEOUT = 60
 LOG_TAIL = 1500
+POLL_SECONDS = 2.0
 
 
 def worker_kind(labels: dict) -> str | None:
@@ -47,10 +53,11 @@ def ni_workers_list(
     kind: Literal["annotation", "property", "all"] = "all",
     include_test_images: bool = False,
 ) -> dict:
-    """List the analysis workers available on the server: annotation
-    workers create objects or process images (e.g. Cellpose-SAM cell or
-    nucleus segmentation, spot detection, image processing), property
-    workers compute measurements (area, intensity). Returns image, name,
+    """List the analysis workers installed on this server: annotation
+    workers create objects or process images (for example cell or
+    nucleus segmentation, spot detection, filters), property workers
+    compute measurements (area, intensity). Servers differ in what is
+    installed. Returns image, name,
     kind, category, description, and for property workers the annotation
     shape they measure. Use ni_worker_interface to see a worker's
     parameters.
@@ -138,10 +145,7 @@ def ni_worker_interface(image: str, dataset_id: str | None = None) -> dict:
         },
     }
     if dataset_id:
-        result["channels"] = [
-            {"index": i, "name": name}
-            for i, name in enumerate(nc.dataset(dataset_id).channels)
-        ]
+        result["channels"] = channel_list(nc.dataset(dataset_id))
     return result
 
 
@@ -178,11 +182,13 @@ def ni_worker_run(
             "ni_property_compute."
         )
     ds = nc.dataset(dataset_id)
-    channels = ds.channels
+    channels = channel_names(ds)
     if not 0 <= channel < len(channels):
         raise ValueError(
             f"channel={channel} is out of range (0..{len(channels) - 1})"
         )
+    # A location outside the dataset would start a job that then fails.
+    check_location(ds, xy, z, time)
     values = worker_values.resolve(
         fetch_interface(nc, image), parameters or {}, channels
     )
@@ -199,19 +205,27 @@ def ni_worker_run(
 
 
 @instrumented
-def ni_job_wait(job_id: str, timeout_seconds: float = 60) -> dict:
+async def ni_job_wait(job_id: str, timeout_seconds: float = 60) -> dict:
     """Wait for a job started by ni_worker_run or ni_property_compute to
     finish, then report its status and the end of its log. Waits at most
     timeout_seconds (default 60, capped by the server, about 4 minutes);
     if the job is still going, the result says finished=false and you can
     call this again with the same job_id. Do not poll with other tools.
     """
+    # Async so a long wait sleeps on the event loop instead of holding
+    # one of the worker threads every sync tool shares; only the polls
+    # (blocking HTTP) run in a thread.
     limit = max(1.0, min(timeout_seconds, settings().max_job_wait))
-    job = client().job(job_id)
-    try:
-        job.wait(poll_interval=2.0, timeout=limit, verbose=False)
-    except TimeoutError:
-        pass
+    deadline = time.monotonic() + limit
+    nc = client()
+    job = await anyio.to_thread.run_sync(nc.job, job_id)
+    await anyio.to_thread.run_sync(job.refresh)  # also fetches the log
+    while not job.finished:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        await anyio.sleep(min(POLL_SECONDS, remaining))
+        await anyio.to_thread.run_sync(job.refresh)
     return {
         "job_id": job.id,
         "title": job.title,

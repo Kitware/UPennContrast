@@ -24,6 +24,20 @@ def known_scale(scale: dict | None) -> dict | None:
     return scale
 
 
+def channel_names(ds) -> list[str]:
+    """One name per channel, "" where the image has none. ds.channels is
+    empty for images without channel names (e.g. a single frame), while
+    ds.num_channels still counts them."""
+    names = list(ds.channels)
+    return [names[i] if i < len(names) else ""
+            for i in range(ds.num_channels)]
+
+
+def channel_list(ds) -> list[dict]:
+    return [{"index": i, "name": name or None}
+            for i, name in enumerate(channel_names(ds))]
+
+
 @instrumented
 def ni_datasets_list(
     name_contains: str | None = None, limit: int = 50
@@ -64,9 +78,7 @@ def ni_dataset_info(dataset_id: str) -> dict:
         "width": width,
         "height": height,
         "dtype": ds.dtype,
-        "channels": [
-            {"index": i, "name": name} for i, name in enumerate(ds.channels)
-        ],
+        "channels": channel_list(ds),
         "num_z": ds.num_z,
         "num_time": ds.num_time,
         "num_xy": ds.num_xy,

@@ -21,6 +21,7 @@ Shape = Literal["point", "polygon", "line", "rectangle"]
 # Matches the AI panel's MAX_LIST_ANNOTATIONS.
 MAX_LIST = 200
 MAX_COUNT_DATASETS = 50
+MAX_SUMMARY_TAGS = 200
 # One tagging call loads every matching annotation (with coordinates)
 # into this process and sends one bulk update; past this, narrow the
 # query or run it in the app.
@@ -38,9 +39,10 @@ def ni_annotations_count(
 
     Optionally filter by shape (point = spots, polygon = cells/nuclei,
     line, rectangle) and by tags (an annotation must have ALL the given
-    tags). Returns {total, counts: [{dataset_id, count}]}; a dataset that
-    cannot be read gets an "error" instead of a count. Use this before
-    listing annotations.
+    tags). Returns {total, counts: [{dataset_id, count}], incomplete}; a
+    dataset that cannot be read gets an "error" instead of a count, and
+    then total covers only the readable ones and incomplete is true. Use
+    this before listing annotations.
     """
     if not 1 <= len(dataset_ids) <= MAX_COUNT_DATASETS:
         raise ValueError(
@@ -64,6 +66,7 @@ def ni_annotations_count(
             })
     return {
         "total": sum(c.get("count", 0) for c in counts),
+        "incomplete": any("error" in c for c in counts),
         "shape": shape,
         "tags": tags or [],
         "counts": counts,
@@ -79,9 +82,10 @@ def ni_annotations_summary(
     max_tags: int = 30,
 ) -> dict:
     """Summarize a dataset's annotations: total count, counts by tag (most
-    common first, capped at max_tags), and counts by shape. Use this to
-    learn which tags exist (e.g. "nucleus", "spot", "cell") before counting
-    or filtering. An annotation with several tags counts once per tag.
+    common first, capped at max_tags, at most 200), and counts by shape.
+    Use this to learn which tags exist (e.g. "nucleus", "spot", "cell")
+    before counting or filtering. An annotation with several tags counts
+    once per tag.
 
     Optionally restrict to a shape, and to annotations with ANY of `tags`
     (or exactly those tags with exclusive=true).
@@ -91,7 +95,8 @@ def ni_annotations_summary(
     )
     return {
         "total": summary.total,
-        "by_tag": dict(list(summary.tags.items())[:max(1, max_tags)]),
+        "by_tag": dict(list(summary.tags.items())[
+            :clamp(max_tags, 1, MAX_SUMMARY_TAGS)]),
         "distinct_tags": len(summary.tags),
         "by_shape": summary.shapes,
     }
@@ -198,7 +203,8 @@ def ni_annotations_tag(
             raise ToolError(
                 f"At most {MAX_TAG_ANNOTATIONS} annotation_ids per call."
             )
-        # Scoped to this dataset: other datasets' ids are dropped.
+        # Ids of other readable datasets are dropped; an id of a dataset
+        # the caller cannot read makes the server refuse the whole call.
         matched = annotations.get_many(annotation_ids)
     else:
         total = annotations.count(shape=match_shape, tags=match_tags)

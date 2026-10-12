@@ -8,8 +8,10 @@ same value shapes as one started from the app. Keep the two in step.
 from __future__ import annotations
 
 import math
+import re
 
-# WORKER_INTERFACE_VALUE_FORMATS in src/utils/workerInterface.ts.
+# Adapted from WORKER_INTERFACE_VALUE_FORMATS in
+# src/utils/workerInterface.ts (this port also accepts channel names).
 VALUE_FORMATS = {
     "number": "A number. Respect this parameter's min/max if given.",
     "notes": "Informational text, not an input; do not set it.",
@@ -46,7 +48,8 @@ def _available(channels: list[str]) -> str:
     if not channels:
         return ""
     return " Available channels: " + ", ".join(
-        f"{i} ({name})" for i, name in enumerate(channels)
+        f"{i} ({name})" if name else str(i)
+        for i, name in enumerate(channels)
     ) + "."
 
 
@@ -72,10 +75,11 @@ def _channel_index(ref, channels: list[str], param: str) -> int:
         return check(int(ref))
     if isinstance(ref, str):
         text = ref.strip()
-        if text.isdigit():
+        if re.fullmatch(r"[0-9]+", text):
             return check(int(text))
         lowered = [name.lower() for name in channels]
-        if text.lower() in lowered:
+        # "" marks a channel without a name; it matches nothing.
+        if text and text.lower() in lowered:
             return lowered.index(text.lower())
         raise ValueError(
             f'"{param}": unknown channel "{ref}".{_available(channels)}'
@@ -101,11 +105,14 @@ def normalize(element: dict, value, channels: list[str], param: str):
             pass
         elif isinstance(value, list):
             selected = {_channel_index(v, channels, param) for v in value}
-        elif isinstance(value, (int, str)) and not isinstance(value, bool):
+        elif isinstance(value, (int, float, str)) \
+                and not isinstance(value, bool):
             selected = {_channel_index(value, channels, param)}
         elif isinstance(value, dict):
             for key, on in value.items():
-                if on is True:
+                # As in the app: any truthy value selects; a falsy one
+                # other than false is an index typed in the value slot.
+                if on:
                     selected.add(_channel_index(key, channels, param))
                 elif on is not False:
                     raise ValueError(

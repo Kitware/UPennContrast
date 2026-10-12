@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from types import SimpleNamespace
 
@@ -58,7 +59,6 @@ def test_result_size_matches_sdk_wire_format():
 
 def test_every_tool_is_registered_with_its_annotations():
     server = build_server(make_settings())
-    import asyncio
     listed = {t.name: t for t in asyncio.run(server.list_tools())}
     assert set(listed) == {fn.__name__ for fn, _ in TOOLS}
     writers = {name for name, t in listed.items()
@@ -189,7 +189,7 @@ def test_count_across_datasets_reports_each(nc):
     result = loads(annotations.ni_annotations_count(
         dataset_ids=["aa", "bad", "aaa", "aa"], shape="point"
     ))
-    assert result["total"] == 5
+    assert result["total"] == 5 and result["incomplete"] is True
     assert [c["dataset_id"] for c in result["counts"]] == ["aa", "bad", "aaa"]
     assert "denied" in result["counts"][1]["error"]
     with pytest.raises(ToolError, match="between 1 and 50"):
@@ -220,6 +220,18 @@ def test_tag_by_query_updates_only_changed(nc):
     )
 
 
+def test_tag_by_ids(nc):
+    accessor = nc.dataset.return_value.annotations
+    accessor.get_many.return_value = [annotation(1, tags=["cell", "x"])]
+    result = loads(annotations.ni_annotations_tag(
+        dataset_id="d", tags=["x"], mode="remove", annotation_ids=["a1"]
+    ))
+    accessor.get_many.assert_called_once_with(["a1"])
+    accessor.count.assert_not_called()
+    accessor.update_many.assert_called_once_with([("a1", {"tags": ["cell"]})])
+    assert result["changed"] == 1
+
+
 def test_tag_refuses_unbounded_or_ambiguous_targets(nc):
     accessor = nc.dataset.return_value.annotations
     with pytest.raises(ToolError, match="match_shape, match_tags"):
@@ -237,8 +249,18 @@ def test_tag_refuses_unbounded_or_ambiguous_targets(nc):
     with pytest.raises(ToolError, match="Narrow it"):
         annotations.ni_annotations_tag(dataset_id="d", tags=["x"],
                                        mode="add", match_shape="point")
+    with pytest.raises(ToolError, match="At most"):
+        annotations.ni_annotations_tag(
+            dataset_id="d", tags=["x"], mode="add",
+            annotation_ids=["a"] * (annotations.MAX_TAG_ANNOTATIONS + 1),
+        )
+    # An empty id list is "no target", never "every annotation".
+    with pytest.raises(ToolError, match="match_shape, match_tags"):
+        annotations.ni_annotations_tag(dataset_id="d", tags=["x"],
+                                       mode="add", annotation_ids=[])
     accessor.update_many.assert_not_called()
     accessor.list.assert_not_called()
+    accessor.get_many.assert_not_called()
 
 
 # --- properties ---------------------------------------------------------
@@ -376,6 +398,7 @@ INTERFACE = {
 def test_worker_interface_shape(nc):
     nc.get_worker_interface.return_value = INTERFACE
     nc.dataset.return_value.channels = ["DAPI", "GFP"]
+    nc.dataset.return_value.num_channels = 2
     result = loads(workers.ni_worker_interface(
         image="annotations/seg:latest", dataset_id="d"
     ))
@@ -389,7 +412,8 @@ def test_worker_run_fills_defaults_and_rejects_property_workers(nc):
     nc.list_workers.return_value = WORKERS
     nc.get_worker_interface.return_value = INTERFACE
     ds = nc.dataset.return_value
-    ds.channels = ["DAPI", "GFP"]
+    ds.channels, ds.num_channels = ["DAPI", "GFP"], 2
+    ds.num_xy, ds.num_z, ds.num_time = 1, 5, 1
     ds.annotations.compute.return_value = SimpleNamespace(
         id="j1", status_name="queued", title="Seg"
     )
@@ -411,36 +435,92 @@ def test_worker_run_fills_defaults_and_rejects_property_workers(nc):
                               parameters={"Nope": 1})
 
 
+def test_worker_tools_count_unnamed_channels(nc):
+    """large_image leaves `channels` empty for images without channel
+    names (e.g. one frame); num_channels still counts them."""
+    nc.list_workers.return_value = WORKERS
+    nc.get_worker_interface.return_value = {
+        "Slot 1": {"type": "channelCheckboxes"}}
+    ds = nc.dataset.return_value
+    ds.channels, ds.num_channels = [], 1
+    ds.num_xy, ds.num_z, ds.num_time = 1, 1, 1
+    ds.annotations.compute.return_value = SimpleNamespace(
+        id="j1", status_name="queued", title="Seg")
+    workers.ni_worker_run(dataset_id="d", image="annotations/seg:latest",
+                          parameters={"Slot 1": [0]})
+    assert ds.annotations.compute.call_args.kwargs["worker_interface"] == {
+        "Slot 1": {"0": True}}
+    info = loads(workers.ni_worker_interface(image="annotations/seg:latest",
+                                             dataset_id="d"))
+    assert info["channels"] == [{"index": 0, "name": None}]
+
+
+def test_worker_run_checks_the_location_before_submitting(nc):
+    nc.list_workers.return_value = WORKERS
+    nc.get_worker_interface.return_value = INTERFACE
+    ds = nc.dataset.return_value
+    ds.channels, ds.num_channels = ["DAPI"], 1
+    ds.num_xy, ds.num_z, ds.num_time = 1, 3, 1
+    with pytest.raises(ToolError, match="z=3 is out of range"):
+        workers.ni_worker_run(dataset_id="d", image="annotations/seg:latest",
+                              z=3)
+    ds.annotations.compute.assert_not_called()
+
+
 class _Job:
-    def __init__(self, finish: bool):
+    """Finishes after `polls` refreshes (never, for None)."""
+
+    def __init__(self, polls):
         self.id, self.title = "j1", "Seg"
-        self.finished = self.succeeded = finish
-        self.status_name = "success" if finish else "running"
+        self.polls_left = polls
+        self.refreshes = 0
         self.log = "x" * 5000
-        self.timeouts = []
 
-    def wait(self, poll_interval, timeout, verbose):
-        self.timeouts.append(timeout)
-        if not self.finished:
-            raise TimeoutError
+    @property
+    def finished(self):
+        return self.polls_left is not None and self.refreshes > \
+            self.polls_left
+
+    succeeded = finished
+
+    @property
+    def status_name(self):
+        return "success" if self.finished else "running"
+
+    def refresh(self):
+        self.refreshes += 1
 
 
-def test_job_wait_clamps_and_reports_still_running(nc):
-    job = _Job(finish=False)
-    nc.job.return_value = job
-    result = loads(workers.ni_job_wait(job_id="j1", timeout_seconds=10_000))
-    assert job.timeouts == [_common.settings().max_job_wait]
+def test_job_wait_clamps_and_reports_still_running(nc, monkeypatch):
+    clock = {"now": 0.0}
+    sleeps = []
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+        clock["now"] += seconds
+
+    monkeypatch.setattr(workers.anyio, "sleep", fake_sleep)
+    monkeypatch.setattr(workers.time, "monotonic", lambda: clock["now"])
+    nc.job.return_value = _Job(polls=None)
+    result = loads(asyncio.run(workers.ni_job_wait(
+        job_id="j1", timeout_seconds=10_000
+    )))
+    assert sum(sleeps) == _common.settings().max_job_wait
     assert result["finished"] is False and result["status"] == "running"
     assert len(result["log_tail"]) == workers.LOG_TAIL
-    job = _Job(finish=True)
-    nc.job.return_value = job
-    assert loads(workers.ni_job_wait(job_id="j1"))["succeeded"] is True
+
+    clock["now"], sleeps[:] = 0.0, []
+    nc.job.return_value = _Job(polls=2)
+    result = loads(asyncio.run(workers.ni_job_wait(job_id="j1")))
+    assert result["succeeded"] is True
+    assert sleeps == [workers.POLL_SECONDS] * 2
 
 
 def test_job_wait_scope_problem_is_explained(nc):
-    nc.job.return_value.wait.side_effect = PermissionError("core.user_auth")
+    nc.job.return_value.refresh.side_effect = PermissionError(
+        "core.user_auth")
     with pytest.raises(ToolError, match="core.user_auth"):
-        workers.ni_job_wait(job_id="j1")
+        asyncio.run(workers.ni_job_wait(job_id="j1"))
 
 
 # --- help ---------------------------------------------------------------

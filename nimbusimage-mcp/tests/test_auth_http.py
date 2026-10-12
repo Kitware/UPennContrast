@@ -9,6 +9,7 @@ token collection does not grow per call).
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock
 
 import pytest
@@ -85,6 +86,33 @@ def test_tools_run_as_the_callers_session(server, girder, monkeypatch):
     assert api_url == make_settings().api_url
     # The client carries the caller's Girder session, nothing else.
     assert girder.tokens[token]["key"] == KEY
+
+
+def test_concurrent_callers_each_get_their_own_session(
+        server, girder, monkeypatch):
+    """Sync tools run in worker threads; under concurrency each must
+    still see its own caller's token."""
+    other = "o" * 40
+    girder.add_key(other, "bob")
+    seen = []
+
+    def connect(api_url, token):
+        fake = MagicMock()
+        fake.list_datasets.return_value = [{"_id": token, "name": "x"}]
+        seen.append(token)
+        return fake
+
+    monkeypatch.setattr(_common.ni, "connect", connect)
+    keys = [KEY, other] * 10
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        results = list(pool.map(
+            lambda key: call_tool(server, key, "ni_datasets_list", {}),
+            keys,
+        ))
+    for key, result in zip(keys, results):
+        token = result["datasets"][0]["id"]
+        assert girder.tokens[token]["key"] == key
+    assert len(set(seen)) == 2
 
 
 # --- Integration: the local compose stack -------------------------------

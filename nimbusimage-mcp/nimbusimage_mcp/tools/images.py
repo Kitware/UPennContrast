@@ -31,7 +31,7 @@ def check_crop(crop, width: int, height: int) -> tuple[int, int, int, int]:
     return left, top, right, bottom
 
 
-def _check_location(ds, xy: int, z: int, time: int) -> None:
+def check_location(ds, xy: int, z: int, time: int) -> None:
     sizes = {"xy": ds.num_xy, "z": ds.num_z, "time": ds.num_time}
     for axis, value in {"xy": xy, "z": z, "time": time}.items():
         if not 0 <= value < sizes[axis]:
@@ -78,7 +78,7 @@ def ni_image_get_composite(
     """
     max_size = clamp(max_size, 64, MAX_IMAGE_SIZE)
     ds = client().dataset(dataset_id)
-    _check_location(ds, xy, z, time)
+    check_location(ds, xy, z, time)
     if crop is not None:
         height, width = ds.shape
         crop = check_crop(crop, width, height)
@@ -120,7 +120,7 @@ def ni_image_get_channel(
     """
     max_size = clamp(max_size, 64, MAX_IMAGE_SIZE)
     ds = client().dataset(dataset_id)
-    _check_location(ds, xy, z, time)
+    check_location(ds, xy, z, time)
     if not 0 <= channel < ds.num_channels:
         raise ValueError(
             f"channel={channel} is out of range (0..{ds.num_channels - 1})"

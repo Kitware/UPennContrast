@@ -84,7 +84,9 @@ def ni_properties_list(dataset_id: str) -> dict:
     and tags they apply to, the worker image that computes them, how many
     matching annotations still lack a value (uncomputed), and the value
     paths found (each a list of keys, e.g. [property_id, "Area"]) to pass
-    to ni_property_values_summary or ni_property_histogram.
+    to ni_property_values_summary or ni_property_histogram. uncomputed
+    is exact; value_paths come from a sample of stored values, so they
+    can be missing for a property computed on only a few annotations.
     """
     nc = client()
     ds = nc.dataset(dataset_id)
@@ -140,11 +142,17 @@ def ni_property_values_summary(
     discovered = discover_paths(nc, dataset_id)
     paths = [path for pid in wanted for path in discovered.get(pid, [])]
     if not paths:
+        # The sample can miss a property computed on only some
+        # annotations, so this must not claim "not computed".
         raise ToolError(
-            "No computed values found for "
+            "Found no values for "
             + (f"property {property_id}" if property_id else
                "any property of this dataset")
-            + ". Compute it first (ni_property_compute)."
+            + f" in a sample of {2 * PATH_SAMPLE} value records. Check "
+            "its uncomputed count with ni_properties_list: if every "
+            "matching annotation is uncomputed, compute it with "
+            "ni_property_compute; otherwise its values are too sparse "
+            "for the sample."
         )
     truncated = max(0, len(paths) - MAX_SUMMARY_PATHS)
     paths = paths[:MAX_SUMMARY_PATHS]

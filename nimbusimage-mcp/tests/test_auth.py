@@ -101,14 +101,63 @@ def test_token_near_expiry_is_exchanged_again(girder, monkeypatch):
 
     async def twice():
         first = await v.verify_token(KEY)
-        # Jump to inside the refresh margin.
-        now = time.time() + 120
+        # Jump to a minute before expiry: inside any refresh margin.
+        now = time.time() + auth.REFRESH_MARGIN_SECONDS
         monkeypatch.setattr(auth.time, "time", lambda: now)
         return first, await v.verify_token(KEY)
 
     first, second = run(twice())
     assert girder.exchanges == 2
     assert first.claims["girder_token"] != second.claims["girder_token"]
+
+
+def test_short_lived_tokens_are_still_cached(girder):
+    # A key whose tokens live under an hour would otherwise be inside
+    # the refresh margin from the start and mint a token per request.
+    girder.lifetime = timedelta(minutes=20)
+    v = verifier(girder)
+
+    async def twice():
+        return [await v.verify_token(KEY) for _ in range(2)]
+
+    run(twice())
+    assert girder.exchanges == 1
+
+
+def test_transient_check_failures_are_retried(girder, monkeypatch):
+    monkeypatch.setattr(auth.asyncio, "sleep", _no_sleep)
+    v = verifier(girder)
+    run(v.verify_token(KEY))
+    original = girder.handler
+    failures = iter([503, 502])
+
+    def flaky(request):
+        status = next(failures, None)
+        if status and request.url.path.endswith("token/current"):
+            return httpx.Response(status)
+        return original(request)
+
+    v._http = httpx.AsyncClient(transport=httpx.MockTransport(flaky))
+    assert run(v.verify_token(KEY)) is not None
+    assert girder.exchanges == 1
+
+
+async def _no_sleep(_seconds):
+    return None
+
+
+def test_concurrent_different_keys_do_not_wait_on_each_other(girder):
+    other = "o" * 40
+    girder.add_key(other, "bob")
+    v = verifier(girder)
+
+    async def both():
+        return await asyncio.gather(v.verify_token(KEY),
+                                    v.verify_token(other))
+
+    alice, bob = run(both())
+    assert alice.subject != bob.subject
+    assert girder.exchanges == 2 and not v._inflight
 
 
 def test_girder_outage_is_an_error_not_a_bad_key(girder):
