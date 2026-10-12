@@ -48,7 +48,8 @@ print(f"Name: {ds.name}")
 print(f"Shape: {ds.shape}")  # (height, width)
 print(f"Channels: {ds.channels}")
 print(f"Z-slices: {ds.num_z}, Time points: {ds.num_time}")
-print(f"Pixel size: {ds.pixel_size.to('um').value} um")
+ps = ds.pixel_size  # None when the size is unknown
+print(f"Pixel size: {ps.to('um').value if ps else 'unknown'} um")
 ```
 
 ## Fetching images

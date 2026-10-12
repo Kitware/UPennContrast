@@ -266,6 +266,12 @@ Watch out for stringify cost on large objects.
 
 Not every `{ deep: true }` is this bug — it only applies when the watched source is a **getter function that rebuilds a fresh object/array on each call** (a Vuex/Pinia getter, a `computed`, or a plain function reading store state). A `ref()`/`reactive()` passed **directly** as the watch source (not wrapped in a function) is the correct, safe use of `deep: true` — Vue tracks its stable identity and only fires on genuine in-place mutations. Don't blanket-remove `deep: true` without checking which case you're in.
 
+### An "unknown" value needs ONE spelling and ONE predicate
+
+An uncalibrated dataset's pixel size had three stored spellings — `0` (the intended marker), `null` (JSON's rendering of a `NaN` from `(undefined + undefined) / 2`) and `{1, "m"}` (the configuration default) — and every consumer checked a different subset: the scale bar and blob-metrics worker tested `0`, the line scan tested `1 m`, nothing tested `null`. Each gap was a real bug: a 1.5 km scale bar, a worker crash on `None * 1e-3`, the spatial plugin refusing to adopt a size because "1 m" looked set.
+
+When a value can be "unknown", give it one representation (`unknownPixelSize()` in `src/utils/scales.ts`), one predicate every consumer calls (`isKnownPixelSize`), and normalize legacy spellings at the read boundary (`normalizeScales` in the `scales`/`configurationScales` getters), so workers that receive the value see only real-or-marker. Sweep with a concept search ("where is this value tested for unset?"), not a grep for one spelling. Backend ports of frontend defaults (`server/helpers/default_configuration.py`) are the twin — change both.
+
 ### Don't re-key a dataset/configuration watcher on ids
 
 `Viewer.vue`'s `watch([dataset, configuration], fetchAnnotationData)` looks like it should key on ids ("a reload of the same object shouldn't refetch"), but **`refreshDataset()` depends on the object swap**: it re-runs `setSelectedDataset` with the same id, which resets annotation and property state, and only this watcher repopulates it. Keying on ids left the viewer empty after unroll toggles and `addLargeImage` (caught in review of issue #1379). Before narrowing any watcher on `store.dataset`/`store.configuration`, find what resets state on a same-id reload and who repopulates it.

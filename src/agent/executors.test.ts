@@ -300,6 +300,15 @@ beforeEach(() => {
   mockAnnotations.annotationCount = 0;
   mockAnnotations.selectedAnnotationIds = new Set();
   mockAnnotations.resolvedSelectedAnnotationIds = [];
+  // clearAllMocks keeps implementations, so a test's summary would leak
+  // into the next; start each from an empty dataset.
+  mockMain.annotationsAPI.fetchAnnotationSummary = vi.fn(async () => ({
+    total: 0,
+    tags: [],
+    shapes: [],
+    channels: [],
+    properties: [],
+  }));
   mockFilters.filteredAnnotations = [];
   mockJobs.jobIdForToolId = {};
   mockJobs.jobIdForPropertyId = {};

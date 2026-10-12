@@ -207,3 +207,90 @@ class TestCollectionAccessorCollections:
         assert layers[0]["channel"] == 0
         assert layers[0]["color"] == "#FF0000"
         assert layers[0]["contrast"]["mode"] == "percentile"
+
+
+class TestCollectionAccessorDefaultView:
+    """The default collection is the one the caller sees in the app: their
+    own view's configuration, not whichever readable view lists first."""
+
+    @staticmethod
+    def _server(own, other):
+        def get(path, parameters=None, **kwargs):
+            if path == "dataset_view":
+                if (parameters or {}).get("currentUserOnly") == "true":
+                    return own
+                return other + own
+            return {
+                "_id": path.split("/", 1)[1],
+                "meta": {
+                    "layers": [{"id": path.split("/", 1)[1]}],
+                    "scales": {
+                        "pixelSize": {"value": 0.2, "unit": "µm"},
+                        "zStep": {"value": 1, "unit": "µm"},
+                    },
+                },
+            }
+        return get
+
+    def test_prefers_the_callers_own_view(self, mock_gc):
+        mock_gc.get.side_effect = self._server(
+            own=[{"_id": "mine", "configurationId": "c_mine"}],
+            other=[{"_id": "theirs", "configurationId": "c_theirs"}],
+        )
+        accessor = CollectionAccessor(mock_gc, "ds_001")
+        assert accessor.default_view()["_id"] == "mine"
+        assert accessor.get().id == "c_mine"
+        assert accessor.layers == [{"id": "c_mine"}]
+
+    def test_falls_back_to_any_readable_view(self, mock_gc):
+        """A dataset shared with the caller that they have not opened."""
+        mock_gc.get.side_effect = self._server(
+            own=[], other=[{"_id": "theirs", "configurationId": "c_theirs"}],
+        )
+        accessor = CollectionAccessor(mock_gc, "ds_001")
+        assert accessor.get_raw()["_id"] == "c_theirs"
+
+    def test_list_views_current_user_only_parameter(self, mock_gc):
+        mock_gc.get.return_value = []
+        accessor = CollectionAccessor(mock_gc, "ds_001")
+        accessor.list_views(current_user_only=True)
+        mock_gc.get.assert_called_with(
+            "dataset_view",
+            parameters={"datasetId": "ds_001", "currentUserOnly": "true"},
+        )
+        accessor.list_views()
+        mock_gc.get.assert_called_with(
+            "dataset_view", parameters={"datasetId": "ds_001"}
+        )
+
+    def test_layer_contrasts_come_from_the_view(self, mock_gc):
+        override = {"mode": "percentile", "blackPoint": 0, "whitePoint": 17}
+        mock_gc.get.side_effect = self._server(
+            own=[{
+                "_id": "mine", "configurationId": "c_mine",
+                "layerContrasts": {"layer_1": override},
+            }],
+            other=[],
+        )
+        accessor = CollectionAccessor(mock_gc, "ds_001")
+        assert accessor.layer_contrasts == {"layer_1": override}
+
+    def test_scales_put_the_view_over_the_configuration(self, mock_gc):
+        mock_gc.get.side_effect = self._server(
+            own=[{
+                "_id": "mine", "configurationId": "c_mine",
+                "scales": {"pixelSize": {"value": 0.5, "unit": "µm"}},
+            }],
+            other=[],
+        )
+        scales = CollectionAccessor(mock_gc, "ds_001").scales
+        assert scales["pixelSize"] == {"value": 0.5, "unit": "µm"}
+        assert scales["zStep"] == {"value": 1, "unit": "µm"}
+
+    def test_no_views_means_empty_settings(self, mock_gc):
+        mock_gc.get.return_value = []
+        accessor = CollectionAccessor(mock_gc, "ds_001")
+        assert accessor.get() is None
+        assert accessor.layers == []
+        assert accessor.layer_contrasts == {}
+        assert accessor.scales == {}

@@ -23,7 +23,7 @@ A unified Python API package for programmatic access to NimbusImage. Replaces th
 - The `Collection` class represents a collection/configuration
 - `client.list_collections()` and `client.collection(id)` access them at the top level
 - `ds.collections.get()` and `ds.collections.list()` access them via a dataset
-- `ds.collections.layers` is a shortcut to the first collection's layer settings (used by `get_composite`)
+- `ds.collections.layers` is a shortcut to the default collection's layer settings (used by `get_composite`): the configuration of the caller's own view, else of any view they can read. `ds.collections.layer_contrasts` and `ds.collections.scales` give that view's contrast overrides and its scales over the configuration's, as the app uses them
 - Datasets and collections have a **many-to-many relationship** — one dataset can have multiple collections, and one collection can be shared across datasets. They are linked by `dataset_view` documents.
 
 ## Package Structure
@@ -137,7 +137,7 @@ ds = client.dataset(dataset_id)
 - `.id`, `.name` — str
 - `.num_channels`, `.num_z`, `.num_time`, `.num_xy` — int
 - `.channels` — list[str]
-- `.pixel_size` — PixelSize
+- `.pixel_size` — PixelSize | None (the app's scales: view over configuration, then the file's `mm_x`; None when unknown)
 - `.shape` — tuple[int, int] (height, width)
 - `.dtype` — str
 - `.mm_x`, `.mm_y`, `.magnification` — float | None
@@ -162,7 +162,9 @@ ds.images.get(xy=0, z=0, time=0, channel=0,
 ds.images.get_all_channels(xy=0, z=0, time=0)                   # → list[np.ndarray]
 ds.images.get_stack(xy=0, time=0, channel=0, axis='z')          # → np.ndarray (Z, H, W)
 ds.images.get_stack(xy=0, z=0, channel=0, axis='time')          # → np.ndarray (T, H, W)
+ds.images.get(xy=0, z=0, time=0, channel=0, max_size=1024)     # → downsampled on the server
 ds.images.get_composite(xy=0, z=0, time=0, mode='lighten')      # → np.ndarray (H, W, 3)
+ds.images.get_composite(max_size=1024, crop=(l, t, r, b))       # → downsampled / cropped
 ds.images.iter_frames()                                          # → Iterator[(FrameInfo, np.ndarray)]
 ds.images.new_writer(copy_metadata=True)                         # → ImageWriter (requires [worker])
 ```
@@ -172,6 +174,7 @@ ds.images.new_writer(copy_metadata=True)                         # → ImageWrit
 - `dtype='float64'` → [0, 1] range
 - `dtype='uint8'` → [0, 255] range
 - Contrast normalization and pseudocolor math happens in float64 internally, converts at the end
+- Drawn as the app draws it (`toStyle` in `src/store/images.ts`): percentile contrast is a percent of the frame histogram's min..max, the caller's per-view contrast overrides win, and layer slice settings (`constant`, `offset`, `max-merge`) are honored
 
 **Frame index resolution:** Builds `map[channel][time][z][xy] → frame_index` lazily from tiles metadata.
 
@@ -195,7 +198,9 @@ writer.write(filename='output.tiff')    # writes TIFF + uploads to dataset folde
 ```python
 ds.annotations.list(shape='polygon', tags=['nucleus'], limit=0)           # → list[Annotation]
 ds.annotations.get(annotation_id)                                         # → Annotation
-ds.annotations.count(shape='polygon', tags=['nucleus'])                   # → int
+ds.annotations.count(shape='polygon', tags=['nucleus'])                   # → int (must have all tags)
+ds.annotations.summary(tags=['cell'], exclusive=False,
+                       property_paths=[[prop_id, 'Area']])               # → AnnotationSummary (server-side)
 ds.annotations.create(annotation)                                         # → Annotation (with id)
 ds.annotations.create_many(annotation_list)                               # → list[Annotation]
 ds.annotations.create_many(annotation_list,
@@ -592,6 +597,7 @@ ni_image_upload                → ds.images.new_writer(...)
 ni_annotations_list            → ds.annotations.list(...)
 ni_annotations_get             → ds.annotations.get(...)
 ni_annotations_count           → ds.annotations.count(...)
+ni_annotations_summary         → ds.annotations.summary(...)
 ni_annotations_create          → ds.annotations.create_many(...)
 ni_annotations_update          → ds.annotations.update(...)
 ni_annotations_update_many     → ds.annotations.update_many(...)
@@ -617,3 +623,50 @@ ni_history_redo                → ds.history.redo()
 ni_dataset_share               → ds.sharing.share(...)
 ni_dataset_set_public          → ds.sharing.set_public(...)
 ```
+
+## Regression checklist
+
+Rendering, query, and listing invariants established on PR #1390 across four review rounds. Several findings were caught only by live tests on real data (a `max_size` that upsampled, 52 configurations storing a 0 pixel size), and one was introduced by the previous round's fix (the projected path's styling, then needed for downsampled layers too). Each line names the test that holds it; change one of these behaviors and re-check its neighbors.
+
+**Composite rendering matches the app** (`src/store/images.ts` `toStyle`, `resolveSlice`; large_image band styling)
+- Percentile contrast is a percent of the frame histogram's min..max, not a quantile — *"test_percentile_is_a_percent_of_the_histogram_range"*.
+- Percentile bounds round like d3's `rangeRound` — *"test_percentile_bounds_round_like_the_app"*.
+- The caller's per-view `layerContrasts` override wins over the layer's contrast — *"test_view_contrast_override_wins"*.
+- Absolute contrast uses raw values, including white points at or below 1 — *"test_absolute_contrast_uses_raw_values"*.
+- Equal bounds scale by 1, as large_image does (a flat frame is black) — *"test_equal_contrast_bounds_scale_by_one_like_large_image"*.
+- A missing histogram falls back to the image's own range — *"test_missing_histogram_falls_back_to_the_image_range"*.
+- Slice settings: `offset` reads the offset slice — *"test_offset_layer_reads_the_offset_slice"*; `constant` ignores the current slice — *"test_constant_layer_ignores_the_current_slice"*; an out-of-range slice is not drawn — *"test_layer_offset_out_of_range_is_not_drawn"*; a channel absent at the current location is not drawn — *"test_max_merge_layer_without_a_current_frame_is_not_drawn"*.
+- Hidden layers are not fetched or drawn — *"test_hidden_layer_excluded"*.
+
+**Cost: requests and allocation**
+- A max-merge layer is one server-side styled request, not one fetch per projected frame; its contrast comes from the current frame's histogram only — *"test_max_merge_is_one_server_side_projection"*.
+- A downsampled layer is windowed by the server before its final resample, as the app's tiles are; full resolution stays exact in float — *"test_downsampled_layer_is_windowed_by_the_server_like_the_app"*.
+- `max_size` and `crop` reach the region request — *"test_max_size_and_crop_reach_the_region_request"*; `get_stack`/`get_all_channels` pass `max_size` — *"test_stack_and_all_channels_pass_max_size"*.
+- `max_size` never upsamples, including for a crop past the image edge — *"test_max_size_above_the_region_does_not_upsample"*, *"test_crop_past_the_image_does_not_upsample"*; negative crop edges count from the far edge — *"test_negative_crop_edges_count_from_the_far_edge"*.
+- `list_datasets` is one `resource/batch` call, not a GET per dataset — *"test_list_datasets_batches_the_folder_lookup"*.
+
+**Annotation summary** (`ds.annotations.summary`, POST `upenn_annotation/summary`)
+- The request body and parsing, in the server's tag order — *"test_posts_the_summary_request_and_parses_it"*.
+- `shape`/`tags` become list filters (any of, or exactly with `exclusive`); the caller's `filters` dict is not mutated — *"test_shape_and_tags_become_list_filters"*; the same filter given twice is an error — *"test_rejects_the_same_filter_twice"*.
+- A bare-string `tags` or a dotted-string property path is an error, not split into characters; `exclusive` needs `tags` — *"test_rejects_misshapen_arguments"*.
+- Duplicate tags are sent once (an exclusive match compares set size) — *"test_duplicate_tags_are_sent_once"*.
+- `shapes` is None (not empty) on servers without the breakdown — *"test_shapes_is_none_on_servers_without_the_breakdown"*.
+- Live: counts, filters, `+` in tags, and property statistics — *"test_counts_by_tag_and_shape"*, *"test_filters_narrow_the_summary"*, *"test_property_statistics"*.
+
+**Query encoding**
+- Free-text tags survive `+`, `&` and spaces — *"test_special_characters_survive"*; live — *"test_tags_with_special_characters_round_trip"*.
+- Property paths are encoded — *"test_histogram_encodes_the_property_path"*.
+
+**Views, scales, and the default collection**
+- The default collection is the caller's own view's configuration, falling back to any readable view — *"test_prefers_the_callers_own_view"*, *"test_falls_back_to_any_readable_view"*.
+- Scales put the view over the configuration — *"test_scales_put_the_view_over_the_configuration"*.
+- `pixel_size` prefers the configuration over the file — *"test_pixel_size_prefers_configuration_scales"*; the view over the configuration — *"test_pixel_size_view_scales_override_configuration"*; is None when unknown, never an invented 1 µm — *"test_pixel_size_is_none_when_unknown"*; treats 0 / null / unknown units / the 1 m placeholder as unknown — *"test_uncalibrated_configuration_falls_back_to_the_file"*.
+- Only an inaccessible or missing configuration falls back to the file; server errors propagate — *"test_unreadable_configuration_falls_back_to_the_file"*, *"test_server_errors_reading_scales_propagate"*.
+- `configure()`/upload invalidation drops the cached view, configuration, and frame map — *"test_invalidation_drops_view_configuration_and_frame_map"*.
+- View URLs look the view up fresh — *"test_view_url_sees_a_view_created_after_caching"*.
+
+**Listing shape and access**
+- Batched folders keep only what `GET folder/{id}` exposes (no ACL) — *"test_list_datasets_keeps_only_the_public_folder_fields"*; with the caller's `_accessLevel` computed as Girder does — *"test_access_level_follows_girder_rules"*; a server-provided level wins — *"test_server_provided_level_wins"*.
+- Unreadable folders are left out — *"test_list_datasets_skips_unreadable_folders"*; anonymous clients use per-folder GETs — *"test_anonymous_list_datasets_fetches_public_folders"*.
+
+Process rules this feature proved: check composites live against an independent server rendering of the app's own style (the oracle in the PR description), not only against mocks; and verify on real datasets that actually have the property under test (uncalibrated files, view overrides, z-stacks).

@@ -1104,7 +1104,7 @@ class Annotation(AccessControlMixin, ProxiedModel):
         """Aggregate statistics over the annotations matching `filters`.
 
         Returns {total, tags: [{tag, count}], shapes: [{shape, count}] and
-        channels: [{channel, count}] (each count desc, then name), and
+        channels: [{channel, count}] (each count desc, then key), and
         properties: [{path, count, mean, std, min, max}]} — one entry per
         requested path, in request order. `count` is the number of matching
         annotations holding a NUMERIC value at the path; non-numeric, NaN
@@ -1140,7 +1140,6 @@ class Annotation(AccessControlMixin, ProxiedModel):
 
         pipeline = self._buildListMatchStages(datasetId, facetFilters)
         pipeline.append({"$facet": {
-            "total": [{"$count": "count"}],
             "tags": [
                 {"$unwind": "$tags"},
                 {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
@@ -1148,7 +1147,10 @@ class Annotation(AccessControlMixin, ProxiedModel):
             ],
             # Shapes and channels ride the same scan as the tags: separate
             # count-by-field queries would each re-read every annotation in
-            # the dataset (there is no datasetId+shape/channel index).
+            # the dataset (there is no datasetId+shape/channel index). The
+            # shape facet also gives the total (every annotation lands in one
+            # shape group, a missing shape in the null group), so no separate
+            # $count facet is needed.
             "shapes": [
                 {"$group": {"_id": "$shape", "count": {"$sum": 1}}},
                 {"$sort": {"count": -1, "_id": 1}},
@@ -1159,7 +1161,7 @@ class Annotation(AccessControlMixin, ProxiedModel):
             ],
         }})
         facets = next(self._aggregate(self.collection, pipeline))
-        total = facets["total"][0]["count"] if facets["total"] else 0
+        total = sum(doc["count"] for doc in facets["shapes"])
         return {
             "total": total,
             "tags": [
