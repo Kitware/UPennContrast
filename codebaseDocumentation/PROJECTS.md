@@ -712,6 +712,9 @@ that writes an ACL or a public flag, or that exports a project.
 - The export publishes the configurations the check returned, never re-queried views
   (a view can be repointed after the check) —
   *"testExportUsesTheConfigurationsItChecked"*.
+- Publishing a draft checks the resources the upload recorded
+  (`meta.zenodo.uploadedResources`), not the project's membership by then —
+  *"testPublishChecksWhatTheDraftContains"*.
 
 **Process rules this feature proved**
 - Test fixtures: Girder makes the first user in a fresh database a site admin, who holds
@@ -720,6 +723,10 @@ that writes an ACL or a public flag, or that exports a project.
 - When a container (project) grants or exports, check every path that reaches a
   contained resource, including ones found indirectly (views, a collection's datasets,
   a view's configuration).
+- Check what you act on, not a re-query of it: the Zenodo path took four review rounds
+  because the endpoint, the job, the export and publish each derived the resource set
+  separately. The check now returns the set (`ProjectContents`), the export uses it,
+  and the draft records it for publish.
 
 ---
 

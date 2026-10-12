@@ -79,7 +79,10 @@ added to a project by someone with only WRITE on it, and a co-admin of the proje
 not be able to read it at all. The upload job repeats the check on the project it
 reloads, since anyone with WRITE on the project can add a dataset between the
 request and the job. The check returns the configurations it authorized, and the
-annotation export uses those instead of querying views again. Tests: `test/test_share_escalation.py`
+annotation export uses those instead of querying views again. The finished draft
+records the checked ids in `meta.zenodo.uploadedResources`, and publish checks those
+(drafts from before this fall back to the project's current contents), since
+datasets can be removed from the project between upload and publish. Tests: `test/test_share_escalation.py`
 (`TestZenodoRequiresOwnership`).
 
 The upload endpoint returns a `jobId` that the frontend uses for SSE-based progress tracking.

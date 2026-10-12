@@ -1,6 +1,7 @@
 """Shared helpers for access control endpoints."""
 
 from collections import defaultdict
+from dataclasses import dataclass, field
 
 from bson import ObjectId
 
@@ -40,6 +41,37 @@ def requireDatasetsAccess(datasetIds, user, level=AccessType.WRITE):
         folderModel.requireAccess(dataset, user, level)
 
 
+@dataclass
+class ProjectContents:
+    """What a project's export publishes, as an access check saw it."""
+    datasetIds: list
+    collectionIds: list
+    # dataset id -> configuration docs (with meta.propertyIds) its views use
+    configsByDataset: dict = field(default_factory=dict)
+
+
+def requireResourcesAccess(datasetIds, collectionIds, user,
+                           level=AccessType.ADMIN):
+    """Check access on datasets and collections loaded in two queries.
+
+    Ids of deleted resources are ignored.
+
+    :raises AccessException: If user lacks access to any of them.
+    :returns: Dict of the collection documents checked, by id, with
+        meta.propertyIds.
+    """
+    for doc in Folder().find(
+            {'_id': {'$in': list(datasetIds)}}, fields=['access', 'public']):
+        Folder().requireAccess(doc, user, level)
+    collectionsById = {}
+    for doc in Collection().find(
+            {'_id': {'$in': list(collectionIds)}},
+            fields=['access', 'public', 'meta.propertyIds']):
+        Collection().requireAccess(doc, user, level)
+        collectionsById[doc['_id']] = doc
+    return collectionsById
+
+
 def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
     """Check access on everything a project's export publishes.
 
@@ -52,12 +84,13 @@ def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
     them. References to deleted resources are ignored, as the export skips
     them.
 
-    Views can change after the check, so the export must use what this
-    returns rather than query the views again.
+    Views and project membership can change after the check, so the export
+    must use what this returns rather than query them again, and publishing
+    a draft must check what was uploaded (requireResourcesAccess on the
+    returned ids), not the project as it is by then.
 
     :raises AccessException: If user lacks access to any of them.
-    :returns: Dict mapping each dataset id to the configuration documents
-        (with meta.propertyIds) its views use, as checked.
+    :returns: A ProjectContents of what was checked.
     """
     meta = project.get('meta', {})
     datasetIds = [
@@ -72,19 +105,18 @@ def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
             configIdsByDataset[view['datasetId']].add(
                 view['configurationId'])
             collectionIds.add(view['configurationId'])
-    for doc in Folder().find(
-            {'_id': {'$in': datasetIds}}, fields=['access', 'public']):
-        Folder().requireAccess(doc, user, level)
-    configsById = {}
-    for doc in Collection().find(
-            {'_id': {'$in': list(collectionIds)}},
-            fields=['access', 'public', 'meta.propertyIds']):
-        Collection().requireAccess(doc, user, level)
-        configsById[doc['_id']] = doc
-    return {
-        datasetId: [configsById[c] for c in configIds if c in configsById]
-        for datasetId, configIds in configIdsByDataset.items()
-    }
+    collectionsById = requireResourcesAccess(
+        datasetIds, collectionIds, user, level)
+    return ProjectContents(
+        datasetIds=datasetIds,
+        collectionIds=list(collectionIds),
+        configsByDataset={
+            datasetId: [
+                collectionsById[c] for c in configIds
+                if c in collectionsById]
+            for datasetId, configIds in configIdsByDataset.items()
+        },
+    )
 
 
 def requireAnnotationsInDatasets(entries):

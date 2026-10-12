@@ -84,9 +84,7 @@ def run(job):
     # project can add resources before this reload: check the snapshot
     # this job actually exports.
     try:
-        configs_by_dataset = requireProjectContentsAccess(
-            project, user
-        )
+        contents = requireProjectContentsAccess(project, user)
     except AccessException as e:
         _fail(
             job, job_model, project_id, project_model,
@@ -107,7 +105,7 @@ def run(job):
         _do_upload(
             job, job_model,
             project, user, project_id,
-            project_model, client, configs_by_dataset,
+            project_model, client, contents,
         )
     except Exception as e:
         log.exception(
@@ -252,12 +250,12 @@ def _batch_load_collections(project, collection_model):
 
 
 def _do_upload(job, job_model, project, user, project_id,
-               project_model, client, configs_by_dataset):
+               project_model, client, contents):
     """Perform the full Zenodo upload.
 
-    :param configs_by_dataset: The configurations each dataset's views
-        use, as requireProjectContentsAccess checked them. The export
-        uses these instead of re-querying views that may have changed.
+    :param contents: What requireProjectContentsAccess checked. The export
+        uses its configurations instead of re-querying views that may have
+        changed, and the draft records its ids for the publish check.
     """
     zenodo_meta = project['meta'].get('zenodo', {})
 
@@ -390,7 +388,7 @@ def _do_upload(job, job_model, project, user, project_id,
 
         ann_json = _build_annotation_json(
             ds_id, annotation_model, connection_model,
-            configs_by_dataset.get(ds_id, []),
+            contents.configsByDataset.get(ds_id, []),
             property_model, property_values_model,
         )
         ann_filename = (
@@ -480,8 +478,14 @@ def _do_upload(job, job_model, project, user, project_id,
     zenodo_metadata = _build_zenodo_metadata(project)
     client.set_metadata(dep_id, zenodo_metadata)
 
-    # Done - mark as draft (ready to publish)
+    # Done - mark as draft (ready to publish). Publishing checks the
+    # resources recorded here, which is what the draft contains, not the
+    # project's membership by then.
     update_zenodo_meta(project_id, {
+        'uploadedResources': {
+            'datasetIds': contents.datasetIds,
+            'collectionIds': contents.collectionIds,
+        },
         'depositionId': dep_id,
         'depositionUrl': deposition['links']['html'],
         'status': 'draft',

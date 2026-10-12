@@ -522,10 +522,41 @@ class TestZenodoRequiresOwnership:
         valuesModel.find.return_value = []
         zenodo_job._build_annotation_json(
             dataset["_id"], Annotation(), AnnotationConnection(),
-            checked.get(dataset["_id"], []), propertyModel, valuesModel)
+            checked.configsByDataset.get(dataset["_id"], []),
+            propertyModel, valuesModel)
 
         query = propertyModel.find.call_args.args[0]
         assert set(query["_id"]["$in"]) == {ownProperty}
+
+    def testPublishChecksWhatTheDraftContains(self, server, owner, user):
+        """Removing a dataset from the project after the upload does not
+        make its draft publishable by someone who lost access to it."""
+        dataset, config, view = createDataset(owner)
+        for doc, model in ((dataset, Folder()), (config, Collection()),
+                           (view, DatasetViewModel())):
+            grant(doc, model, user, ADMIN)
+        project = TestProjectShareLimits().createProject(server, user)
+        TestProjectShareLimits().addDataset(server, user, project, dataset)
+        projectDoc = Project().load(project["_id"], force=True)
+        projectDoc["meta"]["zenodo"] = {
+            "status": "draft", "depositionId": 1,
+            "uploadedResources": {
+                "datasetIds": [dataset["_id"]],
+                "collectionIds": [config["_id"]],
+            },
+        }
+        Project().save(projectDoc)
+        # The dataset's owner revokes; the publisher drops it from the project
+        grant(Folder().load(dataset["_id"], force=True), Folder(), user, WRITE)
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/dataset/{dataset['_id']}",
+            method="DELETE", user=user))
+
+        resp = server.request(
+            path=f"/zenodo/publish/{project['_id']}", method="POST",
+            user=user)
+
+        assertStatus(resp, 403)
 
     def testOwnerPassesTheOwnershipCheck(self, server, owner):
         dataset, _, _ = createDataset(owner)

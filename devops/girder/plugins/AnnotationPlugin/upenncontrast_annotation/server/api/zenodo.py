@@ -19,7 +19,10 @@ from girder.constants import AccessType
 from girder.exceptions import RestException
 from girder_jobs.models.job import Job as JobModel
 
-from ..helpers.access_helpers import requireProjectContentsAccess
+from ..helpers.access_helpers import (
+    requireProjectContentsAccess,
+    requireResourcesAccess,
+)
 from ..helpers.zenodo_client import (
     ZenodoError,
     get_zenodo_client_for_user,
@@ -334,9 +337,18 @@ class Zenodo(Resource):
             projectId, user=user,
             level=AccessType.ADMIN, exc=True,
         )
-        requireProjectContentsAccess(project, user)
-
         zenodo = project['meta'].get('zenodo', {})
+        # Check what the draft contains: datasets can be removed from the
+        # project after the upload. Drafts uploaded before resources were
+        # recorded fall back to the project's current contents.
+        uploaded = zenodo.get('uploadedResources')
+        if uploaded:
+            requireResourcesAccess(
+                uploaded.get('datasetIds', []),
+                uploaded.get('collectionIds', []), user)
+        else:
+            requireProjectContentsAccess(project, user)
+
         if zenodo.get('status') != 'draft':
             raise RestException(
                 "No draft deposition to publish. "
