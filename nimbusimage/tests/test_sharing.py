@@ -52,12 +52,16 @@ class TestShare:
         mock_gc.get.assert_called_once_with("user/me")
         mock_gc.post.assert_not_called()
 
-    def test_share_with_unscoped_user_me_still_shares(self, mock_gc):
-        """user/me is null for tokens without USER_INFO_READ scope; the
-        self-target check is skipped rather than crashing."""
-        mock_gc.get.side_effect = [None, VIEWS]
-        SharingAccessor(mock_gc, "ds_001").share("user@test.com")
-        mock_gc.post.assert_called_once()
+    def test_share_refuses_when_caller_is_unknown(self, mock_gc):
+        """user/me is null for tokens without USER_INFO_READ scope. The
+        server doesn't guard self-targeting, so the share fails closed
+        rather than skipping the check."""
+        mock_gc.get.return_value = None
+        with pytest.raises(ValueError, match="USER_INFO_READ"):
+            SharingAccessor(mock_gc, "ds_001").share(
+                "owner", access="remove"
+            )
+        mock_gc.post.assert_not_called()
 
     def test_share_without_views_raises_before_posting(self, mock_gc):
         mock_gc.get.side_effect = [ME, []]

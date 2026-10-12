@@ -108,6 +108,12 @@ class TestProjectSharing:
             _make_project(mock_gc).share(target, access="remove")
         mock_gc.post.assert_not_called()
 
+    def test_share_refuses_when_caller_is_unknown(self, mock_gc):
+        mock_gc.get.return_value = None
+        with pytest.raises(ValueError, match="USER_INFO_READ"):
+            _make_project(mock_gc).share("owner", access="remove")
+        mock_gc.post.assert_not_called()
+
     @pytest.mark.parametrize(
         "public, flag", [(True, "true"), (False, "false")]
     )

@@ -50,7 +50,9 @@ class SharingAccessor:
         Raises:
             ValueError: If ``user_email_or_name`` is the calling user
                 (e.g. "remove" would lock you out of your own dataset),
-                or if the dataset has no dataset views (the server
+                if the token can't identify the caller (no user-info
+                scope, e.g. a data-only API key), or if the dataset has
+                no dataset views (the server
                 derives the dataset and collections from the views, so
                 there is nothing to share through).
         """

@@ -120,11 +120,12 @@ class TestLiveSharing:
         assert ds.sharing.get_access()["public"] is False
         assert not _can_read(other, ds.id)
 
-    def test_share_with_scoped_api_key(
+    def test_share_refuses_without_user_info_scope(
         self, private_test_dataset, second_user, client, api_url
     ):
-        """A key with only data scopes can share: user/me returns null
-        (not 403) for it, so the self-target check is skipped."""
+        """A data-only key gets null from user/me (200, not 403), so the
+        caller can't be identified; share() fails closed instead of
+        risking a self-removal the server wouldn't stop."""
         ds = private_test_dataset
         login, other = second_user
         key = client.girder.post(
@@ -138,12 +139,13 @@ class TestLiveSharing:
             scoped = ni.connect(api_url, api_key=key["key"])
             assert scoped.girder.get("user/me") is None
 
-            scoped.dataset(ds.id).sharing.share(login, access="read")
+            with pytest.raises(ValueError, match="USER_INFO_READ"):
+                scoped.dataset(ds.id).sharing.share(login, access="read")
         finally:
             client.girder.delete(f"api_key/{key['_id']}")
 
-        assert _user_levels(ds)[login] == 0
-        assert _can_read(other, ds.id)
+        assert login not in _user_levels(ds)
+        assert not _can_read(other, ds.id)
 
     def test_share_refuses_to_target_caller(
         self, private_test_dataset, client

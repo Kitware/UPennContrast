@@ -115,7 +115,8 @@ class Project:
             access: 'read', 'write', 'admin', or 'remove'.
 
         Raises:
-            ValueError: If ``user_email_or_name`` is the calling user.
+            ValueError: If ``user_email_or_name`` is the calling user, or
+                the token can't identify the caller (no user-info scope).
         """
         access_type = _resolve_access(access)
         _refuse_self_target(self._gc, user_email_or_name)
