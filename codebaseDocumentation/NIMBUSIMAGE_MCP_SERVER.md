@@ -741,8 +741,12 @@ the local stack. Add an item whenever a review finds something this list missed.
 - [x] The server refuses to start with a service credential in its environment.
       *"test_settings_refuse_a_service_credential"*
 - [x] Credentials are never logged; the log names the user id. The server log carries
-      no tool arguments or error messages (they quote user data), only the opt-in call
-      log does. *"test_no_credentials_in_logs"*
+      no tool arguments or error messages for handled errors (they quote user data);
+      only the opt-in call log does. An unexpected crash is still logged with its
+      traceback, for diagnosis. *"test_no_credentials_in_logs"*
+- [x] The batch count endpoint, which is public, accepts only the schema's shapes and a
+      bounded tag filter. An empty shape means no filter, as in GET count.
+      *"testMalformedBodiesAre400"*, *"testEmptyShapeMeansNoFilter"*
 
 ### Cost and context
 
@@ -764,10 +768,20 @@ the local stack. Add an item whenever a review finds something this list missed.
 - [x] The server holds no per-session state between requests.
       *"test_stateless_requests_any_instance"*
 - [x] `ni_job_wait` never starts a poll at or after the configured cap, and stops waiting
-      for a slow poll at the cap. *"test_job_wait_stops_waiting_for_a_slow_refresh"* Job waits (it, and a
-      worker's first interface registration) sleep on the event loop rather than holding
-      one of the worker threads all sync tools share.
-      *"test_job_wait_clamps_and_reports_still_running"*
+      at the cap for a slow lookup or poll (status `unknown` if Girder never answered).
+      *"test_job_wait_clamps_and_reports_still_running"*,
+      *"test_job_wait_stops_waiting_for_a_slow_refresh"*
+- [x] Job waits (`ni_job_wait`, and a worker's first interface registration, which also
+      keeps within the cap) sleep on the event loop instead of holding one of the worker
+      threads all sync tools share. *"test_worker_interface_registration_respects_the_wait_cap"*
+- [x] Async tools do no blocking reads on the event loop, including lazy properties.
+      *"test_worker_run_reads_the_dataset_off_the_event_loop"*
+- [x] Every request a tool makes has a timeout, so a thread abandoned at a deadline
+      ends. *"test_tool_clients_have_a_request_timeout"*
+- [x] A wait's result is one complete job snapshot, never a mix of states.
+      *"test_job_wait_never_reports_a_torn_state"*
+- [x] Failing to write the optional call log never fails a tool call.
+      *"test_unwritable_call_log_does_not_fail_the_call"*
 - [x] A cancelled request does not fail other requests waiting on the same key's
       exchange. *"test_waiters_survive_a_cancelled_exchange"*
 

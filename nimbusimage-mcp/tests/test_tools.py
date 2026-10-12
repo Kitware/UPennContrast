@@ -536,6 +536,8 @@ class _Job:
 
 
 def test_job_wait_clamps_and_reports_still_running(nc, monkeypatch):
+    # Patching time.monotonic also drives asyncio's clock; real timeouts
+    # are tested in test_job_wait_stops_waiting_for_a_slow_refresh.
     clock = {"now": 0.0}
     sleeps = []
 
@@ -588,6 +590,66 @@ def test_job_wait_stops_waiting_for_a_slow_refresh(nc):
     )))
     assert real_time.monotonic() - start < 2
     assert result["status"] == "unknown" and result["finished"] is False
+
+
+def test_job_wait_never_reports_a_torn_state(nc):
+    """A refresh abandoned at the deadline finishes later and mutates the
+    job; the result is the last complete snapshot, not a mix."""
+    import time as real_time
+
+    class LateJob(_Job):
+        def refresh(self):
+            # Status lands before the 1 s deadline, the log after it:
+            # reading the live job at the deadline would mix the two.
+            real_time.sleep(0.5)
+            self.polls_left = -1
+            real_time.sleep(1.0)
+            self.log = "late log"
+
+    nc.job.return_value = LateJob(polls=None)
+    result = loads(asyncio.run(workers.ni_job_wait(
+        job_id="j1", timeout_seconds=1
+    )))
+    # No refresh completed: the job as looked up, consistently.
+    assert result["status"] == "running" and result["finished"] is False
+    assert result["log_tail"] == "x" * workers.LOG_TAIL
+
+
+def test_worker_interface_registration_respects_the_wait_cap(nc):
+    import time as real_time
+    _common.configure(make_settings(max_job_wait=1))
+    nc.get_worker_interface.side_effect = lambda *a, **k: real_time.sleep(3)
+    start = real_time.monotonic()
+    with pytest.raises(ToolError, match="did not answer in time"):
+        run_tool(workers.ni_worker_interface, image=SEG)
+    assert real_time.monotonic() - start < 2
+
+
+def test_worker_run_reads_the_dataset_off_the_event_loop(nc):
+    import threading
+    nc.list_workers.return_value = WORKERS
+    nc.get_worker_interface.return_value = INTERFACE
+    ds = nc.dataset.return_value
+    ds.channels, ds.num_channels = ["DAPI", "GFP"], 2
+    ds.num_xy, ds.num_z, ds.num_time = 1, 1, 1
+    seen = []
+    type(ds.collections).scales = property(
+        lambda _: seen.append(threading.current_thread()) or {})
+    ds.annotations.compute.return_value = SimpleNamespace(
+        id="j1", status_name="queued", title="Seg")
+    run_tool(workers.ni_worker_run, dataset_id="d", image=SEG)
+    # ds.collections.scales can fetch; it must not run on the loop.
+    assert seen and threading.main_thread() not in seen
+
+
+def test_tool_clients_have_a_request_timeout():
+    calls = []
+    session = SimpleNamespace(request=lambda method, url, **kw: calls.append(
+        kw))
+    _common._set_default_timeout(session)
+    session.request("GET", "u")
+    session.request("GET", "u", timeout=5)
+    assert calls == [{"timeout": _common.HTTP_TIMEOUT}, {"timeout": 5}]
 
 
 def test_worker_interface_checks_the_dataset_before_registering(nc):

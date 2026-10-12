@@ -60,7 +60,29 @@ def client() -> ni.NimbusClient:
         # Unreachable behind the auth middleware; a guard against ever
         # serving a request without a caller.
         raise ToolError("Not authenticated.")
-    return ni.connect(settings().api_url, token=access.claims["girder_token"])
+    nc = ni.connect(settings().api_url, token=access.claims["girder_token"])
+    _set_default_timeout(nc.girder._session)
+    return nc
+
+
+# (connect, read) seconds for every request a tool makes. girder_client
+# sets none, so a hung Girder would hold a worker thread forever: a
+# deadline-bounded wait (ni_job_wait) returns at its cap, but its
+# abandoned thread would never end. Above the longest legitimate request.
+HTTP_TIMEOUT = (10, 300)
+
+
+def _set_default_timeout(session) -> None:
+    """Give a requests.Session a default timeout (it has no setting for
+    one): girder_client calls session.get/post/..., which call
+    session.request."""
+    request = session.request
+
+    def request_with_timeout(method, url, **kwargs):
+        kwargs.setdefault("timeout", HTTP_TIMEOUT)
+        return request(method, url, **kwargs)
+
+    session.request = request_with_timeout
 
 
 def caller_id() -> str | None:

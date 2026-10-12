@@ -89,30 +89,51 @@ def in_thread(fn, *args, **kwargs):
     return anyio.to_thread.run_sync(functools.partial(fn, *args, **kwargs))
 
 
-async def poll_job(job: ni.Job, deadline: float) -> None:
-    """Refresh the job until it finishes or the (monotonic) deadline. Sleeps
-    on the event loop, so a long wait holds none of the worker threads
-    that every sync tool shares; only the polls (blocking HTTP) use one.
+def _snapshot(job: ni.Job) -> dict:
+    """Refresh the job and copy what the tools report, in the worker
+    thread. A refresh abandoned at a deadline still finishes and mutates
+    the Job afterwards; a snapshot it never touches."""
+    job.refresh()  # also fetches the log
+    return _fields(job)
+
+
+def _fields(job: ni.Job) -> dict:
+    return {
+        "title": job.title,
+        "status": job.status_name,
+        "finished": job.finished,
+        "succeeded": job.succeeded,
+        "log_tail": job.log[-LOG_TAIL:] if job.log else "",
+    }
+
+
+async def poll_job(job: ni.Job, deadline: float) -> dict | None:
+    """Refresh the job until it finishes or the (monotonic) deadline, and
+    return the last completed snapshot (None if no refresh completed in
+    time). Sleeps on the event loop, so a long wait holds none of the
+    worker threads every sync tool shares; only the polls use one.
     """
-    await _refresh_by(job, deadline)  # also fetches the log
+    done, last = await _by_deadline(functools.partial(_snapshot, job),
+                                    deadline)
+    last = last if done else None
     # Poll only while a whole interval fits before the deadline, so no
-    # refresh starts after it.
-    while not job.finished and deadline - time.monotonic() > POLL_SECONDS:
+    # refresh starts after it (and no two refreshes of a job overlap).
+    while not (last and last["finished"]) \
+            and deadline - time.monotonic() > POLL_SECONDS:
         await anyio.sleep(POLL_SECONDS)
-        await _refresh_by(job, deadline)
-
-
-async def _refresh_by(job: ni.Job, deadline: float) -> None:
-    """Refresh the job, but stop waiting at the deadline (the abandoned
-    refresh finishes in its thread; the caller reports the state it last
-    saw)."""
-    await _by_deadline(job.refresh, deadline)
+        done, snap = await _by_deadline(
+            functools.partial(_snapshot, job), deadline
+        )
+        if done:
+            last = snap
+    return last
 
 
 async def _by_deadline(fn, deadline: float):
     """Blocking `fn()` in a thread, waited for until the (monotonic)
     deadline: a slow backend must not hold a call past its cap. Returns
-    (finished, result); an abandoned call finishes in its thread."""
+    (finished, result). An abandoned call finishes in its thread (bounded
+    by the client's HTTP_TIMEOUT)."""
     with anyio.move_on_after(max(0.0, deadline - time.monotonic())):
         return True, await anyio.to_thread.run_sync(
             fn, abandon_on_cancel=True
@@ -120,34 +141,49 @@ async def _by_deadline(fn, deadline: float):
     return False, None
 
 
+async def _before(deadline: float, fn, *args, **kwargs):
+    """`fn(*args, **kwargs)` in a thread; a ToolError if it does not
+    finish by the deadline."""
+    done, result = await _by_deadline(
+        functools.partial(fn, *args, **kwargs), deadline
+    )
+    if not done:
+        raise ToolError("NimbusImage did not answer in time; try again.")
+    return result
+
+
 async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
     """The worker's parameter interface, asking the worker to register it
-    (a short job) the first time."""
-    interface = await in_thread(
-        nc.get_worker_interface, image, request_if_missing=False
+    (a short job) the first time. Bounded as a whole by the job-wait cap,
+    since it can wait on that job."""
+    deadline = time.monotonic() + min(
+        INTERFACE_REQUEST_TIMEOUT, settings().max_job_wait
+    )
+    interface = await _before(
+        deadline, nc.get_worker_interface, image, request_if_missing=False
     )
     if interface is None:
         # Registering runs the image on the server, which accepts any
         # name: only ever ask for an installed worker.
-        labels = (await in_thread(nc.list_workers)).get(image)
+        labels = (await _before(deadline, nc.list_workers)).get(image)
         if labels is None or worker_kind(labels) is None:
             raise ToolError(
                 f"No worker image {image!r}; use ni_workers_list for names."
             )
-        response = await in_thread(
-            nc.girder.post, "worker_interface/request",
+        response = await _before(
+            deadline, nc.girder.post, "worker_interface/request",
             parameters={"image": image},
         )
         if isinstance(response, list) and response:
-            job = ni.Job(nc.girder, response[0])
-            await poll_job(job, time.monotonic() + INTERFACE_REQUEST_TIMEOUT)
-            if not job.finished:
+            state = await poll_job(ni.Job(nc.girder, response[0]), deadline)
+            if not (state and state["finished"]):
                 raise ToolError(
                     f"{image} is still registering its parameters; try "
                     "again in a minute."
                 )
-        interface = await in_thread(
-            nc.get_worker_interface, image, request_if_missing=False
+        interface = await _before(
+            deadline, nc.get_worker_interface, image,
+            request_if_missing=False,
         )
     if not interface:
         raise ToolError(
@@ -237,13 +273,20 @@ async def ni_worker_run(
             "ni_property_compute."
         )
     ds = nc.dataset(dataset_id)
-    channels = await in_thread(channel_names, ds)
-    if not 0 <= channel < len(channels):
-        raise ValueError(
-            f"channel={channel} is out of range (0..{len(channels) - 1})"
-        )
-    # A location outside the dataset would start a job that then fails.
-    check_location(ds, xy, z, time)
+
+    def read_dataset():
+        # Every read of the dataset here can be an HTTP request, so all
+        # of them run in the thread, off the event loop.
+        names = channel_names(ds)
+        if not 0 <= channel < len(names):
+            raise ValueError(
+                f"channel={channel} is out of range (0..{len(names) - 1})"
+            )
+        # A location outside the dataset would start a job that fails.
+        check_location(ds, xy, z, time)
+        return names, ds.collections.scales
+
+    channels, scales = await in_thread(read_dataset)
     values = worker_values.resolve(
         await fetch_interface(nc, image), parameters or {}, channels
     )
@@ -254,7 +297,7 @@ async def ni_worker_run(
         tags=tags or [],
         location=ni.Location(xy=xy, z=z, time=time),
         worker_interface=values,
-        scales=ds.collections.scales,
+        scales=scales,
         name=labels.get("interfaceName") or image,
     )
     return {"job_id": job.id, "status": job.status_name, "title": job.title}
@@ -266,7 +309,8 @@ async def ni_job_wait(job_id: str, timeout_seconds: float = 60) -> dict:
     finish, then report its status and the end of its log. Waits at most
     timeout_seconds (default 60, capped by the server, about 4 minutes);
     if the job is still going, the result says finished=false and you can
-    call this again with the same job_id. Do not poll with other tools.
+    call this again with the same job_id. If NimbusImage itself does not
+    answer in time, status is "unknown". Do not poll with other tools.
     """
     limit = max(1.0, min(timeout_seconds, settings().max_job_wait))
     # The budget covers the first lookup too.
@@ -280,15 +324,10 @@ async def ni_job_wait(job_id: str, timeout_seconds: float = 60) -> dict:
             "succeeded": False,
             "note": "NimbusImage did not answer within the wait; try again.",
         }
-    await poll_job(job, deadline)
-    return {
-        "job_id": job.id,
-        "title": job.title,
-        "status": job.status_name,
-        "finished": job.finished,
-        "succeeded": job.succeeded,
-        "log_tail": job.log[-LOG_TAIL:] if job.log else "",
-    }
+    # As looked up (no log yet), in case no refresh completes in time;
+    # read before any refresh thread exists.
+    looked_up = _fields(job)
+    return {"job_id": job_id, **(await poll_job(job, deadline) or looked_up)}
 
 
 TOOLS = [

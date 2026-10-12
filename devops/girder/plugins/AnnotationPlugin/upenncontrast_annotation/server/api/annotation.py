@@ -526,10 +526,12 @@ class Annotation(Resource):
         Description("Annotation counts for several datasets at once")
         .notes(
             "Body: {datasetIds: [id, ...] (at most %d), shape?, tags?}. "
-            "Counts annotations per dataset in one query, with the same "
-            "filters as GET upenn_annotation/count (tags: all must be "
-            "present). Returns {counts: [{datasetId, count} | {datasetId, "
-            "error}]} in request order, without duplicates; an id that is "
+            "Counts annotations per dataset in one query, filtering like "
+            "GET upenn_annotation/count (tags: all must be present), but "
+            "stricter about input: shape must be a known annotation shape, "
+            "and tags are capped in number and length. Returns {counts: "
+            "[{datasetId, count} | {datasetId, error}]} in request order, "
+            "without duplicates; an id that is "
             "malformed, does not exist, or names a dataset the caller cannot "
             "read gets an error entry rather than failing the request."
             % MAX_COUNT_DATASETS

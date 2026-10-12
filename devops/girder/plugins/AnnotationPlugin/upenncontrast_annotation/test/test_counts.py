@@ -421,3 +421,16 @@ class TestBatchAnnotationCounts:
     ])
     def testMalformedBodiesAre400(self, admin, server, body):
         assertStatus(postCounts(server, admin, body), 400)
+
+    @pytest.mark.parametrize("shape", [None, ""])
+    def testEmptyShapeMeansNoFilter(self, admin, server, shape):
+        # As in GET count, where an empty shape filters nothing.
+        folder = utilities.createFolder(
+            admin, "ds", upenn_utilities.datasetMetadata)
+        addAnnotations(folder["_id"], "point", [], 2)
+        addAnnotations(folder["_id"], "polygon", [], 1)
+        resp = postCounts(server, admin, {
+            "datasetIds": [str(folder["_id"])], "shape": shape,
+        })
+        assertStatusOk(resp)
+        assert resp.json["counts"][0]["count"] == 3

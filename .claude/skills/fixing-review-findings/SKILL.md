@@ -440,6 +440,17 @@ Report per-finding outcomes (fixed / stale / by-design / needs-decision) keyed t
   and reread the winning persisted identity before returning derived state.
 - Projection-aware mocks matter: a mock returning every field hides code that
   reads a discriminator omitted from its database projection.
+- A deadline on an async call bounds only the awaits it wraps. Blocking work
+  hides in arguments evaluated on the event loop (`scales=ds.collections.scales`
+  inside an `in_thread(...)` call) and in lazy properties that fetch on first
+  read. Sweep every read in the async function, not just the explicit calls. An
+  abandoned thread keeps running, so the client needs an HTTP timeout. Build the
+  result from a snapshot taken in the thread, never from an object it may still
+  mutate (PR #1409, rounds 4-7).
+- Harness trap: patching `time.monotonic` patches the clock asyncio uses
+  (`loop.time()`), so `move_on_after` and `sleep` deadlines follow the fake clock.
+  A test like that proves nothing about real timeouts. Test those with a fake
+  operation that blocks for real (e.g. `time.sleep(3)` against a 1 s cap).
 - Replacing a data source invalidates values, pending responses, AND revisions
   consumed by gates. Test lazy and wholesale paths separately, plus late replies.
 - Virtual entities have no backing document ID. Persistence validators must
