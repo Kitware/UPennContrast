@@ -187,8 +187,13 @@ def _recorded(name: str, kwargs: dict):
                 **record, "args": _loggable(kwargs),
                 "error": None if succeeded else (error or "unhandled"),
             }, default=str)
-            with _log_lock, open(call_log, "a") as f:
-                f.write(line + "\n")
+            # An optional sink: failing to write it must not turn a
+            # finished call (perhaps one that changed data) into an error.
+            try:
+                with _log_lock, open(call_log, "a") as f:
+                    f.write(line + "\n")
+            except OSError as e:
+                log.warning("Could not write the call log: %s", e)
 
 
 _log_lock = threading.Lock()

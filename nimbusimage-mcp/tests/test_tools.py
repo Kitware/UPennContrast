@@ -88,6 +88,13 @@ def test_girder_errors_become_tool_errors(nc, status, fragment):
         datasets.ni_dataset_info(dataset_id="x")
 
 
+def test_unwritable_call_log_does_not_fail_the_call(nc, tmp_path, caplog):
+    _common.configure(make_settings(call_log=str(tmp_path)))  # a directory
+    nc.list_datasets.return_value = [{"_id": "d1", "name": "x"}]
+    assert loads(datasets.ni_datasets_list())["total"] == 1
+    assert "Could not write the call log" in caplog.text
+
+
 def test_known_scale_drops_placeholders():
     assert datasets.known_scale({"value": 1, "unit": "m"}) is None
     assert datasets.known_scale({"value": 0, "unit": "mm"}) is None
