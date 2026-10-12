@@ -133,18 +133,29 @@ def requireObjectId(value, field="id"):
 
 def validateCountsRequest(body):
     """Parse a batch-count body {datasetIds, shape?, tags?} into
-    (datasetIds as ObjectIds, deduplicated in request order, shape, tags).
-    Raises RestException(400) for anything malformed."""
+    (datasetIds, shape, tags). datasetIds keeps request order without
+    duplicates, as (requested string, ObjectId or None when the string is
+    not an id): one mistyped id is that entry's error, not the request's.
+    A malformed request (not an object, ids not a list of strings, over
+    the cap, bad shape or tags) raises RestException(400)."""
     body = requireObjectBody(body)
     rawIds = requireList(body.get("datasetIds"), "datasetIds")
     requireCountWithin(len(rawIds), MAX_COUNT_DATASETS, "datasetIds")
-    datasetIds = list(dict.fromkeys(
-        requireObjectId(value, "datasetIds entry") for value in rawIds
-    ))
+    if not all(isinstance(value, str) for value in rawIds):
+        raise RestException("datasetIds must be a list of strings", code=400)
+    datasetIds = []
+    for value in dict.fromkeys(rawIds):
+        try:
+            datasetIds.append((value, ObjectId(value)))
+        except InvalidId:
+            datasetIds.append((value, None))
     shape = body.get("shape")
     if shape is not None and not isinstance(shape, str):
         raise RestException("shape must be a string", code=400)
-    tags = requireList(body.get("tags") or [], "tags")
+    # Like GET count's tags: absent means no filter, anything but a list
+    # of strings is refused (not read as "no filter").
+    tags = body.get("tags")
+    tags = [] if tags is None else requireList(tags, "tags")
     if not all(isinstance(tag, str) for tag in tags):
         raise RestException("tags must be a list of strings", code=400)
     return datasetIds, shape or None, tags

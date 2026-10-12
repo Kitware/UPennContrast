@@ -189,9 +189,11 @@ def test_check_crop_clips_and_rejects_empty():
 
 
 def test_count_across_datasets_reports_each(nc):
+    # Rows as the server returns them: a malformed id and an unreadable
+    # one each fail only their own entry.
     nc.count_annotations.return_value = [
         {"datasetId": "aa", "count": 2},
-        {"datasetId": "bad", "error": "not found or not readable"},
+        {"datasetId": "bad", "error": "not a valid id"},
         {"datasetId": "aaa", "count": 3},
     ]
     result = loads(annotations.ni_annotations_count(
@@ -204,7 +206,7 @@ def test_count_across_datasets_reports_each(nc):
     nc.dataset.assert_not_called()
     assert result["total"] == 5 and result["incomplete"] is True
     assert [c["dataset_id"] for c in result["counts"]] == ["aa", "bad", "aaa"]
-    assert result["counts"][1]["error"] == "not found or not readable"
+    assert result["counts"][1]["error"] == "not a valid id"
     with pytest.raises(ToolError, match="between 1 and 50"):
         annotations.ni_annotations_count(dataset_ids=["x"] * 51)
 

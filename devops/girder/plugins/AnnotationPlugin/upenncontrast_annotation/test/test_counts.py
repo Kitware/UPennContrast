@@ -380,7 +380,7 @@ class TestBatchAnnotationCounts:
         addAnnotations(private["_id"], "point", [], 7)
         missing = "000000000000000000000000"
         resp = postCounts(server, user, {"datasetIds": [
-            str(private["_id"]), str(readable["_id"]), missing,
+            str(private["_id"]), str(readable["_id"]), missing, "typo",
         ]})
         assertStatusOk(resp)
         assert resp.json["counts"] == [
@@ -389,6 +389,8 @@ class TestBatchAnnotationCounts:
              "error": "not found or not readable"},
             {"datasetId": str(readable["_id"]), "count": 2},
             {"datasetId": missing, "error": "not found or not readable"},
+            # A mistyped id fails only its own entry.
+            {"datasetId": "typo", "error": "not a valid id"},
         ]
         # Anonymous callers see public datasets only.
         resp = postCounts(server, None, {"datasetIds": [
@@ -402,12 +404,15 @@ class TestBatchAnnotationCounts:
         [],
         {},
         {"datasetIds": "abc"},
-        {"datasetIds": ["not-an-id"]},
         {"datasetIds": [123]},
+        {"datasetIds": [None]},
         {"datasetIds": ["000000000000000000000000"] * 101},
         {"datasetIds": [], "shape": 3},
         {"datasetIds": [], "tags": "cell"},
         {"datasetIds": [], "tags": [1]},
+        # Falsy non-lists must not read as "no filter".
+        {"datasetIds": [], "tags": {}},
+        {"datasetIds": [], "tags": ""},
     ])
     def testMalformedBodiesAre400(self, admin, server, body):
         assertStatus(postCounts(server, admin, body), 400)

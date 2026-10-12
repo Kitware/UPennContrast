@@ -412,7 +412,7 @@ included, and cannot be undone.
 10. **Rebuilding the Girder image kills running local jobs** (materialize, recompute,
     transcode). Never `docker compose build girder` during an ingest.
 11. **`ds.properties.get_values()` downloads every value** (paged since nimbusimage
-    0.5.1; before that it silently returned at most 50). Don't use it to count or
+    0.6.0; before that it silently returned at most 50). Don't use it to count or
     summarize a large dataset: use `ds.annotations.summary(property_paths=...)`,
     `histogram`, or the export endpoints, which download no rows.
 12. **Running Python from the repo root shadows the package**: `nimbusimage/` is a folder

@@ -14,8 +14,9 @@ if TYPE_CHECKING:
     import girder_client
 
 _BATCH_SIZE = 10000
-# Value documents per request in get_values(); pages follow the stable
-# afterId cursor, so values written meanwhile cannot shift them.
+# Value documents per request in get_values(). Pages follow the afterId
+# cursor, so an update during the walk never skips or repeats a document;
+# a value first written for an annotation behind the cursor is missed.
 _VALUES_PAGE = 10000
 
 
@@ -148,7 +149,11 @@ class PropertyAccessor:
         """
         url = f"annotation_property_values?datasetId={self._dataset_id}"
         if annotation_id:
-            return self._gc.get(url + f"&annotationId={annotation_id}")
+            # One document per annotation; limit=0 all the same, so no
+            # list here relies on the default page.
+            return self._gc.get(
+                url + f"&annotationId={annotation_id}&limit=0"
+            )
         values: list[dict] = []
         after_id = None
         while True:

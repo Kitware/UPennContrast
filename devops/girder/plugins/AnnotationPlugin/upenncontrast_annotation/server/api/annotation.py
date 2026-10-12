@@ -528,9 +528,10 @@ class Annotation(Resource):
             "Counts annotations per dataset in one query, with the same "
             "filters as GET upenn_annotation/count (tags: all must be "
             "present). Returns {counts: [{datasetId, count} | {datasetId, "
-            "error}]} in request order, without duplicates; a dataset that "
-            "does not exist or that the caller cannot read gets an error "
-            "entry rather than failing the request." % MAX_COUNT_DATASETS
+            "error}]} in request order, without duplicates; an id that is "
+            "malformed, does not exist, or names a dataset the caller cannot "
+            "read gets an error entry rather than failing the request."
+            % MAX_COUNT_DATASETS
         )
         .jsonParam(
             "body", "datasetIds and optional shape/tags filters",
@@ -540,25 +541,30 @@ class Annotation(Resource):
     )
     def counts(self, body):
         datasetIds, shape, tags = validateCountsRequest(body)
-        user = self.getCurrentUser()
-        folderModel = Folder()
-        # One query for every folder, then the access check on each.
+        ids = [objectId for _, objectId in datasetIds if objectId]
+        # One permission-filtered query for every folder, ids only.
         readable = {
-            folder["_id"]
-            for folder in folderModel.find({"_id": {"$in": datasetIds}})
-            if folderModel.hasAccess(folder, user, AccessType.READ)
+            folder["_id"] for folder in Folder().findWithPermissions(
+                {"_id": {"$in": ids}}, fields=["_id"],
+                user=self.getCurrentUser(), level=AccessType.READ,
+            )
         }
         counts = self._annotationModel.countByDataset(
-            [d for d in datasetIds if d in readable], shape, tags
+            [d for d in ids if d in readable], shape, tags
         )
-        return {"counts": [
-            {"datasetId": str(d), "count": counts.get(d, 0)}
-            if d in readable else
-            # One message for both: whether an unreadable id exists is
-            # not the caller's business.
-            {"datasetId": str(d), "error": "not found or not readable"}
-            for d in datasetIds
-        ]}
+
+        def row(requested, objectId):
+            if objectId is None:
+                return {"datasetId": requested, "error": "not a valid id"}
+            if objectId not in readable:
+                # One message for both: whether an unreadable id exists
+                # is not the caller's business.
+                return {"datasetId": requested,
+                        "error": "not found or not readable"}
+            return {"datasetId": requested,
+                    "count": counts.get(objectId, 0)}
+
+        return {"counts": [row(*entry) for entry in datasetIds]}
 
     @access.public(scope=TokenScope.DATA_READ)
     @autoDescribeRoute(

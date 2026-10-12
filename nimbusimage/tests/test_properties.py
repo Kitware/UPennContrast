@@ -180,7 +180,7 @@ class TestPropertyValues:
 
         accessor.get_values(annotation_id="a1")
         call_url = mock_gc.get.call_args[0][0]
-        assert "annotationId=a1" in call_url
+        assert "annotationId=a1" in call_url and "limit=0" in call_url
 
     def test_submit_values_transforms_format(self, mock_gc):
         accessor = PropertyAccessor(mock_gc, "ds_001")

@@ -37,8 +37,9 @@ def ni_annotations_count(
 
     Optionally filter by shape (point = spots, polygon = cells/nuclei,
     line, rectangle) and by tags (an annotation must have ALL the given
-    tags). Returns {total, counts: [{dataset_id, count}], incomplete}; a
-    dataset that cannot be read gets an "error" instead of a count, and
+    tags). Returns {total, counts: [{dataset_id, count}], incomplete}; an
+    id that is mistyped, missing, or not readable gets an "error" instead
+    of a count, and
     then total covers only the readable ones and incomplete is true. Use
     this before listing annotations.
     """
