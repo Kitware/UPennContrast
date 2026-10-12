@@ -199,8 +199,14 @@ async def _run_registration(nc: ni.NimbusClient, image: str) -> None:
             try:
                 if await _interface(nc, image, deadline) is not None:
                     return
-            except (girder_client.HttpError, requests.RequestException):
-                continue  # still unreachable: keep the registration pending
+            except girder_client.HttpError as e:
+                if e.status in (401, 403):
+                    raise  # refused for good: report it (_register_once)
+                continue  # a 5xx: keep the registration pending
+            except requests.RequestException:
+                continue  # unreachable for now: keep it pending
+            except ToolError:
+                break  # the read ran into the task's own deadline
         state = None
     if state is None or not state["finished"]:
         raise ToolError(
@@ -429,7 +435,21 @@ async def ni_job_wait(job_id: str, timeout_seconds: float = 60) -> dict:
     # As looked up (no log yet), in case no refresh completes in time;
     # read before any refresh thread exists.
     looked_up = _fields(job)
-    return {"job_id": job_id, **(await poll_job(job, deadline) or looked_up)}
+    try:
+        state = await poll_job(job, deadline)
+    except requests.RequestException:
+        state = None
+    except girder_client.HttpError as e:
+        if e.status < 500:
+            raise
+        state = None
+    else:
+        return {"job_id": job_id, **(state or looked_up)}
+    # Girder stopped answering mid-wait: report what was known; the job
+    # itself is unaffected.
+    return {"job_id": job_id, **looked_up,
+            "note": "NimbusImage stopped answering during the wait; "
+                    "try again."}
 
 
 TOOLS = [

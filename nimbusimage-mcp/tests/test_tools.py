@@ -611,6 +611,12 @@ def test_worker_run_fills_defaults_and_rejects_property_workers(nc):
     }
     assert kwargs["location"] == ni.Location(xy=0, z=3, time=0)
     assert kwargs["tags"] == ["cell"]
+    # A worker labelled with both roles runs as an annotation worker.
+    ds.annotations.compute.reset_mock()
+    run_tool(workers.ni_worker_run, dataset_id="d",
+             image="both/seg-and-area:latest")
+    assert ds.annotations.compute.call_args.kwargs["image"] == \
+        "both/seg-and-area:latest"
     with pytest.raises(ToolError, match="not an annotation worker"):
         run_tool(workers.ni_worker_run, dataset_id="d",
                  image="properties/area:latest")
@@ -1005,7 +1011,7 @@ def test_an_outage_while_watching_for_the_interface_keeps_it_pending(
     nc.get_worker_interface.side_effect = interface
 
     async def scenario():
-        with pytest.raises(ToolError):
+        with pytest.raises(ToolError, match="still registering"):
             await workers.ni_worker_interface(image=SEG)
         # The task outlives the first caller; let it watch a while.
         await asyncio.sleep(0.3)
@@ -1015,6 +1021,38 @@ def test_an_outage_while_watching_for_the_interface_keeps_it_pending(
     monkeypatch.setattr(workers, "POLL_SECONDS", 0.05)
     assert asyncio.run(scenario()) is False  # still pending
     assert nc.girder.post.call_count == 1
+
+
+def test_a_refusal_while_watching_ends_the_registration(nc, monkeypatch):
+    """401/403 is permanent: the task ends and reports it, rather than
+    retrying a refused key for five minutes."""
+    _common.configure(make_settings(max_job_wait=10))
+    _registering(nc)
+    nc.girder.get.side_effect = http_error(403)  # job unreadable
+    reads = iter([None, None])
+
+    def interface(*args, **kwargs):
+        value = next(reads, "refused")
+        if value == "refused":
+            raise http_error(403)
+        return value
+
+    nc.get_worker_interface.side_effect = interface
+    monkeypatch.setattr(workers, "POLL_SECONDS", 0.05)
+    with pytest.raises(ToolError, match="denied"):
+        run_tool(workers.ni_worker_interface, image=SEG)
+
+
+def test_job_wait_survives_a_girder_blip(nc):
+    import requests
+    job = _Job(polls=None)
+    job.refresh = lambda: (_ for _ in ()).throw(
+        requests.ConnectionError("blip"))
+    nc.job.return_value = job
+    result = loads(asyncio.run(workers.ni_job_wait(
+        job_id="j1", timeout_seconds=1)))
+    assert result["status"] == "running" and "stopped answering" in \
+        result["note"]
 
 
 def test_another_users_refusal_is_not_reported_as_yours(nc, monkeypatch):

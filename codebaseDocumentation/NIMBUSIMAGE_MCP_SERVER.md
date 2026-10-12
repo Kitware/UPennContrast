@@ -314,7 +314,7 @@ JSON with no structured copy (the SDK's default indents dicts and duplicates the
 | `ni_workers_list` | `client.list_workers()` | Roles from marker labels by presence (a worker can have both); base images and `:test` tags hidden by default |
 | `ni_worker_interface` | `get_worker_interface` (+ registration job; whole call at most 60 s and the job-wait cap) | Parameters, value formats, and the dataset's channels |
 | `ni_worker_run` | `ds.annotations.compute` | **Destructive hint.** Annotation workers only; parameters normalized like the app (`worker_values.py` ports `src/utils/workerInterface.ts`) |
-| `ni_job_wait` | `client.job(id)` + `refresh()` | Async; at most `NI_MCP_MAX_JOB_WAIT` (240 s); reports `finished: false` instead of failing, or `status: "unknown"` if Girder does not answer in time |
+| `ni_job_wait` | `client.job(id)` + `refresh()` | Async; at most `NI_MCP_MAX_JOB_WAIT` (240 s); reports `finished: false` instead of failing, `status: "unknown"` if Girder does not answer in time, or the last known state with a note if Girder stops answering mid-wait |
 | `ni_help_topic` | `GET claude_agent/help` | See 5.2 |
 
 ---
@@ -768,8 +768,9 @@ the local stack. Add an item whenever a review finds something this list missed.
 - [x] The server holds no per-session state between requests.
       *"test_stateless_requests_any_instance"*
 - [x] `ni_job_wait` never starts a poll at or after the configured cap, and stops waiting
-      at the cap for a slow lookup or poll (status `unknown` if Girder never answered).
-      *"test_job_wait_clamps_and_reports_still_running"*,
+      at the cap for a slow lookup or poll (status `unknown` if Girder never answered);
+      a Girder blip mid-wait returns the last known state with a note.
+      *"test_job_wait_clamps_and_reports_still_running"*, *"test_job_wait_survives_a_girder_blip"*,
       *"test_job_wait_stops_waiting_for_a_slow_refresh"*
 - [x] Job waits (`ni_job_wait`, and a worker's first interface registration, which also
       keeps within the cap) sleep on the event loop instead of holding one of the worker
@@ -833,14 +834,16 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_an_unreadable_job_keeps_the_registration_pending"*,
       *"test_a_connection_blip_while_following_the_job_keeps_it_pending"*,
       *"test_an_outage_while_watching_for_the_interface_keeps_it_pending"*,
+      *"test_a_refusal_while_watching_ends_the_registration"*,
       *"test_another_users_refusal_is_not_reported_as_yours"*,
       *"test_finished_registrations_leave_the_registry"*
 - [x] Tagging needs an explicit target (an empty id list is not "everything"), refuses
       more than 10,000 annotations before loading any, and sends only the annotations
       whose tags change. *"test_tag_refuses_unbounded_or_ambiguous_targets"*,
       *"test_tag_by_query_updates_only_changed"*, *"test_tag_by_ids"*
-- [x] A worker with both role labels is listed, and runnable, in both roles.
-      *"test_workers_list_keeps_real_workers"*
+- [x] A worker with both role labels is listed under both roles and accepted by
+      `ni_worker_run`. *"test_workers_list_keeps_real_workers"*,
+      *"test_worker_run_fills_defaults_and_rejects_property_workers"*
 - [x] A worker run checks channel and location before starting a job.
       *"test_worker_run_checks_the_location_before_submitting"*
 - [x] Worker parameters are normalized like the app's (channel names, checkbox maps,
