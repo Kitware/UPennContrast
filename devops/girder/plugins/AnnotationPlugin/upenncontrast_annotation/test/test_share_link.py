@@ -8,6 +8,7 @@ from pytest_girder.assertions import assertStatus, assertStatusOk
 
 from girder.constants import AccessType
 from girder.models.folder import Folder
+from girder.models.item import Item
 from girder.models.token import Token
 from girder.models.user import User
 
@@ -158,20 +159,27 @@ class TestShareLink:
         assertStatusOk(listed)
         assert not any(u["login"].startswith("share-") for u in listed.json)
 
-    def testGuardLeavesOrdinaryUsersDownloadsAlone(self, user, server):
-        """The guard is a `rest.*.before` listener; without an access level
-        of its own Girder demanded site-admin for every guarded route, so
-        non-admin users could not download or export their own datasets."""
+    def testNonAdminOwnerCanStillDownload(self, admin, user, server):
+        # The download guard is a `.before` handler; without an access level
+        # Girder makes every route it guards admin-only. The test above only
+        # downloads as admin, so it missed that. (`admin` is requested so
+        # `user` is not Girder's first, auto-admin user.)
         assert not user["admin"]
-        dataset, _, _ = privateDatasetWithView(user)
+        dataset, config, view = privateDatasetWithView(user)
+        item = Item().createItem("file", creator=user, folder=dataset)
         assertStatusOk(server.request(
             path="/folder/%s/download" % dataset["_id"], method="GET",
             user=user, isJson=False,
         ))
         assertStatusOk(server.request(
-            path="/export/json", method="GET", user=user, isJson=False,
+            path="/item/%s/download" % item["_id"], method="GET",
+            user=user, isJson=False,
+        ))
+        assertStatusOk(request(
+            server, "GET", "/export/json", user=user,
             params={"datasetId": str(dataset["_id"])},
         ))
+        # Every guarded export format, not only JSON.
         for route in ("/export/csv", "/export/geojson"):
             assertStatusOk(server.request(
                 path=route, method="POST", user=user, isJson=False,

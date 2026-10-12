@@ -1,0 +1,10 @@
+# Local test and build leftovers. The Dockerfile copies whole plugin
+# directories and runs `pip install -e` on each (which regenerates
+# *.egg-info), so none of these belong in the image. A developer's tox
+# environments alone can add over 1 GB to the build context.
+**/.tox
+**/.pytest_cache
+**/__pycache__
+**/*.pyc
+**/*.egg-info
+**/.venv

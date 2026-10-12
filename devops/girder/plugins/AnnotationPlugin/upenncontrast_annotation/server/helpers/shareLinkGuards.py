@@ -34,10 +34,10 @@ def isLinkUser(user):
     return bool(user and user.get("shareLink"))
 
 
-# A `rest.*.before` listener without an access level makes Girder demand
-# site-admin for the whole route (`Resource._defaultAccess`), which refused
-# every ordinary user's downloads and exports. `public` adds no check of its
-# own; the route's handler still enforces its access level after this runs.
+# Girder runs a `.before` handler with no access level as admin-only
+# (Resource._defaultAccess), which would refuse every non-admin download.
+# Marking it public widens nothing: the route still checks its own READ
+# access after this guard runs.
 @access.public
 def refuseDownloadForLinkUsers(event):
     if isLinkUser(getCurrentUser()):

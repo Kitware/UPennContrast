@@ -22,12 +22,14 @@ from nimbusimage.filters import (
 )
 from nimbusimage.models import (
     Annotation,
+    AnnotationSummary,
     Connection,
     FrameInfo,
     Location,
     MultiSourceConfiguration,
     PixelSize,
     Property,
+    PropertyStats,
 )
 from nimbusimage.worker import WorkerContext
 
@@ -105,7 +107,9 @@ __all__ = [
     "Connection",
     "Property",
     "Location",
+    "AnnotationSummary",
     "PixelSize",
+    "PropertyStats",
     "FrameInfo",
     "MultiSourceConfiguration",
     # Filters

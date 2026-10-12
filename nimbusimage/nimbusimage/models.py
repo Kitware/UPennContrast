@@ -172,6 +172,60 @@ class PixelSize(BaseModel):
         return other * self.value
 
 
+class PropertyStats(BaseModel):
+    """Statistics of one property path over the summarized annotations.
+
+    ``count`` is the number of annotations with a numeric value at the
+    path (strings, NaN, and missing values are skipped); the statistics are
+    None when ``count`` is 0, ``std`` (the sample standard deviation) also
+    below two values, and any statistic that is not finite (an Infinity
+    value is counted but makes mean/min/max infinite) is None too.
+    """
+
+    path: list[str]
+    count: int
+    mean: float | None = None
+    std: float | None = None
+    min: float | None = None
+    max: float | None = None
+
+
+class AnnotationSummary(BaseModel):
+    """Server-side aggregate over the annotations matching a filter.
+
+    ``tags``, ``shapes`` and ``channels`` map each tag, shape or channel
+    index to its annotation count, most common first (ties by name or
+    index). An annotation with several tags counts once per tag.
+    ``shapes`` and ``channels`` are None on servers that predate those
+    breakdowns.
+    """
+
+    total: int
+    tags: dict[str, int]
+    shapes: dict[str, int] | None = None
+    channels: dict[int, int] | None = None
+    properties: list[PropertyStats] = []
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "AnnotationSummary":
+        """Build from the POST upenn_annotation/summary response."""
+        shapes = data.get("shapes")
+        channels = data.get("channels")
+        return cls(
+            total=data["total"],
+            tags={row["tag"]: row["count"] for row in data["tags"]},
+            shapes=(
+                None if shapes is None
+                else {row["shape"]: row["count"] for row in shapes}
+            ),
+            channels=(
+                None if channels is None
+                else {row["channel"]: row["count"] for row in channels}
+            ),
+            properties=data.get("properties", []),
+        )
+
+
 class MultiSourceConfiguration(BaseModel):
     """Result of configuring a folder of image files as a dataset.
 

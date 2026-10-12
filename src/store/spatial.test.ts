@@ -62,6 +62,24 @@ describe("spatial store: the configuration scale pulls from the registry", () =>
     });
   });
 
+  it("adopts over a stored null or the legacy 1 m placeholder", async () => {
+    // An uncalibrated source used to persist NaN (as null), and a
+    // configuration created without tile metadata the 1 m default; neither
+    // is a size anyone set.
+    for (const pixelSize of [
+      { value: null, unit: "mm" },
+      { value: 1, unit: "m" },
+    ]) {
+      mocks.saveScalesInConfiguration.mockReset();
+      spatialStore.setInfo({ datasetId: "", info: null });
+      mocks.main.configuration.scales.pixelSize = pixelSize;
+      await spatialStore.refreshInfo();
+      expect(mocks.saveScalesInConfiguration).toHaveBeenCalledWith({
+        scales: { pixelSize: { value: 0.2125, unit: "µm" } },
+      });
+    }
+  });
+
   it("never overwrites a pixel size someone already set", async () => {
     mocks.main.configuration.scales.pixelSize = { value: 0.5, unit: "µm" };
     await spatialStore.refreshInfo();
