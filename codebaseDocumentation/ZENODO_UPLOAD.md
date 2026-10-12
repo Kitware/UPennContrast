@@ -79,7 +79,8 @@ it, and a co-admin of the project may not be able to read it at all. Configurati
 reached only through a dataset's views contribute their property definitions only if
 the uploader owns them; otherwise they are left out, along with those properties'
 values, instead of refusing the upload (anyone can create a view naming any dataset
-and make it public). The upload job repeats the check on the project it reloads, and
+and make it public). The upload job repeats the check on the project it reloads, and again
+immediately before reading any data (after its Zenodo calls), and
 the annotation export uses the configurations the check returned instead of querying
 views again. The finished draft records what the job actually uploaded in
 `meta.zenodo.uploadedResources`, and publish checks those resources (a draft without

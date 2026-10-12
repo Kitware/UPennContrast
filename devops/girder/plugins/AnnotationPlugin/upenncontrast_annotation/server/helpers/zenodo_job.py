@@ -24,7 +24,10 @@ from girder.models.user import User
 from girder_jobs.constants import JobStatus
 from girder_jobs.models.job import Job
 
-from .access_helpers import requireProjectContentsAccess
+from .access_helpers import (
+    requireProjectContentsAccess,
+    requireResourcesAccess,
+)
 from .serialization import orJsonDefaults
 from .zenodo_client import (
     get_zenodo_client_for_user,
@@ -292,6 +295,14 @@ def _do_upload(job, job_model, project, user, project_id,
             'message': 'Starting upload...',
         },
     }, project_model=project_model)
+
+    # Ownership was checked before the Zenodo calls above, which can take
+    # a while; check again immediately before reading any data, so access
+    # revoked meanwhile stops the export. (Revocation during the file
+    # uploads themselves still blocks publishing: publish rechecks.)
+    requireResourcesAccess(
+        contents.datasetIds, contents.collectionIds, user
+    )
 
     # Batch load all project data upfront
     (folders_by_id, items_by_folder,

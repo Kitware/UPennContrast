@@ -772,6 +772,46 @@ class TestZenodoRequiresOwnership:
         assertStatus(resp, 409)
         assert "upload again" in resp.json["message"]
 
+    def testUploadRechecksOwnershipBeforeReadingData(
+            self, server, owner, user):
+        """Access revoked while the job waits on Zenodo stops it before it
+        reads or uploads any of the dataset."""
+        from unittest.mock import MagicMock
+        from girder.exceptions import AccessException
+        from girder_jobs.constants import JobStatus
+        from girder_jobs.models.job import Job
+        from upenncontrast_annotation.server.helpers import zenodo_job
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, view = createDataset(owner)
+        for doc, model in ((dataset, Folder()), (config, Collection()),
+                           (view, DatasetViewModel())):
+            grant(doc, model, user, ADMIN)
+        project = TestProjectShareLimits().createProject(server, user)
+        TestProjectShareLimits().addDataset(server, user, project, dataset)
+        projectDoc = Project().load(project["_id"], force=True)
+        contents = requireProjectContentsAccess(projectDoc, user)
+
+        def revokeThenCreate():
+            grant(Folder().load(dataset["_id"], force=True), Folder(), user,
+                  WRITE)
+            return {"id": 1, "links": {"bucket": "b", "html": "h"}}
+
+        client = MagicMock()
+        client.base_url = "https://sandbox.zenodo.org"
+        client.create_deposition.side_effect = revokeThenCreate
+        job = Job().updateJob(
+            Job().createJob(title="t", type="zenodo_upload", user=user),
+            status=JobStatus.RUNNING)
+
+        with pytest.raises(AccessException):
+            zenodo_job._do_upload(
+                job, Job(), projectDoc, user, project["_id"], Project(),
+                client, contents)
+        client.upload_file.assert_not_called()
+
     def testOwnerPassesTheOwnershipCheck(self, server, owner):
         dataset, _, _ = createDataset(owner)
         project = TestProjectShareLimits().createProject(server, owner)
