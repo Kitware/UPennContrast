@@ -4,6 +4,7 @@ The unit tests pin the request bodies; these prove the server accepts
 them and that access actually changes for another, non-admin user.
 """
 
+import json
 import secrets
 
 import girder_client
@@ -118,6 +119,31 @@ class TestLiveSharing:
         ds.sharing.set_public(False)
         assert ds.sharing.get_access()["public"] is False
         assert not _can_read(other, ds.id)
+
+    def test_share_with_scoped_api_key(
+        self, private_test_dataset, second_user, client, api_url
+    ):
+        """A key with only data scopes can share: user/me returns null
+        (not 403) for it, so the self-target check is skipped."""
+        ds = private_test_dataset
+        login, other = second_user
+        key = client.girder.post(
+            "api_key",
+            parameters={
+                "name": f"ni-share-test-{secrets.token_hex(4)}",
+                "scope": json.dumps(["core.data.read", "core.data.write"]),
+            },
+        )
+        try:
+            scoped = ni.connect(api_url, api_key=key["key"])
+            assert scoped.girder.get("user/me") is None
+
+            scoped.dataset(ds.id).sharing.share(login, access="read")
+        finally:
+            client.girder.delete(f"api_key/{key['_id']}")
+
+        assert _user_levels(ds)[login] == 0
+        assert _can_read(other, ds.id)
 
     def test_share_refuses_to_target_caller(
         self, private_test_dataset, client

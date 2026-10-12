@@ -31,8 +31,10 @@ def refuse_self_target(gc, user_email_or_name: str) -> None:
         ValueError: If the target is the current user.
     """
     me = gc.get("user/me")
-    # null when the token lacks USER_INFO_READ scope (e.g. a scoped API
-    # key): we can't tell who the caller is, so leave it to the server.
+    # null (HTTP 200, not 403) when the token lacks USER_INFO_READ scope,
+    # e.g. a scoped API key: user/me is a public route, so Girder treats
+    # the caller as anonymous. We can't tell who they are; let the server
+    # decide. Pinned live by test_share_with_scoped_api_key.
     if me is not None and user_email_or_name.lower() in (
         me["login"].lower(), me["email"].lower()
     ):

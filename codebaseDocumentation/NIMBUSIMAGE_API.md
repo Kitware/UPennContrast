@@ -674,7 +674,7 @@ Rendering, query, and listing invariants established on PR #1390 across four rev
 
 **Sharing and project requests** (every one of these 400'd on the live server while mock tests that only asserted "post was called" passed; unit tests must pin the exact request)
 - Dataset `share()` sends `datasetViewIds` (all the dataset's views, as the Share dialog does), the user, and the access code — *"test_share_sends_schema_body"*; a dataset without views is an error before any POST — *"test_share_without_views_raises_before_posting"*.
-- `share()` refuses to target the caller (self-"remove" is an owner lockout) — *"test_share_refuses_to_target_caller"*; a token whose `user/me` is null skips the check rather than crashing — *"test_share_with_unscoped_user_me_still_shares"*.
+- `share()` refuses to target the caller (self-"remove" is an owner lockout) — *"test_share_refuses_to_target_caller"*; a token whose `user/me` is null skips the check rather than crashing — *"test_share_with_unscoped_user_me_still_shares"*; live, a data-scoped API key gets null (200, not 403) and can share — *"test_share_with_scoped_api_key"*.
 - Project `share`/`set_public`/`add_dataset`/`add_configuration`/`set_status` send query params, not JSON bodies — *"test_share_sends_query_params"*, *"test_set_public_sends_query_params"*, *"test_add_dataset"*.
 - Live: a second non-admin user can read only after sharing and loses access on remove — *"test_share_read_then_remove"*; project mutators land — *"test_project_mutators_round_trip"*.
 
