@@ -119,6 +119,9 @@ class NimbusClient:
                 parameters={
                     "q": name, "mode": "prefix",
                     "types": '["folder"]',
+                    # The search returns 10 by default: an exact name
+                    # behind 10 longer prefix matches would be missed.
+                    "limit": 0,
                 },
             )
             # Handle both list response and dict-with-folder-key response
@@ -255,7 +258,8 @@ class NimbusClient:
 
     def list_projects(self) -> list[dict]:
         """List all accessible projects."""
-        return self._gc.get("project")
+        # limit=0: the endpoint pages at Girder's default of 50.
+        return self._gc.get("project", parameters={"limit": 0})
 
     def create_project(
         self, name: str, description: str = ""
@@ -306,7 +310,7 @@ class NimbusClient:
                 return []
 
         data = self._gc.get(
-            f"upenn_collection?folderId={folder_id}"
+            f"upenn_collection?folderId={folder_id}&limit=0"
         )
         return [
             Collection(self._gc, d, frontend_url=self._frontend_url)

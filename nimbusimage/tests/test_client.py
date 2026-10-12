@@ -128,6 +128,18 @@ class TestNimbusClientDataset:
 
         ds = client.dataset(name="My Dataset")
         assert ds.id == "folder_123"
+        # The search returns 10 matches by default; an exact name behind
+        # 10 longer prefix matches must still be found.
+        assert mock_gc.get.call_args.kwargs["parameters"]["limit"] == 0
+
+    def test_list_projects_requests_every_page(self, mock_gc):
+        mock_gc.get.return_value = []
+        client = NimbusClient.__new__(NimbusClient)
+        client._gc = mock_gc
+        client.list_projects()
+        mock_gc.get.assert_called_once_with(
+            "project", parameters={"limit": 0}
+        )
 
     def test_dataset_by_name_not_found(self, mock_gc):
         mock_gc.get.return_value = []
