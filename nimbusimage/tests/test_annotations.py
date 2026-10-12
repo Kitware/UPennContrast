@@ -339,6 +339,9 @@ class TestAnnotationSummary:
         "shapes": [
             {"shape": "polygon", "count": 3}, {"shape": "point", "count": 1},
         ],
+        "channels": [
+            {"channel": 2, "count": 3}, {"channel": 0, "count": 1},
+        ],
         "properties": [
             {"path": ["p", "Area"], "count": 2, "mean": 10.0, "std": 7.07,
              "min": 5.0, "max": 15.0},
@@ -362,6 +365,9 @@ class TestAnnotationSummary:
         # Server order (count desc) is kept.
         assert list(s.tags.items()) == [("A", 3), ("B", 1)]
         assert s.shapes == {"polygon": 3, "point": 1}
+        # Keyed by channel index (an int, as the app's layers use), in the
+        # server's count order.
+        assert list(s.channels.items()) == [(2, 3), (0, 1)]
         assert s.properties[0].path == ["p", "Area"]
         assert s.properties[0].mean == 10.0
         assert s.properties[1].count == 0 and s.properties[1].mean is None
@@ -427,4 +433,5 @@ class TestAnnotationSummary:
         mock_gc.post.return_value = {"total": 0, "tags": [], "properties": []}
         s = AnnotationAccessor(mock_gc, "ds_001").summary()
         assert s.shapes is None
+        assert s.channels is None
         assert s.tags == {} and s.properties == []

@@ -177,13 +177,14 @@ class AnnotationAccessor:
         property_paths: list[list[str]] | None = None,
         filters: dict | None = None,
     ) -> AnnotationSummary:
-        """Count annotations by tag and shape, and summarize property values,
-        in one server-side aggregation (no annotations are downloaded).
+        """Count annotations by tag, shape and channel, and summarize
+        property values, in one server-side aggregation (no annotations are
+        downloaded).
 
         Example::
 
             s = ds.annotations.summary(tags=["cell"])
-            s.total, s.tags, s.shapes
+            s.total, s.tags, s.shapes, s.channels
             s = ds.annotations.summary(property_paths=[[prop.id, "Area"]])
             s.properties[0].mean
 
@@ -204,7 +205,8 @@ class AnnotationAccessor:
                 than their keys here.
 
         Returns:
-            AnnotationSummary with ``total``, ``tags``, ``shapes``, and one
+            AnnotationSummary with ``total``, ``tags``, ``shapes``,
+            ``channels`` (keyed by channel index), and one
             ``properties`` entry per requested path, in order.
 
         Raises:

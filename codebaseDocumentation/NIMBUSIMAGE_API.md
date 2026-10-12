@@ -650,8 +650,9 @@ Rendering, query, and listing invariants established on PR #1390 across four rev
 - `shape`/`tags` become list filters (any of, or exactly with `exclusive`); the caller's `filters` dict is not mutated — *"test_shape_and_tags_become_list_filters"*; the same filter given twice is an error — *"test_rejects_the_same_filter_twice"*.
 - A bare-string `tags` or a dotted-string property path is an error, not split into characters; `exclusive` needs `tags` — *"test_rejects_misshapen_arguments"*.
 - Duplicate tags are sent once (an exclusive match compares set size) — *"test_duplicate_tags_are_sent_once"*.
-- `shapes` is None (not empty) on servers without the breakdown — *"test_shapes_is_none_on_servers_without_the_breakdown"*.
-- Live: counts, filters, `+` in tags, and property statistics — *"test_counts_by_tag_and_shape"*, *"test_filters_narrow_the_summary"*, *"test_property_statistics"*.
+- `channels` is keyed by channel index (int), in the server's count order — *"test_posts_the_summary_request_and_parses_it"*.
+- `shapes` and `channels` are None (not empty) on servers without the breakdown — *"test_shapes_is_none_on_servers_without_the_breakdown"*.
+- Live: counts, filters, `+` in tags, and property statistics — *"test_counts_by_tag_shape_and_channel"*, *"test_filters_narrow_the_summary"*, *"test_property_statistics"*.
 
 **Query encoding**
 - Free-text tags survive `+`, `&` and spaces — *"test_special_characters_survive"*; live — *"test_tags_with_special_characters_round_trip"*.
