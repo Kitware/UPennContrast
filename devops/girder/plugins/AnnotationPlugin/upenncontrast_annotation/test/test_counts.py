@@ -381,6 +381,7 @@ class TestBatchAnnotationCounts:
         missing = "000000000000000000000000"
         resp = postCounts(server, user, {"datasetIds": [
             str(private["_id"]), str(readable["_id"]), missing, "typo",
+            "y" * 64,
         ]})
         assertStatusOk(resp)
         assert resp.json["counts"] == [
@@ -389,8 +390,10 @@ class TestBatchAnnotationCounts:
              "error": "not found or not readable"},
             {"datasetId": str(readable["_id"]), "count": 2},
             {"datasetId": missing, "error": "not found or not readable"},
-            # A mistyped id fails only its own entry.
+            # A mistyped id fails only its own entry, up to the length
+            # cap (64 characters; longer is a 400).
             {"datasetId": "typo", "error": "not a valid id"},
+            {"datasetId": "y" * 64, "error": "not a valid id"},
         ]
         # Anonymous callers see public datasets only.
         resp = postCounts(server, None, {"datasetIds": [

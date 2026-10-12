@@ -19,6 +19,8 @@ Shape = Literal["point", "polygon", "line", "rectangle"]
 # Matches the AI panel's MAX_LIST_ANNOTATIONS.
 MAX_LIST = 200
 MAX_COUNT_DATASETS = 50
+# The batch count endpoint's MAX_DATASET_ID_LENGTH (an ObjectId is 24).
+MAX_DATASET_ID_LENGTH = 64
 MAX_SUMMARY_TAGS = 200
 # One tagging call loads every matching annotation (with coordinates)
 # into this process and sends one bulk update; past this, narrow the
@@ -39,24 +41,32 @@ def ni_annotations_count(
     line, rectangle) and by tags (an annotation must have ALL the given
     tags). Returns {total, counts: [{dataset_id, count}], incomplete}; an
     id that is mistyped, missing, or not readable gets an "error" instead
-    of a count, and
-    then total covers only the readable ones and incomplete is true. Use
-    this before listing annotations.
+    of a count, and then total covers only the readable ones and
+    incomplete is true. Use this before listing annotations.
     """
     if not 1 <= len(dataset_ids) <= MAX_COUNT_DATASETS:
         raise ValueError(
             f"Pass between 1 and {MAX_COUNT_DATASETS} dataset_ids."
         )
+    ids = list(dict.fromkeys(dataset_ids))
+    # The server refuses the whole request for an id longer than it
+    # accepts; keep that one entry's error instead, like any bad id.
+    sendable = [i for i in ids if len(i) <= MAX_DATASET_ID_LENGTH]
     # One request: the server counts every dataset in one aggregation
     # and reports unreadable ones as errors instead of failing.
-    counts = [
-        {"dataset_id": row["datasetId"], "count": row["count"]}
-        if "count" in row else
-        {"dataset_id": row["datasetId"], "error": row["error"]}
-        for row in client().count_annotations(
-            dataset_ids, shape=shape, tags=tags
+    rows = {
+        row["datasetId"]: row for row in client().count_annotations(
+            sendable, shape=shape, tags=tags
         )
-    ]
+    } if sendable else {}
+    counts = []
+    for dataset_id in ids:
+        row = rows.get(dataset_id, {"error": "not a valid id"})
+        counts.append(
+            {"dataset_id": dataset_id, "count": row["count"]}
+            if "count" in row else
+            {"dataset_id": dataset_id, "error": row["error"]}
+        )
     return {
         "total": sum(c.get("count", 0) for c in counts),
         "incomplete": any("error" in c for c in counts),

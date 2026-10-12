@@ -142,9 +142,13 @@ def ni_property_values_summary(
             f"No property {property_id!r} is set up for this dataset; "
             "use ni_properties_list to find its id."
         )
+    if not names:
+        raise ToolError(
+            "No measurements (properties) are set up for this dataset; "
+            "see ni_properties_list."
+        )
     wanted = [property_id] if property_id else list(names)
-    # No property set up: nothing to sample (the error below says so).
-    discovered = discover_paths(nc, dataset_id) if wanted else {}
+    discovered = discover_paths(nc, dataset_id)
     paths = [path for pid in wanted for path in discovered.get(pid, [])]
     if not paths:
         # The sample can miss a property computed on only some

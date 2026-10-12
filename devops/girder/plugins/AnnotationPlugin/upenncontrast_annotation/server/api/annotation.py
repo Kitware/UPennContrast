@@ -533,7 +533,8 @@ class Annotation(Resource):
             "[{datasetId, count} | {datasetId, error}]} in request order, "
             "without duplicates; an id that is "
             "malformed, does not exist, or names a dataset the caller cannot "
-            "read gets an error entry rather than failing the request."
+            "read gets an error entry rather than failing the request (an "
+            "id string over 64 characters is refused with 400)."
             % MAX_COUNT_DATASETS
         )
         .jsonParam(

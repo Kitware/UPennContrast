@@ -143,9 +143,9 @@ def validateCountsRequest(body, shapes):
     (datasetIds, shape, tags). datasetIds keeps request order without
     duplicates, as (requested string, ObjectId or None when the string is
     not an id): one mistyped id is that entry's error, not the request's.
-    A malformed request (not an object, ids not a list of strings, over
-    the cap, a shape not in `shapes`, bad tags) raises
-    RestException(400)."""
+    A malformed request (not an object, ids not a list of strings of at
+    most MAX_DATASET_ID_LENGTH characters, over the cap, a shape not in
+    `shapes`, bad tags) raises RestException(400)."""
     body = requireObjectBody(body)
     rawIds = requireList(body.get("datasetIds"), "datasetIds")
     requireCountWithin(len(rawIds), MAX_COUNT_DATASETS, "datasetIds")

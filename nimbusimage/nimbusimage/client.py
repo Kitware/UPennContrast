@@ -270,6 +270,10 @@ class NimbusClient:
             One dict per distinct dataset, in order: ``{"datasetId",
             "count"}``, or ``{"datasetId", "error"}`` for an id that is
             malformed, does not exist, or that the caller cannot read.
+
+        Raises:
+            girder_client.HttpError: 400 for an id string over 64
+                characters (the server refuses the whole request).
         """
         if isinstance(tags, str):
             raise TypeError("tags must be a list of tag names, not a string")

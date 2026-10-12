@@ -303,9 +303,9 @@ def test_count_across_datasets_reports_each(nc):
     result = loads(annotations.ni_annotations_count(
         dataset_ids=["aa", "bad", "aaa", "aa"], shape="point"
     ))
-    # One batch request, not one per dataset.
+    # One batch request, not one per dataset, without duplicates.
     nc.count_annotations.assert_called_once_with(
-        ["aa", "bad", "aaa", "aa"], shape="point", tags=None
+        ["aa", "bad", "aaa"], shape="point", tags=None
     )
     nc.dataset.assert_not_called()
     assert result["total"] == 5 and result["incomplete"] is True
@@ -313,6 +313,23 @@ def test_count_across_datasets_reports_each(nc):
     assert result["counts"][1]["error"] == "not a valid id"
     with pytest.raises(ToolError, match="between 1 and 50"):
         annotations.ni_annotations_count(dataset_ids=["x"] * 51)
+
+
+def test_count_keeps_an_overlong_id_to_its_own_entry(nc):
+    """The server refuses a whole request with an id over its length cap;
+    the tool keeps that a per-entry error and counts the rest."""
+    nc.count_annotations.return_value = [{"datasetId": "aa", "count": 2}]
+    long_id = "x" * 65
+    result = loads(annotations.ni_annotations_count(
+        dataset_ids=["aa", long_id]
+    ))
+    nc.count_annotations.assert_called_once_with(
+        ["aa"], shape=None, tags=None)
+    assert result["counts"] == [
+        {"dataset_id": "aa", "count": 2},
+        {"dataset_id": long_id, "error": "not a valid id"},
+    ]
+    assert result["total"] == 2 and result["incomplete"] is True
 
 
 @pytest.mark.parametrize("mode, expected", [
@@ -433,7 +450,7 @@ def test_no_properties_means_no_value_sampling(nc):
     ds.properties.list.return_value = [_property("elsewhere")]
     assert loads(properties.ni_properties_list(dataset_id="d")) == {
         "properties": []}
-    with pytest.raises(ToolError, match="Found no values"):
+    with pytest.raises(ToolError, match="No measurements"):
         properties.ni_property_values_summary(dataset_id="d")
     nc.girder.get.assert_not_called()
     nc.girder.post.assert_not_called()
@@ -822,6 +839,24 @@ def test_concurrent_first_requests_register_an_interface_once(nc):
     first, second = (loads(r) for r in asyncio.run(both()))
     assert nc.girder.post.call_count == 1
     assert first["parameters"] == second["parameters"]
+
+
+def test_a_pending_registration_is_not_sent_again(nc):
+    """The first caller gives up while the registration job still runs;
+    a retry must wait for that job's result, not start another."""
+    _common.configure(make_settings(max_job_wait=1))
+    nc.list_workers.return_value = WORKERS
+    nc.get_worker_interface.return_value = None
+    nc.girder.post.return_value = [{"_id": "j1", "status": 2}]
+    nc.girder.get.return_value = {"_id": "j1", "status": 2}  # running
+
+    async def twice():
+        for _ in range(2):
+            with pytest.raises(ToolError, match="still registering"):
+                await workers.ni_worker_interface(image=SEG)
+
+    asyncio.run(twice())
+    assert nc.girder.post.call_count == 1
 
 
 def test_worker_interface_checks_the_dataset_before_registering(nc):

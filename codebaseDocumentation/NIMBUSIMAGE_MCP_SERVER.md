@@ -795,10 +795,12 @@ the local stack. Add an item whenever a review finds something this list missed.
 - [x] Channels are counted from `num_channels`; an image without channel names (a single
       frame) still has channel 0 for workers and the channel view.
       *"test_worker_tools_count_unnamed_channels"*
-- [x] A multi-dataset count is one request, and says when a dataset could not be read
+- [x] A multi-dataset count is one request, keeps every bad id (including one too long
+      for the server) to its own entry, and says when a dataset could not be read
       instead of counting it as 0; the server counts with the single-dataset endpoint's
       filters and reports a missing dataset like an unreadable one.
-      *"test_count_across_datasets_reports_each"*, *"testCountsMatchSingleDatasetCount"*,
+      *"test_count_across_datasets_reports_each"*,
+      *"test_count_keeps_an_overlong_id_to_its_own_entry"*, *"testCountsMatchSingleDatasetCount"*,
       *"testUnreadableDatasetsGetAnErrorEntry"*
 - [x] No values in the path sample is reported as "not found in a sample", never as
       "not computed". *"test_values_summary_says_when_nothing_is_computed"*
@@ -812,9 +814,11 @@ the local stack. Add an item whenever a review finds something this list missed.
       so is marked non-destructive but not read-only.
       *"test_every_tool_is_registered_with_its_annotations"*
 - [x] Interface registration runs only for installed worker images (the server would
-      run any image name it is given), and concurrent first requests for one image send
-      one registration (per server process; the server does not deduplicate).
-      *"test_concurrent_first_requests_register_an_interface_once"*,
+      run any image name it is given). Per server process (the server does not
+      deduplicate), concurrent first requests send one registration, and a retry while
+      a registration is still running (up to 5 minutes) waits for it instead of sending
+      another. *"test_concurrent_first_requests_register_an_interface_once"*,
+      *"test_a_pending_registration_is_not_sent_again"*,
       *"test_worker_interface_registers_only_installed_workers"*,
       *"test_worker_interface_checks_the_dataset_before_registering"*
 - [x] Tagging needs an explicit target (an empty id list is not "everything"), refuses
