@@ -30,6 +30,10 @@ from . import analysis
 # few dozen properties at most.
 MAX_UNCOMPUTED_PROPERTIES = 10_000
 MAX_ANNOTATION_IDS = 100_000_000
+# Datasets per batch-count request (POST upenn_annotation/counts): one
+# indexed aggregation over all of them, so this bounds a public request's
+# work. Comparing a project's or a search's datasets is tens, not hundreds.
+MAX_COUNT_DATASETS = 100
 
 # Analysis-gating request ceilings (SERVER_GATING.md "Limits"): abuse guards
 # on the public gate-resolution endpoint, far above real use (a panel holds a
@@ -125,6 +129,25 @@ def requireObjectId(value, field="id"):
         return ObjectId(value)
     except (InvalidId, TypeError):
         raise RestException("%s is not a valid id" % field, code=400)
+
+
+def validateCountsRequest(body):
+    """Parse a batch-count body {datasetIds, shape?, tags?} into
+    (datasetIds as ObjectIds, deduplicated in request order, shape, tags).
+    Raises RestException(400) for anything malformed."""
+    body = requireObjectBody(body)
+    rawIds = requireList(body.get("datasetIds"), "datasetIds")
+    requireCountWithin(len(rawIds), MAX_COUNT_DATASETS, "datasetIds")
+    datasetIds = list(dict.fromkeys(
+        requireObjectId(value, "datasetIds entry") for value in rawIds
+    ))
+    shape = body.get("shape")
+    if shape is not None and not isinstance(shape, str):
+        raise RestException("shape must be a string", code=400)
+    tags = requireList(body.get("tags") or [], "tags")
+    if not all(isinstance(tag, str) for tag in tags):
+        raise RestException("tags must be a list of strings", code=400)
+    return datasetIds, shape or None, tags
 
 
 def requireInt(value, field):

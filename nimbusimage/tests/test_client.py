@@ -363,3 +363,39 @@ class TestJobLookup:
             job = client.job("job1")
             mock_gc.get.assert_called_with("job/job1")
             assert job.id == "job1"
+
+
+class TestCountAnnotations:
+    def _client(self, mock_gc):
+        client = NimbusClient.__new__(NimbusClient)
+        client._gc = mock_gc
+        return client
+
+    def test_one_request_with_filters(self, mock_gc):
+        mock_gc.post.return_value = {"counts": [
+            {"datasetId": "a", "count": 3},
+            {"datasetId": "b", "error": "not found or not readable"},
+        ]}
+        rows = self._client(mock_gc).count_annotations(
+            ["a", "b", "a"], shape="point", tags=["spot"]
+        )
+        mock_gc.post.assert_called_once_with(
+            "upenn_annotation/counts",
+            json={"datasetIds": ["a", "b"], "shape": "point",
+                  "tags": ["spot"]},
+        )
+        assert rows[1]["error"]
+
+    def test_batches_past_the_server_cap(self, mock_gc):
+        from nimbusimage import client as client_module
+        ids = [f"d{i}" for i in range(client_module._COUNT_BATCH + 1)]
+        mock_gc.post.side_effect = lambda url, json: {"counts": [
+            {"datasetId": i, "count": 1} for i in json["datasetIds"]
+        ]}
+        rows = self._client(mock_gc).count_annotations(ids)
+        assert [r["datasetId"] for r in rows] == ids
+        assert mock_gc.post.call_count == 2
+
+    def test_tags_must_be_a_list(self, mock_gc):
+        with pytest.raises(TypeError):
+            self._client(mock_gc).count_annotations(["a"], tags="spot")

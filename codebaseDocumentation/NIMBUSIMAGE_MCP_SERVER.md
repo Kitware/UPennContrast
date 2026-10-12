@@ -296,7 +296,8 @@ in the plugin. The topic list is kept in the tool; an unknown topic gets the end
 ### 5.4 Phase 1 tool set (built)
 
 The spike's five tools, changed as the spike recommended: `ni_datasets_list` caps at 100,
-`ni_annotations_count` takes up to 50 `dataset_ids` (one eval task had needed 16 calls),
+`ni_annotations_count` takes up to 50 `dataset_ids` and counts them in one request to
+`POST upenn_annotation/counts` (one eval task had needed 16 calls),
 `ni_annotations_summary` takes shape and tag filters, and every text result is compact
 JSON with no structured copy (the SDK's default indents dicts and duplicates them as
 `structuredContent`). Added:
@@ -773,8 +774,11 @@ the local stack. Add an item whenever a review finds something this list missed.
 - [x] Channels are counted from `num_channels`; an image without channel names (a single
       frame) still has channel 0 for workers and the channel view.
       *"test_worker_tools_count_unnamed_channels"*
-- [x] A multi-dataset count says when a dataset could not be read instead of counting it
-      as 0. *"test_count_across_datasets_reports_each"*
+- [x] A multi-dataset count is one request, and says when a dataset could not be read
+      instead of counting it as 0; the server counts with the single-dataset endpoint's
+      filters and reports a missing dataset like an unreadable one.
+      *"test_count_across_datasets_reports_each"*, *"testCountsMatchSingleDatasetCount"*,
+      *"testUnreadableDatasetsGetAnErrorEntry"*
 - [x] No values in the path sample is reported as "not found in a sample", never as
       "not computed". *"test_values_summary_says_when_nothing_is_computed"*
 

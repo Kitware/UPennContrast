@@ -39,6 +39,11 @@ def _access_level(doc: dict, user: dict) -> int:
     return max(levels, default=-1)
 
 
+# Datasets per POST upenn_annotation/counts (the server's
+# MAX_COUNT_DATASETS).
+_COUNT_BATCH = 100
+
+
 class NimbusClient:
     """Authenticated session to a NimbusImage server.
 
@@ -241,6 +246,45 @@ class NimbusClient:
                 # Not readable; anything else propagates.
                 pass
         return folders
+
+    def count_annotations(
+        self,
+        dataset_ids,
+        shape: str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[dict]:
+        """Annotation counts for several datasets, one request per 100
+        (``POST upenn_annotation/counts``)::
+
+            for row in client.count_annotations(ids, shape="point"):
+                print(row["datasetId"], row.get("count", row.get("error")))
+
+        Args:
+            dataset_ids: Dataset ids (any iterable); duplicates are counted
+                once.
+            shape: Only annotations of this shape.
+            tags: Only annotations with ALL of these tags (as
+                ``ds.annotations.count``).
+
+        Returns:
+            One dict per distinct dataset, in order: ``{"datasetId",
+            "count"}``, or ``{"datasetId", "error"}`` for a dataset that
+            does not exist or that the caller cannot read.
+        """
+        if isinstance(tags, str):
+            raise TypeError("tags must be a list of tag names, not a string")
+        ids = list(dict.fromkeys(str(i) for i in dataset_ids))
+        rows: list[dict] = []
+        for start in range(0, len(ids), _COUNT_BATCH):
+            body = {"datasetIds": ids[start:start + _COUNT_BATCH]}
+            if shape is not None:
+                body["shape"] = shape
+            if tags:
+                body["tags"] = list(tags)
+            rows.extend(
+                self._gc.post("upenn_annotation/counts", json=body)["counts"]
+            )
+        return rows
 
     # --- Jobs ---
 

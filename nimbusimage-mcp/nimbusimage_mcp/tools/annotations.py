@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-import girder_client
 from mcp.server.mcpserver.exceptions import ToolError
 
 from nimbusimage_mcp._common import (
@@ -13,7 +12,6 @@ from nimbusimage_mcp._common import (
     clamp,
     client,
     instrumented,
-    tool_error,
 )
 
 Shape = Literal["point", "polygon", "line", "rectangle"]
@@ -48,22 +46,16 @@ def ni_annotations_count(
         raise ValueError(
             f"Pass between 1 and {MAX_COUNT_DATASETS} dataset_ids."
         )
-    nc = client()
-    counts = []
-    # One count request per dataset: the server counts one dataset at a
-    # time, and each is an indexed count, not a scan.
-    for dataset_id in dict.fromkeys(dataset_ids):
-        try:
-            counts.append({
-                "dataset_id": dataset_id,
-                "count": nc.dataset(dataset_id).annotations.count(
-                    shape=shape, tags=tags
-                ),
-            })
-        except girder_client.HttpError as e:
-            counts.append({
-                "dataset_id": dataset_id, "error": str(tool_error(e)),
-            })
+    # One request: the server counts every dataset in one aggregation
+    # and reports unreadable ones as errors instead of failing.
+    counts = [
+        {"dataset_id": row["datasetId"], "count": row["count"]}
+        if "count" in row else
+        {"dataset_id": row["datasetId"], "error": row["error"]}
+        for row in client().count_annotations(
+            dataset_ids, shape=shape, tags=tags
+        )
+    ]
     return {
         "total": sum(c.get("count", 0) for c in counts),
         "incomplete": any("error" in c for c in counts),

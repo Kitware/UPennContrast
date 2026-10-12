@@ -28,6 +28,7 @@ from ..helpers.colormaps import (
 )
 from ..helpers.proxiedModel import recordable, memoizeBodyJson
 from ..helpers.validation import (
+    MAX_COUNT_DATASETS,
     MAX_LIST_LIMIT,
     MAX_SUMMARY_PROPERTY_PATHS,
     dropNoOpPropertyFilters,
@@ -42,6 +43,7 @@ from ..helpers.validation import (
     validateAnalysisGatePlots,
     validateAnalysisHistogramRequest,
     validateAnnotationIdCount,
+    validateCountsRequest,
     validateListInputs,
     validatePropertyPaths,
     validateUncomputedCountsProperties,
@@ -194,6 +196,7 @@ class Annotation(Resource):
         self.route("GET", (":id",), self.get)
         self.route("GET", (), self.find)
         self.route("GET", ("count",), self.count)
+        self.route("POST", ("counts",), self.counts)
         self.route("POST", (), self.create)
         self.route("PUT", (":id",), self.update)
         self.route("PUT", ("multiple",), self.updateMultiple)
@@ -516,6 +519,46 @@ class Annotation(Resource):
         return {
             "count": self._annotationModel.collection.count_documents(query)
         }
+
+    @access.public(scope=TokenScope.DATA_READ)
+    @autoDescribeRoute(
+        Description("Annotation counts for several datasets at once")
+        .notes(
+            "Body: {datasetIds: [id, ...] (at most %d), shape?, tags?}. "
+            "Counts annotations per dataset in one query, with the same "
+            "filters as GET upenn_annotation/count (tags: all must be "
+            "present). Returns {counts: [{datasetId, count} | {datasetId, "
+            "error}]} in request order, without duplicates; a dataset that "
+            "does not exist or that the caller cannot read gets an error "
+            "entry rather than failing the request." % MAX_COUNT_DATASETS
+        )
+        .jsonParam(
+            "body", "datasetIds and optional shape/tags filters",
+            paramType="body", requireObject=True,
+        )
+        .errorResponse()
+    )
+    def counts(self, body):
+        datasetIds, shape, tags = validateCountsRequest(body)
+        user = self.getCurrentUser()
+        folderModel = Folder()
+        # One query for every folder, then the access check on each.
+        readable = {
+            folder["_id"]
+            for folder in folderModel.find({"_id": {"$in": datasetIds}})
+            if folderModel.hasAccess(folder, user, AccessType.READ)
+        }
+        counts = self._annotationModel.countByDataset(
+            [d for d in datasetIds if d in readable], shape, tags
+        )
+        return {"counts": [
+            {"datasetId": str(d), "count": counts.get(d, 0)}
+            if d in readable else
+            # One message for both: whether an unreadable id exists is
+            # not the caller's business.
+            {"datasetId": str(d), "error": "not found or not readable"}
+            for d in datasetIds
+        ]}
 
     @access.public(scope=TokenScope.DATA_READ)
     @autoDescribeRoute(

@@ -189,23 +189,22 @@ def test_check_crop_clips_and_rejects_empty():
 
 
 def test_count_across_datasets_reports_each(nc):
-    def dataset(dataset_id):
-        ds = SimpleNamespace(annotations=SimpleNamespace())
-        if dataset_id == "bad":
-            def fail(**_):
-                raise http_error(403)
-            ds.annotations.count = fail
-        else:
-            ds.annotations.count = lambda **_: len(dataset_id)
-        return ds
-
-    nc.dataset.side_effect = dataset
+    nc.count_annotations.return_value = [
+        {"datasetId": "aa", "count": 2},
+        {"datasetId": "bad", "error": "not found or not readable"},
+        {"datasetId": "aaa", "count": 3},
+    ]
     result = loads(annotations.ni_annotations_count(
         dataset_ids=["aa", "bad", "aaa", "aa"], shape="point"
     ))
+    # One batch request, not one per dataset.
+    nc.count_annotations.assert_called_once_with(
+        ["aa", "bad", "aaa", "aa"], shape="point", tags=None
+    )
+    nc.dataset.assert_not_called()
     assert result["total"] == 5 and result["incomplete"] is True
     assert [c["dataset_id"] for c in result["counts"]] == ["aa", "bad", "aaa"]
-    assert "denied" in result["counts"][1]["error"]
+    assert result["counts"][1]["error"] == "not found or not readable"
     with pytest.raises(ToolError, match="between 1 and 50"):
         annotations.ni_annotations_count(dataset_ids=["x"] * 51)
 
