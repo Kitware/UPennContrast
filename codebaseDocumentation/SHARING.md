@@ -42,6 +42,17 @@ When sharing a dataset, permissions are set on multiple Girder resources:
 
 All three resource types must have matching permissions for proper access.
 
+### Property documents never carry the ACL
+
+Annotation properties (`annotation_property`) carry a Girder `access` ACL of their own, but it does not decide who reads them: `GET /annotation_property` and `GET /annotation_property/:id` admit anyone with READ on a configuration whose `meta.propertyIds` lists the property, including anonymous viewers of a public dataset. So no response may include that ACL, which names every user the property was shared with.
+
+- `AnnotationProperty.CLIENT_FIELDS` (`name`, `image`, `tags`, `shape`, `workerInterface`) plus `_id` are the only fields exposed. The get, list and create endpoints use `@filtermodel`; the JSON export and the Zenodo archive project to the same fields via `findClientFields`.
+- Create and update store only `CLIENT_FIELDS`. A body's `access`, `public` or exported `_id` is dropped.
+- Responses carry no `_accessLevel`. A level computed from the property's own ACL would be wrong (`-1` for a collaborator who reads it through a configuration), so `UngatedAclFilterMixin` filters by exposed fields alone.
+- `worker_interface` and `worker_preview` responses are filtered the same way (`_id`, `image`, and `interface` or `preview`). There is one document per worker image, readable by any user, with an ACL naming whoever first created it. Their write paths need no allow-list because the model builds the document itself.
+
+Tests: `test/test_property_fields.py`.
+
 ### Data Flow
 
 ```

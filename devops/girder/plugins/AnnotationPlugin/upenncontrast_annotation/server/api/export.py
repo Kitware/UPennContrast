@@ -336,9 +336,7 @@ class Export(Resource):
                     propertyIds.add(ObjectId(pid))
 
         if propertyIds:
-            return list(self._propertyModel.find(
-                {"_id": {"$in": list(propertyIds)}}
-            ))
+            return self._propertyModel.findClientFields(propertyIds)
         return []
 
     def _getPropertyValues(self, datasetId):
