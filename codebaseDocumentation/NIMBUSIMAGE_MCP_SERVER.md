@@ -311,7 +311,7 @@ JSON with no structured copy (the SDK's default indents dicts and duplicates the
 | `ni_property_values_summary` | `ds.annotations.summary(property_paths=…)` | count, mean, std, min, max per path; shape and tag filters |
 | `ni_property_histogram` | `ds.properties.histogram` | The server's bins hold equal counts; the description says so |
 | `ni_property_compute` | `ds.properties.compute` | **Destructive hint.** Not in the original list; without it a "measure X" request dead-ends |
-| `ni_workers_list` | `client.list_workers()` | Role labels by presence; base images and `:test` tags hidden by default |
+| `ni_workers_list` | `client.list_workers()` | Roles from marker labels by presence (a worker can have both); base images and `:test` tags hidden by default |
 | `ni_worker_interface` | `get_worker_interface` (+ registration job; whole call at most 60 s and the job-wait cap) | Parameters, value formats, and the dataset's channels |
 | `ni_worker_run` | `ds.annotations.compute` | **Destructive hint.** Annotation workers only; parameters normalized like the app (`worker_values.py` ports `src/utils/workerInterface.ts`) |
 | `ni_job_wait` | `client.job(id)` + `refresh()` | Async; at most `NI_MCP_MAX_JOB_WAIT` (240 s); reports `finished: false` instead of failing, or `status: "unknown"` if Girder does not answer in time |
@@ -832,12 +832,15 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_a_registration_that_never_reached_the_server_is_retried"*,
       *"test_an_unreadable_job_keeps_the_registration_pending"*,
       *"test_a_connection_blip_while_following_the_job_keeps_it_pending"*,
+      *"test_an_outage_while_watching_for_the_interface_keeps_it_pending"*,
       *"test_another_users_refusal_is_not_reported_as_yours"*,
       *"test_finished_registrations_leave_the_registry"*
 - [x] Tagging needs an explicit target (an empty id list is not "everything"), refuses
       more than 10,000 annotations before loading any, and sends only the annotations
       whose tags change. *"test_tag_refuses_unbounded_or_ambiguous_targets"*,
       *"test_tag_by_query_updates_only_changed"*, *"test_tag_by_ids"*
+- [x] A worker with both role labels is listed, and runnable, in both roles.
+      *"test_workers_list_keeps_real_workers"*
 - [x] A worker run checks channel and location before starting a job.
       *"test_worker_run_checks_the_location_before_submitting"*
 - [x] Worker parameters are normalized like the app's (channel names, checkbox maps,

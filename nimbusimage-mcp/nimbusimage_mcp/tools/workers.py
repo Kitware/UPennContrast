@@ -42,12 +42,12 @@ LOG_TAIL = 1500
 POLL_SECONDS = 2.0
 
 
-def worker_kind(labels: dict) -> str | None:
-    if ANNOTATION_LABEL in labels:
-        return "annotation"
-    if PROPERTY_LABEL in labels:
-        return "property"
-    return None
+def worker_roles(labels: dict) -> list[str]:
+    """Every role the image's marker labels give it; a worker may have
+    both."""
+    return [role for role, label in (("annotation", ANNOTATION_LABEL),
+                                     ("property", PROPERTY_LABEL))
+            if label in labels]
 
 
 def _trim(text, limit: int):
@@ -65,26 +65,26 @@ def ni_workers_list(
     workers create objects or process images (for example cell or
     nucleus segmentation, spot detection, filters), property workers
     compute measurements (area, intensity). Servers differ in what is
-    installed. Returns image, name,
-    kind, category, description, and for property workers the annotation
-    shape they measure. Use ni_worker_interface to see a worker's
-    parameters.
+    installed. Returns image, name, roles (annotation, property, or both),
+    category, description, and for property workers the annotation shape
+    they measure. kind filters by role. Use ni_worker_interface to see a
+    worker's parameters.
     """
     rows = []
     for image, labels in sorted(client().list_workers().items()):
-        found = worker_kind(labels)
-        if found is None or (kind != "all" and found != kind):
+        roles = worker_roles(labels)
+        if not roles or (kind != "all" and kind not in roles):
             continue
         if image.endswith(":test") and not include_test_images:
             continue
         row = {
             "image": image,
             "name": labels.get("interfaceName") or image,
-            "kind": found,
+            "roles": roles,
             "category": labels.get("interfaceCategory"),
             "description": _trim(labels.get("description"), MAX_DESCRIPTION),
         }
-        if found == "property":
+        if "property" in roles:
             row["shape"] = labels.get("annotationShape")
         rows.append(row)
     return {"workers": rows}
@@ -196,8 +196,11 @@ async def _run_registration(nc: ni.NimbusClient, image: str) -> None:
         # another.
         while deadline - time.monotonic() > POLL_SECONDS:
             await anyio.sleep(POLL_SECONDS)
-            if await _interface(nc, image, deadline) is not None:
-                return
+            try:
+                if await _interface(nc, image, deadline) is not None:
+                    return
+            except (girder_client.HttpError, requests.RequestException):
+                continue  # still unreachable: keep the registration pending
         state = None
     if state is None or not state["finished"]:
         raise ToolError(
@@ -279,7 +282,7 @@ async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
         # Registering runs the image on the server, which accepts any
         # name: only ever ask for an installed worker.
         labels = (await _before(deadline, nc.list_workers)).get(image)
-        if labels is None or worker_kind(labels) is None:
+        if labels is None or not worker_roles(labels):
             raise ToolError(
                 f"No worker image {image!r}; use ni_workers_list for names."
             )
@@ -365,7 +368,7 @@ async def ni_worker_run(
         raise ToolError(
             f"No worker image {image!r}; use ni_workers_list for names."
         )
-    if worker_kind(labels) != "annotation":
+    if "annotation" not in worker_roles(labels):
         raise ToolError(
             f"{image} is not an annotation worker. Property workers run "
             "through a property: see ni_properties_list and "

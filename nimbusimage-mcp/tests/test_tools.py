@@ -532,6 +532,9 @@ WORKERS = {
     "annotations/seg:test": {"isAnnotationWorker": ""},
     "properties/area:latest": {"isPropertyWorker": "",
                                "annotationShape": "polygon"},
+    "both/seg-and-area:latest": {"isAnnotationWorker": "",
+                                 "isPropertyWorker": "",
+                                 "annotationShape": "polygon"},
     "nimbusimage/worker-base:latest": {"isUPennContrastWorkerBase": "True"},
 }
 
@@ -539,14 +542,22 @@ WORKERS = {
 def test_workers_list_keeps_real_workers(nc):
     nc.list_workers.return_value = WORKERS
     rows = loads(workers.ni_workers_list())["workers"]
-    assert [r["image"] for r in rows] == [
-        "annotations/seg:latest", "properties/area:latest",
+    assert [(r["image"], r["roles"]) for r in rows] == [
+        ("annotations/seg:latest", ["annotation"]),
+        ("both/seg-and-area:latest", ["annotation", "property"]),
+        ("properties/area:latest", ["property"]),
     ]
-    assert rows[1]["shape"] == "polygon"
+    assert rows[2]["shape"] == "polygon"
     rows = loads(workers.ni_workers_list(kind="annotation",
                                          include_test_images=True))["workers"]
     assert [r["image"] for r in rows] == [
         "annotations/seg:latest", "annotations/seg:test",
+        "both/seg-and-area:latest",
+    ]
+    # A dual-role worker is a property worker too.
+    rows = loads(workers.ni_workers_list(kind="property"))["workers"]
+    assert [r["image"] for r in rows] == [
+        "both/seg-and-area:latest", "properties/area:latest",
     ]
 
 
@@ -972,6 +983,37 @@ def test_a_connection_blip_while_following_the_job_keeps_it_pending(nc):
                 await workers.ni_worker_interface(image=SEG)
 
     asyncio.run(twice())
+    assert nc.girder.post.call_count == 1
+
+
+def test_an_outage_while_watching_for_the_interface_keeps_it_pending(
+        nc, monkeypatch):
+    """Girder stays unreachable after the job poll fails: the interface
+    reads fail too, and the registration must still stay pending."""
+    import requests
+    _common.configure(make_settings(max_job_wait=1))
+    _registering(nc)
+    nc.girder.get.side_effect = requests.ConnectionError("down")
+    reads = iter([None, None])  # before posting; then Girder is down
+
+    def interface(*args, **kwargs):
+        value = next(reads, "down")
+        if value == "down":
+            raise requests.ConnectionError("down")
+        return value
+
+    nc.get_worker_interface.side_effect = interface
+
+    async def scenario():
+        with pytest.raises(ToolError):
+            await workers.ni_worker_interface(image=SEG)
+        # The task outlives the first caller; let it watch a while.
+        await asyncio.sleep(0.3)
+        task, _ = workers._registrations[asyncio.get_running_loop()][SEG]
+        return task.done()
+
+    monkeypatch.setattr(workers, "POLL_SECONDS", 0.05)
+    assert asyncio.run(scenario()) is False  # still pending
     assert nc.girder.post.call_count == 1
 
 
