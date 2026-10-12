@@ -705,6 +705,7 @@ import {
 import { logError } from "@/utils/log";
 import { snapshotLoadRequest } from "@/commands/requests";
 import { snapshotKey } from "@/utils/snapshotKey";
+import { isKnownPixelSize } from "@/utils/scales";
 
 interface ISnapshotItem {
   name: string;
@@ -1034,10 +1035,7 @@ const manualPixelSizeUnit = computed({
 
 const configurationPixelSize = computed((): IScalebarSettings => {
   const scale = store.configuration?.scales.pixelSize;
-  if (!scale) {
-    return { length: 1.0, unit: TScalebarUnit.PX };
-  }
-  if (scale.value === 0) {
+  if (!isKnownPixelSize(scale)) {
     return { length: 1.0, unit: TScalebarUnit.PX };
   }
   return { length: scale.value, unit: scale.unit as TScalebarUnit };

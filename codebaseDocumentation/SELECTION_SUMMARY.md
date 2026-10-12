@@ -10,7 +10,8 @@ Import/export menu → *Selection summary*. A dialog that reports, for the whole
 the filtered objects, or the current selection:
 
 - the object count,
-- composition by tag (count and percentage per tag, sorted by count), and
+- composition by tag (count and percentage per tag, sorted by count),
+- composition by shape (point, polygon, line, rectangle; same layout), and
 - per-property statistics (n, mean, sample SD, min, max) for a picked set of property
   paths, defaulting to the columns shown in the Objects tab,
 
@@ -41,6 +42,7 @@ Response:
 {
   "total": 289469,
   "tags": [{"tag": "cell", "count": 289469}, {"tag": "Endothelial Cell", "count": 62098}],
+  "shapes": [{"shape": "polygon", "count": 289469}],
   "properties": [
     {"path": ["<propId>", "CD3E"], "count": 289469, "mean": 1.23, "std": 1.69, "min": 0, "max": 26}
   ]
@@ -49,7 +51,13 @@ Response:
 
 Semantics:
 
-- `tags` is sorted by count descending, then tag name.
+- `tags` is sorted by count descending, then tag name. `shapes` is sorted the same way and
+  shares the tag facet's scan; per-shape `GET /upenn_annotation/count` calls would each
+  re-read the whole dataset, since there is no `datasetId`+`shape` index (measured 0.25 to
+  0.9 s each on a 465K-annotation dataset, against 0.6 s for the whole summary). `total` is
+  the sum of the shape counts, replacing a separate `$count` facet. Measured (median of 7,
+  interleaved) against the previous total + tags facet: +52 ms on 465K annotations
+  (514 → 566 ms), +54 ms on 709K (847 → 901 ms), +35 ms on 709K with a tag filter.
 - A property `count` is the number of matching annotations holding a **numeric** value at
   the path. Strings, nested objects, missing values, and **NaN** are skipped (NaN would
   poison a mean); **Infinity is a number and is kept**. `mean/min/max` are null at count 0;
@@ -61,7 +69,7 @@ Semantics:
   value document orphaned by a deleted annotation counts until the removal hook cleans it.
   Excluding them would cost a second full scan per request (measured +2.6 s for an id set
   difference, +7.4 s for a `$lookup`, against a 1.5 s query), so this is accepted.
-- An empty match is `total: 0`, `tags: []`, zeroed property entries — not an error. The
+- An empty match is `total: 0`, `tags: []`, `shapes: []`, zeroed property entries — not an error. The
   client short-circuits an empty id constraint locally (`filtersMatchNothing`), as the
   other list calls do.
 
@@ -72,7 +80,7 @@ Property filters need the property-value join (or the PV-driven scan `listIds` u
 first version ran that join for the tag facet and again for the statistics and took 21.6 s
 on 709K cells. Now:
 
-| Filters | Facet (total + tags) | Statistics |
+| Filters | Facet (tags + shapes; total = sum of shapes) | Statistics |
 |---|---|---|
 | none | annotation scan | PV scan on `datasetId` |
 | annotation fields only (tags, shape, location, ids, gates) | annotation scan with the match | PV `$in` / `$nin` from the selector |
@@ -99,7 +107,7 @@ one property range 1.5 s (was 21.6 s); tag + property range 1.7 s.
 - One request per change of the request's inputs (open, scope, paths, and for "filtered"
   the filter signature). A sequence counter drops late answers from superseded requests.
 - Download: client-side CSV with `Section,Name,Count,Fraction,Mean,SD,Min,Max` rows for
-  `total`, each `tag`, and each `property`.
+  `total`, each `tag`, each `shape`, and each `property`.
 
 ## Regression checklist
 
@@ -107,6 +115,9 @@ Each line names the test that holds it.
 
 **Backend (`test/test_summary.py`)**
 - Total and tag composition, sorted by count then name — *"testTotalAndTagComposition"*.
+- Shape composition, sorted the same way and narrowed by the same filters —
+  *"testShapeComposition"*; on the property-filter and mixed (id clause) paths too —
+  *"testShapesFollowPropertyAndMixedFilters"*.
 - Non-numeric and missing values are excluded from every statistic and from `count`; single
   values have null std — *"testPropertyStatsSkipNonNumericAndMissing"*.
 - Annotation-field filters narrow both the facet and the statistics —
@@ -138,7 +149,8 @@ Each line names the test that holds it.
   *"keeps the latest request's answer when an earlier one resolves late"*.
 - A bail-out retires the request in flight — *"retires an in-flight request when a bail-out clears the summary"*.
 - Server error messages surface in the dialog — *"shows the server's message when the request fails"*.
-- CSV sections and the download call — *"downloads a CSV with total, tag and property sections"*.
+- CSV sections and the download call — *"downloads a CSV with total, tag, shape and property sections"*.
+- The dialog shows the shape breakdown — *"shows composition by shape next to composition by tag"*.
 
 **Process**
 - Verify from a fresh page load on a dataset that actually has tags and property values

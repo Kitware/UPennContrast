@@ -101,9 +101,9 @@ A second variant of the same "circle a few examples, find the rest" idea has the
 The line scan tool is a *measurement* tool: it never creates stored annotations.
 It plots the raw pixel intensities along a line in a panel at the bottom right
 of the viewer, updating live while the line is being drawn. The panel also
-shows the line length in pixels and, when the configuration has a physical
-pixel size (anything other than the 1 m placeholder default), in physical
-units.
+shows the line length in pixels and, when the pixel size is known
+(`isKnownPixelSize` in `src/utils/scales.ts`: not 0, null, or the legacy 1 m
+placeholder), in physical units.
 
 ### The template
 
