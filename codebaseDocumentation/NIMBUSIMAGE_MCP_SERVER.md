@@ -4,7 +4,10 @@
 auth and 17 tools, run locally or as the compose `mcp` profile (see
 [`nimbusimage-mcp/README.md`](../nimbusimage-mcp/README.md)). Phase 0 measurements are in
 [`nimbusimage-mcp/eval/PHASE0_RESULTS.md`](../nimbusimage-mcp/eval/PHASE0_RESULTS.md).
-The placement decision is still open. Phases 2 onward are proposals.
+Placement decided (2026-10-12): a small separate service, see §11. Phases 2 onward are
+proposals; the order was changed on 2026-10-12 so a header-key connector test through a
+tunnel (Phase 2) comes before OAuth (Phase 3), because most users will be on Team/Enterprise
+plans and OAuth must follow soon, built on a verified connector path.
 **Last reviewed:** 2026-10-11, against NimbusImage `82a746f`, the AWSDeploy HAProxy
 template and deploy playbook, and the current Claude and MCP documentation listed in
 [References](#13-references).
@@ -44,12 +47,12 @@ finally production.
 | What we build | A standalone MCP server that wraps the `nimbusimage` Python package. |
 | Relationship to the in-app AI panel | Separate surface. `girder-claude-chat` is **not modified**. We borrow design patterns and copy useful tool definitions, but we do not mirror its tool list. |
 | Transport | Streamable HTTP in **stateless** mode, served at `/mcp` behind HAProxy. |
-| Placement | A sidecar container on each Girder instance (see [Open decisions](#11-open-decisions) for the in-process alternative). |
+| Placement | A **small separate service**: the MCP container on its own instance (e.g. EC2 t4g.small), behind HAProxy, calling Girder over the private network. Not a sidecar on every Girder host, not inside Girder. See [11](#11-open-decisions). |
 | Identity | Every tool call runs as the calling user. Girder's existing access control decides what anyone can see or change. The MCP server never holds a privileged credential. |
 | Auth, individuals | A personal Girder API key sent as a bearer header. Works for Claude Code and for Pro/Max custom connectors. |
 | Auth, teams | OAuth 2.1, with **Girder as the authorization server** (a new Girder plugin) and the MCP server as a resource server only. Needed because Team/Enterprise connector headers are shared by every member. |
 | Context discipline | Discoverable tool names and descriptions for client-side tool search, plus small results: aggregates before rows, hard row caps, downsampled images. |
-| Order of work | Local spike, then local production-shape server, then local OAuth, then a tunnel test, then an AWS test-environment rehearsal, then production. |
+| Order of work | Local spike, then local production-shape server (both done), then a header-key connector test through a tunnel, then OAuth (local, then through the tunnel), then an AWS test-environment rehearsal, then production. |
 
 ---
 
@@ -129,8 +132,10 @@ flowchart LR
 
   NG["nginx<br/>built frontend"]
 
+  SC["MCP service (new)<br/>own small instance, e.g. t4g.small<br/>stateless streamable HTTP<br/>tools on nimbusimage<br/>token verifier"]
+
   subgraph inst["Girder EC2 instance (ASG 1–6 + warm pool)"]
-    SC["MCP server sidecar (new)<br/>stateless streamable HTTP<br/>tools on nimbusimage<br/>token verifier"]
+    GIRDERS["other Girder instances<br/>(same as this one)"]
     subgraph gir["Girder :8080"]
       OA["OAuth plugin (new)"]
       CH["girder-claude-chat (unchanged)"]
@@ -154,14 +159,15 @@ flowchart LR
   R4 --> REST
   R5 --> NG
   R6 --> NG
-  SC -- "verify token, then REST as the user" --> gir
+  SC -- "verify token, then REST as the user<br/>(private network, any instance)" --> gir
+  SC -.-> GIRDERS
   gir --> DB
 ```
 
 Key properties:
 
 - **One path in.** Every MCP client reaches the server through HAProxy at `/mcp`.
-- **The user's identity flows through.** The sidecar builds a `nimbusimage` client per
+- **The user's identity flows through.** The MCP service builds a `nimbusimage` client per
   request with the caller's own Girder token. It holds no admin or service credential.
 - **Stateless.** HAProxy round-robins across Girder instances, and MCP clients do not keep
   HAProxy's `SERVER` sticky cookie. Every request must be servable by any instance.
@@ -173,11 +179,11 @@ Key properties:
 
 | Component | Role | Where it lives |
 |---|---|---|
-| MCP server | Exposes `ni_*` tools over streamable HTTP. Serves Protected Resource Metadata and the 401 challenge (the MCP Python SDK does both automatically when auth is configured). | New package, proposed `nimbusimage-mcp/` at the repo root; container image on each Girder host |
+| MCP server | Exposes `ni_*` tools over streamable HTTP. Serves Protected Resource Metadata and the 401 challenge (the MCP Python SDK does both automatically when auth is configured). | `nimbusimage-mcp/` at the repo root; container image in ECR, run on its own small instance |
 | Token verifier | Accepts a Girder API key or an OAuth access token, resolves it to a Girder session token and user. | Inside the MCP server |
 | Girder OAuth plugin | Authorization server: metadata, authorize, approve, token, revoke, and an internal introspection endpoint. Off by default behind a setting. | New plugin under `devops/girder/plugins/` |
 | Consent page | Frontend route that shows who is asking and approves the request with the user's own Girder token. | NimbusImage frontend (`src/views/`, router) |
-| HAProxy rules | Exact-path routes for `/mcp` and the two OAuth discovery documents. | AWSDeploy `templates/startup_haproxy.tftpl`, possibly `templates/load_balancer_ip_manager_script.py` |
+| HAProxy rules | Exact-path routes for `/mcp` and the two OAuth discovery documents; a static backend for the MCP service. | AWSDeploy `templates/startup_haproxy.tftpl` (the IP manager script should need no change; confirm with a test) |
 
 ### 4.3 API-key request path
 
@@ -255,9 +261,9 @@ the approve call.
   `destructiveHint`) so clients can ask before running them. Prefer query-based mutations
   ("tag all polygons with tag X") over ID lists.
 - **Stateless:** every tool takes `dataset_id`. No "current dataset" session state.
-- **Memory, not just context:** some `nimbusimage` calls fetch full sets into the sidecar
+- **Memory, not just context:** some `nimbusimage` calls fetch full sets into the MCP service
   (for example `annotations.list(limit=0)`). That never reaches the model, but it does use
-  sidecar memory. Prefer `count` and server-side filters, and always pass a limit.
+  MCP service memory. Prefer `count` and server-side filters, and always pass a limit.
 
 ### 5.2 What to borrow from the in-app agent, and what not to
 
@@ -351,7 +357,7 @@ Anything that fails both returns `None`, which the SDK turns into a 401.
 - **Refused keys are not cached.** Each request with an unknown key costs Girder one
   lookup (exchanges for different keys run in parallel, so a flood does not block other
   users' sign-ins). Rate-limit 401s at HAProxy when the route goes public (Phase 4); a
-  negative cache in the sidecar would not survive round-robin across instances anyway.
+  negative cache in the MCP service would not survive round-robin across instances anyway.
 
 ### 6.3 Girder OAuth plugin
 
@@ -376,7 +382,7 @@ autoscaling churn (see [Phase 6](#phase-6-production-rollout)).
 | `POST token` | Public, rate-limited | `authorization_code` and `refresh_token` grants |
 | `POST revoke` | Public, client-authenticated | Revoke a refresh token or grant |
 | `GET grants`, `DELETE grants/:id` | User | Let users see and revoke connected apps (UI later) |
-| `POST introspect` | Internal only | Called by the sidecar; never routed through HAProxy |
+| `POST introspect` | Internal only | Called by the MCP service over the private network; never routed through the public HAProxy frontend (restrict by source, e.g. security group) |
 
 **Collections:** OAuth clients; pending authorization requests (TTL index); authorization
 codes (TTL index, single use); grants (user, client, scopes, resource, hashed refresh
@@ -460,7 +466,7 @@ the composite for z=3", "which datasets have spot annotations"):
 - [x] Claude Code completes most tasks without hand-holding.
 - [x] No single tool response is larger than about 2K tokens, except images.
 - [x] A written list of tools to add, rename, or drop.
-- [ ] A decision on the open placement question in [11](#11-open-decisions), informed by
+- [x] A decision on the open placement question in [11](#11-open-decisions), informed by
       how heavy the server process is. (Spike input: light, ~100 to 230 MB; the decision
       still needs the in-process option tried.)
 
@@ -521,9 +527,43 @@ sat at about 240 MB.
 - Deleting a dataset folder does not delete its annotations; the integration tests delete
   theirs explicitly.
 
-### Phase 2: OAuth (local)
+### Phase 2: Header-key connector test (local machine, public URL)
 
-**Goal:** the full OAuth flow working end to end on a laptop.
+**Goal:** prove the real claude.ai and Desktop connector path with what already exists (API
+keys) before building OAuth on top of it. Moved ahead of OAuth on 2026-10-12: most users
+will be on Team/Enterprise plans, so OAuth is next, and its design should rest on a
+verified connector path (headers reach the server, stateless serving works, images render,
+latency is acceptable, the proposed HAProxy rules behave).
+
+**Work:**
+
+- Run the stack in the production shape: the `mcp` compose service as the separate MCP
+  service, and a local HAProxy in front with the **proposed production rules**, so this
+  also rehearses Phase 4's routing. Expose only that HAProxy through a tunnel
+  (cloudflared or ngrok).
+- Test as a Pro/Max user with "No sign in" plus an `Authorization: Bearer <key>` header.
+- Test Desktop's config file through `mcp-remote` with a header.
+- Note anything about connector behaviour that the OAuth design must account for
+  (callback URL, which discovery documents the connector requests, resource indicator).
+
+**Safety:**
+
+- The local stack uses the default `admin`/`password`. Change it before opening a tunnel.
+- Use a throwaway local database with test data only.
+- Shut the tunnel down when done.
+
+**Exit criteria:**
+
+- [ ] Header-key connector works from claude.ai and Desktop (tools listed, a count, a
+      composite image, a worker run with `ni_job_wait`).
+- [ ] `/.well-known/acme-challenge/*` still routes to the static server in the local
+      HAProxy.
+- [ ] Connector observations written down for Phase 3.
+
+### Phase 3: OAuth (local, then through the tunnel)
+
+**Goal:** the full OAuth flow working end to end, first on a laptop, then through the
+Phase 2 tunnel with a Team or Enterprise org.
 
 **Work:**
 
@@ -546,6 +586,9 @@ sat at about 240 MB.
 - End to end with the MCP Inspector's OAuth flow.
 - Manual: revoke a grant and confirm the next MCP call fails.
 
+Then repeat through the Phase 2 tunnel: an Owner of a Team or Enterprise org adds the
+connector with OAuth, and two members use it.
+
 **Exit criteria:**
 
 - [ ] Claude Code completes OAuth against the local stack and calls tools as the right user.
@@ -553,46 +596,34 @@ sat at about 240 MB.
 - [ ] With the setting off, every OAuth endpoint returns 404 and API-key auth still works.
 - [ ] Security review of the plugin (use the repo's `/security-review` skill plus a human
       read).
+- [ ] OAuth connector works through the tunnel, and two members of the same org see
+      different data.
 
-### Phase 3: Public tunnel test (local machine, public URL)
-
-**Goal:** try the real claude.ai and Desktop connector experience before touching AWS.
-
-**Work:**
-
-- Run a local HAProxy in front of the stack with the **proposed production rules**, so
-  this also rehearses Phase 4's routing. Expose only that HAProxy through a tunnel
-  (cloudflared or ngrok).
-- Test as a Pro/Max user with "No sign in" plus a header key.
-- Test OAuth through the connector, ideally with a Team or Enterprise org whose Owner adds
-  the connector.
-- Test Desktop's config file through `mcp-remote` with a header.
-
-**Safety:**
-
-- The local stack uses the default `admin`/`password`. Change it before opening a tunnel.
-- Use a throwaway local database with test data only.
-- Shut the tunnel down when done.
-
-**Exit criteria:**
-
-- [ ] Header-key connector works.
-- [ ] OAuth connector works, and two members of the same org see different data.
-- [ ] `/.well-known/acme-challenge/*` still routes to the static server in the local
-      HAProxy.
 
 ### Phase 4: Deploy preparation
 
 **Goal:** all deploy-side changes written, reviewed, and unit-tested. Nothing applied yet.
 
-**OutsetaLogin (production Girder stack):**
+**The MCP service (new, AWSDeploy Terraform):**
 
-- Add the sidecar service using a **prebuilt image pulled from a registry** (ECR already
-  hosts worker images). Building it at boot risks pushing first boot past the Girder
-  launch hook's 900-second budget, which leaves warm-pool instances parked half-built.
-- Set a memory limit on the container.
-- Pass `NI_API_URL` pointing at the local Girder container, and the issuer and resource
-  URLs.
+- One small instance (EC2 t4g.small, Graviton: about $12/month on demand; t3.small if an
+  x86 image is preferred) running the `nimbusimage-mcp` container from a **prebuilt,
+  multi-arch image in ECR** (`docker buildx --platform linux/arm64,linux/amd64`; the
+  `nimbus-ecr-builder` builder supports both). Memory limit on the container (1 GB).
+  Measured footprint: about 100 MB idle, 240 MB peak under 13 parallel sessions.
+- It is outside the Girder autoscaling group, so it needs no warm-pool cycle to deploy,
+  does not touch the Girder launch hook's 900-second budget, and an outage affects MCP
+  only. Stateless, so a second instance can be added behind the same backend later.
+- `NI_API_URL`: how it reaches Girder over the private network, e.g. HAProxy's private
+  address for the Girder backend (round-robin across instances is fine, the server is
+  stateless). Decide and document. `NI_MCP_PUBLIC_URL` and `NI_MCP_ISSUER_URL` are the
+  public `/mcp` URL and the Girder issuer. A health check (`/mcp` answering 401 without a
+  key is enough).
+- Security group: inbound only from HAProxy; Girder's OAuth introspection endpoint
+  reachable from this instance but never through the public frontend.
+
+**OutsetaLogin (production Girder stack):** no MCP change. The OAuth plugin (Phase 3) ships
+with NimbusImage's Girder image like the other plugins.
 
 **AWSDeploy:**
 
@@ -602,13 +633,14 @@ sat at about 240 MB.
   - Narrow the existing HTTPS-redirect exemption (`acl acme_challenge path_beg
     /.well-known/`) to `/.well-known/acme-challenge/`, so OAuth metadata is never served
     over plain HTTP.
-  - If the sidecar gets its own port: a new backend for it.
-- `templates/load_balancer_ip_manager_script.py` (only if the sidecar has its own port):
-  today `render_config` replaces a single `##backend_IPs##` placeholder with
-  `server sN <ip>:8080` lines, and reconciliation checks one backend. It would need a
-  second placeholder and backend, both reconciled every tick.
-- **Add tests for the IP manager script.** It has none today. Cover `render_config` for
-  both backends and the drift check. This script's failure mode is a site-wide 503.
+  - A new **static** backend for the MCP service (its fixed private address), not part
+    of the dynamic Girder backend. `/mcp` and `/.well-known/oauth-protected-resource`
+    route to it; `/.well-known/oauth-authorization-server` routes to Girder.
+- `templates/load_balancer_ip_manager_script.py`: **no change needed** with a static MCP
+  backend; this is the main reason the separate service was chosen over a sidecar on
+  each Girder host (a second dynamic backend there risks a site-wide 503). Confirm the
+  script's reconciliation leaves a second, static backend alone, and add a test for
+  that; the script has no tests today.
 - Log every deploy action in `deploy_log/DEPLOY_LOG.md`, per AWSDeploy's `CLAUDE.md`.
 
 **NimbusImage docs to update when shipping:**
@@ -637,11 +669,12 @@ that is not production.
 
 **Steps:**
 
-1. Deploy the sidecar (dark) and the OAuth plugin (setting off). Cycle the warm pool with
-   `aws autoscaling start-instance-refresh` or by terminating instances, per the
-   aws-deploy skill's warm-pool gotcha.
-2. Verify on **every** instance, including warm-pool ones, using `get-console-output
-   --latest` markers and a direct request to the sidecar.
+1. Deploy the MCP service instance (dark) and the OAuth plugin (setting off). Cycle the
+   warm pool for the plugin with `aws autoscaling start-instance-refresh` or by
+   terminating instances, per the aws-deploy skill's warm-pool gotcha.
+2. Verify the plugin on **every** Girder instance, including warm-pool ones, using
+   `get-console-output --latest` markers; verify the MCP service with a direct request
+   from HAProxy's host.
 3. HAProxy replace with the new rules and the consent page. Verify per the playbook:
    cloud-init takes 8 minutes or more, `dist` is non-empty, the served bundle hash matches,
    `/girder/api/v1/system/version` answers, and the ACME path still reaches nginx.
@@ -658,10 +691,10 @@ that is not production.
 
 Order matters, because Girder changes deploy themselves and HAProxy changes do not.
 
-1. **Merge the sidecar and OAuth plugin with the setting off.** Girder instances rebuild
-   from master as the autoscaling group churns, so merging is deploying. Then cycle the
-   warm pool deliberately so every instance has them, and verify each one. Nothing routes
-   to them yet, so users see no change.
+1. **Merge the OAuth plugin with the setting off, and start the MCP service instance.**
+   Girder instances rebuild from master as the autoscaling group churns, so merging is
+   deploying. Cycle the warm pool deliberately so every instance has the plugin, and
+   verify each one. Nothing routes to either yet, so users see no change.
 2. **One HAProxy replace** with the new routes and the consent page. Verify per the
    playbook. If OAuth routes went live before every Girder instance had the plugin,
    round-robin would produce intermittent 404s.
@@ -677,7 +710,7 @@ HAProxy replace, the riskiest operation in this plan.
 | What | How | Speed |
 |---|---|---|
 | OAuth | Turn the setting off, revoke grants | Immediate |
-| Sidecar | Remove from compose and cycle the warm pool, or pull the HAProxy route | Slow |
+| MCP service | Stop the instance, or pull the HAProxy route | Fast (instance); slow (route) |
 | HAProxy rules or consent page | Another replace from the previous commit | Slow, same build risk |
 
 ---
@@ -688,10 +721,10 @@ Numbered in rollout order. Blast radius is who is affected if the change is wron
 
 | # | Change | Repo | Reaches prod via | Blast radius | Worst case | Risk |
 |---|---|---|---|---|---|---|
-| C1 | MCP server sidecar | OutsetaLogin (prod), NimbusImage (local) | OutsetaLogin merge, then instance churn | Every Girder host's CPU and memory | Boot-time build overruns the 900 s launch budget; warm-pool instances park half-built | Medium |
+| C1 | MCP service (own instance) | AWSDeploy (instance, ECR image), NimbusImage (code) | Terraform apply; image push | MCP users only | Service down or misconfigured: MCP unavailable, the app unaffected | Low |
 | C2 | Token verifier | NimbusImage (`nimbusimage-mcp/`) | With C1 | MCP users only | An unchecked token serves one user's data to another | Medium |
 | C3 | Girder OAuth plugin | NimbusImage | Merge, then instance churn, at a time you do not choose | Security: every account. Availability: every new Girder instance | Flawed redirect, code, or PKCE checks leak a session token | High |
-| C4 | HAProxy routing | AWSDeploy | HAProxy instance replace only | The whole site | IP manager bug gives site-wide 503; broad `/.well-known/` rule breaks certificate renewal weeks later; silent frontend build failure serves 500 (happened 2026-09-12) | High |
+| C4 | HAProxy routing | AWSDeploy | HAProxy instance replace only | The whole site | A rule or backend mistake gives site-wide 503; broad `/.well-known/` rule breaks certificate renewal weeks later; silent frontend build failure serves 500 (happened 2026-09-12) | High |
 | C5 | Consent page and return after login | NimbusImage frontend | HAProxy replace only | Every user's login path | Users stranded after login, or an open redirect | Medium |
 
 Not changed: `girder-claude-chat`, the in-app agent, and the `nimbusimage` package (unless
@@ -706,12 +739,12 @@ the spike shows it needs a helper, for example image encoding).
 | Tool logic | Each tool's output shape, caps, and error mapping | pytest with mocked `nimbusimage` | 1 |
 | Tool integration | Tools against real Girder data | pytest `-m integration` against local compose | 1 |
 | Auth, API key | Valid, invalid, revoked keys; per-user isolation; cache behavior | pytest with a real HTTP client | 1 |
-| OAuth plugin | Every rule in [6.3](#63-girder-oauth-plugin); setting off returns 404 | pytest via tox | 2 |
-| Consent page | Rendering, approve call, return-target validation | Vitest | 2 |
-| End to end, local | Claude Code (header and OAuth), MCP Inspector | Manual, scripted checklist | 1, 2 |
-| End to end, public | claude.ai and Desktop connectors, Team org | Manual via tunnel | 3 |
-| HAProxy rules | Path matching, ACME path untouched, HTTPS redirect narrowed | Local HAProxy container | 3 |
-| IP manager script | `render_config` for both backends, drift check | pytest (new) | 4 |
+| OAuth plugin | Every rule in [6.3](#63-girder-oauth-plugin); setting off returns 404 | pytest via tox | 3 |
+| Consent page | Rendering, approve call, return-target validation | Vitest | 3 |
+| End to end, local | Claude Code (header and OAuth), MCP Inspector | Manual, scripted checklist | 1, 3 |
+| End to end, public | claude.ai and Desktop connectors: header key (Phase 2), then OAuth with a Team org (Phase 3) | Manual via tunnel | 2, 3 |
+| HAProxy rules | Path matching, ACME path untouched, HTTPS redirect narrowed | Local HAProxy container | 2 |
+| IP manager script | Reconciliation leaves the static MCP backend alone | pytest (new) | 4 |
 | Deploy | Warm-pool cycle, HAProxy replace, client matrix | AWS test environment | 5 |
 | Quality | Tool selection and response sizes on a fixed task list | Spike task list, rerun after tool changes | 0, then ongoing |
 
@@ -861,16 +894,16 @@ the local stack. Add an item whenever a review finds something this list missed.
 
 ### Planned (no test yet)
 
-OAuth (Phase 2): PKCE S256 required and plain rejected; exact redirect URI match;
+OAuth (Phase 3): PKCE S256 required and plain rejected; exact redirect URI match;
 single-use codes that expire; refresh tokens rotate and reuse revokes the grant;
 `resource` required and bound to the token; every endpoint 404s with the setting off;
 return-after-login accepts only in-app routes. Planned locations: the OAuth plugin's
 `test/test_authorize.py`, `test_token.py`, `test_settings.py`, and
 `src/views/oauth/OAuthConsent.test.ts`.
 
-Deploy (Phases 3 to 5): no HAProxy rule matches `/.well-known/acme-challenge/*` except the
-static server; the IP manager renders both backends and detects drift on each (AWSDeploy
-`tests/test_load_balancer_ip_manager.py`).
+Deploy (Phases 2, 4 and 5): no HAProxy rule matches `/.well-known/acme-challenge/*` except
+the static server; the IP manager's reconciliation leaves the static MCP backend alone
+(AWSDeploy `tests/test_load_balancer_ip_manager.py`).
 
 Process rules carried over from `CLAUDE.md`: verify from a fresh start against data that
 actually has the property under test, and use `git stash` to confirm a test fails without
@@ -882,9 +915,9 @@ its fix.
 
 | Decision | Options | Leaning |
 |---|---|---|
-| Sidecar or in-process | **Sidecar container** on its own port: isolated, but needs a second HAProxy backend and IP manager changes. **Mount inside Girder's ASGI app**: Girder already runs under uvicorn as `girder.asgi:app` (see `docker-compose.yaml`), so `/mcp` could route to the existing backend with no IP manager change; shares Girder's process and image. | Decide after the spike. Verify that mounting is actually possible first. |
+| Placement | **Decided 2026-10-12: a small separate service** (own instance, e.g. t4g.small, behind a static HAProxy backend). Rejected: a **sidecar** on each Girder host (needs a second dynamic HAProxy backend and IP manager changes, the plan's site-wide-503 risk; every MCP change needs a warm-pool cycle; adds to the 900 s launch budget) and **mounting inside Girder's ASGI app** (cheapest on infrastructure, but shares Girder's process, threads and memory with image work, couples every MCP change to a Girder deploy, and the MCP SDK's pinned dependencies must coexist with Girder 5's, unverified). Stickiness is irrelevant: the server is stateless, and connectors calling from Anthropic's cloud do not keep HAProxy's cookie. Per-process state (the key-exchange cache, the registration single-flight) becomes effectively global with one instance. | Separate service |
 | Where the code lives | New top-level `nimbusimage-mcp/` package, or an optional extra in `nimbusimage` | Separate package |
-| Token lifetimes | Access token hours to a day; refresh token weeks | Decide in Phase 2 |
+| Token lifetimes | Access token hours to a day; refresh token weeks | Decide in Phase 3 |
 | Client registration | Pre-registered only, or add Client ID Metadata Documents | Pre-registered first |
 | API key creation UI | Build a settings page, or keep issuing keys by hand | By hand for now |
 | In-app agent using MCP | Attach the MCP server to the AI panel through the connector | Not planned |
@@ -894,7 +927,8 @@ its fix.
 ## 12. Assumptions and things not yet verified
 
 - The production Girder stack is defined in `CytoPixel/OutsetaLogin`, which was not read
-  for this plan. Where the sidecar goes there, and how its port is exposed, are assumptions.
+  for this plan. With the separate MCP service it needs no MCP change, but how the service
+  reaches Girder over the private network (`NI_API_URL`) is still to be decided.
 - Whether the Outseta login widgets can return users to a given page after login was not
   checked.
 - Claude's OAuth callback URL for custom connectors comes from the connector dialog and was
