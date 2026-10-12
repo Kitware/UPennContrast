@@ -601,6 +601,43 @@ class TestZenodoRequiresOwnership:
         assert contents.datasetIds == [dataset["_id"]]
         assert goneConfig["_id"] not in contents.collectionIds
 
+    def testDraftRecordsWhatTheJobUploaded(self, server, owner):
+        """A dataset deleted after the job's check is skipped by the upload,
+        so the draft must not record it (publish would refuse the draft)."""
+        from unittest.mock import MagicMock
+        from girder_jobs.models.job import Job
+        from upenncontrast_annotation.server.helpers import zenodo_job
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        goneDataset, goneConfig, _ = createDataset(owner)
+        project = TestProjectShareLimits().createProject(server, owner)
+        for ds in (dataset, goneDataset):
+            TestProjectShareLimits().addDataset(server, owner, project, ds)
+        projectDoc = Project().load(project["_id"], force=True)
+        contents = requireProjectContentsAccess(projectDoc, owner)
+        Folder().remove(Folder().load(goneDataset["_id"], force=True))
+        client = MagicMock()
+        client.base_url = "https://sandbox.zenodo.org"
+        client.create_deposition.return_value = {
+            "id": 1, "links": {"bucket": "b", "html": "h"}}
+        client.upload_file.return_value = {}
+        from girder_jobs.constants import JobStatus
+        job = Job().createJob(title="t", type="zenodo_upload", user=owner)
+        job = Job().updateJob(job, status=JobStatus.RUNNING)
+
+        zenodo_job._do_upload(
+            job, Job(), projectDoc, owner, project["_id"], Project(),
+            client, contents)
+
+        recorded = Project().load(project["_id"], force=True)[
+            "meta"]["zenodo"]["uploadedResources"]
+        assert recorded["datasetIds"] == [dataset["_id"]]
+        assert config["_id"] in recorded["collectionIds"]
+        assert goneConfig["_id"] not in recorded["collectionIds"]
+
     def testOwnerPassesTheOwnershipCheck(self, server, owner):
         dataset, _, _ = createDataset(owner)
         project = TestProjectShareLimits().createProject(server, owner)

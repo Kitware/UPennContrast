@@ -720,7 +720,9 @@ that writes an ACL or a public flag, or that exports a project.
   references — *"testPublishRefusesDraftWithDeletedResources"*.
 - The draft records only resources that existed and were exported (not references
   already deleted, nor configurations reached through a deleted dataset's views), or
-  publish would refuse a valid draft — *"testUploadRecordsOnlyResourcesThatExist"*.
+  publish would refuse a valid draft — *"testUploadRecordsOnlyResourcesThatExist"*;
+  the record is built from what the job actually uploaded, so a resource deleted
+  mid-job is not recorded either — *"testDraftRecordsWhatTheJobUploaded"*.
 
 **Process rules this feature proved**
 - Test fixtures: Girder makes the first user in a fresh database a site admin, who holds

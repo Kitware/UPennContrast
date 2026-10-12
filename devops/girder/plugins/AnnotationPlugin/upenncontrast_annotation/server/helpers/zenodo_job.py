@@ -480,11 +480,24 @@ def _do_upload(job, job_model, project, user, project_id,
 
     # Done - mark as draft (ready to publish). Publishing checks the
     # resources recorded here, which is what the draft contains, not the
-    # project's membership by then.
+    # project's membership by then. Record only what was uploaded: a
+    # resource deleted after the check was skipped above, and publish
+    # refuses recorded resources that no longer exist.
+    uploaded_dataset_ids = [
+        ds_id for ds_id in contents.datasetIds if ds_id in folders_by_id
+    ]
+    uploaded_collection_ids = {
+        coll_id for coll_id in contents.collectionIds
+        if coll_id in colls_by_id
+    } | {
+        config['_id']
+        for ds_id in uploaded_dataset_ids
+        for config in contents.configsByDataset.get(ds_id, [])
+    }
     update_zenodo_meta(project_id, {
         'uploadedResources': {
-            'datasetIds': contents.datasetIds,
-            'collectionIds': contents.collectionIds,
+            'datasetIds': uploaded_dataset_ids,
+            'collectionIds': list(uploaded_collection_ids),
         },
         'depositionId': dep_id,
         'depositionUrl': deposition['links']['html'],
