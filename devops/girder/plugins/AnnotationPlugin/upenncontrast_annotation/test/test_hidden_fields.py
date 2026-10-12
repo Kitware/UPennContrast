@@ -296,6 +296,44 @@ def assertPublicViewShape(doc, view, accessLevel):
     assert doc["_accessLevel"] == accessLevel
 
 
+# Every field the frontend reads from a view (asDatasetView in
+# src/store/GirderAPI.ts), with values that would show if one were dropped.
+FRONTEND_VIEW_FIELDS = {
+    "layerContrasts": {
+        "layer1": {"mode": "absolute", "blackPoint": 1, "whitePoint": 9},
+    },
+    "scales": {"pixelSize": {"value": 0.5, "unit": "um"}},
+    "lastViewed": 1700000000000,
+    "lastLocation": {"xy": 1, "z": 2, "time": 3},
+}
+
+
+def readViewViaEveryEndpoint(server, caller, view):
+    """`view` as get, find and bulk_find each return it to `caller`."""
+    viewId = str(view["_id"])
+    datasetId = str(view["datasetId"])
+    resp = server.request(path="/dataset_view/%s" % viewId, user=caller)
+    assertStatusOk(resp)
+    results = {"get": resp.json}
+
+    resp = server.request(
+        path="/dataset_view", user=caller, params={"datasetId": datasetId}
+    )
+    assertStatusOk(resp)
+    results["find"] = next(v for v in resp.json if v["_id"] == viewId)
+
+    resp = server.request(
+        path="/dataset_view/bulk_find",
+        method="POST",
+        user=caller,
+        body=json.dumps({"datasetIds": [datasetId]}),
+        type="application/json",
+    )
+    assertStatusOk(resp)
+    results["bulk_find"] = next(v for v in resp.json if v["_id"] == viewId)
+    return results
+
+
 @pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
 @pytest.mark.plugin("upenncontrast_annotation")
 class TestDatasetViewHiddenFields:
@@ -361,6 +399,58 @@ class TestDatasetViewHiddenFields:
         assert "access" not in resp.json
         assert resp.json["lastLocation"] == {"xy": 0, "z": 1, "time": 0}
         assert resp.json["_accessLevel"] == AccessType.WRITE
+
+    def testAnonymousViewerOfPublicDatasetSeesNoCollaborators(
+        self, admin, user, server
+    ):
+        view = createSharedView(admin, user, AccessType.WRITE)
+        DatasetViewModel().setPublic(view, True, save=True)
+        Folder().setPublic(
+            Folder().load(view["datasetId"], force=True), True, save=True
+        )
+
+        for endpoint, doc in readViewViaEveryEndpoint(
+            server, None, view
+        ).items():
+            assert "access" not in doc, endpoint
+            assert str(user["_id"]) not in json.dumps(doc), endpoint
+            assert doc["_accessLevel"] == AccessType.READ, endpoint
+
+    def testEveryFieldTheFrontendReadsSurvives(self, admin, server):
+        dataset = createDataset(admin, "own_ds")
+        config = Collection().createCollection(
+            "OwnConfig", admin, dataset, configMetadata()
+        )
+        view = createView(admin, dataset, config)
+        view.update(json.loads(json.dumps(FRONTEND_VIEW_FIELDS)))
+        view = DatasetViewModel().save(view)
+
+        for endpoint, doc in readViewViaEveryEndpoint(
+            server, admin, view
+        ).items():
+            assert doc["_id"] == str(view["_id"]), endpoint
+            assert doc["datasetId"] == str(view["datasetId"]), endpoint
+            assert doc["configurationId"] == str(
+                view["configurationId"]
+            ), endpoint
+            for key, value in FRONTEND_VIEW_FIELDS.items():
+                assert doc[key] == value, (endpoint, key)
+            assert doc["_accessLevel"] == AccessType.ADMIN, endpoint
+
+    def testStoredAccessLevelIsNotReported(self, admin, user, server):
+        # The frontend PUTs back the view it holds, so older documents store
+        # the owner's `_accessLevel` (and `id`); find used to return that
+        # stored value to every caller.
+        view = createSharedView(admin, user)
+        view["_accessLevel"] = AccessType.ADMIN
+        view["id"] = str(view["_id"])
+        view = DatasetViewModel().save(view)
+
+        for endpoint, doc in readViewViaEveryEndpoint(
+            server, user, view
+        ).items():
+            assert doc["_accessLevel"] == AccessType.READ, endpoint
+            assert "id" not in doc, endpoint
 
 
 @pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
