@@ -108,6 +108,7 @@ import {
   clampLocationToDataset,
 } from "@/utils/datasetLocation";
 import { quotaExceededMessage } from "@/utils/quota";
+import { normalizeScales } from "@/utils/scales";
 import { memDiag } from "@/utils/memoryDiagnostics";
 import { TCompositionMode } from "@/utils/compositionModes";
 import {
@@ -945,8 +946,12 @@ export class Main extends VuexModule {
     return this.girderUser?.meta?.channelColors || {};
   }
 
+  // Scales are normalized so an unknown pixel size reads as the single
+  // unknown marker (0) whatever form it was stored in; workers receive these.
   get configurationScales() {
-    return this.configuration?.scales || exampleConfigurationBase().scales;
+    return normalizeScales(
+      this.configuration?.scales || exampleConfigurationBase().scales,
+    );
   }
 
   get viewScales() {
@@ -954,7 +959,7 @@ export class Main extends VuexModule {
   }
 
   get scales() {
-    return { ...this.configurationScales, ...this.viewScales };
+    return normalizeScales({ ...this.configurationScales, ...this.viewScales });
   }
 
   // Upload workflow getters

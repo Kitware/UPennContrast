@@ -674,7 +674,8 @@ export interface IDatasetViewBase {
     [layerId: string]: IContrast;
   };
   scales: Partial<IScales>;
-  lastViewed: number;
+  // Absent on views created outside the app before the server defaulted it.
+  lastViewed?: number;
   lastLocation: {
     xy: number;
     z: number;
@@ -1810,6 +1811,8 @@ export interface IAnnotationSummaryPropertyStats {
 export interface IAnnotationSummary {
   total: number;
   tags: { tag: string; count: number }[];
+  shapes: { shape: AnnotationShape; count: number }[];
+  channels: { channel: number; count: number }[];
   properties: IAnnotationSummaryPropertyStats[];
 }
 
@@ -2876,6 +2879,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ISetQuadStatus } from "@/utils/setFrameQuad";
 import type { ITileMeta } from "./GirderAPI";
 import { isEqual } from "lodash";
+import { unknownPixelSize } from "@/utils/scales";
 import type { TSamNodes } from "@/pipelines/samPipeline";
 import type { TObjectSegmentationNodes } from "@/pipelines/objectSegmentationPipeline";
 
@@ -2961,8 +2965,10 @@ export function exampleConfigurationBase(): IDatasetConfigurationBase {
     propertyIds: [],
     pipelines: [],
     scales: {
-      pixelSize: { value: 1, unit: "m" },
-      zStep: { value: 1, unit: "m" },
+      pixelSize: unknownPixelSize(),
+      // A typical confocal step. The old 1 m was only harmless because the
+      // volume viewer rejects z steps of 1e6 µm or more as implausible.
+      zStep: { value: 1, unit: "µm" },
       tStep: { value: 1, unit: "s" },
     },
     visibilityConfig: resolveVisibilityConfig(),

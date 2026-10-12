@@ -171,6 +171,7 @@ import lineScanStore from "@/store/lineScan";
 import { IDisplayLayer } from "@/store/model";
 import { bilinearSample, resamplePolyline } from "@/utils/lineScan";
 import { formatLength } from "@/utils/conversion";
+import { isKnownPixelSize } from "@/utils/scales";
 import { logError } from "@/utils/log";
 
 // At most one sample per pixel of line length, capped to keep updates cheap
@@ -246,15 +247,9 @@ const totalLength = computed(() =>
 );
 
 // Physical length of the line, or null when the pixel size is unknown.
-// A pixel size of exactly 1 m is the placeholder default of configurations
-// whose physical scale was never set.
 const physicalLengthText = computed(() => {
   const pixelSize = store.scales.pixelSize;
-  if (
-    !pixelSize ||
-    pixelSize.value <= 0 ||
-    (pixelSize.value === 1 && pixelSize.unit === "m")
-  ) {
+  if (!isKnownPixelSize(pixelSize)) {
     return null;
   }
   return formatLength(totalLength.value * pixelSize.value, pixelSize.unit);

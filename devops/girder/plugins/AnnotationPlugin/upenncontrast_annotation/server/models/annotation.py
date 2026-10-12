@@ -1103,7 +1103,8 @@ class Annotation(AccessControlMixin, ProxiedModel):
     def summarize(self, datasetId, filters, propertyPaths):
         """Aggregate statistics over the annotations matching `filters`.
 
-        Returns {total, tags: [{tag, count}] (count desc, then tag), and
+        Returns {total, tags: [{tag, count}], shapes: [{shape, count}] and
+        channels: [{channel, count}] (each count desc, then key), and
         properties: [{path, count, mean, std, min, max}]} — one entry per
         requested path, in request order. `count` is the number of matching
         annotations holding a NUMERIC value at the path; non-numeric, NaN
@@ -1116,8 +1117,8 @@ class Annotation(AccessControlMixin, ProxiedModel):
         complement (`_idSelector`), as the gate resolver does: a broad
         filter that keeps most of a 700K dataset would otherwise ship a
         dataset-sized `$in` twice. Annotation-field-only filters skip the
-        property-value join, so the tag facet runs on them directly and only
-        the statistics need the ids.
+        property-value join, so the composition facets run on them
+        directly and only the statistics need the ids.
 
         Without any filter the statistics run over every property-value
         document of the dataset, so a value document orphaned by a deleted
@@ -1139,20 +1140,41 @@ class Annotation(AccessControlMixin, ProxiedModel):
 
         pipeline = self._buildListMatchStages(datasetId, facetFilters)
         pipeline.append({"$facet": {
-            "total": [{"$count": "count"}],
             "tags": [
                 {"$unwind": "$tags"},
                 {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
                 {"$sort": {"count": -1, "_id": 1}},
             ],
+            # Shapes and channels ride the same scan as the tags: separate
+            # count-by-field queries would each re-read every annotation in
+            # the dataset (there is no datasetId+shape/channel index). The
+            # shape facet also gives the total (every annotation lands in one
+            # shape group, a missing shape in the null group), so no separate
+            # $count facet is needed.
+            "shapes": [
+                {"$group": {"_id": "$shape", "count": {"$sum": 1}}},
+                {"$sort": {"count": -1, "_id": 1}},
+            ],
+            "channels": [
+                {"$group": {"_id": "$channel", "count": {"$sum": 1}}},
+                {"$sort": {"count": -1, "_id": 1}},
+            ],
         }})
         facets = next(self._aggregate(self.collection, pipeline))
-        total = facets["total"][0]["count"] if facets["total"] else 0
+        total = sum(doc["count"] for doc in facets["shapes"])
         return {
             "total": total,
             "tags": [
                 {"tag": doc["_id"], "count": doc["count"]}
                 for doc in facets["tags"]
+            ],
+            "shapes": [
+                {"shape": doc["_id"], "count": doc["count"]}
+                for doc in facets["shapes"]
+            ],
+            "channels": [
+                {"channel": doc["_id"], "count": doc["count"]}
+                for doc in facets["channels"]
             ],
             "properties": self._propertyStats(
                 datasetId, selector, matchingIds, propertyPaths, total

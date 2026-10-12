@@ -676,6 +676,8 @@ class TestDatasetMultiSourcePipeline:
         )
         assert view["datasetId"] == folder["_id"]
         assert view["configurationId"] == collection["_id"]
+        # Without lastViewed the Recent Datasets list shows no date.
+        assert isinstance(view["lastViewed"], int) and view["lastViewed"] > 0
 
     def testCollectionAndViewInheritTheFolderAcl(
         self, admin, user, secondUser, server, largeImageCapable

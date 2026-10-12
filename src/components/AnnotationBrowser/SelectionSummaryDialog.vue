@@ -3,8 +3,8 @@
     <v-card>
       <v-card-title>Selection summary</v-card-title>
       <v-card-subtitle>
-        Composition by tag and statistics of property values, computed on the
-        server over every matching object
+        Composition by tag and shape and statistics of property values, computed
+        on the server over every matching object
       </v-card-subtitle>
 
       <v-card-text>
@@ -88,6 +88,28 @@
               </tr>
             </tbody>
           </v-table>
+
+          <template v-if="summary.shapes.length > 0">
+            <v-list-subheader>Composition by shape</v-list-subheader>
+            <v-table density="compact" class="mb-4 summary-table">
+              <thead>
+                <tr>
+                  <th>Shape</th>
+                  <th class="text-right">Count</th>
+                  <th class="text-right">% of objects</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in summary.shapes" :key="row.shape">
+                  <td>{{ row.shape }}</td>
+                  <td class="text-right">{{ row.count.toLocaleString() }}</td>
+                  <td class="text-right">
+                    {{ formatPercent(row.count / summary.total) }}
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </template>
 
           <div class="d-flex align-center">
             <v-list-subheader>Spatial statistics</v-list-subheader>
@@ -517,6 +539,16 @@ function buildCsv(result: IAnnotationSummary): string {
     ...result.tags.map((row) => [
       "tag",
       row.tag,
+      row.count,
+      result.total > 0 ? row.count / result.total : 0,
+      null,
+      null,
+      null,
+      null,
+    ]),
+    ...result.shapes.map((row) => [
+      "shape",
+      row.shape,
       row.count,
       result.total > 0 ? row.count / result.total : 0,
       null,

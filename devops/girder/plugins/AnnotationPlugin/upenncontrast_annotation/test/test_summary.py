@@ -66,7 +66,66 @@ class TestAnnotationSummary:
             {"tag": "B", "count": 1},
             {"tag": "C", "count": 1},
         ]
+        assert resp.json["shapes"] == [{"shape": "polygon", "count": 4}]
+        assert resp.json["channels"] == [{"channel": 0, "count": 4}]
         assert resp.json["properties"] == []
+
+    def testChannelComposition(self, admin, server):
+        folder = self._setup(admin)
+        for channel, tags in ((2, ["A"]), (2, ["B"]), (1, ["B"])):
+            ann = upenn_utilities.getSampleAnnotation(folder["_id"])
+            ann["channel"] = channel
+            ann["tags"] = tags
+            Annotation().create(ann)
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]), "filters": {},
+        })
+        assertStatusOk(resp)
+        # Sorted by count descending, then channel.
+        assert resp.json["channels"] == [
+            {"channel": 0, "count": 4},
+            {"channel": 2, "count": 2},
+            {"channel": 1, "count": 1},
+        ]
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]),
+            "filters": {"tags": {"values": ["B"], "exclusive": False}},
+        })
+        assertStatusOk(resp)
+        assert resp.json["channels"] == [
+            {"channel": 0, "count": 1},
+            {"channel": 1, "count": 1},
+            {"channel": 2, "count": 1},
+        ]
+
+    def testShapeComposition(self, admin, server):
+        folder = self._setup(admin)
+        for shape, vertices in (("point", 1), ("point", 1), ("line", 2)):
+            ann = upenn_utilities.getSampleAnnotation(folder["_id"])
+            ann["shape"] = shape
+            ann["coordinates"] = ann["coordinates"][:vertices]
+            ann["tags"] = ["A"]
+            Annotation().create(ann)
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]), "filters": {},
+        })
+        assertStatusOk(resp)
+        # Sorted by count descending, then shape name.
+        assert resp.json["shapes"] == [
+            {"shape": "polygon", "count": 4},
+            {"shape": "point", "count": 2},
+            {"shape": "line", "count": 1},
+        ]
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]),
+            "filters": {"tags": {"values": ["B", "C"], "exclusive": False}},
+        })
+        assertStatusOk(resp)
+        assert resp.json["shapes"] == [{"shape": "polygon", "count": 2}]
 
     def testPropertyStatsSkipNonNumericAndMissing(self, admin, server):
         folder = self._setup(admin)
@@ -124,6 +183,49 @@ class TestAnnotationSummary:
         assert resp.json["total"] == 1
         assert resp.json["tags"] == [{"tag": "A", "count": 1}]
         assert statsByPath(resp.json)["p.Area"]["mean"] == 5
+
+    def testShapesFollowPropertyAndMixedFilters(self, admin, server):
+        """The shape and channel facets narrow on the gated paths too
+        (property-only and mixed filters go through an id clause, not the
+        raw match)."""
+        folder = self._setup(admin)
+        ann = upenn_utilities.getSampleAnnotation(folder["_id"])
+        ann["shape"] = "point"
+        ann["coordinates"] = ann["coordinates"][:1]
+        ann["tags"] = ["A"]
+        point = Annotation().create(ann)
+        AnnotationPropertyValues().appendValues(
+            {"p": {"Area": 7}}, point["_id"], folder["_id"]
+        )
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]),
+            "filters": {"propertyFilters": [
+                {"path": ["p", "Area"], "mode": "range", "max": 10},
+            ]},
+        })
+        assertStatusOk(resp)
+        assert resp.json["shapes"] == [
+            {"shape": "point", "count": 1},
+            {"shape": "polygon", "count": 1},
+        ]
+        # The channel facet shares the narrowed match.
+        assert resp.json["channels"] == [{"channel": 0, "count": 2}]
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]),
+            "filters": {
+                "tags": {"values": ["A"], "exclusive": False},
+                "propertyFilters": [
+                    {"path": ["p", "Area"], "mode": "range", "min": 0},
+                ],
+            },
+        })
+        assertStatusOk(resp)
+        assert resp.json["shapes"] == [
+            {"shape": "polygon", "count": 2},
+            {"shape": "point", "count": 1},
+        ]
 
     def testStatsFollowMixedFieldAndPropertyFilters(self, admin, server):
         """Tags + property range takes the annotation-driven join path; the
@@ -248,6 +350,8 @@ class TestAnnotationSummary:
         assertStatusOk(resp)
         assert resp.json["total"] == 0
         assert resp.json["tags"] == []
+        assert resp.json["shapes"] == []
+        assert resp.json["channels"] == []
         assert statsByPath(resp.json)["p.Area"] == {
             "path": ["p", "Area"], "count": 0,
             "mean": None, "std": None, "min": None, "max": None,
