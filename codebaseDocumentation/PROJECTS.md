@@ -388,8 +388,8 @@ type TProjectStatus = 'draft' | 'exporting' | 'exported';
 | DELETE | `/project/:id/collection/:collectionId` | Remove collection from project |
 | PUT | `/project/:id/status` | Update project status |
 | PUT | `/project/:id/metadata` | Update publication metadata |
-| POST | `/project/:id/share` | Share project with user (propagates to all resources) |
-| POST | `/project/:id/set_public` | Make project and all resources public/private |
+| POST | `/project/:id/share` | Share project with user (propagates to the resources the caller can share) |
+| POST | `/project/:id/set_public` | Make project and the resources the caller owns public/private |
 | GET | `/project/:id/access` | Get access list for a project (requires ADMIN) |
 
 ---
@@ -470,8 +470,9 @@ Opened from ProjectInfo. Allows the project owner to manage access:
 - **Add user form**: Username/email field + access level selector + Add button
 
 **Confirmation dialogs**: Every sharing action shows a confirmation dialog before
-executing, because all actions propagate to every dataset, collection, configuration,
-and dataset view in the project. The dialog displays:
+executing, because actions propagate to the datasets, collections, configurations
+and dataset views in the project that the caller can share (see "Permission
+Propagation"). The dialog displays:
 - Action-specific message explaining what will happen
 - Resource counts: "This will affect X datasets and Y collections..."
 
@@ -503,10 +504,15 @@ Every propagation runs **as the acting user** (the `actor` argument) and changes
 contained resource only as far as that user could share it directly
 (`server/helpers/aclLimits.py`, the same rules as `POST /dataset_view/share`):
 
-- a dataset (folder) only if the actor has ADMIN on it;
-- a configuration or dataset view only if the actor has WRITE on it, and then at no
-  more than the actor's own level;
-- an existing entry above the actor's level is left unchanged;
+- a dataset (folder) only if the actor owns it (ADMIN);
+- a dataset view only if the actor owns the view's dataset, and a configuration only
+  if such a view uses it or the actor owns the configuration
+  (`limitToShareable`);
+- each grant at no more than the actor's own level on that document, and an existing
+  entry above the actor's level is left unchanged (`grantableLevel`);
+- copying the project's whole ACL onto a newly added resource never lowers an existing
+  entry, so adding your own dataset to a project where you are only WRITE keeps you
+  its owner;
 - the public flag only on resources the actor has ADMIN on.
 
 `POST /project/:id/set_public` returns `skipped`, the number of contained resources it

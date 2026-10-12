@@ -286,9 +286,39 @@ class TestProjectShareLimits:
                 "userMailOrUsername": third["login"],
                 "accessType": ADMIN}))
 
+        # dataset_view/share would refuse the caller outright, so the
+        # project route does not reach the view or configuration either
         assert levels(third, dataset, config, view) == (
-            NO_ACCESS, WRITE, WRITE)
+            NO_ACCESS, NO_ACCESS, NO_ACCESS)
         assert levelOf(Project(), project, third) == ADMIN
+
+    def testAddingOwnDatasetToProjectKeepsOwnership(
+            self, server, owner, user):
+        """A WRITE member adding their own dataset must not be demoted to
+        the project's level on it."""
+        project = self.createProject(server, owner)
+        grant(Project().load(project["_id"], force=True), Project(), user,
+              WRITE)
+        dataset, config, view = createDataset(user)
+
+        self.addDataset(server, user, project, dataset)
+
+        assert levels(user, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+        assert levels(owner, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+
+    def testAddingOwnDatasetToPublicProjectPublishesAllOfIt(
+            self, server, owner, user):
+        project = self.createProject(server, owner)
+        projectDoc = Project().load(project["_id"], force=True)
+        grant(projectDoc, Project(), user, WRITE)
+        Project().setPublic(projectDoc, True, save=True)
+        dataset, config, view = createDataset(user)
+
+        self.addDataset(server, user, project, dataset)
+
+        for model, doc in ((Folder(), dataset), (Collection(), config),
+                           (DatasetViewModel(), view)):
+            assert model.load(doc["_id"], force=True).get("public")
 
     def testRevokingProjectLeavesOwnerOfContainedDataset(
             self, server, owner, user):

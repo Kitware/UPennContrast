@@ -69,8 +69,8 @@
             <strong>public</strong>
           </template>
           <template v-else> <strong>shared with other users</strong> </template
-          >. Adding {{ selectedDatasets.length }} dataset(s) will update their
-          permissions to match the project's access settings.
+          >. Adding {{ selectedDatasets.length }} dataset(s) will share the ones
+          you own with the project's users and, if it is public, publish them.
         </v-card-text>
         <v-card-actions class="justify-end" style="gap: 8px">
           <v-btn

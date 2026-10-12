@@ -28,7 +28,7 @@ NimbusImage uses Girder's built-in access control system with three permission l
 - Users automatically receive ADMIN access when they create a dataset
 - Only users with ADMIN access can modify sharing settings (add/remove users, toggle public)
 - Any user with READ access can view the access list (who has access and at what level)
-- The dataset owner (ADMIN) cannot be removed from the access list
+- The Share dialog never offers to remove an ADMIN; the API lets any ADMIN change another ADMIN (as in Girder) but refuses to let callers change their own entry
 
 ## Architecture
 
@@ -163,7 +163,9 @@ Grants, modifies, or revokes user access.
 caller holds. A view or configuration the caller can edit but does not own is shared
 at no more than the caller's own level (granting ADMIN gives WRITE on it), and an
 entry above the caller's level -- its owner's -- is left unchanged rather than
-downgraded or removed. Before this, a WRITE collaborator could grant themselves ADMIN
+downgraded or removed. Only the dataset's owner can share its views and
+configurations at all; project propagation applies the same precondition
+(`limitToShareable`), so a WRITE collaborator cannot re-share them through a project. Before this, a WRITE collaborator could grant themselves ADMIN
 (`accessType: 2` on their own login). The same rules limit project sharing and
 propagation (`codebaseDocumentation/PROJECTS.md`, "Permission Propagation"). Tests:
 `test/test_share_escalation.py`.
