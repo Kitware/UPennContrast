@@ -58,7 +58,9 @@ See `nimbusimage/README.md` for the full API overview, authentication options (A
   mean "network trouble" also catches a 401 or a 404. Handle `HttpError` first
   whenever an HTTP answer and a lost connection need different treatment. This
   bit nimbusimage-mcp twice: a refusal was taken for a lost answer, and a missing
-  job for a blip.
+  job for a blip. Its MRO also includes `OSError`, so `except OSError` catches
+  it too. And a 502/504 from a proxy is not a refusal: the request may have
+  reached Girder.
 - A scoped API key without `core.user_auth` gets 401 from job status and from
   `GET claude_agent/help`; `tmp/local_api_key.txt` is such a key. Use a full-access key for
   anything that waits on jobs.

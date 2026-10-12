@@ -985,6 +985,30 @@ def test_a_registration_whose_answer_was_lost_stays_pending(nc):
     assert nc.girder.post.call_count == 1
 
 
+def test_a_proxy_timeout_on_registration_stays_pending(nc):
+    """A 504 from the proxy: Girder may have the request; no second POST."""
+    _common.configure(make_settings(max_job_wait=1))
+    _registering(nc)
+    nc.girder.post.side_effect = http_error(504)
+
+    async def twice():
+        for _ in range(2):
+            with pytest.raises(ToolError, match="still registering"):
+                await workers.ni_worker_interface(image=SEG)
+
+    asyncio.run(twice())
+    assert nc.girder.post.call_count == 1
+
+
+def test_a_truncated_answer_is_a_clean_tool_error(nc):
+    import requests
+    nc.dataset.side_effect = requests.exceptions.ChunkedEncodingError(
+        "http://internal-girder:8080 broke")
+    with pytest.raises(ToolError, match="incomplete answer") as raised:
+        datasets.ni_dataset_info(dataset_id="d")
+    assert "internal-girder" not in str(raised.value)
+
+
 def test_job_wait_reports_a_missing_job(nc):
     """A 4xx is an answer, not a blip (girder_client.HttpError is also a
     requests.RequestException, so the order of the handlers matters)."""

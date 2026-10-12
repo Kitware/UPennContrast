@@ -223,6 +223,13 @@ def _recorded(name: str, kwargs: dict):
         # internal Girder host, so it is not passed on.
         kind = error = "timeout"
         raise ToolError(TOO_SLOW) from None
+    except requests.RequestException:
+        # The rest: a truncated or undecodable answer and the like
+        # (HttpError, also a RequestException, is handled above).
+        kind = error = "bad response"
+        raise ToolError(
+            "NimbusImage sent an incomplete answer; try again."
+        ) from None
     except (ValueError, PermissionError) as e:
         # nimbusimage reports bad input as ValueError ("No large image
         # found in dataset ...") and a key scope problem as

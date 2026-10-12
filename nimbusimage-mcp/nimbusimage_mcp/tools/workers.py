@@ -181,14 +181,21 @@ async def _run_registration(nc: ni.NimbusClient, image: str) -> None:
     if await _interface(nc, image, deadline) is not None:
         return
     try:
+        # (A POST still hanging at the task's own deadline raises a
+        # ToolError and ends the task: after five minutes, accepted.)
         response = await _before(
             deadline, nc.girder.post, "worker_interface/request",
             parameters={"image": image},
         )
-    except girder_client.HttpError:
-        # An answer (a refusal): nothing is running. Caught first, since
-        # girder_client.HttpError is also a requests.RequestException.
-        raise
+    except girder_client.HttpError as e:
+        # Caught first: girder_client.HttpError is also a
+        # requests.RequestException. A 502/504 is a proxy giving up after
+        # forwarding the request, which Girder may still have acted on:
+        # keep it pending. Any other answer is a refusal: nothing runs.
+        if e.status not in (502, 504):
+            raise
+        await _watch_for_interface(nc, image, deadline)
+        return
     except requests.RequestException as e:
         if _never_sent(e):
             raise  # nothing reached Girder: the next call may register

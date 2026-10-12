@@ -823,7 +823,10 @@ the local stack. Add an item whenever a review finds something this list missed.
       for the interface instead), and every caller waits on it up to its own deadline. A
       retry while it runs joins it; its outcome reaches every waiter, except that a
       Girder error from another user's registration is reported neutrally;
-      a finished one leaves the registry, so the next call starts afresh.
+      a finished one leaves the registry, so the next call starts afresh. A request
+      that may have reached Girder (its connection dropped after sending, or a proxy
+      answered 502/504) counts as running; one that never connected, or that Girder
+      refused, ends it and the next call retries.
       *"test_worker_interface_registers_only_installed_workers"*,
       *"test_worker_interface_checks_the_dataset_before_registering"*,
       *"test_concurrent_first_requests_register_an_interface_once"*,
@@ -833,6 +836,7 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_a_failed_registration_is_reported_and_retried"*,
       *"test_a_registration_that_never_reached_the_server_is_retried"*,
       *"test_a_registration_whose_answer_was_lost_stays_pending"*,
+      *"test_a_proxy_timeout_on_registration_stays_pending"*,
       *"test_an_unreadable_job_keeps_the_registration_pending"*,
       *"test_a_connection_blip_while_following_the_job_keeps_it_pending"*,
       *"test_an_outage_while_watching_for_the_interface_keeps_it_pending"*,
