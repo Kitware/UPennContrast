@@ -558,6 +558,29 @@ class TestZenodoRequiresOwnership:
 
         assertStatus(resp, 403)
 
+    def testPublishRefusesDraftWithDeletedResources(self, server, owner):
+        """A recorded resource that no longer exists cannot be checked, and
+        the draft still holds its files: refuse to publish it."""
+        dataset, config, _ = createDataset(owner)
+        project = TestProjectShareLimits().createProject(server, owner)
+        projectDoc = Project().load(project["_id"], force=True)
+        projectDoc["meta"]["zenodo"] = {
+            "status": "draft", "depositionId": 1,
+            "uploadedResources": {
+                "datasetIds": [dataset["_id"]],
+                "collectionIds": [config["_id"]],
+            },
+        }
+        Project().save(projectDoc)
+        Folder().remove(Folder().load(dataset["_id"], force=True))
+
+        resp = server.request(
+            path=f"/zenodo/publish/{project['_id']}", method="POST",
+            user=owner)
+
+        assertStatus(resp, 403)
+        assert "no longer exist" in resp.json["message"]
+
     def testOwnerPassesTheOwnershipCheck(self, server, owner):
         dataset, _, _ = createDataset(owner)
         project = TestProjectShareLimits().createProject(server, owner)

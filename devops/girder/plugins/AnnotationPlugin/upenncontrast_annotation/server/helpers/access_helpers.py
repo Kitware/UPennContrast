@@ -51,24 +51,35 @@ class ProjectContents:
 
 
 def requireResourcesAccess(datasetIds, collectionIds, user,
-                           level=AccessType.ADMIN):
+                           level=AccessType.ADMIN, requireAll=False):
     """Check access on datasets and collections loaded in two queries.
 
-    Ids of deleted resources are ignored.
-
-    :raises AccessException: If user lacks access to any of them.
+    :param requireAll: Refuse ids that no longer resolve instead of
+        ignoring them. A Zenodo draft still holds a deleted resource's
+        files, and a missing document cannot be checked.
+    :raises AccessException: If user lacks access to any of them, or (with
+        requireAll) any of them no longer exists.
     :returns: Dict of the collection documents checked, by id, with
         meta.propertyIds.
     """
+    datasetIds = set(datasetIds)
+    collectionIds = set(collectionIds)
+    found = 0
     for doc in Folder().find(
             {'_id': {'$in': list(datasetIds)}}, fields=['access', 'public']):
         Folder().requireAccess(doc, user, level)
+        found += 1
     collectionsById = {}
     for doc in Collection().find(
             {'_id': {'$in': list(collectionIds)}},
             fields=['access', 'public', 'meta.propertyIds']):
         Collection().requireAccess(doc, user, level)
         collectionsById[doc['_id']] = doc
+    found += len(collectionsById)
+    if requireAll and found < len(datasetIds) + len(collectionIds):
+        raise AccessException(
+            'Some datasets or collections in this draft no longer exist; '
+            'discard the draft and upload again.')
     return collectionsById
 
 

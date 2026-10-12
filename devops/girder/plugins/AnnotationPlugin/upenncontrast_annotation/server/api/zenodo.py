@@ -345,7 +345,8 @@ class Zenodo(Resource):
         if uploaded:
             requireResourcesAccess(
                 uploaded.get('datasetIds', []),
-                uploaded.get('collectionIds', []), user)
+                uploaded.get('collectionIds', []), user,
+                requireAll=True)
         else:
             requireProjectContentsAccess(project, user)
 

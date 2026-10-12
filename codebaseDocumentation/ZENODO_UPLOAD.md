@@ -82,7 +82,8 @@ request and the job. The check returns the configurations it authorized, and the
 annotation export uses those instead of querying views again. The finished draft
 records the checked ids in `meta.zenodo.uploadedResources`, and publish checks those
 (drafts from before this fall back to the project's current contents), since
-datasets can be removed from the project between upload and publish. Tests: `test/test_share_escalation.py`
+datasets can be removed from the project between upload and publish. A recorded
+resource deleted after the upload blocks publishing (403): discard and upload again. Tests: `test/test_share_escalation.py`
 (`TestZenodoRequiresOwnership`).
 
 The upload endpoint returns a `jobId` that the frontend uses for SSE-based progress tracking.
