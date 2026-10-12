@@ -221,7 +221,8 @@ def ni_annotations_tag(
     updates = []
     for annotation in matched:
         new_tags = retag(annotation.tags, tags, mode)
-        if new_tags != annotation.tags:
+        # Compared as sets: a replace that only reorders changes nothing.
+        if set(new_tags) != set(annotation.tags):
             updates.append((annotation.id, {"tags": new_tags}))
     if updates:
         annotations.update_many(updates)

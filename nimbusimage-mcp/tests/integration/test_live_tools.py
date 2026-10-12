@@ -11,11 +11,14 @@ annotations tagged with a unique tag).
 
 from __future__ import annotations
 
+import base64
+import io
 import json
 import os
 import uuid
 
 import pytest
+from PIL import Image as PILImage
 
 import nimbusimage as ni
 
@@ -162,6 +165,9 @@ def test_live_image_tools(live):
         block, = result["content"]
         assert block["type"] == "image"
         assert block["mimeType"] == "image/jpeg"
+        # Downsampled for real: the longer side is at most max_size.
+        picture = PILImage.open(io.BytesIO(base64.b64decode(block["data"])))
+        assert max(picture.size) <= 256
 
 
 def test_live_worker_run_and_wait(live):

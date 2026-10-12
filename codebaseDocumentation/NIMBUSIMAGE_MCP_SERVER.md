@@ -313,7 +313,7 @@ JSON with no structured copy (the SDK's default indents dicts and duplicates the
 | `ni_workers_list` | `client.list_workers()` | Role labels by presence; base images and `:test` tags hidden by default |
 | `ni_worker_interface` | `get_worker_interface` (+ registration job, 60 s) | Parameters, value formats, and the dataset's channels |
 | `ni_worker_run` | `ds.annotations.compute` | **Destructive hint.** Annotation workers only; parameters normalized like the app (`worker_values.py` ports `src/utils/workerInterface.ts`) |
-| `ni_job_wait` | `client.job(id).wait(timeout)` | At most `NI_MCP_MAX_JOB_WAIT` (240 s); reports `finished: false` instead of failing |
+| `ni_job_wait` | `client.job(id)` + `refresh()` | Async; at most `NI_MCP_MAX_JOB_WAIT` (240 s); reports `finished: false` instead of failing |
 | `ni_help_topic` | `GET claude_agent/help` | See 5.2 |
 
 ---
@@ -746,8 +746,8 @@ the local stack. Add an item whenever a review finds something this list missed.
 
 - [x] Row-returning tools cap (200 annotations, 100 datasets) and say what is left.
       *"test_list_tools_enforce_cap"*
-- [x] `max_size` is clamped and passed to the server's downsampling, and crops are
-      clipped. *"test_composite_downsampled"*
+- [x] Images are downsampled to `max_size` (clamped), and crops are clipped.
+      *"test_composite_downsampled"*, *"test_live_image_tools"* (decodes the JPEG)
 - [x] Text results are compact JSON with no structured duplicate.
       *"test_result_size_matches_sdk_wire_format"*,
       *"test_every_tool_is_registered_with_its_annotations"*
@@ -761,9 +761,12 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_transient_check_failures_are_retried"*
 - [x] The server holds no per-session state between requests.
       *"test_stateless_requests_any_instance"*
-- [x] `ni_job_wait` never waits longer than the configured cap, and waits on the event
-      loop rather than holding one of the worker threads all sync tools share.
+- [x] `ni_job_wait` never waits longer than the configured cap. Job waits (it, and a
+      worker's first interface registration) sleep on the event loop rather than holding
+      one of the worker threads all sync tools share.
       *"test_job_wait_clamps_and_reports_still_running"*
+- [x] A cancelled request does not fail other requests waiting on the same key's
+      exchange. *"test_waiters_survive_a_cancelled_exchange"*
 
 ### Right answers
 

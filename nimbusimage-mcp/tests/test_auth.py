@@ -160,6 +160,32 @@ def test_concurrent_different_keys_do_not_wait_on_each_other(girder):
     assert girder.exchanges == 2 and not v._inflight
 
 
+def test_waiters_survive_a_cancelled_exchange(girder):
+    """The request doing a key's exchange can be cancelled (client
+    disconnect); requests waiting on that exchange must not fail."""
+    v = verifier(girder)
+    gate = asyncio.Event()
+    original = v._exchange
+
+    async def slow_exchange(key):
+        await gate.wait()
+        return await original(key)
+
+    v._exchange = slow_exchange
+
+    async def scenario():
+        first = asyncio.create_task(v.verify_token(KEY))
+        await asyncio.sleep(0)
+        second = asyncio.create_task(v.verify_token(KEY))
+        await asyncio.sleep(0)
+        first.cancel()
+        await asyncio.sleep(0)
+        gate.set()
+        return await second
+
+    assert run(scenario()).subject == "user0001"
+
+
 def test_girder_outage_is_an_error_not_a_bad_key(girder):
     girder.fail_with = 502
     with pytest.raises(httpx.HTTPStatusError):

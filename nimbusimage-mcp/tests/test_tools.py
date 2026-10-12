@@ -36,6 +36,11 @@ def annotation(i: int, tags=("cell",), shape="polygon") -> ni.Annotation:
     )
 
 
+def run_tool(tool, **kwargs):
+    """Call an async tool from a sync test."""
+    return asyncio.run(tool(**kwargs))
+
+
 def loads(text: str):
     assert isinstance(text, str)
     return json.loads(text)
@@ -218,6 +223,15 @@ def test_tag_by_query_updates_only_changed(nc):
     accessor.update_many.assert_called_once_with(
         [("a1", {"tags": ["cell", "big"]})]
     )
+    accessor.update_many.reset_mock()
+    accessor.list.return_value = [annotation(3, tags=["big", "cell"])]
+    accessor.count.return_value = 1
+    result = loads(annotations.ni_annotations_tag(
+        dataset_id="d", tags=["cell", "big"], mode="replace",
+        match_tags=["cell"],
+    ))
+    assert result["changed"] == 0
+    accessor.update_many.assert_not_called()
 
 
 def test_tag_by_ids(nc):
@@ -363,6 +377,7 @@ def test_property_compute_needs_a_configured_property(nc):
 # --- workers ------------------------------------------------------------
 
 
+SEG = "annotations/seg:latest"
 WORKERS = {
     "annotations/seg:latest": {"isAnnotationWorker": "",
                                "interfaceName": "Seg"},
@@ -399,8 +414,8 @@ def test_worker_interface_shape(nc):
     nc.get_worker_interface.return_value = INTERFACE
     nc.dataset.return_value.channels = ["DAPI", "GFP"]
     nc.dataset.return_value.num_channels = 2
-    result = loads(workers.ni_worker_interface(
-        image="annotations/seg:latest", dataset_id="d"
+    result = loads(run_tool(
+        workers.ni_worker_interface, image=SEG, dataset_id="d"
     ))
     assert result["notes"] == ["Segments cells."]
     assert [p["name"] for p in result["parameters"]] == ["Slot 1", "Model"]
@@ -417,8 +432,8 @@ def test_worker_run_fills_defaults_and_rejects_property_workers(nc):
     ds.annotations.compute.return_value = SimpleNamespace(
         id="j1", status_name="queued", title="Seg"
     )
-    result = loads(workers.ni_worker_run(
-        dataset_id="d", image="annotations/seg:latest",
+    result = loads(run_tool(
+        workers.ni_worker_run, dataset_id="d", image=SEG,
         parameters={"Slot 1": ["gfp"]}, tags=["cell"], z=3,
     ))
     assert result["job_id"] == "j1"
@@ -429,10 +444,11 @@ def test_worker_run_fills_defaults_and_rejects_property_workers(nc):
     assert kwargs["location"] == ni.Location(xy=0, z=3, time=0)
     assert kwargs["tags"] == ["cell"]
     with pytest.raises(ToolError, match="not an annotation worker"):
-        workers.ni_worker_run(dataset_id="d", image="properties/area:latest")
+        run_tool(workers.ni_worker_run, dataset_id="d",
+                 image="properties/area:latest")
     with pytest.raises(ToolError, match="Unknown worker parameters"):
-        workers.ni_worker_run(dataset_id="d", image="annotations/seg:latest",
-                              parameters={"Nope": 1})
+        run_tool(workers.ni_worker_run, dataset_id="d", image=SEG,
+                 parameters={"Nope": 1})
 
 
 def test_worker_tools_count_unnamed_channels(nc):
@@ -446,12 +462,12 @@ def test_worker_tools_count_unnamed_channels(nc):
     ds.num_xy, ds.num_z, ds.num_time = 1, 1, 1
     ds.annotations.compute.return_value = SimpleNamespace(
         id="j1", status_name="queued", title="Seg")
-    workers.ni_worker_run(dataset_id="d", image="annotations/seg:latest",
-                          parameters={"Slot 1": [0]})
+    run_tool(workers.ni_worker_run, dataset_id="d", image=SEG,
+             parameters={"Slot 1": [0]})
     assert ds.annotations.compute.call_args.kwargs["worker_interface"] == {
         "Slot 1": {"0": True}}
-    info = loads(workers.ni_worker_interface(image="annotations/seg:latest",
-                                             dataset_id="d"))
+    info = loads(run_tool(workers.ni_worker_interface, image=SEG,
+                          dataset_id="d"))
     assert info["channels"] == [{"index": 0, "name": None}]
 
 
@@ -462,8 +478,7 @@ def test_worker_run_checks_the_location_before_submitting(nc):
     ds.channels, ds.num_channels = ["DAPI"], 1
     ds.num_xy, ds.num_z, ds.num_time = 1, 3, 1
     with pytest.raises(ToolError, match="z=3 is out of range"):
-        workers.ni_worker_run(dataset_id="d", image="annotations/seg:latest",
-                              z=3)
+        run_tool(workers.ni_worker_run, dataset_id="d", image=SEG, z=3)
     ds.annotations.compute.assert_not_called()
 
 

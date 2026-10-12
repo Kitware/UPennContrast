@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import time
 from typing import Literal
 
@@ -82,25 +83,48 @@ def ni_workers_list(
     return {"workers": rows}
 
 
-def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
+def in_thread(fn, *args, **kwargs):
+    """Run blocking nimbusimage work off the event loop."""
+    return anyio.to_thread.run_sync(functools.partial(fn, *args, **kwargs))
+
+
+async def poll_job(job: ni.Job, limit: float) -> None:
+    """Refresh the job until it finishes or `limit` seconds pass. Sleeps
+    on the event loop, so a long wait holds none of the worker threads
+    that every sync tool shares; only the polls (blocking HTTP) use one.
+    """
+    deadline = time.monotonic() + limit
+    await in_thread(job.refresh)  # also fetches the log
+    while not job.finished:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return
+        await anyio.sleep(min(POLL_SECONDS, remaining))
+        await in_thread(job.refresh)
+
+
+async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
     """The worker's parameter interface, asking the worker to register it
     (a short job) the first time."""
-    interface = nc.get_worker_interface(image, request_if_missing=False)
+    interface = await in_thread(
+        nc.get_worker_interface, image, request_if_missing=False
+    )
     if interface is None:
-        response = nc.girder.post(
-            "worker_interface/request", parameters={"image": image}
+        response = await in_thread(
+            nc.girder.post, "worker_interface/request",
+            parameters={"image": image},
         )
         if isinstance(response, list) and response:
-            try:
-                ni.Job(nc.girder, response[0]).wait(
-                    timeout=INTERFACE_REQUEST_TIMEOUT, verbose=False
-                )
-            except TimeoutError:
+            job = ni.Job(nc.girder, response[0])
+            await poll_job(job, INTERFACE_REQUEST_TIMEOUT)
+            if not job.finished:
                 raise ToolError(
                     f"{image} is still registering its parameters; try "
                     "again in a minute."
-                ) from None
-        interface = nc.get_worker_interface(image, request_if_missing=False)
+                )
+        interface = await in_thread(
+            nc.get_worker_interface, image, request_if_missing=False
+        )
     if not interface:
         raise ToolError(
             f"{image} has no parameter interface; check the image name "
@@ -110,7 +134,9 @@ def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
 
 
 @instrumented
-def ni_worker_interface(image: str, dataset_id: str | None = None) -> dict:
+async def ni_worker_interface(
+    image: str, dataset_id: str | None = None
+) -> dict:
     """The parameters a worker takes (from ni_workers_list): each one's
     name, type, default, min/max, and choices, plus value_formats saying
     the exact value shape each type expects. Pass dataset_id to also get
@@ -118,7 +144,7 @@ def ni_worker_interface(image: str, dataset_id: str | None = None) -> dict:
     parameters take 0-based channel indices. Call before ni_worker_run.
     """
     nc = client()
-    interface = fetch_interface(nc, image)
+    interface = await fetch_interface(nc, image)
     parameters, notes = [], []
     for name, element in sorted(
         interface.items(), key=lambda item: item[1].get("displayOrder", 0)
@@ -145,12 +171,14 @@ def ni_worker_interface(image: str, dataset_id: str | None = None) -> dict:
         },
     }
     if dataset_id:
-        result["channels"] = channel_list(nc.dataset(dataset_id))
+        result["channels"] = await in_thread(
+            channel_list, nc.dataset(dataset_id)
+        )
     return result
 
 
 @instrumented
-def ni_worker_run(
+async def ni_worker_run(
     dataset_id: str,
     image: str,
     parameters: dict | None = None,
@@ -170,7 +198,7 @@ def ni_worker_run(
     there. To compute a measurement, use ni_property_compute instead.
     """
     nc = client()
-    labels = nc.list_workers().get(image)
+    labels = (await in_thread(nc.list_workers)).get(image)
     if labels is None:
         raise ToolError(
             f"No worker image {image!r}; use ni_workers_list for names."
@@ -182,7 +210,7 @@ def ni_worker_run(
             "ni_property_compute."
         )
     ds = nc.dataset(dataset_id)
-    channels = channel_names(ds)
+    channels = await in_thread(channel_names, ds)
     if not 0 <= channel < len(channels):
         raise ValueError(
             f"channel={channel} is out of range (0..{len(channels) - 1})"
@@ -190,9 +218,10 @@ def ni_worker_run(
     # A location outside the dataset would start a job that then fails.
     check_location(ds, xy, z, time)
     values = worker_values.resolve(
-        fetch_interface(nc, image), parameters or {}, channels
+        await fetch_interface(nc, image), parameters or {}, channels
     )
-    job = ds.annotations.compute(
+    job = await in_thread(
+        ds.annotations.compute,
         image=image,
         channel=channel,
         tags=tags or [],
@@ -212,20 +241,10 @@ async def ni_job_wait(job_id: str, timeout_seconds: float = 60) -> dict:
     if the job is still going, the result says finished=false and you can
     call this again with the same job_id. Do not poll with other tools.
     """
-    # Async so a long wait sleeps on the event loop instead of holding
-    # one of the worker threads every sync tool shares; only the polls
-    # (blocking HTTP) run in a thread.
     limit = max(1.0, min(timeout_seconds, settings().max_job_wait))
-    deadline = time.monotonic() + limit
     nc = client()
-    job = await anyio.to_thread.run_sync(nc.job, job_id)
-    await anyio.to_thread.run_sync(job.refresh)  # also fetches the log
-    while not job.finished:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            break
-        await anyio.sleep(min(POLL_SECONDS, remaining))
-        await anyio.to_thread.run_sync(job.refresh)
+    job = await in_thread(nc.job, job_id)
+    await poll_job(job, limit)
     return {
         "job_id": job.id,
         "title": job.title,

@@ -103,7 +103,9 @@ class GirderApiKeyVerifier:
         if session is not None:
             if await self._still_valid(session):
                 return self._access_token(key_hash, session)
-            self._cache.pop(key_hash, None)
+            # Only if no other request replaced it during the check.
+            if self._cache.get(key_hash) is session:
+                del self._cache[key_hash]
         session = await self._exchange_once(key_hash, token)
         if session is None:
             return None
@@ -112,7 +114,13 @@ class GirderApiKeyVerifier:
     async def _exchange_once(self, key_hash: str, key: str):
         pending = self._inflight.get(key_hash)
         if pending is not None:
-            return await asyncio.shield(pending)
+            try:
+                return await asyncio.shield(pending)
+            except asyncio.CancelledError:
+                if not pending.cancelled():
+                    raise  # this request itself was cancelled
+                # The request doing the exchange went away; do our own.
+                return await self._exchange_once(key_hash, key)
         future = asyncio.get_running_loop().create_future()
         self._inflight[key_hash] = future
         try:
@@ -121,6 +129,10 @@ class GirderApiKeyVerifier:
                 self._remember(key_hash, session)
             future.set_result(session)
             return session
+        except asyncio.CancelledError:
+            # This request went away (client disconnect); waiters retry.
+            future.cancel()
+            raise
         except BaseException as e:
             future.set_exception(e)
             future.exception()  # retrieved: no "never retrieved" warning
