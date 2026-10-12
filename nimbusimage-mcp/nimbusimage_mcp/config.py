@@ -8,6 +8,7 @@ nimbusimage package would otherwise fall back to it silently).
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass
 
@@ -40,7 +41,7 @@ class Settings:
             )
         port = int(environ.get("NI_MCP_PORT", "8000"))
         max_job_wait = float(environ.get("NI_MCP_MAX_JOB_WAIT", "240"))
-        if max_job_wait < 1:
+        if not math.isfinite(max_job_wait) or max_job_wait < 1:
             raise ValueError("NI_MCP_MAX_JOB_WAIT must be at least 1 second.")
         host = environ.get("NI_MCP_HOST", "127.0.0.1")
         return cls(

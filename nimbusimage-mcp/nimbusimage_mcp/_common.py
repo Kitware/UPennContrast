@@ -14,6 +14,8 @@ import time
 
 import girder_client
 import requests
+from urllib3.exceptions import ReadTimeoutError
+from urllib3.util.retry import Retry
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.mcpserver import Image
 from mcp.server.mcpserver.exceptions import ToolError
@@ -65,6 +67,18 @@ def client() -> ni.NimbusClient:
     return nc
 
 
+class _NoReadTimeoutRetry(Retry):
+    """A Retry that gives up at once on a read timeout (and only then)."""
+
+    def increment(self, method=None, url=None, response=None, error=None,
+                  _pool=None, _stacktrace=None):
+        if isinstance(error, ReadTimeoutError):
+            raise error
+        return super().increment(
+            method, url, response, error, _pool, _stacktrace
+        )
+
+
 # (connect, read) seconds for every request a tool makes. girder_client
 # sets none, so a hung Girder would hold a worker thread forever: a
 # deadline-bounded wait (ni_job_wait) returns at its cap, but its
@@ -83,12 +97,15 @@ def _bound_requests(session) -> None:
     retry adapter retries GET/PUT/DELETE on read errors up to 5 times,
     which would turn one timeout into six requests (each re-running a
     slow server aggregation) and a stuck thread into half an hour.
-    Connect and 502/503/504 retries stay.
+    Every other retry stays: connect errors, 502/503/504, and a
+    connection dropped before the response (a recycled keep-alive).
     """
     for adapter in session.adapters.values():
         retries = getattr(adapter, "max_retries", None)
-        if retries is not None:
-            adapter.max_retries = retries.new(read=False)
+        if isinstance(retries, Retry):
+            # Same settings, one changed rule; new() keeps the class.
+            adapter.max_retries = retries.new()
+            adapter.max_retries.__class__ = _NoReadTimeoutRetry
     request = session.request
 
     def request_with_timeout(method, url, **kwargs):
@@ -192,7 +209,12 @@ def _recorded(name: str, kwargs: dict):
     except girder_client.HttpError as e:
         kind = error = f"HTTP {e.status}"
         raise tool_error(e) from None
-    except requests.ConnectionError:
+    except requests.ConnectionError as e:
+        # requests reports a read timeout while streaming a body as a
+        # ConnectionError wrapping urllib3's ReadTimeoutError.
+        if e.args and isinstance(e.args[0], ReadTimeoutError):
+            kind = error = "timeout"
+            raise ToolError(TOO_SLOW) from None
         # Includes ConnectTimeout (also a requests.Timeout).
         kind = error = "connection"
         raise ToolError("Could not reach the NimbusImage server.") from None
@@ -200,10 +222,7 @@ def _recorded(name: str, kwargs: dict):
         # A read timeout (HTTP_TIMEOUT). The exception text names the
         # internal Girder host, so it is not passed on.
         kind = error = "timeout"
-        raise ToolError(
-            "NimbusImage took too long to answer; narrow the request or "
-            "try again."
-        ) from None
+        raise ToolError(TOO_SLOW) from None
     except (ValueError, PermissionError) as e:
         # nimbusimage reports bad input as ValueError ("No large image
         # found in dataset ...") and a key scope problem as
@@ -241,6 +260,9 @@ def _recorded(name: str, kwargs: dict):
 
 
 _log_lock = threading.Lock()
+TOO_SLOW = (
+    "NimbusImage took too long to answer; narrow the request or try again."
+)
 
 
 def instrumented(fn):

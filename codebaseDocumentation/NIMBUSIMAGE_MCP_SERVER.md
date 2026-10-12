@@ -778,9 +778,11 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_worker_run_reads_the_dataset_off_the_event_loop"*
 - [x] Every request a tool makes has a timeout (read 330 s, above the server's 300 s
       aggregation cap) and is not retried after a read timeout, so one slow request is
-      never re-sent and a thread abandoned at a deadline ends; a read timeout is a
-      clear tool error that does not name the internal host.
-      *"test_tool_requests_time_out_once_without_retrying"*
+      never re-sent and a thread abandoned at a deadline ends. A read timeout, before or
+      during the body, is a clear tool error that does not name the internal host.
+      Other retries stay, including a connection dropped before the response.
+      *"test_tool_requests_time_out_once_without_retrying"*,
+      *"test_a_body_that_stalls_is_a_timeout"*, *"test_dropped_connections_are_still_retried"*
 - [x] A wait's result is one complete job snapshot, never a mix of states.
       *"test_job_wait_never_reports_a_torn_state"*
 - [x] Failing to write the optional call log never fails a tool call.

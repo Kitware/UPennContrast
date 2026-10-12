@@ -95,10 +95,101 @@ def test_unwritable_call_log_does_not_fail_the_call(nc, tmp_path, caplog):
     assert "Could not write the call log" in caplog.text
 
 
+def test_a_body_that_stalls_is_a_timeout(monkeypatch):
+    """Headers arrive, then the body stalls: requests reports that read
+    timeout as a ConnectionError; it is still a timeout to the user."""
+    import socket
+    import threading
+    from types import SimpleNamespace as Token
+
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(16)
+    held = []
+
+    def serve():
+        while True:
+            try:
+                conn, _ = listener.accept()
+            except OSError:
+                return
+            held.append(conn)
+            conn.recv(65536)
+            conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n"
+                         b"Content-Type: application/json\r\n\r\n{")
+
+    threading.Thread(target=serve, daemon=True).start()
+    port = listener.getsockname()[1]
+    _common.configure(make_settings(
+        api_url=f"http://127.0.0.1:{port}/api/v1"))
+    monkeypatch.setattr(_common, "get_access_token", lambda: Token(
+        claims={"girder_token": "t"}, subject="u"))
+    monkeypatch.setattr(_common, "HTTP_TIMEOUT", (1, 0.3))
+    threading.Timer(5, lambda: [c.close() for c in held]).start()
+    try:
+        with pytest.raises(ToolError, match="took too long"):
+            datasets.ni_dataset_info(dataset_id="d")
+    finally:
+        _close_listener(listener)
+        for conn in held:
+            conn.close()
+
+
+def _close_listener(listener):
+    import socket
+    try:
+        # Wakes a thread blocked in accept() on Linux; macOS raises
+        # ENOTCONN for a listening socket, and close() wakes it there.
+        listener.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+    listener.close()
+
+
+def test_dropped_connections_are_still_retried():
+    """Only read timeouts lose their retries: a keep-alive connection
+    Girder closed before answering is retried as before (NIM-006)."""
+    import socket
+    import threading
+
+    import nimbusimage._girder as girder_module
+
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(16)
+    connections = []
+
+    def serve():
+        while True:
+            try:
+                conn, _ = listener.accept()
+            except OSError:
+                return
+            connections.append(conn)
+            conn.recv(65536)
+            if len(connections) == 1:
+                conn.close()  # dropped before any response
+            else:
+                conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n"
+                             b"Content-Type: application/json\r\n\r\n{}")
+                conn.close()
+
+    threading.Thread(target=serve, daemon=True).start()
+    session = girder_module._build_retry_session()
+    _common._bound_requests(session)
+    try:
+        port = listener.getsockname()[1]
+        response = session.get(f"http://127.0.0.1:{port}/x")
+        assert response.status_code == 200 and len(connections) == 2
+    finally:
+        _close_listener(listener)
+
+
 def test_settings_refuse_a_nonpositive_job_wait():
     from nimbusimage_mcp.config import Settings
-    with pytest.raises(ValueError, match="at least 1 second"):
-        Settings.from_env({"NI_MCP_MAX_JOB_WAIT": "0"})
+    for value in ("0", "nan", "inf"):
+        with pytest.raises(ValueError, match="at least 1 second"):
+            Settings.from_env({"NI_MCP_MAX_JOB_WAIT": value})
 
 
 def test_known_scale_drops_placeholders():
@@ -670,6 +761,14 @@ def test_tool_requests_time_out_once_without_retrying(monkeypatch):
                 return
 
     threading.Thread(target=accept, daemon=True).start()
+
+    # If the timeout wiring regressed, the request would block forever:
+    # answer nothing for 5 s, then drop the connections, so the test
+    # fails instead of hanging.
+    def drop_all():
+        for connection in accepted:
+            connection.close()
+    threading.Timer(5, drop_all).start()
     port = listener.getsockname()[1]
     _common.configure(make_settings(
         api_url=f"http://127.0.0.1:{port}/api/v1"))
@@ -682,7 +781,7 @@ def test_tool_requests_time_out_once_without_retrying(monkeypatch):
         assert "127.0.0.1" not in str(raised.value)
         assert len(accepted) == 1
     finally:
-        listener.close()
+        _close_listener(listener)
         for connection in accepted:
             connection.close()
 

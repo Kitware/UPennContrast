@@ -134,7 +134,8 @@ async def _by_deadline(fn, deadline: float):
     """Blocking `fn()` in a thread, waited for until the (monotonic)
     deadline: a slow backend must not hold a call past its cap. Returns
     (finished, result). An abandoned call finishes in its thread, within
-    the client's HTTP_TIMEOUT plus its connect retries."""
+    the client's HTTP_TIMEOUT per attempt (connect and 5xx retries can
+    add attempts)."""
     with anyio.move_on_after(max(0.0, deadline - time.monotonic())):
         return True, await anyio.to_thread.run_sync(
             fn, abandon_on_cancel=True
