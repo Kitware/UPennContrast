@@ -163,21 +163,21 @@ class Project(Resource):
     def addDataset(self, project, dataset):
         """Add dataset to project, then sync permissions.
 
-        TODO #0001: Currently requires WRITE access on
-        the dataset. Should require ADMIN (owner) so
-        that only the dataset owner can add it to a
-        project, since adding triggers permission
-        propagation (sharing the project grants access
-        to the dataset).
+        The project's ACL and public flag reach the dataset
+        and its views/configurations only as far as the
+        caller could share them directly (helpers.aclLimits):
+        a WRITE collaborator's project does not make them, or
+        anyone else, an owner of the dataset.
         """
+        user = self.getCurrentUser()
         result = self._projectModel.addDataset(
             project, dataset['_id']
         )
         self._projectModel.propagateAccessToDataset(
-            project, dataset
+            project, dataset, user
         )
         self._projectModel.propagatePublicToDataset(
-            project, dataset
+            project, dataset, user
         )
         return result
 
@@ -209,21 +209,20 @@ class Project(Resource):
     def addCollection(self, project, collection):
         """Add collection to project, then sync perms.
 
-        TODO #0001: Currently requires WRITE access on
-        the collection. Should require ADMIN (owner) so
-        that only the collection owner can add it to a
-        project, since adding triggers permission
-        propagation (sharing the project grants access
-        to the collection).
+        Propagation reaches the collection, its views and
+        the datasets using it only as far as the caller could
+        share each directly (helpers.aclLimits); datasets the
+        caller does not own are left alone.
         """
+        user = self.getCurrentUser()
         result = self._projectModel.addCollection(
             project, collection['_id']
         )
         self._projectModel.propagateAccessToCollection(
-            project, collection
+            project, collection, user
         )
         self._projectModel.propagatePublicToCollection(
-            project, collection
+            project, collection, user
         )
         return result
 
@@ -279,7 +278,15 @@ class Project(Resource):
             Set accessType to:
             - 0 (READ) for view-only access
             - 1 (WRITE) for edit access
+            - 2 (ADMIN) to make the user an owner
             - -1 to remove user's access entirely
+
+            Each contained resource changes only as far as
+            the caller could share it directly: datasets the
+            caller owns, and views/configurations the caller
+            can edit, at no more than the caller's own level.
+            Entries above the caller's level are left as they
+            are.
         """)
         .modelParam(
             'id', model=ProjectModel,
@@ -294,7 +301,7 @@ class Project(Resource):
         .param(
             'accessType',
             'Access level: -1 (remove), 0 (READ), '
-            '1 (WRITE).',
+            '1 (WRITE), 2 (ADMIN).',
             dataType='integer', required=True
         )
         .errorResponse()
@@ -302,15 +309,6 @@ class Project(Resource):
     )
     def share(self, project, userMailOrUsername,
               accessType):
-        # TODO #0001: Currently, sharing a project
-        # propagates access to all contained datasets
-        # and collections without checking that the
-        # sharer has ADMIN (owner) privileges on those
-        # resources. We should require ADMIN on each
-        # dataset/collection so that only the owner
-        # can grant others access via project sharing.
-        # For now, the project-level ADMIN check
-        # (above) is the only gate.
         accessType = AccessType().validate(accessType)
 
         targetUser = User().findOne(
@@ -326,7 +324,8 @@ class Project(Resource):
             project, targetUser, accessType, save=True
         )
         self._projectModel.propagateUserAccess(
-            project, targetUser, accessType
+            project, targetUser, accessType,
+            self.getCurrentUser()
         )
 
         return True
@@ -369,9 +368,11 @@ class Project(Resource):
         .notes("""
             Sets public READ access on:
             - The project itself
-            - All datasets (folders) in the project
-            - All collections in the project
-            - All dataset views linking them
+            - The datasets (folders) in the project
+            - The collections in the project
+            - The dataset views linking them
+            Contained resources the caller does not own (ADMIN)
+            are left as they are.
         """)
         .modelParam(
             'id', model=ProjectModel,
@@ -388,16 +389,11 @@ class Project(Resource):
         .errorResponse('Admin access denied.', 403)
     )
     def setPublic(self, project, public):
-        # TODO #0001: Currently, making a project
-        # public propagates to all contained datasets
-        # and collections without checking ADMIN
-        # (owner) privileges on those resources.
-        # Should require ADMIN on each resource.
         self._projectModel.setPublic(
             project, public, save=True
         )
         self._projectModel.propagatePublic(
-            project, public
+            project, public, self.getCurrentUser()
         )
 
         return {

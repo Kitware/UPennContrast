@@ -134,7 +134,8 @@ Returns the current access list for a configuration and its associated datasets.
 
 Grants, modifies, or revokes user access.
 
-**Required permission:** WRITE access to the dataset and configurations
+**Required permission:** ADMIN access to the dataset (as Girder's own
+`PUT folder/{id}/access`), and WRITE on every listed view and its configuration.
 
 **Request body:**
 ```json
@@ -148,12 +149,23 @@ Grants, modifies, or revokes user access.
 **Access type values:**
 - `0` - READ access
 - `1` - WRITE access
-- `null` - Remove access entirely
+- `2` - ADMIN access (co-owner: can share, set public, delete)
+- `-1` - Remove access entirely
 
 **Behavior:**
 - Sets permissions on all specified DatasetViews
 - Also sets permissions on the parent Dataset folder
 - Also sets permissions on associated Configurations
+- All views must belong to one dataset (400 otherwise); an empty list is a 400
+
+**Limits (`server/helpers/aclLimits.py`):** sharing never hands out more than the
+caller holds. A view or configuration the caller can edit but does not own is shared
+at no more than the caller's own level (granting ADMIN gives WRITE on it), and an
+entry above the caller's level -- its owner's -- is left unchanged rather than
+downgraded or removed. Before this, a WRITE collaborator could grant themselves ADMIN
+(`accessType: 2` on their own login). The same rules limit project sharing and
+propagation (`codebaseDocumentation/PROJECTS.md`, "Permission Propagation"). Tests:
+`test/test_share_escalation.py`.
 
 #### `POST /dataset_view/set_public`
 

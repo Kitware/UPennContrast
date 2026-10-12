@@ -499,25 +499,41 @@ and dataset views. This is handled by the model-layer propagation methods in
 
 ### How It Works
 
+Every propagation runs **as the acting user** (the `actor` argument) and changes a
+contained resource only as far as that user could share it directly
+(`server/helpers/aclLimits.py`, the same rules as `POST /dataset_view/share`):
+
+- a dataset (folder) only if the actor has ADMIN on it;
+- a configuration or dataset view only if the actor has WRITE on it, and then at no
+  more than the actor's own level;
+- an existing entry above the actor's level is left unchanged;
+- the public flag only on resources the actor has ADMIN on.
+
+Without this, adding a dataset you could only edit to a project you own copied the
+project's ACL -- where you are ADMIN -- onto the dataset, and `addCollection` reached
+every dataset using the collection, even ones you could not read. Tests:
+`test/test_share_escalation.py`.
+
 **Sharing with a user (`POST /project/:id/share`):**
 1. Caller must have ADMIN access on the project.
 2. Looks up the target user by email or username.
 3. Calls `setUserAccess(project, targetUser, level)` on the project itself.
-4. Calls `propagateUserAccess(project, targetUser, level)` which:
+4. Calls `propagateUserAccess(project, targetUser, level, actor)` which:
    - Bulk-loads all datasets, collections, and dataset views via `_gatherAllResources()`
-   - Calls `setUserAccess()` on each resource with the same access level
-5. Level `-1` revokes access (removes user from ACLs on all resources).
+   - Sets the user's level on each resource the actor may change (capped as above)
+5. Level `-1` revokes access (removes user from ACLs on those resources).
 
 **Making public/private (`POST /project/:id/set_public`):**
 1. Caller must have ADMIN access on the project.
 2. Calls `setPublic(project, public)` on the project itself.
-3. Calls `propagatePublic(project, public)` which:
+3. Calls `propagatePublic(project, public, actor)` which:
    - Bulk-loads all resources via `_gatherAllResources()`
-   - Calls `setPublic()` on each dataset, collection, and dataset view
+   - Sets `public` on each dataset, collection, and dataset view the actor owns
 
 **Adding a resource to an already-shared project:**
-- `addDataset` → calls `propagateAccessToDataset()` which applies the project's full
-  user ACL to the new dataset, its dataset views, and their configurations.
+- `addDataset` → calls `propagateAccessToDataset()` which applies the project's
+  user ACL to the new dataset, its dataset views, and their configurations, as the
+  caller may (above).
 - `addCollection` → calls `propagateAccessToCollection()` similarly.
 
 ### Resource Discovery (`_gatherAllResources`)

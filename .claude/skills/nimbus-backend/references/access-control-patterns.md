@@ -65,23 +65,33 @@ Resources affected by sharing:
 ### Share Endpoint Pattern
 
 ```python
-@access.user
+@access.user(scope=TokenScope.DATA_WRITE)
 @autoDescribeRoute(
     Description("Share dataset views with a user")
     .jsonParam("body", "Share request", paramType="body",
                schema={
                    "datasetViewIds": ["id1", "id2"],
                    "userMailOrUsername": "user@example.com",
-                   "accessType": 0  # 0=READ, 1=WRITE, -1=remove
+                   "accessType": 0  # 0=READ, 1=WRITE, 2=ADMIN, -1=remove
                })
 )
 def share(self, body):
     # 1. Resolve user by email or username
-    # 2. For each DatasetView:
-    #    - Set access on the DatasetView
-    #    - Set access on the parent Dataset folder
-    #    - Set access on associated Configurations
+    # 2. Load views and configurations at WRITE, the dataset at ADMIN
+    # 3. Per document: level = grantableLevel(model, doc, caller, target, req)
+    #    (helpers/aclLimits.py) and skip the document when it returns None
 ```
+
+`AccessType().validate()` accepts 2, so a share endpoint that only checks
+WRITE lets a collaborator grant **themselves** ADMIN (their own login as
+the target). Any code that writes an ACL for someone else -- an endpoint,
+or a propagation like project sharing -- must go through
+`helpers/aclLimits.py`: the dataset needs ADMIN, a view/configuration
+needs WRITE and is capped at the caller's level, and an entry above the
+caller's level is left alone. Copying a whole ACL (a project's onto an
+added dataset) is the same write: the caller's own ADMIN entry rides
+along. Pass the acting user down to the model rather than letting the
+model write unconditionally.
 
 ### Public Access Pattern
 

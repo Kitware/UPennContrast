@@ -14,6 +14,7 @@ from girder.models.user import User
 from upenncontrast_annotation.server.helpers.access_helpers import (
     formatAccessList
 )
+from upenncontrast_annotation.server.helpers.aclLimits import grantableLevel
 from upenncontrast_annotation.server.helpers.params import getBooleanParam
 from upenncontrast_annotation.server.models.datasetView import \
     DatasetView as DatasetViewModel
@@ -248,7 +249,15 @@ class DatasetView(Resource):
             Set accessType to:
             - 0 (READ) for view-only access
             - 1 (WRITE) for edit access
+            - 2 (ADMIN) to make the user an owner
             - -1 to remove user's access entirely
+
+            Requires ADMIN on the dataset (as Girder's own folder access
+            endpoint does) and WRITE on every view and configuration. A
+            view or configuration the caller does not own is shared at no
+            more than the caller's own level, and an entry above that level
+            (its owner's) is left unchanged. All views must belong to the
+            same dataset.
         """)
         .jsonParam(
             "body",
@@ -259,7 +268,7 @@ class DatasetView(Resource):
                 "id": "datasetView_share",
                 "type": "object",
                 "properties": {
-                    "datasetViewIds": {"type": "array"},
+                    "datasetViewIds": {"type": "array", "minItems": 1},
                     "userMailOrUsername": {"type": "string"},
                     "accessType": {"type": "number"},
                 },
@@ -267,12 +276,10 @@ class DatasetView(Resource):
                     "datasetViewIds", "userMailOrUsername", "accessType"],
             }
         )
+        .errorResponse("Admin access to the dataset was denied.", 403)
     )
     def share(self, body):
         user = self.getCurrentUser()
-
-        def loadDocument(model, documentId):
-            return model.load(documentId, AccessType.WRITE, user, exc=True)
 
         targetUser = User().findOne(
             {"$or": [{"login": body["userMailOrUsername"]},
@@ -287,30 +294,35 @@ class DatasetView(Resource):
 
         # Will raise if user has not WRITE permissions on a datasetView
         datasetViews = [
-            loadDocument(DatasetViewModel(), datasetViewId)
+            DatasetViewModel().load(
+                datasetViewId, AccessType.WRITE, user, exc=True)
             for datasetViewId in body["datasetViewIds"]]
+        datasetId = datasetViews[0]["datasetId"]
+        if any(view["datasetId"] != datasetId for view in datasetViews):
+            raise RestException(
+                "All datasetViewIds must belong to the same dataset.")
 
-        # Will raise if user has not WRITE permissions on the dataset
-        dataset = loadDocument(Folder(), datasetViews[0]["datasetId"])
+        # Changing who can see a dataset is an owner operation; without this,
+        # a WRITE collaborator could grant themselves ADMIN.
+        dataset = Folder().load(datasetId, AccessType.ADMIN, user, exc=True)
 
         # Will raise if user has not WRITE permissions on a configuration
-        for datasetView in datasetViews:
-            datasetView['configuration'] = loadDocument(
-                CollectionModel(), datasetView['configurationId'])
+        configurations = {
+            view["configurationId"]: CollectionModel().load(
+                view["configurationId"], AccessType.WRITE, user, exc=True)
+            for view in datasetViews}
 
-        # Iterating twice so we first make sure all elements are accessible
-        # before modifying anything
-        for datasetView in datasetViews:
-            CollectionModel().setUserAccess(
-                datasetView['configuration'], targetUser, accessType,
-                save=True)
-            datasetView.pop('configuration')
-            DatasetViewModel().setUserAccess(
-                datasetView, targetUser, accessType,
-                save=True)
-
-        Folder().setUserAccess(
-            dataset, targetUser, accessType, save=True)
+        # Every document is checked above before any is modified
+        for model, docs in (
+            (CollectionModel(), configurations.values()),
+            (DatasetViewModel(), datasetViews),
+            (Folder(), [dataset]),
+        ):
+            for doc in docs:
+                level = grantableLevel(
+                    model, doc, user, targetUser["_id"], accessType)
+                if level is not None:
+                    model.setUserAccess(doc, targetUser, level, save=True)
 
         return True
 

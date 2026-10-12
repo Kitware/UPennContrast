@@ -7,15 +7,18 @@ flat, non-hierarchical organizational tags.
 """
 
 import datetime
-import fastjsonschema
+from collections import defaultdict
 
+import fastjsonschema
 from bson import ObjectId
+from pymongo import UpdateOne
 from girder.constants import AccessType
 from girder.models.item import Item
 from girder.models.folder import Folder
 from girder.models.user import User
 from girder.exceptions import ValidationException, GirderException
 
+from ..helpers.aclLimits import canPublish, grantableLevel
 from ..helpers.fastjsonschema import customJsonSchemaCompile
 from ..helpers.proxiedModel import ProxiedModel
 from ..models.datasetView import DatasetView as DatasetViewModel
@@ -353,67 +356,89 @@ class Project(ProxiedModel):
         }
 
     def _bulkSetUserAccess(
-        self, doc_ids, model, user_id, level
+        self, docs, model, actor, user_id, level
     ):
-        """Set a single user's access on multiple docs.
+        """Set a single user's access on multiple docs, as
+        `actor` may (see helpers.aclLimits.grantableLevel).
 
-        Uses two bulk MongoDB ops ($pull + $push) instead
-        of N individual setUserAccess calls.
+        Uses one $pull plus one $push per resulting level
+        instead of N individual setUserAccess calls.
 
-        :param doc_ids: List of document ObjectIds.
+        :param docs: List of documents (with their ACLs).
         :param model: The Girder model instance.
-        :param user_id: The user's ObjectId.
+        :param actor: The user making the change.
+        :param user_id: The target user's ObjectId.
         :param level: AccessType level, or -1 to remove.
         """
-        if not doc_ids:
+        ids_by_level = defaultdict(list)
+        for doc in docs:
+            granted = grantableLevel(
+                model, doc, actor, user_id, level
+            )
+            if granted is not None:
+                ids_by_level[granted].append(doc['_id'])
+        if not ids_by_level:
             return
-        query = {'_id': {'$in': list(doc_ids)}}
         model.update(
-            query,
+            {'_id': {'$in': [
+                doc_id for ids in ids_by_level.values()
+                for doc_id in ids
+            ]}},
             {'$pull': {
                 'access.users': {'id': user_id}
             }}
         )
-        if level is not None and level >= 0:
+        for granted, ids in ids_by_level.items():
+            if granted < 0:
+                continue
             model.update(
-                query,
+                {'_id': {'$in': ids}},
                 {'$push': {'access.users': {
                     'id': user_id,
-                    'level': level,
+                    'level': granted,
                     'flags': []
                 }}}
             )
 
-    def _bulkSetPublic(self, doc_ids, model, public):
-        """Set public flag on multiple documents.
+    def _bulkSetPublic(self, docs, model, actor, public):
+        """Set the public flag on the docs `actor` owns.
 
+        Publishing is an owner operation, so documents the
+        actor does not administer are left as they are.
         Uses a single updateMany instead of N individual
         setPublic calls.
 
-        :param doc_ids: List of document ObjectIds.
+        :param docs: List of documents.
         :param model: The Girder model instance.
+        :param actor: The user making the change.
         :param public: Boolean, True to make public.
         """
+        doc_ids = [
+            doc['_id'] for doc in docs
+            if canPublish(model, doc, actor)
+        ]
         if not doc_ids:
             return
         model.update(
-            {'_id': {'$in': list(doc_ids)}},
+            {'_id': {'$in': doc_ids}},
             {'$set': {'public': public}}
         )
 
     def _bulkSetAllUsersAccess(
-        self, doc_ids, model, project
+        self, docs, model, project, actor
     ):
-        """Apply project's full user ACL to multiple docs.
+        """Apply project's full user ACL to multiple docs,
+        as `actor` may (see helpers.aclLimits).
 
-        Bulk-validates that users exist, then uses two
-        bulk MongoDB ops ($pull + $push with $each).
+        Bulk-validates that users exist, then writes every
+        document's capped entries in one bulk_write.
 
-        :param doc_ids: List of document ObjectIds.
+        :param docs: List of documents (with their ACLs).
         :param model: The Girder model instance.
         :param project: The project document.
+        :param actor: The user making the change.
         """
-        if not doc_ids:
+        if not docs:
             return
         project_users = project.get(
             'access', {}
@@ -428,33 +453,38 @@ class Project(ProxiedModel):
                 fields=['_id']
             )
         }
-        entries = [
-            {
-                'id': u['id'],
-                'level': u['level'],
-                'flags': u.get('flags', [])
-            }
-            for u in project_users
-            if u['id'] in valid_ids
+        project_users = [
+            u for u in project_users if u['id'] in valid_ids
         ]
-        if not entries:
-            return
-        query = {'_id': {'$in': list(doc_ids)}}
-        valid_user_ids = [e['id'] for e in entries]
-        model.update(
-            query,
-            {'$pull': {
-                'access.users': {
-                    'id': {'$in': valid_user_ids}
-                }
-            }}
-        )
-        model.update(
-            query,
-            {'$push': {
-                'access.users': {'$each': entries}
-            }}
-        )
+        ops = []
+        for doc in docs:
+            entries = []
+            for u in project_users:
+                granted = grantableLevel(
+                    model, doc, actor, u['id'], u['level']
+                )
+                if granted is not None and granted >= 0:
+                    entries.append({
+                        'id': u['id'],
+                        'level': granted,
+                        'flags': u.get('flags', []),
+                    })
+            if not entries:
+                continue
+            ops.append(UpdateOne(
+                {'_id': doc['_id']},
+                {'$pull': {'access.users': {'id': {
+                    '$in': [e['id'] for e in entries]
+                }}}}
+            ))
+            ops.append(UpdateOne(
+                {'_id': doc['_id']},
+                {'$push': {'access.users': {'$each': entries}}}
+            ))
+        if ops:
+            # Girder models have no bulk write. Ordered, so each
+            # document's $pull lands before its $push.
+            model.collection.bulk_write(ops, ordered=True)
 
     def _applyToAllResourceTypes(
         self, resources, apply_fn
@@ -462,78 +492,69 @@ class Project(ProxiedModel):
         """Apply a function to all resource types.
 
         :param resources: Dict from _gatherAllResources.
-        :param apply_fn: fn(doc_ids, model) to call.
+        :param apply_fn: fn(docs, model) to call.
         """
-        apply_fn(
-            [d['_id'] for d in resources['datasets']],
-            Folder()
-        )
-        apply_fn(
-            [c['_id']
-             for c in resources['collections']],
-            CollectionModel()
-        )
-        apply_fn(
-            [v['_id']
-             for v in resources['datasetViews']],
-            DatasetViewModel()
-        )
+        apply_fn(resources['datasets'], Folder())
+        apply_fn(resources['collections'], CollectionModel())
+        apply_fn(resources['datasetViews'], DatasetViewModel())
 
     def propagateUserAccess(
-        self, project, targetUser, level
+        self, project, targetUser, level, actor
     ):
         """Propagate a single user's access level to all
-        project resources.
+        project resources, limited to what `actor` may grant
+        on each one (helpers.aclLimits.grantableLevel).
 
         :param project: The project document.
         :param targetUser: The Girder user document.
         :param level: AccessType level (0, 1, 2) or -1
                       to remove access.
+        :param actor: The user sharing the project.
         """
         resources = self._gatherAllResources(project)
         uid = targetUser['_id']
         self._applyToAllResourceTypes(
             resources,
-            lambda ids, model: (
+            lambda docs, model: (
                 self._bulkSetUserAccess(
-                    ids, model, uid, level
+                    docs, model, actor, uid, level
                 )
             )
         )
 
-    def propagatePublic(self, project, public):
-        """Set public/private on all project resources.
+    def propagatePublic(self, project, public, actor):
+        """Set public/private on the project resources
+        `actor` owns.
 
         :param project: The project document.
         :param public: Boolean, True to make public.
+        :param actor: The user changing the project.
         """
         resources = self._gatherAllResources(project)
         self._applyToAllResourceTypes(
             resources,
-            lambda ids, model: (
-                self._bulkSetPublic(ids, model, public)
+            lambda docs, model: (
+                self._bulkSetPublic(docs, model, actor, public)
             )
         )
 
     def propagateAllUsersAccess(
-        self, project, documents, model
+        self, project, documents, model, actor
     ):
         """Apply the project's full user access list to
-        one or more documents of a given model.
-
-        Uses bulk DB operations instead of per-user
-        per-document setUserAccess calls.
+        one or more documents of a given model, limited to
+        what `actor` may grant on each.
 
         :param project: The project document.
         :param documents: List of documents to update
                           (or a single document).
         :param model: The Girder model instance.
+        :param actor: The user making the change.
         """
         if not isinstance(documents, list):
             documents = [documents]
-        doc_ids = [d['_id'] for d in documents]
         self._bulkSetAllUsersAccess(
-            doc_ids, model, project
+            documents, model, project, actor
         )
 
     def _gatherDatasetResources(self, dataset):
@@ -584,10 +605,11 @@ class Project(ProxiedModel):
     def _propagateToResource(
         self, project, doc, doc_model,
         related_docs, related_model,
-        dataset_views, propagate_type
+        dataset_views, propagate_type, actor
     ):
         """Propagate permissions to a resource and its
-        related views and resources.
+        related views and resources, limited to what
+        `actor` may change on each (helpers.aclLimits).
 
         :param doc: The primary document.
         :param doc_model: Model for the primary document.
@@ -595,41 +617,28 @@ class Project(ProxiedModel):
         :param related_model: Model for related docs.
         :param dataset_views: Associated DatasetViews.
         :param propagate_type: 'access' or 'public'.
+        :param actor: The user making the change.
         """
+        targets = [
+            ([doc], doc_model),
+            (dataset_views, DatasetViewModel()),
+            (related_docs, related_model),
+        ]
         if propagate_type == 'access':
-            self.propagateAllUsersAccess(
-                project, doc, doc_model
-            )
-            self.propagateAllUsersAccess(
-                project, dataset_views,
-                DatasetViewModel()
-            )
-            self.propagateAllUsersAccess(
-                project, related_docs,
-                related_model
-            )
+            for docs, model in targets:
+                self.propagateAllUsersAccess(
+                    project, docs, model, actor
+                )
         elif propagate_type == 'public':
             if not project.get('public', False):
                 return
-            for ids, model in [
-                ([doc['_id']], doc_model),
-                (
-                    [v['_id']
-                     for v in dataset_views],
-                    DatasetViewModel()
-                ),
-                (
-                    [r['_id']
-                     for r in related_docs],
-                    related_model
-                ),
-            ]:
+            for docs, model in targets:
                 self._bulkSetPublic(
-                    ids, model, True
+                    docs, model, actor, True
                 )
 
     def propagateAccessToDataset(
-        self, project, dataset
+        self, project, dataset, actor
     ):
         """Propagate project ACL to a dataset and its
         associated views/configs."""
@@ -639,11 +648,11 @@ class Project(ProxiedModel):
         self._propagateToResource(
             project, dataset, Folder(),
             configs, CollectionModel(),
-            views, 'access'
+            views, 'access', actor
         )
 
     def propagateAccessToCollection(
-        self, project, collection
+        self, project, collection, actor
     ):
         """Propagate project ACL to a collection and
         its associated views/datasets."""
@@ -655,11 +664,11 @@ class Project(ProxiedModel):
         self._propagateToResource(
             project, collection,
             CollectionModel(), datasets,
-            Folder(), views, 'access'
+            Folder(), views, 'access', actor
         )
 
     def propagatePublicToDataset(
-        self, project, dataset
+        self, project, dataset, actor
     ):
         """Propagate project public flag to a dataset
         and its associated views/configs."""
@@ -669,11 +678,11 @@ class Project(ProxiedModel):
         self._propagateToResource(
             project, dataset, Folder(),
             configs, CollectionModel(),
-            views, 'public'
+            views, 'public', actor
         )
 
     def propagatePublicToCollection(
-        self, project, collection
+        self, project, collection, actor
     ):
         """Propagate project public flag to a collection
         and its associated views/datasets."""
@@ -685,5 +694,5 @@ class Project(ProxiedModel):
         self._propagateToResource(
             project, collection,
             CollectionModel(), datasets,
-            Folder(), views, 'public'
+            Folder(), views, 'public', actor
         )
