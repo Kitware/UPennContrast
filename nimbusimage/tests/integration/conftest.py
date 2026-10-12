@@ -3,6 +3,7 @@
 import contextlib
 import json
 import os
+import uuid
 
 import pytest
 
@@ -53,7 +54,10 @@ def _temporary_dataset(client, parent_folder_name):
         parameters={
             "parentType": "folder",
             "parentId": parent_folder["_id"],
-            "name": "nimbusimage_test_dataset",
+            # Unique per fixture: a fixed name collides ("A folder with
+            # that name already exists here") whenever an earlier test's
+            # folder is still present, e.g. another run on the same server.
+            "name": f"nimbusimage_test_dataset_{uuid.uuid4().hex[:8]}",
             "metadata": json.dumps({"subtype": "contrastDataset"}),
         },
     )

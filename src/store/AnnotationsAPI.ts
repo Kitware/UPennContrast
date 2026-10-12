@@ -233,7 +233,7 @@ export default class AnnotationsAPI {
   }
 
   /**
-   * Total, tag composition, and per-path statistics for the annotations
+   * Total, tag and shape composition, and per-path statistics for the annotations
    * matching `filters` — resolved server-side over the whole population, so
    * it holds at any dataset size and under active gates.
    */
@@ -246,6 +246,7 @@ export default class AnnotationsAPI {
       return {
         total: 0,
         tags: [],
+        shapes: [],
         properties: propertyPaths.map((path) => ({
           path,
           count: 0,

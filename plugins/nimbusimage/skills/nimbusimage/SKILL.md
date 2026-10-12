@@ -289,7 +289,8 @@ print(f"Num channels: {ds.num_channels}")
 print(f"Z-slices: {ds.num_z}")
 print(f"Time points: {ds.num_time}")
 print(f"XY positions: {ds.num_xy}")
-print(f"Pixel size: {ds.pixel_size.to('um').value} um")
+ps = ds.pixel_size                   # None when the size is unknown
+print(f"Pixel size: {ps.to('um').value if ps else 'unknown'} um")
 print(f"Dtype: {ds.dtype}")
 print(f"Magnification: {ds.magnification}")
 

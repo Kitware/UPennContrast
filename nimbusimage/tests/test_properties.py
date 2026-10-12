@@ -196,3 +196,15 @@ class TestPropertyValues:
         call_url = mock_gc.get.call_args[0][0]
         assert "propertyPath=prop_001.Area" in call_url
         assert "buckets=128" in call_url
+
+    def test_histogram_encodes_the_property_path(self, mock_gc):
+        """Paths carry user-chosen names, which may contain "+" or "&"."""
+        from urllib.parse import parse_qs, urlsplit
+
+        mock_gc.get.return_value = []
+        accessor = PropertyAccessor(mock_gc, "ds_001")
+
+        accessor.histogram("prop_001.CD8+ & CD4+ Mean")
+        query = parse_qs(urlsplit(mock_gc.get.call_args[0][0]).query)
+        assert query["propertyPath"] == ["prop_001.CD8+ & CD4+ Mean"]
+        assert query["datasetId"] == ["ds_001"]
