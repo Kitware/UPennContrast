@@ -1304,10 +1304,26 @@ export class Properties extends VuexModule {
   // This action should be called when changing configuration
   async fetchProperties() {
     if (main.configuration) {
-      const properties = await this.propertiesAPI.getProperties(
-        main.configuration.propertyIds,
+      const propertyIds = main.configuration.propertyIds;
+      const fetched = new Map(
+        (await this.propertiesAPI.getProperties(propertyIds)).map(
+          (property) => [property.id, property],
+        ),
       );
-      this.setPropertiesImpl(properties);
+      // The server omits ids it cannot resolve. A deleted property should
+      // drop out, but one created moments ago is in the local configuration
+      // before its propertyIds save lands, so the server omits it too; keep
+      // the loaded copy of any id the server did not return, or the next
+      // setProperties would persist the drop.
+      const loaded = new Map(
+        this.properties.map((property) => [property.id, property]),
+      );
+      this.setPropertiesImpl(
+        propertyIds.flatMap((id) => {
+          const property = fetched.get(id) ?? loaded.get(id);
+          return property ? [property] : [];
+        }),
+      );
       // Properties may load after fetchPropertyValues already ran (the stub
       // fetch can resolve first when cached), so trigger the count fetch here
       // too; the guard in fetchUncomputedCounts dedupes (no-op in wholesale

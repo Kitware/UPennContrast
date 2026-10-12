@@ -81,6 +81,28 @@ from girder.models.item import Item
 .modelParam('collectionId', model=Item, level=AccessType.WRITE, ...)
 ```
 
+## Responses: Filter Access-Controlled Documents
+
+Plugin models are `AccessControlledModel`s, so every raw document carries an
+`access` ACL naming other users and their levels. Returning it leaks who a
+resource is shared with — PR #1402 found this on a dozen endpoints at once
+(properties, previews, interfaces, dataset views, exports, Zenodo archives).
+
+- Return documents through `@filtermodel(model=...)` (keeps a cursor's
+  `Girder-Total-Count` header) or `model.filter(doc, user)`. Girder's
+  `filter()` is a whitelist: a model with no `exposeFields()` returns nothing
+  but `_modelType`/`_accessLevel`, so add `exposeFields(AccessType.READ, ...)`
+  in `initialize()` with the fields clients actually read (grep `src/*API.ts`,
+  `nimbusimage/`, `annotation_client/` first).
+- Sweep the twins: write responses (`POST`/`PUT` returning the saved doc),
+  exports and archives that serialize docs, and list endpoints that
+  `find()` related documents without `findWithPermissions` (a response that
+  *names* a resource the caller cannot read leaks too).
+- A caller-supplied Mongo query reveals hidden fields through *which*
+  documents match (`{"access.users.id": X}` is an ACL-membership oracle),
+  even when the response is filtered. Validate it with
+  `requireQueryOnFields(query, exposedFields)` from `helpers/validation.py`.
+
 ## Database Queries
 
 **Always use `Model().find()`**, never `Model().collection.find()`:

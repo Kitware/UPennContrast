@@ -43,6 +43,11 @@ class WorkerInterfaceModel(ProxiedModel):
 
     def initialize(self):
         self.name = "worker_interface"
+        # filter() exposes only these; the `access` ACL names whoever first
+        # registered the interface.
+        self.exposeFields(
+            AccessType.READ, ("_id", "name", "image", "interface")
+        )
 
     def validate(self, document):
         try:

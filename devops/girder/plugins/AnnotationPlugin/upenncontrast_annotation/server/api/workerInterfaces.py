@@ -50,8 +50,14 @@ class WorkerInterfaces(Resource):
         if "image" not in params:
             raise RestException(code=400, message="Missing 'image' parameter")
         image = params.get("image")
-        return self._interfaceModel.updateWorkerInterface(
-            self.getCurrentUser(), image, self.getBodyJson()
+        user = self.getCurrentUser()
+        # Filtered: this updates an existing document in place, so the raw
+        # result would carry its original registrant's ACL.
+        return self._interfaceModel.filter(
+            self._interfaceModel.updateWorkerInterface(
+                user, image, self.getBodyJson()
+            ),
+            user,
         )
 
     @access.user(scope=TokenScope.DATA_READ)

@@ -22,6 +22,9 @@ from upenncontrast_annotation.server.models.datasetView import (
 from upenncontrast_annotation.server.models.property import (
     AnnotationProperty
 )
+from upenncontrast_annotation.server.models.workerInterfaces import (
+    WorkerInterfaceModel
+)
 from upenncontrast_annotation.server.models.workerPreviews import (
     WorkerPreviewModel
 )
@@ -262,6 +265,36 @@ class TestWorkerPreviewHiddenFields:
         assert "access" not in resp.json
         assert resp.json["image"] == image
         assert resp.json["preview"] == preview
+
+    def testPostResponsesOmitAcl(self, admin, user, server):
+        image = "test/worker:latest"
+        # admin registered the interface first; user's update returns the
+        # same document, whose ACL names admin.
+        WorkerInterfaceModel().create(admin, image, {"a": {"type": "text"}})
+
+        resp = server.request(
+            path="/worker_interface", method="POST", user=user,
+            params={"image": image},
+            body=json.dumps({"b": {"type": "text"}}),
+            type="application/json",
+        )
+
+        assertStatusOk(resp)
+        assert "access" not in resp.json
+        assert resp.json["_id"]
+        assert resp.json["interface"] == {"b": {"type": "text"}}
+
+        resp = server.request(
+            path="/worker_preview", method="POST", user=admin,
+            params={"image": image},
+            body=json.dumps({"image": "data:,x"}),
+            type="application/json",
+        )
+
+        assertStatusOk(resp)
+        assert "access" not in resp.json
+        assert resp.json["_id"]
+        assert resp.json["preview"] == {"image": "data:,x"}
 
     def testMissingPreviewIsEmpty(self, user, server):
         resp = server.request(
@@ -537,7 +570,8 @@ class TestQueryEndpointsRejectHiddenFields:
         ({"$expr": {"$gt": ["$access", None]}},
          "may not use the $expr operator"),
         ({"$where": "true"}, "may not use the $where operator"),
-        ({"$or": {"name": "a"}}, "query.$or must be a list"),
+        ({"$or": {"name": "a"}}, "query.$or must be a non-empty list"),
+        ({"$and": []}, "query.$and must be a non-empty list"),
         ({"$or": ["name"]}, "query must be a JSON object"),
     ])
     def testHiddenFieldQueriesAreRejected(

@@ -665,9 +665,10 @@ def requireQueryOnFields(query, allowedFields, name="query"):
         raise RestException("%s must be a JSON object" % name, code=400)
     for key, value in query.items():
         if key in QUERY_LOGICAL_OPERATORS:
-            if not isinstance(value, list):
+            # Mongo also rejects an empty list, as a 500 at iteration time.
+            if not isinstance(value, list) or not value:
                 raise RestException(
-                    "%s.%s must be a list" % (name, key), code=400
+                    "%s.%s must be a non-empty list" % (name, key), code=400
                 )
             for clause in value:
                 requireQueryOnFields(clause, allowedFields, name)

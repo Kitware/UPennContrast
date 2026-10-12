@@ -46,8 +46,12 @@ class WorkerPreviews(Resource):
         if "image" not in params:
             raise RestException(code=400, message="Missing 'image' parameter")
         image = params.get("image")
-        return self._previewModel.updateWorkerPreview(
-            self.getCurrentUser(), image, self.getBodyJson()
+        user = self.getCurrentUser()
+        return self._previewModel.filter(
+            self._previewModel.updateWorkerPreview(
+                user, image, self.getBodyJson()
+            ),
+            user,
         )
 
     @access.user(scope=TokenScope.DATA_READ)

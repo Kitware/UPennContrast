@@ -442,3 +442,83 @@ class TestDiscardFromUploading:
 
         assert new_meta['status'] == 'published'
         assert new_meta['doi'] == '10.5072/zenodo.12345'
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestAnnotationJsonProperties:
+    """The archive is public: properties come only from configurations the
+    publishing user can read, without their `access` ACL."""
+
+    def testOnlyReadableConfigurationsWithoutAcl(self, admin, user):
+        import orjson
+
+        from girder.constants import AccessType
+        from girder.models.folder import Folder
+
+        from upenncontrast_annotation.server.helpers.zenodo_job import (
+            _build_annotation_json,
+        )
+        from upenncontrast_annotation.server.models.annotation import (
+            Annotation,
+        )
+        from upenncontrast_annotation.server.models.collection import (
+            Collection,
+        )
+        from upenncontrast_annotation.server.models.connections import (
+            AnnotationConnection,
+        )
+        from upenncontrast_annotation.server.models.datasetView import (
+            DatasetView,
+        )
+        from upenncontrast_annotation.server.models.property import (
+            AnnotationProperty,
+        )
+        from upenncontrast_annotation.server.models.propertyValues import (
+            AnnotationPropertyValues,
+        )
+
+        dataset = utilities.createFolder(
+            user, "zenodo_ds", upenn_utilities.datasetMetadata
+        )
+        Folder().setUserAccess(dataset, admin, AccessType.READ, save=True)
+
+        def prop(name, creator):
+            return AnnotationProperty().create(creator, {
+                "name": name, "image": "img", "shape": "point",
+                "tags": {"tags": [], "exclusive": False},
+                "workerInterface": {},
+            })
+
+        def configWithView(creator, folder, propertyIds):
+            config = Collection().createCollection(
+                "cfg", creator, folder, {
+                    "subtype": "contrastConfiguration", "compatibility": {},
+                    "layers": [], "tools": [], "snapshots": [], "scales": {},
+                    "propertyIds": [str(pid) for pid in propertyIds],
+                },
+            )
+            DatasetView().create(creator, {
+                "datasetId": dataset["_id"],
+                "configurationId": config["_id"],
+                "lastLocation": {"xy": 0, "z": 0, "time": 0},
+                "layerContrasts": {},
+            })
+            return config
+
+        mine = prop("Mine", user)
+        configWithView(user, dataset, [mine["_id"]])
+        # admin opened user's dataset with a private configuration.
+        theirs = prop("Theirs", admin)
+        adminFolder = utilities.createPrivateFolder(admin, "admin_cfgs", {})
+        configWithView(admin, adminFolder, [theirs["_id"]])
+
+        exported = orjson.loads(_build_annotation_json(
+            str(dataset["_id"]), Annotation(), AnnotationConnection(),
+            Collection(), DatasetView(), AnnotationProperty(),
+            AnnotationPropertyValues(), user,
+        ))
+
+        properties = exported["annotationProperties"]
+        assert [p["name"] for p in properties] == ["Mine"]
+        assert "access" not in properties[0]

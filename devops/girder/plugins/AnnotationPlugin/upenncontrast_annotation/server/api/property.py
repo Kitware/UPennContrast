@@ -225,14 +225,21 @@ class AnnotationProperty(Resource):
 
         # As in get: a property is readable through any readable
         # configuration that references it (meta.propertyIds holds strings).
+        # Only meta.propertyIds is needed: configurations carry layers,
+        # tools and snapshots, and many can list the same property. The
+        # permission check is part of the query, unaffected by the
+        # projection.
+        requested = set(idStrings)
         readable = {
             pid
             for config in CollectionModel().findWithPermissions(
                 {"meta.propertyIds": {"$in": idStrings}},
                 user=self.getCurrentUser(),
                 level=AccessType.READ,
+                fields=["meta.propertyIds"],
             )
             for pid in config["meta"]["propertyIds"]
+            if pid in requested
         }
         props = {
             str(prop["_id"]): prop
