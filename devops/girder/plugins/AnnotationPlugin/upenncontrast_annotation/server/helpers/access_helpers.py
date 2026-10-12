@@ -1,5 +1,9 @@
 """Shared helpers for access control endpoints."""
 
+from collections import defaultdict
+
+from bson import ObjectId
+
 from girder.constants import AccessType
 from girder.exceptions import AccessException, RestException
 from girder.models.folder import Folder
@@ -48,27 +52,39 @@ def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
     them. References to deleted resources are ignored, as the export skips
     them.
 
+    Views can change after the check, so the export must use what this
+    returns rather than query the views again.
+
     :raises AccessException: If user lacks access to any of them.
+    :returns: Dict mapping each dataset id to the configuration documents
+        (with meta.propertyIds) its views use, as checked.
     """
     meta = project.get('meta', {})
-    datasetIds = [d['datasetId'] for d in meta.get('datasets', [])]
-    collectionIds = {c['collectionId'] for c in meta.get('collections', [])}
+    datasetIds = [
+        ObjectId(d['datasetId']) for d in meta.get('datasets', [])]
+    collectionIds = {
+        ObjectId(c['collectionId']) for c in meta.get('collections', [])}
+    configIdsByDataset = defaultdict(set)
     if datasetIds:
-        collectionIds.update(
-            view['configurationId'] for view in DatasetView().find(
+        for view in DatasetView().find(
                 {'datasetId': {'$in': datasetIds}},
-                fields=['configurationId'])
-        )
-    for model, ids in (
-        (Folder(), datasetIds),
-        (Collection(), list(collectionIds)),
-    ):
-        if not ids:
-            continue
-        for doc in model.find(
-            {'_id': {'$in': ids}}, fields=['access', 'public']
-        ):
-            model.requireAccess(doc, user, level)
+                fields=['datasetId', 'configurationId']):
+            configIdsByDataset[view['datasetId']].add(
+                view['configurationId'])
+            collectionIds.add(view['configurationId'])
+    for doc in Folder().find(
+            {'_id': {'$in': datasetIds}}, fields=['access', 'public']):
+        Folder().requireAccess(doc, user, level)
+    configsById = {}
+    for doc in Collection().find(
+            {'_id': {'$in': list(collectionIds)}},
+            fields=['access', 'public', 'meta.propertyIds']):
+        Collection().requireAccess(doc, user, level)
+        configsById[doc['_id']] = doc
+    return {
+        datasetId: [configsById[c] for c in configIds if c in configsById]
+        for datasetId, configIds in configIdsByDataset.items()
+    }
 
 
 def requireAnnotationsInDatasets(entries):

@@ -37,9 +37,6 @@ from ..models.collection import (
 from ..models.connections import (
     AnnotationConnection as ConnectionModel,
 )
-from ..models.datasetView import (
-    DatasetView as DatasetViewModel,
-)
 from ..models.project import Project as ProjectModel
 from ..models.property import (
     AnnotationProperty as PropertyModel,
@@ -87,7 +84,9 @@ def run(job):
     # project can add resources before this reload: check the snapshot
     # this job actually exports.
     try:
-        requireProjectContentsAccess(project, user)
+        configs_by_dataset = requireProjectContentsAccess(
+            project, user
+        )
     except AccessException as e:
         _fail(
             job, job_model, project_id, project_model,
@@ -108,7 +107,7 @@ def run(job):
         _do_upload(
             job, job_model,
             project, user, project_id,
-            project_model, client,
+            project_model, client, configs_by_dataset,
         )
     except Exception as e:
         log.exception(
@@ -253,8 +252,13 @@ def _batch_load_collections(project, collection_model):
 
 
 def _do_upload(job, job_model, project, user, project_id,
-               project_model, client):
-    """Perform the full Zenodo upload."""
+               project_model, client, configs_by_dataset):
+    """Perform the full Zenodo upload.
+
+    :param configs_by_dataset: The configurations each dataset's views
+        use, as requireProjectContentsAccess checked them. The export
+        uses these instead of re-querying views that may have changed.
+    """
     zenodo_meta = project['meta'].get('zenodo', {})
 
     # Create deposition or new version
@@ -305,7 +309,6 @@ def _do_upload(job, job_model, project, user, project_id,
     # Models for annotation export
     annotation_model = AnnotationModel()
     connection_model = ConnectionModel()
-    dataset_view_model = DatasetViewModel()
     property_model = PropertyModel()
     property_values_model = PropertyValuesModel()
 
@@ -386,10 +389,9 @@ def _do_upload(job, job_model, project, user, project_id,
         )
 
         ann_json = _build_annotation_json(
-            ds_id, annotation_model,
-            connection_model, collection_model,
-            dataset_view_model, property_model,
-            property_values_model,
+            ds_id, annotation_model, connection_model,
+            configs_by_dataset.get(ds_id, []),
+            property_model, property_values_model,
         )
         ann_filename = (
             f"{folder_name}_annotations.json"
@@ -511,8 +513,7 @@ def _do_upload(job, job_model, project, user, project_id,
 
 def _build_annotation_json(
     dataset_id, annotation_model, connection_model,
-    collection_model, dataset_view_model,
-    property_model, property_values_model,
+    configs, property_model, property_values_model,
 ):
     """Build annotation export JSON for a dataset.
 
@@ -529,25 +530,13 @@ def _build_annotation_json(
         connection_model.find({'datasetId': ds_oid})
     )
 
-    # Get properties via DatasetViews -> Configurations
-    # (same pattern as export.py _getProperties)
-    dataset_views = list(
-        dataset_view_model.collection.find(
-            {'datasetId': ds_oid}
-        )
-    )
-    config_ids = list({
-        dv['configurationId'] for dv in dataset_views
-    })
+    # Properties of the configurations this dataset's views use
+    # (same pattern as export.py _getProperties), as checked at the
+    # start of the job: never re-query views here.
     property_ids = set()
-    if config_ids:
-        for config in collection_model.find(
-            {'_id': {'$in': config_ids}}
-        ):
-            if ('meta' in config
-                    and 'propertyIds' in config['meta']):
-                for pid in config['meta']['propertyIds']:
-                    property_ids.add(ObjectId(pid))
+    for config in configs:
+        for pid in config.get('meta', {}).get('propertyIds', []):
+            property_ids.add(ObjectId(pid))
 
     properties = []
     if property_ids:

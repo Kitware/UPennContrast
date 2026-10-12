@@ -306,8 +306,10 @@ const impactSummary = computed((): string => {
   }`;
   return (
     `This project has ${datasets} and ${collections}; only the ones you ` +
-    "own change, with the views and configurations of the datasets you own. " +
-    "The rest keep their own settings."
+    "own change. Sharing also covers the views and configurations of the " +
+    "datasets you own, at no more than your own access; publishing changes " +
+    "only views and configurations you own. Everything else keeps its own " +
+    "settings."
   );
 });
 

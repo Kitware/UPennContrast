@@ -486,6 +486,47 @@ class TestZenodoRequiresOwnership:
         assert meta["status"] == "error"
         assert "Admin access denied" in meta["error"]
 
+    def testExportUsesTheConfigurationsItChecked(self, server, owner, user):
+        """A view pointed at someone else's configuration after the check
+        must not reach the export: it publishes what was checked."""
+        from unittest.mock import MagicMock
+        from bson import ObjectId
+        from upenncontrast_annotation.server.helpers import zenodo_job
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+        from upenncontrast_annotation.server.models.annotation import (
+            Annotation,
+        )
+        from upenncontrast_annotation.server.models.connections import (
+            AnnotationConnection,
+        )
+
+        dataset, ownConfig, _ = createDataset(user)
+        ownProperty, theirProperty = ObjectId(), ObjectId()
+        ownConfig["meta"]["propertyIds"] = [str(ownProperty)]
+        Collection().save(ownConfig)
+        theirConfig = createConfiguration(owner, ownFolder(owner))
+        theirConfig["meta"]["propertyIds"] = [str(theirProperty)]
+        Collection().save(theirConfig)
+        grant(theirConfig, Collection(), user, WRITE)
+        project = TestProjectShareLimits().createProject(server, user)
+        TestProjectShareLimits().addDataset(server, user, project, dataset)
+
+        checked = requireProjectContentsAccess(
+            Project().load(project["_id"], force=True), user)
+        createView(user, dataset, theirConfig)  # after the check
+        propertyModel = MagicMock()
+        propertyModel.find.return_value = []
+        valuesModel = MagicMock()
+        valuesModel.find.return_value = []
+        zenodo_job._build_annotation_json(
+            dataset["_id"], Annotation(), AnnotationConnection(),
+            checked.get(dataset["_id"], []), propertyModel, valuesModel)
+
+        query = propertyModel.find.call_args.args[0]
+        assert set(query["_id"]["$in"]) == {ownProperty}
+
     def testOwnerPassesTheOwnershipCheck(self, server, owner):
         dataset, _, _ = createDataset(owner)
         project = TestProjectShareLimits().createProject(server, owner)

@@ -73,5 +73,9 @@ describe("ShareProject", () => {
     expect(vm.impactSummary).toContain("2 datasets and 1 collection");
     expect(vm.impactSummary).toContain("only the ones you own");
     expect(vm.impactSummary).not.toContain("all associated");
+    // Publishing skips configurations of owned datasets the caller only edits
+    expect(vm.impactSummary).toContain(
+      "publishing changes only views and configurations you own",
+    );
   });
 });
