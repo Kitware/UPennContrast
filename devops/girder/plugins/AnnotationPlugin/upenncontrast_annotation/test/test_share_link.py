@@ -131,10 +131,13 @@ class TestShareLink:
         assertStatus(request(
             server, "GET", "/folder/%s/download" % dataset["_id"], token=token
         ), 403)
-        assertStatus(request(
+        refused = request(
             server, "GET", "/export/json", token=token,
             params={"datasetId": str(dataset["_id"])},
-        ), 403)
+        )
+        assertStatus(refused, 403)
+        # Refused by the share-link guard, not by a blanket admin check.
+        assert "Share links show a view" in refused.json["message"]
         # Every export format, not only JSON.
         for route in ("/export/csv", "/export/geojson"):
             assertStatus(request(
@@ -176,6 +179,13 @@ class TestShareLink:
             server, "GET", "/export/json", user=user,
             params={"datasetId": str(dataset["_id"])},
         ))
+        # Every guarded export format, not only JSON.
+        for route in ("/export/csv", "/export/geojson"):
+            assertStatusOk(server.request(
+                path=route, method="POST", user=user, isJson=False,
+                type="application/json",
+                body=json.dumps({"datasetId": str(dataset["_id"])}),
+            ))
 
     def testCreateNeedsAdminAndValidInput(self, admin, user, server):
         dataset, config, view = privateDatasetWithView(admin)
