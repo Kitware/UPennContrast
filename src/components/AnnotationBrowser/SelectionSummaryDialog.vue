@@ -3,8 +3,8 @@
     <v-card>
       <v-card-title>Selection summary</v-card-title>
       <v-card-subtitle>
-        Composition by tag and statistics of property values, computed on the
-        server over every matching object
+        Composition by tag and shape and statistics of property values, computed
+        on the server over every matching object
       </v-card-subtitle>
 
       <v-card-text>

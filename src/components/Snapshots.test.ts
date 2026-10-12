@@ -554,6 +554,27 @@ describe("Snapshots.vue", () => {
       };
     });
 
+    it("configurationPixelSize defaults to 1px for a stored null or 1 m placeholder", () => {
+      for (const pixelSize of [
+        { value: null, unit: "mm" },
+        { value: 1, unit: "m" },
+      ]) {
+        (store as any).configuration = {
+          scales: { pixelSize },
+          snapshots: [],
+          layers: [],
+        };
+        const ps = (mountComponent().vm as any).configurationPixelSize;
+        expect(ps).toEqual({ length: 1.0, unit: TScalebarUnit.PX });
+      }
+      (store as any).configuration = {
+        name: "Test Config",
+        snapshots: [],
+        layers: [],
+        scales: { pixelSize: { value: 0.5, unit: "µm" } },
+      };
+    });
+
     it("configurationPixelSize defaults to 1px when scale value is 0", () => {
       (store as any).configuration = {
         scales: { pixelSize: { value: 0, unit: "µm" } },

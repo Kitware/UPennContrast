@@ -121,6 +121,7 @@ import store from "@/store";
 import { ISpatialNeighborhood } from "@/store/model";
 import { jobStates } from "@/store/jobConstants";
 import { convertLength } from "@/utils/conversion";
+import { isKnownPixelSize } from "@/utils/scales";
 import { downloadToClient } from "@/utils/download";
 import { logError } from "@/utils/log";
 import { extractErrorMessage } from "@/utils/errors";
@@ -158,7 +159,7 @@ const polling = useJobPolling(
  * the dataset has no physical scale. */
 const pixelsPerMicron = computed(() => {
   const pixelSize = store.scales?.pixelSize;
-  if (!pixelSize || !pixelSize.value) {
+  if (!isKnownPixelSize(pixelSize)) {
     return null;
   }
   const micronsPerPixel = convertLength(pixelSize.value, pixelSize.unit, "µm");

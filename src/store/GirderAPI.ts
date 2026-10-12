@@ -52,6 +52,7 @@ import { stringify } from "qs";
 import { logError, logWarning } from "@/utils/log";
 import { markRaw } from "vue";
 import { inferZStepFromDimensionLabelsUm } from "@/utils/dimensionLabels";
+import { pixelSizeFromTileInfo } from "@/utils/scales";
 import { IRawImageData, parseRawTiff } from "@/utils/tiff";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
@@ -1290,12 +1291,7 @@ export function getDatasetCompatibility(
 export function getDatasetScales(dataset: IDataset): IScales {
   const scales = exampleConfigurationBase().scales;
   const tileInfo = dataset.anyImage()?.tileinfo;
-  if (tileInfo) {
-    scales.pixelSize = {
-      value: (tileInfo.mm_x + tileInfo.mm_y) / 2,
-      unit: "mm",
-    };
-  }
+  scales.pixelSize = pixelSizeFromTileInfo(tileInfo?.mm_x, tileInfo?.mm_y);
   const zStepUm = inferZStepFromDimensionLabelsUm(dataset.dimensionLabels);
   if (zStepUm !== null && zStepUm > 0) {
     scales.zStep = {

@@ -57,7 +57,8 @@ All models have `to_dict()` / `from_dict()` for serialization.
 | `list` | `(shape?, tags?, limit=0, offset=0, after_id?, sort?, sortdir=1)` | `list[Annotation]` |
 | `iter_all` | `(shape?, tags?, page_size=1000)` | `Iterator[Annotation]` |
 | `get` | `(annotation_id)` | `Annotation` |
-| `count` | `(shape?, tags?)` | `int` |
+| `count` | `(shape?, tags?)` | `int` (tags: must have all) |
+| `summary` | `(shape?, tags?, exclusive=False, property_paths?, filters?)` | `AnnotationSummary`: `total`, `tags` and `shapes` counts, per-path `properties` stats; one server-side aggregation (tags: any of, or exactly with `exclusive`) |
 | `create` | `(annotation)` | `Annotation` |
 | `create_many` | `(annotations, connect_to?)` | `list[Annotation]` |
 | `update` | `(annotation_id, updates)` | `Annotation` |
@@ -70,10 +71,10 @@ All models have `to_dict()` / `from_dict()` for serialization.
 
 | Method | Signature | Returns |
 |--------|-----------|---------|
-| `get` | `(xy=0, z=0, time=0, channel=0, crop?)` | `np.ndarray` (2D) |
+| `get` | `(xy=0, z=0, time=0, channel=0, crop?, max_size?)` | `np.ndarray` (2D); `max_size` downsamples on the server |
 | `get_all_channels` | `(xy=0, z=0, time=0)` | `list[np.ndarray]` |
 | `get_stack` | `(channel=0, axis="z", ...)` | `np.ndarray` (3D) |
-| `get_composite` | `(xy=0, z=0, time=0, mode="lighten", dtype?)` | `np.ndarray` (H,W,3) |
+| `get_composite` | `(xy=0, z=0, time=0, mode="lighten", dtype?, max_size?, crop?)` | `np.ndarray` (H,W,3), drawn as the app draws it |
 | `iter_frames` | `()` | `Iterator[(FrameInfo, np.ndarray)]` |
 | `new_writer` | `(copy_metadata=True)` | `ImageWriter` |
 

@@ -16,7 +16,7 @@
               type="button"
               class="recent-item"
               v-bind="activatorProps"
-              :title="formatDateNumber(d.datasetView.lastViewed)"
+              :title="formatDateNumber(d.datasetView.lastViewed) || undefined"
               @click="handleDatasetClick(d.datasetView.id)"
             >
               <span class="recent-item__name">
@@ -80,7 +80,7 @@ defineProps<{
   datasetViewItems: IRecentDatasetViewItem[];
   getUserDisplayName: (creatorId: string) => string;
   getUserShortName: (creatorId: string) => string;
-  formatDateNumber: (date: number) => string;
+  formatDateNumber: (date?: number) => string;
 }>();
 
 const emit = defineEmits<{

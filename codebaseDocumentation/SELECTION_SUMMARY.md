@@ -56,6 +56,10 @@ Semantics:
   the same way and share the tag facet's scan; per-shape `GET /upenn_annotation/count` calls
   would each re-read the whole dataset, since there is no `datasetId`+`shape` index (measured
   0.25 to 0.9 s each on a 465K-annotation dataset, against 0.6 s for the whole summary).
+  `total` is the sum of the shape counts, replacing a separate `$count` facet. Measured
+  (median of 7, interleaved) against the previous total + tags facet: +52 ms on 465K
+  annotations (514 → 566 ms), +54 ms on 709K (847 → 901 ms), +35 ms on 709K with a tag
+  filter. The channel facet adds about 70 ms on 465K annotations.
 - `channels` is the annotation's `channel` field (the channel it was drawn or computed on).
   The dialog does not show it; the AI panel's `get_annotation_summary` reports it as
   `byChannel`.
@@ -81,7 +85,7 @@ Property filters need the property-value join (or the PV-driven scan `listIds` u
 first version ran that join for the tag facet and again for the statistics and took 21.6 s
 on 709K cells. Now:
 
-| Filters | Facet (total + tags + shapes + channels) | Statistics |
+| Filters | Facet (tags + shapes + channels; total = sum of shapes) | Statistics |
 |---|---|---|
 | none | annotation scan | PV scan on `datasetId` |
 | annotation fields only (tags, shape, location, ids, gates) | annotation scan with the match | PV `$in` / `$nin` from the selector |
