@@ -89,12 +89,11 @@ def in_thread(fn, *args, **kwargs):
     return anyio.to_thread.run_sync(functools.partial(fn, *args, **kwargs))
 
 
-async def poll_job(job: ni.Job, limit: float) -> None:
-    """Refresh the job until it finishes or `limit` seconds pass. Sleeps
+async def poll_job(job: ni.Job, deadline: float) -> None:
+    """Refresh the job until it finishes or the (monotonic) deadline. Sleeps
     on the event loop, so a long wait holds none of the worker threads
     that every sync tool shares; only the polls (blocking HTTP) use one.
     """
-    deadline = time.monotonic() + limit
     await _refresh_by(job, deadline)  # also fetches the log
     # Poll only while a whole interval fits before the deadline, so no
     # refresh starts after it.
@@ -104,12 +103,21 @@ async def poll_job(job: ni.Job, limit: float) -> None:
 
 
 async def _refresh_by(job: ni.Job, deadline: float) -> None:
-    """Refresh the job, but stop waiting at the deadline: a slow backend
-    must not hold the call past its cap. The abandoned refresh finishes
-    in its thread and updates the job unseen; the caller reports the
-    state it last saw."""
+    """Refresh the job, but stop waiting at the deadline (the abandoned
+    refresh finishes in its thread; the caller reports the state it last
+    saw)."""
+    await _by_deadline(job.refresh, deadline)
+
+
+async def _by_deadline(fn, deadline: float):
+    """Blocking `fn()` in a thread, waited for until the (monotonic)
+    deadline: a slow backend must not hold a call past its cap. Returns
+    (finished, result); an abandoned call finishes in its thread."""
     with anyio.move_on_after(max(0.0, deadline - time.monotonic())):
-        await anyio.to_thread.run_sync(job.refresh, abandon_on_cancel=True)
+        return True, await anyio.to_thread.run_sync(
+            fn, abandon_on_cancel=True
+        )
+    return False, None
 
 
 async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
@@ -132,7 +140,7 @@ async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
         )
         if isinstance(response, list) and response:
             job = ni.Job(nc.girder, response[0])
-            await poll_job(job, INTERFACE_REQUEST_TIMEOUT)
+            await poll_job(job, time.monotonic() + INTERFACE_REQUEST_TIMEOUT)
             if not job.finished:
                 raise ToolError(
                     f"{image} is still registering its parameters; try "
@@ -261,9 +269,18 @@ async def ni_job_wait(job_id: str, timeout_seconds: float = 60) -> dict:
     call this again with the same job_id. Do not poll with other tools.
     """
     limit = max(1.0, min(timeout_seconds, settings().max_job_wait))
+    # The budget covers the first lookup too.
+    deadline = time.monotonic() + limit
     nc = client()
-    job = await in_thread(nc.job, job_id)
-    await poll_job(job, limit)
+    found, job = await _by_deadline(functools.partial(nc.job, job_id),
+                                    deadline)
+    if not found:
+        return {
+            "job_id": job_id, "status": "unknown", "finished": False,
+            "succeeded": False,
+            "note": "NimbusImage did not answer within the wait; try again.",
+        }
+    await poll_job(job, deadline)
     return {
         "job_id": job.id,
         "title": job.title,

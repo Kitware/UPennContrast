@@ -49,6 +49,7 @@ from ..helpers.validation import (
     validateUncomputedCountsProperties,
 )
 from ..models.annotation import Annotation as AnnotationModel
+from ..models.annotation import AnnotationSchema
 from ..models.rasterFilter import (
     RasterFilter as RasterFilterModel,
     UnknownRasterFilter,
@@ -540,7 +541,9 @@ class Annotation(Resource):
         .errorResponse()
     )
     def counts(self, body):
-        datasetIds, shape, tags = validateCountsRequest(body)
+        datasetIds, shape, tags = validateCountsRequest(
+            body, AnnotationSchema.shapeSchema["enum"]
+        )
         ids = [objectId for _, objectId in datasetIds if objectId]
         # One permission-filtered query for every folder, ids only.
         readable = {

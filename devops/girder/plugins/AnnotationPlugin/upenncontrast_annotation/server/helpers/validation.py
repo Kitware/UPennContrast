@@ -135,13 +135,14 @@ def requireObjectId(value, field="id"):
         raise RestException("%s is not a valid id" % field, code=400)
 
 
-def validateCountsRequest(body):
+def validateCountsRequest(body, shapes):
     """Parse a batch-count body {datasetIds, shape?, tags?} into
     (datasetIds, shape, tags). datasetIds keeps request order without
     duplicates, as (requested string, ObjectId or None when the string is
     not an id): one mistyped id is that entry's error, not the request's.
     A malformed request (not an object, ids not a list of strings, over
-    the cap, bad shape or tags) raises RestException(400)."""
+    the cap, a shape not in `shapes`, bad tags) raises
+    RestException(400)."""
     body = requireObjectBody(body)
     rawIds = requireList(body.get("datasetIds"), "datasetIds")
     requireCountWithin(len(rawIds), MAX_COUNT_DATASETS, "datasetIds")
@@ -154,8 +155,10 @@ def validateCountsRequest(body):
         except InvalidId:
             datasetIds.append((value, None))
     shape = body.get("shape")
-    if shape is not None and not isinstance(shape, str):
-        raise RestException("shape must be a string", code=400)
+    if shape not in (None, "", *shapes):
+        raise RestException(
+            "shape must be one of: %s" % ", ".join(shapes), code=400
+        )
     # Like GET count's tags: absent means no filter, anything but a list
     # of strings is refused (not read as "no filter").
     tags = body.get("tags")

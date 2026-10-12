@@ -573,6 +573,14 @@ def test_job_wait_stops_waiting_for_a_slow_refresh(nc):
     )))
     assert real_time.monotonic() - start < 2
     assert result["finished"] is False
+    # The first lookup is inside the budget too.
+    nc.job.side_effect = lambda job_id: real_time.sleep(3)
+    start = real_time.monotonic()
+    result = loads(asyncio.run(workers.ni_job_wait(
+        job_id="j1", timeout_seconds=1
+    )))
+    assert real_time.monotonic() - start < 2
+    assert result["status"] == "unknown" and result["finished"] is False
 
 
 def test_worker_interface_checks_the_dataset_before_registering(nc):

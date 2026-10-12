@@ -408,6 +408,8 @@ class TestBatchAnnotationCounts:
         {"datasetIds": [None]},
         {"datasetIds": ["000000000000000000000000"] * 101},
         {"datasetIds": [], "shape": 3},
+        {"datasetIds": [], "shape": "hexagon"},
+        {"datasetIds": [], "shape": "x" * 10_000},
         {"datasetIds": [], "tags": "cell"},
         {"datasetIds": [], "tags": [1]},
         # Falsy non-lists must not read as "no filter".
