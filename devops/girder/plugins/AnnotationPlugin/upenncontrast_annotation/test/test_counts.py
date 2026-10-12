@@ -413,6 +413,9 @@ class TestBatchAnnotationCounts:
         # Falsy non-lists must not read as "no filter".
         {"datasetIds": [], "tags": {}},
         {"datasetIds": [], "tags": ""},
+        # Bounded on a public endpoint: how many tags, and how long.
+        {"datasetIds": [], "tags": ["t"] * 101},
+        {"datasetIds": [], "tags": ["x" * 1001]},
     ])
     def testMalformedBodiesAre400(self, admin, server, body):
         assertStatus(postCounts(server, admin, body), 400)

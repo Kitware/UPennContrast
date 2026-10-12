@@ -40,6 +40,12 @@ def build_server(
     settings: Settings, verifier: GirderApiKeyVerifier | None = None
 ) -> MCPServer:
     _common.configure(settings)
+    # The SDK logs each failed tool call's message at INFO ("Tool X
+    # failed: ..."); messages can quote the caller's data, and the call
+    # record already counts the failure.
+    logging.getLogger("mcp.server.mcpserver.server").setLevel(
+        logging.WARNING
+    )
     mcp = MCPServer(
         name="nimbusimage",
         instructions=INSTRUCTIONS,

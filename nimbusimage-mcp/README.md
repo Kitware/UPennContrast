@@ -70,7 +70,7 @@ NI_API_URL=http://localhost:8080/api/v1 nimbusimage-mcp/.venv/bin/nimbusimage-mc
 | `NI_MCP_HOST` / `NI_MCP_PORT` | `127.0.0.1` / `8000` | Where it listens (the image uses `0.0.0.0`) |
 | `NI_MCP_PUBLIC_URL` | `http://localhost:<port>/mcp` | This server's public URL (the OAuth resource id) |
 | `NI_MCP_ISSUER_URL` | `http://localhost:8080` | Advertised authorization server (Girder) |
-| `NI_MCP_CALL_LOG` | unset | JSON-lines call log (tool, user id, seconds, bytes, error) |
+| `NI_MCP_CALL_LOG` | unset | JSON-lines call log (tool, user id, arguments, seconds, bytes, error), for evals. The server log has the same records without arguments or error messages (only the kind of error) |
 | `NI_MCP_MAX_JOB_WAIT` | `240` | Longest `ni_job_wait`, in seconds; keep it under every HTTP timeout in front of the server |
 
 `NI_API_KEY` and `NI_TOKEN` must **not** be set: the server refuses to start

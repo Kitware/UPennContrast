@@ -24,15 +24,17 @@ def test_no_credentials_in_logs(tmp_path, caplog, monkeypatch):
     settings = make_settings(call_log=str(call_log))
     fake = MagicMock()
     fake.list_datasets.return_value = [{"_id": "d1", "name": "Mine"}]
-    fake.dataset.side_effect = ValueError("No large image found")
+    fake.dataset.side_effect = ValueError("No large image in patient-1234")
     monkeypatch.setattr(_common.ni, "connect", lambda api_url, token: fake)
 
     caplog.set_level(logging.DEBUG)
+    secret_tag = "patient-1234"
     app = build_app(settings, GirderApiKeyVerifier(
         API, settings.public_url, http=girder.http()
     ))
     with serve(app) as url:
-        call_tool(url, KEY, "ni_datasets_list", {})
+        call_tool(url, KEY, "ni_datasets_list",
+                  {"name_contains": secret_tag})
         rpc(url, "tools/call", {"name": "ni_dataset_info",
                                 "arguments": {"dataset_id": "d1"}}, key=KEY)
         rpc(url, "tools/list", {}, key="w" * 40)  # refused key
@@ -43,11 +45,16 @@ def test_no_credentials_in_logs(tmp_path, caplog, monkeypatch):
     for secret in [KEY, "w" * 40, *session_tokens]:
         assert secret not in logged
 
+    # Arguments are the user's data: never in the server log, only in the
+    # opt-in call log.
+    assert secret_tag not in caplog.text
     records = [json.loads(line) for line in call_log.read_text().splitlines()]
+    assert records[0]["args"]["name_contains"] == secret_tag
     assert [r["tool"] for r in records] == [
         "ni_datasets_list", "ni_dataset_info",
     ]
     # The caller is identified by user id, and failures are recorded.
     assert {r["user"] for r in records} == {"user0001"}
     assert records[0]["bytes"] > 0 and records[0]["error"] is None
-    assert records[1]["error"] == "No large image found"
+    assert records[1]["error"] == "No large image in patient-1234"
+    assert '"error": "bad input"' in caplog.text

@@ -740,8 +740,9 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_girder_outage_is_an_error_not_a_bad_key"*
 - [x] The server refuses to start with a service credential in its environment.
       *"test_settings_refuse_a_service_credential"*
-- [x] Credentials are never logged; the log names the user id.
-      *"test_no_credentials_in_logs"*
+- [x] Credentials are never logged; the log names the user id. The server log carries
+      no tool arguments or error messages (they quote user data), only the opt-in call
+      log does. *"test_no_credentials_in_logs"*
 
 ### Cost and context
 

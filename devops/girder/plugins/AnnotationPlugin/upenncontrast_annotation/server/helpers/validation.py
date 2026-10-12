@@ -34,6 +34,10 @@ MAX_ANNOTATION_IDS = 100_000_000
 # indexed aggregation over all of them, so this bounds a public request's
 # work. Comparing a project's or a search's datasets is tens, not hundreds.
 MAX_COUNT_DATASETS = 100
+# Tag filters on the public counts endpoint: each tag is part of a $all
+# clause, so cap how many and how long (real filters are a few tags).
+MAX_FILTER_TAGS = 100
+MAX_TAG_LENGTH = 1000
 
 # Analysis-gating request ceilings (SERVER_GATING.md "Limits"): abuse guards
 # on the public gate-resolution endpoint, far above real use (a panel holds a
@@ -156,8 +160,13 @@ def validateCountsRequest(body):
     # of strings is refused (not read as "no filter").
     tags = body.get("tags")
     tags = [] if tags is None else requireList(tags, "tags")
-    if not all(isinstance(tag, str) for tag in tags):
-        raise RestException("tags must be a list of strings", code=400)
+    requireCountWithin(len(tags), MAX_FILTER_TAGS, "tags")
+    if not all(isinstance(tag, str) and len(tag) <= MAX_TAG_LENGTH
+               for tag in tags):
+        raise RestException(
+            "tags must be a list of strings of at most %d characters"
+            % MAX_TAG_LENGTH, code=400,
+        )
     return datasetIds, shape or None, tags
 
 

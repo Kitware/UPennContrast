@@ -144,42 +144,49 @@ def _recorded(name: str, kwargs: dict):
     duration, wire size. Never logs credentials."""
     call = _Call()
     start = time.perf_counter()
-    error = None
+    # kind: a fixed label, safe for the server log; error: the message,
+    # which can quote the caller's input, so only the call log gets it.
+    kind = error = None
     succeeded = False
     try:
         yield call
         succeeded = True
     except ToolError as e:
-        error = str(e)
+        kind, error = "tool error", str(e)
         raise
     except girder_client.HttpError as e:
-        error = f"HTTP {e.status}"
+        kind = error = f"HTTP {e.status}"
         raise tool_error(e) from None
     except requests.ConnectionError:
-        error = "connection"
+        kind = error = "connection"
         raise ToolError("Could not reach the NimbusImage server.") from None
     except (ValueError, PermissionError) as e:
         # nimbusimage reports bad input as ValueError ("No large image
         # found in dataset ...") and a key scope problem as
         # PermissionError; both messages are meant for the user.
-        error = str(e)
+        kind, error = "bad input", str(e)
         raise ToolError(str(e)) from None
     finally:
         record = {
             "ts": round(time.time(), 3),
             "tool": name,
             "user": caller_id(),
-            "args": _loggable(kwargs),
             "seconds": round(time.perf_counter() - start, 3),
             "bytes": result_size(call.result) if succeeded else None,
             # "unhandled": not one of the mapped errors; the SDK reports
             # it to the client.
-            "error": None if succeeded else (error or "unhandled"),
+            "error": None if succeeded else (kind or "unhandled"),
         }
-        line = json.dumps(record, default=str)
-        log.info(line)
+        # The server log never carries arguments or error messages
+        # (dataset ids, tags, parameters are the user's data); the opt-in
+        # call log, kept for evals, does.
+        log.info(json.dumps(record, default=str))
         call_log = _settings.call_log if _settings else None
         if call_log:
+            line = json.dumps({
+                **record, "args": _loggable(kwargs),
+                "error": None if succeeded else (error or "unhandled"),
+            }, default=str)
             with _log_lock, open(call_log, "a") as f:
                 f.write(line + "\n")
 
