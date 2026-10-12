@@ -53,6 +53,12 @@ See `nimbusimage/README.md` for the full API overview, authentication options (A
 - Deleting a dataset folder does **not** delete its annotations or property values. Test
   fixtures that create annotations must `ds.annotations.delete_many(...)` before deleting
   the folder, or they leave orphans (the local DB already holds ~8K from past runs).
+- `girder_client.HttpError` subclasses `requests.HTTPError`, which is a
+  `requests.RequestException`. So `except requests.RequestException` written to
+  mean "network trouble" also catches a 401 or a 404. Handle `HttpError` first
+  whenever an HTTP answer and a lost connection need different treatment. This
+  bit nimbusimage-mcp twice: a refusal was taken for a lost answer, and a missing
+  job for a blip.
 - A scoped API key without `core.user_auth` gets 401 from job status and from
   `GET claude_agent/help`; `tmp/local_api_key.txt` is such a key. Use a full-access key for
   anything that waits on jobs.

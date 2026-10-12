@@ -771,6 +771,7 @@ the local stack. Add an item whenever a review finds something this list missed.
       at the cap for a slow lookup or poll (status `unknown` if Girder never answered);
       a Girder blip mid-wait returns the last known state with a note.
       *"test_job_wait_clamps_and_reports_still_running"*, *"test_job_wait_survives_a_girder_blip"*,
+      *"test_job_wait_reports_a_missing_job"*,
       *"test_job_wait_stops_waiting_for_a_slow_refresh"*
 - [x] Job waits (`ni_job_wait`, and a worker's first interface registration, which also
       keeps within the cap) sleep on the event loop instead of holding one of the worker
@@ -831,6 +832,7 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_a_retry_joins_the_running_registration_and_gets_its_result"*,
       *"test_a_failed_registration_is_reported_and_retried"*,
       *"test_a_registration_that_never_reached_the_server_is_retried"*,
+      *"test_a_registration_whose_answer_was_lost_stays_pending"*,
       *"test_an_unreadable_job_keeps_the_registration_pending"*,
       *"test_a_connection_blip_while_following_the_job_keeps_it_pending"*,
       *"test_an_outage_while_watching_for_the_interface_keeps_it_pending"*,
@@ -844,6 +846,8 @@ the local stack. Add an item whenever a review finds something this list missed.
 - [x] A worker with both role labels is listed under both roles and accepted by
       `ni_worker_run`. *"test_workers_list_keeps_real_workers"*,
       *"test_worker_run_fills_defaults_and_rejects_property_workers"*
+- [x] A worker run lists the workers (a slow Docker listing) once.
+      *"test_worker_run_lists_the_workers_once"*
 - [x] A worker run checks channel and location before starting a job.
       *"test_worker_run_checks_the_location_before_submitting"*
 - [x] Worker parameters are normalized like the app's (channel names, checkbox maps,

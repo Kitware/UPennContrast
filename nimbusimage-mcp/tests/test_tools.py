@@ -944,12 +944,19 @@ def test_a_failed_registration_is_reported_and_retried(nc, monkeypatch):
     assert nc.girder.post.call_count == 2
 
 
+def _refused_connection():
+    """A requests error as a refused connection really raises it."""
+    import requests
+    from urllib3.exceptions import MaxRetryError, NewConnectionError
+    reason = NewConnectionError(None, "Connection refused")
+    return requests.ConnectionError(MaxRetryError(None, "/x", reason))
+
+
 def test_a_registration_that_never_reached_the_server_is_retried(nc):
     """Nothing was sent (connection refused): the next call registers."""
-    import requests
     _common.configure(make_settings(max_job_wait=10))
     _registering(nc)
-    nc.girder.post.side_effect = requests.ConnectionError("refused")
+    nc.girder.post.side_effect = _refused_connection()
 
     async def scenario():
         for _ in range(2):
@@ -958,6 +965,48 @@ def test_a_registration_that_never_reached_the_server_is_retried(nc):
 
     asyncio.run(scenario())
     assert nc.girder.post.call_count == 2
+
+
+def test_a_registration_whose_answer_was_lost_stays_pending(nc):
+    """The connection dropped after the request went out: it may have
+    reached Girder, so a retry must not register again."""
+    import requests
+    _common.configure(make_settings(max_job_wait=1))
+    _registering(nc)
+    nc.girder.post.side_effect = requests.ConnectionError(
+        "Connection aborted")
+
+    async def twice():
+        for _ in range(2):
+            with pytest.raises(ToolError, match="still registering"):
+                await workers.ni_worker_interface(image=SEG)
+
+    asyncio.run(twice())
+    assert nc.girder.post.call_count == 1
+
+
+def test_job_wait_reports_a_missing_job(nc):
+    """A 4xx is an answer, not a blip (girder_client.HttpError is also a
+    requests.RequestException, so the order of the handlers matters)."""
+    job = _Job(polls=None)
+    job.refresh = lambda: (_ for _ in ()).throw(http_error(404, "gone"))
+    nc.job.return_value = job
+    with pytest.raises(ToolError, match="Not found"):
+        asyncio.run(workers.ni_job_wait(job_id="j1", timeout_seconds=1))
+
+
+def test_worker_run_lists_the_workers_once(nc):
+    nc.list_workers.return_value = WORKERS
+    nc.get_worker_interface.side_effect = [None, None, INTERFACE]
+    nc.girder.post.return_value = []
+    ds = nc.dataset.return_value
+    ds.channels, ds.num_channels = ["DAPI"], 1
+    ds.num_xy, ds.num_z, ds.num_time = 1, 1, 1
+    ds.annotations.compute.return_value = SimpleNamespace(
+        id="j1", status_name="queued", title="Seg")
+    run_tool(workers.ni_worker_run, dataset_id="d", image=SEG)
+    # Listing workers is a slow Docker listing on the server.
+    assert nc.list_workers.call_count == 1
 
 
 def test_an_unreadable_job_keeps_the_registration_pending(nc):

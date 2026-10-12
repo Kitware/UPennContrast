@@ -11,6 +11,7 @@ from typing import Literal
 import anyio
 import girder_client
 import requests
+from urllib3.exceptions import ConnectTimeoutError, NewConnectionError
 
 from mcp.server.mcpserver.exceptions import ToolError
 
@@ -179,10 +180,23 @@ async def _run_registration(nc: ni.NimbusClient, image: str) -> None:
     # registered it already.
     if await _interface(nc, image, deadline) is not None:
         return
-    response = await _before(
-        deadline, nc.girder.post, "worker_interface/request",
-        parameters={"image": image},
-    )
+    try:
+        response = await _before(
+            deadline, nc.girder.post, "worker_interface/request",
+            parameters={"image": image},
+        )
+    except girder_client.HttpError:
+        # An answer (a refusal): nothing is running. Caught first, since
+        # girder_client.HttpError is also a requests.RequestException.
+        raise
+    except requests.RequestException as e:
+        if _never_sent(e):
+            raise  # nothing reached Girder: the next call may register
+        # The request may have reached Girder (only its answer was
+        # lost): treat it as running rather than letting a retry send
+        # another.
+        await _watch_for_interface(nc, image, deadline)
+        return
     if not (isinstance(response, list) and response):
         return
     try:
@@ -194,30 +208,52 @@ async def _run_registration(nc: ni.NimbusClient, image: str) -> None:
         # moment): watch for the interface instead, so the registration
         # stays pending rather than ending and letting the next call send
         # another.
-        while deadline - time.monotonic() > POLL_SECONDS:
-            await anyio.sleep(POLL_SECONDS)
-            try:
-                if await _interface(nc, image, deadline) is not None:
-                    return
-            except girder_client.HttpError as e:
-                if e.status in (401, 403):
-                    raise  # refused for good: report it (_register_once)
-                continue  # a 5xx: keep the registration pending
-            except requests.RequestException:
-                continue  # unreachable for now: keep it pending
-            except ToolError:
-                break  # the read ran into the task's own deadline
-        state = None
+        await _watch_for_interface(nc, image, deadline)
+        return
     if state is None or not state["finished"]:
-        raise ToolError(
-            f"{image}'s parameter registration did not finish; try again "
-            "later."
-        )
+        raise _did_not_finish(image)
     if not state["succeeded"]:
         raise ToolError(
             f"{image}'s parameter registration failed ({state['status']}); "
             "try again, or check the worker."
         )
+
+
+def _did_not_finish(image: str) -> ToolError:
+    return ToolError(
+        f"{image}'s parameter registration did not finish; try again "
+        "later."
+    )
+
+
+def _never_sent(error: requests.RequestException) -> bool:
+    """Whether a failed request certainly never reached the server: the
+    connection was never opened."""
+    if isinstance(error, requests.ConnectTimeout):
+        return True
+    reason = getattr(error.args[0], "reason", None) if error.args else None
+    return isinstance(reason, (NewConnectionError, ConnectTimeoutError))
+
+
+async def _watch_for_interface(nc: ni.NimbusClient, image: str,
+                               deadline: float) -> None:
+    """Poll for the interface a registration in flight will produce,
+    until the deadline. Transient errors keep waiting; a refusal
+    (401/403) is final and raised."""
+    while deadline - time.monotonic() > POLL_SECONDS:
+        await anyio.sleep(POLL_SECONDS)
+        try:
+            if await _interface(nc, image, deadline) is not None:
+                return
+        except girder_client.HttpError as e:
+            if e.status in (401, 403):
+                raise  # refused for good: report it (_register_once)
+            # a 5xx: keep waiting
+        except requests.RequestException:
+            pass  # unreachable for now: keep waiting
+        except ToolError:
+            break  # the read ran into the deadline
+    raise _did_not_finish(image)
 
 
 def _interface(nc: ni.NimbusClient, image: str, deadline: float):
@@ -276,10 +312,12 @@ async def _register_once(nc: ni.NimbusClient, image: str,
     return await _interface(nc, image, deadline)
 
 
-async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
+async def fetch_interface(nc: ni.NimbusClient, image: str,
+                          labels: dict | None = None) -> dict:
     """The worker's parameter interface, asking the worker to register it
     (a short job) the first time. Bounded as a whole by the job-wait cap,
-    since it can wait on that job."""
+    since it can wait on that job. `labels`: the image's labels if the
+    caller already listed the workers (a slow Docker listing)."""
     deadline = time.monotonic() + max(1.0, min(
         INTERFACE_REQUEST_TIMEOUT, settings().max_job_wait
     ))
@@ -287,7 +325,8 @@ async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
     if interface is None:
         # Registering runs the image on the server, which accepts any
         # name: only ever ask for an installed worker.
-        labels = (await _before(deadline, nc.list_workers)).get(image)
+        if labels is None:
+            labels = (await _before(deadline, nc.list_workers)).get(image)
         if labels is None or not worker_roles(labels):
             raise ToolError(
                 f"No worker image {image!r}; use ni_workers_list for names."
@@ -396,7 +435,8 @@ async def ni_worker_run(
 
     channels, scales = await in_thread(read_dataset)
     values = worker_values.resolve(
-        await fetch_interface(nc, image), parameters or {}, channels
+        await fetch_interface(nc, image, labels), parameters or {},
+        channels
     )
     job = await in_thread(
         ds.annotations.compute,
@@ -437,11 +477,12 @@ async def ni_job_wait(job_id: str, timeout_seconds: float = 60) -> dict:
     looked_up = _fields(job)
     try:
         state = await poll_job(job, deadline)
-    except requests.RequestException:
-        state = None
     except girder_client.HttpError as e:
+        # First: girder_client.HttpError is also a RequestException.
         if e.status < 500:
             raise
+        state = None
+    except requests.RequestException:
         state = None
     else:
         return {"job_id": job_id, **(state or looked_up)}
