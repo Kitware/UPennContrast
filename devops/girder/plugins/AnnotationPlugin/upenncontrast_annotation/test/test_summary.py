@@ -67,7 +67,38 @@ class TestAnnotationSummary:
             {"tag": "C", "count": 1},
         ]
         assert resp.json["shapes"] == [{"shape": "polygon", "count": 4}]
+        assert resp.json["channels"] == [{"channel": 0, "count": 4}]
         assert resp.json["properties"] == []
+
+    def testChannelComposition(self, admin, server):
+        folder = self._setup(admin)
+        for channel, tags in ((2, ["A"]), (2, ["B"]), (1, ["B"])):
+            ann = upenn_utilities.getSampleAnnotation(folder["_id"])
+            ann["channel"] = channel
+            ann["tags"] = tags
+            Annotation().create(ann)
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]), "filters": {},
+        })
+        assertStatusOk(resp)
+        # Sorted by count descending, then channel.
+        assert resp.json["channels"] == [
+            {"channel": 0, "count": 4},
+            {"channel": 2, "count": 2},
+            {"channel": 1, "count": 1},
+        ]
+
+        resp = postSummary(server, admin, {
+            "datasetId": str(folder["_id"]),
+            "filters": {"tags": {"values": ["B"], "exclusive": False}},
+        })
+        assertStatusOk(resp)
+        assert resp.json["channels"] == [
+            {"channel": 0, "count": 1},
+            {"channel": 1, "count": 1},
+            {"channel": 2, "count": 1},
+        ]
 
     def testShapeComposition(self, admin, server):
         folder = self._setup(admin)
@@ -154,8 +185,9 @@ class TestAnnotationSummary:
         assert statsByPath(resp.json)["p.Area"]["mean"] == 5
 
     def testShapesFollowPropertyAndMixedFilters(self, admin, server):
-        """The shape facet narrows on the gated paths too (property-only
-        and mixed filters go through an id clause, not the raw match)."""
+        """The shape and channel facets narrow on the gated paths too
+        (property-only and mixed filters go through an id clause, not the
+        raw match)."""
         folder = self._setup(admin)
         ann = upenn_utilities.getSampleAnnotation(folder["_id"])
         ann["shape"] = "point"
@@ -177,6 +209,8 @@ class TestAnnotationSummary:
             {"shape": "point", "count": 1},
             {"shape": "polygon", "count": 1},
         ]
+        # The channel facet shares the narrowed match.
+        assert resp.json["channels"] == [{"channel": 0, "count": 2}]
 
         resp = postSummary(server, admin, {
             "datasetId": str(folder["_id"]),
@@ -317,6 +351,7 @@ class TestAnnotationSummary:
         assert resp.json["total"] == 0
         assert resp.json["tags"] == []
         assert resp.json["shapes"] == []
+        assert resp.json["channels"] == []
         assert statsByPath(resp.json)["p.Area"] == {
             "path": ["p", "Area"], "count": 0,
             "mean": None, "std": None, "min": None, "max": None,
