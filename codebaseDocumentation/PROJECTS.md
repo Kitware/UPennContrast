@@ -718,6 +718,9 @@ that writes an ACL or a public flag, or that exports a project.
 - A recorded resource that was deleted after the upload blocks publishing (its files
   are still in the draft and it can no longer be checked); upload still skips deleted
   references — *"testPublishRefusesDraftWithDeletedResources"*.
+- The draft records only resources that existed and were exported (not references
+  already deleted, nor configurations reached through a deleted dataset's views), or
+  publish would refuse a valid draft — *"testUploadRecordsOnlyResourcesThatExist"*.
 
 **Process rules this feature proved**
 - Test fixtures: Girder makes the first user in a fresh database a site admin, who holds

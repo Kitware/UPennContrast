@@ -581,6 +581,26 @@ class TestZenodoRequiresOwnership:
         assertStatus(resp, 403)
         assert "no longer exist" in resp.json["message"]
 
+    def testUploadRecordsOnlyResourcesThatExist(self, server, owner):
+        """A reference deleted before the upload is skipped by the export,
+        so it must not be recorded either: publish would refuse it."""
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        goneDataset, goneConfig, _ = createDataset(owner)
+        project = TestProjectShareLimits().createProject(server, owner)
+        for ds in (dataset, goneDataset):
+            TestProjectShareLimits().addDataset(server, owner, project, ds)
+        Folder().remove(Folder().load(goneDataset["_id"], force=True))
+
+        contents = requireProjectContentsAccess(
+            Project().load(project["_id"], force=True), owner)
+
+        assert contents.datasetIds == [dataset["_id"]]
+        assert goneConfig["_id"] not in contents.collectionIds
+
     def testOwnerPassesTheOwnershipCheck(self, server, owner):
         dataset, _, _ = createDataset(owner)
         project = TestProjectShareLimits().createProject(server, owner)

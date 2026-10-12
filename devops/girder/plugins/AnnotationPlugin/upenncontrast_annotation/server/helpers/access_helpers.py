@@ -50,6 +50,15 @@ class ProjectContents:
     configsByDataset: dict = field(default_factory=dict)
 
 
+def _requireDocsAccess(model, ids, user, level, fields):
+    """Check access on the docs among `ids` that exist; return them by id."""
+    docs = {}
+    for doc in model.find({'_id': {'$in': list(ids)}}, fields=fields):
+        model.requireAccess(doc, user, level)
+        docs[doc['_id']] = doc
+    return docs
+
+
 def requireResourcesAccess(datasetIds, collectionIds, user,
                            level=AccessType.ADMIN, requireAll=False):
     """Check access on datasets and collections loaded in two queries.
@@ -59,28 +68,23 @@ def requireResourcesAccess(datasetIds, collectionIds, user,
         files, and a missing document cannot be checked.
     :raises AccessException: If user lacks access to any of them, or (with
         requireAll) any of them no longer exists.
-    :returns: Dict of the collection documents checked, by id, with
-        meta.propertyIds.
+    :returns: (ids of the datasets that exist, collection documents that
+        exist by id, with meta.propertyIds).
     """
     datasetIds = set(datasetIds)
     collectionIds = set(collectionIds)
-    found = 0
-    for doc in Folder().find(
-            {'_id': {'$in': list(datasetIds)}}, fields=['access', 'public']):
-        Folder().requireAccess(doc, user, level)
-        found += 1
-    collectionsById = {}
-    for doc in Collection().find(
-            {'_id': {'$in': list(collectionIds)}},
-            fields=['access', 'public', 'meta.propertyIds']):
-        Collection().requireAccess(doc, user, level)
-        collectionsById[doc['_id']] = doc
-    found += len(collectionsById)
-    if requireAll and found < len(datasetIds) + len(collectionIds):
+    datasets = _requireDocsAccess(
+        Folder(), datasetIds, user, level, ['access', 'public'])
+    collections = _requireDocsAccess(
+        Collection(), collectionIds, user, level,
+        ['access', 'public', 'meta.propertyIds'])
+    if requireAll and (
+            len(datasets) < len(datasetIds)
+            or len(collections) < len(collectionIds)):
         raise AccessException(
             'Some datasets or collections in this draft no longer exist; '
             'discard the draft and upload again.')
-    return collectionsById
+    return list(datasets), collections
 
 
 def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
@@ -92,8 +96,8 @@ def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
     operation on each dataset and collection it lists, and on each
     configuration its datasets' views use -- the export publishes those
     configurations' property definitions whether or not the project lists
-    them. References to deleted resources are ignored, as the export skips
-    them.
+    them. References to deleted resources are skipped, as the export skips
+    them, and left out of the result.
 
     Views and project membership can change after the check, so the export
     must use what this returns rather than query them again, and publishing
@@ -101,13 +105,16 @@ def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
     returned ids), not the project as it is by then.
 
     :raises AccessException: If user lacks access to any of them.
-    :returns: A ProjectContents of what was checked.
+    :returns: A ProjectContents of what was checked and exists.
     """
     meta = project.get('meta', {})
-    datasetIds = [
-        ObjectId(d['datasetId']) for d in meta.get('datasets', [])]
+    datasetIds = list(_requireDocsAccess(
+        Folder(),
+        {ObjectId(d['datasetId']) for d in meta.get('datasets', [])},
+        user, level, ['access', 'public']))
     collectionIds = {
         ObjectId(c['collectionId']) for c in meta.get('collections', [])}
+    # Only views of datasets the export will upload
     configIdsByDataset = defaultdict(set)
     if datasetIds:
         for view in DatasetView().find(
@@ -116,11 +123,12 @@ def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
             configIdsByDataset[view['datasetId']].add(
                 view['configurationId'])
             collectionIds.add(view['configurationId'])
-    collectionsById = requireResourcesAccess(
-        datasetIds, collectionIds, user, level)
+    collectionsById = _requireDocsAccess(
+        Collection(), collectionIds, user, level,
+        ['access', 'public', 'meta.propertyIds'])
     return ProjectContents(
         datasetIds=datasetIds,
-        collectionIds=list(collectionIds),
+        collectionIds=list(collectionsById),
         configsByDataset={
             datasetId: [
                 collectionsById[c] for c in configIds
