@@ -345,8 +345,10 @@ class DatasetView(Resource):
             - The configurations used by those datasetViews that the caller
               administers
 
-            Views and configurations owned by other users are left as they
-            are and counted in datasetViewsSkipped / configurationsSkipped.
+            When publishing, views and configurations owned by other users
+            are left as they are and counted in datasetViewsSkipped /
+            configurationsSkipped. Making the dataset private unpublishes
+            every view and configuration of it.
 
             Write operations remain restricted to users with WRITE permissions.
         """)
@@ -356,8 +358,8 @@ class DatasetView(Resource):
                dataType='boolean', required=True)
     )
     def setDatasetPublic(self, dataset, public):
-        """Set a dataset and the views/configurations the caller administers
-        to public or private."""
+        """Make a dataset public with the views/configurations the caller
+        administers, or make it private with all of them."""
         user = self.getCurrentUser()
 
         # 1. Set the dataset (folder) itself to public
@@ -370,39 +372,40 @@ class DatasetView(Resource):
         datasetViews = list(self._datasetViewModel.find({
             'datasetId': dataset['_id']
         }))
-        configIds = {dv['configurationId'] for dv in datasetViews}
+        viewQuery = {'_id': {'$in': [dv['_id'] for dv in datasetViews]}}
+        configQuery = {'_id': {'$in': list(
+            {dv['configurationId'] for dv in datasetViews}
+        )}}
+        # Counted against configurations that still exist: a view can
+        # outlive its (deleted) configuration.
+        configs = list(CollectionModel().find(configQuery))
 
-        # 3. Change only what the caller administers: setting public is an
-        # ADMIN operation, and owning the dataset must not let the caller
-        # publish (or unpublish) another user's configuration or view.
+        # 3. Publishing changes only what the caller administers: setting
+        # public is an ADMIN operation, and owning the dataset must not let
+        # the caller publish another user's configuration or view. Making
+        # the dataset private unpublishes all of them: that only restricts
+        # access, and leaves nothing of a private dataset readable.
         # setPublic must be called individually as it modifies ACLs.
-        ownedViews = list(self._datasetViewModel.findWithPermissions(
-            {'_id': {'$in': [dv['_id'] for dv in datasetViews]}},
-            user=user, level=AccessType.ADMIN,
-        ))
-        for dv in ownedViews:
+        if public:
+            views = list(self._datasetViewModel.findWithPermissions(
+                viewQuery, user=user, level=AccessType.ADMIN))
+            changedConfigs = list(CollectionModel().findWithPermissions(
+                configQuery, user=user, level=AccessType.ADMIN))
+        else:
+            views = datasetViews
+            changedConfigs = configs
+        for dv in views:
             self._datasetViewModel.setPublic(dv, public, save=True)
-        existingConfigIds = [
-            config['_id'] for config in CollectionModel().find(
-                {'_id': {'$in': list(configIds)}}, fields=['_id'])
-        ]
-        ownedConfigs = list(CollectionModel().findWithPermissions(
-            {'_id': {'$in': list(configIds)}},
-            user=user, level=AccessType.ADMIN,
-        ))
-        for config in ownedConfigs:
+        for config in changedConfigs:
             CollectionModel().setPublic(config, public, save=True)
 
         return {
             'dataset': str(dataset['_id']),
             'public': public,
-            'datasetViewsUpdated': len(ownedViews),
-            'configurationsUpdated': len(ownedConfigs),
-            'datasetViewsSkipped': len(datasetViews) - len(ownedViews),
-            # Counted against configurations that still exist: a view can
-            # outlive its (deleted) configuration.
-            'configurationsSkipped':
-                len(existingConfigIds) - len(ownedConfigs),
+            'datasetViewsUpdated': len(views),
+            'configurationsUpdated': len(changedConfigs),
+            'datasetViewsSkipped': len(datasetViews) - len(views),
+            'configurationsSkipped': len(configs) - len(changedConfigs),
         }
 
     @access.user(scope=TokenScope.DATA_READ)

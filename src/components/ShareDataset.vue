@@ -451,8 +451,8 @@ const associatedViews = ref<IDatasetView[]>([]);
 
 // Loading states
 const publicLoading = ref(false);
-// Set when set_public left views/collections owned by other users unchanged:
-// changing those is their owners' call, so "Public" may not cover them.
+// Set when publishing left views/collections owned by other users private:
+// publishing those is their owners' call, so "Public" may not cover them.
 const publicSkippedNotice = ref("");
 const userLoading = ref<string | null>(null);
 const addUserLoading = ref(false);
@@ -542,7 +542,9 @@ function getSelectedViews(): IDatasetView[] {
   );
 }
 
-function skippedNotice(result: ISetDatasetPublicResult, value: boolean) {
+// Only publishing skips anything: making a dataset private unpublishes all
+// of its views and collections.
+function skippedNotice(result: ISetDatasetPublicResult) {
   const parts = [
     [result.configurationsSkipped, "collection"],
     [result.datasetViewsSkipped, "view"],
@@ -553,8 +555,8 @@ function skippedNotice(result: ISetDatasetPublicResult, value: boolean) {
     return "";
   }
   return (
-    `${parts.join(" and ")} owned by other users stayed unchanged; ` +
-    `only their owners can make them ${value ? "public" : "private"}.`
+    `${parts.join(" and ")} owned by other users stayed private; ` +
+    "only their owners can make them public."
   );
 }
 
@@ -568,7 +570,7 @@ async function togglePublic(newValue: boolean | null) {
   try {
     const result = await store.api.setDatasetPublic(datasetId.value!, value);
     isPublic.value = value;
-    publicSkippedNotice.value = skippedNotice(result, value);
+    publicSkippedNotice.value = skippedNotice(result);
   } catch (error) {
     logError("Failed to toggle public access", error);
     errorString.value = "Failed to update public access";

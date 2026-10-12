@@ -167,26 +167,22 @@ Makes a dataset and all associated resources public or private.
 
 **Affected resources:**
 - Dataset folder
-- The DatasetViews for the dataset that the caller administers
-- The Configurations used by those DatasetViews that the caller administers
+- Publishing: the DatasetViews for the dataset that the caller administers, and the
+  Configurations used by those DatasetViews that the caller administers
+- Making private: every DatasetView of the dataset and every Configuration they use
 
 Other users can open a dataset they may read with their own configuration,
 creating their own view. Owning the dataset does not let the caller publish
-(or unpublish) those: setting `public` is an ADMIN operation on each
-document. They are left unchanged and counted in the response's
-`datasetViewsSkipped` / `configurationsSkipped` (beside
-`datasetViewsUpdated` / `configurationsUpdated`). A site admin administers
-everything, so nothing is skipped for them. The Share dialog shows a note when
-anything was skipped, since "Public" then does not cover those views and collections.
+those: setting `public` is an ADMIN operation on each document. They stay
+private and are counted in the response's `datasetViewsSkipped` /
+`configurationsSkipped` (beside `datasetViewsUpdated` / `configurationsUpdated`);
+the Share dialog says when anything was skipped. Making the dataset private
+unpublishes all of them, including other users': that only restricts access, and
+it also clears views and configurations the pre-ownership `set_public` made
+public. A site admin administers everything, so nothing is skipped for them.
 
-**Known gaps (open decisions, not yet enforced elsewhere):**
-- `POST /dataset_view/share` needs only WRITE on the dataset, views and
-  configurations, and accepts `accessType: 2`, so a WRITE collaborator can grant
-  themselves ADMIN or remove the owner, and then call `set_public`.
-- `POST /project/:id/set_public` publishes every dataset in the project with its
-  views and configurations, and adding a dataset to a project needs only WRITE on it.
-- Views and configurations made public by the pre-ownership `set_public` stay public
-  until their owners (or a site admin) change them.
+Who may share a dataset, and what project sharing and `project/:id/set_public`
+may reach, are handled in PRs #1406 and #1410.
 
 ## Share links (share a view without making the dataset public)
 

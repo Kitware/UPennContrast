@@ -289,7 +289,7 @@ describe("ShareDataset", () => {
 
     expect(vm.isPublic).toBe(true);
     expect(vm.publicSkippedNotice).toBe(
-      "2 collections and 1 view owned by other users stayed unchanged; " +
+      "2 collections and 1 view owned by other users stayed private; " +
         "only their owners can make them public.",
     );
 

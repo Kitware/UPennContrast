@@ -684,7 +684,7 @@ class TestSetDatasetPublicOwnership:
         assertStatusOk(resp)
         return resp.json
 
-    def testLeavesOtherUsersConfigurationsAndViewsAlone(self, user, server):
+    def testPublishesOnlyOwnButUnpublishesAll(self, user, server):
         # user (not a site admin) owns the dataset and one view/config.
         dataset, ownConfig, ownView = createDatasetWithView(user)
         Folder().setPublic(dataset, False, save=True)
@@ -706,16 +706,27 @@ class TestSetDatasetPublicOwnership:
         assert result["datasetViewsSkipped"] == 1
         assert result["configurationsSkipped"] == 1
 
-        # Making it private does not unpublish other's configuration.
+        # Making it private unpublishes everything of the dataset, other's
+        # view and configuration included: that only restricts access.
         Collection().setPublic(
             Collection().load(otherConfig["_id"], force=True), True,
             save=True,
         )
-        self._setPublic(server, user, dataset, False)
+        DatasetViewModel().setPublic(
+            DatasetViewModel().load(otherView["_id"], force=True), True,
+            save=True,
+        )
+        result = self._setPublic(server, user, dataset, False)
 
         assert not isPublic(Folder(), dataset)
         assert not isPublic(Collection(), ownConfig)
-        assert isPublic(Collection(), otherConfig)
+        assert not isPublic(DatasetViewModel(), ownView)
+        assert not isPublic(Collection(), otherConfig)
+        assert not isPublic(DatasetViewModel(), otherView)
+        assert result["datasetViewsUpdated"] == 2
+        assert result["configurationsUpdated"] == 2
+        assert result["datasetViewsSkipped"] == 0
+        assert result["configurationsSkipped"] == 0
 
     def testDeletedConfigurationIsNotCountedAsSkipped(self, user, server):
         dataset, _, view = createDatasetWithView(user)
