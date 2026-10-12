@@ -83,14 +83,14 @@ def createSharedProperty(admin, user):
     return prop, dataset, config
 
 
-def assertPublicPropertyShape(doc, prop, accessLevel=AccessType.READ):
+def assertPublicPropertyShape(doc, prop):
     assert "access" not in doc
     assert doc["_id"] == str(prop["_id"])
     for key, value in PROPERTY_FIELDS.items():
         assert doc[key] == value, key
-    # The property's own ACL names only its creator; a configuration reader
-    # is still reported as READ, not -1.
-    assert doc["_accessLevel"] == accessLevel
+    # The property's own ACL does not govern reads (configurations do), so
+    # no _accessLevel is computed from it.
+    assert "_accessLevel" not in doc
 
 
 @pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
@@ -147,7 +147,7 @@ class TestPropertyHiddenFields:
         assertStatusOk(resp)
         assert "access" not in resp.json
         assert resp.json["name"] == PROPERTY_FIELDS["name"]
-        assert resp.json["_accessLevel"] == AccessType.ADMIN
+        assert "_accessLevel" not in resp.json
         assert AnnotationProperty().load(resp.json["_id"], force=True)[
             "access"
         ]
@@ -302,7 +302,7 @@ class TestWorkerPreviewHiddenFields:
         )
 
         assertStatusOk(resp)
-        assert resp.json == {}
+        assert "preview" not in resp.json and "access" not in resp.json
 
 
 VIEW_FIELDS = (

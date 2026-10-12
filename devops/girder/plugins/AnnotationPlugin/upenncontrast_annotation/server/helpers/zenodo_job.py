@@ -16,7 +16,6 @@ from collections import defaultdict
 import orjson
 
 from bson import ObjectId
-from girder.constants import AccessType
 from girder.models.file import File
 from girder.models.folder import Folder
 from girder.models.item import Item
@@ -376,7 +375,7 @@ def _do_upload(job, job_model, project, user, project_id,
             ds_id, annotation_model,
             connection_model, collection_model,
             dataset_view_model, property_model,
-            property_values_model, user,
+            property_values_model,
         )
         ann_filename = (
             f"{folder_name}_annotations.json"
@@ -499,16 +498,13 @@ def _do_upload(job, job_model, project, user, project_id,
 def _build_annotation_json(
     dataset_id, annotation_model, connection_model,
     collection_model, dataset_view_model,
-    property_model, property_values_model, user,
+    property_model, property_values_model,
 ):
     """Build annotation export JSON for a dataset.
 
     Follows the same format as the Export endpoint's
     JSON export (annotations, connections, properties,
-    property values). Properties come only from the
-    configurations `user` (the publishing user) can read,
-    filtered as the endpoint filters them: the archive is
-    public, and a property's `access` ACL names users.
+    property values).
     """
     ds_oid = ObjectId(dataset_id)
 
@@ -521,29 +517,27 @@ def _build_annotation_json(
 
     # Get properties via DatasetViews -> Configurations
     # (same pattern as export.py _getProperties)
-    config_ids = list({
-        dv['configurationId']
-        for dv in dataset_view_model.find(
-            {'datasetId': ds_oid}, fields=['configurationId']
+    dataset_views = list(
+        dataset_view_model.collection.find(
+            {'datasetId': ds_oid}
         )
+    )
+    config_ids = list({
+        dv['configurationId'] for dv in dataset_views
     })
     property_ids = set()
     if config_ids:
-        for config in collection_model.findWithPermissions(
-            {'_id': {'$in': config_ids}},
-            user=user, level=AccessType.READ,
+        for config in collection_model.find(
+            {'_id': {'$in': config_ids}}
         ):
-            for pid in config.get('meta', {}).get('propertyIds', []):
-                property_ids.add(ObjectId(pid))
+            if ('meta' in config
+                    and 'propertyIds' in config['meta']):
+                for pid in config['meta']['propertyIds']:
+                    property_ids.add(ObjectId(pid))
 
     properties = []
     if property_ids:
-        properties = [
-            property_model.filter(prop, user)
-            for prop in property_model.find(
-                {'_id': {'$in': list(property_ids)}}
-            )
-        ]
+        properties = property_model.findClientFields(property_ids)
 
     # Get property values
     # (same pattern as export.py _getPropertyValues)

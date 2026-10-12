@@ -74,6 +74,14 @@ class AnnotationProperty(Resource):
             )
         return {}
 
+    def _propertyBody(self):
+        """The request body reduced to the client-owned fields. Anything
+        else -- `access`, `public`, or the `_id`/`_modelType` an exported
+        property carries -- is dropped, so a caller cannot set the ACL of
+        the property they create or update."""
+        return self._propertyModel.filterUpdateFields(
+            requireObjectBody(self.getBodyJson()))
+
     @access.user(scope=TokenScope.DATA_WRITE)
     @filtermodel(model=PropertyModel)
     @describeRoute(
@@ -85,7 +93,7 @@ class AnnotationProperty(Resource):
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException("User not found", "currentUser")
-        return self._propertyModel.create(currentUser, self.getBodyJson())
+        return self._propertyModel.create(currentUser, self._propertyBody())
 
     @describeRoute(
         Description("Delete an existing property")
@@ -121,10 +129,7 @@ class AnnotationProperty(Resource):
         level=AccessType.WRITE,
     )
     def update(self, annotation_property, params):
-        filtered = self._propertyModel.filterUpdateFields(
-            self.getBodyJson()
-        )
-        annotation_property.update(filtered)
+        annotation_property.update(self._propertyBody())
         self._propertyModel.save(annotation_property)
 
     @access.public(scope=TokenScope.DATA_READ)

@@ -5,7 +5,7 @@ from docker.errors import DockerException
 
 from girder.api import access
 from girder.api.describe import Description, describeRoute
-from girder.api.rest import Resource
+from girder.api.rest import Resource, filtermodel
 from girder.constants import TokenScope
 from girder.exceptions import RestException
 
@@ -46,18 +46,13 @@ class WorkerInterfaces(Resource):
         )
     )
     @access.user
+    @filtermodel(model=InterfaceModel)
     def update(self, params):
         if "image" not in params:
             raise RestException(code=400, message="Missing 'image' parameter")
         image = params.get("image")
-        user = self.getCurrentUser()
-        # Filtered: this updates an existing document in place, so the raw
-        # result would carry its original registrant's ACL.
-        return self._interfaceModel.filter(
-            self._interfaceModel.updateWorkerInterface(
-                user, image, self.getBodyJson()
-            ),
-            user,
+        return self._interfaceModel.updateWorkerInterface(
+            self.getCurrentUser(), image, self.getBodyJson()
         )
 
     @access.user(scope=TokenScope.DATA_READ)

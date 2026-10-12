@@ -1,6 +1,6 @@
 from girder.api import access
 from girder.api.describe import Description, describeRoute
-from girder.api.rest import Resource
+from girder.api.rest import Resource, filtermodel
 from girder.constants import TokenScope
 from ..helpers.validation import requireObjectBody
 from ..models.workerPreviews import WorkerPreviewModel as PreviewModel
@@ -42,19 +42,17 @@ class WorkerPreviews(Resource):
         .errorResponse("Validation Error: JSON doesn't follow schema.")
     )
     @access.admin
+    @filtermodel(model=PreviewModel)
     def update(self, params):
         if "image" not in params:
             raise RestException(code=400, message="Missing 'image' parameter")
         image = params.get("image")
-        user = self.getCurrentUser()
-        return self._previewModel.filter(
-            self._previewModel.updateWorkerPreview(
-                user, image, self.getBodyJson()
-            ),
-            user,
+        return self._previewModel.updateWorkerPreview(
+            self.getCurrentUser(), image, self.getBodyJson()
         )
 
     @access.user(scope=TokenScope.DATA_READ)
+    @filtermodel(model=PreviewModel)
     @describeRoute(
         Description("Get a preview for the given image").param(
             "image", "The docker image name for the worker."
@@ -64,10 +62,7 @@ class WorkerPreviews(Resource):
         if "image" not in params:
             raise RestException(code=400, message="Missing 'image' parameter")
         image = params.get("image")
-        preview = self._previewModel.getImagePreview(image)
-        if preview is None:
-            return {}
-        return self._previewModel.filter(preview, self.getCurrentUser())
+        return self._previewModel.getImagePreview(image) or {}
 
     @access.user(scope=TokenScope.DATA_WRITE)
     @describeRoute(

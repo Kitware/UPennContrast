@@ -1,3 +1,4 @@
+from ..helpers.customModel import UngatedAclFilterMixin
 from ..helpers.proxiedModel import ProxiedModel
 from girder.exceptions import ValidationException, RestException
 from girder.constants import AccessType
@@ -28,7 +29,16 @@ class PropertySchema:
     }
 
 
-class AnnotationProperty(ProxiedModel):
+class AnnotationProperty(UngatedAclFilterMixin, ProxiedModel):
+    # The client-owned fields of a property: the only ones the API accepts
+    # in a create/update body and, with `_id`, the only ones it returns or
+    # exports. Everything else on the document is server-owned -- above all
+    # `access`, which lists every user the property was shared with, while
+    # readers include anyone who can read a referencing configuration.
+    # Keep in sync with IAnnotationPropertyConfiguration in
+    # src/store/model.ts.
+    CLIENT_FIELDS = ("name", "image", "tags", "shape", "workerInterface")
+
     # TODO: write lock
     # TODO: delete hooks: remove all computed values if the property is
     #   deleted ? (big operation)
@@ -44,26 +54,8 @@ class AnnotationProperty(ProxiedModel):
 
     def initialize(self):
         self.name = "annotation_property"
-        # filter() exposes only these. The document's `access` ACL names the
-        # creator, and readers reach a property through a configuration's
-        # meta.propertyIds rather than through that ACL.
-        self.exposeFields(AccessType.READ, (
-            "_id", "name", "image", "tags", "shape", "workerInterface",
-        ))
-
-    def filter(self, doc, user, additionalKeys=None):
-        """Filter like any access-controlled model, but report at least READ.
-
-        _accessLevel comes from the property's own ACL, which only names its
-        creator, so a reader who reaches the property through a
-        configuration's meta.propertyIds would see -1. Every endpoint that
-        returns properties has already established that read access."""
-        filtered = super().filter(doc, user, additionalKeys)
-        if filtered is not None:
-            filtered["_accessLevel"] = max(
-                filtered["_accessLevel"], AccessType.READ
-            )
-        return filtered
+        self.exposeFields(
+            level=AccessType.READ, fields=("_id",) + self.CLIENT_FIELDS)
 
     def validate(self, document):
         try:
@@ -78,6 +70,15 @@ class AnnotationProperty(ProxiedModel):
             property, user=creator, level=AccessType.ADMIN, save=False
         )
         return self.save(property)
+
+    def findClientFields(self, propertyIds):
+        """The properties with these ids, client-owned fields only -- for
+        exports, which embed the documents without passing through
+        filter()."""
+        return list(self.find(
+            {"_id": {"$in": list(propertyIds)}},
+            fields=list(self.CLIENT_FIELDS),
+        ))
 
     def delete(self, property):
         self.remove(property)

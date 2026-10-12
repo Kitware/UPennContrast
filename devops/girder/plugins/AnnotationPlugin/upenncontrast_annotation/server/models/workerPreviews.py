@@ -1,3 +1,4 @@
+from ..helpers.customModel import UngatedAclFilterMixin
 from ..helpers.proxiedModel import ProxiedModel
 from girder.exceptions import ValidationException
 from girder.constants import AccessType
@@ -30,7 +31,10 @@ class PreviewSchema:
     }
 
 
-class WorkerPreviewModel(ProxiedModel):
+class WorkerPreviewModel(UngatedAclFilterMixin, ProxiedModel):
+    # One document per worker image, readable by any user; its `access`
+    # names whoever's request first created it, so responses never carry it.
+    CLIENT_FIELDS = ("image", "preview")
 
     def __init__(self):
         super().__init__()
@@ -43,9 +47,8 @@ class WorkerPreviewModel(ProxiedModel):
 
     def initialize(self):
         self.name = "worker_preview"
-        # filter() exposes only these; the `access` ACL names the site admin
-        # (or worker token user) who posted the preview.
-        self.exposeFields(AccessType.READ, ("_id", "name", "image", "preview"))
+        self.exposeFields(
+            level=AccessType.READ, fields=("_id",) + self.CLIENT_FIELDS)
 
     def validate(self, document):
         try:
