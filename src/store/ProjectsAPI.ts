@@ -218,7 +218,8 @@ export default class ProjectsAPI {
 
   /**
    * Share or revoke access to a project and the resources in it the caller
-   * can share (datasets they own; collections and views they can edit).
+   * can share: datasets they own with their views and configurations, and
+   * collections they own.
    */
   async shareProject(
     projectId: string,

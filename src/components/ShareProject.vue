@@ -16,10 +16,23 @@
           {{ errorString }}
         </v-alert>
 
+        <!-- Partial-result notice (resources the caller doesn't own) -->
+        <v-alert
+          v-if="noticeString"
+          type="warning"
+          density="compact"
+          closable
+          class="mb-4"
+          @click:close="noticeString = ''"
+        >
+          {{ noticeString }}
+        </v-alert>
+
         <!-- Info Alert -->
         <v-alert type="info" density="compact" class="mb-4">
-          Sharing this project also shares the datasets you own in it, and the
-          collections you can edit (at no more than your own access).
+          Sharing this project also shares the datasets you own in it, with
+          their views and configurations, and the collections you own. Anything
+          else keeps its own sharing settings.
         </v-alert>
 
         <!-- Loading State -->
@@ -251,6 +264,7 @@ const dialog = computed({
 const loading = ref(false);
 const showError = ref(false);
 const errorString = ref("");
+const noticeString = ref("");
 
 const isPublic = ref(false);
 const users = ref<IDatasetAccessUser[]>([]);
@@ -301,6 +315,7 @@ function resetState() {
   loading.value = false;
   showError.value = false;
   errorString.value = "";
+  noticeString.value = "";
   isPublic.value = false;
   users.value = [];
   newUserEmail.value = "";
@@ -379,8 +394,9 @@ function confirmTogglePublic(newValue: boolean | null) {
   } else {
     showConfirm(
       "Make Project Private",
-      "This will remove public access. Only users explicitly shared " +
-        "on this project will retain access.",
+      "This will remove public access from the project and the " +
+        "resources in it that you own. Only users explicitly shared on " +
+        "this project will retain access to them.",
       "Make Private",
       "warning",
       () => togglePublic(false),
@@ -395,8 +411,16 @@ async function togglePublic(newValue: boolean) {
   publicLoading.value = true;
   showError.value = false;
   try {
-    await store.projectsAPI.setProjectPublic(props.project.id, newValue);
+    const { skipped } = await store.projectsAPI.setProjectPublic(
+      props.project.id,
+      newValue,
+    );
     isPublic.value = newValue;
+    noticeString.value =
+      skipped > 0
+        ? `${skipped} datasets, collections or views in this project that ` +
+          "you don't own kept their own visibility."
+        : "";
   } catch (error) {
     logError("Failed to toggle public access", error);
     errorString.value = "Failed to update public access";
@@ -485,8 +509,8 @@ function confirmAddUser() {
   showConfirm(
     "Share Project",
     `Grant ${levelLabel} access to "${newUserEmail.value}"? ` +
-      "This will also give them access to the datasets you own and " +
-      "the collections you can edit in this project.",
+      "This will also give them access to the datasets and " +
+      "collections you own in this project.",
     "Share",
     "primary",
     () => addUser(),
@@ -520,6 +544,7 @@ defineExpose({
   loading,
   showError,
   errorString,
+  noticeString,
   isPublic,
   users,
   publicLoading,

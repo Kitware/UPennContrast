@@ -283,10 +283,11 @@ class Project(Resource):
 
             Each contained resource changes only as far as
             the caller could share it directly: datasets the
-            caller owns, and views/configurations the caller
-            can edit, at no more than the caller's own level.
-            Entries above the caller's level are left as they
-            are. The caller cannot target themselves.
+            caller owns with their views and configurations,
+            and collections the caller owns, at no more than
+            the caller's own level on each. Entries above the
+            caller's level are left as they are. The caller
+            cannot target themselves.
         """)
         .modelParam(
             'id', model=ProjectModel,

@@ -320,6 +320,26 @@ class TestProjectShareLimits:
                            (DatasetViewModel(), view)):
             assert model.load(doc["_id"], force=True).get("public")
 
+    def testSharingProjectSkipsCollectionsCallerCanOnlyEdit(
+            self, server, owner, user, third):
+        """No route lets a non-owner share a collection on its own, so a
+        collection added to a project with only WRITE stays as it is."""
+        _, config, _ = createDataset(owner)
+        grant(config, Collection(), user, WRITE)
+        project = self.createProject(server, user)
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/collection", method="POST",
+            user=user, params={"collectionId": str(config["_id"])}))
+
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/share", method="POST",
+            user=user, params={
+                "userMailOrUsername": third["login"],
+                "accessType": READ}))
+
+        assert levelOf(Collection(), config, third) == NO_ACCESS
+        assert levelOf(Project(), project, third) == READ
+
     def testRevokingProjectLeavesOwnerOfContainedDataset(
             self, server, owner, user):
         dataset, config, view = createDataset(owner)

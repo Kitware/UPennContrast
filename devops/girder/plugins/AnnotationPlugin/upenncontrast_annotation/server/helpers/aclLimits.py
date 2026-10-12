@@ -17,8 +17,9 @@ from girder.models.folder import Folder
 from ..models.collection import Collection
 
 # Folders (datasets) are only re-shared by their owners, as in Girder core.
-# Views and configurations can be re-shared by anyone who can edit them, up to
-# their own level.
+# A view or configuration needs at least WRITE; which ones a caller may reach
+# at all is limited further by the dataset they belong to (dataset_view/share
+# requires its owner; projects use limitToShareable).
 MIN_LEVEL_TO_SHARE_FOLDER = AccessType.ADMIN
 MIN_LEVEL_TO_SHARE_OTHER = AccessType.WRITE
 
