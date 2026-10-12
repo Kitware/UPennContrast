@@ -70,16 +70,46 @@ describe("fetchProperties", () => {
     expect(propertyStore.properties.map((p) => p.id)).toEqual(["p1"]);
   });
 
-  it("keeps a just-created property the server does not list yet", async () => {
-    (propertyStore as any).setPropertiesImpl([property("p1"), property("new")]);
-    setConfiguration(["p1", "new"]);
+  it("keeps a property still being created that the server does not list yet", async () => {
+    setConfiguration(["p1"]);
+    (propertyStore as any).setPropertiesImpl([property("p1")]);
+    vi.spyOn(propertyStore.propertiesAPI, "createProperty").mockResolvedValue(
+      property("new"),
+    );
+    // Hold the propertyIds save open, and fetch while it is in flight.
+    let finishSave: () => void = () => {};
+    vi.spyOn(main.api, "updateConfigurationKey").mockImplementation(
+      () => new Promise<any>((resolve) => (finishSave = () => resolve({}))),
+    );
+    vi.spyOn(propertyStore.propertiesAPI, "getProperties").mockResolvedValue([
+      property("p1"),
+    ]);
+
+    const creating = propertyStore.createProperty({ name: "new" } as any);
+    await vi.waitFor(() =>
+      expect(main.configuration!.propertyIds).toEqual(["p1", "new"]),
+    );
+    await propertyStore.fetchProperties();
+
+    expect(propertyStore.properties.map((p) => p.id)).toEqual(["p1", "new"]);
+    finishSave();
+    await creating;
+  });
+
+  it("drops a loaded property deleted on the server", async () => {
+    // Not being created, so the omission means it is gone.
+    (propertyStore as any).setPropertiesImpl([
+      property("p1"),
+      property("gone"),
+    ]);
+    setConfiguration(["p1", "gone"]);
     vi.spyOn(propertyStore.propertiesAPI, "getProperties").mockResolvedValue([
       property("p1"),
     ]);
 
     await propertyStore.fetchProperties();
 
-    expect(propertyStore.properties.map((p) => p.id)).toEqual(["p1", "new"]);
+    expect(propertyStore.properties.map((p) => p.id)).toEqual(["p1"]);
   });
 
   it("prefers the server's copy of a property it returns", async () => {

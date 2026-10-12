@@ -81,6 +81,9 @@ let propertyValuesGeneration = 0;
 // Ordinary values are independent of the active expression table. A table
 // switch cancels virtual reads, but must not drop the initial ordinary load.
 let propertyDatasetGeneration = 0;
+// Ids of properties being created: added to the local configuration but not
+// yet registered server-side, so a batch fetch omits them (fetchProperties).
+const pendingPropertyIds = new Set<string>();
 
 export interface IPropertyStatus {
   running: boolean;
@@ -1305,22 +1308,26 @@ export class Properties extends VuexModule {
   async fetchProperties() {
     if (main.configuration) {
       const propertyIds = main.configuration.propertyIds;
+      // The server omits ids it cannot resolve. A deleted property should
+      // drop out, but one being created is in the local configuration before
+      // its propertyIds save lands, so the server omits it too. Keep the
+      // loaded copy of those only (pending now, or when the request went
+      // out), or the next setProperties would persist the drop.
+      const pendingAtRequest = new Set(pendingPropertyIds);
       const fetched = new Map(
         (await this.propertiesAPI.getProperties(propertyIds)).map(
           (property) => [property.id, property],
         ),
       );
-      // The server omits ids it cannot resolve. A deleted property should
-      // drop out, but one created moments ago is in the local configuration
-      // before its propertyIds save lands, so the server omits it too; keep
-      // the loaded copy of any id the server did not return, or the next
-      // setProperties would persist the drop.
       const loaded = new Map(
         this.properties.map((property) => [property.id, property]),
       );
+      const isPending = (id: string) =>
+        pendingAtRequest.has(id) || pendingPropertyIds.has(id);
       this.setPropertiesImpl(
         propertyIds.flatMap((id) => {
-          const property = fetched.get(id) ?? loaded.get(id);
+          const property =
+            fetched.get(id) ?? (isPending(id) ? loaded.get(id) : undefined);
           return property ? [property] : [];
         }),
       );
@@ -1480,7 +1487,14 @@ export class Properties extends VuexModule {
   async createProperty(property: IAnnotationPropertyConfiguration) {
     const newProperty = await this.propertiesAPI.createProperty(property);
     if (newProperty) {
-      await this.setProperties([...this.properties, newProperty]);
+      // Pending until the configuration's propertyIds save settles; see
+      // fetchProperties.
+      pendingPropertyIds.add(newProperty.id);
+      try {
+        await this.setProperties([...this.properties, newProperty]);
+      } finally {
+        pendingPropertyIds.delete(newProperty.id);
+      }
     }
     return newProperty;
   }
