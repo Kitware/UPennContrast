@@ -88,7 +88,7 @@ const TEST_ROOTS = [
     matches: PYTEST,
     knownTest: "test_connect_with_token",
   },
-  // The MCP server package (`nimbusimage-mcp/`), Phase 0 spike first.
+  // The MCP server package (`nimbusimage-mcp/`).
   {
     dir: resolve(__dirname, "../../nimbusimage-mcp"),
     matches: PYTEST,

@@ -1,8 +1,10 @@
 # NimbusImage MCP Server: Architecture and Implementation Plan
 
-**Status:** Phase 0 spike built and measured (placement decision still open); see
-[`nimbusimage-mcp/spike/RESULTS.md`](../nimbusimage-mcp/spike/RESULTS.md).
-Phases 1 onward are proposals.
+**Status:** Phase 1 built: the `nimbusimage-mcp/` package with per-request API-key
+auth and 17 tools, run locally or as the compose `mcp` profile (see
+[`nimbusimage-mcp/README.md`](../nimbusimage-mcp/README.md)). Phase 0 measurements are in
+[`nimbusimage-mcp/eval/PHASE0_RESULTS.md`](../nimbusimage-mcp/eval/PHASE0_RESULTS.md).
+The placement decision is still open. Phases 2 onward are proposals.
 **Last reviewed:** 2026-10-11, against NimbusImage `82a746f`, the AWSDeploy HAProxy
 template and deploy playbook, and the current Claude and MCP documentation listed in
 [References](#13-references).
@@ -28,7 +30,7 @@ finally production.
 7. [Implementation plan](#7-implementation-plan)
 8. [Changes and blast radius](#8-changes-and-blast-radius)
 9. [Test plan](#9-test-plan)
-10. [Regression checklist (planned)](#10-regression-checklist-planned)
+10. [Regression checklist](#regression-checklist)
 11. [Open decisions](#11-open-decisions)
 12. [Assumptions and things not yet verified](#12-assumptions-and-things-not-yet-verified)
 13. [References](#13-references)
@@ -270,9 +272,16 @@ An MCP server has no open viewer.
 | `get_interface_state`, `capture_screenshot`, `set_location`, `set_camera`, `set_layer_mode`, `update_layer`, `set_layer_visibility`, `set_display_options`, `set_view_mode`, `select_annotations`, `set_annotation_filter`, `select_tool`, plot tools | **Leave out.** They only make sense inside an open browser tab. |
 
 Patterns worth copying: the shared annotation `query` sub-schema, summaries before rows,
-the row cap, and the read-versus-gated-write split. **Copy** definitions and help topics
-into the MCP package instead of importing them from the chat plugin, so the two surfaces
-can change independently.
+the row cap, and the read-versus-gated-write split. **Copy** tool definitions into the MCP
+package instead of importing them from the chat plugin, so the two surfaces can change
+independently.
+
+**Help topics are the exception (decided in Phase 1).** `ni_help_topic` reads the articles
+over REST from the chat plugin's `GET claude_agent/help?topic=` endpoint, as the caller.
+The articles document the app, not either surface, and are edited often; a copy of about
+100 KB of markdown would drift. The MCP server only reads the endpoint and changes nothing
+in the plugin. The topic list is kept in the tool; an unknown topic gets the endpoint's own
+400, which lists the current topics. Reading help needs a key with `core.user_auth`.
 
 ### 5.3 Spike tool set (read-only)
 
@@ -284,11 +293,28 @@ can change independently.
 | `ni_annotations_summary` | counts by shape and tag | Small table |
 | `ni_image_get_composite` | `ds.images.get_composite(xy, z, time)` | Downsampled PNG |
 
-### 5.4 Phase 1 additions
+### 5.4 Phase 1 tool set (built)
 
-`ni_annotations_list` (capped), `ni_properties_list`, `ni_property_values_summary`,
-`ni_property_histogram`, `ni_workers_list`, `ni_worker_interface`, `ni_worker_run`
-(destructive hint), `ni_job_wait`, `ni_annotations_tag` (destructive hint), `ni_help_topic`.
+The spike's five tools, changed as the spike recommended: `ni_datasets_list` caps at 100,
+`ni_annotations_count` takes up to 50 `dataset_ids` (one eval task had needed 16 calls),
+`ni_annotations_summary` takes shape and tag filters, and every text result is compact
+JSON with no structured copy (the SDK's default indents dicts and duplicates them as
+`structuredContent`). Added:
+
+| Tool | Wraps | Notes |
+|---|---|---|
+| `ni_annotations_list` | `ds.annotations.list(limit, offset)` + `count` | Max 200 rows; center and vertex count instead of coordinates |
+| `ni_annotations_tag` | `list`/`get_many` + `update_many` | **Destructive hint.** Query-based (`match_shape`, `match_tags`) or ids; a filter is required; max 10,000 annotations; undoable in the app |
+| `ni_image_get_channel` | `ds.images.get` | One channel, grayscale, 0.5–99.5 percentile stretch (spike wish list) |
+| `ni_properties_list` | configuration `propertyIds`, `uncomputed_counts`, a value sample | Value paths come from a bounded sample of value documents (both ends), as the app's lazy mode does |
+| `ni_property_values_summary` | `ds.annotations.summary(property_paths=…)` | count, mean, std, min, max per path; shape and tag filters |
+| `ni_property_histogram` | `ds.properties.histogram` | The server's bins hold equal counts; the description says so |
+| `ni_property_compute` | `ds.properties.compute` | **Destructive hint.** Not in the original list; without it a "measure X" request dead-ends |
+| `ni_workers_list` | `client.list_workers()` | Role labels by presence; base images and `:test` tags hidden by default |
+| `ni_worker_interface` | `get_worker_interface` (+ registration job, 60 s) | Parameters, value formats, and the dataset's channels |
+| `ni_worker_run` | `ds.annotations.compute` | **Destructive hint.** Annotation workers only; parameters normalized like the app (`worker_values.py` ports `src/utils/workerInterface.ts`) |
+| `ni_job_wait` | `client.job(id).wait(timeout)` | At most `NI_MCP_MAX_JOB_WAIT` (240 s); reports `finished: false` instead of failing |
+| `ni_help_topic` | `GET claude_agent/help` | See 5.2 |
 
 ---
 
@@ -399,7 +425,8 @@ as possible. The code may be thrown away. What we keep is the answers.
   MCP endpoint itself.
 - Runs on the host against the local compose stack. No container, no OAuth, no HAProxy.
 
-**Steps:**
+**Steps** (as run; the spike code has since been replaced by the Phase 1 package, so
+`spike/server.py` no longer exists):
 
 ```bash
 # 1. Local backend (repo root)
@@ -459,13 +486,25 @@ the composite for z=3", "which datasets have spot annotations"):
 
 **Exit criteria:**
 
-- [ ] Claude Code works with `--header "Authorization: Bearer <key>"` against the
+- [x] Claude Code works with `--header "Authorization: Bearer <key>"` against the
       container.
-- [ ] Two local users with different datasets each see only their own data.
-- [ ] Missing, invalid, and revoked keys all return 401.
-- [ ] The exchange cache is hit on repeat calls (token count in Mongo does not grow per
+- [x] Two local users with different datasets each see only their own data.
+- [x] Missing, invalid, and revoked keys all return 401. Deactivating a key counts as
+      revoking it: Girder removes the key's tokens either way.
+- [x] The exchange cache is hit on repeat calls (token count in Mongo does not grow per
       call).
-- [ ] All unit and integration tests pass.
+- [x] All unit and integration tests pass.
+
+**What Phase 1 learned:**
+
+- Each MCP request costs one extra Girder read (`GET token/current`) to re-check the cached
+  session. That check is what makes revocation immediate; without it a deleted key would
+  keep working until its cached session expired.
+- A scoped API key without `core.user_auth` cannot poll jobs or read help topics, and
+  Girder answers 401. Because the verifier has just checked the session, the tools report a
+  mid-call 401 as a likely missing scope, not as an expired session.
+- Deleting a dataset folder does not delete its annotations; the integration tests delete
+  theirs explicitly.
 
 ### Phase 2: OAuth (local)
 
@@ -663,54 +702,72 @@ the spike shows it needs a helper, for example image encoding).
 
 ---
 
-## 10. Regression checklist (planned)
+## Regression checklist
 
-Per `CLAUDE.md`, every invariant names its test. These tests do not exist yet; the names
-are the planned locations. Add an item whenever a review finds something this list missed.
+Section 10. Per `CLAUDE.md`, every invariant names its test (`src/__tests__/regressionChecklist.test.ts`
+checks that the names exist). Tests are in `nimbusimage-mcp/tests/`; *integration* ones need
+the local stack. Add an item whenever a review finds something this list missed.
 
 ### Identity and access
 
-- [ ] Every tool call runs as the caller, never a service account.
-      `nimbusimage-mcp/tests/test_auth_http.py::test_two_users_see_only_own_datasets`
-- [ ] Missing, malformed, invalid, and revoked credentials return 401.
-      `test_auth_http.py::test_rejects_bad_credentials`
-- [ ] Tokens are never logged.
-      `test_logging.py::test_no_credentials_in_logs`
+- [x] Every tool call runs as the caller: the per-request client carries the caller's
+      Girder session and nothing else. *"test_tools_run_as_the_callers_session"*
+- [x] Two users each see exactly what Girder lets them read (integration).
+      *"test_two_users_see_only_own_datasets"*
+- [x] Missing, malformed, invalid, and revoked credentials return 401 over HTTP.
+      *"test_rejects_bad_credentials"*
+- [x] A key deleted or deactivated in Girder stops working on the next request, despite
+      the cache (integration). *"test_revoked_key_rejected_live"*,
+      *"test_deactivated_key_rejected_live"*, *"test_deleted_key_stops_working_at_once"*
+- [x] A Girder outage is a server error, not "bad key".
+      *"test_girder_outage_is_an_error_not_a_bad_key"*
+- [x] The server refuses to start with a service credential in its environment.
+      *"test_settings_refuse_a_service_credential"*
+- [x] Credentials are never logged; the log names the user id.
+      *"test_no_credentials_in_logs"*
 
 ### Cost and context
 
-- [ ] Row-returning tools cap at 200 and say so.
-      `test_tools.py::test_list_tools_enforce_cap`
-- [ ] Images are downsampled to `max_size`.
-      `test_tools.py::test_composite_downsampled`
-- [ ] API-key exchanges are cached; repeat calls mint no new Girder tokens.
-      `test_auth_http.py::test_key_exchange_cached`
-- [ ] The server holds no per-session state between requests.
-      `test_server.py::test_stateless_requests_any_instance`
+- [x] Row-returning tools cap (200 annotations, 100 datasets) and say what is left.
+      *"test_list_tools_enforce_cap"*
+- [x] Images are downsampled to `max_size` and crops are clipped.
+      *"test_composite_downsampled"*
+- [x] Text results are compact JSON with no structured duplicate.
+      *"test_result_size_matches_sdk_wire_format"*,
+      *"test_every_tool_is_registered_with_its_annotations"*
+- [x] API-key exchanges are cached; repeat calls mint no new Girder tokens (unit, and
+      integration via the Mongo token count). *"test_exchange_is_cached_and_rechecked"*,
+      *"test_concurrent_first_use_exchanges_once"*, *"test_key_exchange_cached"*
+- [x] The server holds no per-session state between requests.
+      *"test_stateless_requests_any_instance"*
+- [x] `ni_job_wait` never waits longer than the configured cap.
+      *"test_job_wait_clamps_and_reports_still_running"*
 
-### OAuth
+### Writes
 
-- [ ] PKCE S256 required, plain rejected.
-      `<oauth-plugin>/test/test_authorize.py::test_pkce_required`
-- [ ] Redirect URI must match exactly.
-      `test_authorize.py::test_redirect_uri_exact_match`
-- [ ] Codes are single use and expire.
-      `test_token.py::test_code_single_use_and_ttl`
-- [ ] Refresh tokens rotate; reuse revokes the grant.
-      `test_token.py::test_refresh_reuse_revokes_grant`
-- [ ] `resource` is required and bound to the token.
-      `test_token.py::test_resource_bound`
-- [ ] With the setting off, every endpoint returns 404.
-      `test_settings.py::test_disabled_returns_404`
-- [ ] Return-after-login accepts only in-app routes.
-      `src/views/oauth/OAuthConsent.test.ts` (planned)
+- [x] Tools that change data carry `destructiveHint`; the rest are read-only.
+      *"test_every_tool_is_registered_with_its_annotations"*
+- [x] Tagging needs an explicit target, refuses more than 10,000 annotations before
+      loading any, and sends only the annotations whose tags change.
+      *"test_tag_refuses_unbounded_or_ambiguous_targets"*,
+      *"test_tag_by_query_updates_only_changed"*
+- [x] Worker parameters are normalized like the app's (channel names, checkbox maps,
+      strict numbers and booleans), and property workers are refused by `ni_worker_run`.
+      *"test_channel_checkboxes_canonical_map"*, *"test_strict_scalars"*,
+      *"test_worker_run_fills_defaults_and_rejects_property_workers"*
 
-### Deploy
+### Planned (no test yet)
 
-- [ ] No HAProxy rule matches `/.well-known/acme-challenge/*` except the static server.
-      Checked in the Phase 3 local HAProxy run and the Phase 5 rehearsal.
-- [ ] IP manager renders both backends and detects drift on each.
-      AWSDeploy `tests/test_load_balancer_ip_manager.py` (planned)
+OAuth (Phase 2): PKCE S256 required and plain rejected; exact redirect URI match;
+single-use codes that expire; refresh tokens rotate and reuse revokes the grant;
+`resource` required and bound to the token; every endpoint 404s with the setting off;
+return-after-login accepts only in-app routes. Planned locations: the OAuth plugin's
+`test/test_authorize.py`, `test_token.py`, `test_settings.py`, and
+`src/views/oauth/OAuthConsent.test.ts`.
+
+Deploy (Phases 3 to 5): no HAProxy rule matches `/.well-known/acme-challenge/*` except the
+static server; the IP manager renders both backends and detects drift on each (AWSDeploy
+`tests/test_load_balancer_ip_manager.py`).
 
 Process rules carried over from `CLAUDE.md`: verify from a fresh start against data that
 actually has the property under test, and use `git stash` to confirm a test fails without
@@ -740,8 +797,9 @@ its fix.
 - Claude's OAuth callback URL for custom connectors comes from the connector dialog and was
   not looked up.
 - MCP Python SDK names (`MCPServer`, `TokenVerifier`, `AuthSettings`,
-  `validate_token_resource`, `stateless_http`) come from the current SDK docs. Pin a
-  version in Phase 0 and confirm against it.
+  `validate_token_resource`, `stateless_http`) were confirmed against the pinned
+  `mcp==2.3.0` in Phases 0 and 1. The request's verified token reaches sync tools (run in a
+  worker thread) through `get_access_token()`.
 - Whether the AWS test environment can be stood up as-is has not been tried.
 
 ---

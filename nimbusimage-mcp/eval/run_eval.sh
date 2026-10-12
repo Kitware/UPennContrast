@@ -1,17 +1,30 @@
 #!/usr/bin/env bash
-# Run every task in tasks.txt through headless Claude Code against the spike
-# server (must already be running on 127.0.0.1:8000), in parallel, then
-# summarize tool choice, turns, cost, and answers.
+# Run every task in tasks.txt through headless Claude Code against a running
+# nimbusimage-mcp server, in parallel, then summarize tool choice, turns,
+# cost, and answers.
 #
-# Start the server with a fresh call log (NI_MCP_CALL_LOG=<new file>) so the
-# eval's sizes and latencies are not mixed with earlier calls.
+#   NI_MCP_KEY_FILE=../tmp/local_api_key.txt eval/run_eval.sh [http://127.0.0.1:8000/mcp]
+#
+# The key file holds a Girder API key for the user the tasks run as (a
+# full-access key: job status and help topics need core.user_auth). Start the
+# server with a fresh call log (NI_MCP_CALL_LOG=<new file>) so the eval's
+# sizes and latencies are not mixed with earlier calls. The tasks only read.
 #
 # Only the nimbus MCP tools are allowed, and user/project settings are not
 # loaded, so Claude cannot fall back to the nimbusimage skills or Bash.
 set -euo pipefail
 EVAL="$(cd "$(dirname "$0")" && pwd)"
+URL="${1:-http://127.0.0.1:8000/mcp}"
+KEY="$(tr -d '[:space:]' < "${NI_MCP_KEY_FILE:?set NI_MCP_KEY_FILE}")"
 WORK="$(mktemp -d)"   # neutral cwd: no CLAUDE.md, no repo context
 trap 'rm -rf "$WORK"' EXIT
+# The config holds the key, so it lives in the temp dir, never in the repo.
+# (Passed through the environment, not argv, so it stays out of `ps`.)
+NI_URL="$URL" NI_KEY="$KEY" python3 -c 'import json, os
+print(json.dumps({"mcpServers": {"nimbus": {
+    "type": "http", "url": os.environ["NI_URL"],
+    "headers": {"Authorization": "Bearer " + os.environ["NI_KEY"]}}}}))' \
+  > "$WORK/mcp.json"
 mkdir -p "$EVAL/runs"
 rm -f "$EVAL"/runs/*.jsonl
 
@@ -22,7 +35,7 @@ while IFS= read -r task; do
   # </dev/null matters: claude -p appends piped stdin to the prompt, which
   # would otherwise hand the rest of tasks.txt to the first session.
   (cd "$WORK" && claude -p "$task" \
-      --mcp-config "$EVAL/mcp.json" --strict-mcp-config \
+      --mcp-config "$WORK/mcp.json" --strict-mcp-config \
       --setting-sources "" \
       --allowedTools "mcp__nimbus" \
       --disallowedTools "Bash Read Write Edit Glob Grep WebFetch WebSearch Agent NotebookEdit Skill" \

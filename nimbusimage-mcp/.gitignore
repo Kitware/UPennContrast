@@ -1,3 +1,2 @@
-spike/out/
-spike/calls.jsonl
-spike/eval/runs/
+eval/runs/
+eval/calls.jsonl

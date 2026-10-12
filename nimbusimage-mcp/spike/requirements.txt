@@ -1,4 +1,0 @@
-# Install from the repo root: pip install -e nimbusimage -r nimbusimage-mcp/spike/requirements.txt
-mcp[cli]==2.3.0
-pillow==12.3.0
-pytest==9.1.1

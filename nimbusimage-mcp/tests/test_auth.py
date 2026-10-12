@@ -1,0 +1,132 @@
+"""The API-key verifier against a fake Girder (no network)."""
+
+from __future__ import annotations
+
+import asyncio
+import time
+from datetime import timedelta
+
+import httpx
+import pytest
+
+from nimbusimage_mcp import auth
+from nimbusimage_mcp.auth import GirderApiKeyVerifier
+
+from fake_girder import API, FakeGirder
+
+KEY = "a" * 40
+RESOURCE = "http://127.0.0.1:8000/mcp"
+
+
+@pytest.fixture
+def girder():
+    fake = FakeGirder()
+    fake.add_key(KEY, "alice")
+    return fake
+
+
+def verifier(girder: FakeGirder) -> GirderApiKeyVerifier:
+    return GirderApiKeyVerifier(API, RESOURCE, http=girder.http())
+
+
+def run(coro):
+    return asyncio.run(coro)
+
+
+def test_valid_key_resolves_to_the_users_session(girder):
+    access = run(verifier(girder).verify_token(KEY))
+    assert access.subject == "user0001"
+    assert access.claims["login"] == "alice"
+    assert access.claims["girder_token"] in girder.tokens
+    assert access.resource == RESOURCE
+    # The raw key is not kept anywhere on the token.
+    assert KEY not in access.model_dump_json()
+
+
+def test_exchange_is_cached_and_rechecked(girder):
+    v = verifier(girder)
+
+    async def three_calls():
+        return [await v.verify_token(KEY) for _ in range(3)]
+
+    first, second, third = run(three_calls())
+    assert girder.exchanges == 1
+    # Every cached use is checked against Girder (revocation).
+    assert girder.checks == 2
+    assert first.claims["girder_token"] == third.claims["girder_token"]
+
+
+def test_concurrent_first_use_exchanges_once(girder):
+    v = verifier(girder)
+
+    async def burst():
+        return await asyncio.gather(*(v.verify_token(KEY) for _ in range(8)))
+
+    results = run(burst())
+    assert all(r is not None for r in results)
+    assert girder.exchanges == 1
+
+
+def test_unknown_key_is_refused_and_not_cached(girder):
+    v = verifier(girder)
+
+    async def twice():
+        return [await v.verify_token("b" * 40) for _ in range(2)]
+
+    assert run(twice()) == [None, None]
+    assert girder.exchanges == 2
+
+
+def test_deleted_key_stops_working_at_once(girder):
+    v = verifier(girder)
+
+    async def scenario():
+        assert await v.verify_token(KEY) is not None
+        girder.delete_key(KEY)
+        return await v.verify_token(KEY)
+
+    assert run(scenario()) is None
+
+
+def test_implausible_tokens_never_reach_girder(girder):
+    v = verifier(girder)
+    for token in ("", "x" * 300, "has space", "ünïcode", "a.b.c"):
+        assert run(v.verify_token(token)) is None
+    assert girder.exchanges == 0
+
+
+def test_token_near_expiry_is_exchanged_again(girder, monkeypatch):
+    girder.lifetime = timedelta(seconds=auth.REFRESH_MARGIN_SECONDS + 60)
+    v = verifier(girder)
+
+    async def twice():
+        first = await v.verify_token(KEY)
+        # Jump to inside the refresh margin.
+        now = time.time() + 120
+        monkeypatch.setattr(auth.time, "time", lambda: now)
+        return first, await v.verify_token(KEY)
+
+    first, second = run(twice())
+    assert girder.exchanges == 2
+    assert first.claims["girder_token"] != second.claims["girder_token"]
+
+
+def test_girder_outage_is_an_error_not_a_bad_key(girder):
+    girder.fail_with = 502
+    with pytest.raises(httpx.HTTPStatusError):
+        run(verifier(girder).verify_token(KEY))
+
+
+def test_cache_is_bounded(girder, monkeypatch):
+    monkeypatch.setattr(auth, "MAX_CACHED_KEYS", 3)
+    keys = [chr(ord("c") + i) * 40 for i in range(5)]
+    for key in keys:
+        girder.add_key(key, key[0])
+    v = verifier(girder)
+
+    async def all_keys():
+        for key in keys:
+            await v.verify_token(key)
+
+    run(all_keys())
+    assert len(v._cache) == 3

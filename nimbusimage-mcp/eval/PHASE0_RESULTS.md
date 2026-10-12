@@ -1,5 +1,9 @@
 # Phase 0 spike: results
 
+> Historical record. The spike code (`spike/server.py`, `smoke_test.py`, `test_server.py`)
+> was replaced by the Phase 1 package in this directory; the eval harness moved to
+> `eval/`. Paths below are as they were during Phase 0.
+
 **Plan:** [`NIMBUSIMAGE_MCP_SERVER.md`](../../codebaseDocumentation/NIMBUSIMAGE_MCP_SERVER.md), Phase 0.
 **SDK:** `mcp==2.3.0` (`mcp-types==2.3.0`), Python 3.14. **Package:** `nimbusimage` 0.5.0.
 **Data:** local compose stack built from master (95 datasets, up to 709K annotations each).
