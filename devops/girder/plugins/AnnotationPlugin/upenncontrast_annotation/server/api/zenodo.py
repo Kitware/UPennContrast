@@ -338,18 +338,6 @@ class Zenodo(Resource):
             level=AccessType.ADMIN, exc=True,
         )
         zenodo = project['meta'].get('zenodo', {})
-        # Check what the draft contains: datasets can be removed from the
-        # project after the upload. Drafts uploaded before resources were
-        # recorded fall back to the project's current contents.
-        uploaded = zenodo.get('uploadedResources')
-        if uploaded:
-            requireResourcesAccess(
-                uploaded.get('datasetIds', []),
-                uploaded.get('collectionIds', []), user,
-                requireAll=True)
-        else:
-            requireProjectContentsAccess(project, user)
-
         if zenodo.get('status') != 'draft':
             raise RestException(
                 "No draft deposition to publish. "
@@ -362,6 +350,21 @@ class Zenodo(Resource):
             raise RestException(
                 "No deposition ID found.", code=400
             )
+
+        # Check what the draft contains, not the project's membership by
+        # now: datasets can be removed from the project after the upload.
+        # A draft uploaded before resources were recorded cannot be
+        # checked, so it must be uploaded again.
+        uploaded = zenodo.get('uploadedResources')
+        if not uploaded:
+            raise RestException(
+                "This draft predates ownership checks; discard it and "
+                "upload again.", code=409,
+            )
+        requireResourcesAccess(
+            uploaded.get('datasetIds', []),
+            uploaded.get('collectionIds', []), user,
+            requireAll=True)
 
         client = self._getZenodoClient(user)
         try:

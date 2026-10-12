@@ -440,6 +440,16 @@ class TestZenodoRequiresOwnership:
 
     def testPublishRefusesDatasetsCallerDoesNotOwn(self, server, owner, user):
         project = self.projectWithDatasetOf(server, owner, user)
+        projectDoc = Project().load(project["_id"], force=True)
+        projectDoc["meta"]["zenodo"] = {
+            "status": "draft", "depositionId": 1,
+            "uploadedResources": {
+                "datasetIds": [
+                    d["datasetId"] for d in projectDoc["meta"]["datasets"]],
+                "collectionIds": [],
+            },
+        }
+        Project().save(projectDoc)
 
         resp = server.request(
             path=f"/zenodo/publish/{project['_id']}", method="POST",
@@ -637,6 +647,40 @@ class TestZenodoRequiresOwnership:
         assert recorded["datasetIds"] == [dataset["_id"]]
         assert config["_id"] in recorded["collectionIds"]
         assert goneConfig["_id"] not in recorded["collectionIds"]
+
+    def testStrangersViewsDoNotBlockTheExport(self, server, owner, user):
+        """Anyone can create a view naming any dataset; a view the uploader
+        cannot read must not join (or block) the export."""
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        strangersConfig = createConfiguration(user, ownFolder(user))
+        createView(user, dataset, strangersConfig)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+
+        contents = requireProjectContentsAccess(
+            Project().load(project["_id"], force=True), owner)
+
+        assert strangersConfig["_id"] not in contents.collectionIds
+        assert config["_id"] in contents.collectionIds
+
+    def testPublishRefusesDraftsWithoutAnUploadRecord(self, server, owner):
+        dataset, _, _ = createDataset(owner)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+        projectDoc = Project().load(project["_id"], force=True)
+        projectDoc["meta"]["zenodo"] = {"status": "draft", "depositionId": 1}
+        Project().save(projectDoc)
+
+        resp = server.request(
+            path=f"/zenodo/publish/{project['_id']}", method="POST",
+            user=owner)
+
+        assertStatus(resp, 409)
+        assert "upload again" in resp.json["message"]
 
     def testOwnerPassesTheOwnershipCheck(self, server, owner):
         dataset, _, _ = createDataset(owner)

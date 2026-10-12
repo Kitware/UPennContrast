@@ -81,8 +81,9 @@ reloads, since anyone with WRITE on the project can add a dataset between the
 request and the job. The check returns the configurations it authorized, and the
 annotation export uses those instead of querying views again. The finished draft
 records the checked ids in `meta.zenodo.uploadedResources`, and publish checks those
-(drafts from before this fall back to the project's current contents), since
-datasets can be removed from the project between upload and publish. A recorded
+since datasets can be removed from the project between upload and publish. A
+draft without that record (uploaded before these checks) is refused with 409: discard
+it and upload again. Only views the uploader can read count toward the export. A recorded
 resource deleted after the upload blocks publishing (403): discard and upload again. Tests: `test/test_share_escalation.py`
 (`TestZenodoRequiresOwnership`).
 

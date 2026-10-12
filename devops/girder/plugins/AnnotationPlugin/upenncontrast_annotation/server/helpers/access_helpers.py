@@ -114,12 +114,20 @@ def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
         user, level, ['access', 'public']))
     collectionIds = {
         ObjectId(c['collectionId']) for c in meta.get('collections', [])}
-    # Only views of datasets the export will upload
+    # Only views of datasets the export will upload, and only views the
+    # user can read: creating a view does not check the dataset it names,
+    # so anyone could otherwise add a configuration to the export (or
+    # block it with one the user does not own).
     configIdsByDataset = defaultdict(set)
     if datasetIds:
-        for view in DatasetView().find(
+        datasetViewModel = DatasetView()
+        for view in datasetViewModel.find(
                 {'datasetId': {'$in': datasetIds}},
-                fields=['datasetId', 'configurationId']):
+                fields=['datasetId', 'configurationId', 'access',
+                        'public']):
+            if not datasetViewModel.hasAccess(
+                    view, user, AccessType.READ):
+                continue
             configIdsByDataset[view['datasetId']].add(
                 view['configurationId'])
             collectionIds.add(view['configurationId'])

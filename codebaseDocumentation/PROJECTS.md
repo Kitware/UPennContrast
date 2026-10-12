@@ -723,6 +723,11 @@ that writes an ACL or a public flag, or that exports a project.
   publish would refuse a valid draft — *"testUploadRecordsOnlyResourcesThatExist"*;
   the record is built from what the job actually uploaded, so a resource deleted
   mid-job is not recorded either — *"testDraftRecordsWhatTheJobUploaded"*.
+- A draft without an upload record (from before these checks) cannot be published; it
+  must be discarded and uploaded again (409) —
+  *"testPublishRefusesDraftsWithoutAnUploadRecord"*.
+- Views the uploader cannot read neither join nor block the export (creating a view
+  does not check the dataset it names) — *"testStrangersViewsDoNotBlockTheExport"*.
 
 **Process rules this feature proved**
 - Test fixtures: Girder makes the first user in a fresh database a site admin, who holds
