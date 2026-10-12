@@ -546,17 +546,6 @@ export function annotationsBoundingBox(
   };
 }
 
-function countBy<T>(items: T[], key: (item: T) => string | string[]) {
-  const counts: { [key: string]: number } = {};
-  for (const item of items) {
-    const keys = key(item);
-    for (const k of Array.isArray(keys) ? keys : [keys]) {
-      counts[k] = (counts[k] || 0) + 1;
-    }
-  }
-  return counts;
-}
-
 // Also injected into the first user message of each agent turn (cheap
 // textual grounding, see AI_PANEL_SPEC.md §4)
 export function buildInterfaceState() {
@@ -616,9 +605,11 @@ export function buildInterfaceState() {
       currentFrameOnly: filterStore.onlyCurrentFrame,
     },
     annotations: {
-      total: annotationStore.annotations.length,
+      // annotationCount, not annotations.length: annotations[] is empty in
+      // stub-only mode (large datasets), where the stubs hold the population.
+      total: annotationStore.annotationCount,
       filtered: filterStore.filteredAnnotations.length,
-      selected: annotationStore.selectedAnnotationIds.size,
+      selected: annotationStore.resolvedSelectedAnnotationIds.length,
       tags: [...annotationStore.annotationTags],
     },
     // Analysis-panel gates narrow the SAME `filtered` count above, so
@@ -1322,16 +1313,41 @@ const registry: { [name: string]: IAgentToolEntry } = {
   },
 
   get_annotation_summary: {
-    execute: async () => {
-      const annotations = annotationStore.annotations;
+    // Total and the tag/shape/channel breakdowns come from the server summary
+    // (SELECTION_SUMMARY.md): annotationStore.annotations is empty in
+    // stub-only mode, so counting it reported 0 on a large dataset. Filtered
+    // and selected counts are client state.
+    execute: async (_input, context) => {
+      const dataset = requireDataset();
+      // Read before the await, so they describe the dataset the request is
+      // for. The resolved selection drops ids a delete or undo left behind.
+      const filtered = filterStore.filteredAnnotations.length;
+      const selected = annotationStore.resolvedSelectedAnnotationIds.length;
+      const summary = await main.annotationsAPI.fetchAnnotationSummary(
+        dataset.id,
+        {},
+        [],
+      );
+      if (context.hasViewIdentityChanged?.()) {
+        throw new ToolExecutionError(
+          "Aborted: the active dataset changed while summarizing " +
+            "annotations; not reporting counts for a different dataset.",
+        );
+      }
       return {
         result: {
-          total: annotations.length,
-          filtered: filterStore.filteredAnnotations.length,
-          selected: annotationStore.selectedAnnotationIds.size,
-          byTag: countBy(annotations, (a) => a.tags),
-          byShape: countBy(annotations, (a) => a.shape),
-          byChannel: countBy(annotations, (a) => `${a.channel}`),
+          total: summary.total,
+          filtered,
+          selected,
+          byTag: Object.fromEntries(
+            summary.tags.map(({ tag, count }) => [tag, count]),
+          ),
+          byShape: Object.fromEntries(
+            summary.shapes.map(({ shape, count }) => [shape, count]),
+          ),
+          byChannel: Object.fromEntries(
+            summary.channels.map(({ channel, count }) => [channel, count]),
+          ),
         },
       };
     },
