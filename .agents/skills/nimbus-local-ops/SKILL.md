@@ -253,6 +253,8 @@ docker ps
 
 The `docker-compose.yaml` is at the repository root.
 
+**Warning — never run `docker compose up` from a git worktree.** The `girder` service bind-mounts `./assetstore` and `./logs/girder` *relative to the compose file*, and the container is named `girder` regardless of directory, so `compose up` in `.claude/worktrees/<name>/` recreates the shared container against that worktree's **empty** assetstore: every dataset's `GET item/{id}/tiles` returns 500 (`OSError: [Errno 22] Invalid argument` from `large_image_source_multi`) for every session using the stack. Check with `docker inspect girder --format '{{range .Mounts}}{{.Source}} {{end}}'`. To test a branch's plugin code: build from the worktree (`docker build -t nimbusimage-girder <worktree>/devops/girder`), then recreate from the **main checkout** (`docker compose up -d --no-deps girder`), keeping the real mounts; tag the old image first (`docker tag nimbusimage-girder nimbusimage-girder:before-<branch>`) to roll back.
+
 ## Debugging
 
 ### Girder Logs
