@@ -563,12 +563,19 @@ def _build_annotation_json(
 
     # Get property values
     # (same pattern as export.py _getPropertyValues)
+    # Only values of the properties defined above: values of a property
+    # whose configuration was left out would ship without a definition.
+    exported_property_ids = {str(pid) for pid in property_ids}
     prop_values = {}
     for doc in property_values_model.find(
         {'datasetId': ds_oid}
     ):
         ann_id = str(doc['annotationId'])
-        prop_values[ann_id] = doc.get('values', {})
+        prop_values[ann_id] = {
+            pid: value
+            for pid, value in doc.get('values', {}).items()
+            if pid in exported_property_ids
+        }
 
     data = {
         'annotations': annotations,

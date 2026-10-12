@@ -517,11 +517,13 @@ contained resource only as far as that user could share it directly
   its owner;
 - the public flag only on resources the actor has ADMIN on.
 
-`POST /project/:id/set_public` returns `skipped`, the number of contained resources it
-left unchanged because the caller does not own them. Neither share endpoint lets the
+`POST /project/:id/set_public` returns `skipped`, the number of contained resources the
+caller can see but does not own, which it left unchanged (other users' private views are
+not counted). Neither share endpoint lets the
 caller target themselves (400): an owner removing themselves would leave the project,
-or the dataset, with no owner. Zenodo upload/publish need ADMIN on every dataset and
-collection in the project, and on every configuration its datasets' views use
+or the dataset, with no owner. Zenodo upload needs ADMIN on every dataset and
+collection the project lists; configurations reached only through views are exported
+only if the uploader owns them; publish checks what the draft recorded
 (`codebaseDocumentation/ZENODO_UPLOAD.md`). Invariants: "Regression checklist" below.
 
 Without this, adding a dataset you could only edit to a project you own copied the
@@ -692,21 +694,29 @@ that writes an ACL or a public flag, or that exports a project.
   *"testRevokingProjectLeavesOwnerOfContainedDataset"*.
 - An owner sharing a project still grants ADMIN on its contents —
   *"testOwnerSharingProjectGrantsAdmin"*.
-- `set_public` publishes only what the caller owns and reports the rest, and the
-  dialog shows that count — *"testPublishingProjectSkipsDatasetsCallerDoesNotOwn"*,
+- `set_public` publishes only what the caller owns and reports the rest it can see, and
+  the dialog shows that count — *"testPublishingProjectSkipsDatasetsCallerDoesNotOwn"*,
   *"testPublishingProjectReportsSkippedResources"*,
+  *"testSkippedCountsOnlyResourcesTheCallerCanSee"*,
+  *"words the notice for a single skipped resource"*,
   *"reports contained resources set_public left unchanged"*,
   *"shows no notice when set_public changed everything"*.
 - The confirmation dialog does not claim every project resource is affected —
   *"does not claim every project resource is affected"*.
 
 **Publishing (Zenodo)**
-- Upload and publish need ADMIN on every dataset and collection in the project, and on
-  every configuration its datasets' views use (the export publishes their property
-  definitions) — *"testUploadRefusesDatasetsCallerDoesNotOwn"*,
+- Upload and publish need ADMIN on every dataset and collection the project lists —
+  *"testUploadRefusesDatasetsCallerDoesNotOwn"*,
   *"testPublishRefusesDatasetsCallerDoesNotOwn"*,
-  *"testUploadRefusesConfigurationsReachedThroughViews"*,
+  *"testUploadRefusesListedCollectionsCallerDoesNotOwn"*,
   *"testOwnerPassesTheOwnershipCheck"*.
+- A configuration reached only through a dataset's views is exported (its property
+  definitions) only if the uploader owns it, and otherwise left out, with its
+  properties' values, rather than refusing the upload: anyone can create a view naming
+  any dataset, and make it public — *"testExportSkipsConfigurationsCallerDoesNotOwn"*,
+  *"testPublicStrangersViewDoesNotBlockTheExport"*,
+  *"testStrangersViewsDoNotBlockTheExport"*,
+  *"testExportOmitsValuesOfPropertiesItDoesNotDefine"*.
 - The upload job rechecks the project it reloads (resources can be added after the
   endpoint's check) — *"testUploadJobRechecksTheProjectItExports"*.
 - The export publishes the configurations the check returned, never re-queried views
@@ -721,13 +731,13 @@ that writes an ACL or a public flag, or that exports a project.
 - The draft records only resources that existed and were exported (not references
   already deleted, nor configurations reached through a deleted dataset's views), or
   publish would refuse a valid draft — *"testUploadRecordsOnlyResourcesThatExist"*;
-  the record is built from what the job actually uploaded, so a resource deleted
-  mid-job is not recorded either — *"testDraftRecordsWhatTheJobUploaded"*.
+  the record is built from what the job loaded for upload, so a resource deleted
+  between the check and that load is not recorded either (one deleted during the file
+  uploads is recorded and then blocks publishing) —
+  *"testDraftRecordsWhatTheJobUploaded"*.
 - A draft without an upload record (from before these checks) cannot be published; it
   must be discarded and uploaded again (409) —
   *"testPublishRefusesDraftsWithoutAnUploadRecord"*.
-- Views the uploader cannot read neither join nor block the export (creating a view
-  does not check the dataset it names) — *"testStrangersViewsDoNotBlockTheExport"*.
 
 **Process rules this feature proved**
 - Test fixtures: Girder makes the first user in a fresh database a site admin, who holds
@@ -736,10 +746,14 @@ that writes an ACL or a public flag, or that exports a project.
 - When a container (project) grants or exports, check every path that reaches a
   contained resource, including ones found indirectly (views, a collection's datasets,
   a view's configuration).
-- Check what you act on, not a re-query of it: the Zenodo path took four review rounds
-  because the endpoint, the job, the export and publish each derived the resource set
-  separately. The check now returns the set (`ProjectContents`), the export uses it,
-  and the draft records it for publish.
+- Check what you act on, not a re-query of it: the Zenodo path took several review
+  rounds because the endpoint, the job, the export and publish each derived the
+  resource set separately. The check now returns the set (`ProjectContents`), the
+  export uses it, and the draft records what was uploaded from it for publish.
+- Refusing because of a resource someone else can attach is a denial of service:
+  views reference datasets without any access check, so the export skips
+  configurations the uploader does not own instead of refusing them, and filtering by
+  "readable" is not enough (public views are readable by everyone).
 
 ---
 

@@ -148,9 +148,10 @@ class Zenodo(Resource):
             starts uploading all project data to Zenodo
             as a background job.
 
-            Requires ADMIN on the project, on every dataset
-            and collection in it, and on every configuration
-            its datasets' views use.
+            Requires ADMIN on the project and on every
+            dataset and collection it lists. Configurations
+            reached only through the datasets' views are
+            exported only if the caller owns them.
 
             If the project was previously published, this
             creates a new version of the existing
@@ -323,6 +324,9 @@ class Zenodo(Resource):
             WARNING: Publishing is irreversible. The
             record will receive a permanent DOI and
             cannot be deleted.
+
+            Requires ADMIN on the project and on every
+            resource the upload recorded in the draft.
         """)
         .param(
             'projectId', 'The project ID',
@@ -330,6 +334,12 @@ class Zenodo(Resource):
         )
         .errorResponse('Project not found.', 404)
         .errorResponse('No draft to publish.', 400)
+        .errorResponse(
+            'Admin access denied on a resource in the draft, '
+            'or one no longer exists.', 403)
+        .errorResponse(
+            'The draft predates ownership checks; discard it '
+            'and upload again.', 409)
     )
     def publish(self, projectId):
         user = self.getCurrentUser()

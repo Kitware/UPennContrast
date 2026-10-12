@@ -413,18 +413,22 @@ class Project(ProxiedModel):
         :param model: The Girder model instance.
         :param actor: The user making the change.
         :param public: Boolean, True to make public.
-        :returns: How many docs were left unchanged.
+        :returns: How many docs the actor can see were left
+            unchanged (other users' private views are not counted).
         """
-        doc_ids = [
-            doc['_id'] for doc in docs
-            if canPublish(model, doc, actor)
-        ]
+        doc_ids = []
+        skipped = 0
+        for doc in docs:
+            if canPublish(model, doc, actor):
+                doc_ids.append(doc['_id'])
+            elif model.hasAccess(doc, actor, AccessType.READ):
+                skipped += 1
         if doc_ids:
             model.update(
                 {'_id': {'$in': doc_ids}},
                 {'$set': {'public': public}}
             )
-        return len(docs) - len(doc_ids)
+        return skipped
 
     def _bulkSetAllUsersAccess(
         self, docs, model, project, actor

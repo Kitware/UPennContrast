@@ -399,6 +399,22 @@ class TestProjectShareLimits:
         # dataset, configuration and view are all the owner's
         assert resp.json["skipped"] == 3
 
+    def testSkippedCountsOnlyResourcesTheCallerCanSee(
+            self, server, owner, user):
+        """Another user's private view of your dataset is not yours to
+        publish, but it is not something you can see kept private either."""
+        dataset, _, _ = createDataset(owner)
+        createView(user, dataset, createConfiguration(user, ownFolder(user)))
+        project = self.createProject(server, owner)
+        self.addDataset(server, owner, project, dataset)
+
+        resp = server.request(
+            path=f"/project/{project['_id']}/set_public", method="POST",
+            user=owner, params={"public": True})
+
+        assertStatusOk(resp)
+        assert resp.json["skipped"] == 0
+
     def testProjectOwnerCannotRemoveThemselves(self, server, owner):
         dataset, config, view = createDataset(owner)
         project = self.createProject(server, owner)
@@ -457,17 +473,38 @@ class TestZenodoRequiresOwnership:
 
         assertStatus(resp, 403)
 
-    def testUploadRefusesConfigurationsReachedThroughViews(
+    def testExportSkipsConfigurationsCallerDoesNotOwn(
             self, server, owner, user):
-        """The export publishes the property definitions of every
-        configuration the project's datasets' views use, listed in the
-        project or not."""
-        dataset, _, _ = createDataset(user)
+        """A configuration reached only through a view of the dataset is
+        published (its property definitions) only if the uploader owns it;
+        otherwise it is left out rather than blocking the upload."""
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, ownConfig, _ = createDataset(user)
         theirConfig = createConfiguration(owner, ownFolder(owner))
         grant(theirConfig, Collection(), user, WRITE)
         createView(user, dataset, theirConfig)
         project = TestProjectShareLimits().createProject(server, user)
         TestProjectShareLimits().addDataset(server, user, project, dataset)
+
+        contents = requireProjectContentsAccess(
+            Project().load(project["_id"], force=True), user)
+
+        assert theirConfig["_id"] not in contents.collectionIds
+        assert ownConfig["_id"] in contents.collectionIds
+        assert [c["_id"] for c in contents.configsByDataset[
+            dataset["_id"]]] == [ownConfig["_id"]]
+
+    def testUploadRefusesListedCollectionsCallerDoesNotOwn(
+            self, server, owner, user):
+        _, theirConfig, _ = createDataset(owner)
+        grant(theirConfig, Collection(), user, WRITE)
+        project = TestProjectShareLimits().createProject(server, user)
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/collection", method="POST",
+            user=user, params={"collectionId": str(theirConfig["_id"])}))
 
         resp = server.request(
             path="/zenodo/upload", method="POST", user=user,
@@ -476,6 +513,59 @@ class TestZenodoRequiresOwnership:
 
         assertStatus(resp, 403)
         assert "Admin access denied" in resp.json["message"]
+
+    def testPublicStrangersViewDoesNotBlockTheExport(
+            self, server, owner, user):
+        """A public view is readable by everyone; it still must not make the
+        owner's upload depend on the stranger's configuration."""
+        dataset, _, _ = createDataset(owner)
+        strangersConfig = createConfiguration(user, ownFolder(user))
+        strangersView = createView(user, dataset, strangersConfig)
+        DatasetViewModel().setPublic(strangersView, True, save=True)
+        Collection().setPublic(strangersConfig, True, save=True)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+
+        resp = server.request(
+            path="/zenodo/upload", method="POST", user=owner,
+            type="application/json",
+            body=json.dumps({"projectId": project["_id"]}))
+
+        assertStatus(resp, 400)
+        assert "No Zenodo token" in resp.json["message"]
+
+    def testExportOmitsValuesOfPropertiesItDoesNotDefine(
+            self, server, owner):
+        from unittest.mock import MagicMock
+        from bson import ObjectId
+        from upenncontrast_annotation.server.helpers import zenodo_job
+        from upenncontrast_annotation.server.models.annotation import (
+            Annotation,
+        )
+        from upenncontrast_annotation.server.models.connections import (
+            AnnotationConnection,
+        )
+
+        dataset, _, _ = createDataset(owner)
+        exported, omitted = ObjectId(), ObjectId()
+        config = {"_id": ObjectId(),
+                  "meta": {"propertyIds": [str(exported)]}}
+        propertyModel = MagicMock()
+        propertyModel.find.return_value = []
+        valuesModel = MagicMock()
+        valuesModel.find.return_value = [{
+            "annotationId": ObjectId(),
+            "values": {str(exported): 1, str(omitted): 2},
+        }]
+
+        data = zenodo_job._build_annotation_json(
+            dataset["_id"], Annotation(), AnnotationConnection(), [config],
+            propertyModel, valuesModel)
+
+        if isinstance(data, (bytes, str)):
+            data = json.loads(data)
+        values = list(data["annotationPropertyValues"].values())
+        assert values == [{str(exported): 1}]
 
     def testUploadJobRechecksTheProjectItExports(self, server, owner, user):
         """The job reloads the project; a dataset added after the endpoint's
@@ -694,3 +784,4 @@ class TestZenodoRequiresOwnership:
 
         # Next gate: the owner has no Zenodo token configured
         assertStatus(resp, 400)
+        assert "No Zenodo token" in resp.json["message"]

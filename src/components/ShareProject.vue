@@ -427,10 +427,13 @@ async function togglePublic(newValue: boolean) {
     );
     isPublic.value = newValue;
     noticeString.value =
-      skipped > 0
-        ? `${skipped} datasets, collections or views in this project that ` +
-          "you don't own kept their own visibility."
-        : "";
+      skipped === 1
+        ? "1 dataset, collection or view in this project that you don't " +
+          "own kept its own visibility."
+        : skipped > 1
+          ? `${skipped} datasets, collections or views in this project ` +
+            "that you don't own kept their own visibility."
+          : "";
   } catch (error) {
     logError("Failed to toggle public access", error);
     errorString.value = "Failed to update public access";

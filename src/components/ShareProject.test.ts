@@ -49,6 +49,20 @@ describe("ShareProject", () => {
     expect(vm.noticeString).toContain("you don't own");
   });
 
+  it("words the notice for a single skipped resource", async () => {
+    mockSetProjectPublic.mockResolvedValue({
+      projectId: "p1",
+      public: true,
+      skipped: 1,
+    });
+    const vm = mountComponent().vm as any;
+
+    await vm.togglePublic(true);
+
+    expect(vm.noticeString).toContain("1 dataset, collection or view");
+    expect(vm.noticeString).toContain("kept its own visibility");
+  });
+
   it("shows no notice when set_public changed everything", async () => {
     mockSetProjectPublic.mockResolvedValue({
       projectId: "p1",

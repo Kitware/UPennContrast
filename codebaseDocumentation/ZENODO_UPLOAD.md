@@ -66,25 +66,27 @@ Tokens are encrypted at rest using Fernet symmetric encryption. The encryption k
 
 | Method | Endpoint | Description | Access |
 |--------|----------|-------------|--------|
-| `POST` | `/api/v1/zenodo/upload` | Start uploading a project to Zenodo | ADMIN on the project, every dataset and collection in it, and every configuration its datasets' views use |
+| `POST` | `/api/v1/zenodo/upload` | Start uploading a project to Zenodo | ADMIN on the project and on every dataset and collection it lists; configurations reached only through views are exported only if the uploader owns them |
 | `GET` | `/api/v1/zenodo/status/:projectId` | Get upload progress (fallback for diagnostics) | READ |
-| `POST` | `/api/v1/zenodo/publish/:projectId` | Publish draft, mint DOI | ADMIN on the project, every dataset and collection in it, and every configuration its datasets' views use |
+| `POST` | `/api/v1/zenodo/publish/:projectId` | Publish draft, mint DOI | ADMIN on the project and on every resource the draft recorded at upload (`uploadedResources`) |
 | `POST` | `/api/v1/zenodo/discard/:projectId` | Discard unpublished draft | ADMIN |
 
 Publishing hands out every file in the project, so upload and publish need ADMIN on
-each dataset and collection, and on each configuration the datasets' views use (the
-export publishes their property definitions), not only on the project (`requireProjectContentsAccess` in
-`server/helpers/access_helpers.py`). Project ADMIN alone is not enough: a dataset can be
-added to a project by someone with only WRITE on it, and a co-admin of the project may
-not be able to read it at all. The upload job repeats the check on the project it
-reloads, since anyone with WRITE on the project can add a dataset between the
-request and the job. The check returns the configurations it authorized, and the
-annotation export uses those instead of querying views again. The finished draft
-records the checked ids in `meta.zenodo.uploadedResources`, and publish checks those
-since datasets can be removed from the project between upload and publish. A
-draft without that record (uploaded before these checks) is refused with 409: discard
-it and upload again. Only views the uploader can read count toward the export. A recorded
-resource deleted after the upload blocks publishing (403): discard and upload again. Tests: `test/test_share_escalation.py`
+each dataset and collection the project lists, not only on the project
+(`requireProjectContentsAccess` in `server/helpers/access_helpers.py`). Project ADMIN
+alone is not enough: a dataset can be added to a project by someone with only WRITE on
+it, and a co-admin of the project may not be able to read it at all. Configurations
+reached only through a dataset's views contribute their property definitions only if
+the uploader owns them; otherwise they are left out, along with those properties'
+values, instead of refusing the upload (anyone can create a view naming any dataset
+and make it public). The upload job repeats the check on the project it reloads, and
+the annotation export uses the configurations the check returned instead of querying
+views again. The finished draft records what the job actually uploaded in
+`meta.zenodo.uploadedResources`, and publish checks those resources (a draft without
+that record, uploaded before these checks, is refused with 409: discard it and upload
+again), since datasets can be removed from the project between upload and publish. A
+recorded resource deleted after the upload, including during the upload itself,
+blocks publishing (403). Tests: `test/test_share_escalation.py`
 (`TestZenodoRequiresOwnership`).
 
 The upload endpoint returns a `jobId` that the frontend uses for SSE-based progress tracking.

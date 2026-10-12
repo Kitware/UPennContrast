@@ -98,10 +98,16 @@ only the ones that write ACLs: a Zenodo upload of a project exported every
 dataset in it on project ADMIN alone, including datasets the caller could
 not read. Publishing or exporting a container needs ADMIN on each thing in
 it (`requireProjectContentsAccess`) -- including what the export finds
-indirectly: the Zenodo job publishes the property definitions of every
-configuration a project dataset's views use, listed in the project or not.
-Derive the checked set from what the export reads, not from the
-container's own list.
+indirectly: the Zenodo job publishes the property definitions of the
+configurations a project dataset's views use. Derive the checked set from
+what the export reads, not from the container's own list, and hand the
+export that set instead of letting it re-query.
+
+But do not *refuse* because of something anyone can attach: dataset views
+reference a dataset without any access check, so a stranger's view (public,
+hence "readable") would block the owner's upload. Skip what the caller
+does not own instead, and drop the data that depended on it (property
+values without their definitions).
 
 ### Public Access Pattern
 

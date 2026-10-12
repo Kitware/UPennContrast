@@ -93,10 +93,10 @@ def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
     Project-level access says nothing about the resources in it: a dataset
     can be added by someone with only WRITE on it, and a project admin may
     not be able to read it at all. Publishing a project (Zenodo) is an owner
-    operation on each dataset and collection it lists, and on each
-    configuration its datasets' views use -- the export publishes those
-    configurations' property definitions whether or not the project lists
-    them. References to deleted resources are skipped, as the export skips
+    operation on each dataset and collection it lists. Configurations
+    reached only through views of its datasets are exported (their
+    property definitions) only when the user owns them, and otherwise left
+    out. References to deleted resources are skipped, as the export skips
     them, and left out of the result.
 
     Views and project membership can change after the check, so the export
@@ -112,28 +112,32 @@ def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
         Folder(),
         {ObjectId(d['datasetId']) for d in meta.get('datasets', [])},
         user, level, ['access', 'public']))
-    collectionIds = {
-        ObjectId(c['collectionId']) for c in meta.get('collections', [])}
-    # Only views of datasets the export will upload, and only views the
-    # user can read: creating a view does not check the dataset it names,
-    # so anyone could otherwise add a configuration to the export (or
-    # block it with one the user does not own).
+    # Collections the project lists are published as such: the user must
+    # own them.
+    collectionsById = _requireDocsAccess(
+        Collection(),
+        {ObjectId(c['collectionId']) for c in meta.get('collections', [])},
+        user, level, ['access', 'public', 'meta.propertyIds'])
+    # Configurations reached only through views of the uploaded datasets
+    # contribute their property definitions only if the user owns them,
+    # and are otherwise left out rather than refused: anyone can create a
+    # view naming any dataset (and make it public), so refusing would let
+    # a stranger block the upload.
     configIdsByDataset = defaultdict(set)
     if datasetIds:
-        datasetViewModel = DatasetView()
-        for view in datasetViewModel.find(
+        for view in DatasetView().find(
                 {'datasetId': {'$in': datasetIds}},
-                fields=['datasetId', 'configurationId', 'access',
-                        'public']):
-            if not datasetViewModel.hasAccess(
-                    view, user, AccessType.READ):
-                continue
+                fields=['datasetId', 'configurationId']):
             configIdsByDataset[view['datasetId']].add(
                 view['configurationId'])
-            collectionIds.add(view['configurationId'])
-    collectionsById = _requireDocsAccess(
-        Collection(), collectionIds, user, level,
-        ['access', 'public', 'meta.propertyIds'])
+    viewConfigIds = set().union(*configIdsByDataset.values()) - set(
+        collectionsById)
+    collectionModel = Collection()
+    for doc in collectionModel.find(
+            {'_id': {'$in': list(viewConfigIds)}},
+            fields=['access', 'public', 'meta.propertyIds']):
+        if collectionModel.hasAccess(doc, user, level):
+            collectionsById[doc['_id']] = doc
     return ProjectContents(
         datasetIds=datasetIds,
         collectionIds=list(collectionsById),
