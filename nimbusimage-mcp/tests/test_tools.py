@@ -312,7 +312,12 @@ def test_count_across_datasets_reports_each(nc):
     assert [c["dataset_id"] for c in result["counts"]] == ["aa", "bad", "aaa"]
     assert result["counts"][1]["error"] == "not a valid id"
     with pytest.raises(ToolError, match="between 1 and 50"):
-        annotations.ni_annotations_count(dataset_ids=["x"] * 51)
+        annotations.ni_annotations_count(
+            dataset_ids=[f"d{i}" for i in range(51)])
+    # The limit counts distinct ids.
+    nc.count_annotations.return_value = [{"datasetId": "x", "count": 1}]
+    assert loads(annotations.ni_annotations_count(
+        dataset_ids=["x"] * 51))["total"] == 1
 
 
 def test_count_keeps_an_overlong_id_to_its_own_entry(nc):
@@ -857,6 +862,74 @@ def test_a_pending_registration_is_not_sent_again(nc):
 
     asyncio.run(twice())
     assert nc.girder.post.call_count == 1
+
+
+def _registering(nc, job_status=2):
+    """A worker whose registration job has the given status."""
+    nc.list_workers.return_value = WORKERS
+    nc.get_worker_interface.return_value = None
+    nc.girder.post.return_value = [{"_id": "j1", "status": 2}]
+    nc.girder.get.return_value = {"_id": "j1", "status": job_status}
+
+
+def test_a_slow_registration_post_counts_as_pending(nc):
+    """A POST that outlives the wait still reaches the server; the retry
+    must not send another."""
+    import time as real_time
+    _common.configure(make_settings(max_job_wait=1))
+    _registering(nc)
+    nc.girder.post.side_effect = lambda *a, **k: real_time.sleep(1.5)
+
+    async def twice():
+        for _ in range(2):
+            with pytest.raises(ToolError):
+                await workers.ni_worker_interface(image=SEG)
+
+    asyncio.run(twice())
+    assert nc.girder.post.call_count == 1
+
+
+def test_a_pending_registration_returns_the_interface_when_it_appears(
+        nc, monkeypatch):
+    _common.configure(make_settings(max_job_wait=1))
+    _registering(nc)
+
+    async def scenario():
+        with pytest.raises(ToolError, match="still registering"):
+            await workers.ni_worker_interface(image=SEG)
+        # The job registers the interface later; a retry with a longer
+        # wait picks it up without posting again.
+        _common.configure(make_settings(max_job_wait=10))
+        monkeypatch.setattr(workers, "POLL_SECONDS", 0.05)
+        nc.get_worker_interface.return_value = INTERFACE
+        return await workers.ni_worker_interface(image=SEG)
+
+    assert loads(asyncio.run(scenario()))["parameters"]
+    assert nc.girder.post.call_count == 1
+
+
+def test_a_failed_pending_registration_is_reported_and_retried(
+        nc, monkeypatch):
+    """The first caller stops waiting; the job then fails. A retry sees
+    the job finished (no interface) at once, and the next call posts a
+    new registration instead of waiting out the pending window."""
+    _common.configure(make_settings(max_job_wait=1))
+    _registering(nc)
+
+    async def scenario():
+        with pytest.raises(ToolError, match="still registering"):
+            await workers.ni_worker_interface(image=SEG)
+        nc.girder.get.return_value = {"_id": "j1", "status": 4}  # error
+        _common.configure(make_settings(max_job_wait=10))
+        monkeypatch.setattr(workers, "POLL_SECONDS", 0.05)
+        with pytest.raises(ToolError, match="no parameter interface"):
+            await workers.ni_worker_interface(image=SEG)
+        assert nc.girder.post.call_count == 1
+        with pytest.raises(ToolError, match="no parameter interface"):
+            await workers.ni_worker_interface(image=SEG)
+
+    asyncio.run(scenario())
+    assert nc.girder.post.call_count == 2
 
 
 def test_worker_interface_checks_the_dataset_before_registering(nc):

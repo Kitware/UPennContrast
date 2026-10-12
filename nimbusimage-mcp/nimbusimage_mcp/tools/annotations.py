@@ -44,11 +44,11 @@ def ni_annotations_count(
     of a count, and then total covers only the readable ones and
     incomplete is true. Use this before listing annotations.
     """
-    if not 1 <= len(dataset_ids) <= MAX_COUNT_DATASETS:
+    ids = list(dict.fromkeys(dataset_ids))
+    if not 1 <= len(ids) <= MAX_COUNT_DATASETS:
         raise ValueError(
             f"Pass between 1 and {MAX_COUNT_DATASETS} dataset_ids."
         )
-    ids = list(dict.fromkeys(dataset_ids))
     # The server refuses the whole request for an id longer than it
     # accepts; keep that one entry's error instead, like any bad id.
     sendable = [i for i in ids if len(i) <= MAX_DATASET_ID_LENGTH]
@@ -61,7 +61,10 @@ def ni_annotations_count(
     } if sendable else {}
     counts = []
     for dataset_id in ids:
-        row = rows.get(dataset_id, {"error": "not a valid id"})
+        row = rows.get(dataset_id) or {
+            "error": "not a valid id"
+            if len(dataset_id) > MAX_DATASET_ID_LENGTH else "no result"
+        }
         counts.append(
             {"dataset_id": dataset_id, "count": row["count"]}
             if "count" in row else

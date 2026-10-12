@@ -815,10 +815,15 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_every_tool_is_registered_with_its_annotations"*
 - [x] Interface registration runs only for installed worker images (the server would
       run any image name it is given). Per server process (the server does not
-      deduplicate), concurrent first requests send one registration, and a retry while
-      a registration is still running (up to 5 minutes) waits for it instead of sending
-      another. *"test_concurrent_first_requests_register_an_interface_once"*,
+      deduplicate), concurrent first requests send one registration. For up to 5 minutes
+      after a registration was sent (even one whose request timed out), a retry waits
+      for the interface instead of sending another, unless it sees that registration's
+      job finish, in which case it reports the result and the next call may register
+      again. *"test_concurrent_first_requests_register_an_interface_once"*,
       *"test_a_pending_registration_is_not_sent_again"*,
+      *"test_a_slow_registration_post_counts_as_pending"*,
+      *"test_a_pending_registration_returns_the_interface_when_it_appears"*,
+      *"test_a_failed_pending_registration_is_reported_and_retried"*,
       *"test_worker_interface_registers_only_installed_workers"*,
       *"test_worker_interface_checks_the_dataset_before_registering"*
 - [x] Tagging needs an explicit target (an empty id list is not "everything"), refuses
