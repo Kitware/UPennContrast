@@ -16,7 +16,7 @@ from upenncontrast_annotation.server.helpers.access_helpers import (
 )
 from upenncontrast_annotation.server.helpers.params import getBooleanParam
 from upenncontrast_annotation.server.helpers.validation import (
-    requireObjectBody
+    requireObjectBody, requireObjectId
 )
 from upenncontrast_annotation.server.models.datasetView import \
     DatasetView as DatasetViewModel
@@ -75,16 +75,26 @@ class DatasetView(Resource):
     def create(self, params):
         # Keep only the schema's fields: the body is saved as the document,
         # so an `access` or `public` key would otherwise land in the ACL.
-        new_document = self._datasetViewModel.convertIdsToObjectIds(
-            self._datasetViewModel.filterUpdateFields(
-                requireObjectBody(self.getBodyJson())))
+        body = self._datasetViewModel.filterUpdateFields(
+            requireObjectBody(self.getBodyJson()))
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException("User not found", "currentUser")
+        # A view pairs a dataset with a configuration; the caller must be
+        # able to read both (and a missing id is a 400, not a KeyError 500).
+        datasetId = requireObjectId(body.get("datasetId"), "datasetId")
+        configurationId = requireObjectId(
+            body.get("configurationId"), "configurationId")
+        Folder().load(
+            datasetId, user=currentUser, level=AccessType.READ, exc=True)
+        CollectionModel().load(
+            configurationId, user=currentUser, level=AccessType.READ,
+            exc=True)
+        new_document = self._datasetViewModel.convertIdsToObjectIds(body)
         # Check with same datasetId and configurationId already exists
         query = {
-            "datasetId": new_document["datasetId"],
-            "configurationId": new_document["configurationId"],
+            "datasetId": datasetId,
+            "configurationId": configurationId,
         }
         cursor = self._datasetViewModel.findWithPermissions(
             query, user=currentUser, level=AccessType.WRITE
@@ -372,6 +382,10 @@ class DatasetView(Resource):
         ))
         for dv in ownedViews:
             self._datasetViewModel.setPublic(dv, public, save=True)
+        existingConfigIds = [
+            config['_id'] for config in CollectionModel().find(
+                {'_id': {'$in': list(configIds)}}, fields=['_id'])
+        ]
         ownedConfigs = list(CollectionModel().findWithPermissions(
             {'_id': {'$in': list(configIds)}},
             user=user, level=AccessType.ADMIN,
@@ -385,7 +399,10 @@ class DatasetView(Resource):
             'datasetViewsUpdated': len(ownedViews),
             'configurationsUpdated': len(ownedConfigs),
             'datasetViewsSkipped': len(datasetViews) - len(ownedViews),
-            'configurationsSkipped': len(configIds) - len(ownedConfigs),
+            # Counted against configurations that still exist: a view can
+            # outlive its (deleted) configuration.
+            'configurationsSkipped':
+                len(existingConfigIds) - len(ownedConfigs),
         }
 
     @access.user(scope=TokenScope.DATA_READ)

@@ -6,6 +6,7 @@ in the DatasetView API.
 import json
 
 import pytest
+from bson import ObjectId
 import random
 
 from pytest_girder.assertions import assertStatus, assertStatusOk
@@ -716,6 +717,19 @@ class TestSetDatasetPublicOwnership:
         assert not isPublic(Collection(), ownConfig)
         assert isPublic(Collection(), otherConfig)
 
+    def testDeletedConfigurationIsNotCountedAsSkipped(self, user, server):
+        dataset, _, view = createDatasetWithView(user)
+        # A view can outlive its configuration.
+        DatasetViewModel().update(
+            {"_id": view["_id"]},
+            {"$set": {"configurationId": ObjectId()}},
+        )
+
+        result = self._setPublic(server, user, dataset, True)
+
+        assert result["configurationsUpdated"] == 0
+        assert result["configurationsSkipped"] == 0
+
     def testSiteAdminStillChangesEverything(self, admin, user, server):
         dataset, ownConfig, _ = createDatasetWithView(user)
         Folder().setUserAccess(dataset, admin, AccessType.READ, save=True)
@@ -791,6 +805,64 @@ class TestDatasetViewBodyAllowlist:
         saved = DatasetViewModel().load(resp.json["_id"], force=True)
         assert [u["id"] for u in saved["access"]["users"]] == [user["_id"]]
         assert not saved.get("public", False)
+
+    def testCreateValidatesAndChecksBothIds(self, admin, user, server):
+        dataset, config, _ = createDatasetWithView(user)
+        privateDataset, privateConfig, _ = createDatasetWithView(admin)
+        Folder().setPublic(privateDataset, False, save=True)
+        Collection().setPublic(privateConfig, False, save=True)
+
+        def create(**ids):
+            return server.request(
+                path="/dataset_view", method="POST", user=user,
+                body=json.dumps({
+                    "lastLocation": {"xy": 0, "z": 0, "time": 0},
+                    "layerContrasts": {}, **ids,
+                }),
+                type="application/json",
+            )
+
+        resp = create(configurationId=str(config["_id"]))
+        assertStatus(resp, 400)
+        assert "datasetId is required" in resp.json["message"]
+        resp = create(datasetId=str(dataset["_id"]), configurationId="bad")
+        assertStatus(resp, 400)
+        assert "configurationId is not a valid id" in resp.json["message"]
+        # Ids the caller cannot read.
+        assertStatus(create(
+            datasetId=str(privateDataset["_id"]),
+            configurationId=str(config["_id"]),
+        ), 403)
+        assertStatus(create(
+            datasetId=str(dataset["_id"]),
+            configurationId=str(privateConfig["_id"]),
+        ), 403)
+        assertStatusOk(create(
+            datasetId=str(dataset["_id"]),
+            configurationId=str(config["_id"]),
+        ))
+
+    def testAclSavesAcceptOlderNullFields(self, admin, user, server):
+        """Saves outside create/update validate the stored document as is;
+        an older view holding null scales/lastViewed must still save."""
+        dataset, _, view = createDatasetWithView(admin)
+        DatasetViewModel().update(
+            {"_id": view["_id"]},
+            {"$set": {"lastViewed": None, "scales": None}},
+        )
+        view = DatasetViewModel().load(view["_id"], force=True)
+
+        DatasetViewModel().setUserAccess(
+            view, user, AccessType.READ, save=True
+        )
+        resp = server.request(
+            path="/dataset_view/set_public", method="POST", user=admin,
+            params={"datasetId": str(dataset["_id"]), "public": "true"},
+        )
+
+        assertStatusOk(resp)
+        assert resp.json["datasetViewsUpdated"] == 1
+        assert isPublic(DatasetViewModel(), view)
 
     def testNonObjectBodyIsRejected(self, admin, server):
         _, _, view = createDatasetWithView(admin)

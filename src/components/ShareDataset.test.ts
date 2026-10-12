@@ -77,7 +77,14 @@ describe("ShareDataset", () => {
     mockGetDatasetAccess.mockResolvedValue({ ...defaultAccessList });
     mockFindDatasetViews.mockResolvedValue([...defaultViews]);
     mockShareDatasetView.mockResolvedValue({});
-    mockSetDatasetPublic.mockResolvedValue(undefined);
+    mockSetDatasetPublic.mockResolvedValue({
+      dataset: "ds1",
+      public: true,
+      datasetViewsUpdated: 1,
+      configurationsUpdated: 1,
+      datasetViewsSkipped: 0,
+      configurationsSkipped: 0,
+    });
     shareLinkMocks.list.mockReset().mockResolvedValue([]);
     shareLinkMocks.create.mockReset();
     shareLinkMocks.revoke.mockReset().mockResolvedValue({});
@@ -257,6 +264,46 @@ describe("ShareDataset", () => {
     expect(mockSetDatasetPublic).toHaveBeenCalledWith("ds1", true);
     expect(vm.isPublic).toBe(true);
     expect(vm.publicLoading).toBe(false);
+  });
+
+  it("togglePublic shows no notice when nothing was skipped", async () => {
+    const wrapper = mountComponent();
+    const vm = wrapper.vm as any;
+    await vm.togglePublic(true);
+
+    expect(vm.publicSkippedNotice).toBe("");
+  });
+
+  it("togglePublic explains views and collections owned by others", async () => {
+    mockSetDatasetPublic.mockResolvedValue({
+      dataset: "ds1",
+      public: true,
+      datasetViewsUpdated: 1,
+      configurationsUpdated: 1,
+      datasetViewsSkipped: 1,
+      configurationsSkipped: 2,
+    });
+    const wrapper = mountComponent();
+    const vm = wrapper.vm as any;
+    await vm.togglePublic(true);
+
+    expect(vm.isPublic).toBe(true);
+    expect(vm.publicSkippedNotice).toBe(
+      "2 collections and 1 view owned by other users stayed unchanged; " +
+        "only their owners can make them public.",
+    );
+
+    // Cleared by the next toggle.
+    mockSetDatasetPublic.mockResolvedValue({
+      dataset: "ds1",
+      public: false,
+      datasetViewsUpdated: 1,
+      configurationsUpdated: 1,
+      datasetViewsSkipped: 0,
+      configurationsSkipped: 0,
+    });
+    await vm.togglePublic(false);
+    expect(vm.publicSkippedNotice).toBe("");
   });
 
   it("togglePublic reverts isPublic on error", async () => {

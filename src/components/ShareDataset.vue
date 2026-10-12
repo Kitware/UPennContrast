@@ -56,6 +56,14 @@
                 density="compact"
                 @update:model-value="togglePublic"
               />
+              <v-alert
+                v-if="publicSkippedNotice"
+                type="info"
+                density="compact"
+                class="mt-2"
+              >
+                {{ publicSkippedNotice }}
+              </v-alert>
             </v-col>
           </v-row>
 
@@ -374,6 +382,7 @@ import { ref, computed, watch } from "vue";
 import { IGirderSelectAble } from "@/girder";
 import store from "@/store";
 import { shareLinkUrl } from "@/store/ShareLinkAPI";
+import type { ISetDatasetPublicResult } from "@/store/GirderAPI";
 import { logError } from "@/utils/log";
 import { accessLevelLabel } from "@/utils/accessLevel";
 import {
@@ -442,6 +451,9 @@ const associatedViews = ref<IDatasetView[]>([]);
 
 // Loading states
 const publicLoading = ref(false);
+// Set when set_public left views/collections owned by other users unchanged:
+// changing those is their owners' call, so "Public" may not cover them.
+const publicSkippedNotice = ref("");
 const userLoading = ref<string | null>(null);
 const addUserLoading = ref(false);
 
@@ -530,15 +542,33 @@ function getSelectedViews(): IDatasetView[] {
   );
 }
 
+function skippedNotice(result: ISetDatasetPublicResult, value: boolean) {
+  const parts = [
+    [result.configurationsSkipped, "collection"],
+    [result.datasetViewsSkipped, "view"],
+  ]
+    .filter(([count]) => (count as number) > 0)
+    .map(([count, noun]) => `${count} ${noun}${count === 1 ? "" : "s"}`);
+  if (parts.length === 0) {
+    return "";
+  }
+  return (
+    `${parts.join(" and ")} owned by other users stayed unchanged; ` +
+    `only their owners can make them ${value ? "public" : "private"}.`
+  );
+}
+
 async function togglePublic(newValue: boolean | null) {
   if (!props.dataset) return;
   const value = !!newValue;
 
   publicLoading.value = true;
   showError.value = false;
+  publicSkippedNotice.value = "";
   try {
-    await store.api.setDatasetPublic(datasetId.value!, value);
+    const result = await store.api.setDatasetPublic(datasetId.value!, value);
     isPublic.value = value;
+    publicSkippedNotice.value = skippedNotice(result, value);
   } catch (error) {
     logError("Failed to toggle public access", error);
     errorString.value = "Failed to update public access";
@@ -785,6 +815,7 @@ defineExpose({
   selectedConfigIds,
   associatedViews,
   publicLoading,
+  publicSkippedNotice,
   userLoading,
   addUserLoading,
   newUserEmail,

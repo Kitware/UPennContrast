@@ -176,7 +176,17 @@ creating their own view. Owning the dataset does not let the caller publish
 document. They are left unchanged and counted in the response's
 `datasetViewsSkipped` / `configurationsSkipped` (beside
 `datasetViewsUpdated` / `configurationsUpdated`). A site admin administers
-everything, so nothing is skipped for them.
+everything, so nothing is skipped for them. The Share dialog shows a note when
+anything was skipped, since "Public" then does not cover those views and collections.
+
+**Known gaps (open decisions, not yet enforced elsewhere):**
+- `POST /dataset_view/share` needs only WRITE on the dataset, views and
+  configurations, and accepts `accessType: 2`, so a WRITE collaborator can grant
+  themselves ADMIN or remove the owner, and then call `set_public`.
+- `POST /project/:id/set_public` publishes every dataset in the project with its
+  views and configurations, and adding a dataset to a project needs only WRITE on it.
+- Views and configurations made public by the pre-ownership `set_public` stay public
+  until their owners (or a site admin) change them.
 
 ## Share links (share a view without making the dataset public)
 

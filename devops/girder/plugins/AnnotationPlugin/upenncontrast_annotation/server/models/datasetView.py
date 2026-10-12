@@ -49,9 +49,12 @@ class DatasetViewSchema:
                 "additionalProperties": contrastSchema,
             },
             # Per-user scale overrides and last-opened time (epoch ms),
-            # written by the client on every view save.
-            "scales": {"type": "object"},
-            "lastViewed": {"type": "number"},
+            # written by the client on every view save. Listed so update's
+            # allowlist keeps them; null stays valid because older views
+            # may hold it, and saves outside create/update (setPublic,
+            # setUserAccess) validate the stored document as it is.
+            "scales": {"type": ["object", "null"]},
+            "lastViewed": {"type": ["number", "null"]},
         },
         "required": [
             "datasetId",
@@ -90,7 +93,7 @@ class DatasetView(ProxiedModel):
         # views it creates; views from the REST API or the multi_source
         # endpoint (nimbusimage ds.configure()) would otherwise have none,
         # sort last in the recent list, and show no date there. null counts
-        # as missing: the schema does not type this field.
+        # as missing (the schema allows it for older views).
         if dataset_view.get("lastViewed") is None:
             dataset_view["lastViewed"] = int(time.time() * 1000)
 

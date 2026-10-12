@@ -310,6 +310,24 @@ class TestShareLink:
                 type="application/json", isJson=False,
             ))
 
+    def testAnonymousUsersCanDownloadAndExportAPublicDataset(
+        self, user, server
+    ):
+        """The admin lockout also refused anonymous downloads of public
+        datasets (requireAdmin(None))."""
+        dataset, _, _ = createDatasetWithView(user)
+        assert Folder().load(dataset["_id"], force=True)["public"]
+        datasetId = str(dataset["_id"])
+
+        assertStatusOk(server.request(
+            path="/folder/%s/download" % datasetId, method="GET",
+            isJson=False,
+        ))
+        assertStatusOk(server.request(
+            path="/export/json", method="GET",
+            params={"datasetId": datasetId}, isJson=False,
+        ))
+
     def testOrdinaryLoginIsNotALink(self, admin, server):
         resp = request(server, "GET", "/share_link/me", user=admin)
         assertStatus(resp, 404)
