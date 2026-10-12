@@ -95,12 +95,21 @@ async def poll_job(job: ni.Job, limit: float) -> None:
     that every sync tool shares; only the polls (blocking HTTP) use one.
     """
     deadline = time.monotonic() + limit
-    await in_thread(job.refresh)  # also fetches the log
+    await _refresh_by(job, deadline)  # also fetches the log
     # Poll only while a whole interval fits before the deadline, so no
-    # refresh (blocking HTTP) starts after it.
+    # refresh starts after it.
     while not job.finished and deadline - time.monotonic() > POLL_SECONDS:
         await anyio.sleep(POLL_SECONDS)
-        await in_thread(job.refresh)
+        await _refresh_by(job, deadline)
+
+
+async def _refresh_by(job: ni.Job, deadline: float) -> None:
+    """Refresh the job, but stop waiting at the deadline: a slow backend
+    must not hold the call past its cap. The abandoned refresh finishes
+    in its thread and updates the job unseen; the caller reports the
+    state it last saw."""
+    with anyio.move_on_after(max(0.0, deadline - time.monotonic())):
+        await anyio.to_thread.run_sync(job.refresh, abandon_on_cancel=True)
 
 
 async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
@@ -151,6 +160,11 @@ async def ni_worker_interface(
     parameters take 0-based channel indices. Call before ni_worker_run.
     """
     nc = client()
+    # The dataset first: a typo or unreadable id must fail before a
+    # cache miss starts a registration job.
+    channels = await in_thread(
+        channel_list, nc.dataset(dataset_id)
+    ) if dataset_id else None
     interface = await fetch_interface(nc, image)
     parameters, notes = [], []
     for name, element in sorted(
@@ -177,10 +191,8 @@ async def ni_worker_interface(
             if kind in worker_values.VALUE_FORMATS
         },
     }
-    if dataset_id:
-        result["channels"] = await in_thread(
-            channel_list, nc.dataset(dataset_id)
-        )
+    if channels is not None:
+        result["channels"] = channels
     return result
 
 

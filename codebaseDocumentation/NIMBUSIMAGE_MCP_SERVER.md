@@ -763,7 +763,8 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_transient_check_failures_are_retried"*
 - [x] The server holds no per-session state between requests.
       *"test_stateless_requests_any_instance"*
-- [x] `ni_job_wait` never starts a poll at or after the configured cap. Job waits (it, and a
+- [x] `ni_job_wait` never starts a poll at or after the configured cap, and stops waiting
+      for a slow poll at the cap. *"test_job_wait_stops_waiting_for_a_slow_refresh"* Job waits (it, and a
       worker's first interface registration) sleep on the event loop rather than holding
       one of the worker threads all sync tools share.
       *"test_job_wait_clamps_and_reports_still_running"*
@@ -791,7 +792,8 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_every_tool_is_registered_with_its_annotations"*
 - [x] Interface registration runs only for installed worker images (the server would
       run any image name it is given).
-      *"test_worker_interface_registers_only_installed_workers"*
+      *"test_worker_interface_registers_only_installed_workers"*,
+      *"test_worker_interface_checks_the_dataset_before_registering"*
 - [x] Tagging needs an explicit target (an empty id list is not "everything"), refuses
       more than 10,000 annotations before loading any, and sends only the annotations
       whose tags change. *"test_tag_refuses_unbounded_or_ambiguous_targets"*,

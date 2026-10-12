@@ -557,6 +557,36 @@ def test_job_wait_clamps_and_reports_still_running(nc, monkeypatch):
     assert sleeps == [workers.POLL_SECONDS] * 2
 
 
+def test_job_wait_stops_waiting_for_a_slow_refresh(nc):
+    """A refresh that hangs (slow backend) must not hold the call past
+    its cap; the call reports the state it last saw."""
+    import time as real_time
+
+    class SlowJob(_Job):
+        def refresh(self):
+            real_time.sleep(3)
+
+    nc.job.return_value = SlowJob(polls=None)
+    start = real_time.monotonic()
+    result = loads(asyncio.run(workers.ni_job_wait(
+        job_id="j1", timeout_seconds=1
+    )))
+    assert real_time.monotonic() - start < 2
+    assert result["finished"] is False
+
+
+def test_worker_interface_checks_the_dataset_before_registering(nc):
+    nc.get_worker_interface.return_value = None
+    nc.list_workers.return_value = WORKERS
+    nc.dataset.return_value.num_channels = 1
+    # Girder answers 400 for an id that matches no folder.
+    type(nc.dataset.return_value).channels = property(
+        lambda _: (_ for _ in ()).throw(http_error(400, "No such folder")))
+    with pytest.raises(ToolError, match="No such folder"):
+        run_tool(workers.ni_worker_interface, image=SEG, dataset_id="typo")
+    nc.girder.post.assert_not_called()
+
+
 def test_job_wait_scope_problem_is_explained(nc):
     nc.job.return_value.refresh.side_effect = PermissionError(
         "core.user_auth")
