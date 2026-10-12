@@ -10,6 +10,7 @@ from typing import Literal
 
 import anyio
 import girder_client
+import requests
 
 from mcp.server.mcpserver.exceptions import ToolError
 
@@ -186,11 +187,13 @@ async def _run_registration(nc: ni.NimbusClient, image: str) -> None:
         return
     try:
         state = await poll_job(ni.Job(nc.girder, response[0]), deadline)
-    except (girder_client.HttpError, PermissionError):
-        # The request went through but its job is not readable with this
-        # key (job status needs core.user_auth): watch for the interface
-        # instead, so the registration stays pending rather than ending
-        # and letting the next call send another.
+    except (girder_client.HttpError, PermissionError,
+            requests.RequestException):
+        # The request was accepted but its job cannot be followed (a key
+        # without core.user_auth, a job error, Girder unreachable for a
+        # moment): watch for the interface instead, so the registration
+        # stays pending rather than ending and letting the next call send
+        # another.
         while deadline - time.monotonic() > POLL_SECONDS:
             await anyio.sleep(POLL_SECONDS)
             if await _interface(nc, image, deadline) is not None:
@@ -209,6 +212,8 @@ async def _run_registration(nc: ni.NimbusClient, image: str) -> None:
 
 
 def _interface(nc: ni.NimbusClient, image: str, deadline: float):
+    """The image's registered interface (None if there is none yet), read
+    by `nc`'s user, by the deadline."""
     return _before(deadline, nc.get_worker_interface, image,
                    request_if_missing=False)
 
@@ -269,9 +274,7 @@ async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
     deadline = time.monotonic() + max(1.0, min(
         INTERFACE_REQUEST_TIMEOUT, settings().max_job_wait
     ))
-    interface = await _before(
-        deadline, nc.get_worker_interface, image, request_if_missing=False
-    )
+    interface = await _interface(nc, image, deadline)
     if interface is None:
         # Registering runs the image on the server, which accepts any
         # name: only ever ask for an installed worker.
