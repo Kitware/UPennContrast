@@ -217,7 +217,8 @@ export default class ProjectsAPI {
   }
 
   /**
-   * Share or revoke access to a project and all its resources.
+   * Share or revoke access to a project and the resources in it the caller
+   * can share (datasets they own; collections and views they can edit).
    */
   async shareProject(
     projectId: string,
@@ -244,13 +245,14 @@ export default class ProjectsAPI {
   }
 
   /**
-   * Make a project and all its resources public or private.
-   * Requires ADMIN access to the project.
+   * Make a project, and the resources in it the caller owns, public or
+   * private. Requires ADMIN access to the project; `skipped` counts the
+   * contained resources left unchanged because the caller does not own them.
    */
   async setProjectPublic(
     projectId: string,
     isPublic: boolean,
-  ): Promise<{ projectId: string; public: boolean }> {
+  ): Promise<{ projectId: string; public: boolean; skipped: number }> {
     const response = await this.client.post(
       `project/${projectId}/set_public`,
       null,

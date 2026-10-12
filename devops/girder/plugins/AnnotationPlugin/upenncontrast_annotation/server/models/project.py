@@ -412,17 +412,18 @@ class Project(ProxiedModel):
         :param model: The Girder model instance.
         :param actor: The user making the change.
         :param public: Boolean, True to make public.
+        :returns: How many docs were left unchanged.
         """
         doc_ids = [
             doc['_id'] for doc in docs
             if canPublish(model, doc, actor)
         ]
-        if not doc_ids:
-            return
-        model.update(
-            {'_id': {'$in': doc_ids}},
-            {'$set': {'public': public}}
-        )
+        if doc_ids:
+            model.update(
+                {'_id': {'$in': doc_ids}},
+                {'$set': {'public': public}}
+            )
+        return len(docs) - len(doc_ids)
 
     def _bulkSetAllUsersAccess(
         self, docs, model, project, actor
@@ -493,10 +494,13 @@ class Project(ProxiedModel):
 
         :param resources: Dict from _gatherAllResources.
         :param apply_fn: fn(docs, model) to call.
+        :returns: apply_fn's results, one per resource type.
         """
-        apply_fn(resources['datasets'], Folder())
-        apply_fn(resources['collections'], CollectionModel())
-        apply_fn(resources['datasetViews'], DatasetViewModel())
+        return [
+            apply_fn(resources['datasets'], Folder()),
+            apply_fn(resources['collections'], CollectionModel()),
+            apply_fn(resources['datasetViews'], DatasetViewModel()),
+        ]
 
     def propagateUserAccess(
         self, project, targetUser, level, actor
@@ -529,14 +533,16 @@ class Project(ProxiedModel):
         :param project: The project document.
         :param public: Boolean, True to make public.
         :param actor: The user changing the project.
+        :returns: How many resources were left unchanged
+                  because the actor does not own them.
         """
         resources = self._gatherAllResources(project)
-        self._applyToAllResourceTypes(
+        return sum(self._applyToAllResourceTypes(
             resources,
             lambda docs, model: (
                 self._bulkSetPublic(docs, model, actor, public)
             )
-        )
+        ))
 
     def propagateAllUsersAccess(
         self, project, documents, model, actor

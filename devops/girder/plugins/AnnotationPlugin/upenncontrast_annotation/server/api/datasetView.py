@@ -257,7 +257,7 @@ class DatasetView(Resource):
             view or configuration the caller does not own is shared at no
             more than the caller's own level, and an entry above that level
             (its owner's) is left unchanged. All views must belong to the
-            same dataset.
+            same dataset. The caller cannot target themselves.
         """)
         .jsonParam(
             "body",
@@ -287,6 +287,10 @@ class DatasetView(Resource):
         if not targetUser:
             logger.error(f"Cannot find user {body['userMailOrUsername']}")
             raise RestException("badEmailOrUsername")
+        if targetUser["_id"] == user["_id"]:
+            # Owners would lock themselves out (-1 leaves the dataset with
+            # no owner); others cannot share at all.
+            raise RestException("Cannot change your own access.")
 
         # Will raise if accessType is a bad value
         # -1 means remove access (Girder convention), 0=READ, 1=WRITE, 2=ADMIN

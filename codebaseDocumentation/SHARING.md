@@ -157,6 +157,7 @@ Grants, modifies, or revokes user access.
 - Also sets permissions on the parent Dataset folder
 - Also sets permissions on associated Configurations
 - All views must belong to one dataset (400 otherwise); an empty list is a 400
+- The caller cannot target themselves (400): an owner would lock themselves out
 
 **Limits (`server/helpers/aclLimits.py`):** sharing never hands out more than the
 caller holds. A view or configuration the caller can edit but does not own is shared

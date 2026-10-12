@@ -6,6 +6,7 @@ from girder.models.folder import Folder
 from girder.models.user import User
 
 from ..models.annotation import Annotation
+from ..models.collection import Collection
 from ..models.propertyValues import MAX_IDS_PER_QUERY
 
 
@@ -32,6 +33,31 @@ def requireDatasetsAccess(datasetIds, user, level=AccessType.WRITE):
         )
     for dataset in datasets:
         folderModel.requireAccess(dataset, user, level)
+
+
+def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
+    """Check access on every dataset and collection a project references.
+
+    Project-level access says nothing about the resources in it: a dataset
+    can be added by someone with only WRITE on it, and a project admin may
+    not be able to read it at all. Publishing a project (Zenodo) is an owner
+    operation on each of them. References to deleted resources are ignored,
+    as the export skips them.
+
+    :raises AccessException: If user lacks access to any of them.
+    """
+    meta = project.get('meta', {})
+    for model, ids in (
+        (Folder(), [d['datasetId'] for d in meta.get('datasets', [])]),
+        (Collection(),
+         [c['collectionId'] for c in meta.get('collections', [])]),
+    ):
+        if not ids:
+            continue
+        for doc in model.find(
+            {'_id': {'$in': ids}}, fields=['access', 'public']
+        ):
+            model.requireAccess(doc, user, level)
 
 
 def requireAnnotationsInDatasets(entries):

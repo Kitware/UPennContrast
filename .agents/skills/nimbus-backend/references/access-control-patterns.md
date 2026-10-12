@@ -93,6 +93,12 @@ added dataset) is the same write: the caller's own ADMIN entry rides
 along. Pass the acting user down to the model rather than letting the
 model write unconditionally.
 
+Check every path that hands data *out* on a container's authority, not
+only the ones that write ACLs: a Zenodo upload of a project exported every
+dataset in it on project ADMIN alone, including datasets the caller could
+not read. Publishing or exporting a container needs ADMIN on each thing in
+it (`requireProjectContentsAccess`).
+
 ### Public Access Pattern
 
 Making resources public/private affects the entire chain:

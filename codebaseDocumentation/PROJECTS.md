@@ -509,6 +509,12 @@ contained resource only as far as that user could share it directly
 - an existing entry above the actor's level is left unchanged;
 - the public flag only on resources the actor has ADMIN on.
 
+`POST /project/:id/set_public` returns `skipped`, the number of contained resources it
+left unchanged because the caller does not own them. Neither share endpoint lets the
+caller target themselves (400): an owner removing themselves would leave the project,
+or the dataset, with no owner. Zenodo upload/publish need ADMIN on every dataset and
+collection in the project (`codebaseDocumentation/ZENODO_UPLOAD.md`).
+
 Without this, adding a dataset you could only edit to a project you own copied the
 project's ACL -- where you are ADMIN -- onto the dataset, and `addCollection` reached
 every dataset using the collection, even ones you could not read. Tests:

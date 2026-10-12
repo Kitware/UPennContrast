@@ -286,7 +286,7 @@ class Project(Resource):
             caller owns, and views/configurations the caller
             can edit, at no more than the caller's own level.
             Entries above the caller's level are left as they
-            are.
+            are. The caller cannot target themselves.
         """)
         .modelParam(
             'id', model=ProjectModel,
@@ -319,13 +319,17 @@ class Project(Resource):
         )
         if not targetUser:
             raise RestException("badEmailOrUsername")
+        user = self.getCurrentUser()
+        if targetUser['_id'] == user['_id']:
+            # An owner would lock themselves out of the project
+            # (and, by propagation, of everything in it).
+            raise RestException("Cannot change your own access.")
 
         self._projectModel.setUserAccess(
             project, targetUser, accessType, save=True
         )
         self._projectModel.propagateUserAccess(
-            project, targetUser, accessType,
-            self.getCurrentUser()
+            project, targetUser, accessType, user
         )
 
         return True
@@ -372,7 +376,8 @@ class Project(Resource):
             - The collections in the project
             - The dataset views linking them
             Contained resources the caller does not own (ADMIN)
-            are left as they are.
+            are left as they are; the response counts them in
+            `skipped`.
         """)
         .modelParam(
             'id', model=ProjectModel,
@@ -392,11 +397,12 @@ class Project(Resource):
         self._projectModel.setPublic(
             project, public, save=True
         )
-        self._projectModel.propagatePublic(
+        skipped = self._projectModel.propagatePublic(
             project, public, self.getCurrentUser()
         )
 
         return {
             'projectId': str(project['_id']),
             'public': public,
+            'skipped': skipped,
         }

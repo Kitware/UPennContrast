@@ -18,8 +18,8 @@
 
         <!-- Info Alert -->
         <v-alert type="info" density="compact" class="mb-4">
-          Sharing this project will grant access to all datasets and collections
-          within it.
+          Sharing this project also shares the datasets you own in it, and the
+          collections you can edit (at no more than your own access).
         </v-alert>
 
         <!-- Loading State -->
@@ -370,7 +370,8 @@ function confirmTogglePublic(newValue: boolean | null) {
     showConfirm(
       "Make Project Public",
       "This will grant read-only access to everyone, including " +
-        "anonymous users who are not logged in.",
+        "anonymous users who are not logged in, to the project and the " +
+        "datasets and collections in it that you own.",
       "Make Public",
       "primary",
       () => togglePublic(true),
@@ -412,7 +413,8 @@ function confirmUpdateUserAccess(user: IDatasetAccessUser, newLevel: number) {
   showConfirm(
     "Change Access Level",
     `Change access for ${user.name || user.login} to ${levelLabel}? ` +
-      "This will update their permissions on all resources in this project.",
+      "This will update their permissions on the resources in this project " +
+      "that you can share.",
     "Change",
     "primary",
     () => updateUserAccess(user, newLevel),
@@ -449,8 +451,8 @@ function confirmRemoveUser(user: IDatasetAccessUser) {
   showConfirm(
     "Remove Access",
     `Remove access for ${user.name || user.login}? ` +
-      "This will also remove their access to all datasets and " +
-      "collections in this project.",
+      "This will also remove their access to the datasets and " +
+      "collections in this project that you can share.",
     "Remove",
     "error",
     () => removeUser(),
@@ -483,8 +485,8 @@ function confirmAddUser() {
   showConfirm(
     "Share Project",
     `Grant ${levelLabel} access to "${newUserEmail.value}"? ` +
-      "This will give them access to all datasets and collections " +
-      "in this project.",
+      "This will also give them access to the datasets you own and " +
+      "the collections you can edit in this project.",
     "Share",
     "primary",
     () => addUser(),

@@ -19,6 +19,7 @@ from girder.constants import AccessType
 from girder.exceptions import RestException
 from girder_jobs.models.job import Job as JobModel
 
+from ..helpers.access_helpers import requireProjectContentsAccess
 from ..helpers.zenodo_client import (
     ZenodoError,
     get_zenodo_client_for_user,
@@ -144,6 +145,9 @@ class Zenodo(Resource):
             starts uploading all project data to Zenodo
             as a background job.
 
+            Requires ADMIN on the project and on every
+            dataset and collection in it.
+
             If the project was previously published, this
             creates a new version of the existing
             deposition.
@@ -174,6 +178,9 @@ class Zenodo(Resource):
             project_id, user=user,
             level=AccessType.ADMIN, exc=True,
         )
+        # Publishing hands out every file in the project: an owner
+        # operation on each dataset and collection, not just the project.
+        requireProjectContentsAccess(project, user)
 
         # Check if upload is already in progress
         # (cheap check before hitting Zenodo API)
@@ -326,6 +333,7 @@ class Zenodo(Resource):
             projectId, user=user,
             level=AccessType.ADMIN, exc=True,
         )
+        requireProjectContentsAccess(project, user)
 
         zenodo = project['meta'].get('zenodo', {})
         if zenodo.get('status') != 'draft':

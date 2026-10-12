@@ -132,8 +132,29 @@ class TestDatasetViewShareLimits:
 
         resp = share(server, user, [view], user, ADMIN)
 
-        assertStatus(resp, 403)
+        assertStatus(resp, 400)
+        assert "your own access" in resp.json["message"]
         assert levels(user, dataset, config, view) == (WRITE, WRITE, WRITE)
+
+    def testWriteCollaboratorCannotGrantAdminToAnotherAccount(
+            self, server, owner, user, third):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+
+        resp = share(server, user, [view], third, ADMIN)
+
+        assertStatus(resp, 403)
+        assert "Admin access denied" in resp.json["message"]
+        assert levels(third, dataset, config, view) == (
+            NO_ACCESS, NO_ACCESS, NO_ACCESS)
+
+    def testOwnerCannotRemoveThemselves(self, server, owner):
+        dataset, config, view = createDataset(owner)
+
+        resp = share(server, owner, [view], owner, -1)
+
+        assertStatus(resp, 400)
+        assert levels(owner, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
 
     def testWriteCollaboratorCannotShareWithOthers(
             self, server, owner, user, third):
@@ -312,3 +333,79 @@ class TestProjectShareLimits:
         for model, doc in ((Folder(), dataset), (Collection(), config),
                            (DatasetViewModel(), view)):
             assert not model.load(doc["_id"], force=True).get("public")
+
+    def testPublishingProjectReportsSkippedResources(
+            self, server, owner, user):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+        project = self.createProject(server, user)
+        self.addDataset(server, user, project, dataset)
+
+        resp = server.request(
+            path=f"/project/{project['_id']}/set_public", method="POST",
+            user=user, params={"public": True})
+
+        assertStatusOk(resp)
+        # dataset, configuration and view are all the owner's
+        assert resp.json["skipped"] == 3
+
+    def testProjectOwnerCannotRemoveThemselves(self, server, owner):
+        dataset, config, view = createDataset(owner)
+        project = self.createProject(server, owner)
+        self.addDataset(server, owner, project, dataset)
+
+        resp = server.request(
+            path=f"/project/{project['_id']}/share", method="POST",
+            user=owner, params={
+                "userMailOrUsername": owner["login"], "accessType": -1})
+
+        assertStatus(resp, 400)
+        assert levelOf(Project(), project, owner) == ADMIN
+        assert levels(owner, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestZenodoRequiresOwnership:
+    """Publishing a project hands out every file in it, so it needs ADMIN on
+    each dataset and collection, not only on the project."""
+
+    def projectWithDatasetOf(self, server, owner, user):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+        project = TestProjectShareLimits().createProject(server, user)
+        TestProjectShareLimits().addDataset(server, user, project, dataset)
+        return project
+
+    def testUploadRefusesDatasetsCallerDoesNotOwn(self, server, owner, user):
+        project = self.projectWithDatasetOf(server, owner, user)
+
+        resp = server.request(
+            path="/zenodo/upload", method="POST", user=user,
+            type="application/json",
+            body=json.dumps({"projectId": project["_id"]}))
+
+        assertStatus(resp, 403)
+        assert "Admin access denied" in resp.json["message"]
+
+    def testPublishRefusesDatasetsCallerDoesNotOwn(self, server, owner, user):
+        project = self.projectWithDatasetOf(server, owner, user)
+
+        resp = server.request(
+            path=f"/zenodo/publish/{project['_id']}", method="POST",
+            user=user)
+
+        assertStatus(resp, 403)
+
+    def testOwnerPassesTheOwnershipCheck(self, server, owner):
+        dataset, _, _ = createDataset(owner)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+
+        resp = server.request(
+            path="/zenodo/upload", method="POST", user=owner,
+            type="application/json",
+            body=json.dumps({"projectId": project["_id"]}))
+
+        # Next gate: the owner has no Zenodo token configured
+        assertStatus(resp, 400)
