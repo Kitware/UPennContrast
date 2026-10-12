@@ -193,12 +193,14 @@ def ni_property_histogram(
     [{min, max, count}] with up to `buckets` buckets (default 20, max
     100).
     """
+    # The keys become a Mongo field path; the histogram endpoint does not
+    # validate them (the server's isValidPropertyPath also refuses these).
     if len(property_path) < 2 or any(
-        not key or "." in key for key in property_path
+        not key or "." in key or "$" in key for key in property_path
     ):
         raise ValueError(
             "property_path must be a list of keys from ni_properties_list, "
-            "e.g. [property_id, \"Area\"] (keys cannot contain '.')."
+            "e.g. [property_id, \"Area\"] (keys cannot contain '.' or '$')."
         )
     rows = client().dataset(dataset_id).properties.histogram(
         ".".join(property_path), buckets=clamp(buckets, 1, MAX_BUCKETS)

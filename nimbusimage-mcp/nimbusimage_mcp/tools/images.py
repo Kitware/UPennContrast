@@ -16,6 +16,14 @@ MAX_IMAGE_SIZE = 2048
 CHANNEL_CONTRAST = (0.5, 99.5)
 
 
+BLACK_NOTE = (
+    "The composite is entirely black. Either no visible layer draws at "
+    "this xy/z/time (e.g. a layer set to an offset slice past the end), "
+    "or the frame is dark at the user's contrast; ni_image_get_channel "
+    "shows a channel with automatic contrast."
+)
+
+
 def check_crop(crop, width: int, height: int) -> tuple[int, int, int, int]:
     """The crop, clipped to the image; ValueError (shown to the model)
     when it is empty or entirely outside the image."""
@@ -70,7 +78,8 @@ def ni_image_get_composite(
     """Show the image: a color composite of the dataset's visible channels
     at one XY position, z-slice, and time point, rendered the way the user
     sees it in NimbusImage (their channel colors, contrast, and layer
-    settings such as max projections). Returns a JPEG whose longer side is
+    settings such as max projections). Returns a JPEG (with a note if it
+    is entirely black) whose longer side is
     at most max_size pixels (default 1024, max 2048). To zoom in, pass
     crop=(left, top, right, bottom) in full-resolution image pixels (see
     width/height from ni_dataset_info). To see one channel on its own,
@@ -90,14 +99,13 @@ def ni_image_get_composite(
     rgb = ds.images.get_composite(
         xy=xy, z=z, time=time, dtype="uint8", max_size=max_size, crop=crop
     )
+    image = Image(data=encode_jpeg(rgb), format="jpeg")
     if not rgb.any():
-        # get_composite returns black when no layer draws here (e.g. an
-        # offset slice out of range); say so rather than show a black image.
-        raise ValueError(
-            "Nothing is drawn at this location: every visible layer is "
-            "empty or not shown at this xy/z/time."
-        )
-    return Image(data=encode_jpeg(rgb), format="jpeg")
+        # Black is ambiguous: get_composite also returns black when no
+        # layer draws here (e.g. an offset slice out of range). Show it,
+        # and say so, rather than refuse a frame that may really be dark.
+        return [image, BLACK_NOTE]
+    return image
 
 
 @instrumented

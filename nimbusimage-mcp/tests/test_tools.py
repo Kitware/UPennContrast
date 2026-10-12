@@ -151,6 +151,13 @@ def test_composite_downsampled(nc):
     assert kwargs["max_size"] == images.MAX_IMAGE_SIZE
     assert kwargs["crop"] == (0, 0, 3000, 100)
     assert isinstance(result, Image)
+    # An all-black composite is still shown, with a note saying why it
+    # may be black.
+    ds.images.get_composite.return_value = np.zeros((8, 8, 3), np.uint8)
+    image, note = images.ni_image_get_composite(dataset_id="d")
+    assert isinstance(image, Image) and note == images.BLACK_NOTE
+    assert _common.result_size([image, note]) == (
+        _common.result_size(image) + len(note))
 
 
 def test_channel_view_is_one_stretched_channel(nc):
@@ -348,7 +355,7 @@ def test_values_summary_says_when_nothing_is_computed(nc):
 
 
 def test_histogram_validates_the_path(nc):
-    for bad in (["p1"], ["p1", "a.b"], ["p1", ""]):
+    for bad in (["p1"], ["p1", "a.b"], ["p1", ""], ["p1", "$bad"]):
         with pytest.raises(ToolError, match="property_path"):
             properties.ni_property_histogram(dataset_id="d",
                                              property_path=bad)

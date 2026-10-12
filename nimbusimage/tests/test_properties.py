@@ -30,6 +30,10 @@ class TestPropertyDefinitions:
         assert len(result) == 1
         assert isinstance(result[0], Property)
         assert result[0].name == "Blob Intensity"
+        # Every page: the server's default page is 50 properties.
+        mock_gc.get.assert_called_once_with(
+            "annotation_property", parameters={"limit": 0}
+        )
 
     def test_get(self, mock_gc, sample_property_dict):
         mock_gc.get.return_value = sample_property_dict

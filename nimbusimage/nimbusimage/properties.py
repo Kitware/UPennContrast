@@ -27,7 +27,9 @@ class PropertyAccessor:
 
     def list(self) -> list[Property]:
         """List all property definitions accessible to the user."""
-        data = self._gc.get("annotation_property")
+        # limit=0: the endpoint pages (50 by default), and a missing
+        # property makes get_or_create() create a duplicate.
+        data = self._gc.get("annotation_property", parameters={"limit": 0})
         return [Property.from_dict(d) for d in data]
 
     def get(self, property_id: str) -> Property:

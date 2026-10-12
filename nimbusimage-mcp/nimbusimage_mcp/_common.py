@@ -62,16 +62,22 @@ def caller_id() -> str | None:
     return access.subject if access else None
 
 
-def compact(result) -> str | Image:
+def compact(result):
     """Tool results go out as compact JSON text. The SDK would indent dict
-    results (about a third more bytes, measured in the spike)."""
-    if isinstance(result, (str, Image)):
+    results (about a third more bytes, measured in the spike). Content
+    (text, an image, or a list of them) passes through."""
+    if isinstance(result, (str, Image)) or (
+        isinstance(result, list)
+        and all(isinstance(item, (str, Image)) for item in result)
+    ):
         return result
     return json.dumps(result, separators=(",", ":"), default=str)
 
 
 def result_size(result) -> int:
     """Bytes on the wire: images travel base64-encoded, text as is."""
+    if isinstance(result, list):
+        return sum(result_size(item) for item in result)
     if isinstance(result, Image):
         return 4 * math.ceil(len(result.data or b"") / 3)
     return len(result.encode())
