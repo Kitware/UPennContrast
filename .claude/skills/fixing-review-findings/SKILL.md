@@ -447,6 +447,13 @@ Report per-finding outcomes (fixed / stale / by-design / needs-decision) keyed t
   abandoned thread keeps running, so the client needs an HTTP timeout. Build the
   result from a snapshot taken in the thread, never from an object it may still
   mutate (PR #1409, rounds 4-7).
+- When successive review rounds keep finding races in hand-rolled "pending"
+  state (timestamps, saved job ids, locks with rechecks), stop patching it.
+  Make the operation a single-flight task: one task per key does the whole
+  thing, callers `await shield(task)` up to their own deadline, and a done task
+  is replaced. "Pending" then means "task not done", and every outcome (sent,
+  refused, never sent, failed) reaches every waiter. PR #1409 went through
+  three rounds of fixes before switching.
 - Harness trap: patching `time.monotonic` patches the clock asyncio uses
   (`loop.time()`), so `move_on_after` and `sleep` deadlines follow the fake clock.
   A test like that proves nothing about real timeouts. Test those with a fake

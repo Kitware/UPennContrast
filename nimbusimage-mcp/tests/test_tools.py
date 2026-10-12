@@ -889,44 +889,55 @@ def test_a_slow_registration_post_counts_as_pending(nc):
     assert nc.girder.post.call_count == 1
 
 
-def test_a_pending_registration_returns_the_interface_when_it_appears(
+def test_a_retry_joins_the_running_registration_and_gets_its_result(
         nc, monkeypatch):
+    """The first caller stops waiting while the registration job runs; a
+    retry joins the same registration (no second POST) and returns the
+    interface once its job finishes."""
     _common.configure(make_settings(max_job_wait=1))
     _registering(nc)
 
     async def scenario():
         with pytest.raises(ToolError, match="still registering"):
             await workers.ni_worker_interface(image=SEG)
-        # The job registers the interface later; a retry with a longer
-        # wait picks it up without posting again.
-        _common.configure(make_settings(max_job_wait=10))
-        monkeypatch.setattr(workers, "POLL_SECONDS", 0.05)
+        # The job now finishes and registers the interface.
+        nc.girder.get.return_value = {"_id": "j1", "status": 3}
         nc.get_worker_interface.return_value = INTERFACE
+        _common.configure(make_settings(max_job_wait=10))
         return await workers.ni_worker_interface(image=SEG)
 
+    monkeypatch.setattr(workers, "POLL_SECONDS", 0.05)
     assert loads(asyncio.run(scenario()))["parameters"]
     assert nc.girder.post.call_count == 1
 
 
-def test_a_failed_pending_registration_is_reported_and_retried(
-        nc, monkeypatch):
-    """The first caller stops waiting; the job then fails. A retry sees
-    the job finished (no interface) at once, and the next call posts a
-    new registration instead of waiting out the pending window."""
-    _common.configure(make_settings(max_job_wait=1))
-    _registering(nc)
+def test_a_failed_registration_is_reported_and_retried(nc, monkeypatch):
+    """A registration whose job fails is reported as failed to everyone
+    waiting on it, and the next call starts a new one."""
+    _common.configure(make_settings(max_job_wait=10))
+    _registering(nc, job_status=4)  # the job errors
+    monkeypatch.setattr(workers, "POLL_SECONDS", 0.05)
 
     async def scenario():
-        with pytest.raises(ToolError, match="still registering"):
-            await workers.ni_worker_interface(image=SEG)
-        nc.girder.get.return_value = {"_id": "j1", "status": 4}  # error
-        _common.configure(make_settings(max_job_wait=10))
-        monkeypatch.setattr(workers, "POLL_SECONDS", 0.05)
-        with pytest.raises(ToolError, match="no parameter interface"):
-            await workers.ni_worker_interface(image=SEG)
-        assert nc.girder.post.call_count == 1
-        with pytest.raises(ToolError, match="no parameter interface"):
-            await workers.ni_worker_interface(image=SEG)
+        for _ in range(2):
+            with pytest.raises(ToolError, match="registration failed"):
+                await workers.ni_worker_interface(image=SEG)
+
+    asyncio.run(scenario())
+    assert nc.girder.post.call_count == 2
+
+
+def test_a_registration_that_never_reached_the_server_is_retried(nc):
+    """Nothing was sent (connection refused): the next call registers."""
+    import requests
+    _common.configure(make_settings(max_job_wait=10))
+    _registering(nc)
+    nc.girder.post.side_effect = requests.ConnectionError("refused")
+
+    async def scenario():
+        for _ in range(2):
+            with pytest.raises(ToolError, match="Could not reach"):
+                await workers.ni_worker_interface(image=SEG)
 
     asyncio.run(scenario())
     assert nc.girder.post.call_count == 2

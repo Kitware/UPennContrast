@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import dataclasses
 import functools
-import math
 import time
 import weakref
 from typing import Literal
 
 import anyio
-import girder_client
 
 from mcp.server.mcpserver.exceptions import ToolError
 
@@ -159,111 +156,74 @@ async def _before(deadline: float, fn, *args, **kwargs):
     return result
 
 
-# Registrations per image in this process: the server starts a worker
-# container for every registration request, so a burst of first calls,
-# or a retry while a slow registration is still running, must not send
-# another. Per event loop (asyncio locks bind to one; production has a
-# single loop). Weak keys free a loop's entries only while no lock of
-# that loop has been contended, which is fine for one long-lived loop.
+# One registration task per image in this process: the server starts a
+# worker container for every registration request, so a burst of first
+# calls, or a retry while a slow registration is still running, must not
+# send another. Callers wait on the task (shielded, up to their own
+# deadline); a finished task, whatever its outcome, lets the next call
+# start a new one. Per event loop (production has one).
 _registrations: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
-# How long a registration this process sent is presumed still running.
+# The longest a registration task waits for its job.
 REGISTRATION_PENDING_SECONDS = 300
 
 
-@dataclasses.dataclass
-class _Registration:
-    lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock)
-    posted_at: float = -math.inf  # monotonic; -inf: none pending
-    job_id: str | None = None  # the pending registration's job, if known
+async def _run_registration(nc: ni.NimbusClient, image: str) -> None:
+    """Register the image's interface: one POST, then follow its job to
+    the end. Runs as a task with the first caller's client (it polls that
+    caller's own job); its outcome is every waiter's."""
+    deadline = time.monotonic() + REGISTRATION_PENDING_SECONDS
+    # A task that finished just before this one started may have
+    # registered it already.
+    if await _before(deadline, nc.get_worker_interface, image,
+                     request_if_missing=False) is not None:
+        return
+    response = await _before(
+        deadline, nc.girder.post, "worker_interface/request",
+        parameters={"image": image},
+    )
+    if isinstance(response, list) and response:
+        state = await poll_job(ni.Job(nc.girder, response[0]), deadline)
+        if state is None or not state["finished"]:
+            raise ToolError(
+                f"{image}'s parameter registration did not finish; try "
+                "again later."
+            )
+        if not state["succeeded"]:
+            raise ToolError(
+                f"{image}'s parameter registration failed "
+                f"({state['status']}); try again, or check the worker."
+            )
 
 
-def _registration(image: str) -> _Registration:
-    images = _registrations.setdefault(asyncio.get_running_loop(), {})
-    return images.setdefault(image, _Registration())
-
-
-async def _job_finished(nc: ni.NimbusClient, job_id: str,
-                        deadline: float) -> bool:
-    """Whether the caller can see the job has finished. A job started by
-    another user may not be readable: then it is not known to be done."""
-    try:
-        state = await _before(
-            deadline, _snapshot, ni.Job(nc.girder, {"_id": job_id})
+def _registration_task(nc: ni.NimbusClient, image: str) -> asyncio.Task:
+    tasks = _registrations.setdefault(asyncio.get_running_loop(), {})
+    task = tasks.get(image)
+    if task is None or task.done():
+        task = asyncio.create_task(_run_registration(nc, image))
+        # Mark a failure as seen even if every waiter has given up.
+        task.add_done_callback(
+            lambda t: t.cancelled() or t.exception()
         )
-    except (girder_client.HttpError, PermissionError):
-        return False
-    return state["finished"]
+        tasks[image] = task
+    return task
 
 
 async def _register_once(nc: ni.NimbusClient, image: str,
                          deadline: float) -> dict | None:
-    """The image's interface, registering it unless a registration is
-    already pending (None if registration produced none)."""
-    still_registering = ToolError(
-        f"{image} is still registering its parameters; try again in a "
-        "minute."
-    )
-    registration = _registration(image)
-    # The deadline bounds the wait for the lock only; inside, each call
-    # is bounded by _before and keeps its own error.
+    """Wait (until the deadline) for the image's registration, starting
+    one unless one is running, then read the interface as the caller."""
+    task = _registration_task(nc, image)
     with anyio.move_on_after(max(0.0, deadline - time.monotonic())) as wait:
-        await registration.lock.acquire()
+        # Shielded: a caller giving up does not cancel the registration.
+        await asyncio.shield(task)
     if wait.cancelled_caught:
-        raise still_registering
-    try:
-        # Recheck: whoever held the lock may have registered it.
-        interface = await _before(
-            deadline, nc.get_worker_interface, image,
-            request_if_missing=False,
+        raise ToolError(
+            f"{image} is still registering its parameters; try again in "
+            "a minute."
         )
-        if interface is not None:
-            return interface
-        if (time.monotonic() - registration.posted_at
-                >= REGISTRATION_PENDING_SECONDS):
-            # Pending from before the POST: a POST that outlives our wait
-            # still reaches the server, so a retry must not post again.
-            registration.posted_at = time.monotonic()
-            registration.job_id = None
-            try:
-                response = await _before(
-                    deadline, nc.girder.post, "worker_interface/request",
-                    parameters={"image": image},
-                )
-            except girder_client.HttpError:
-                registration.posted_at = -math.inf  # refused: none running
-                raise
-            if isinstance(response, list) and response:
-                job = ni.Job(nc.girder, response[0])
-                registration.job_id = job.id
-                state = await poll_job(job, deadline)
-                if not (state and state["finished"]):
-                    raise still_registering
-            registration.posted_at = -math.inf  # done, either way
-            return await _before(
-                deadline, nc.get_worker_interface, image,
-                request_if_missing=False,
-            )
-        job_id = registration.job_id
-    finally:
-        registration.lock.release()
-    # A registration sent earlier is still running: wait for its result
-    # (outside the lock, so other callers can wait too) instead of
-    # starting another container.
-    while deadline - time.monotonic() > POLL_SECONDS:
-        await anyio.sleep(POLL_SECONDS)
-        interface = await _before(
-            deadline, nc.get_worker_interface, image,
-            request_if_missing=False,
-        )
-        if interface is not None:
-            registration.posted_at = -math.inf
-            return interface
-        if job_id and await _job_finished(nc, job_id, deadline):
-            # Finished without an interface (e.g. the worker failed):
-            # report that, and let the next call register again.
-            registration.posted_at = -math.inf
-            return None
-    raise still_registering
+    return await _before(
+        deadline, nc.get_worker_interface, image, request_if_missing=False
+    )
 
 
 async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:

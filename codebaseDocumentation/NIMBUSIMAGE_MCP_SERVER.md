@@ -814,18 +814,19 @@ the local stack. Add an item whenever a review finds something this list missed.
       so is marked non-destructive but not read-only.
       *"test_every_tool_is_registered_with_its_annotations"*
 - [x] Interface registration runs only for installed worker images (the server would
-      run any image name it is given). Per server process (the server does not
-      deduplicate), concurrent first requests send one registration. For up to 5 minutes
-      after a registration was sent (even one whose request timed out), a retry waits
-      for the interface instead of sending another, unless it sees that registration's
-      job finish, in which case it reports the result and the next call may register
-      again. *"test_concurrent_first_requests_register_an_interface_once"*,
+      run any image name it is given), and at most one registration per image runs at a
+      time in a server process (the server does not deduplicate): it is a background
+      task that sends one request and follows its job, and every caller waits on it up to
+      its own deadline. A retry while it runs joins it; its outcome (registered, failed,
+      never sent) reaches every waiter; a finished one lets the next call start afresh.
+      *"test_worker_interface_registers_only_installed_workers"*,
+      *"test_worker_interface_checks_the_dataset_before_registering"*,
+      *"test_concurrent_first_requests_register_an_interface_once"*,
       *"test_a_pending_registration_is_not_sent_again"*,
       *"test_a_slow_registration_post_counts_as_pending"*,
-      *"test_a_pending_registration_returns_the_interface_when_it_appears"*,
-      *"test_a_failed_pending_registration_is_reported_and_retried"*,
-      *"test_worker_interface_registers_only_installed_workers"*,
-      *"test_worker_interface_checks_the_dataset_before_registering"*
+      *"test_a_retry_joins_the_running_registration_and_gets_its_result"*,
+      *"test_a_failed_registration_is_reported_and_retried"*,
+      *"test_a_registration_that_never_reached_the_server_is_retried"*
 - [x] Tagging needs an explicit target (an empty id list is not "everything"), refuses
       more than 10,000 annotations before loading any, and sends only the annotations
       whose tags change. *"test_tag_refuses_unbounded_or_ambiguous_targets"*,
