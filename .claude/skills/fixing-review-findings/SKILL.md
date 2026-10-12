@@ -454,6 +454,10 @@ Report per-finding outcomes (fixed / stale / by-design / needs-decision) keyed t
   is replaced. "Pending" then means "task not done", and every outcome (sent,
   refused, never sent, failed) reaches every waiter. PR #1409 went through
   three rounds of fixes before switching.
+- Harness trap: faking a per-request identity (`caller_id`) with a module
+  global makes concurrent fake users overwrite each other, so a correct
+  "is this the caller who started it?" check fails, or a wrong one passes.
+  Fake it with a `contextvars.ContextVar`, as the real one is.
 - Harness trap: patching `time.monotonic` patches the clock asyncio uses
   (`loop.time()`), so `move_on_after` and `sleep` deadlines follow the fake clock.
   A test like that proves nothing about real timeouts. Test those with a fake

@@ -9,6 +9,7 @@ import weakref
 from typing import Literal
 
 import anyio
+import girder_client
 
 from mcp.server.mcpserver.exceptions import ToolError
 
@@ -17,6 +18,7 @@ import nimbusimage as ni
 from nimbusimage_mcp import worker_values
 from nimbusimage_mcp._common import (
     CACHE_FILL,
+    caller_id,
     READ_ONLY,
     WRITES,
     client,
@@ -160,70 +162,104 @@ async def _before(deadline: float, fn, *args, **kwargs):
 # worker container for every registration request, so a burst of first
 # calls, or a retry while a slow registration is still running, must not
 # send another. Callers wait on the task (shielded, up to their own
-# deadline); a finished task, whatever its outcome, lets the next call
-# start a new one. Per event loop (production has one).
+# deadline); a finished task leaves the registry, so the next call starts
+# afresh. Keyed per event loop (production has one).
 _registrations: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
-# The longest a registration task waits for its job.
+# The longest a registration task follows its job.
 REGISTRATION_PENDING_SECONDS = 300
 
 
 async def _run_registration(nc: ni.NimbusClient, image: str) -> None:
-    """Register the image's interface: one POST, then follow its job to
-    the end. Runs as a task with the first caller's client (it polls that
+    """Register the image's interface: one POST, then follow it to the
+    end. Runs as a task with the first caller's client (it polls that
     caller's own job); its outcome is every waiter's."""
     deadline = time.monotonic() + REGISTRATION_PENDING_SECONDS
     # A task that finished just before this one started may have
     # registered it already.
-    if await _before(deadline, nc.get_worker_interface, image,
-                     request_if_missing=False) is not None:
+    if await _interface(nc, image, deadline) is not None:
         return
     response = await _before(
         deadline, nc.girder.post, "worker_interface/request",
         parameters={"image": image},
     )
-    if isinstance(response, list) and response:
+    if not (isinstance(response, list) and response):
+        return
+    try:
         state = await poll_job(ni.Job(nc.girder, response[0]), deadline)
-        if state is None or not state["finished"]:
-            raise ToolError(
-                f"{image}'s parameter registration did not finish; try "
-                "again later."
-            )
-        if not state["succeeded"]:
-            raise ToolError(
-                f"{image}'s parameter registration failed "
-                f"({state['status']}); try again, or check the worker."
-            )
-
-
-def _registration_task(nc: ni.NimbusClient, image: str) -> asyncio.Task:
-    tasks = _registrations.setdefault(asyncio.get_running_loop(), {})
-    task = tasks.get(image)
-    if task is None or task.done():
-        task = asyncio.create_task(_run_registration(nc, image))
-        # Mark a failure as seen even if every waiter has given up.
-        task.add_done_callback(
-            lambda t: t.cancelled() or t.exception()
+    except (girder_client.HttpError, PermissionError):
+        # The request went through but its job is not readable with this
+        # key (job status needs core.user_auth): watch for the interface
+        # instead, so the registration stays pending rather than ending
+        # and letting the next call send another.
+        while deadline - time.monotonic() > POLL_SECONDS:
+            await anyio.sleep(POLL_SECONDS)
+            if await _interface(nc, image, deadline) is not None:
+                return
+        state = None
+    if state is None or not state["finished"]:
+        raise ToolError(
+            f"{image}'s parameter registration did not finish; try again "
+            "later."
         )
-        tasks[image] = task
-    return task
+    if not state["succeeded"]:
+        raise ToolError(
+            f"{image}'s parameter registration failed ({state['status']}); "
+            "try again, or check the worker."
+        )
+
+
+def _interface(nc: ni.NimbusClient, image: str, deadline: float):
+    return _before(deadline, nc.get_worker_interface, image,
+                   request_if_missing=False)
+
+
+def _registration_task(nc: ni.NimbusClient,
+                       image: str) -> tuple[asyncio.Task, str | None]:
+    """The running registration of `image`, or a new one; and who
+    started it."""
+    tasks = _registrations.setdefault(asyncio.get_running_loop(), {})
+    entry = tasks.get(image)
+    if entry is None or entry[0].done():
+        task = asyncio.create_task(_run_registration(nc, image))
+        entry = tasks[image] = (task, caller_id())
+
+        def finished(t):
+            if tasks.get(image) is entry:
+                del tasks[image]  # drop the starter's client with it
+            # Mark a failure as seen even if every waiter has given up.
+            if not t.cancelled():
+                t.exception()
+
+        task.add_done_callback(finished)
+    return entry
 
 
 async def _register_once(nc: ni.NimbusClient, image: str,
                          deadline: float) -> dict | None:
     """Wait (until the deadline) for the image's registration, starting
     one unless one is running, then read the interface as the caller."""
-    task = _registration_task(nc, image)
-    with anyio.move_on_after(max(0.0, deadline - time.monotonic())) as wait:
-        # Shielded: a caller giving up does not cancel the registration.
-        await asyncio.shield(task)
+    task, starter = _registration_task(nc, image)
+    try:
+        with anyio.move_on_after(
+            max(0.0, deadline - time.monotonic())
+        ) as wait:
+            # Shielded: a caller giving up does not cancel the task.
+            await asyncio.shield(task)
+    except (girder_client.HttpError, PermissionError):
+        if starter == caller_id():
+            raise  # about this caller's own key: say so
+        # Another request's key was refused; that says nothing about
+        # this caller's, and nothing is registering now.
+        raise ToolError(
+            f"{image}'s parameter registration could not be completed; "
+            "try again."
+        ) from None
     if wait.cancelled_caught:
         raise ToolError(
             f"{image} is still registering its parameters; try again in "
             "a minute."
         )
-    return await _before(
-        deadline, nc.get_worker_interface, image, request_if_missing=False
-    )
+    return await _interface(nc, image, deadline)
 
 
 async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:

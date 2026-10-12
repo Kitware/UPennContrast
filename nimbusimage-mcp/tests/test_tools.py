@@ -943,6 +943,76 @@ def test_a_registration_that_never_reached_the_server_is_retried(nc):
     assert nc.girder.post.call_count == 2
 
 
+def test_an_unreadable_job_keeps_the_registration_pending(nc):
+    """A key without core.user_auth can POST but not read the job: the
+    registration stays pending (watching for the interface) instead of
+    ending, so a retry does not start another container."""
+    _common.configure(make_settings(max_job_wait=1))
+    _registering(nc)
+    nc.girder.get.side_effect = http_error(401)
+
+    async def twice():
+        for _ in range(2):
+            with pytest.raises(ToolError, match="still registering"):
+                await workers.ni_worker_interface(image=SEG)
+
+    asyncio.run(twice())
+    assert nc.girder.post.call_count == 1
+
+
+def test_another_users_refusal_is_not_reported_as_yours(nc, monkeypatch):
+    """B joins a registration A started; A's key is refused. B must not
+    be told B's own key was refused."""
+    import threading
+    _common.configure(make_settings(max_job_wait=10))
+    _registering(nc)
+    import contextvars
+    users = iter(["alice", "bob"])
+    # Per task, like the real caller_id (the request's contextvar).
+    current = contextvars.ContextVar("user", default=None)
+    monkeypatch.setattr(workers, "caller_id", current.get)
+    go = threading.Event()
+
+    def refused(*args, **kwargs):
+        go.wait(5)
+        raise http_error(401)
+
+    nc.girder.post.side_effect = refused
+
+    async def call(user):
+        current.set(user)
+        return await workers.ni_worker_interface(image=SEG)
+
+    async def both():
+        alice = asyncio.create_task(call(next(users)))
+        await asyncio.sleep(0.2)  # alice's registration is in flight
+        bob = asyncio.create_task(call(next(users)))
+        await asyncio.sleep(0.2)
+        go.set()
+        return await asyncio.gather(alice, bob, return_exceptions=True)
+
+    alice_error, bob_error = asyncio.run(both())
+    assert "API key" in str(alice_error)  # about alice's own key
+    assert "could not be completed" in str(bob_error)
+    assert "API key" not in str(bob_error)
+    assert nc.girder.post.call_count == 1
+
+
+def test_finished_registrations_leave_the_registry(nc):
+    nc.list_workers.return_value = WORKERS
+    calls = iter([None, None, INTERFACE])
+    nc.get_worker_interface.side_effect = lambda *a, **k: next(calls)
+    nc.girder.post.return_value = []
+
+    async def once():
+        await workers.ni_worker_interface(image=SEG)
+        await asyncio.sleep(0)  # let the done callback run
+        return dict(workers._registrations.get(
+            asyncio.get_running_loop(), {}))
+
+    assert asyncio.run(once()) == {}
+
+
 def test_worker_interface_checks_the_dataset_before_registering(nc):
     nc.get_worker_interface.return_value = None
     nc.list_workers.return_value = WORKERS
