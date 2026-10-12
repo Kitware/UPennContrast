@@ -26,6 +26,12 @@ from nimbusimage_mcp.config import Settings
 log = logging.getLogger("nimbusimage_mcp.calls")
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
+# Writes server state but none of the user's data (e.g. registering a
+# worker's parameter interface).
+CACHE_FILL = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=False, idempotentHint=True,
+    openWorldHint=False,
+)
 # Changes stored data; clients should ask the user first.
 WRITES = ToolAnnotations(
     readOnlyHint=False, destructiveHint=True, idempotentHint=False,

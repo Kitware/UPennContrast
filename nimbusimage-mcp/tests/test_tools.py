@@ -72,8 +72,10 @@ def test_every_tool_is_registered_with_its_annotations():
                        "ni_property_compute"}
     for name, tool in listed.items():
         assert tool.output_schema is None, name
-        if name not in writers:
+        if name not in writers | {"ni_worker_interface"}:
             assert tool.annotations.read_only_hint, name
+    # Registering a worker's interface writes server state (a job).
+    assert listed["ni_worker_interface"].annotations.read_only_hint is False
 
 
 @pytest.mark.parametrize("status, fragment", [
@@ -417,6 +419,15 @@ INTERFACE = {
 }
 
 
+def test_worker_interface_registers_only_installed_workers(nc):
+    nc.get_worker_interface.return_value = None
+    nc.list_workers.return_value = WORKERS
+    for image in ("evil/image:latest", "nimbusimage/worker-base:latest"):
+        with pytest.raises(ToolError, match="No worker image"):
+            run_tool(workers.ni_worker_interface, image=image)
+    nc.girder.post.assert_not_called()
+
+
 def test_worker_interface_shape(nc):
     nc.get_worker_interface.return_value = INTERFACE
     nc.dataset.return_value.channels = ["DAPI", "GFP"]
@@ -492,10 +503,12 @@ def test_worker_run_checks_the_location_before_submitting(nc):
 class _Job:
     """Finishes after `polls` refreshes (never, for None)."""
 
-    def __init__(self, polls):
+    def __init__(self, polls, clock=None):
         self.id, self.title = "j1", "Seg"
         self.polls_left = polls
         self.refreshes = 0
+        self.refreshed_at = []
+        self.clock = clock or {"now": 0.0}
         self.log = "x" * 5000
 
     @property
@@ -511,6 +524,7 @@ class _Job:
 
     def refresh(self):
         self.refreshes += 1
+        self.refreshed_at.append(self.clock["now"])
 
 
 def test_job_wait_clamps_and_reports_still_running(nc, monkeypatch):
@@ -523,11 +537,15 @@ def test_job_wait_clamps_and_reports_still_running(nc, monkeypatch):
 
     monkeypatch.setattr(workers.anyio, "sleep", fake_sleep)
     monkeypatch.setattr(workers.time, "monotonic", lambda: clock["now"])
-    nc.job.return_value = _Job(polls=None)
+    job = _Job(polls=None, clock=clock)
+    nc.job.return_value = job
     result = loads(asyncio.run(workers.ni_job_wait(
         job_id="j1", timeout_seconds=10_000
     )))
-    assert sum(sleeps) == _common.settings().max_job_wait
+    # Waits close to the cap, and no poll starts at or after it.
+    limit = _common.settings().max_job_wait
+    assert limit - workers.POLL_SECONDS <= sum(sleeps) < limit
+    assert max(job.refreshed_at) < limit
     assert result["finished"] is False and result["status"] == "running"
     assert len(result["log_tail"]) == workers.LOG_TAIL
 

@@ -14,6 +14,7 @@ import nimbusimage as ni
 
 from nimbusimage_mcp import worker_values
 from nimbusimage_mcp._common import (
+    CACHE_FILL,
     READ_ONLY,
     WRITES,
     client,
@@ -95,11 +96,10 @@ async def poll_job(job: ni.Job, limit: float) -> None:
     """
     deadline = time.monotonic() + limit
     await in_thread(job.refresh)  # also fetches the log
-    while not job.finished:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            return
-        await anyio.sleep(min(POLL_SECONDS, remaining))
+    # Poll only while a whole interval fits before the deadline, so no
+    # refresh (blocking HTTP) starts after it.
+    while not job.finished and deadline - time.monotonic() > POLL_SECONDS:
+        await anyio.sleep(POLL_SECONDS)
         await in_thread(job.refresh)
 
 
@@ -110,6 +110,13 @@ async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
         nc.get_worker_interface, image, request_if_missing=False
     )
     if interface is None:
+        # Registering runs the image on the server, which accepts any
+        # name: only ever ask for an installed worker.
+        labels = (await in_thread(nc.list_workers)).get(image)
+        if labels is None or worker_kind(labels) is None:
+            raise ToolError(
+                f"No worker image {image!r}; use ni_workers_list for names."
+            )
         response = await in_thread(
             nc.girder.post, "worker_interface/request",
             parameters={"image": image},
@@ -257,7 +264,9 @@ async def ni_job_wait(job_id: str, timeout_seconds: float = 60) -> dict:
 
 TOOLS = [
     (ni_workers_list, READ_ONLY),
-    (ni_worker_interface, READ_ONLY),
+    # Not read-only: the first request for a worker registers its
+    # interface (a short server job). Nothing the user owns changes.
+    (ni_worker_interface, CACHE_FILL),
     (ni_worker_run, WRITES),
     (ni_job_wait, READ_ONLY),
 ]
