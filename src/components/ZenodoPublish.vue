@@ -78,6 +78,19 @@
         </div>
       </div>
 
+      <!-- Request refused by the server (upload / discard) -->
+      <v-alert
+        v-if="!confirmPublish"
+        v-model="showError"
+        type="error"
+        density="compact"
+        closable
+        class="mb-3"
+        data-testid="zenodo-request-error"
+      >
+        {{ errorString }}
+      </v-alert>
+
       <!-- Error display -->
       <v-alert
         v-if="zenodoStatus === 'error' && zenodoError"
@@ -137,7 +150,7 @@
         color="success"
         size="small"
         :loading="publishing"
-        @click="confirmPublish = true"
+        @click="openPublishConfirm"
       >
         <v-icon start>mdi-earth</v-icon>
         Publish (Mint DOI)
@@ -182,6 +195,16 @@
       <v-card>
         <v-card-title>Publish to Zenodo?</v-card-title>
         <v-card-text>
+          <v-alert
+            v-model="showError"
+            type="error"
+            density="compact"
+            closable
+            class="mb-3"
+            data-testid="zenodo-publish-error"
+          >
+            {{ errorString }}
+          </v-alert>
           <v-alert type="warning" density="compact" class="mb-3">
             This action is <strong>irreversible</strong>.
           </v-alert>
@@ -215,6 +238,7 @@ import { ref, computed, onMounted } from "vue";
 import store from "@/store";
 import jobs from "@/store/jobs";
 import { logError } from "@/utils/log";
+import { extractErrorMessage } from "@/utils/errors";
 import { IProject, IJobEventData } from "@/store/model";
 import { jobStates } from "@/store/jobConstants";
 import ZenodoTokenDialog from "./ZenodoTokenDialog.vue";
@@ -236,6 +260,8 @@ const hasToken = ref(false);
 const isSandbox = ref(false);
 const publishing = ref(false);
 const discarding = ref(false);
+const showError = ref(false);
+const errorString = ref("");
 
 // Local progress state, updated from job SSE events
 const localProgress = ref<{
@@ -297,6 +323,19 @@ const statusLabel = computed(() => {
 });
 
 // Methods
+function showRequestError(error: unknown) {
+  const message = extractErrorMessage(error);
+  // 403 from upload/publish: the caller must own the project and every
+  // dataset and collection in it, not just the project.
+  errorString.value =
+    (error as any)?.response?.status === 403
+      ? `${message.replace(/\.$/, "")}. Publishing to Zenodo requires owner access to every ` +
+        "dataset and collection in the project. Ask their owners to " +
+        "publish, or remove them from the project."
+      : message;
+  showError.value = true;
+}
+
 async function checkToken() {
   try {
     const status = await store.zenodoAPI.getCredentials();
@@ -362,6 +401,7 @@ async function startUpload() {
     total: 0,
     message: "Starting upload…",
   };
+  showError.value = false;
   try {
     const response = await store.zenodoAPI.uploadProject(props.project.id);
     localProgress.value = {
@@ -375,17 +415,25 @@ async function startUpload() {
   } catch (error) {
     localProgress.value = null;
     logError("Failed to start Zenodo upload", error);
+    showRequestError(error);
   }
+}
+
+function openPublishConfirm() {
+  showError.value = false;
+  confirmPublish.value = true;
 }
 
 async function doPublish() {
   publishing.value = true;
+  showError.value = false;
   try {
     await store.zenodoAPI.publishProject(props.project.id);
     confirmPublish.value = false;
     emit("updated");
   } catch (error) {
     logError("Failed to publish to Zenodo", error);
+    showRequestError(error);
   } finally {
     publishing.value = false;
   }
@@ -393,11 +441,13 @@ async function doPublish() {
 
 async function discardDraft() {
   discarding.value = true;
+  showError.value = false;
   try {
     await store.zenodoAPI.discardDraft(props.project.id);
     emit("updated");
   } catch (error) {
     logError("Failed to discard Zenodo draft", error);
+    showRequestError(error);
   } finally {
     discarding.value = false;
   }
