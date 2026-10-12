@@ -312,9 +312,9 @@ JSON with no structured copy (the SDK's default indents dicts and duplicates the
 | `ni_property_histogram` | `ds.properties.histogram` | The server's bins hold equal counts; the description says so |
 | `ni_property_compute` | `ds.properties.compute` | **Destructive hint.** Not in the original list; without it a "measure X" request dead-ends |
 | `ni_workers_list` | `client.list_workers()` | Role labels by presence; base images and `:test` tags hidden by default |
-| `ni_worker_interface` | `get_worker_interface` (+ registration job, 60 s) | Parameters, value formats, and the dataset's channels |
+| `ni_worker_interface` | `get_worker_interface` (+ registration job; whole call at most 60 s and the job-wait cap) | Parameters, value formats, and the dataset's channels |
 | `ni_worker_run` | `ds.annotations.compute` | **Destructive hint.** Annotation workers only; parameters normalized like the app (`worker_values.py` ports `src/utils/workerInterface.ts`) |
-| `ni_job_wait` | `client.job(id)` + `refresh()` | Async; at most `NI_MCP_MAX_JOB_WAIT` (240 s); reports `finished: false` instead of failing |
+| `ni_job_wait` | `client.job(id)` + `refresh()` | Async; at most `NI_MCP_MAX_JOB_WAIT` (240 s); reports `finished: false` instead of failing, or `status: "unknown"` if Girder does not answer in time |
 | `ni_help_topic` | `GET claude_agent/help` | See 5.2 |
 
 ---
@@ -776,8 +776,11 @@ the local stack. Add an item whenever a review finds something this list missed.
       threads all sync tools share. *"test_worker_interface_registration_respects_the_wait_cap"*
 - [x] Async tools do no blocking reads on the event loop, including lazy properties.
       *"test_worker_run_reads_the_dataset_off_the_event_loop"*
-- [x] Every request a tool makes has a timeout, so a thread abandoned at a deadline
-      ends. *"test_tool_clients_have_a_request_timeout"*
+- [x] Every request a tool makes has a timeout (read 330 s, above the server's 300 s
+      aggregation cap) and is not retried after a read timeout, so one slow request is
+      never re-sent and a thread abandoned at a deadline ends; a read timeout is a
+      clear tool error that does not name the internal host.
+      *"test_tool_requests_time_out_once_without_retrying"*
 - [x] A wait's result is one complete job snapshot, never a mix of states.
       *"test_job_wait_never_reports_a_torn_state"*
 - [x] Failing to write the optional call log never fails a tool call.

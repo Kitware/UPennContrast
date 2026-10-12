@@ -29,8 +29,9 @@ ANNOTATION_LABEL = "isAnnotationWorker"
 PROPERTY_LABEL = "isPropertyWorker"
 MAX_DESCRIPTION = 200
 MAX_TOOLTIP = 200
-# How long ni_worker_interface waits for a worker to register its
-# interface the first time it is asked.
+# The longest a worker-interface fetch takes as a whole, including the
+# registration job the first time a worker is asked for (also capped by
+# NI_MCP_MAX_JOB_WAIT).
 INTERFACE_REQUEST_TIMEOUT = 60
 LOG_TAIL = 1500
 POLL_SECONDS = 2.0
@@ -132,8 +133,8 @@ async def poll_job(job: ni.Job, deadline: float) -> dict | None:
 async def _by_deadline(fn, deadline: float):
     """Blocking `fn()` in a thread, waited for until the (monotonic)
     deadline: a slow backend must not hold a call past its cap. Returns
-    (finished, result). An abandoned call finishes in its thread (bounded
-    by the client's HTTP_TIMEOUT)."""
+    (finished, result). An abandoned call finishes in its thread, within
+    the client's HTTP_TIMEOUT plus its connect retries."""
     with anyio.move_on_after(max(0.0, deadline - time.monotonic())):
         return True, await anyio.to_thread.run_sync(
             fn, abandon_on_cancel=True
@@ -156,9 +157,9 @@ async def fetch_interface(nc: ni.NimbusClient, image: str) -> dict:
     """The worker's parameter interface, asking the worker to register it
     (a short job) the first time. Bounded as a whole by the job-wait cap,
     since it can wait on that job."""
-    deadline = time.monotonic() + min(
+    deadline = time.monotonic() + max(1.0, min(
         INTERFACE_REQUEST_TIMEOUT, settings().max_job_wait
-    )
+    ))
     interface = await _before(
         deadline, nc.get_worker_interface, image, request_if_missing=False
     )

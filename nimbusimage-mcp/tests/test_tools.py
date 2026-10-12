@@ -95,6 +95,12 @@ def test_unwritable_call_log_does_not_fail_the_call(nc, tmp_path, caplog):
     assert "Could not write the call log" in caplog.text
 
 
+def test_settings_refuse_a_nonpositive_job_wait():
+    from nimbusimage_mcp.config import Settings
+    with pytest.raises(ValueError, match="at least 1 second"):
+        Settings.from_env({"NI_MCP_MAX_JOB_WAIT": "0"})
+
+
 def test_known_scale_drops_placeholders():
     assert datasets.known_scale({"value": 1, "unit": "m"}) is None
     assert datasets.known_scale({"value": 0, "unit": "mm"}) is None
@@ -642,14 +648,43 @@ def test_worker_run_reads_the_dataset_off_the_event_loop(nc):
     assert seen and threading.main_thread() not in seen
 
 
-def test_tool_clients_have_a_request_timeout():
-    calls = []
-    session = SimpleNamespace(request=lambda method, url, **kw: calls.append(
-        kw))
-    _common._set_default_timeout(session)
-    session.request("GET", "u")
-    session.request("GET", "u", timeout=5)
-    assert calls == [{"timeout": _common.HTTP_TIMEOUT}, {"timeout": 5}]
+def test_tool_requests_time_out_once_without_retrying(monkeypatch):
+    """The real client() against a server that accepts and never answers:
+    the request must end at the read timeout, after ONE connection (no
+    read retries re-running a slow server request), and surface as a
+    clear tool error that does not name the internal host."""
+    import socket
+    import threading
+    from types import SimpleNamespace as Token
+
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(16)
+    accepted = []
+
+    def accept():
+        while True:
+            try:
+                accepted.append(listener.accept()[0])
+            except OSError:
+                return
+
+    threading.Thread(target=accept, daemon=True).start()
+    port = listener.getsockname()[1]
+    _common.configure(make_settings(
+        api_url=f"http://127.0.0.1:{port}/api/v1"))
+    monkeypatch.setattr(_common, "get_access_token", lambda: Token(
+        claims={"girder_token": "t"}, subject="u"))
+    monkeypatch.setattr(_common, "HTTP_TIMEOUT", (1, 0.3))
+    try:
+        with pytest.raises(ToolError, match="took too long") as raised:
+            datasets.ni_dataset_info(dataset_id="d")
+        assert "127.0.0.1" not in str(raised.value)
+        assert len(accepted) == 1
+    finally:
+        listener.close()
+        for connection in accepted:
+            connection.close()
 
 
 def test_worker_interface_checks_the_dataset_before_registering(nc):

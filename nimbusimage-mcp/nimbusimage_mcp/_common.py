@@ -61,21 +61,34 @@ def client() -> ni.NimbusClient:
         # serving a request without a caller.
         raise ToolError("Not authenticated.")
     nc = ni.connect(settings().api_url, token=access.claims["girder_token"])
-    _set_default_timeout(nc.girder._session)
+    _bound_requests(nc.girder._session)
     return nc
 
 
 # (connect, read) seconds for every request a tool makes. girder_client
 # sets none, so a hung Girder would hold a worker thread forever: a
 # deadline-bounded wait (ni_job_wait) returns at its cap, but its
-# abandoned thread would never end. Above the longest legitimate request.
-HTTP_TIMEOUT = (10, 300)
+# abandoned thread would never end. The read timeout is above the
+# server's own aggregation cap (AGGREGATION_MAX_TIME_MS, 300 s), so a
+# legitimate slow request is never cut off first.
+HTTP_TIMEOUT = (10, 330)
 
 
-def _set_default_timeout(session) -> None:
-    """Give a requests.Session a default timeout (it has no setting for
-    one): girder_client calls session.get/post/..., which call
-    session.request."""
+def _bound_requests(session) -> None:
+    """Bound every request of a nimbusimage session.
+
+    A default timeout (requests.Session has no setting for one;
+    girder_client calls session.get/post/..., which call
+    session.request). And no retry after a read timeout: nimbusimage's
+    retry adapter retries GET/PUT/DELETE on read errors up to 5 times,
+    which would turn one timeout into six requests (each re-running a
+    slow server aggregation) and a stuck thread into half an hour.
+    Connect and 502/503/504 retries stay.
+    """
+    for adapter in session.adapters.values():
+        retries = getattr(adapter, "max_retries", None)
+        if retries is not None:
+            adapter.max_retries = retries.new(read=False)
     request = session.request
 
     def request_with_timeout(method, url, **kwargs):
@@ -180,8 +193,17 @@ def _recorded(name: str, kwargs: dict):
         kind = error = f"HTTP {e.status}"
         raise tool_error(e) from None
     except requests.ConnectionError:
+        # Includes ConnectTimeout (also a requests.Timeout).
         kind = error = "connection"
         raise ToolError("Could not reach the NimbusImage server.") from None
+    except requests.Timeout:
+        # A read timeout (HTTP_TIMEOUT). The exception text names the
+        # internal Girder host, so it is not passed on.
+        kind = error = "timeout"
+        raise ToolError(
+            "NimbusImage took too long to answer; narrow the request or "
+            "try again."
+        ) from None
     except (ValueError, PermissionError) as e:
         # nimbusimage reports bad input as ValueError ("No large image
         # found in dataset ...") and a key scope problem as

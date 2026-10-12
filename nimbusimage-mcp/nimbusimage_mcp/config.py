@@ -39,6 +39,9 @@ class Settings:
                 "it acts only as each caller, with their own key."
             )
         port = int(environ.get("NI_MCP_PORT", "8000"))
+        max_job_wait = float(environ.get("NI_MCP_MAX_JOB_WAIT", "240"))
+        if max_job_wait < 1:
+            raise ValueError("NI_MCP_MAX_JOB_WAIT must be at least 1 second.")
         host = environ.get("NI_MCP_HOST", "127.0.0.1")
         return cls(
             api_url=environ.get(
@@ -53,5 +56,5 @@ class Settings:
             host=host,
             port=port,
             call_log=environ.get("NI_MCP_CALL_LOG") or None,
-            max_job_wait=float(environ.get("NI_MCP_MAX_JOB_WAIT", "240")),
+            max_job_wait=max_job_wait,
         )
