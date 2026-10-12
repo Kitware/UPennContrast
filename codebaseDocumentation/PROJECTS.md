@@ -474,7 +474,9 @@ executing, because actions propagate to the datasets, collections, configuration
 and dataset views in the project that the caller can share (see "Permission
 Propagation"). The dialog displays:
 - Action-specific message explaining what will happen
-- Resource counts: "This will affect X datasets and Y collections..."
+- Resource counts: "This project has X datasets and Y collections; only the ones you own
+  change..." (`impactSummary`; the client doesn't know ownership, so it states totals
+  and the rule, not a count of what will change)
 
 The confirmation is implemented with a single reusable `v-dialog` driven by a
 `showConfirm()` helper that stores a pending action callback, executed on confirm.
@@ -695,6 +697,8 @@ that writes an ACL or a public flag, or that exports a project.
   *"testPublishingProjectReportsSkippedResources"*,
   *"reports contained resources set_public left unchanged"*,
   *"shows no notice when set_public changed everything"*.
+- The confirmation dialog does not claim every project resource is affected —
+  *"does not claim every project resource is affected"*.
 
 **Publishing (Zenodo)**
 - Upload and publish need ADMIN on every dataset and collection in the project, and on

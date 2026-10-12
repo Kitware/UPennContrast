@@ -19,14 +19,10 @@ vi.mock("@/utils/log", () => ({
 
 import ShareProject from "./ShareProject.vue";
 
-function mountComponent() {
+function mountComponent(meta: any = { datasets: [], collections: [] }) {
   return shallowMount(ShareProject, {
     props: {
-      project: {
-        id: "p1",
-        name: "Project",
-        meta: { datasets: [], collections: [] },
-      } as any,
+      project: { id: "p1", name: "Project", meta } as any,
       modelValue: false,
     },
   });
@@ -66,5 +62,16 @@ describe("ShareProject", () => {
 
     expect(vm.isPublic).toBe(false);
     expect(vm.noticeString).toBe("");
+  });
+
+  it("does not claim every project resource is affected", () => {
+    const vm = mountComponent({
+      datasets: [{ datasetId: "d1" }, { datasetId: "d2" }],
+      collections: [{ collectionId: "c1" }],
+    }).vm as any;
+
+    expect(vm.impactSummary).toContain("2 datasets and 1 collection");
+    expect(vm.impactSummary).toContain("only the ones you own");
+    expect(vm.impactSummary).not.toContain("all associated");
   });
 });

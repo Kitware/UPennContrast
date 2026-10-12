@@ -207,15 +207,7 @@
         <v-card-title class="text-h6">{{ confirmTitle }}</v-card-title>
         <v-card-text>
           <div>{{ confirmMessage }}</div>
-          <div class="mt-3 text-body-2">
-            This will affect
-            <strong>{{ datasetCount }}</strong>
-            {{ datasetCount === 1 ? "dataset" : "datasets" }}
-            and
-            <strong>{{ collectionCount }}</strong>
-            {{ collectionCount === 1 ? "collection" : "collections" }}
-            in this project, along with all associated configurations and views.
-          </div>
+          <div class="mt-3 text-body-2">{{ impactSummary }}</div>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
@@ -301,6 +293,22 @@ const datasetCount = computed((): number => {
 
 const collectionCount = computed((): number => {
   return props.project?.meta.collections.length ?? 0;
+});
+
+// The client doesn't know which of these the caller owns, so it states the
+// totals and the rule rather than a count of what will change.
+const impactSummary = computed((): string => {
+  const datasets = `${datasetCount.value} ${
+    datasetCount.value === 1 ? "dataset" : "datasets"
+  }`;
+  const collections = `${collectionCount.value} ${
+    collectionCount.value === 1 ? "collection" : "collections"
+  }`;
+  return (
+    `This project has ${datasets} and ${collections}; only the ones you ` +
+    "own change, with the views and configurations of the datasets you own. " +
+    "The rest keep their own settings."
+  );
 });
 
 watch(dialog, (val) => {
@@ -563,6 +571,7 @@ defineExpose({
   accessLevelLabels,
   datasetCount,
   collectionCount,
+  impactSummary,
   resetState,
   fetchAccessInfo,
   close,
