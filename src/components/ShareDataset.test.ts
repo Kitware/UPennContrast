@@ -213,11 +213,14 @@ describe("ShareDataset", () => {
     vm.showError = true;
     vm.errorString = "Error";
     vm.isPublic = true;
+    vm.publicSkippedNotice = "1 collection owned by other users stayed private";
     vm.users = [{ id: "u1" }];
     vm.newUserEmail = "test@test.com";
     vm.newUserAccessLevel = 1;
 
     vm.resetState();
+
+    expect(vm.publicSkippedNotice).toBe("");
 
     expect(vm.loading).toBe(false);
     expect(vm.showError).toBe(false);
@@ -292,6 +295,11 @@ describe("ShareDataset", () => {
       "2 collections and 1 view owned by other users stayed private; " +
         "only their owners can make them public.",
     );
+
+    // Not carried over to the next dataset the dialog loads.
+    await vm.fetchAccessInfo("ds2");
+    expect(vm.publicSkippedNotice).toBe("");
+    await vm.togglePublic(true);
 
     // Cleared by the next toggle.
     mockSetDatasetPublic.mockResolvedValue({

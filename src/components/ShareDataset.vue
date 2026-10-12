@@ -495,6 +495,7 @@ function resetState() {
   showError.value = false;
   errorString.value = "";
   isPublic.value = false;
+  publicSkippedNotice.value = "";
   users.value = [];
   configurations.value = [];
   selectedConfigIds.value = [];
@@ -508,6 +509,8 @@ async function fetchAccessInfo(datasetId: string) {
   fetchShareLinks(datasetId);
   loading.value = true;
   showError.value = false;
+  // The notice describes the last publish of the dataset it was shown for.
+  publicSkippedNotice.value = "";
   try {
     // Fetch access list from new endpoint
     const accessList = await store.api.getDatasetAccess(datasetId);
