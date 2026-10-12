@@ -16,6 +16,7 @@ from collections import defaultdict
 import orjson
 
 from bson import ObjectId
+from girder.exceptions import AccessException
 from girder.models.file import File
 from girder.models.folder import Folder
 from girder.models.item import Item
@@ -23,6 +24,7 @@ from girder.models.user import User
 from girder_jobs.constants import JobStatus
 from girder_jobs.models.job import Job
 
+from .access_helpers import requireProjectContentsAccess
 from .serialization import orJsonDefaults
 from .zenodo_client import (
     get_zenodo_client_for_user,
@@ -78,6 +80,18 @@ def run(job):
         _fail(
             job, job_model, project_id, project_model,
             'Project or user not found',
+        )
+        return
+
+    # The upload endpoint checked ownership, but anyone with WRITE on the
+    # project can add resources before this reload: check the snapshot
+    # this job actually exports.
+    try:
+        requireProjectContentsAccess(project, user)
+    except AccessException as e:
+        _fail(
+            job, job_model, project_id, project_model,
+            str(e),
         )
         return
 

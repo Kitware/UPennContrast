@@ -76,7 +76,9 @@ each dataset and collection, and on each configuration the datasets' views use (
 export publishes their property definitions), not only on the project (`requireProjectContentsAccess` in
 `server/helpers/access_helpers.py`). Project ADMIN alone is not enough: a dataset can be
 added to a project by someone with only WRITE on it, and a co-admin of the project may
-not be able to read it at all. Tests: `test/test_share_escalation.py`
+not be able to read it at all. The upload job repeats the check on the project it
+reloads, since anyone with WRITE on the project can add a dataset between the
+request and the job. Tests: `test/test_share_escalation.py`
 (`TestZenodoRequiresOwnership`).
 
 The upload endpoint returns a `jobId` that the frontend uses for SSE-based progress tracking.

@@ -467,6 +467,25 @@ class TestZenodoRequiresOwnership:
         assertStatus(resp, 403)
         assert "Admin access denied" in resp.json["message"]
 
+    def testUploadJobRechecksTheProjectItExports(self, server, owner, user):
+        """The job reloads the project; a dataset added after the endpoint's
+        check (WRITE on the project is enough to add one) must not ship."""
+        from girder_jobs.constants import JobStatus
+        from girder_jobs.models.job import Job
+        from upenncontrast_annotation.server.helpers import zenodo_job
+
+        project = self.projectWithDatasetOf(server, owner, user)
+        job = Job().createJob(
+            title="Zenodo Upload", type="zenodo_upload", user=user,
+            kwargs={"projectId": project["_id"], "userId": str(user["_id"])})
+
+        zenodo_job.run(job)
+
+        assert Job().load(job["_id"], force=True)["status"] == JobStatus.ERROR
+        meta = Project().load(project["_id"], force=True)["meta"]["zenodo"]
+        assert meta["status"] == "error"
+        assert "Admin access denied" in meta["error"]
+
     def testOwnerPassesTheOwnershipCheck(self, server, owner):
         dataset, _, _ = createDataset(owner)
         project = TestProjectShareLimits().createProject(server, owner)

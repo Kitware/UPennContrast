@@ -707,6 +707,8 @@ that writes an ACL or a public flag, or that exports a project.
   *"testPublishRefusesDatasetsCallerDoesNotOwn"*,
   *"testUploadRefusesConfigurationsReachedThroughViews"*,
   *"testOwnerPassesTheOwnershipCheck"*.
+- The upload job rechecks the project it reloads (resources can be added after the
+  endpoint's check) — *"testUploadJobRechecksTheProjectItExports"*.
 
 **Process rules this feature proved**
 - Test fixtures: Girder makes the first user in a fresh database a site admin, who holds
