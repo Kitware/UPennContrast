@@ -71,6 +71,25 @@ class TestJobRefresh:
         assert job.log == "line 1\nline 2\n"
         gc.get.assert_called_once_with("job/j1")
 
+    def test_refresh_redacts_tokens(self):
+        # A worker's launch line carries a live Girder token; it must not
+        # reach a terminal or a model through job.log or job.wait().
+        token = (
+            "6g18cliYHP4RaujW68NBQPscNrg214NVqUJaBDhaEeF8JQ8VFuUqoAsqdCz060mi"
+        )
+        digest = "0123456789abcdef" * 4
+        gc = MagicMock()
+        gc.get.return_value = {"_id": "j1", "status": STATUS_SUCCESS, "log": [
+            f"Running container: args: ['--token', '{token}', '--x']\n",
+            f"pulled sha256:{digest}, dataset 6accce3ebabab1576b6bdaf8\n",
+        ]}
+        job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
+        job.refresh()
+        assert token not in job.log
+        assert "'--token', '[redacted]', '--x'" in job.log
+        # Hex digests and ObjectIds are not secrets
+        assert digest in job.log and "6accce3ebabab1576b6bdaf8" in job.log
+
     def test_refresh_without_log_field(self):
         gc = MagicMock()
         gc.get.return_value = {"_id": "j1", "status": STATUS_RUNNING}

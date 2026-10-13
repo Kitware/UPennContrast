@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import time
 
 import girder_client
+
+# Girder tokens and API keys: 40+ mixed-case letters and digits. A worker
+# job's log starts with its launch command, which carries a live Girder
+# token; Job.log never includes it. (Hex digests are lower-case, so kept.)
+_SECRET = re.compile(
+    r"(?<![A-Za-z0-9])(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[a-z])"
+    r"[A-Za-z0-9]{40,}(?![A-Za-z0-9])"
+)
 
 # GET job/{id} recognizes a custom-scoped key only if it carries
 # jobs.rest.list_job ("List and read jobs" in Girder's API key dialog). That
@@ -81,7 +90,8 @@ class Job:
 
     @property
     def log(self) -> str:
-        """Full job log text."""
+        """Full job log text, with Girder tokens replaced by
+        ``[redacted]``. Call refresh() to update."""
         return self._log
 
     @property
@@ -110,7 +120,8 @@ class Job:
         # The log comes back inside the job document; girder_jobs has no
         # separate job/{id}/log route.
         log = self._data.get("log") or []
-        self._log = "".join(log) if isinstance(log, list) else str(log)
+        log = "".join(log) if isinstance(log, list) else str(log)
+        self._log = _SECRET.sub("[redacted]", log)
 
     def wait(
         self,
