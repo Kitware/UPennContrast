@@ -486,6 +486,32 @@ sibling's values.
   documents and several rounds (`test/test_save_many.py`). It fails reliably
   without the fix; a single-threaded test cannot see the race.
 
+## Single-use credentials: claim atomically, and only after the request is well-formed
+
+One-time codes, refresh tokens, invite links, consent requests: claim them
+with a conditional update (`Model().update({'_id': h, 'used': False},
+{'$set': {'used': True}}, multi=False)`, then check `modified_count == 1`);
+a find-then-save lets two requests both win.
+
+Then watch **what fails after the claim**. In the MCP OAuth plugin
+(`McpOAuthPlugin/nimbus_mcp_oauth/oauth.py`, PR on branch
+`claude/mcp-phase3-oauth`) the same bug was found three review rounds in a
+row: a refresh with a missing `client_id`, then one with a non-canonical
+`resource`, failed *after* the refresh token was marked used, so the
+client's corrected retry looked like token reuse and the whole connection
+was revoked. Sort every post-claim error into one of two kinds:
+
+- **Malformed request** (missing or mismatched parameters a well-behaved
+  client could get wrong): check it **before** the claim. If it needs the
+  stored record, peek with the same `used: False` filter, then claim.
+- **Security event** (wrong client, replay): claim first, then revoke.
+
+A peek must not soften a security event: the resource peek only applies
+when the client matches, or a wrong client could probe a token without
+tripping the revocation (review round 4). Test each malformed-request
+case with a **corrected retry that succeeds**; a test that only checks the
+error response cannot see a spent token.
+
 ## Index changes on existing collections: not at startup
 
 Any `create_index` / `drop_index` / `ensureIndices` you add to a model
