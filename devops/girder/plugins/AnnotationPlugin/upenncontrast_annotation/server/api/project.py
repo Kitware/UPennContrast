@@ -10,12 +10,10 @@ from girder.api import access
 from girder.api.rest import Resource, filtermodel, loadmodel
 from girder.api.describe import Description, autoDescribeRoute
 from girder.constants import AccessType, TokenScope
-from girder.exceptions import RestException
 from girder.models.folder import Folder
-from girder.models.user import User
 
 from upenncontrast_annotation.server.helpers.access_helpers import (
-    formatAccessList, parseShareAccessType
+    findShareTarget, formatAccessList, parseShareAccessType
 )
 from upenncontrast_annotation.server.models.project import (
     Project as ProjectModel
@@ -314,14 +312,7 @@ class Project(Resource):
         # (above) is the only gate.
         accessType = parseShareAccessType(accessType)
 
-        targetUser = User().findOne(
-            {"$or": [
-                {"login": userMailOrUsername},
-                {"email": userMailOrUsername},
-            ]}
-        )
-        if not targetUser:
-            raise RestException("badEmailOrUsername")
+        targetUser = findShareTarget(userMailOrUsername)
 
         self._projectModel.setUserAccess(
             project, targetUser, accessType, save=True

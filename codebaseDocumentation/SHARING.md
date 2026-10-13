@@ -31,7 +31,9 @@ NimbusImage uses Girder's built-in access control system with three permission l
   anyone above Write (the owner). Toggling public, choosing collections and share links stay
   ADMIN-only
 - Any user with READ access can view the access list (who has access and at what level)
-- The dataset owner (ADMIN) cannot be removed from the access list
+- Owners (ADMIN) can't be changed or removed by anyone below ADMIN (`requireCanSetUserAccess`).
+  The dialog also locks owner rows for everyone. Another ADMIN can still change an owner through
+  the API.
 
 ## Architecture
 
@@ -328,6 +330,9 @@ Location: `src/components/ShareDataset.vue`
 - Confirmation dialog before removing access
 - ADMIN users protected from removal (lock icon)
 - Rights come from the access response's `currentUserLevel`, not the caller's row (*"takes management rights from the server's effective level"*). Changing your own entry re-reads it without resetting the collection selection. Any failed load, including the 403 after removing your last access, fails closed (*"removing your last access fails closed on the 403"*).
+- Only the latest access load commits: `fetchAccessInfo`, `refetchIfSelf` and `resetState` share one request counter, and a self-change during an in-flight full load (a reopen) restarts the full load instead of superseding it (*"an older self-change reload cannot overwrite a newer load"*, *"a self-change during a reopen's load still fills the dialog"*).
+- Share targets are named users only. `findShareTarget` treats share-link principals as unknown on both share endpoints (*"testShareEndpointRejectsShareLinkPrincipals"*).
+- With nothing shareable (`canShareAny`), the add form becomes a note and the row controls are hidden (*"with nothing shareable, a WRITE user gets a note, not controls"*).
 - **WRITE collaborators** (`canManageUsers`) get the add-user form, plus level dropdowns and remove buttons on rows at or below their own level (`canEditUser`). Rows above it show a lock. Public toggle, collection checkboxes and share links stay ADMIN-only (`isResourceAdmin`). A refused share shows the server's reason.
 - **Read-only mode** for READ users: the dialog hides all edit controls (add user form, remove buttons, access level dropdowns, public toggle, collection checkboxes) and shows access levels as plain text. The dialog title changes from "Share Dataset:" to "Sharing:".
 
@@ -382,6 +387,7 @@ interface IDatasetAccessConfiguration {
   id: string;
   name: string;
   public: boolean;
+  currentUserLevel: number; // caller's effective level on this configuration
 }
 
 interface IDatasetAccessList {
@@ -390,6 +396,8 @@ interface IDatasetAccessList {
   users: IDatasetAccessUser[];
   groups: unknown[];
   configurations: IDatasetAccessConfiguration[];
+  currentUserLevel: number; // caller's effective level on the dataset
+  writableViewIds: string[]; // views the caller can write (and so share)
 }
 ```
 

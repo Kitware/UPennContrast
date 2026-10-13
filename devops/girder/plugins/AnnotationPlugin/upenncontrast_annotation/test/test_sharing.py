@@ -304,6 +304,21 @@ class TestSharing:
         assert {u["id"]: u["level"] for u in config["access"]["users"]}[
             configOwner["_id"]] == AccessType.ADMIN
 
+    def testShareEndpointRejectsShareLinkPrincipals(self, admin, server):
+        """Share-link users are managed only through the link endpoints:
+        naming one as a share target is "badEmailOrUsername", not a grant
+        that would widen (or break) the link."""
+        dataset, config, datasetView = createDatasetWithView(admin)
+        linkUser = createUser("share-deadbeef")
+        linkUser["shareLink"] = True
+        User().save(linkUser)
+
+        resp = shareDatasetView(
+            server, admin, datasetView, linkUser, AccessType.READ)
+        assertStatus(resp, 400)
+        assert resp.json["message"] == "badEmailOrUsername"
+        assert linkUser["_id"] not in aclUserIds(Folder(), dataset["_id"])
+
     def testShareEndpointRejectsViewsOfSeveralDatasets(
             self, admin, user, server):
         """Views of several datasets in one request are a 400."""

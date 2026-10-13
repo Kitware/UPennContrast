@@ -9,10 +9,10 @@ from girder.constants import AccessType, TokenScope
 from girder.exceptions import AccessException
 from girder.exceptions import RestException
 from girder.models.folder import Folder
-from girder.models.user import User
 
 from upenncontrast_annotation.server.helpers.access_helpers import (
-    formatAccessList, parseShareAccessType, requireCanSetUserAccess
+    findShareTarget, formatAccessList, parseShareAccessType,
+    requireCanSetUserAccess
 )
 from upenncontrast_annotation.server.helpers.params import getBooleanParam
 from upenncontrast_annotation.server.models.datasetView import \
@@ -280,12 +280,7 @@ class DatasetView(Resource):
         def loadDocument(model, documentId):
             return model.load(documentId, AccessType.WRITE, user, exc=True)
 
-        targetUser = User().findOne(
-            {"$or": [{"login": body["userMailOrUsername"]},
-                     {"email": body["userMailOrUsername"]}]})
-        if not targetUser:
-            logger.error(f"Cannot find user {body['userMailOrUsername']}")
-            raise RestException("badEmailOrUsername")
+        targetUser = findShareTarget(body["userMailOrUsername"])
 
         # Will raise if accessType is a bad value; -1 (remove) becomes None
         accessType = parseShareAccessType(body["accessType"])

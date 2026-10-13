@@ -625,6 +625,100 @@ describe("ShareDataset", () => {
       expect(mockGetDatasetAccess).toHaveBeenCalledTimes(1);
     });
 
+    it("an older self-change reload cannot overwrite a newer load", async () => {
+      // Codex: change your own entry, then add a user before that reload
+      // returns; the add's newer load must win when the old one lands last.
+      const { vm } = await openAsWriteUser();
+      let resolveOld: (value: unknown) => void = () => {};
+      mockGetDatasetAccess.mockReturnValueOnce(
+        new Promise((resolve) => (resolveOld = resolve)),
+      );
+      const selfChange = vm.updateUserAccess(vm.users[0], 1);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const newer = {
+        ...selfOnly,
+        users: [
+          ...selfOnly.users,
+          { id: "u9", login: "new", name: "New", email: "n@t.com", level: 0 },
+        ],
+      };
+      mockGetDatasetAccess.mockResolvedValue(newer);
+      vm.newUserEmail = "new";
+      await vm.addUser();
+      expect(vm.users.map((u: any) => u.id)).toContain("u9");
+
+      resolveOld({ ...selfOnly, currentUserLevel: 0 });
+      await selfChange;
+      expect(vm.users.map((u: any) => u.id)).toContain("u9");
+      expect(vm.currentUserLevel).toBe(1);
+    });
+
+    it("overlapping full loads commit only the latest", async () => {
+      const { vm } = await openAsWriteUser();
+      let resolveFirst: (value: unknown) => void = () => {};
+      mockGetDatasetAccess.mockReturnValueOnce(
+        new Promise((resolve) => (resolveFirst = resolve)),
+      );
+      const first = vm.fetchAccessInfo("ds1");
+      mockGetDatasetAccess.mockResolvedValueOnce({
+        ...selfOnly,
+        currentUserLevel: 2,
+      });
+      await vm.fetchAccessInfo("ds1");
+      expect(vm.currentUserLevel).toBe(2);
+
+      resolveFirst({ ...selfOnly, currentUserLevel: 0 });
+      await first;
+      expect(vm.currentUserLevel).toBe(2);
+      expect(vm.loading).toBe(false);
+    });
+
+    it("a load superseded by a self-change reload still clears loading", async () => {
+      const { vm } = await openAsWriteUser();
+      let resolveFull: (value: unknown) => void = () => {};
+      mockGetDatasetAccess.mockReturnValueOnce(
+        new Promise((resolve) => (resolveFull = resolve)),
+      );
+      const full = vm.fetchAccessInfo("ds1");
+      expect(vm.loading).toBe(true);
+
+      mockGetDatasetAccess.mockResolvedValueOnce(selfOnly);
+      await vm.refetchIfSelf(vm.users[0]);
+      resolveFull(selfOnly);
+      await full;
+      expect(vm.loading).toBe(false);
+    });
+
+    it("a self-change during a reopen's load still fills the dialog", async () => {
+      // Review: close and reopen while your own change is pending; the
+      // self-change reload must not leave views/selection/public unset.
+      const { vm } = await openAsWriteUser();
+      let resolveShare: (value: unknown) => void = () => {};
+      mockShareDatasetView.mockReturnValueOnce(
+        new Promise((resolve) => (resolveShare = resolve)),
+      );
+      const selfChange = vm.updateUserAccess(vm.users[0], 1);
+
+      vm.resetState();
+      let resolveReopen: (value: unknown) => void = () => {};
+      mockGetDatasetAccess.mockReturnValueOnce(
+        new Promise((resolve) => (resolveReopen = resolve)),
+      );
+      const reopen = vm.fetchAccessInfo("ds1");
+      mockGetDatasetAccess.mockResolvedValue({ ...selfOnly, public: true });
+
+      resolveShare(true);
+      await selfChange;
+      resolveReopen({ ...selfOnly, public: true });
+      await reopen;
+
+      expect(vm.loading).toBe(false);
+      expect(vm.isPublic).toBe(true);
+      expect(vm.associatedViews.length).toBe(defaultViews.length);
+      expect(vm.selectedConfigIds.length).toBeGreaterThan(0);
+    });
+
     it("drops a reload that lands after the dialog closed", async () => {
       const { vm, wrapper } = await openAsWriteUser();
       let resolveReload: (value: unknown) => void = () => {};
@@ -766,5 +860,28 @@ describe("ShareDataset", () => {
       expect(vm.selectedConfigIds).toEqual([]);
       expect(vm.getSelectedViews()).toEqual([]);
     });
+  });
+
+  it("with nothing shareable, a WRITE user gets a note, not controls", async () => {
+    mockGetDatasetAccess.mockResolvedValue({
+      ...defaultAccessList,
+      currentUserLevel: 1,
+      users: [
+        { id: "u1", login: "me", name: "Me", email: "me@t.com", level: 1 },
+        { id: "u3", login: "r", name: "R", email: "r@t.com", level: 0 },
+      ],
+      writableViewIds: [],
+    });
+    const wrapper = mountComponent({ modelValue: true }, true);
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    await wrapper.vm.$nextTick();
+
+    expect(vm.canManageUsers).toBe(true);
+    expect(vm.canShareAny).toBe(false);
+    expect(vm.canEditUser(vm.users[1])).toBe(false);
+    const html = wrapper.html();
+    expect(html).toContain("You can't share any of this dataset's collections");
+    expect(html).not.toContain('label="Username or Email"');
   });
 });

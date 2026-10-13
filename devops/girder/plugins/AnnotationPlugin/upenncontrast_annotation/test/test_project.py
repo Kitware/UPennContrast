@@ -1201,6 +1201,26 @@ class TestProjectShareEndpointRemove:
             ), 400)
         assert user['_id'] not in aclUserIds(pm, proj['_id'])
 
+    def test_share_link_principal_is_not_a_target(
+        self, admin, server
+    ):
+        pm = Project()
+        proj = pm.createProject(
+            name="Link target", creator=admin
+        )
+        linkUser = User().createUser(
+            'share-cafef00d', 'password', 'Link', 'User',
+            'share-cafef00d@example.com'
+        )
+        linkUser['shareLink'] = True
+        User().save(linkUser)
+        resp = self._share(
+            server, admin, proj, linkUser, AccessType.READ
+        )
+        assertStatus(resp, 400)
+        assert resp.json['message'] == 'badEmailOrUsername'
+        assert linkUser['_id'] not in aclUserIds(pm, proj['_id'])
+
     def test_resync_cleans_legacy_negative_entries(
         self, admin, user
     ):

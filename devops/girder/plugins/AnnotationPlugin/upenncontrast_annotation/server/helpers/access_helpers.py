@@ -37,6 +37,29 @@ def parseShareAccessType(accessType):
     return None if accessType == AccessType.NONE else accessType
 
 
+def findShareTarget(userMailOrUsername):
+    """Find the named user a share request targets, by login or email.
+
+    Share-link principals are managed only through the link endpoints, so
+    they are treated as unknown here: otherwise a WRITE collaborator could
+    widen a link to other collections or quietly break it.
+
+    :param userMailOrUsername: The target's login or email.
+    :returns: The user document.
+    :raises RestException: "badEmailOrUsername" if no such named user.
+    """
+    targetUser = User().findOne({
+        '$or': [
+            {'login': userMailOrUsername},
+            {'email': userMailOrUsername},
+        ],
+        'shareLink': {'$exists': False},
+    })
+    if not targetUser:
+        raise RestException('badEmailOrUsername')
+    return targetUser
+
+
 def requireCanSetUserAccess(model, document, user, targetUser, level):
     """Refuse an ACL change that reaches above the caller's own level.
 

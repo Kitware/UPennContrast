@@ -183,7 +183,11 @@
             <v-row>
               <v-col cols="12">
                 <div class="subtitle-2 mb-2">Add User:</div>
-                <v-row density="comfortable" align="center">
+                <div v-if="!canShareAny" class="text-body-2 text-grey">
+                  You can't share any of this dataset's collections: sharing
+                  needs edit access to a collection and to one of its views.
+                </div>
+                <v-row v-else density="comfortable" align="center">
                   <v-col cols="5">
                     <v-text-field
                       v-model="newUserEmail"
@@ -449,6 +453,13 @@ const selectedConfigIds = ref<string[]>([]);
 // sent, so only those the caller can write are ever included.
 const writableViewIds = ref<Set<string>>(new Set());
 
+// Every access-list load (fetchAccessInfo and refetchIfSelf) and
+// resetState claim the next number; a load commits only while it is still
+// the latest, so an older response can never overwrite a newer one.
+let accessRequest = 0;
+// The load that turned the spinner on turns it off, even if superseded
+let loadingRequest = 0;
+
 // Associated dataset views (needed for API calls)
 const associatedViews = ref<IDatasetView[]>([]);
 
@@ -493,9 +504,19 @@ function shareErrorMessage(response: string, unknownUser: string): string {
 async function refetchIfSelf(user: IDatasetAccessUser) {
   const requestedDatasetId = datasetId.value;
   if (user.id !== store.girderUser?._id || !requestedDatasetId) return;
+  // A full load still in flight (e.g. the dialog was reopened) must not be
+  // superseded by this partial one, or views, public state and the default
+  // selection never land; start a fresh full load instead.
+  if (loading.value) {
+    await fetchAccessInfo(requestedDatasetId);
+    return;
+  }
+  const request = ++accessRequest;
+  const isCurrent = () =>
+    request === accessRequest && datasetId.value === requestedDatasetId;
   try {
     const accessList = await store.api.getDatasetAccess(requestedDatasetId);
-    if (!dialog.value || datasetId.value !== requestedDatasetId) return;
+    if (!isCurrent()) return;
     users.value = accessList.users;
     currentUserLevel.value = accessList.currentUserLevel;
     configurations.value = accessList.configurations;
@@ -508,6 +529,7 @@ async function refetchIfSelf(user: IDatasetAccessUser) {
       writable.has(id),
     );
   } catch (error) {
+    if (!isCurrent()) return;
     // Removing your last access makes the list itself a 403: fail closed
     logError(
       `Failed to reload access for dataset ${requestedDatasetId}`,
@@ -517,9 +539,15 @@ async function refetchIfSelf(user: IDatasetAccessUser) {
   }
 }
 
+// With nothing shareable every add/edit/remove would fail, so offer none
+const canShareAny = computed((): boolean =>
+  configurations.value.some(isConfigShareable),
+);
+
 function canEditUser(user: IDatasetAccessUser): boolean {
   return (
     canManageUsers.value &&
+    canShareAny.value &&
     user.level !== 2 &&
     user.level <= currentUserLevel.value
   );
@@ -535,6 +563,7 @@ watch(dialog, (val) => {
 
 function resetState() {
   shareLinksRequest++;
+  accessRequest++;
   shareLinks.value = [];
   createdLinkUrl.value = null;
   createdEmbedUrl.value = null;
@@ -557,11 +586,14 @@ function resetState() {
 
 async function fetchAccessInfo(datasetId: string) {
   fetchShareLinks(datasetId);
+  const request = ++accessRequest;
+  loadingRequest = request;
   loading.value = true;
   showError.value = false;
   try {
     // Fetch access list from new endpoint
     const accessList = await store.api.getDatasetAccess(datasetId);
+    if (request !== accessRequest) return;
 
     isPublic.value = accessList.public;
     users.value = accessList.users;
@@ -570,22 +602,23 @@ async function fetchAccessInfo(datasetId: string) {
     writableViewIds.value = new Set(accessList.writableViewIds);
 
     // Also fetch dataset views for the share API calls
-    associatedViews.value = await store.api.findDatasetViews({
-      datasetId,
-    });
+    const views = await store.api.findDatasetViews({ datasetId });
+    if (request !== accessRequest) return;
+    associatedViews.value = views;
     // Select every configuration the caller can share by default (needs
     // the views, so only once they are loaded)
     selectedConfigIds.value = configurations.value
       .filter(isConfigShareable)
       .map((c) => c.id);
   } catch (error) {
+    if (request !== accessRequest) return;
     logError(`Failed to fetch access info for dataset ${datasetId}`, error);
     // Without the list we can't know the caller's rights: fail closed
     currentUserLevel.value = -1;
     errorString.value = "Failed to load access information";
     showError.value = true;
   } finally {
-    loading.value = false;
+    if (loadingRequest === request) loading.value = false;
   }
 }
 
@@ -879,11 +912,13 @@ defineExpose({
   currentUserLevel,
   canManageUsers,
   canEditUser,
+  canShareAny,
   resetState,
   fetchAccessInfo,
   close,
   getSelectedViews,
   isConfigShareable,
+  refetchIfSelf,
   togglePublic,
   updateUserAccess,
   confirmRemoveUser,
