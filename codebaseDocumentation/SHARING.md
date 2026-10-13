@@ -102,8 +102,11 @@ holds only direct entries, so access held through a group has no row. *"testAcce
 
 Each configuration also carries the caller's level, and `writableViewIds` lists the dataset's views
 the caller can write. `POST /dataset_view/share` needs WRITE on every view and configuration it is
-sent, so the dialog pre-selects only writable configurations, disables an owner's checkbox for a
-read-only one, and sends only writable views. Without this, a WRITE collaborator with READ on one
+sent, so the dialog sends only writable views, and treats a configuration as shareable only when
+the caller can write it **and** at least one of its views (`isConfigShareable`). That one predicate
+drives the default selection, the owner's checkbox enabling and the pruning after a self-change, so
+a collection is never shown selected while its views are silently dropped
+(*"never shows a collection selected that would not be shared"*). Without this, a WRITE collaborator with READ on one
 collection had every share refused. *"testAccessListReportsWhatTheCallerCanShare"*,
 *"selects writable collections and sends writable views"*
 

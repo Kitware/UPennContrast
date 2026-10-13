@@ -35,12 +35,12 @@
                 :key="config.id"
                 v-model="selectedConfigIds"
                 :label="
-                  isConfigWritable(config)
+                  isConfigShareable(config)
                     ? config.name
-                    : `${config.name} (read-only for you)`
+                    : `${config.name} (you can't share this one)`
                 "
                 :value="config.id"
-                :disabled="!isConfigWritable(config)"
+                :disabled="!isConfigShareable(config)"
                 :hide-details="true"
                 density="compact"
               />
@@ -502,7 +502,7 @@ async function refetchIfSelf(user: IDatasetAccessUser) {
     writableViewIds.value = new Set(accessList.writableViewIds);
     // Keep the user's choice, minus anything they can no longer write
     const writable = new Set(
-      accessList.configurations.filter(isConfigWritable).map((c) => c.id),
+      accessList.configurations.filter(isConfigShareable).map((c) => c.id),
     );
     selectedConfigIds.value = selectedConfigIds.value.filter((id) =>
       writable.has(id),
@@ -568,15 +568,16 @@ async function fetchAccessInfo(datasetId: string) {
     currentUserLevel.value = accessList.currentUserLevel;
     configurations.value = accessList.configurations;
     writableViewIds.value = new Set(accessList.writableViewIds);
-    // Select every configuration the caller can share by default
-    selectedConfigIds.value = accessList.configurations
-      .filter(isConfigWritable)
-      .map((c) => c.id);
 
     // Also fetch dataset views for the share API calls
     associatedViews.value = await store.api.findDatasetViews({
       datasetId,
     });
+    // Select every configuration the caller can share by default (needs
+    // the views, so only once they are loaded)
+    selectedConfigIds.value = configurations.value
+      .filter(isConfigShareable)
+      .map((c) => c.id);
   } catch (error) {
     logError(`Failed to fetch access info for dataset ${datasetId}`, error);
     // Without the list we can't know the caller's rights: fail closed
@@ -592,8 +593,19 @@ function close() {
   dialog.value = false;
 }
 
-function isConfigWritable(config: IDatasetAccessConfiguration): boolean {
-  return config.currentUserLevel >= 1;
+// A configuration can be shared only with one of its views, and the share
+// endpoint needs WRITE on both. This one predicate decides selection,
+// checkbox enabling and pruning, so a collection is never shown selected
+// while getSelectedViews silently drops it.
+function isConfigShareable(config: IDatasetAccessConfiguration): boolean {
+  return (
+    config.currentUserLevel >= 1 &&
+    associatedViews.value.some(
+      (view) =>
+        view.configurationId === config.id &&
+        writableViewIds.value.has(view.id),
+    )
+  );
 }
 
 function getSelectedViews(): IDatasetView[] {
@@ -871,7 +883,7 @@ defineExpose({
   fetchAccessInfo,
   close,
   getSelectedViews,
-  isConfigWritable,
+  isConfigShareable,
   togglePublic,
   updateUserAccess,
   confirmRemoveUser,

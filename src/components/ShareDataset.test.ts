@@ -680,7 +680,11 @@ describe("ShareDataset", () => {
       const vm = wrapper.vm as any;
       await vm.fetchAccessInfo("ds1");
 
-      expect(vm.selectedConfigIds).toEqual(["cfg1", "cfg3"]);
+      // cfg1 is writable but its only view is not, so it can't be shared
+      expect(vm.selectedConfigIds).toEqual(["cfg3"]);
+      expect(vm.isConfigShareable(partlyWritable.configurations[0])).toBe(
+        false,
+      );
       vm.newUserEmail = "someone";
       await vm.addUser();
       expect(mockShareDatasetView).toHaveBeenCalledWith(
@@ -688,6 +692,23 @@ describe("ShareDataset", () => {
         "someone",
         0,
       );
+    });
+
+    it("never shows a collection selected that would not be shared", async () => {
+      // Every selected collection must contribute a view to the request
+      mockGetDatasetAccess.mockResolvedValue({
+        ...partlyWritable,
+        currentUserLevel: 2,
+      });
+      mockFindDatasetViews.mockResolvedValue(views);
+      const wrapper = mountComponent({ modelValue: true });
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+
+      const sharedConfigs = new Set(
+        vm.getSelectedViews().map((v: any) => v.configurationId),
+      );
+      expect(new Set(vm.selectedConfigIds)).toEqual(sharedConfigs);
     });
 
     it("disables an owner's checkbox for a read-only collection", async () => {
@@ -702,13 +723,22 @@ describe("ShareDataset", () => {
       await wrapper.vm.$nextTick();
 
       const boxes = wrapper.findAllComponents({ name: "v-checkbox" });
-      const readOnly = boxes.find((b) =>
-        String(b.props("label") ?? b.attributes("label")).includes("Config 2"),
+      // Config 2 is read-only; Config 1 is writable but has no writable view
+      for (const name of ["Config 1", "Config 2"]) {
+        const box = boxes.find((b) =>
+          String(b.props("label") ?? b.attributes("label")).includes(name),
+        );
+        expect(box).toBeDefined();
+        expect(
+          box!.props("disabled") ?? box!.attributes("disabled"),
+        ).toBeTruthy();
+      }
+      const shareable = boxes.find((b) =>
+        String(b.props("label") ?? b.attributes("label")).includes("Config 3"),
       );
-      expect(readOnly).toBeDefined();
       expect(
-        readOnly!.props("disabled") ?? readOnly!.attributes("disabled"),
-      ).toBeTruthy();
+        shareable!.props("disabled") ?? shareable!.attributes("disabled"),
+      ).toBeFalsy();
     });
 
     it("a self-change prunes collections you can no longer write", async () => {
@@ -723,7 +753,7 @@ describe("ShareDataset", () => {
       const wrapper = mountComponent({ modelValue: true });
       const vm = wrapper.vm as any;
       await vm.fetchAccessInfo("ds1");
-      expect(vm.selectedConfigIds).toEqual(["cfg1", "cfg3"]);
+      expect(vm.selectedConfigIds).toEqual(["cfg3"]);
 
       mockGetDatasetAccess.mockResolvedValue({
         ...partlyWritable,
@@ -733,7 +763,7 @@ describe("ShareDataset", () => {
         writableViewIds: [],
       });
       await vm.updateUserAccess(vm.users[0], 1);
-      expect(vm.selectedConfigIds).toEqual(["cfg1"]);
+      expect(vm.selectedConfigIds).toEqual([]);
       expect(vm.getSelectedViews()).toEqual([]);
     });
   });
