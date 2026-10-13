@@ -721,6 +721,9 @@ that writes an ACL or a public flag, or that exports a project.
   endpoint's check) — *"testUploadJobRechecksTheProjectItExports"* — and checks again
   immediately before reading any data, after its Zenodo calls —
   *"testUploadRechecksOwnershipBeforeReadingData"*.
+- Anything deleted between the job's first check and that recheck is dropped, not
+  exported from the stale snapshot nor recorded —
+  *"testConfigurationDeletedBeforeTheRecheckIsNotExported"*.
 - The export publishes the configurations the check returned, never re-queried views
   (a view can be repointed after the check) —
   *"testExportUsesTheConfigurationsItChecked"*.

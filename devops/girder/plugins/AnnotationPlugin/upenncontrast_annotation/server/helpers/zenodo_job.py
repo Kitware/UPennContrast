@@ -25,6 +25,7 @@ from girder_jobs.constants import JobStatus
 from girder_jobs.models.job import Job
 
 from .access_helpers import (
+    ProjectContents,
     requireProjectContentsAccess,
     requireResourcesAccess,
 )
@@ -300,8 +301,29 @@ def _do_upload(job, job_model, project, user, project_id,
     # a while; check again immediately before reading any data, so access
     # revoked meanwhile stops the export. (Revocation during the file
     # uploads themselves still blocks publishing: publish rechecks.)
-    requireResourcesAccess(
+    existing_dataset_ids, existing_collections = requireResourcesAccess(
         contents.datasetIds, contents.collectionIds, user
+    )
+    existing_dataset_ids = set(existing_dataset_ids)
+    # Drop anything deleted since the first check, so it is neither
+    # exported from the stale snapshot nor recorded (publish refuses
+    # recorded resources that no longer exist).
+    contents = ProjectContents(
+        datasetIds=[
+            ds_id for ds_id in contents.datasetIds
+            if ds_id in existing_dataset_ids
+        ],
+        collectionIds=[
+            coll_id for coll_id in contents.collectionIds
+            if coll_id in existing_collections
+        ],
+        configsByDataset={
+            ds_id: [
+                config for config in configs
+                if config['_id'] in existing_collections
+            ]
+            for ds_id, configs in contents.configsByDataset.items()
+        },
     )
 
     # Batch load all project data upfront

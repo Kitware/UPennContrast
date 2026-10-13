@@ -812,6 +812,49 @@ class TestZenodoRequiresOwnership:
                 client, contents)
         client.upload_file.assert_not_called()
 
+    def testConfigurationDeletedBeforeTheRecheckIsNotExported(
+            self, server, owner):
+        """A view's configuration deleted after the job's first check is
+        neither exported nor recorded (publish would refuse the draft)."""
+        from unittest.mock import MagicMock
+        from girder_jobs.constants import JobStatus
+        from girder_jobs.models.job import Job
+        from upenncontrast_annotation.server.helpers import zenodo_job
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        extraConfig = createConfiguration(owner, ownFolder(owner))
+        createView(owner, dataset, extraConfig)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+        projectDoc = Project().load(project["_id"], force=True)
+        contents = requireProjectContentsAccess(projectDoc, owner)
+        assert extraConfig["_id"] in contents.collectionIds
+
+        def deleteThenCreate():
+            Collection().remove(Collection().load(
+                extraConfig["_id"], force=True))
+            return {"id": 1, "links": {"bucket": "b", "html": "h"}}
+
+        client = MagicMock()
+        client.base_url = "https://sandbox.zenodo.org"
+        client.create_deposition.side_effect = deleteThenCreate
+        client.upload_file.return_value = {}
+        job = Job().updateJob(
+            Job().createJob(title="t", type="zenodo_upload", user=owner),
+            status=JobStatus.RUNNING)
+
+        zenodo_job._do_upload(
+            job, Job(), projectDoc, owner, project["_id"], Project(),
+            client, contents)
+
+        recorded = Project().load(project["_id"], force=True)[
+            "meta"]["zenodo"]["uploadedResources"]
+        assert extraConfig["_id"] not in recorded["collectionIds"]
+        assert config["_id"] in recorded["collectionIds"]
+
     def testOwnerPassesTheOwnershipCheck(self, server, owner):
         dataset, _, _ = createDataset(owner)
         project = TestProjectShareLimits().createProject(server, owner)
