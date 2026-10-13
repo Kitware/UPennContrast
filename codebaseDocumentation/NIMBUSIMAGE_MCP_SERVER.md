@@ -127,7 +127,7 @@ flowchart LR
   subgraph hap["HAProxy · app.nimbusimage.com (single box)"]
     R1["/mcp (new)"]
     R2["/.well-known/oauth-protected-resource/mcp (new)"]
-    R3["/.well-known/oauth-authorization-server (new)"]
+    R3["/.well-known/oauth-authorization-server<br/>+ /.well-known/openid-configuration (new)"]
     R4["/girder/*"]
     R5["/.well-known/acme-challenge/* (must keep)"]
     R6["/ (everything else)"]
