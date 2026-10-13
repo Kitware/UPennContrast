@@ -8,6 +8,87 @@ from girder.models.user import User
 from ..models.annotation import Annotation
 from ..models.propertyValues import MAX_IDS_PER_QUERY
 
+SHARE_ACCESS_TYPES = (
+    AccessType.NONE, AccessType.READ, AccessType.WRITE, AccessType.ADMIN
+)
+
+
+def parseShareAccessType(accessType):
+    """Convert a share request's accessType to a setUserAccess level.
+
+    The share endpoints take -1 (AccessType.NONE) to mean "remove access",
+    but Girder's setUserAccess only removes the entry when the level is None;
+    any other value, -1 included, is stored as an inert {id, level: -1}
+    entry that keeps the user listed in the access table.
+
+    AccessType.validate would also accept SITE_ADMIN (100) and raises
+    ValueError (a 500) on bad input, so the allowed set is checked here.
+    The value must already be an int: int() would truncate a JSON 1.9 to
+    WRITE, and bool is an int subclass.
+
+    :param accessType: -1 (remove), 0 (READ), 1 (WRITE) or 2 (ADMIN).
+    :returns: The AccessType level, or None to remove access.
+    :raises RestException: 400 if accessType is not one of those levels.
+    """
+    if (isinstance(accessType, bool) or not isinstance(accessType, int)
+            or accessType not in SHARE_ACCESS_TYPES):
+        raise RestException(
+            "accessType must be one of %s" % (SHARE_ACCESS_TYPES,), code=400)
+    return None if accessType == AccessType.NONE else accessType
+
+
+def findShareTarget(userMailOrUsername):
+    """Find the named user a share request targets, by login or email.
+
+    Share-link principals are managed only through the link endpoints, so
+    they are treated as unknown here: otherwise a WRITE collaborator could
+    widen a link to other collections or quietly break it.
+
+    :param userMailOrUsername: The target's login or email.
+    :returns: The user document.
+    :raises RestException: "badEmailOrUsername" if no such named user.
+    """
+    targetUser = User().findOne({
+        '$or': [
+            {'login': userMailOrUsername},
+            {'email': userMailOrUsername},
+        ],
+        'shareLink': {'$exists': False},
+    })
+    if not targetUser:
+        raise RestException('badEmailOrUsername')
+    return targetUser
+
+
+def requireCanSetUserAccess(model, document, user, targetUser, level):
+    """Refuse an ACL change that reaches above the caller's own level.
+
+    The caller may grant at most their own level, and may change or remove
+    only a user whose current entry is no higher than their own. So a WRITE
+    collaborator can share READ or WRITE, but can neither make anyone
+    (themselves included) ADMIN nor demote or remove an owner.
+
+    :param model: The AccessControlledModel the document belongs to.
+    :param document: The document whose ACL is about to change.
+    :param user: The user making the change.
+    :param targetUser: The user whose access is changing.
+    :param level: The new level, or None to remove access.
+    :raises AccessException: If the change exceeds the caller's level.
+    """
+    userLevel = model.getAccessLevel(document, user)
+    targetLevel = max(
+        (entry['level']
+         for entry in document.get('access', {}).get('users', [])
+         if entry['id'] == targetUser['_id']),
+        default=None,
+    )
+    if level is not None and level > userLevel:
+        raise AccessException(
+            'You cannot grant access above your own level')
+    if targetLevel is not None and targetLevel > userLevel:
+        raise AccessException(
+            'You cannot change access for a user above your own level')
+
 
 def requireDatasetsAccess(datasetIds, user, level=AccessType.WRITE):
     """Load all datasets in one query and check access on each.
@@ -83,16 +164,23 @@ def fetchNamedUserEmails(userIds):
     }
 
 
-def formatAccessList(model, document):
+def formatAccessList(model, document, currentUser):
     """Format a document's access list with user emails.
 
-    Returns dict with 'public', 'users', and 'groups' keys.
+    Returns dict with 'public', 'users', 'groups' and 'currentUserLevel'.
+    currentUserLevel is the caller's effective level (groups and site admin
+    included, the same getAccessLevel the share endpoints authorize with),
+    so a client never infers its own rights from the direct-user rows.
     Users include id, login, name, email, and level. Share-link principals
     are managed only through the link list, never the named sharing table.
+    Entries with a negative level grant nothing; they are leftovers from
+    share endpoints that stored -1 instead of removing the user, so they
+    are dropped rather than listed as a user with access.
 
     :param model: The Girder model instance.
     :param document: The document to get access for.
-    :returns: Dict with public, users, groups.
+    :param currentUser: The user making the request.
+    :returns: Dict with public, users, groups, currentUserLevel.
     """
     accessList = model.getFullAccessList(document)
     userIds = [
@@ -112,7 +200,8 @@ def formatAccessList(model, document):
                 'level': u['level'],
             }
             for u in accessList.get('users', [])
-            if u['id'] in userEmails
+            if u['id'] in userEmails and u['level'] >= AccessType.READ
         ],
         'groups': accessList.get('groups', []),
+        'currentUserLevel': model.getAccessLevel(document, currentUser),
     }

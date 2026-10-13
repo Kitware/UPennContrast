@@ -4,7 +4,6 @@ Tests the share, setDatasetPublic, and getDatasetAccess endpoints
 in the DatasetView API.
 """
 import json
-
 import pytest
 from bson import ObjectId
 import random
@@ -14,6 +13,7 @@ from pytest_girder.assertions import assertStatus, assertStatusOk
 from girder.constants import AccessType
 from girder.exceptions import AccessException
 from girder.models.folder import Folder
+from girder.models.group import Group
 from girder.models.user import User
 
 from upenncontrast_annotation.server.models.datasetView import (
@@ -64,6 +64,30 @@ def createDatasetWithView(creator):
     )
 
     return dataset, config, datasetView
+
+
+aclUserIds = utilities.aclUserIds
+
+
+def createUser(login):
+    return User().createUser(
+        login, "password", login, "User", f"{login}@example.com")
+
+
+def shareDatasetView(server, sharer, datasetView, target, accessType):
+    datasetViews = (
+        datasetView if isinstance(datasetView, list) else [datasetView])
+    return server.request(
+        path="/dataset_view/share",
+        method="POST",
+        user=sharer,
+        body=json.dumps({
+            "datasetViewIds": [str(view["_id"]) for view in datasetViews],
+            "userMailOrUsername": target["login"],
+            "accessType": accessType,
+        }),
+        type="application/json",
+    )
 
 
 @pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
@@ -122,7 +146,7 @@ class TestSharing:
         assert loaded["_id"] == datasetView["_id"]
 
     def testRemoveAccess(self, admin, user):
-        """Test removing access using -1 (Girder convention)."""
+        """Test removing access: Girder removes the entry only for None."""
         dataset, config, datasetView = createDatasetWithView(admin)
 
         # First grant access
@@ -139,13 +163,16 @@ class TestSharing:
         )
         assert loaded is not None
 
-        # Remove access using -1
+        # Remove access (None, which is what the share endpoint passes)
         DatasetViewModel().setUserAccess(
-            datasetView, user, -1, save=True
+            datasetView, user, None, save=True
         )
         Folder().setUserAccess(
-            dataset, user, -1, save=True
+            dataset, user, None, save=True
         )
+        assert user["_id"] not in aclUserIds(
+            DatasetViewModel(), datasetView["_id"])
+        assert user["_id"] not in aclUserIds(Folder(), dataset["_id"])
 
         # User should no longer have access (raises AccessException)
         with pytest.raises(AccessException):
@@ -174,6 +201,155 @@ class TestSharing:
         # Invalid values should raise
         with pytest.raises(Exception):
             AccessType().validate(99)
+
+    def testShareEndpointRemoveDropsAclEntries(self, admin, user, server):
+        """Removing via the endpoint (-1) leaves no access.users entry on
+        the folder, configuration or dataset view, not a level -1 one."""
+        dataset, config, datasetView = createDatasetWithView(admin)
+        assertStatusOk(shareDatasetView(
+            server, admin, datasetView, user, AccessType.WRITE))
+        assert user["_id"] in aclUserIds(Folder(), dataset["_id"])
+
+        assertStatusOk(shareDatasetView(
+            server, admin, datasetView, user, AccessType.NONE))
+
+        assert user["_id"] not in aclUserIds(Folder(), dataset["_id"])
+        assert user["_id"] not in aclUserIds(Collection(), config["_id"])
+        assert user["_id"] not in aclUserIds(
+            DatasetViewModel(), datasetView["_id"])
+        resp = server.request(
+            path=f"/dataset_view/access/{dataset['_id']}",
+            method="GET",
+            user=admin,
+        )
+        assertStatusOk(resp)
+        assert str(user["_id"]) not in {u["id"] for u in resp.json["users"]}
+
+    def testShareEndpointRemoveWithoutGrantIsNoop(self, admin, user, server):
+        """Removing a user who was never shared adds no entry."""
+        dataset, config, datasetView = createDatasetWithView(admin)
+        assertStatusOk(shareDatasetView(
+            server, admin, datasetView, user, AccessType.NONE))
+        assert user["_id"] not in aclUserIds(Folder(), dataset["_id"])
+        assert user["_id"] not in aclUserIds(Collection(), config["_id"])
+        assert user["_id"] not in aclUserIds(
+            DatasetViewModel(), datasetView["_id"])
+
+    def _writeCollaborator(self, admin, user):
+        """A dataset owned by admin, with user at WRITE on all of it."""
+        dataset, config, datasetView = createDatasetWithView(admin)
+        for model, document in (
+            (Folder(), dataset), (Collection(), config),
+            (DatasetViewModel(), datasetView),
+        ):
+            model.setUserAccess(document, user, AccessType.WRITE, save=True)
+        return dataset, config, datasetView
+
+    def testWriteUserCanShareUpToWrite(self, admin, user, server):
+        """WRITE is enough to grant READ or WRITE, and to remove a peer."""
+        dataset, config, datasetView = self._writeCollaborator(admin, user)
+        third = createUser("third")
+
+        for level in (AccessType.READ, AccessType.WRITE):
+            assertStatusOk(shareDatasetView(
+                server, user, datasetView, third, level))
+            folder = Folder().load(dataset["_id"], force=True)
+            assert {u["id"]: u["level"] for u in folder["access"]["users"]}[
+                third["_id"]] == level
+
+        assertStatusOk(shareDatasetView(
+            server, user, datasetView, third, AccessType.NONE))
+        assert third["_id"] not in aclUserIds(Folder(), dataset["_id"])
+
+    def testWriteUserCannotExceedOwnLevel(self, admin, user, server):
+        """A WRITE collaborator can't make anyone (themselves included)
+        ADMIN, nor demote or remove the owner."""
+        dataset, config, datasetView = self._writeCollaborator(admin, user)
+        third = createUser("third")
+
+        for target, level in ((user, AccessType.ADMIN),
+                              (third, AccessType.ADMIN),
+                              (admin, AccessType.WRITE),
+                              (admin, AccessType.NONE)):
+            assertStatus(shareDatasetView(
+                server, user, datasetView, target, level), 403)
+
+        for model, documentId in (
+            (Folder(), dataset["_id"]), (Collection(), config["_id"]),
+            (DatasetViewModel(), datasetView["_id"]),
+        ):
+            document = model.load(documentId, force=True)
+            levels = {u["id"]: u["level"]
+                      for u in document["access"]["users"]}
+            assert levels[user["_id"]] == AccessType.WRITE
+            assert levels[admin["_id"]] == AccessType.ADMIN
+            assert third["_id"] not in levels
+
+    def testOwnLevelIsCheckedPerDocument(self, admin, user, server):
+        """WRITE on the dataset doesn't let a caller demote someone who
+        owns the configuration; each touched document is checked, and a
+        refusal changes nothing."""
+        dataset, config, datasetView = self._writeCollaborator(admin, user)
+        configOwner = createUser("configowner")
+        Folder().setUserAccess(
+            dataset, configOwner, AccessType.READ, save=True)
+        Collection().setUserAccess(
+            config, configOwner, AccessType.ADMIN, save=True)
+
+        assertStatus(shareDatasetView(
+            server, user, datasetView, configOwner, AccessType.WRITE), 403)
+        folder = Folder().load(dataset["_id"], force=True)
+        assert {u["id"]: u["level"] for u in folder["access"]["users"]}[
+            configOwner["_id"]] == AccessType.READ
+        config = Collection().load(config["_id"], force=True)
+        assert {u["id"]: u["level"] for u in config["access"]["users"]}[
+            configOwner["_id"]] == AccessType.ADMIN
+
+    def testShareEndpointRejectsShareLinkPrincipals(self, admin, server):
+        """Share-link users are managed only through the link endpoints:
+        naming one as a share target is "badEmailOrUsername", not a grant
+        that would widen (or break) the link."""
+        dataset, config, datasetView = createDatasetWithView(admin)
+        linkUser = createUser("share-deadbeef")
+        linkUser["shareLink"] = True
+        User().save(linkUser)
+
+        resp = shareDatasetView(
+            server, admin, datasetView, linkUser, AccessType.READ)
+        assertStatus(resp, 400)
+        assert resp.json["message"] == "badEmailOrUsername"
+        assert linkUser["_id"] not in aclUserIds(Folder(), dataset["_id"])
+
+    def testShareEndpointRejectsViewsOfSeveralDatasets(
+            self, admin, user, server):
+        """Views of several datasets in one request are a 400."""
+        _, _, viewA = createDatasetWithView(admin)
+        datasetB, _, viewB = createDatasetWithView(admin)
+        assertStatus(shareDatasetView(
+            server, admin, [viewA, viewB], user, AccessType.READ), 400)
+        assert user["_id"] not in aclUserIds(Folder(), datasetB["_id"])
+
+    @pytest.mark.parametrize(
+        "accessType", [100, 3, -2, "write", 1.9, 0.5, True])
+    def testShareEndpointRejectsInvalidAccessType(
+            self, admin, user, server, accessType):
+        """Only the ints -1/0/1/2 are share levels; SITE_ADMIN (100),
+        fractions (1.9 must not truncate to WRITE), booleans and garbage
+        are a clean 400, not a stored level or a 500."""
+        dataset, config, datasetView = createDatasetWithView(admin)
+        resp = server.request(
+            path="/dataset_view/share",
+            method="POST",
+            user=admin,
+            body=json.dumps({
+                "datasetViewIds": [str(datasetView["_id"])],
+                "userMailOrUsername": user["login"],
+                "accessType": accessType,
+            }),
+            type="application/json",
+        )
+        assertStatus(resp, 400)
+        assert user["_id"] not in aclUserIds(Folder(), dataset["_id"])
 
 
 @pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
@@ -283,6 +459,89 @@ class TestGetDatasetAccess:
         userIds = {u["id"] for u in accessList["users"]}
         assert admin["_id"] in userIds
         assert user["_id"] in userIds
+
+    def testAccessListReportsEffectiveCurrentUserLevel(
+            self, admin, user, server):
+        """currentUserLevel is the caller's effective level, so WRITE held
+        through a group (no direct row) still lets the dialog share."""
+        dataset, config, datasetView = createDatasetWithView(admin)
+        group = Group().createGroup("writers", admin)
+        Group().addUser(group, user, level=AccessType.READ)
+        Folder().setGroupAccess(dataset, group, AccessType.WRITE, save=True)
+        Collection().setGroupAccess(config, group, AccessType.READ, save=True)
+
+        def accessOf(path, caller):
+            resp = server.request(path=path, method="GET", user=caller)
+            assertStatusOk(resp)
+            return resp.json
+
+        datasetPath = f"/dataset_view/access/{dataset['_id']}"
+        configPath = f"/dataset_view/configuration_access/{config['_id']}"
+        datasetAccess = accessOf(datasetPath, user)
+        assert str(user["_id"]) not in {
+            u["id"] for u in datasetAccess["users"]}
+        assert datasetAccess["currentUserLevel"] == AccessType.WRITE
+        assert accessOf(configPath, user)["currentUserLevel"] == (
+            AccessType.READ)
+        assert accessOf(datasetPath, admin)["currentUserLevel"] == (
+            AccessType.ADMIN)
+
+    def testAccessListReportsWhatTheCallerCanShare(
+            self, admin, user, server):
+        """Per-configuration levels and writableViewIds tell the dialog
+        which views and configurations a share request may include, since
+        the share endpoint needs WRITE on each one."""
+        dataset, config, datasetView = createDatasetWithView(admin)
+        Folder().setUserAccess(dataset, user, AccessType.WRITE, save=True)
+        Collection().setUserAccess(config, user, AccessType.READ, save=True)
+        otherConfig = Collection().createCollection(
+            name=f"other_{random.random()}", creator=admin, folder=dataset,
+            metadata={"subtype": "contrastDataset", "compatibility": {},
+                      "layers": [], "tools": [], "propertyIds": [],
+                      "snapshots": [], "scales": {}},
+            description="")
+        otherView = DatasetViewModel().create(admin, {
+            "datasetId": dataset["_id"],
+            "configurationId": otherConfig["_id"],
+            "lastLocation": {"xy": 0, "z": 0, "time": 0},
+            "layerContrasts": {}})
+        Collection().setUserAccess(
+            otherConfig, user, AccessType.WRITE, save=True)
+        DatasetViewModel().setUserAccess(
+            otherView, user, AccessType.WRITE, save=True)
+
+        resp = server.request(
+            path=f"/dataset_view/access/{dataset['_id']}", method="GET",
+            user=user)
+        assertStatusOk(resp)
+        levels = {c["id"]: c["currentUserLevel"]
+                  for c in resp.json["configurations"]}
+        assert levels == {str(config["_id"]): AccessType.READ,
+                          str(otherConfig["_id"]): AccessType.WRITE}
+        assert resp.json["writableViewIds"] == [str(otherView["_id"])]
+
+        # Sharing only what was reported writable succeeds
+        viewer = createUser("viewer")
+        assertStatusOk(shareDatasetView(
+            server, user, otherView, viewer, AccessType.READ))
+        assert viewer["_id"] in aclUserIds(Folder(), dataset["_id"])
+
+    def testAccessListHidesLegacyNegativeEntries(self, admin, user, server):
+        """Level -1 entries left by the old share endpoint grant nothing,
+        so the dataset and configuration access lists omit them."""
+        dataset, config, datasetView = createDatasetWithView(admin)
+        Folder().setUserAccess(dataset, user, AccessType.NONE, save=True)
+        Collection().setUserAccess(config, user, AccessType.NONE, save=True)
+
+        for path in (
+            f"/dataset_view/access/{dataset['_id']}",
+            f"/dataset_view/configuration_access/{config['_id']}",
+        ):
+            resp = server.request(path=path, method="GET", user=admin)
+            assertStatusOk(resp)
+            listed = {u["id"] for u in resp.json["users"]}
+            assert str(user["_id"]) not in listed
+            assert str(admin["_id"]) in listed
 
     def testAccessListShowsCorrectLevels(self, admin, user):
         """Test that access levels are correctly reported."""

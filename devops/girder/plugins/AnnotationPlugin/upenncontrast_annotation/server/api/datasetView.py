@@ -9,10 +9,10 @@ from girder.constants import AccessType, TokenScope
 from girder.exceptions import AccessException
 from girder.exceptions import RestException
 from girder.models.folder import Folder
-from girder.models.user import User
 
 from upenncontrast_annotation.server.helpers.access_helpers import (
-    formatAccessList
+    findShareTarget, formatAccessList, parseShareAccessType,
+    requireCanSetUserAccess
 )
 from upenncontrast_annotation.server.helpers.params import getBooleanParam
 from upenncontrast_annotation.server.helpers.validation import (
@@ -267,7 +267,13 @@ class DatasetView(Resource):
             Set accessType to:
             - 0 (READ) for view-only access
             - 1 (WRITE) for edit access
+            - 2 (ADMIN) for owner access
             - -1 to remove user's access entirely
+
+            Requires WRITE on the dataset and on every view and
+            configuration; all views must belong to one dataset. The caller
+            cannot grant a level above their own, nor change or remove a
+            user whose current level is above their own.
         """)
         .jsonParam(
             "body",
@@ -280,7 +286,7 @@ class DatasetView(Resource):
                 "properties": {
                     "datasetViewIds": {"type": "array"},
                     "userMailOrUsername": {"type": "string"},
-                    "accessType": {"type": "number"},
+                    "accessType": {"type": "integer"},
                 },
                 "required": [
                     "datasetViewIds", "userMailOrUsername", "accessType"],
@@ -293,21 +299,20 @@ class DatasetView(Resource):
         def loadDocument(model, documentId):
             return model.load(documentId, AccessType.WRITE, user, exc=True)
 
-        targetUser = User().findOne(
-            {"$or": [{"login": body["userMailOrUsername"]},
-                     {"email": body["userMailOrUsername"]}]})
-        if not targetUser:
-            logger.error(f"Cannot find user {body['userMailOrUsername']}")
-            raise RestException("badEmailOrUsername")
+        targetUser = findShareTarget(body["userMailOrUsername"])
 
-        # Will raise if accessType is a bad value
-        # -1 means remove access (Girder convention), 0=READ, 1=WRITE, 2=ADMIN
-        accessType = AccessType().validate(body["accessType"])
+        # Will raise if accessType is a bad value; -1 (remove) becomes None
+        accessType = parseShareAccessType(body["accessType"])
 
         # Will raise if user has not WRITE permissions on a datasetView
         datasetViews = [
             loadDocument(DatasetViewModel(), datasetViewId)
             for datasetViewId in body["datasetViewIds"]]
+
+        # Only the dataset's own views and configurations may change here
+        if len({view["datasetId"] for view in datasetViews}) != 1:
+            raise RestException(
+                "datasetViewIds must all belong to one dataset", code=400)
 
         # Will raise if user has not WRITE permissions on the dataset
         dataset = loadDocument(Folder(), datasetViews[0]["datasetId"])
@@ -316,6 +321,17 @@ class DatasetView(Resource):
         for datasetView in datasetViews:
             datasetView['configuration'] = loadDocument(
                 CollectionModel(), datasetView['configurationId'])
+
+        # WRITE is enough to share, but never above the caller's own level:
+        # a WRITE collaborator can't grant ADMIN or demote/remove an owner.
+        requireCanSetUserAccess(
+            Folder(), dataset, user, targetUser, accessType)
+        for datasetView in datasetViews:
+            requireCanSetUserAccess(
+                DatasetViewModel(), datasetView, user, targetUser, accessType)
+            requireCanSetUserAccess(
+                CollectionModel(), datasetView['configuration'], user,
+                targetUser, accessType)
 
         # Iterating twice so we first make sure all elements are accessible
         # before modifying anything
@@ -423,6 +439,10 @@ class DatasetView(Resource):
             - List of users with their access levels
             - Public status of the dataset
             - Associated configurations with their public status
+            - currentUserLevel: the caller's effective level on the dataset
+              and on each configuration
+            - writableViewIds: the dataset's views the caller can write,
+              i.e. the ones a share request from them may include
 
             Requires READ access to the dataset folder.
         """)
@@ -435,7 +455,8 @@ class DatasetView(Resource):
     def getDatasetAccess(self, dataset):
         """Return the full access list for a dataset
         and its configurations."""
-        result = formatAccessList(Folder(), dataset)
+        user = self.getCurrentUser()
+        result = formatAccessList(Folder(), dataset, user)
         result['datasetId'] = str(dataset['_id'])
 
         # Find all DatasetViews for this dataset
@@ -453,6 +474,10 @@ class DatasetView(Resource):
         configs = list(CollectionModel().find({
             '_id': {'$in': list(configIds)}
         }))
+        # The share endpoint needs WRITE on every view and configuration it
+        # touches, so tell the client which ones the caller can include
+        # (from the documents already loaded, no extra queries).
+        collectionModel = CollectionModel()
         result['configurations'] = [
             {
                 'id': str(config['_id']),
@@ -460,8 +485,15 @@ class DatasetView(Resource):
                 'public': config.get(
                     'public', False
                 ),
+                'currentUserLevel': collectionModel.getAccessLevel(
+                    config, user),
             }
             for config in configs
+        ]
+        result['writableViewIds'] = [
+            str(view['_id']) for view in datasetViews
+            if self._datasetViewModel.hasAccess(
+                view, user, AccessType.WRITE)
         ]
         return result
 
@@ -498,7 +530,7 @@ class DatasetView(Resource):
         """Return the access list for a configuration
         and its datasets."""
         result = formatAccessList(
-            CollectionModel(), configuration
+            CollectionModel(), configuration, self.getCurrentUser()
         )
         result['configurationId'] = str(
             configuration['_id']
