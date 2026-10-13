@@ -11,9 +11,10 @@ export const BATCH_DATASET_LIMIT = 50;
 // configuration hydration cannot bypass it.
 export const MAX_DISPLAYED_PROPERTY_PATHS = 100;
 
-// Mirrors MAX_COMPUTE_PROPERTIES in the property API. Compute-all advances
-// through larger configurations in explicit chunks rather than sending a
-// request the backend must reject after the UI has entered a running state.
+// Mirrors MAX_COMPUTE_PROPERTIES in the property API; PropertiesAPI.test.ts
+// pins the two together. Compute-all advances through larger configurations
+// in explicit chunks rather than sending a request the backend must reject
+// after the UI has entered a running state.
 export const MAX_PROPERTY_COMPUTE_BATCH = 100;
 
 // Upper bound on how many annotations "Connect selected" will chain in one go.

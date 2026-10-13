@@ -54,6 +54,10 @@ When modifying sharing/access code: read `codebaseDocumentation/SHARING.md`
 - `filter()` adds `_accessLevel`, computed from the doc's own ACL. If that ACL is not what grants reads (properties are read through configurations; worker docs by anyone), the value is wrong, so mix in `UngatedAclFilterMixin` (`helpers/customModel.py`).
 - Test with a READ-only caller and an anonymous one, and assert both that `access` is absent and that every field the consumers read survives.
 
+### Gate on the ACL that actually grants access
+
+The fields rule above has a twin on the access side. A property's own ACL names only its creator and is never shared, so `@loadmodel(level=READ)` or `findWithPermissions` on properties refuses every collaborator, even though they read the property through a shared configuration. Property compute shipped this way: a WRITE collaborator's "Compute all" returned 403 for every property they could see. Before gating an endpoint on a model's ACL, check whether that ACL is what grants reads (the `UngatedAclFilterMixin` models). For properties, use `_loadComputableProperties` in `api/property.py`: it accepts the property's ACL or a READ-able configuration whose `meta.propertyIds` references the property, in one `$in` query. Test it with a collaborator who is not on the document's ACL.
+
 ### `rest.*.before` listeners need their own access level
 
 Girder runs `Resource._defaultAccess` on every listener bound to a `rest.<method>.<route>.before` event. A listener with no `accessLevel` attribute makes Girder demand **site admin for the whole route**. `shareLinkGuards.refuseDownloadForLinkUsers` shipped this way, and every non-admin user's folder/item/file downloads and JSON/CSV/GeoJSON exports returned 403 "Administrator access required." Decorate such listeners with `@access.public`. That only sets the attribute; the route handler's own decorator still enforces access afterwards. Tests that exercise only the `admin` fixture can't see this, so test guarded routes with a non-admin `user`, and assert the refusal **message**, not just the 403.

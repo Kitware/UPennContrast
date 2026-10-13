@@ -14,14 +14,17 @@ inspection on the large local dataset.
 - Summary: the local-dataset “Compute all” action loops through properties and
   submits one HTTP request/job at a time from the client. Large property sets
   amplify request overhead and permit partial client-side submission.
-- Status: fixed in two stacked PRs. The frontend PR consolidates Compute-all
-  into one store action (`propertyStore.computeProperties`) with full
-  lifecycle guarantees while still submitting per property, so it deploys
-  without a Girder rebuild. This backend PR adds
-  `POST /annotation_property/compute` — which validates all input, checks
-  dataset WRITE access, and batch-loads READ-accessible properties with one
-  permission-aware query before scheduling — and switches the client to a
-  single request.
+- Status: fixed. #1327 consolidated Compute-all into one store action
+  (`propertyStore.computeProperties`) with full lifecycle guarantees while
+  still submitting per property, so it deployed without a Girder rebuild.
+  #1334 added `POST /annotation_property/compute` and switched the client to
+  a single request. The endpoint validates all input, requires dataset WRITE,
+  loads the properties with one `$in` query, and checks them all before
+  scheduling any job. It shares that path with the single-property endpoint.
+  A property is computable by a caller who can read it through its own ACL,
+  which names only the creator, or through a configuration that references
+  it. That is the rule `GET /annotation_property/:id` applies, so dataset
+  collaborators can compute the properties they can see.
 
 ### F2 — Property-value menus and bulk visibility are unbounded
 
@@ -99,8 +102,15 @@ test that holds the invariant.
       checks properties without looped loads —
       _"submits every property in one request"_,
       _"testComputeMultipleSubmitsAllPropertiesInOneRequest"_,
-      _"testComputeMultipleValidatesEveryPropertyBeforeSubmitting"_, and
-      _"testComputeRequiresDatasetWriteAccess"_.
+      _"testComputeMultipleValidatesEveryPropertyBeforeSubmitting"_,
+      _"testComputeRequiresDatasetWriteAccess"_, and
+      _"testComputeMultipleRequiresDatasetWriteAccess"_.
+- [x] The client batch cap equals the server's `MAX_COMPUTE_PROPERTIES` —
+      _"matches the server's MAX_COMPUTE_PROPERTIES"_.
+- [x] Collaborators can compute properties they read through a shared
+      configuration, and a deleted property is a 404 rather than an access
+      error — _"testCollaboratorComputesPropertyReadableThroughConfiguration"_
+      and _"testComputeMultipleReportsMissingPropertyAs404"_.
 - [x] Submission, missing-job, worker-failure, and refresh-failure paths always
       clear running/progress state and surface an error —
       _"cleans up and surfaces an API submission failure"_,

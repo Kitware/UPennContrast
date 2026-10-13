@@ -9,6 +9,7 @@ from upenncontrast_annotation.server.models.property import (
     AnnotationProperty,
 )
 from upenncontrast_annotation.server.api import property as propertyApi
+from upenncontrast_annotation.server.models.collection import Collection
 
 from girder.constants import AccessType
 from girder.models.folder import Folder
@@ -194,6 +195,7 @@ class TestPropertyEndpoints:
 
         assertStatus(resp, 400)
         assert "no image" in resp.json["message"]
+        assert str(invalid["_id"]) in resp.json["message"]
         compute.assert_not_called()
 
     def testComputeRequiresDatasetWriteAccess(self, admin, user, server):
@@ -218,3 +220,139 @@ class TestPropertyEndpoints:
 
         assertStatus(resp, 403)
         compute.assert_not_called()
+
+    def _postComputeMultiple(self, server, user, datasetId, properties):
+        return server.request(
+            path="/annotation_property/compute",
+            method="POST",
+            user=user,
+            body=json.dumps(
+                {
+                    "datasetId": str(datasetId),
+                    "properties": [
+                        {
+                            "id": str(prop["_id"]),
+                            "parameters": {"name": prop["name"]},
+                        }
+                        for prop in properties
+                    ],
+                }
+            ),
+            type="application/json",
+        )
+
+    def testComputeMultipleRequiresDatasetWriteAccess(
+        self, admin, user, server
+    ):
+        dataset = utilities.createFolder(admin, "batch-read-only", {})
+        Folder().setUserAccess(
+            dataset, user=user, level=AccessType.READ, save=True
+        )
+        prop = self._createProperty(admin)
+        AnnotationProperty().setUserAccess(
+            prop, user=user, level=AccessType.READ, save=True
+        )
+
+        with mock.patch.object(AnnotationProperty, "compute") as compute:
+            resp = self._postComputeMultiple(
+                server, user, dataset["_id"], [prop]
+            )
+
+        assertStatus(resp, 403)
+        compute.assert_not_called()
+
+    def testComputeMultipleRejectsDuplicatePropertyIds(self, admin, server):
+        dataset = utilities.createFolder(admin, "batch-duplicates", {})
+        prop = self._createProperty(admin)
+
+        with mock.patch.object(AnnotationProperty, "compute") as compute:
+            resp = self._postComputeMultiple(
+                server, admin, dataset["_id"], [prop, prop]
+            )
+
+        assertStatus(resp, 400)
+        assert "unique" in resp.json["message"]
+        compute.assert_not_called()
+
+    def testComputeMultipleReportsMissingPropertyAs404(self, admin, server):
+        dataset = utilities.createFolder(admin, "batch-missing", {})
+        prop = self._createProperty(admin)
+        missing = {"_id": "0" * 24, "name": "deleted"}
+
+        with mock.patch.object(AnnotationProperty, "compute") as compute:
+            resp = self._postComputeMultiple(
+                server, admin, dataset["_id"], [prop, missing]
+            )
+
+        assertStatus(resp, 404)
+        assert "0" * 24 in resp.json["message"]
+        compute.assert_not_called()
+
+    def testComputeRequiresDatasetId(self, admin, server):
+        prop = self._createProperty(admin)
+
+        with mock.patch.object(AnnotationProperty, "compute") as compute:
+            resp = server.request(
+                path="/annotation_property/%s/compute" % prop["_id"],
+                method="POST",
+                user=admin,
+                body=json.dumps({"name": prop["name"]}),
+                type="application/json",
+            )
+
+        assertStatus(resp, 400)
+        compute.assert_not_called()
+
+    def testCollaboratorComputesPropertyReadableThroughConfiguration(
+        self, admin, user, server
+    ):
+        """A property's own ACL only ever names its creator; a dataset
+        collaborator reads it through the shared configuration, and may
+        compute it on a dataset they can write."""
+        dataset = utilities.createPrivateFolder(admin, "shared-ds", {})
+        Folder().setUserAccess(
+            dataset, user=user, level=AccessType.WRITE, save=True
+        )
+        prop = self._createProperty(admin)
+        config = Collection().createCollection(
+            "SharedConfig",
+            admin,
+            dataset,
+            {
+                "subtype": "contrastConfiguration",
+                "compatibility": {},
+                "layers": [],
+                "tools": [],
+                "propertyIds": [str(prop["_id"])],
+                "snapshots": [],
+                "scales": {},
+            },
+        )
+        Collection().setUserAccess(
+            config, user=user, level=AccessType.READ, save=True
+        )
+        assert not AnnotationProperty().hasAccess(
+            prop, user=user, level=AccessType.READ
+        )
+
+        with mock.patch.object(
+            AnnotationProperty, "compute", return_value=[{"_id": "job-1"}]
+        ):
+            batch = self._postComputeMultiple(
+                server, user, dataset["_id"], [prop]
+            )
+            single = server.request(
+                path="/annotation_property/%s/compute" % prop["_id"],
+                method="POST",
+                user=user,
+                params={"datasetId": str(dataset["_id"])},
+                body=json.dumps({"name": prop["name"]}),
+                type="application/json",
+            )
+
+        assertStatusOk(batch)
+        assert batch.json == [
+            {"propertyId": str(prop["_id"]), "jobs": [{"_id": "job-1"}]}
+        ]
+        assertStatusOk(single)
+        assert single.json == [{"_id": "job-1"}]

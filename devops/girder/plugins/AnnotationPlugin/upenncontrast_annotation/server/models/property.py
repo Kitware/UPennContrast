@@ -89,7 +89,10 @@ class AnnotationProperty(UngatedAclFilterMixin, ProxiedModel):
     def validateCompute(self, property):
         image = property.get("image", None)
         if not image:
-            raise ValueError("Invalid property: no image")
+            raise ValueError(
+                "Invalid property '%s' (%s): no image"
+                % (property.get("name"), property.get("_id"))
+            )
         return image
 
     def compute(self, property, datasetId, params):

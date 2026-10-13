@@ -57,7 +57,7 @@ class AnnotationProperty(Resource):
                 "The dataset for whose annotations "
                 "the property should be computed"
             ),
-            required=False,
+            required=True,
         )
         .param(
             "body",
@@ -65,26 +65,13 @@ class AnnotationProperty(Resource):
             paramType="body",
         )
     )
-    @loadmodel(
-        model="annotation_property",
-        plugin="upenncontrast_annotation",
-        level=AccessType.READ,
-    )
-    def compute(self, annotation_property, params):
+    def compute(self, id, params):
+        propertyId = requireObjectId(id, "id")
         parameters = requireObjectBody(self.getBodyJson(), "Parameters")
         datasetId = requireObjectId(params.get("datasetId"), "datasetId")
-        Folder().load(
-            datasetId,
-            user=self.getCurrentUser(),
-            level=AccessType.WRITE,
-            exc=True,
-        )
-        try:
-            return self._propertyModel.compute(
-                annotation_property, str(datasetId), parameters
-            )
-        except ValueError as error:
-            raise RestException(str(error), code=400) from error
+        return self._computeProperties(
+            datasetId, [propertyId], {str(propertyId): parameters}
+        )[0]["jobs"]
 
     @access.user(scope=TokenScope.DATA_WRITE)
     @describeRoute(
@@ -118,6 +105,15 @@ class AnnotationProperty(Resource):
                 request.get("parameters"), "property parameters"
             )
 
+        return self._computeProperties(
+            datasetId, propertyIds, parametersById
+        )
+
+    def _computeProperties(self, datasetId, propertyIds, parametersById):
+        """Schedule one compute job per property, in request order, after
+        checking dataset WRITE, property access and every property's
+        definition -- so an invalid later property cannot leave an earlier
+        subset scheduled. Shared by the single and batch endpoints."""
         currentUser = self.getCurrentUser()
         Folder().load(
             datasetId,
@@ -125,22 +121,7 @@ class AnnotationProperty(Resource):
             level=AccessType.WRITE,
             exc=True,
         )
-        properties = list(
-            self._propertyModel.findWithPermissions(
-                {"_id": {"$in": propertyIds}},
-                user=currentUser,
-                level=AccessType.READ,
-            )
-        )
-        if len(properties) != len(propertyIds):
-            raise AccessException(
-                "Read access denied for one or more properties"
-            )
-
-        propertiesById = {
-            str(annotationProperty["_id"]): annotationProperty
-            for annotationProperty in properties
-        }
+        properties = self._loadComputableProperties(propertyIds, currentUser)
         try:
             for annotationProperty in properties:
                 self._propertyModel.validateCompute(annotationProperty)
@@ -149,15 +130,60 @@ class AnnotationProperty(Resource):
 
         return [
             {
-                "propertyId": str(propertyId),
+                "propertyId": str(annotationProperty["_id"]),
                 "jobs": self._propertyModel.compute(
-                    propertiesById[str(propertyId)],
+                    annotationProperty,
                     str(datasetId),
-                    parametersById[str(propertyId)],
+                    parametersById[str(annotationProperty["_id"])],
                 ),
             }
-            for propertyId in propertyIds
+            for annotationProperty in properties
         ]
+
+    def _loadComputableProperties(self, propertyIds, user):
+        """The properties with these ids, in request order. A property is
+        computable by a caller who can read it through its own ACL (only
+        its creator is ever on it) or through a configuration that
+        references it -- the rule `get` applies, so a collaborator on a
+        shared dataset can compute the properties they can see."""
+        propertiesById = {
+            annotationProperty["_id"]: annotationProperty
+            for annotationProperty in self._propertyModel.find(
+                {"_id": {"$in": propertyIds}}
+            )
+        }
+        missing = [
+            str(propertyId)
+            for propertyId in propertyIds
+            if propertyId not in propertiesById
+        ]
+        if missing:
+            raise RestException(
+                "No such property: %s" % ", ".join(missing), code=404
+            )
+
+        unreadable = {
+            str(propertyId)
+            for propertyId, annotationProperty in propertiesById.items()
+            if not self._propertyModel.hasAccess(
+                annotationProperty, user=user, level=AccessType.READ
+            )
+        }
+        if unreadable:
+            # One query for every property still unaccounted for.
+            for config in CollectionModel().findWithPermissions(
+                {"meta.propertyIds": {"$in": sorted(unreadable)}},
+                user=user,
+                level=AccessType.READ,
+                fields=["meta.propertyIds"],
+            ):
+                unreadable.difference_update(config["meta"]["propertyIds"])
+        if unreadable:
+            raise AccessException(
+                "Read access denied for property %s"
+                % ", ".join(sorted(unreadable))
+            )
+        return [propertiesById[propertyId] for propertyId in propertyIds]
 
     def _propertyBody(self):
         """The request body reduced to the client-owned fields. Anything
