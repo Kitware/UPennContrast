@@ -684,7 +684,7 @@ class TestSetDatasetPublicOwnership:
         assertStatusOk(resp)
         return resp.json
 
-    def testPublishesOnlyOwnButUnpublishesAll(self, user, server):
+    def testChangesOnlyOwnViewsAndConfigurations(self, user, server):
         # user (not a site admin) owns the dataset and one view/config.
         dataset, ownConfig, ownView = createDatasetWithView(user)
         Folder().setPublic(dataset, False, save=True)
@@ -706,8 +706,9 @@ class TestSetDatasetPublicOwnership:
         assert result["datasetViewsSkipped"] == 1
         assert result["configurationsSkipped"] == 1
 
-        # Making it private unpublishes everything of the dataset, other's
-        # view and configuration included: that only restricts access.
+        # Making it private does not unpublish other's view or
+        # configuration either: other may publish that configuration for a
+        # public dataset of their own, which unpublishing it would break.
         Collection().setPublic(
             Collection().load(otherConfig["_id"], force=True), True,
             save=True,
@@ -721,12 +722,12 @@ class TestSetDatasetPublicOwnership:
         assert not isPublic(Folder(), dataset)
         assert not isPublic(Collection(), ownConfig)
         assert not isPublic(DatasetViewModel(), ownView)
-        assert not isPublic(Collection(), otherConfig)
-        assert not isPublic(DatasetViewModel(), otherView)
-        assert result["datasetViewsUpdated"] == 2
-        assert result["configurationsUpdated"] == 2
-        assert result["datasetViewsSkipped"] == 0
-        assert result["configurationsSkipped"] == 0
+        assert isPublic(Collection(), otherConfig)
+        assert isPublic(DatasetViewModel(), otherView)
+        assert result["datasetViewsUpdated"] == 1
+        assert result["configurationsUpdated"] == 1
+        assert result["datasetViewsSkipped"] == 1
+        assert result["configurationsSkipped"] == 1
 
     def testAlreadyPublicResourcesAreNotCountedAsSkipped(self, user, server):
         """Another user's view/configuration that is already public needed

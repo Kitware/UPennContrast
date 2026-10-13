@@ -345,10 +345,10 @@ class DatasetView(Resource):
             - The configurations used by those datasetViews that the caller
               administers
 
-            When publishing, views and configurations owned by other users
-            are left as they are and counted in datasetViewsSkipped /
-            configurationsSkipped. Making the dataset private unpublishes
-            every view and configuration of it.
+            Views and configurations owned by other users are left as they
+            are, whether publishing or making private; those not already in
+            the requested state are counted in datasetViewsSkipped /
+            configurationsSkipped.
 
             Write operations remain restricted to users with WRITE permissions.
         """)
@@ -358,8 +358,8 @@ class DatasetView(Resource):
                dataType='boolean', required=True)
     )
     def setDatasetPublic(self, dataset, public):
-        """Make a dataset public with the views/configurations the caller
-        administers, or make it private with all of them."""
+        """Make a dataset, and the views/configurations of it the caller
+        administers, public or private."""
         user = self.getCurrentUser()
 
         # 1. Set the dataset (folder) itself to public
@@ -380,20 +380,16 @@ class DatasetView(Resource):
         # outlive its (deleted) configuration.
         configs = list(CollectionModel().find(configQuery))
 
-        # 3. Publishing changes only what the caller administers: setting
-        # public is an ADMIN operation, and owning the dataset must not let
-        # the caller publish another user's configuration or view. Making
-        # the dataset private unpublishes all of them: that only restricts
-        # access, and leaves nothing of a private dataset readable.
+        # 3. Change only what the caller administers, in both directions:
+        # setting public is an ADMIN operation, and owning the dataset must
+        # not let the caller publish or unpublish another user's
+        # configuration or view. A configuration can also serve another
+        # owner's public dataset, which unpublishing it would break.
         # setPublic must be called individually as it modifies ACLs.
-        if public:
-            views = list(self._datasetViewModel.findWithPermissions(
-                viewQuery, user=user, level=AccessType.ADMIN))
-            changedConfigs = list(CollectionModel().findWithPermissions(
-                configQuery, user=user, level=AccessType.ADMIN))
-        else:
-            views = datasetViews
-            changedConfigs = configs
+        views = list(self._datasetViewModel.findWithPermissions(
+            viewQuery, user=user, level=AccessType.ADMIN))
+        changedConfigs = list(CollectionModel().findWithPermissions(
+            configQuery, user=user, level=AccessType.ADMIN))
         for dv in views:
             self._datasetViewModel.setPublic(dv, public, save=True)
         for config in changedConfigs:

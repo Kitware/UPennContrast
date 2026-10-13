@@ -462,8 +462,9 @@ const associatedViews = ref<IDatasetView[]>([]);
 const publicLoading = computed(
   () => datasetId.value !== null && isPublishPending(datasetId.value),
 );
-// Set when publishing left views/collections owned by other users private:
-// publishing those is their owners' call, so "Public" may not cover them.
+// Set when set_public left views/collections owned by other users in the
+// other state: changing those is their owners' call, so the checkbox may not
+// cover them.
 const publicSkippedNotice = ref("");
 const userLoading = ref<string | null>(null);
 const addUserLoading = ref(false);
@@ -632,8 +633,8 @@ function getSelectedViews(): IDatasetView[] {
   );
 }
 
-// Only publishing skips anything: making a dataset private unpublishes all
-// of its views and collections.
+// Views/collections owned by other users are left as they are in both
+// directions (set_public changes only what the caller administers).
 function skippedNotice(result: ISetDatasetPublicResult) {
   const parts = [
     [result.configurationsSkipped, "collection"],
@@ -644,9 +645,12 @@ function skippedNotice(result: ISetDatasetPublicResult) {
   if (parts.length === 0) {
     return "";
   }
+  const [stayed, target] = result.public
+    ? ["private", "public"]
+    : ["public", "private"];
   return (
-    `${parts.join(" and ")} owned by other users stayed private; ` +
-    "only their owners can make them public."
+    `${parts.join(" and ")} owned by other users stayed ${stayed}; ` +
+    `only their owners can make them ${target}.`
   );
 }
 

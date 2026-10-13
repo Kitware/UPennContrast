@@ -178,20 +178,20 @@ Makes a dataset and all associated resources public or private.
 
 **Affected resources:**
 - Dataset folder
-- Publishing: the DatasetViews for the dataset that the caller administers, and the
-  Configurations used by those DatasetViews that the caller administers
-- Making private: every DatasetView of the dataset and every Configuration they use
+- The DatasetViews for the dataset that the caller administers
+- The Configurations used by those DatasetViews that the caller administers
 
 Other users can open a dataset they may read with their own configuration,
-creating their own view. Owning the dataset does not let the caller publish
-those: setting `public` is an ADMIN operation on each document. They are left
-as they are; those not already public are counted in the response's
-`datasetViewsSkipped` / `configurationsSkipped` (beside `datasetViewsUpdated` /
-`configurationsUpdated`);
-the Share dialog says when anything was skipped. Making the dataset private
-unpublishes all of them, including other users': that only restricts access, and
-it also clears views and configurations the pre-ownership `set_public` made
-public. A site admin administers everything, so nothing is skipped for them.
+creating their own view. Owning the dataset does not let the caller publish or
+unpublish those: setting `public` is an ADMIN operation on each document, and a
+configuration can also serve another owner's public dataset, which unpublishing it
+would break. They are left as they are in both directions; those not already in the
+requested state are counted in the response's `datasetViewsSkipped` /
+`configurationsSkipped` (beside `datasetViewsUpdated` / `configurationsUpdated`),
+and the Share dialog says what stayed public or private. Views and configurations the
+pre-ownership `set_public` published stay public until their owners (or a site
+admin) change them. A site admin administers everything, so nothing is skipped for
+them.
 
 Who may share a dataset, and what project sharing and `project/:id/set_public`
 may reach, are handled in PRs #1406 and #1410.
@@ -473,7 +473,7 @@ Run `pnpm test src/components/ShareDataset.test.ts` and, from
 
 ### Publishing (`dataset_view/set_public`)
 
-- [ ] **Publishing changes only the caller's own views and configurations; making private unpublishes all of them.** — *"testPublishesOnlyOwnButUnpublishesAll"*
+- [ ] **Publishing and making private both change only the caller's own views and configurations.** Unpublishing another owner's configuration would break any public dataset of theirs that uses it. — *"testChangesOnlyOwnViewsAndConfigurations"*, *"togglePublic explains what making private left public"*
 - [ ] **A site admin skips nothing.** — *"testSiteAdminStillChangesEverything"*
 - [ ] **Skipped counts ignore deleted configurations** (a view can outlive its configuration). — *"testDeletedConfigurationIsNotCountedAsSkipped"*
 - [ ] **ACL saves accept older views holding null `scales`/`lastViewed`.** `setPublic`/`setUserAccess` validate the stored document as is. — *"testAclSavesAcceptOlderNullFields"*

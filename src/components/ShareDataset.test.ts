@@ -269,6 +269,25 @@ describe("ShareDataset", () => {
     expect(vm.publicLoading).toBe(false);
   });
 
+  it("togglePublic explains what making private left public", async () => {
+    mockSetDatasetPublic.mockResolvedValue({
+      dataset: "ds1",
+      public: false,
+      datasetViewsUpdated: 1,
+      configurationsUpdated: 1,
+      datasetViewsSkipped: 0,
+      configurationsSkipped: 1,
+    });
+    const wrapper = mountComponent();
+    const vm = wrapper.vm as any;
+    await vm.togglePublic(false);
+
+    expect(vm.publicSkippedNotice).toBe(
+      "1 collection owned by other users stayed public; " +
+        "only their owners can make them private.",
+    );
+  });
+
   it("togglePublic shows no notice when nothing was skipped", async () => {
     const wrapper = mountComponent();
     const vm = wrapper.vm as any;
