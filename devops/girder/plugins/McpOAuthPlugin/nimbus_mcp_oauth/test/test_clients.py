@@ -93,6 +93,13 @@ def testDisallowedDocumentUrlsAreNeverFetched(enabled, fetches, clientId):
     FakeResponse(body=dict(DOCUMENT, client_id='https://claude.ai/other')),
     FakeResponse(body=dict(DOCUMENT, redirect_uris=[])),
     FakeResponse(body=dict(DOCUMENT, redirect_uris=['javascript:x'])),
+    # A document may only send codes to Claude's callbacks or loopback.
+    FakeResponse(body=dict(DOCUMENT, redirect_uris=[
+        'https://attacker.example/cb'])),
+    FakeResponse(body=dict(DOCUMENT, redirect_uris=[
+        'http://localhost/callback', 'https://claude.ai.evil.example/cb'])),
+    FakeResponse(body=dict(DOCUMENT, redirect_uris=[
+        'https://localhost/callback'])),
     FakeResponse(body=dict(DOCUMENT,
                            token_endpoint_auth_method='client_secret_post')),
     requests.ConnectionError('down'),
@@ -118,3 +125,12 @@ def testBuiltinClientNeedsNoFetch(enabled, fetches):
     calls, _ = fetches
     startFlow(enabled)
     assert calls == []
+
+
+def testDocumentMayNameClaudeCallbacks(enabled, fetches):
+    _, responses = fetches
+    responses.append(FakeResponse(body=dict(DOCUMENT, redirect_uris=[
+        'https://claude.ai/api/mcp/auth_callback'])))
+    client = clients.resolve(CLIENT_URL)
+    assert clients.redirectAllowed(
+        client, 'https://claude.ai/api/mcp/auth_callback')

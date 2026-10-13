@@ -18,6 +18,8 @@ import re
 import secrets
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
+from bson import ObjectId
+
 from girder.constants import TokenScope
 from girder.models.token import Token
 from girder.models.user import User
@@ -240,14 +242,19 @@ def _checkResource(params, expected):
 def _exchangeCode(params):
     code = params.get('code') or ''
     codeId = _hash(code)
-    # Atomic single use: only one exchange flips used.
+    grantId = ObjectId()
+    # Atomic single use: only one exchange flips used, and it records the
+    # grant it will create, so a replay can always find what to revoke.
     result = AuthorizationCode().update(
-        {'_id': codeId, 'used': False}, {'$set': {'used': True}},
-        multi=False)
+        {'_id': codeId, 'used': False},
+        {'$set': {'used': True, 'grantId': grantId}}, multi=False)
     doc = AuthorizationCode().findOne({'_id': codeId})
     if result.modified_count != 1:
         if doc is not None and doc.get('grantId'):
-            # A replayed code: revoke what it issued (RFC 6749 4.1.2).
+            # A replayed code: revoke what it issued (RFC 6749 4.1.2). The
+            # flag also reaches an exchange still creating that grant.
+            AuthorizationCode().update(
+                {'_id': codeId}, {'$set': {'replayed': True}}, multi=False)
             revokeGrant(doc['grantId'])
         raise OAuthError('invalid_grant', 'Invalid authorization code.')
     if expired(doc):
@@ -263,6 +270,7 @@ def _exchangeCode(params):
     if user is None:
         raise OAuthError('invalid_grant', 'The account is not active.')
     grant = Grant().save({
+        '_id': grantId,
         'userId': user['_id'],
         'clientId': doc['clientId'],
         'clientName': doc['clientName'],
@@ -273,9 +281,7 @@ def _exchangeCode(params):
         'lastUsed': now(),
         'expiresAt': now() + REFRESH_IDLE_LIFETIME,
     })
-    AuthorizationCode().update(
-        {'_id': codeId}, {'$set': {'grantId': grant['_id']}}, multi=False)
-    return _issue(grant, user)
+    return _issueIfStillGranted(grant, user, codeId=codeId)
 
 
 def _refresh(params):
@@ -295,6 +301,8 @@ def _refresh(params):
     grant = Grant().findOne({'_id': doc['grantId']})
     if grant is None or expired(doc) or expired(grant):
         raise OAuthError('invalid_grant', 'The connection has ended.')
+    if not params.get('client_id'):
+        raise OAuthError('invalid_request', 'client_id is required.')
     if params.get('client_id') != grant['clientId']:
         revokeGrant(grant['_id'])
         raise OAuthError('invalid_grant', 'Token was issued to another '
@@ -307,7 +315,20 @@ def _refresh(params):
     Grant().update({'_id': grant['_id']}, {'$set': {
         'lastUsed': now(), 'expiresAt': now() + REFRESH_IDLE_LIFETIME}},
         multi=False)
-    return _issue(grant, user)
+    return _issueIfStillGranted(grant, user)
+
+
+def _issueIfStillGranted(grant, user, codeId=None):
+    """Issue tokens, then make sure the connection was not ended while
+    they were being created (a concurrent replay or reuse revoking it);
+    if it was, take the new tokens back too."""
+    tokens = _issue(grant, user)
+    replayed = codeId is not None and AuthorizationCode().findOne(
+        {'_id': codeId, 'replayed': True}) is not None
+    if replayed or Grant().findOne({'_id': grant['_id']}) is None:
+        revokeGrant(grant['_id'])
+        raise OAuthError('invalid_grant', 'The connection was ended.')
+    return tokens
 
 
 def _issue(grant, user):
@@ -336,8 +357,10 @@ def _issue(grant, user):
 
 
 def _activeUser(userId):
+    """The user, if they could log in right now (not disabled, approved,
+    email verified as required)."""
     user = User().load(userId, force=True)
-    if user is None or user.get('status', 'enabled') != 'enabled':
+    if user is None or not User().canLogin(user):
         return None
     return user
 

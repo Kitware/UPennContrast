@@ -103,6 +103,19 @@ def testResourceIsComparedInCanonicalForm(enabled):
     startFlow(enabled, resource='HTTPS://Nimbus.Example:443/mcp/')
 
 
+def testLoopbackPortWildcardIsTheOnlyLeeway(enabled):
+    _, challenge = pkcePair()
+    for uri in ('http://user@localhost:3118/callback',
+                'http://localhost:3118/callback?x=1',
+                'http://localhost:3118/callback#frag',
+                'http://localhost.:3118/callback',
+                'http://LOCALHOST:3118/Callback'):
+        resp = enabled.request('/mcp_oauth/authorize',
+                               params=authorizeParams(challenge,
+                                                      redirect_uri=uri))
+        assert _status(resp) == 400, uri
+
+
 def testLoopbackRedirectMatchesAnyPort(enabled):
     for uri in ('http://localhost:3118/callback',
                 'http://127.0.0.1:50000/callback'):
@@ -269,6 +282,24 @@ def testRefreshFromAnotherClientRevokes(enabled, user):
         'active': False}
 
 
+def testRefreshWithoutClientIdKeepsTheConnection(enabled, user):
+    first = connect(enabled, user)
+    resp = enabled.request('/mcp_oauth/token', method='POST', params={
+        'grant_type': 'refresh_token',
+        'refresh_token': first['refresh_token']})
+    assert resp.json['error'] == 'invalid_request'
+    assert introspect(enabled, first['access_token']).json['active']
+
+
+def testUnverifiedEmailCannotUseTokens(enabled, user):
+    first = connect(enabled, user)
+    Setting().set('core.email_verification', 'required')
+    user['emailVerified'] = False
+    User().save(user)
+    assert introspect(enabled, first['access_token']).json == {
+        'active': False}
+
+
 def testDisabledUserCannotRefresh(enabled, user):
     first = connect(enabled, user)
     user['status'] = 'disabled'
@@ -353,6 +384,46 @@ def testUsersSeeAndRevokeOnlyTheirOwnConnections(enabled, user, admin):
     resp = enabled.request('/mcp_oauth/grant/not-an-id', method='DELETE',
                            user=user)
     assert _status(resp) == 404
+
+
+def testTokenRateLimitAnswersInOAuthShape(enabled, monkeypatch):
+    from nimbus_mcp_oauth import rest
+    monkeypatch.setattr(rest, '_tokenLimit',
+                        rest.SlidingWindowRateLimiter(1, 60))
+    params = {'grant_type': 'refresh_token', 'refresh_token': 'x',
+              'client_id': 'nimbusimage-claude'}
+    enabled.request('/mcp_oauth/token', method='POST', params=params)
+    resp = enabled.request('/mcp_oauth/token', method='POST', params=params)
+    assert _status(resp) == 429
+    assert resp.json['error'] == 'temporarily_unavailable'
+    assert dict(resp.headers)['Retry-After'] == '60'
+
+
+def testSecretsStayOutOfTheAuditLog(enabled, user, caplog):
+    verifier, code, params = approveFlow(enabled, user)
+    caplog.clear()
+    with caplog.at_level('INFO', logger='girder_audit'):
+        tokens = exchange(enabled, code, verifier, params).json
+        refresh(enabled, tokens['refresh_token'])
+        introspect(enabled, tokens['access_token'])
+        enabled.request('/mcp_oauth/revoke', method='POST',
+                        params={'token': tokens['refresh_token']})
+    logged = repr([(r.getMessage(), getattr(r, 'details', None))
+                   for r in caplog.records])
+    for secret in (code, verifier, tokens['refresh_token'],
+                   tokens['access_token']):
+        assert secret not in logged
+
+
+def testCollectionsExpireOnTheirOwn(enabled):
+    from nimbus_mcp_oauth import models
+    for model in (models.AuthorizationRequest, models.AuthorizationCode,
+                  models.Grant, models.AccessToken, models.RefreshToken,
+                  models.ClientDocument):
+        indexes = model().collection.index_information()
+        assert any(spec['key'] == [('expiresAt', 1)]
+                   and spec.get('expireAfterSeconds') == 0
+                   for spec in indexes.values()), model.__name__
 
 
 def testAuthorizeIsRateLimited(enabled, monkeypatch):

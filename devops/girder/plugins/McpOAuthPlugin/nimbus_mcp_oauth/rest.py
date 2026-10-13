@@ -10,7 +10,8 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from girder.api import access
 from girder.api.describe import Description, describeRoute
-from girder.api.rest import Resource, RestException, setResponseHeader
+from girder.api.rest import (
+    Resource, RestException, disableAuditLog, setResponseHeader)
 
 from . import oauth, settings
 from .errors import OAuthError, RedirectableError
@@ -18,9 +19,13 @@ from .rate_limit import SlidingWindowRateLimiter
 
 INTROSPECTION_HEADER = 'X-Mcp-Introspection-Secret'
 
-# Per client address (authorize, token, revoke) and per user (consent).
+# authorize comes from users' browsers, so per address is per user. The
+# token endpoint is called by connector backends: claude.ai's comes from a
+# few shared Anthropic addresses on behalf of every user, so its cap is a
+# backstop against floods, not a per-user limit (tokens are 256-bit, so
+# guessing is not the threat). Consent is per user.
 _authorizeLimit = SlidingWindowRateLimiter(30, 60)
-_tokenLimit = SlidingWindowRateLimiter(60, 60)
+_tokenLimit = SlidingWindowRateLimiter(1200, 60)
 _consentLimit = SlidingWindowRateLimiter(30, 60)
 
 
@@ -140,6 +145,8 @@ class McpOAuthResource(Resource):
         except OAuthError as err:
             raise RestException(err.description, code=err.status)
 
+    # Secrets travel in these parameters, so they stay out of the audit log.
+    @disableAuditLog
     @access.public
     @describeRoute(
         Description('OAuth token endpoint (form-encoded).')
@@ -148,13 +155,18 @@ class McpOAuthResource(Resource):
     )
     def token(self, params):
         _requireEnabled()
-        _limit(_tokenLimit, _clientAddress())
         _noStore()
+        if not _tokenLimit.check(_clientAddress()):
+            setResponseHeader('Retry-After', '60')
+            return _oauthErrorBody(OAuthError(
+                'temporarily_unavailable', 'Too many requests; retry '
+                'shortly.', status=429))
         try:
             return oauth.token(params)
         except OAuthError as err:
             return _oauthErrorBody(err)
 
+    @disableAuditLog
     @access.public
     @describeRoute(
         Description('OAuth token revocation (RFC 7009).')
@@ -168,6 +180,7 @@ class McpOAuthResource(Resource):
 
     # Token introspection for the MCP service only: needs the shared secret
     # header, and is left out of the API docs.
+    @disableAuditLog
     @access.public
     @describeRoute(None)
     def introspect(self, params):

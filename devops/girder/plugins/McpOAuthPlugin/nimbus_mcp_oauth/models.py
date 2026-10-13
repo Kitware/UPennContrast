@@ -1,7 +1,9 @@
 """Collections of the MCP OAuth server.
 
-Secrets (codes, access and refresh tokens) are stored only as SHA-256
-hashes, as the documents' ``_id``. Every collection with an ``expiresAt``
+Codes, access and refresh tokens are stored only as SHA-256 hashes, as
+the documents' ``_id``. An access token's record holds the id of the Girder
+session token behind it, which is itself a credential (Girder stores its
+tokens in the clear). Every collection with an ``expiresAt``
 has a TTL index; MongoDB's TTL monitor runs about once a minute, so readers
 also check expiry themselves.
 """

@@ -111,8 +111,7 @@ def _validateDocument(url, doc):
     redirects = doc.get('redirect_uris')
     if (not isinstance(redirects, list) or not redirects
             or len(redirects) > MAX_REDIRECT_URIS
-            or not all(isinstance(r, str) and r.startswith(
-                ('https://', 'http://')) for r in redirects)):
+            or not all(_documentRedirectAllowed(r) for r in redirects)):
         raise OAuthError(
             'invalid_client', 'Client metadata has no valid redirect_uris.')
     if doc.get('token_endpoint_auth_method', 'none') != 'none':
@@ -126,6 +125,24 @@ def _validateDocument(url, doc):
         'client_name': name.strip()[:MAX_CLIENT_NAME],
         'redirect_uris': redirects,
     }
+
+
+def _documentRedirectAllowed(uri):
+    """A metadata document may only send codes to Claude's callbacks or to
+    the user's own machine: a JSON file served from an allowed host must
+    not be able to redirect codes anywhere else."""
+    if not isinstance(uri, str):
+        return False
+    if uri in CLAUDE_CALLBACKS:
+        return True
+    try:
+        parts = urlsplit(uri)
+        parts.port
+    except ValueError:
+        return False
+    return (parts.scheme == 'http' and parts.hostname in LOOPBACK_HOSTS
+            and not parts.username and not parts.password
+            and not parts.fragment)
 
 
 def redirectAllowed(client, redirectUri):
