@@ -661,3 +661,77 @@ class TestFindDefaultSort:
 
         returnedIds = [doc["_id"] for doc in resp.json]
         assert returnedIds == [str(i) for i in idsAscending]
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestCreateMultipleValidation:
+    """POST /upenn_annotation/multiple must reject malformed input with 400.
+
+    Regression for issue #1242: the bulk-create endpoint validated its body
+    far less than the bulk-update endpoint, so a non-list body, a non-dict
+    entry, or a malformed id raised a 500 instead of a clean 400.
+    """
+
+    def _post(self, server, user, body):
+        return server.request(
+            path="/upenn_annotation/multiple",
+            method="POST",
+            user=user,
+            body=json.dumps(body),
+            type="application/json",
+        )
+
+    def testNonListBodyReturns400(self, admin, server):
+        resp = self._post(server, admin, {"not": "a list"})
+        assertStatus(resp, 400)
+
+    def testNonDictEntryReturns400(self, admin, server):
+        resp = self._post(server, admin, [123])
+        assertStatus(resp, 400)
+
+    def testMalformedDatasetIdReturns400(self, admin, server):
+        sample = upenn_utilities.getSampleAnnotation("not-a-valid-object-id")
+        resp = self._post(server, admin, [sample])
+        assertStatus(resp, 400)
+
+    def testNumericDatasetIdReturns400(self, admin, server):
+        """A non-string id raises TypeError (not InvalidId) in ObjectId()."""
+        sample = upenn_utilities.getSampleAnnotation(123)
+        resp = self._post(server, admin, [sample])
+        assertStatus(resp, 400)
+
+    def testNumericIdWithoutDatasetIdReturns400(self, admin, server):
+        """With no datasetId, the @recordable finder looks the dataset up
+        from the entry's id before the handler runs; a numeric id must not
+        500 there."""
+        resp = self._post(server, admin, [{"_id": 123}])
+        assertStatus(resp, 400)
+
+    def testValidBodyStillCreates(self, admin, server):
+        dataset = utilities.createFolder(
+            admin, "create-multiple-ds", upenn_utilities.datasetMetadata
+        )
+        samples = [
+            upenn_utilities.getSampleAnnotation(str(dataset["_id"]))
+            for _ in range(2)
+        ]
+        resp = self._post(server, admin, samples)
+        assertStatusOk(resp)
+        assert len(resp.json) == 2
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestUpdateMultipleNumericId:
+    def testNumericIdReturns400(self, admin, server):
+        """PUT /upenn_annotation/multiple with a numeric id is a 400: the
+        handler's ObjectId() raises TypeError for it, not InvalidId."""
+        resp = server.request(
+            path="/upenn_annotation/multiple",
+            method="PUT",
+            user=admin,
+            body=json.dumps([{"id": 123}]),
+            type="application/json",
+        )
+        assertStatus(resp, 400)

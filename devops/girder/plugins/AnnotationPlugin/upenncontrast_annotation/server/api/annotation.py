@@ -33,6 +33,7 @@ from ..helpers.validation import (
     dropNoOpPropertyFilters,
     isFiniteNumber,
     isValidPropertyPath,
+    requireBulkCreateBody,
     requireCountWithin,
     requireFloat,
     requireInt,
@@ -155,7 +156,14 @@ def getDatasetIdFromAnnotationListInBody(self: "Annotation", *args, **kwargs):
     # For partial updates (e.g. updateMultiple), look up from DB
     annId = first.get("id") or first.get("_id")
     if annId:
-        ann = AnnotationModel().load(annId, force=True)
+        # This runs in the @recordable wrapper, before the handler validates
+        # the body. load() already turns a malformed hex id into a 400, but a
+        # non-string id (a JSON number) raises TypeError: skip recording so
+        # the handler rejects it with a clean 400 instead of a 500.
+        try:
+            ann = AnnotationModel().load(annId, force=True)
+        except TypeError:
+            return None
         if ann:
             return ann.get("datasetId")
     return None
@@ -262,8 +270,9 @@ class Annotation(Resource):
         "Create multiple annotations", getDatasetIdFromAnnotationListInBody
     )
     def createMultiple(self, params, *args, **kwargs):
-        bodyJson = kwargs["memoizedBodyJson"]
-        annotations = self._annotationModel.convertIdsToObjectIds(bodyJson)
+        annotations = requireBulkCreateBody(
+            kwargs["memoizedBodyJson"], self._annotationModel, "annotation"
+        )
         datasetIds = {
             ann["datasetId"] for ann in annotations
             if "datasetId" in ann
@@ -385,7 +394,7 @@ class Annotation(Resource):
                 )
             try:
                 objId = ObjectId(annId)
-            except InvalidId:
+            except (InvalidId, TypeError):
                 raise RestException(
                     "Invalid annotation id: %s" % annId
                 )

@@ -107,6 +107,24 @@ def requireList(value, field):
     return value
 
 
+def requireBulkCreateBody(body, model, itemName):
+    """Validate a bulk-create request body and convert its id fields.
+
+    The body must be a list of JSON objects, and each object's id fields (the
+    model schema's `objectId` properties) must parse as ObjectIds. A non-list
+    body or non-dict entry would otherwise trip AttributeError/TypeError in
+    convertIdsToObjectIds; a malformed hex id raises bson.InvalidId and a
+    non-string id (a JSON number) raises TypeError. All are a 400, not a 500.
+    Returns the entries with their ids converted in place."""
+    requireList(body, "Request body")
+    for entry in body:
+        requireObjectBody(entry, "Each %s" % itemName)
+    try:
+        return model.convertIdsToObjectIds(body)
+    except (InvalidId, TypeError):
+        raise RestException("Invalid id in %s" % itemName, code=400)
+
+
 def validateAnnotationIdCount(count):
     """Cap the number of annotation ids accepted by the batch/hydrate
     endpoints. Reads the module constant at call time so it stays in sync if
