@@ -85,11 +85,32 @@ describe("ShareProject", () => {
     }).vm as any;
 
     expect(vm.impactSummary).toContain("2 datasets and 1 collection");
-    expect(vm.impactSummary).toContain("only the ones you own");
+    expect(vm.impactSummary).toContain("Sharing changes the ones you can edit");
+    expect(vm.impactSummary).toContain("refused if it would grant more");
     expect(vm.impactSummary).not.toContain("all associated");
     // Publishing skips configurations of owned datasets the caller only edits
     expect(vm.impactSummary).toContain(
-      "publishing changes only views and configurations you own",
+      "publishing changes only what you own",
+    );
+  });
+
+  it("shows the server's reason when a share is refused", () => {
+    const vm = mountComponent().vm as any;
+    const refusal = (message: string) => ({
+      isAxiosError: true,
+      response: { data: { message } },
+    });
+
+    expect(
+      vm.shareErrorMessage(
+        refusal("You cannot grant access above your own level"),
+      ),
+    ).toBe("You cannot grant access above your own level");
+    expect(vm.shareErrorMessage(refusal("badEmailOrUsername"))).toBe(
+      "Unknown user. Please check the username or email.",
+    );
+    expect(vm.shareErrorMessage(new Error("network"))).toBe(
+      "An error occurred while updating sharing",
     );
   });
 });

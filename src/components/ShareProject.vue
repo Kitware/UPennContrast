@@ -30,9 +30,9 @@
 
         <!-- Info Alert -->
         <v-alert type="info" density="compact" class="mb-4">
-          Sharing this project also shares the datasets you own in it, with
-          their views and configurations, and the collections you own. Anything
-          else keeps its own sharing settings.
+          Sharing this project also shares the datasets and collections in it
+          that you can edit, with their views and configurations, up to your own
+          access level. Anything else keeps its own sharing settings.
         </v-alert>
 
         <!-- Loading State -->
@@ -295,8 +295,8 @@ const collectionCount = computed((): number => {
   return props.project?.meta.collections.length ?? 0;
 });
 
-// The client doesn't know which of these the caller owns, so it states the
-// totals and the rule rather than a count of what will change.
+// The client doesn't know which of these the caller can edit or owns, so it
+// states the totals and the rules rather than a count of what will change.
 const impactSummary = computed((): string => {
   const datasets = `${datasetCount.value} ${
     datasetCount.value === 1 ? "dataset" : "datasets"
@@ -305,11 +305,11 @@ const impactSummary = computed((): string => {
     collectionCount.value === 1 ? "collection" : "collections"
   }`;
   return (
-    `This project has ${datasets} and ${collections}; only the ones you ` +
-    "own change. Sharing also covers the views and configurations of the " +
-    "datasets you own, at no more than your own access; publishing changes " +
-    "only views and configurations you own. Everything else keeps its own " +
-    "settings."
+    `This project has ${datasets} and ${collections}. Sharing changes the ` +
+    "ones you can edit, with the views and configurations of those " +
+    "datasets, and is refused if it would grant more than your own access; " +
+    "publishing changes only what you own. Everything " +
+    "else keeps its own settings."
   );
 });
 
@@ -384,6 +384,11 @@ function shareErrorMessage(error: unknown): string {
     error.response?.data?.message === "badEmailOrUsername"
   ) {
     return "Unknown user. Please check the username or email.";
+  }
+  // A refusal (e.g. a level above your own on a dataset in the project)
+  // carries the server's reason; show it rather than a generic message.
+  if (isAxiosError(error) && error.response?.data?.message) {
+    return error.response.data.message;
   }
   return "An error occurred while updating sharing";
 }
@@ -523,7 +528,7 @@ function confirmAddUser() {
     "Share Project",
     `Grant ${levelLabel} access to "${newUserEmail.value}"? ` +
       "This will also give them access to the datasets and " +
-      "collections you own in this project.",
+      "collections you can edit in this project.",
     "Share",
     "primary",
     () => addUser(),

@@ -506,22 +506,24 @@ Every propagation runs **as the acting user** (the `actor` argument) and changes
 contained resource only as far as that user could share it directly
 (`server/helpers/aclLimits.py`, the same rules as `POST /dataset_view/share`):
 
-- a dataset (folder) only if the actor owns it (ADMIN);
-- a dataset view only if the actor owns the view's dataset, and a configuration only
-  if such a view uses it or the actor owns the configuration
-  (`limitToShareable`);
-- each grant at no more than the actor's own level on that document, and an existing
-  entry above the actor's level is left unchanged (`grantableLevel`);
-- copying the project's whole ACL onto a newly added resource never lowers an existing
-  entry, so adding your own dataset to a project where you are only WRITE keeps you
-  its owner;
+- a dataset (folder) if the actor can edit it (WRITE), a dataset view if the actor can
+  edit both the view and its dataset (also for views reached through a project
+  collection whose dataset is not itself in the project), and a configuration if the
+  actor can edit it (`limitToShareable`);
+- an explicit share (`POST /project/:id/share`) is refused (403, nothing written) if it
+  would grant more than the actor's level on any reached document, or change a user
+  whose entry there is above it (`requireCanSetUserAccess`, as in
+  `dataset_view/share`);
+- copying the project's whole ACL onto a newly added resource caps each entry at the
+  actor's level instead (`cappedCopyLevel`), so adding a dataset never fails over
+  someone else's grant, and never lowers an existing entry, so adding your own dataset
+  to a project where you are only WRITE keeps you its owner;
 - the public flag only on resources the actor has ADMIN on.
 
 `POST /project/:id/set_public` returns `skipped`, the number of contained resources the
 caller can see but does not own, which it left unchanged (other users' private views are
-not counted). Neither share endpoint lets the
-caller target themselves (400): an owner removing themselves would leave the project,
-or the dataset, with no owner. Zenodo upload needs ADMIN on every dataset and
+not counted). Owner self-lockout (an owner removing or lowering their own ADMIN) is
+PR #1165's concern. Zenodo upload needs ADMIN on every dataset and
 collection the project lists; configurations reached only through views are exported
 only if the uploader owns them; publish checks what the draft recorded
 (`codebaseDocumentation/ZENODO_UPLOAD.md`). Invariants: "Regression checklist" below.
@@ -533,12 +535,13 @@ every dataset using the collection, even ones you could not read. Tests:
 
 **Sharing with a user (`POST /project/:id/share`):**
 1. Caller must have ADMIN access on the project.
-2. Looks up the target user by email or username.
-3. Calls `setUserAccess(project, targetUser, level)` on the project itself.
-4. Calls `propagateUserAccess(project, targetUser, level, actor)` which:
+2. Looks up the target user by email or username (`findShareTarget`; share-link users are unknown).
+3. Calls `propagateUserAccess(project, targetUser, level, actor)` first, which:
    - Bulk-loads all datasets, collections, and dataset views via `_gatherAllResources()`
-   - Sets the user's level on each resource the actor may change (capped as above)
-5. Level `-1` revokes access (removes user from ACLs on those resources).
+   - Checks every reached resource first (`requireCanSetUserAccess`) and refuses the whole share (403, nothing written, the project's own ACL included) if it would grant more than the actor's level on one, or change a user whose entry there is above it
+   - Then applies the same level to every reached resource with bulk `$pull`/`$push` updates (`_bulkSetUserAccess`); `None` only pulls
+4. Only then calls `setUserAccess(project, targetUser, level)` on the project itself, so a refused share leaves the project unchanged.
+5. Level `-1` revokes access: the endpoint maps it to `None` (`parseShareAccessType`), which removes the user's entry from the project's ACL and every reached resource's ACL. Passing `-1` straight through would store an inert `level: -1` entry instead.
 
 **Making public/private (`POST /project/:id/set_public`):**
 1. Caller must have ADMIN access on the project.
@@ -662,36 +665,47 @@ invariant names the test that holds it; re-check the group when you change any c
 that writes an ACL or a public flag, or that exports a project.
 
 **Direct sharing (`POST /dataset_view/share`)**
-- A WRITE collaborator cannot grant ADMIN, to themselves or another account —
+- A WRITE collaborator cannot grant ADMIN, to themselves or another account (403) —
   *"testWriteCollaboratorCannotGrantThemselvesAdmin"*,
   *"testWriteCollaboratorCannotGrantAdminToAnotherAccount"*.
-- Sharing at all needs ADMIN on the dataset — *"testWriteCollaboratorCannotShareWithOthers"*.
+- WRITE is enough to share, up to the caller's own level —
+  *"testWriteCollaboratorCanShareUpToTheirLevel"*.
 - A non-owner cannot remove the owner — *"testWriteCollaboratorCannotRemoveOwner"*.
 - Owners can grant and remove ADMIN (nimbusimage `access="admin"`) —
   *"testOwnerCanGrantAdmin"*, *"testOwnerCanRemoveAccess"*.
-- A configuration the owner can only edit is shared at no more than WRITE, and its
-  owner is never downgraded — *"testConfigurationIsSharedAtNoMoreThanCallersLevel"*,
+- The level check runs on every touched document: granting ADMIN when the caller can
+  only edit a configuration, or changing that configuration's owner, is refused and
+  changes nothing — *"testGrantAboveCallersLevelOnConfigurationIsRefused"*,
   *"testConfigurationOwnerIsNotDowngraded"*.
 - Views must belong to one dataset; an empty list is a 400, not a 500 —
   *"testViewsMustShareOneDataset"*, *"testEmptyViewListIsRejected"*.
-- Callers cannot change their own entry (owner lockout) —
-  *"testOwnerCannotRemoveThemselves"*, *"testProjectOwnerCannotRemoveThemselves"*.
+- (Owner self-lockout -- an owner removing or lowering their own ADMIN -- is handled
+  by PR #1165, not here.)
 
 **Project propagation**
 - Adding a dataset you can only edit to your own project does not make you its owner —
   *"testAddingDatasetToOwnProjectDoesNotGrantAdmin"*.
-- `addCollection` does not reach datasets the caller cannot read —
+- `addCollection` does not reach datasets the caller cannot edit —
   *"testAddingCollectionDoesNotReachUnsharedDatasets"*.
-- Sharing a project skips datasets the caller does not own, with their views and
-  configurations, and collections the caller can only edit —
-  *"testSharingProjectSkipsDatasetsCallerDoesNotOwn"*,
-  *"testSharingProjectSkipsCollectionsCallerCanOnlyEdit"*.
+- Sharing a project reaches what the caller could share directly (datasets, their
+  views and collections the caller can edit) and is refused, project included, if it
+  would exceed the caller's level on any of them —
+  *"testSharingProjectReachesDatasetsCallerCanEdit"*,
+  *"testSharingProjectReachesCollectionsCallerCanEdit"*,
+  *"testSharingProjectAboveCallersLevelIsRefused"*.
 - Copying the project ACL never lowers an existing entry, so the adder stays owner
   and a public project publishes all of their dataset —
   *"testAddingOwnDatasetToProjectKeepsOwnership"*,
   *"testAddingOwnDatasetToPublicProjectPublishesAllOfIt"*.
-- Revoking a project member leaves owners of contained datasets alone —
-  *"testRevokingProjectLeavesOwnerOfContainedDataset"*.
+- Revoking a project member who owns a contained dataset (above the caller's level) is
+  refused, so owners are never removed —
+  *"testRevokingProjectMemberWhoOwnsAContainedDatasetIsRefused"*.
+- A refused project share writes nothing on any dataset (all checks before any write) —
+  *"testRefusedProjectShareWritesNothingAcrossDatasets"*.
+- A view reached through a project collection travels only if the caller can edit its
+  dataset — *"testCollectionViewOfOutsideDatasetNeedsThatDatasetEditable"*.
+- Copying the project's ACL onto an added dataset caps every member's entry at the
+  adder's level, not just the adder's — *"testAddedDatasetCapsOtherMembersAtTheAddersLevel"*.
 - An owner sharing a project still grants ADMIN on its contents —
   *"testOwnerSharingProjectGrantsAdmin"*.
 - `set_public` publishes only what the caller owns and reports the rest it can see, and

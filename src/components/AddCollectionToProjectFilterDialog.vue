@@ -127,8 +127,9 @@
           </template>
           <template v-else> <strong>shared with other users</strong> </template
           >. Adding {{ selectedCollections.length }} collection(s) will share
-          the ones you own, and the datasets you own that use them, with the
-          project's users and, if it is public, publish them.
+          the ones you can edit, and the datasets you can edit that use them,
+          with the project's users (up to your own access) and, if it is public,
+          publish the ones you own.
         </v-card-text>
         <v-card-actions class="justify-end" style="gap: 8px">
           <v-btn

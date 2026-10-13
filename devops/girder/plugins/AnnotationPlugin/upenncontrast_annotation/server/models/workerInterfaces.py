@@ -1,3 +1,4 @@
+from ..helpers.customModel import UngatedAclFilterMixin
 from ..helpers.proxiedModel import ProxiedModel
 from girder.exceptions import ValidationException
 from girder.constants import AccessType
@@ -30,7 +31,10 @@ class InterfaceSchema:
     }
 
 
-class WorkerInterfaceModel(ProxiedModel):
+class WorkerInterfaceModel(UngatedAclFilterMixin, ProxiedModel):
+    # One document per worker image, readable by any user; its `access`
+    # names whoever's request first created it, so responses never carry it.
+    CLIENT_FIELDS = ("image", "interface")
 
     def __init__(self):
         super().__init__()
@@ -43,6 +47,8 @@ class WorkerInterfaceModel(ProxiedModel):
 
     def initialize(self):
         self.name = "worker_interface"
+        self.exposeFields(
+            level=AccessType.READ, fields=("_id",) + self.CLIENT_FIELDS)
 
     def validate(self, document):
         try:

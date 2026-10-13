@@ -218,8 +218,9 @@ export default class ProjectsAPI {
 
   /**
    * Share or revoke access to a project and the resources in it the caller
-   * can share: datasets they own with their views and configurations, and
-   * collections they own.
+   * can share: datasets they can edit with the views of them they can edit,
+   * and collections they can edit. Refused (403) if it would grant more than
+   * the caller's own level on any of them.
    */
   async shareProject(
     projectId: string,

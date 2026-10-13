@@ -3,7 +3,9 @@
 Before these checks, a WRITE collaborator could grant themselves ADMIN on a
 dataset through POST dataset_view/share (accessType 2 on their own login), or
 by adding the dataset to a project they own (the project's ACL, where they are
-ADMIN, was copied onto the dataset). See helpers/aclLimits.py.
+ADMIN, was copied onto the dataset). WRITE is enough to share, but never above
+the caller's own level: explicit requests are refused, copies onto added
+resources are capped. See helpers/aclLimits.py.
 """
 import json
 import random
@@ -132,8 +134,8 @@ class TestDatasetViewShareLimits:
 
         resp = share(server, user, [view], user, ADMIN)
 
-        assertStatus(resp, 400)
-        assert "your own access" in resp.json["message"]
+        assertStatus(resp, 403)
+        assert "above your own level" in resp.json["message"]
         assert levels(user, dataset, config, view) == (WRITE, WRITE, WRITE)
 
     def testWriteCollaboratorCannotGrantAdminToAnotherAccount(
@@ -144,28 +146,18 @@ class TestDatasetViewShareLimits:
         resp = share(server, user, [view], third, ADMIN)
 
         assertStatus(resp, 403)
-        assert "Admin access denied" in resp.json["message"]
+        assert "above your own level" in resp.json["message"]
         assert levels(third, dataset, config, view) == (
             NO_ACCESS, NO_ACCESS, NO_ACCESS)
 
-    def testOwnerCannotRemoveThemselves(self, server, owner):
-        dataset, config, view = createDataset(owner)
-
-        resp = share(server, owner, [view], owner, -1)
-
-        assertStatus(resp, 400)
-        assert levels(owner, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
-
-    def testWriteCollaboratorCannotShareWithOthers(
+    def testWriteCollaboratorCanShareUpToTheirLevel(
             self, server, owner, user, third):
         dataset, config, view = createDataset(owner)
         shareWithWrite(dataset, config, view, user)
 
-        resp = share(server, user, [view], third, READ)
+        assertStatusOk(share(server, user, [view], third, WRITE))
 
-        assertStatus(resp, 403)
-        assert levels(third, dataset, config, view) == (
-            NO_ACCESS, NO_ACCESS, NO_ACCESS)
+        assert levels(third, dataset, config, view) == (WRITE, WRITE, WRITE)
 
     def testWriteCollaboratorCannotRemoveOwner(self, server, owner, user):
         dataset, config, view = createDataset(owner)
@@ -192,30 +184,35 @@ class TestDatasetViewShareLimits:
         assert levels(third, dataset, config, view) == (
             NO_ACCESS, NO_ACCESS, NO_ACCESS)
 
-    def testConfigurationIsSharedAtNoMoreThanCallersLevel(
+    def testGrantAboveCallersLevelOnConfigurationIsRefused(
             self, server, owner, user, third):
         """The owner of a dataset can edit, but does not own, a
-        configuration a collaborator made: granting ADMIN gives WRITE on it.
+        configuration a collaborator made: granting ADMIN would exceed the
+        caller's level on it, so the whole request is refused.
         """
         dataset, _, _ = createDataset(owner)
         theirConfig = createConfiguration(user, ownFolder(user))
         grant(theirConfig, Collection(), owner, WRITE)
         view = createView(owner, dataset, theirConfig)
 
-        assertStatusOk(share(server, owner, [view], third, ADMIN))
+        resp = share(server, owner, [view], third, ADMIN)
 
+        assertStatus(resp, 403)
         assert levels(third, dataset, theirConfig, view) == (
-            ADMIN, WRITE, ADMIN)
+            NO_ACCESS, NO_ACCESS, NO_ACCESS)
 
     def testConfigurationOwnerIsNotDowngraded(self, server, owner, user):
+        """Changing a user who owns one of the touched documents (above the
+        caller's level there) is refused, and nothing changes."""
         dataset, _, _ = createDataset(owner)
         theirConfig = createConfiguration(user, ownFolder(user))
         grant(theirConfig, Collection(), owner, WRITE)
         view = createView(owner, dataset, theirConfig)
 
-        assertStatusOk(share(server, owner, [view], user, READ))
+        resp = share(server, owner, [view], user, READ)
 
-        assert levelOf(Folder(), dataset, user) == READ
+        assertStatus(resp, 403)
+        assert levelOf(Folder(), dataset, user) == NO_ACCESS
         assert levelOf(Collection(), theirConfig, user) == ADMIN
 
     def testViewsMustShareOneDataset(self, server, owner, third):
@@ -225,7 +222,7 @@ class TestDatasetViewShareLimits:
         resp = share(server, owner, [viewA, viewB], third, READ)
 
         assertStatus(resp, 400)
-        assert "same dataset" in resp.json["message"]
+        assert "one dataset" in resp.json["message"]
         assert levelOf(Folder(), datasetB, third) == NO_ACCESS
 
     def testEmptyViewListIsRejected(self, server, owner, third):
@@ -273,7 +270,27 @@ class TestProjectShareLimits:
         assert levels(user, dataset, config, view) == (
             NO_ACCESS, WRITE, NO_ACCESS)
 
-    def testSharingProjectSkipsDatasetsCallerDoesNotOwn(
+    def testSharingProjectAboveCallersLevelIsRefused(
+            self, server, owner, user, third):
+        """dataset_view/share would refuse ADMIN from a WRITE collaborator,
+        so sharing the project at ADMIN is refused too, project included."""
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+        project = self.createProject(server, user)
+        self.addDataset(server, user, project, dataset)
+
+        resp = server.request(
+            path=f"/project/{project['_id']}/share", method="POST",
+            user=user, params={
+                "userMailOrUsername": third["login"],
+                "accessType": ADMIN})
+
+        assertStatus(resp, 403)
+        assert levels(third, dataset, config, view) == (
+            NO_ACCESS, NO_ACCESS, NO_ACCESS)
+        assert levelOf(Project(), project, third) == NO_ACCESS
+
+    def testSharingProjectReachesDatasetsCallerCanEdit(
             self, server, owner, user, third):
         dataset, config, view = createDataset(owner)
         shareWithWrite(dataset, config, view, user)
@@ -284,13 +301,10 @@ class TestProjectShareLimits:
             path=f"/project/{project['_id']}/share", method="POST",
             user=user, params={
                 "userMailOrUsername": third["login"],
-                "accessType": ADMIN}))
+                "accessType": WRITE}))
 
-        # dataset_view/share would refuse the caller outright, so the
-        # project route does not reach the view or configuration either
-        assert levels(third, dataset, config, view) == (
-            NO_ACCESS, NO_ACCESS, NO_ACCESS)
-        assert levelOf(Project(), project, third) == ADMIN
+        assert levels(third, dataset, config, view) == (WRITE, WRITE, WRITE)
+        assert levelOf(Project(), project, third) == WRITE
 
     def testAddingOwnDatasetToProjectKeepsOwnership(
             self, server, owner, user):
@@ -320,10 +334,10 @@ class TestProjectShareLimits:
                            (DatasetViewModel(), view)):
             assert model.load(doc["_id"], force=True).get("public")
 
-    def testSharingProjectSkipsCollectionsCallerCanOnlyEdit(
+    def testSharingProjectReachesCollectionsCallerCanEdit(
             self, server, owner, user, third):
-        """No route lets a non-owner share a collection on its own, so a
-        collection added to a project with only WRITE stays as it is."""
+        """WRITE is enough to share (dataset_view/share's rule), so a
+        collection the caller can edit is shared with the project."""
         _, config, _ = createDataset(owner)
         grant(config, Collection(), user, WRITE)
         project = self.createProject(server, user)
@@ -337,11 +351,13 @@ class TestProjectShareLimits:
                 "userMailOrUsername": third["login"],
                 "accessType": READ}))
 
-        assert levelOf(Collection(), config, third) == NO_ACCESS
+        assert levelOf(Collection(), config, third) == READ
         assert levelOf(Project(), project, third) == READ
 
-    def testRevokingProjectLeavesOwnerOfContainedDataset(
+    def testRevokingProjectMemberWhoOwnsAContainedDatasetIsRefused(
             self, server, owner, user):
+        """Removing someone above the caller's level on a reached dataset
+        (its owner) is refused, like dataset_view/share; nothing changes."""
         dataset, config, view = createDataset(owner)
         shareWithWrite(dataset, config, view, user)
         project = self.createProject(server, user)
@@ -349,12 +365,84 @@ class TestProjectShareLimits:
         projectDoc = Project().load(project["_id"], force=True)
         grant(projectDoc, Project(), owner, WRITE)
 
-        assertStatusOk(server.request(
+        resp = server.request(
             path=f"/project/{project['_id']}/share", method="POST",
             user=user, params={
-                "userMailOrUsername": owner["login"], "accessType": -1}))
+                "userMailOrUsername": owner["login"], "accessType": -1})
 
+        assertStatus(resp, 403)
         assert levels(owner, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+        assert levelOf(Project(), project, owner) == WRITE
+
+    def addCollection(self, server, actor, project, collection):
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/collection", method="POST",
+            user=actor, params={"collectionId": str(collection["_id"])}))
+
+    def shareProject(self, server, actor, project, target, level):
+        return server.request(
+            path=f"/project/{project['_id']}/share", method="POST",
+            user=actor, params={
+                "userMailOrUsername": target["login"],
+                "accessType": level})
+
+    @pytest.mark.parametrize("datasetLevel, viewReached", [
+        (WRITE, True), (READ, False)])
+    def testCollectionViewOfOutsideDatasetNeedsThatDatasetEditable(
+            self, server, owner, user, third, datasetLevel, viewReached):
+        """A project collection reaches the views using it, even of
+        datasets not in the project; such a view travels only if the caller
+        could share its dataset (limitToShareable's outside-dataset path)."""
+        dataset, config, view = createDataset(owner)
+        grant(config, Collection(), user, WRITE)
+        grant(view, DatasetViewModel(), user, WRITE)
+        grant(dataset, Folder(), user, datasetLevel)
+        project = self.createProject(server, user)
+        self.addCollection(server, user, project, config)
+
+        assertStatusOk(self.shareProject(server, user, project, third, READ))
+
+        assert levelOf(Collection(), config, third) == READ
+        assert levelOf(DatasetViewModel(), view, third) == (
+            READ if viewReached else NO_ACCESS)
+
+    def testAddedDatasetCapsOtherMembersAtTheAddersLevel(
+            self, server, owner, user, third):
+        """Copying the project's ACL onto an added dataset caps every entry
+        at the adder's level, not just the adder's own: a project ADMIN
+        member gets WRITE on a dataset a WRITE member adds."""
+        project = self.createProject(server, owner)
+        assertStatusOk(self.shareProject(server, owner, project, third, ADMIN))
+        grant(Project().load(project["_id"], force=True), Project(), user,
+              WRITE)
+        someone = makeUser("someone")
+        dataset, config, view = createDataset(someone)
+        shareWithWrite(dataset, config, view, user)
+
+        self.addDataset(server, user, project, dataset)
+
+        assert levels(third, dataset, config, view) == (WRITE, WRITE, WRITE)
+        assert levels(someone, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+
+    def testRefusedProjectShareWritesNothingAcrossDatasets(
+            self, server, owner, user, third):
+        """Every reached document is checked before any is written: with one
+        dataset the caller owns and one they can only edit, ADMIN is refused
+        and neither dataset changes."""
+        ownDataset, ownConfig, ownView = createDataset(user)
+        theirs = createDataset(owner)
+        shareWithWrite(*theirs, user)
+        project = self.createProject(server, user)
+        self.addDataset(server, user, project, ownDataset)
+        self.addDataset(server, user, project, theirs[0])
+
+        resp = self.shareProject(server, user, project, third, ADMIN)
+
+        assertStatus(resp, 403)
+        assert levels(third, ownDataset, ownConfig, ownView) == (
+            NO_ACCESS, NO_ACCESS, NO_ACCESS)
+        assert levels(third, *theirs) == (NO_ACCESS, NO_ACCESS, NO_ACCESS)
+        assert levelOf(Project(), project, third) == NO_ACCESS
 
     def testOwnerSharingProjectGrantsAdmin(self, server, owner, third):
         dataset, config, view = createDataset(owner)
@@ -414,20 +502,6 @@ class TestProjectShareLimits:
 
         assertStatusOk(resp)
         assert resp.json["skipped"] == 0
-
-    def testProjectOwnerCannotRemoveThemselves(self, server, owner):
-        dataset, config, view = createDataset(owner)
-        project = self.createProject(server, owner)
-        self.addDataset(server, owner, project, dataset)
-
-        resp = server.request(
-            path=f"/project/{project['_id']}/share", method="POST",
-            user=owner, params={
-                "userMailOrUsername": owner["login"], "accessType": -1})
-
-        assertStatus(resp, 400)
-        assert levelOf(Project(), project, owner) == ADMIN
-        assert levels(owner, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
 
 
 @pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
@@ -551,7 +625,8 @@ class TestZenodoRequiresOwnership:
         config = {"_id": ObjectId(),
                   "meta": {"propertyIds": [str(exported)]}}
         propertyModel = MagicMock()
-        propertyModel.find.return_value = []
+        # Exports read properties through findClientFields (master)
+        propertyModel.findClientFields.return_value = []
         valuesModel = MagicMock()
         valuesModel.find.return_value = [{
             "annotationId": ObjectId(),
@@ -617,7 +692,8 @@ class TestZenodoRequiresOwnership:
             Project().load(project["_id"], force=True), user)
         createView(user, dataset, theirConfig)  # after the check
         propertyModel = MagicMock()
-        propertyModel.find.return_value = []
+        # Exports read properties through findClientFields (master)
+        propertyModel.findClientFields.return_value = []
         valuesModel = MagicMock()
         valuesModel.find.return_value = []
         zenodo_job._build_annotation_json(
@@ -625,8 +701,8 @@ class TestZenodoRequiresOwnership:
             checked.configsByDataset.get(dataset["_id"], []),
             propertyModel, valuesModel)
 
-        query = propertyModel.find.call_args.args[0]
-        assert set(query["_id"]["$in"]) == {ownProperty}
+        exportedIds = propertyModel.findClientFields.call_args.args[0]
+        assert set(exportedIds) == {ownProperty}
 
     def testPublishChecksWhatTheDraftContains(self, server, owner, user):
         """Removing a dataset from the project after the upload does not

@@ -17,8 +17,9 @@ from girder.models.folder import Folder
 from girder.models.user import User
 from girder.exceptions import ValidationException, GirderException
 
+from ..helpers.access_helpers import requireCanSetUserAccess
 from ..helpers.aclLimits import (
-    canPublish, explicitUserLevel, grantableLevel, limitToShareable,
+    canPublish, cappedCopyLevel, limitToShareable,
 )
 from ..helpers.fastjsonschema import customJsonSchemaCompile
 from ..helpers.proxiedModel import ProxiedModel
@@ -356,47 +357,33 @@ class Project(ProxiedModel):
             'datasetViews': dataset_views,
         }
 
-    def _bulkSetUserAccess(
-        self, docs, model, actor, user_id, level
-    ):
-        """Set a single user's access on multiple docs, as
-        `actor` may (see helpers.aclLimits.grantableLevel).
+    def _bulkSetUserAccess(self, docs, model, user_id, level):
+        """Set a single user's access on multiple docs.
 
-        Uses one $pull plus one $push per resulting level
-        instead of N individual setUserAccess calls.
+        The caller has already checked every doc
+        (propagateUserAccess). Uses two bulk MongoDB ops
+        ($pull + $push) instead of N setUserAccess calls.
 
-        :param docs: List of documents (with their ACLs).
+        :param docs: List of documents.
         :param model: The Girder model instance.
-        :param actor: The user making the change.
         :param user_id: The target user's ObjectId.
-        :param level: AccessType level, or -1 to remove.
+        :param level: AccessType level, or None to remove.
         """
-        ids_by_level = defaultdict(list)
-        for doc in docs:
-            granted = grantableLevel(
-                model, doc, actor, user_id, level
-            )
-            if granted is not None:
-                ids_by_level[granted].append(doc['_id'])
-        if not ids_by_level:
+        if not docs:
             return
+        query = {'_id': {'$in': [doc['_id'] for doc in docs]}}
         model.update(
-            {'_id': {'$in': [
-                doc_id for ids in ids_by_level.values()
-                for doc_id in ids
-            ]}},
+            query,
             {'$pull': {
                 'access.users': {'id': user_id}
             }}
         )
-        for granted, ids in ids_by_level.items():
-            if granted < 0:
-                continue
+        if level is not None and level >= AccessType.READ:
             model.update(
-                {'_id': {'$in': ids}},
+                query,
                 {'$push': {'access.users': {
                     'id': user_id,
-                    'level': granted,
+                    'level': level,
                     'flags': []
                 }}}
             )
@@ -434,17 +421,21 @@ class Project(ProxiedModel):
         self, docs, model, project, actor
     ):
         """Apply project's full user ACL to multiple docs,
-        as `actor` may (see helpers.aclLimits).
+        capped at what `actor` may grant on each
+        (helpers.aclLimits.cappedCopyLevel).
 
         Copying an ACL only adds access: an entry already at
         or above what the project would grant is kept, so
         adding your own dataset to a project where you are
-        only WRITE does not demote you from its owner.
+        only WRITE does not demote you from its owner. Unlike
+        an explicit share this caps rather than refuses, so
+        adding a dataset never fails over someone else's
+        grant.
 
         Bulk-validates that users exist, then issues one
         $pull and one $push per distinct set of entries
-        (almost always one set: the actor's level is usually
-        the same on every doc).
+        (bounded by how much the reached docs' existing ACLs
+        and the actor's level on them differ; usually few).
 
         :param docs: List of documents (with their ACLs).
         :param model: The Girder model instance.
@@ -467,19 +458,28 @@ class Project(ProxiedModel):
             )
         }
         project_users = [
-            u for u in project_users if u['id'] in valid_ids
+            u for u in project_users
+            # Negative levels grant nothing; don't spread
+            # legacy -1 entries
+            if u['id'] in valid_ids and u['level'] >= AccessType.READ
         ]
+        # Drop inert level -1 entries left by the old share
+        # endpoints on every reached doc, so a resync cleans
+        # them up even on docs where nothing new is copied.
+        model.update(
+            {'_id': {'$in': [doc['_id'] for doc in docs]}},
+            {'$pull': {'access.users': {
+                'level': {'$lt': AccessType.READ}
+            }}}
+        )
         ids_by_entries = defaultdict(list)
         for doc in docs:
             entries = []
             for u in project_users:
-                granted = grantableLevel(
+                granted = cappedCopyLevel(
                     model, doc, actor, u['id'], u['level']
                 )
-                existing = explicitUserLevel(doc, u['id'])
-                if granted is None or granted < 0 or (
-                    existing is not None and existing >= granted
-                ):
+                if granted is None:
                     continue
                 entries.append(
                     (u['id'], granted, tuple(u.get('flags', [])))
@@ -523,24 +523,40 @@ class Project(ProxiedModel):
     ):
         """Propagate a single user's access level to the
         project resources `actor` could share directly
-        (helpers.aclLimits.limitToShareable), at no more than
-        the actor's level on each (grantableLevel).
+        (helpers.aclLimits.limitToShareable).
+
+        Like dataset_view/share, every reached document is
+        checked before any is written: the request is refused
+        (AccessException) if it would grant more than the
+        actor's level on one of them, or change a user whose
+        entry there is above the actor's level.
 
         :param project: The project document.
         :param targetUser: The Girder user document.
-        :param level: AccessType level (0, 1, 2) or -1
+        :param level: AccessType level (0, 1, 2) or None
                       to remove access.
         :param actor: The user sharing the project.
+        :raises AccessException: If any reached document
+            would exceed the actor's level.
         """
         resources = limitToShareable(
             actor, self._gatherAllResources(project)
+        )
+        self._applyToAllResourceTypes(
+            resources,
+            lambda docs, model: [
+                requireCanSetUserAccess(
+                    model, doc, actor, targetUser, level
+                )
+                for doc in docs
+            ]
         )
         uid = targetUser['_id']
         self._applyToAllResourceTypes(
             resources,
             lambda docs, model: (
                 self._bulkSetUserAccess(
-                    docs, model, actor, uid, level
+                    docs, model, uid, level
                 )
             )
         )

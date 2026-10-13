@@ -8,6 +8,7 @@ from pytest_girder.assertions import assertStatus, assertStatusOk
 
 from girder.constants import AccessType
 from girder.models.folder import Folder
+from girder.models.item import Item
 from girder.models.token import Token
 from girder.models.user import User
 
@@ -130,10 +131,13 @@ class TestShareLink:
         assertStatus(request(
             server, "GET", "/folder/%s/download" % dataset["_id"], token=token
         ), 403)
-        assertStatus(request(
+        refused = request(
             server, "GET", "/export/json", token=token,
             params={"datasetId": str(dataset["_id"])},
-        ), 403)
+        )
+        assertStatus(refused, 403)
+        # Refused by the share-link guard, not by a blanket admin check.
+        assert "Share links show a view" in refused.json["message"]
         # Every export format, not only JSON.
         for route in ("/export/csv", "/export/geojson"):
             assertStatus(request(
@@ -154,6 +158,34 @@ class TestShareLink:
                          params={"text": "share-"})
         assertStatusOk(listed)
         assert not any(u["login"].startswith("share-") for u in listed.json)
+
+    def testNonAdminOwnerCanStillDownload(self, admin, user, server):
+        # The download guard is a `.before` handler; without an access level
+        # Girder makes every route it guards admin-only. The test above only
+        # downloads as admin, so it missed that. (`admin` is requested so
+        # `user` is not Girder's first, auto-admin user.)
+        assert not user["admin"]
+        dataset, config, view = privateDatasetWithView(user)
+        item = Item().createItem("file", creator=user, folder=dataset)
+        assertStatusOk(server.request(
+            path="/folder/%s/download" % dataset["_id"], method="GET",
+            user=user, isJson=False,
+        ))
+        assertStatusOk(server.request(
+            path="/item/%s/download" % item["_id"], method="GET",
+            user=user, isJson=False,
+        ))
+        assertStatusOk(request(
+            server, "GET", "/export/json", user=user,
+            params={"datasetId": str(dataset["_id"])},
+        ))
+        # Every guarded export format, not only JSON.
+        for route in ("/export/csv", "/export/geojson"):
+            assertStatusOk(server.request(
+                path=route, method="POST", user=user, isJson=False,
+                type="application/json",
+                body=json.dumps({"datasetId": str(dataset["_id"])}),
+            ))
 
     def testCreateNeedsAdminAndValidInput(self, admin, user, server):
         dataset, config, view = privateDatasetWithView(admin)

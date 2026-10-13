@@ -70,7 +70,8 @@
           </template>
           <template v-else> <strong>shared with other users</strong> </template
           >. Adding {{ selectedDatasets.length }} dataset(s) will share the ones
-          you own with the project's users and, if it is public, publish them.
+          you can edit with the project's users (up to your own access) and, if
+          it is public, publish the ones you own.
         </v-card-text>
         <v-card-actions class="justify-end" style="gap: 8px">
           <v-btn

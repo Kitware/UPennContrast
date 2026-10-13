@@ -1,33 +1,29 @@
 """Limits on the ACL changes one user may make on another's behalf.
 
-Girder's own access endpoints (PUT folder/{id}/access) require ADMIN. The
-plugin's sharing paths -- dataset_view/share and project sharing/propagation --
-also write ACLs on dataset views and configurations the caller may only hold
-WRITE on (a configuration a collaborator created), so they cannot simply
-require ADMIN everywhere. These rules keep a caller from handing out more than
-they hold: without them a WRITE collaborator could grant themselves ADMIN.
+The rule everywhere is the one dataset_view/share enforces: WRITE on a
+document is enough to share it, but never above the caller's own level, and
+never by changing a user whose entry there is above the caller's level (an
+owner). Without it a WRITE collaborator could grant themselves ADMIN.
 
-API layer and model layer both use them: the share endpoint directly, project
-propagation (models/project.py) with the acting user passed down.
+Explicit requests (dataset_view/share, project/:id/share) refuse with a 403
+when any reached document would break the rule
+(access_helpers.requireCanSetUserAccess). Copying a project's ACL onto a
+resource newly added to it caps each entry at the caller's level instead
+(cappedCopyLevel): adding a dataset should not fail because of someone else's
+grant.
+
+Which documents a project change reaches at all is limitToShareable: the
+ones the caller could share directly.
 """
 
 from girder.constants import AccessType
 from girder.models.folder import Folder
 
 from ..models.collection import Collection
+from ..models.datasetView import DatasetView
 
-# Folders (datasets) are only re-shared by their owners, as in Girder core.
-# A view or configuration needs at least WRITE; which ones a caller may reach
-# at all is limited further by the dataset they belong to (dataset_view/share
-# requires its owner; projects use limitToShareable).
-MIN_LEVEL_TO_SHARE_FOLDER = AccessType.ADMIN
-MIN_LEVEL_TO_SHARE_OTHER = AccessType.WRITE
-
-
-def minLevelToShare(model):
-    if isinstance(model, Folder):
-        return MIN_LEVEL_TO_SHARE_FOLDER
-    return MIN_LEVEL_TO_SHARE_OTHER
+# Sharing a document needs edit access to it (dataset_view/share's rule).
+MIN_LEVEL_TO_SHARE = AccessType.WRITE
 
 
 def explicitUserLevel(doc, userId):
@@ -38,27 +34,25 @@ def explicitUserLevel(doc, userId):
     return None
 
 
-def grantableLevel(model, doc, actor, targetId, requested):
-    """The level `actor` may set for `targetId` on `doc`, or None to leave it.
+def cappedCopyLevel(model, doc, actor, targetId, requested):
+    """The level a copied project entry may give targetId on doc, or None.
 
-    - The actor needs minLevelToShare(model) on the document at all.
-    - A grant is capped at the actor's own level (WRITE on a configuration
-      re-shares it at WRITE at most, never ADMIN).
-    - An entry above the actor's level is left untouched, so a non-owner
-      cannot downgrade or remove an owner.
+    Copying only adds access: None (leave the doc alone) when the actor
+    cannot share the doc, when the target already holds at least the capped
+    level, or when the target's entry is above the actor's level (an owner's
+    entry is never rewritten by someone below them).
 
-    :param requested: AccessType level, or -1 to remove.
-    :returns: The level to apply (-1 removes), or None to skip this document.
+    :param requested: The project entry's level (>= READ).
+    :returns: The level to set, or None to leave the doc unchanged.
     """
     actorLevel = model.getAccessLevel(doc, actor)
-    if actorLevel < minLevelToShare(model):
+    if actorLevel < MIN_LEVEL_TO_SHARE:
         return None
+    granted = min(requested, actorLevel)
     existing = explicitUserLevel(doc, targetId)
-    if existing is not None and existing > actorLevel:
+    if existing is not None and existing >= granted:
         return None
-    if requested < 0:
-        return -1
-    return min(requested, actorLevel)
+    return granted
 
 
 def canPublish(model, doc, actor):
@@ -69,44 +63,48 @@ def canPublish(model, doc, actor):
 def limitToShareable(actor, resources):
     """Keep only the resources `actor` could share through dataset_view/share.
 
-    That endpoint shares a dataset's views and their configurations only on
-    behalf of the dataset's owner. Project propagation reaches the same
-    documents by other routes (a dataset added with WRITE, a view found
-    through a project collection), so it applies the same precondition:
+    That endpoint needs WRITE on the dataset and on every view and
+    configuration it is sent, and views only travel with their dataset.
+    Project propagation reaches the same documents by other routes, so it
+    applies the same precondition:
 
-    - a dataset only if the actor owns it (ADMIN);
-    - a dataset view only if the actor owns the view's dataset;
-    - a configuration if one of those views uses it, or if the actor owns
-      the configuration itself.
-
-    grantableLevel still caps each grant at the actor's own level.
+    - a dataset if the actor can edit it;
+    - a dataset view if the actor can edit it and its dataset is kept;
+    - a configuration if the actor can edit it.
 
     :param resources: Dict with 'datasets', 'collections' and 'datasetViews'
         lists (as Project._gatherAllResources returns).
     :returns: A dict of the same shape.
     """
     folderModel = Folder()
-    folderIds = {d['_id'] for d in resources['datasets']} | {
-        v['datasetId'] for v in resources['datasetViews']}
-    ownedFolderIds = {
-        folder['_id'] for folder in folderModel.find(
-            {'_id': {'$in': list(folderIds)}}, fields=['access', 'public'])
-        if folderModel.hasAccess(folder, actor, AccessType.ADMIN)
-    } if folderIds else set()
-    views = [
-        v for v in resources['datasetViews']
-        if v['datasetId'] in ownedFolderIds
-    ]
-    usedConfigIds = {v['configurationId'] for v in views}
+    viewModel = DatasetView()
     collectionModel = Collection()
+    datasets = [
+        d for d in resources['datasets']
+        if folderModel.hasAccess(d, actor, MIN_LEVEL_TO_SHARE)
+    ]
+    keptFolderIds = {d['_id'] for d in datasets}
+    # A view of a dataset that is not itself in the project (reached
+    # through a project collection) needs that dataset's access too.
+    otherFolderIds = {
+        v['datasetId'] for v in resources['datasetViews']
+    } - keptFolderIds - {d['_id'] for d in resources['datasets']}
+    if otherFolderIds:
+        keptFolderIds |= {
+            folder['_id'] for folder in folderModel.find(
+                {'_id': {'$in': list(otherFolderIds)}},
+                fields=['access', 'public'])
+            if folderModel.hasAccess(folder, actor, MIN_LEVEL_TO_SHARE)
+        }
     return {
-        'datasets': [
-            d for d in resources['datasets'] if d['_id'] in ownedFolderIds
-        ],
+        'datasets': datasets,
         'collections': [
             c for c in resources['collections']
-            if c['_id'] in usedConfigIds
-            or collectionModel.hasAccess(c, actor, AccessType.ADMIN)
+            if collectionModel.hasAccess(c, actor, MIN_LEVEL_TO_SHARE)
         ],
-        'datasetViews': views,
+        'datasetViews': [
+            v for v in resources['datasetViews']
+            if v['datasetId'] in keptFolderIds
+            and viewModel.hasAccess(v, actor, MIN_LEVEL_TO_SHARE)
+        ],
     }

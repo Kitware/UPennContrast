@@ -10,12 +10,10 @@ from girder.api import access
 from girder.api.rest import Resource, filtermodel, loadmodel
 from girder.api.describe import Description, autoDescribeRoute
 from girder.constants import AccessType, TokenScope
-from girder.exceptions import RestException
 from girder.models.folder import Folder
-from girder.models.user import User
 
 from upenncontrast_annotation.server.helpers.access_helpers import (
-    formatAccessList
+    findShareTarget, formatAccessList, parseShareAccessType
 )
 from upenncontrast_annotation.server.models.project import (
     Project as ProjectModel
@@ -163,11 +161,13 @@ class Project(Resource):
     def addDataset(self, project, dataset):
         """Add dataset to project, then sync permissions.
 
-        The project's ACL and public flag reach the dataset
-        and its views/configurations only as far as the
-        caller could share them directly (helpers.aclLimits):
-        a WRITE collaborator's project does not make them, or
-        anyone else, an owner of the dataset.
+        The project's ACL reaches the dataset and its
+        views/configurations only as far as the caller could
+        share them directly (helpers.aclLimits), each entry
+        capped at the caller's own level: a WRITE
+        collaborator's project does not make them, or anyone
+        else, an owner of the dataset. The public flag reaches
+        only what the caller owns.
         """
         user = self.getCurrentUser()
         result = self._projectModel.addDataset(
@@ -211,8 +211,9 @@ class Project(Resource):
 
         Propagation reaches the collection, its views and
         the datasets using it only as far as the caller could
-        share each directly (helpers.aclLimits); datasets the
-        caller does not own are left alone.
+        share each directly (helpers.aclLimits), capped at the
+        caller's own level; what they cannot edit is left
+        alone.
         """
         user = self.getCurrentUser()
         result = self._projectModel.addCollection(
@@ -278,16 +279,17 @@ class Project(Resource):
             Set accessType to:
             - 0 (READ) for view-only access
             - 1 (WRITE) for edit access
-            - 2 (ADMIN) to make the user an owner
+            - 2 (ADMIN) for owner access
             - -1 to remove user's access entirely
 
-            Each contained resource changes only as far as
-            the caller could share it directly: datasets the
-            caller owns with their views and configurations,
-            and collections the caller owns, at no more than
-            the caller's own level on each. Entries above the
-            caller's level are left as they are. The caller
-            cannot target themselves.
+            The change reaches the contained resources the
+            caller could share directly: datasets they can
+            edit with the views of them they can edit, and
+            collections they can edit. As with
+            dataset_view/share, the request is refused (403,
+            nothing changed) if it would grant more than the
+            caller's own level on any of them, or change a
+            user whose current level there is above it.
         """)
         .modelParam(
             'id', model=ProjectModel,
@@ -310,27 +312,18 @@ class Project(Resource):
     )
     def share(self, project, userMailOrUsername,
               accessType):
-        accessType = AccessType().validate(accessType)
-
-        targetUser = User().findOne(
-            {"$or": [
-                {"login": userMailOrUsername},
-                {"email": userMailOrUsername},
-            ]}
-        )
-        if not targetUser:
-            raise RestException("badEmailOrUsername")
+        accessType = parseShareAccessType(accessType)
+        targetUser = findShareTarget(userMailOrUsername)
         user = self.getCurrentUser()
-        if targetUser['_id'] == user['_id']:
-            # An owner would lock themselves out of the project
-            # (and, by propagation, of everything in it).
-            raise RestException("Cannot change your own access.")
 
-        self._projectModel.setUserAccess(
-            project, targetUser, accessType, save=True
-        )
+        # Propagation checks every reached resource first and
+        # raises before writing anything, so the project's own
+        # ACL changes only once the whole share is allowed.
         self._projectModel.propagateUserAccess(
             project, targetUser, accessType, user
+        )
+        self._projectModel.setUserAccess(
+            project, targetUser, accessType, save=True
         )
 
         return True
@@ -359,7 +352,7 @@ class Project(Resource):
     )
     def getAccess(self, project):
         result = formatAccessList(
-            self._projectModel, project
+            self._projectModel, project, self.getCurrentUser()
         )
         result['projectId'] = str(project['_id'])
         return result
