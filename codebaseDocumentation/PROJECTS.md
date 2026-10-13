@@ -717,6 +717,9 @@ that writes an ACL or a public flag, or that exports a project.
   *"testPublicStrangersViewDoesNotBlockTheExport"*,
   *"testStrangersViewsDoNotBlockTheExport"*,
   *"testExportOmitsValuesOfPropertiesItDoesNotDefine"*.
+- Only views the uploader can edit count, so a stranger's view (even public, even
+  pointing at the uploader's own configuration) cannot choose what the export contains
+  — *"testStrangersViewCannotAddUploadersConfiguration"*.
 - The upload job rechecks the project it reloads (resources can be added after the
   endpoint's check) — *"testUploadJobRechecksTheProjectItExports"* — and checks again
   immediately before reading any data, after its Zenodo calls —

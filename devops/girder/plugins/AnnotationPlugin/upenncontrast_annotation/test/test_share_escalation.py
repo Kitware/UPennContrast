@@ -855,6 +855,27 @@ class TestZenodoRequiresOwnership:
         assert extraConfig["_id"] not in recorded["collectionIds"]
         assert config["_id"] in recorded["collectionIds"]
 
+    def testStrangersViewCannotAddUploadersConfiguration(
+            self, server, owner, user):
+        """A view anyone created must not decide what the export contains,
+        even when it points at a configuration the uploader owns."""
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        unrelated = createConfiguration(owner, ownFolder(owner))
+        strangersView = createView(user, dataset, unrelated)
+        DatasetViewModel().setPublic(strangersView, True, save=True)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+
+        contents = requireProjectContentsAccess(
+            Project().load(project["_id"], force=True), owner)
+
+        assert unrelated["_id"] not in contents.collectionIds
+        assert config["_id"] in contents.collectionIds
+
     def testOwnerPassesTheOwnershipCheck(self, server, owner):
         dataset, _, _ = createDataset(owner)
         project = TestProjectShareLimits().createProject(server, owner)

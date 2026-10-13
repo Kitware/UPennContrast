@@ -96,8 +96,9 @@ def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
     operation on each dataset and collection it lists. Configurations
     reached only through views of its datasets are exported (their
     property definitions) only when the user owns them, and otherwise left
-    out. References to deleted resources are skipped, as the export skips
-    them, and left out of the result.
+    out; only views the user can edit count. References to deleted
+    resources are skipped, as the export skips them, and left out of the
+    result.
 
     Views and project membership can change after the check, so the export
     must use what this returns rather than query them again, and publishing
@@ -120,14 +121,20 @@ def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
         user, level, ['access', 'public', 'meta.propertyIds'])
     # Configurations reached only through views of the uploaded datasets
     # contribute their property definitions only if the user owns them,
-    # and are otherwise left out rather than refused: anyone can create a
-    # view naming any dataset (and make it public), so refusing would let
-    # a stranger block the upload.
+    # and are otherwise left out rather than refused. Only views the user
+    # can edit count: anyone can create a view naming any dataset (and
+    # make it public, which grants READ but never WRITE), so a stranger's
+    # view must neither block the upload nor choose what it contains.
     configIdsByDataset = defaultdict(set)
     if datasetIds:
-        for view in DatasetView().find(
+        datasetViewModel = DatasetView()
+        for view in datasetViewModel.find(
                 {'datasetId': {'$in': datasetIds}},
-                fields=['datasetId', 'configurationId']):
+                fields=['datasetId', 'configurationId', 'access',
+                        'public']):
+            if not datasetViewModel.hasAccess(
+                    view, user, AccessType.WRITE):
+                continue
             configIdsByDataset[view['datasetId']].add(
                 view['configurationId'])
     viewConfigIds = set().union(*configIdsByDataset.values()) - set(
