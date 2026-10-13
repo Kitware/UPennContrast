@@ -520,6 +520,10 @@ describe("ShareDataset", () => {
     // A removal awaiting confirmation and a just-created link's one-time URL.
     vm.confirmRemoveUser(vm.users[1]);
     vm.createdLinkUrl = "https://example.test/#/shared/secret";
+    // Inputs typed for ds1 (Add would grant this user access to dsB).
+    vm.newUserEmail = "someone@example.test";
+    vm.newUserAccessLevel = 1;
+    vm.newLinkLabel = "for ds1";
 
     await wrapper.setProps({ dataset: datasetB });
     await flushPromises();
@@ -529,6 +533,9 @@ describe("ShareDataset", () => {
     expect(vm.userToRemove).toBeNull();
     expect(vm.shareLinks).toEqual([]);
     expect(vm.createdLinkUrl).toBeNull();
+    expect(vm.newUserEmail).toBe("");
+    expect(vm.newUserAccessLevel).toBe(0);
+    expect(vm.newLinkLabel).toBe("");
 
     // ds1's users would keep the admin controls enabled, and its views
     // would be what add/remove submit, while the dialog shows dsB.

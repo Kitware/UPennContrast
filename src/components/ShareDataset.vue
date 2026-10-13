@@ -546,6 +546,12 @@ function resetDatasetState() {
   associatedViews.value = [];
   userToRemove.value = null;
   confirmDialog.value = false;
+  // Inputs typed for the previous dataset: one click would otherwise apply
+  // them to the new one (grant that user access, label a link). The link
+  // expiry choice is a preference, not dataset input, and is kept.
+  newUserEmail.value = "";
+  newUserAccessLevel.value = 0;
+  newLinkLabel.value = "";
   // In-progress flags of requests now disowned (claimDialog checks the
   // dataset): their late finally blocks no longer touch the dialog.
   userLoading.value = null;
@@ -559,9 +565,6 @@ function resetState() {
   // the same dataset (claimDialog).
   dialogGeneration++;
   resetDatasetState();
-  newLinkLabel.value = "";
-  newUserEmail.value = "";
-  newUserAccessLevel.value = 0;
 }
 
 // Bumped per fetch and by resetState(): only the latest fetch, for the
