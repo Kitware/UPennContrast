@@ -364,61 +364,97 @@ Anything that fails both returns `None`, which the SDK turns into a 401.
 
 ### 6.3 Girder OAuth plugin
 
-Lives at `devops/girder/plugins/<name>/` (name to be decided, for example
-`girder-mcp-oauth`), installed by one new line in `devops/girder/Dockerfile`. Follows the
-repo's backend rules in `CLAUDE.md`: API layer raises `RestException`, models raise
-`ValueError`; `Model().find()`, never `collection.find()`; batch `$in` queries; `exc=True`
-on loads.
+**Built (Phase 3, 2026-10-13):** `devops/girder/plugins/McpOAuthPlugin/`, package
+`nimbus_mcp_oauth`, installed in `devops/girder/Dockerfile`; backend CI runs its tox. Code is
+split as the backend rules ask: `oauth.py` and `clients.py` hold the logic and raise
+`OAuthError`, `rest.py` maps that to HTTP. 68 tests, one or more per rule below; the PKCE,
+refresh-reuse, resource and `redirect_uri` checks were each confirmed to fail their test
+when disabled.
 
-**Setting:** `mcp_oauth.enabled`, default **false**. When false, every endpoint returns 404.
-This matters because merging into NimbusImage master deploys to production on the next
-autoscaling churn (see [Phase 6](#phase-6-production-rollout)).
+**Decisions (2026-10-13):**
 
-**Endpoints:**
+| Question | Decision | Why |
+|---|---|---|
+| Client registration | Client ID Metadata Documents, fetched only from `claude.ai` and `claude.com`, plus one built-in public client (`nimbusimage-claude`). No dynamic registration, no secrets. | "Use Claude's published identity" is the connector dialog's recommended option and Claude Code's default; the 2026-07-28 MCP spec deprecates dynamic registration. Restricting hosts keeps the server-side fetch from becoming SSRF. |
+| Scope | One scope, `nimbusimage`: full access, the same as a full-access API key | Every tool works, including job waits (which need `core.user_auth`); the consent page says so plainly |
+| Lifetimes | Access 8 h; refresh 30 days idle, rotated on every use | Each access token mints one Girder session (about 3 a day per active user); revoking a connection takes effect on the next call because the MCP service introspects every request |
+| Login on the consent page | Save the in-app return path in `sessionStorage`, send the user to the root page's login, return after login | Verified live on app.nimbusimage.com: Outseta returns to the root with `?access_token`, `sessionStorage` survives the round trip, and the session survives a reload. No OutsetaComponents change. |
+
+**Setting:** `mcp_oauth.enabled`, default **false**. When false, every endpoint (and the
+metadata document) returns 404. This matters because merging into NimbusImage master
+deploys to production on the next autoscaling churn (see
+[Phase 6](#phase-6-production-rollout)). Other settings: `mcp_oauth.issuer` (the bare
+origin, equal to the MCP server's `NI_MCP_ISSUER_URL`), `mcp_oauth.api_url` (public Girder
+REST root, e.g. `https://app.nimbusimage.com/girder/api/v1`), `mcp_oauth.frontend_url`,
+`mcp_oauth.resources` (the MCP URLs a token may be for), `mcp_oauth.introspection_secret`
+(32+ characters; empty disables introspection), `mcp_oauth.cimd_hosts`.
+
+**Endpoints** (REST under `/api/v1/mcp_oauth`):
 
 | Endpoint | Access | Purpose |
 |---|---|---|
-| Authorization server metadata (RFC 8414) | Public | Issuer, endpoints, `code_challenge_methods_supported: ["S256"]`, registration options |
-| `GET authorize` | Public, rate-limited | Validate client, redirect URI, PKCE, `resource`; store a pending request; redirect to the consent page |
-| `GET request/:id` | User | Return client name and redirect host for the consent screen |
-| `POST approve` | User (Girder token) | Bind the pending request to the user; issue a one-time code; return the redirect URL |
-| `POST token` | Public, rate-limited | `authorization_code` and `refresh_token` grants |
-| `POST revoke` | Public, client-authenticated | Revoke a refresh token or grant |
-| `GET grants`, `DELETE grants/:id` | User | Let users see and revoke connected apps (UI later) |
-| `POST introspect` | Internal only | Called by the MCP service over the private network; never routed through the public HAProxy frontend (restrict by source, e.g. security group) |
+| `/.well-known/oauth-authorization-server` (server root, mounted in CherryPy) | Public | RFC 8414 metadata: S256 only, `token_endpoint_auth_methods_supported: ["none"]`, `client_id_metadata_document_supported`, `authorization_response_iss_parameter_supported` |
+| `GET authorize` | Public, 30/min per address | Validate client, redirect URI, PKCE, `resource`, scope; store a pending request (10 min); redirect to `#/oauth/consent?request=<id>`. An untrusted client or redirect URI gets a 400, never a redirect; later errors redirect back with `error`, `state` and `iss`. |
+| `GET request/:id` | User | Client name, redirect host, whether it is a local redirect |
+| `POST request/:id/approve`, `/deny` | User (Girder token header), 30/min per user | Single use; approve issues a 60 s one-time code and returns the redirect URL (`code`, `state`, `iss`) |
+| `POST token` | Public, form-encoded, flood cap per address | `authorization_code` (PKCE verifier, same client, same redirect URI, `resource` if sent) and `refresh_token` (rotation; reuse or another client revokes the connection). OAuth-shaped errors, including 429. |
+| `POST revoke` | Public | RFC 7009; either token ends the connection |
+| `POST introspect` | Shared secret header (`X-Mcp-Introspection-Secret`), else 404; hidden from the API docs | For the MCP service: active, user, client, scope, resource, expiry, and the Girder session token to act with |
+| `GET grant`, `DELETE grant/:id` | User | Your connected clients; disconnect (UI later) |
 
-**Collections:** OAuth clients; pending authorization requests (TTL index); authorization
-codes (TTL index, single use); grants (user, client, scopes, resource, hashed refresh
-token, created, last used).
+`token`, `revoke` and `introspect` are kept out of Girder's audit log, which records every
+parameter.
+
+**Collections** (all with TTL indexes on `expiresAt`): pending requests, codes, grants (one
+per connection, expiry slides on refresh), access tokens, refresh tokens, and a one-hour
+cache of fetched client documents. Codes, access and refresh tokens are stored only as
+SHA-256 hashes; an access token's record holds the id of the Girder session behind it.
 
 **Tokens:**
 
-- Access token: a Girder session token from `Token().createToken(user, days=…,
-  scope=TokenScope.USER_AUTH)`, short-lived, recorded against its grant.
-- Refresh token: random, opaque, stored only as a hash, **rotated on every use**. Reuse of
-  an old refresh token revokes the whole grant.
+- Access token: `nio_` + 43 random characters, standing for a Girder session token
+  (`Token().createToken(user, days=8/24, scope=TokenScope.USER_AUTH)`). Revoking the
+  connection deletes those sessions.
+- Refresh token: `nir_` + 43 random characters, **rotated on every use**. Reuse of an old
+  one revokes the whole connection, so a client that retries a refresh after a network
+  error loses the connection (by design) and the user reconnects.
 
-**Client registration:**
+**Clients:** the built-in client allows Claude's callbacks
+(`https://claude.ai/api/mcp/auth_callback`, and the `claude.com` variant as a hedge) and
+Claude Code's loopback callbacks on any port (RFC 8252). A client document is fetched over
+https from an allowed host only, without redirects, within 5 s and 64 KB; its `client_id`
+must equal its URL, it must be a public client, and its `redirect_uris` may only be Claude's
+callbacks or loopback, so JSON served anywhere on an allowed host cannot send codes to
+another host.
 
-1. **Pre-registered clients first.** A static client table. The connector dialog's "Use
-   your own OAuth client" option and Claude Code's `--client-id` both support this.
-2. **Client ID Metadata Documents later**, so Owners can choose "Use Claude's published
-   identity" without pasting a secret. This makes the server fetch a URL the client
-   supplies, so: HTTPS only, short timeout, response size cap, and start with an allowlist
-   of hosts.
-3. **No dynamic client registration.** It is optional in the spec.
-
-**Security requirements (each needs a test):**
+**Security requirements (each has a test):**
 
 - PKCE with S256 required; plain is rejected.
-- Exact redirect URI match against the registered list.
-- Authorization codes expire in about 60 seconds and work once.
-- `state` is passed through unchanged.
-- The `resource` parameter is required and must equal the MCP server URL.
-- `authorize` and `token` are rate-limited. Copy the sliding-window limiter pattern from
-  `girder-claude-chat/girder_claude_chat/rate_limit.py`; do not import from that plugin.
-- The consent screen shows the client name and the redirect host.
-- Return-after-login accepts only in-app routes, never external URLs.
+- Exact redirect URI match against the registered list; the only leeway is the loopback
+  port.
+- Authorization codes expire in 60 seconds and work once; a replayed code revokes what it
+  issued.
+- `state` is passed through unchanged, and `iss` is returned (RFC 9207).
+- The `resource` parameter is required and must equal a configured MCP server URL
+  (compared in canonical form).
+- Refresh tokens rotate; reuse or a different client revokes the connection; a missing
+  `client_id` is an error that does not spend the token.
+- Disabled, unapproved or unverified accounts cannot exchange, refresh or introspect.
+- `authorize`, consent and `token` are rate-limited (the limiter is copied from
+  `girder-claude-chat/girder_claude_chat/rate_limit.py`, not imported).
+- The consent screen shows the client name and the redirect host (consent page, next).
+- Return-after-login accepts only in-app routes, never external URLs (consent page, next).
+
+**Known limits:**
+
+- A narrow race can leave a Girder session token nobody holds (it expires in 8 h).
+- Consent requests are not bound to the browser that started them; a forwarded authorize
+  link is stopped by the client's own `state` check. The consent page should refuse to be
+  framed and tell users to approve only a request they just started.
+- The session behind an access token has full access, so it could mint an API key that
+  outlives the connection; the MCP tools never do this.
+- The rate limits are per process, keyed on the last `X-Forwarded-For` hop (correct only
+  behind HAProxy, which is how production runs).
 
 ---
 
@@ -655,6 +691,10 @@ Phase 2 tunnel with a Team or Enterprise org.
   `src/store/GirderAPI.ts`, not in the component, per `CLAUDE.md`.
 - A pre-registered local test client.
 
+**Progress:** the plugin is built and reviewed (two independent review rounds; see
+[6.3](#63-girder-oauth-plugin)). Next: the MCP server's verifier (`nio_` tokens via
+introspection, setting `AccessToken.resource` from the response), then the consent page.
+
 **Tests:**
 
 - Plugin tests with pytest via tox, following
@@ -718,6 +758,9 @@ with NimbusImage's Girder image like the other plugins.
   - Narrow the existing HTTPS-redirect exemption (`acl acme_challenge path_beg
     /.well-known/`) to `/.well-known/acme-challenge/`, so OAuth metadata is never served
     over plain HTTP.
+  - Deny `/girder/api/v1/mcp_oauth/introspect` (and the `//girder` and `/girder/` path
+    variants) from outside the VPC, so only the MCP service reaches it; it already
+    answers 404 without the shared secret.
   - A new **static** backend for the MCP service (its fixed private address), not part
     of the dynamic Girder backend. `/mcp` and `/.well-known/oauth-protected-resource/mcp`
     route to it; `/.well-known/oauth-authorization-server` and
@@ -1005,8 +1048,8 @@ its fix.
 |---|---|---|
 | Placement | **Decided 2026-10-12: a small separate service** (own instance, e.g. t4g.small, behind a static HAProxy backend). Rejected: a **sidecar** on each Girder host (needs a second dynamic HAProxy backend and IP manager changes, the plan's site-wide-503 risk; every MCP change needs a warm-pool cycle; adds to the 900 s launch budget) and **mounting inside Girder's ASGI app** (cheapest on infrastructure, but shares Girder's process, threads and memory with image work, couples every MCP change to a Girder deploy, and the MCP SDK's pinned dependencies must coexist with Girder 5's, unverified). Stickiness is irrelevant: the server is stateless, and connectors calling from Anthropic's cloud do not keep HAProxy's cookie. Per-process state (the key-exchange cache, the registration single-flight) becomes effectively global with one instance. | Separate service |
 | Where the code lives | New top-level `nimbusimage-mcp/` package, or an optional extra in `nimbusimage` | Separate package |
-| Token lifetimes | Access token hours to a day; refresh token weeks | Decide in Phase 3 |
-| Client registration | Pre-registered only, or add Client ID Metadata Documents | Pre-registered first |
+| Token lifetimes | **Decided 2026-10-13:** access 8 h, refresh 30 days idle (see [6.3](#63-girder-oauth-plugin)) | |
+| Client registration | **Decided 2026-10-13:** Claude's published identity (client documents from claude.ai/claude.com) plus one built-in client; no dynamic registration | |
 | API key creation UI | Build a settings page, or keep issuing keys by hand | By hand for now |
 | In-app agent using MCP | Attach the MCP server to the AI panel through the connector | Not planned |
 
