@@ -383,6 +383,12 @@ import { IGirderSelectAble } from "@/girder";
 import store from "@/store";
 import { shareLinkUrl } from "@/store/ShareLinkAPI";
 import type { ISetDatasetPublicResult } from "@/store/GirderAPI";
+import {
+  finishPublish,
+  isPublishPending,
+  publishSettleCount,
+  startPublish,
+} from "@/utils/pendingPublishes";
 import { logError } from "@/utils/log";
 import { accessLevelLabel } from "@/utils/accessLevel";
 import {
@@ -450,14 +456,10 @@ const selectedConfigIds = ref<string[]>([]);
 const associatedViews = ref<IDatasetView[]>([]);
 
 // Loading states
-// Datasets with a set_public request in flight. Kept across dialog resets
-// and dataset switches: the server keeps writing after the dialog closes or
-// moves to another dataset, so returning must not allow an opposite request
-// to interleave with it.
-const publishingDatasetIds = ref(new Set<string>());
+// A set_public in flight for the shown dataset, from this dialog or any other
+// (see utils/pendingPublishes): no opposite request until it settles.
 const publicLoading = computed(
-  () =>
-    datasetId.value !== null && publishingDatasetIds.value.has(datasetId.value),
+  () => datasetId.value !== null && isPublishPending(datasetId.value),
 );
 // Set when publishing left views/collections owned by other users private:
 // publishing those is their owners' call, so "Public" may not cover them.
@@ -492,9 +494,18 @@ watch(dialog, (val) => {
   }
 });
 
+// The dialog is reused: when it moves to another dataset while open, reload
+// rather than keep showing the previous dataset's access, state and notice.
+watch(datasetId, (id, previousId) => {
+  if (dialog.value && id && id !== previousId) {
+    fetchAccessInfo(id);
+  }
+});
+
 function resetState() {
   shareLinksRequest++;
-  publicRequest++;
+  dialogGeneration++;
+  accessRequest++;
   shareLinks.value = [];
   createdLinkUrl.value = null;
   createdEmbedUrl.value = null;
@@ -514,32 +525,48 @@ function resetState() {
   userToRemove.value = null;
 }
 
-async function fetchAccessInfo(datasetId: string) {
-  fetchShareLinks(datasetId);
+// Bumped per fetch and by resetState(): only the latest fetch, for the
+// dataset still shown, may write the dialog's state.
+let accessRequest = 0;
+
+async function fetchAccessInfo(id: string) {
+  fetchShareLinks(id);
+  const request = ++accessRequest;
+  const isCurrent = () => request === accessRequest && datasetId.value === id;
+  // A publish pending now, or settling before this fetch returns, wrote (or
+  // is writing) the public flag this fetch reads; its own response sets the
+  // checkbox instead.
+  const settledAtStart = publishSettleCount(id);
   loading.value = true;
   showError.value = false;
   // The notice describes the last publish of the dataset it was shown for.
   publicSkippedNotice.value = "";
   try {
     // Fetch access list from new endpoint
-    const accessList = await store.api.getDatasetAccess(datasetId);
+    const accessList = await store.api.getDatasetAccess(id);
+    if (!isCurrent()) return;
 
-    isPublic.value = accessList.public;
+    if (!isPublishPending(id) && publishSettleCount(id) === settledAtStart) {
+      isPublic.value = accessList.public;
+    }
     users.value = accessList.users;
     configurations.value = accessList.configurations;
     // Select all configurations by default
     selectedConfigIds.value = accessList.configurations.map((c) => c.id);
 
     // Also fetch dataset views for the share API calls
-    associatedViews.value = await store.api.findDatasetViews({
-      datasetId,
-    });
+    const views = await store.api.findDatasetViews({ datasetId: id });
+    if (!isCurrent()) return;
+    associatedViews.value = views;
   } catch (error) {
-    logError(`Failed to fetch access info for dataset ${datasetId}`, error);
+    logError(`Failed to fetch access info for dataset ${id}`, error);
+    if (!isCurrent()) return;
     errorString.value = "Failed to load access information";
     showError.value = true;
   } finally {
-    loading.value = false;
+    if (isCurrent()) {
+      loading.value = false;
+    }
   }
 }
 
@@ -572,20 +599,27 @@ function skippedNotice(result: ISetDatasetPublicResult) {
   );
 }
 
-// Bumped by resetState(): a publish still in flight when the dialog closes
-// must not write its notice or error into the next dialog.
-let publicRequest = 0;
+// Bumped by resetState() only: a publish still in flight when the dialog
+// closes must not write its notice or error into the next dialog. Starting
+// another publish does not bump it -- a publish for one dataset must not
+// silence another's result (at most one is in flight per dataset).
+let dialogGeneration = 0;
 
 async function togglePublic(newValue: boolean | null) {
   if (!props.dataset) return;
   const id = datasetId.value!;
-  // One publish per dataset at a time (the checkbox is disabled meanwhile).
-  if (publishingDatasetIds.value.has(id)) return;
   const value = !!newValue;
-  const request = ++publicRequest;
-  const isCurrent = () => request === publicRequest && datasetId.value === id;
+  // One publish per dataset at a time (the checkbox is disabled meanwhile);
+  // undo the v-model flip that already happened.
+  if (isPublishPending(id)) {
+    isPublic.value = !value;
+    return;
+  }
+  const generation = dialogGeneration;
+  const isCurrent = () =>
+    generation === dialogGeneration && datasetId.value === id;
 
-  publishingDatasetIds.value.add(id);
+  startPublish(id);
   showError.value = false;
   publicSkippedNotice.value = "";
   try {
@@ -607,7 +641,7 @@ async function togglePublic(newValue: boolean | null) {
       showError.value = true;
     }
   } finally {
-    publishingDatasetIds.value.delete(id);
+    finishPublish(id);
   }
 }
 

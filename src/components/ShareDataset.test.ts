@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { flushPromises, shallowMount } from "@vue/test-utils";
 
 const mockGetDatasetAccess = vi.fn();
 const mockFindDatasetViews = vi.fn();
@@ -383,6 +383,150 @@ describe("ShareDataset", () => {
     finishers.dsA(result("dsA"));
     await publishingA;
     expect(vm.publicLoading).toBe(false);
+  });
+
+  it("togglePublic shows a dataset's notice after another dataset's publish", async () => {
+    const finishers: Record<string, (value: unknown) => void> = {};
+    mockSetDatasetPublic.mockImplementation(
+      (id: string) => new Promise((resolve) => (finishers[id] = resolve)),
+    );
+    const datasetA = { _id: "dsA", _modelType: "folder", name: "A" } as any;
+    const datasetB = { _id: "dsB", _modelType: "folder", name: "B" } as any;
+    const wrapper = mountComponent({ dataset: datasetA });
+    const vm = wrapper.vm as any;
+
+    const publishingA = vm.togglePublic(true);
+    await wrapper.setProps({ dataset: datasetB });
+    const publishingB = vm.togglePublic(true);
+    // Back on A before either settles: B's publish must not silence A's.
+    await wrapper.setProps({ dataset: datasetA });
+    finishers.dsA({
+      dataset: "dsA",
+      public: true,
+      datasetViewsUpdated: 1,
+      configurationsUpdated: 1,
+      datasetViewsSkipped: 0,
+      configurationsSkipped: 1,
+    });
+    await publishingA;
+
+    expect(vm.publicSkippedNotice).toBe(
+      "1 collection owned by other users stayed private; " +
+        "only their owners can make them public.",
+    );
+    finishers.dsB({
+      dataset: "dsB",
+      public: true,
+      datasetViewsUpdated: 1,
+      configurationsUpdated: 1,
+      datasetViewsSkipped: 2,
+      configurationsSkipped: 0,
+    });
+    await publishingB;
+    // B's result does not land on A's dialog.
+    expect(vm.publicSkippedNotice).toBe(
+      "1 collection owned by other users stayed private; " +
+        "only their owners can make them public.",
+    );
+  });
+
+  it("reloads access info when the open dialog moves to another dataset", async () => {
+    mockGetDatasetAccess.mockImplementation(async (id: string) => ({
+      ...defaultAccessList,
+      public: id === "dsB",
+    }));
+    const datasetB = { _id: "dsB", _modelType: "folder", name: "B" } as any;
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+    await flushPromises();
+    vm.publicSkippedNotice = "stale notice for ds1";
+
+    await wrapper.setProps({ dataset: datasetB });
+    await flushPromises();
+
+    expect(mockGetDatasetAccess).toHaveBeenLastCalledWith("dsB");
+    expect(vm.isPublic).toBe(true);
+    expect(vm.publicSkippedNotice).toBe("");
+  });
+
+  it("ignores an access load for a dataset no longer shown", async () => {
+    let finishA: (value: unknown) => void = () => {};
+    mockGetDatasetAccess.mockImplementation((id: string) =>
+      id === "ds1"
+        ? new Promise((resolve) => (finishA = resolve))
+        : Promise.resolve({ ...defaultAccessList, public: false }),
+    );
+    const datasetB = { _id: "dsB", _modelType: "folder", name: "B" } as any;
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+
+    await wrapper.setProps({ dataset: datasetB });
+    await flushPromises();
+    // ds1's load resolves last; it must not overwrite dsB's state.
+    finishA({ ...defaultAccessList, public: true, users: [] });
+    await flushPromises();
+
+    expect(vm.isPublic).toBe(false);
+    expect(vm.users).toHaveLength(2);
+    expect(vm.loading).toBe(false);
+  });
+
+  it("an access load overlapping a publish leaves the checkbox to the publish", async () => {
+    let finishPublishRequest: (value: unknown) => void = () => {};
+    mockSetDatasetPublic.mockReturnValue(
+      new Promise((resolve) => (finishPublishRequest = resolve)),
+    );
+    let finishLoad: (value: unknown) => void = () => {};
+    mockGetDatasetAccess.mockReturnValue(
+      new Promise((resolve) => (finishLoad = resolve)),
+    );
+    const wrapper = mountComponent();
+    const vm = wrapper.vm as any;
+
+    const publishing = vm.togglePublic(true);
+    const loading = vm.fetchAccessInfo("ds1");
+    finishPublishRequest({
+      dataset: "ds1",
+      public: true,
+      datasetViewsUpdated: 1,
+      configurationsUpdated: 1,
+      datasetViewsSkipped: 0,
+      configurationsSkipped: 0,
+    });
+    await publishing;
+    // The load read the flag before the write committed.
+    finishLoad({ ...defaultAccessList, public: false });
+    await loading;
+
+    expect(vm.isPublic).toBe(true);
+  });
+
+  it("shares a pending publish across dialog instances", async () => {
+    let finish: (value: unknown) => void = () => {};
+    mockSetDatasetPublic.mockReturnValue(
+      new Promise((resolve) => (finish = resolve)),
+    );
+    const first = mountComponent();
+    const second = mountComponent();
+    const publishing = (first.vm as any).togglePublic(true);
+
+    // Another dialog for the same dataset (e.g. another file-browser row).
+    expect((second.vm as any).publicLoading).toBe(true);
+    (second.vm as any).isPublic = false; // the v-model flip
+    await (second.vm as any).togglePublic(false);
+    expect(mockSetDatasetPublic).toHaveBeenCalledTimes(1);
+    expect((second.vm as any).isPublic).toBe(true);
+
+    finish({
+      dataset: "ds1",
+      public: true,
+      datasetViewsUpdated: 1,
+      configurationsUpdated: 1,
+      datasetViewsSkipped: 0,
+      configurationsSkipped: 0,
+    });
+    await publishing;
+    expect((second.vm as any).publicLoading).toBe(false);
   });
 
   it("togglePublic reverts isPublic on error", async () => {
