@@ -71,8 +71,11 @@ services:
         nimbusimage: ./nimbusimage
     environment:
       NI_API_URL: "http://girder:8080/api/v1"
-      NI_MCP_PUBLIC_URL: "http://localhost:${MCP_PORT-8001}/mcp"
-      NI_MCP_ISSUER_URL: "http://localhost:${GIRDER_PORT-8080}"
+      # Override both when serving through a public URL (e.g. a tunnel)
+      NI_MCP_PUBLIC_URL: "${NI_MCP_PUBLIC_URL-http://localhost:${MCP_PORT-8001}/mcp}"
+      NI_MCP_ISSUER_URL: "${NI_MCP_ISSUER_URL-http://localhost:${GIRDER_PORT-8080}}"
+      # Keep under every proxy timeout in front (a Cloudflare tunnel: 100 s)
+      NI_MCP_MAX_JOB_WAIT: "${NI_MCP_MAX_JOB_WAIT-240}"
     ports:
       - "${MCP_PORT-8001}:8000"
     depends_on:

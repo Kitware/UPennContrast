@@ -90,6 +90,27 @@ claude mcp add --transport http nimbus http://localhost:8001/mcp \
 Each person uses their own key. Deleting or deactivating the key in Girder ends
 access on the next request.
 
+## Testing through a public URL
+
+claude.ai connectors call from Anthropic's servers, so they need an HTTPS URL.
+`deploy/local-haproxy/` runs HAProxy with the proposed production routing in
+front of the `mcp` service (Girder is refused to tunnel traffic). From the repo
+root of the main checkout:
+
+```bash
+docker compose -f nimbusimage-mcp/deploy/local-haproxy/docker-compose.yaml up -d
+cloudflared tunnel --url http://localhost:8090          # prints https://<name>.trycloudflare.com
+NI_MCP_PUBLIC_URL=https://<name>.trycloudflare.com/mcp \
+NI_MCP_ISSUER_URL=https://<name>.trycloudflare.com NI_MCP_MAX_JOB_WAIT=85 \
+  COMPOSE_BAKE=false docker compose --profile mcp up -d --no-deps mcp
+```
+
+Then add a custom connector at that `/mcp` URL with "No sign in" and the header
+`Authorization: Bearer <key>`. Use a dedicated test user's key, never an admin's.
+A quick tunnel cuts responses after 100 s (hence the 85 s job wait) and does not
+survive overnight. Shut it down afterwards and recreate `mcp` without the
+overrides. Results: the plan's "Phase 2 results".
+
 ## How auth works
 
 - `Authorization: Bearer <key>` is exchanged with `POST api_key/token` and the

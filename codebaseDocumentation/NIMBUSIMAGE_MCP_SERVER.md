@@ -4,8 +4,10 @@
 auth and 17 tools, run locally or as the compose `mcp` profile (see
 [`nimbusimage-mcp/README.md`](../nimbusimage-mcp/README.md)). Phase 0 measurements are in
 [`nimbusimage-mcp/eval/PHASE0_RESULTS.md`](../nimbusimage-mcp/eval/PHASE0_RESULTS.md).
-Placement decided (2026-10-12): a small separate service, see §11. Phases 2 onward are
-proposals; the order was changed on 2026-10-12 so a header-key connector test through a
+Placement decided (2026-10-12): a small separate service, see §11. Phase 2 done
+(2026-10-13): the header-key connector works from claude.ai and through `mcp-remote` behind
+a local HAProxy with the proposed production rules; see
+[Phase 2 results](#phase-2-results-2026-10-13). Phases 3 onward are proposals; the order was changed on 2026-10-12 so a header-key connector test through a
 tunnel (Phase 2) comes before OAuth (Phase 3), because most users will be on Team/Enterprise
 plans and OAuth must follow soon, built on a verified connector path.
 **Last reviewed:** 2026-10-11, against NimbusImage `82a746f`, the AWSDeploy HAProxy
@@ -123,7 +125,7 @@ flowchart LR
 
   subgraph hap["HAProxy · app.nimbusimage.com (single box)"]
     R1["/mcp (new)"]
-    R2["/.well-known/oauth-protected-resource (new)"]
+    R2["/.well-known/oauth-protected-resource/mcp (new)"]
     R3["/.well-known/oauth-authorization-server (new)"]
     R4["/girder/*"]
     R5["/.well-known/acme-challenge/* (must keep)"]
@@ -554,11 +556,81 @@ latency is acceptable, the proposed HAProxy rules behave).
 
 **Exit criteria:**
 
-- [ ] Header-key connector works from claude.ai and Desktop (tools listed, a count, a
-      composite image, a worker run with `ni_job_wait`).
-- [ ] `/.well-known/acme-challenge/*` still routes to the static server in the local
+- [x] Header-key connector works from claude.ai and Desktop (tools listed, a count, a
+      composite image, a worker run with `ni_job_wait`). Desktop's config-file path was
+      tested as `mcp-remote` with `--header` under headless Claude Code (the same stdio
+      bridge Desktop launches); a connector added on claude.ai is account-wide.
+- [x] `/.well-known/acme-challenge/*` still routes to the static server in the local
       HAProxy.
-- [ ] Connector observations written down for Phase 3.
+- [x] Connector observations written down for Phase 3.
+
+#### Phase 2 results (2026-10-13)
+
+**Setup.** `nimbusimage-mcp/deploy/local-haproxy/` holds an HAProxy 3.2 config that copies
+the production frontend (timeouts, the Girder backend's path rewrite) plus the proposed MCP
+rules, a static nginx standing in for the static server, and a compose file that joins the
+main stack's network. A Cloudflare quick tunnel (`cloudflared tunnel --url
+http://localhost:8090`) exposed only that HAProxy. Local differences: TLS ends at the
+tunnel (`X-Forwarded-Proto` stands in for `ssl_fc`), Girder is refused (403) to anything
+arriving through the tunnel because the shared local stack keeps the default admin
+password, and the worker rate limit is left out. Instead of a separate database, the test
+ran as a dedicated non-admin user with a random password and a full-access key, owning one
+copy of a 4-channel, 7-z HCR dataset; the user, key, dataset, annotations and jobs were
+deleted afterwards. The compose `mcp` service now takes `NI_MCP_PUBLIC_URL`,
+`NI_MCP_ISSUER_URL` and `NI_MCP_MAX_JOB_WAIT` from the environment.
+
+**Results.**
+
+| Client | Tools listed | Composite | Count | Worker + `ni_job_wait` |
+|---|---|---|---|---|
+| claude.ai custom connector ("No sign in" + `Authorization` header) | 17 | yes | yes | yes (257 spots), plus an 85 s wait |
+| `mcp-remote` + `--header` (Desktop config shape), headless Claude Code | 17 | yes | yes | yes (578 spots) |
+| Claude Code `--transport http` + header | 17 | yes | yes | yes |
+
+Routing checked with and without HTTPS: plain HTTP to `/mcp` and both metadata paths
+redirects to HTTPS; `/.well-known/acme-challenge/phase2-test` is served by the static
+server over plain HTTP and HTTPS; `/.well-known/oauth-authorization-server` reaches
+Girder (404 until Phase 3).
+
+**Connector observations (for Phase 3 and 4).**
+
+- **Discovery order.** When a connector is added, claude.ai probes from `python-httpx`,
+  `MCP-Protocol-Version: 2025-11-25`: an unauthenticated `POST /mcp` (401), then
+  `GET /.well-known/oauth-protected-resource/mcp` (the URL in the challenge), then
+  `GET /.well-known/oauth-authorization-server` and
+  `GET /.well-known/openid-configuration`, both at the **root**, because the advertised
+  issuer had no path. It does this even for a "No sign in" connector, and 404s there are
+  fine. Phase 3 consequences: the issuer should be the bare origin
+  (`https://app.nimbusimage.com`), and the OAuth plugin must answer
+  `/.well-known/oauth-authorization-server` at Girder's **root**, not under `/api/v1`,
+  since HAProxy passes that path through unchanged.
+- **Protected Resource Metadata path.** The SDK serves it at the path-suffixed URL
+  `/.well-known/oauth-protected-resource/mcp` (RFC 9728 §3.1, resource `<origin>/mcp`), and
+  that is what the challenge and the connector use. The original Phase 4 rule (exact
+  `/.well-known/oauth-protected-resource`) would have sent it to the static server; fixed
+  below.
+- **Tool calls** come with `User-Agent: Claude-User` and `MCP-Protocol-Version:
+  2026-07-28`, which the pinned SDK accepts. Every call is a plain JSON `POST /mcp`; the
+  connector opened no `GET /mcp` stream and kept no cookie, so stateless serving is what it
+  needs. (Claude Code and `mcp-remote` do open a `GET /mcp` stream; with production
+  timeouts HAProxy held them 75 to 120 s, until the client closed them.)
+- **Latency.** Server time per call was 6 to 30 ms for reads, 0.45 s for a 280 KB composite
+  image, 1.5 to 3 s for worker interface and run calls.
+- **Long calls.** claude.ai waited out an 85 s `ni_job_wait`. Production HAProxy timeouts
+  held a 229 s call. A Cloudflare tunnel does **not**: it returns 524 after 100 s without
+  response headers, and the server (`json_response=True`) sends none until the tool
+  returns. Keep `NI_MCP_MAX_JOB_WAIT` under every proxy timeout in front (85 for a
+  tunnel); claude.ai's own limit above 85 s is unmeasured.
+- **Header auth** reached the server unchanged from both claude.ai and `mcp-remote`.
+- **Not observed:** the OAuth callback URL and whether the connector sends a `resource`
+  parameter. Both need the Phase 3 flow.
+- **Quick tunnels expire.** A `trycloudflare.com` tunnel left overnight was gone the next
+  morning ("Tunnel not found"), and the connector reported "Couldn't reach this address".
+  Start a fresh one per session; its URL changes, so recreate the `mcp` service with the
+  new `NI_MCP_PUBLIC_URL`.
+- **Found by the test, fixed elsewhere:** `nimbusimage`'s `job.log` was always empty, so
+  `ni_job_wait` returned an empty `log_tail` (PR #1352). Once logs flow, a worker's first
+  line carries a live Girder token; #1352 now redacts it in `job.log`.
 
 ### Phase 3: OAuth (local, then through the tunnel)
 
@@ -628,13 +700,15 @@ with NimbusImage's Girder image like the other plugins.
 **AWSDeploy:**
 
 - `templates/startup_haproxy.tftpl`:
-  - Exact-path ACLs for `/mcp`, `/.well-known/oauth-protected-resource`, and
-    `/.well-known/oauth-authorization-server`. No `path_beg /.well-known/` rule.
+  - Exact-path ACLs for `/mcp`, `/.well-known/oauth-protected-resource/mcp` (the
+    path-suffixed metadata URL the 401 challenge names; the bare path as well is
+    harmless), and `/.well-known/oauth-authorization-server`. No `path_beg /.well-known/`
+    rule. Rehearsed in `nimbusimage-mcp/deploy/local-haproxy/haproxy.cfg` (Phase 2).
   - Narrow the existing HTTPS-redirect exemption (`acl acme_challenge path_beg
     /.well-known/`) to `/.well-known/acme-challenge/`, so OAuth metadata is never served
     over plain HTTP.
   - A new **static** backend for the MCP service (its fixed private address), not part
-    of the dynamic Girder backend. `/mcp` and `/.well-known/oauth-protected-resource`
+    of the dynamic Girder backend. `/mcp` and `/.well-known/oauth-protected-resource/mcp`
     route to it; `/.well-known/oauth-authorization-server` routes to Girder.
 - `templates/load_balancer_ip_manager_script.py`: **no change needed** with a static MCP
   backend; this is the main reason the separate service was chosen over a sidecar on

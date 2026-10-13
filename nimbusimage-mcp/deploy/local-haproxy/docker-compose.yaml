@@ -1,0 +1,25 @@
+# Local HAProxy with the proposed production MCP routing, for the Phase 2
+# tunnel test. Joins the main stack's network, so start that first (with the
+# mcp profile) from the repo root of the main checkout, then:
+#   docker compose -f nimbusimage-mcp/deploy/local-haproxy/docker-compose.yaml up -d
+# HAProxy listens on localhost:8090; point a tunnel at it.
+name: nimbus-mcp-haproxy
+
+services:
+  haproxy:
+    image: haproxy:3.2-alpine
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "127.0.0.1:${HAPROXY_PORT-8090}:80"
+    depends_on:
+      - static
+  static:
+    image: nginx:alpine
+    volumes:
+      - ./static:/usr/share/nginx/html:ro
+
+networks:
+  default:
+    name: nimbusimage_default
+    external: true
