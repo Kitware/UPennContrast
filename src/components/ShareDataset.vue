@@ -450,14 +450,14 @@ const selectedConfigIds = ref<string[]>([]);
 const associatedViews = ref<IDatasetView[]>([]);
 
 // Loading states
-// The dataset whose set_public request is in flight. Kept across a dialog
-// reset: the server keeps writing after the dialog closes, so reopening must
-// not allow an opposite request to interleave with it.
-const publishingDatasetId = ref<string | null>(null);
+// Datasets with a set_public request in flight. Kept across dialog resets
+// and dataset switches: the server keeps writing after the dialog closes or
+// moves to another dataset, so returning must not allow an opposite request
+// to interleave with it.
+const publishingDatasetIds = ref(new Set<string>());
 const publicLoading = computed(
   () =>
-    publishingDatasetId.value !== null &&
-    publishingDatasetId.value === datasetId.value,
+    datasetId.value !== null && publishingDatasetIds.value.has(datasetId.value),
 );
 // Set when publishing left views/collections owned by other users private:
 // publishing those is their owners' call, so "Public" may not cover them.
@@ -580,12 +580,12 @@ async function togglePublic(newValue: boolean | null) {
   if (!props.dataset) return;
   const id = datasetId.value!;
   // One publish per dataset at a time (the checkbox is disabled meanwhile).
-  if (publishingDatasetId.value === id) return;
+  if (publishingDatasetIds.value.has(id)) return;
   const value = !!newValue;
   const request = ++publicRequest;
   const isCurrent = () => request === publicRequest && datasetId.value === id;
 
-  publishingDatasetId.value = id;
+  publishingDatasetIds.value.add(id);
   showError.value = false;
   publicSkippedNotice.value = "";
   try {
@@ -607,9 +607,7 @@ async function togglePublic(newValue: boolean | null) {
       showError.value = true;
     }
   } finally {
-    if (publishingDatasetId.value === id) {
-      publishingDatasetId.value = null;
-    }
+    publishingDatasetIds.value.delete(id);
   }
 }
 

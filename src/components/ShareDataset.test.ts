@@ -348,6 +348,43 @@ describe("ShareDataset", () => {
     expect(vm.publicLoading).toBe(false);
   });
 
+  it("togglePublic tracks a pending publish per dataset", async () => {
+    const finishers: Record<string, (value: unknown) => void> = {};
+    mockSetDatasetPublic.mockImplementation(
+      (id: string) => new Promise((resolve) => (finishers[id] = resolve)),
+    );
+    const result = (id: string) => ({
+      dataset: id,
+      public: true,
+      datasetViewsUpdated: 1,
+      configurationsUpdated: 1,
+      datasetViewsSkipped: 0,
+      configurationsSkipped: 0,
+    });
+    const datasetA = { _id: "dsA", _modelType: "folder", name: "A" } as any;
+    const datasetB = { _id: "dsB", _modelType: "folder", name: "B" } as any;
+    const wrapper = mountComponent({ dataset: datasetA });
+    const vm = wrapper.vm as any;
+
+    const publishingA = vm.togglePublic(true);
+    // The reused dialog moves to B and publishes it; B settles first.
+    await wrapper.setProps({ dataset: datasetB });
+    expect(vm.publicLoading).toBe(false);
+    const publishingB = vm.togglePublic(true);
+    finishers.dsB(result("dsB"));
+    await publishingB;
+
+    // Back on A: its first request is still writing, so no second one.
+    await wrapper.setProps({ dataset: datasetA });
+    expect(vm.publicLoading).toBe(true);
+    await vm.togglePublic(false);
+    expect(mockSetDatasetPublic).toHaveBeenCalledTimes(2);
+
+    finishers.dsA(result("dsA"));
+    await publishingA;
+    expect(vm.publicLoading).toBe(false);
+  });
+
   it("togglePublic reverts isPublic on error", async () => {
     mockSetDatasetPublic.mockRejectedValue(new Error("fail"));
     const wrapper = mountComponent();
