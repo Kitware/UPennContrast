@@ -528,7 +528,11 @@ watch(
 // the wrong dataset (a pending removal confirmation, a link list, a
 // one-time link URL).
 function resetDatasetState() {
-  // Disown in-flight loads: they belong to the previous dataset.
+  // Start a new dialog session and disown in-flight requests. Bumped on
+  // every reset -- closing the dialog or moving to another dataset -- since
+  // the dataset id alone recurs: after A -> B -> A, a request started in
+  // the first A session would otherwise look current again (claimDialog).
+  dialogGeneration++;
   shareLinksRequest++;
   accessRequest++;
   shareLinks.value = [];
@@ -560,14 +564,12 @@ function resetDatasetState() {
   revokingLinkId.value = null;
 }
 
+// Closing the dialog: the same full reset as a dataset switch.
 function resetState() {
-  // A new session: requests from this one no longer write back, even for
-  // the same dataset (claimDialog).
-  dialogGeneration++;
   resetDatasetState();
 }
 
-// Bumped per fetch and by resetState(): only the latest fetch, for the
+// Bumped per fetch and by every reset: only the latest fetch, for the
 // dataset still shown, may write the dialog's state.
 let accessRequest = 0;
 
@@ -648,7 +650,8 @@ function skippedNotice(result: ISetDatasetPublicResult) {
   );
 }
 
-// The dialog's session, bumped by resetState(). This instance is reused
+// The dialog's session, bumped by every reset (resetDatasetState: closing
+// the dialog or moving it to another dataset). This instance is reused
 // across datasets and across close/reopen, so every async handler captures
 // claimDialog() when it starts and writes its result, error or loading flag
 // back only while the dialog still shows that session and dataset; a late

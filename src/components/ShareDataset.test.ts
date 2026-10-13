@@ -614,6 +614,38 @@ describe("ShareDataset", () => {
     expect(vm.createdLinkUrl).toBeNull();
   });
 
+  it("a request from before A -> B -> A does not write into the new A session", async () => {
+    mockGetDatasetAccess.mockImplementation(async () => ({
+      ...defaultAccessList,
+    }));
+    const datasetB = { _id: "dsB", _modelType: "folder", name: "B" } as any;
+    const datasetA = { _id: "ds1", _modelType: "folder", name: "A" } as any;
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+
+    // Add User starts on A and is still pending...
+    let finishAdd: (value: unknown) => void = () => {};
+    mockShareDatasetView.mockReturnValueOnce(
+      new Promise((resolve) => (finishAdd = resolve)),
+    );
+    vm.newUserEmail = "first@example.test";
+    const adding = vm.addUser();
+    // ...while the dialog moves to B and back to A, where a new user is typed.
+    await wrapper.setProps({ dataset: datasetB });
+    await wrapper.setProps({ dataset: datasetA });
+    await flushPromises();
+    vm.newUserEmail = "second@example.test";
+
+    finishAdd({});
+    await adding;
+    await flushPromises();
+
+    // The first session's success must not clear the new session's input.
+    expect(vm.newUserEmail).toBe("second@example.test");
+    expect(vm.addUserLoading).toBe(false);
+  });
+
   it("shares a pending publish across dialog instances", async () => {
     let finish: (value: unknown) => void = () => {};
     mockSetDatasetPublic.mockReturnValue(
