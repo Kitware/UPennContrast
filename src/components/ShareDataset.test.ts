@@ -314,6 +314,33 @@ describe("ShareDataset", () => {
     expect(vm.publicSkippedNotice).toBe("");
   });
 
+  it("togglePublic drops a response that lands after the dialog reset", async () => {
+    let finish: (value: unknown) => void = () => {};
+    mockSetDatasetPublic.mockReturnValue(
+      new Promise((resolve) => (finish = resolve)),
+    );
+    const wrapper = mountComponent();
+    const vm = wrapper.vm as any;
+
+    const publishing = vm.togglePublic(true);
+    expect(vm.publicLoading).toBe(true);
+    // The user clicks Done before the publish returns.
+    vm.resetState();
+    finish({
+      dataset: "ds1",
+      public: true,
+      datasetViewsUpdated: 1,
+      configurationsUpdated: 1,
+      datasetViewsSkipped: 1,
+      configurationsSkipped: 1,
+    });
+    await publishing;
+
+    expect(vm.publicSkippedNotice).toBe("");
+    expect(vm.isPublic).toBe(false);
+    expect(vm.publicLoading).toBe(false);
+  });
+
   it("togglePublic reverts isPublic on error", async () => {
     mockSetDatasetPublic.mockRejectedValue(new Error("fail"));
     const wrapper = mountComponent();

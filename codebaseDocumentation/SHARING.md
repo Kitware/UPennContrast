@@ -477,6 +477,7 @@ Run `pnpm test src/components/ShareDataset.test.ts` and, from
 - [ ] **Skipped counts ignore deleted configurations** (a view can outlive its configuration). — *"testDeletedConfigurationIsNotCountedAsSkipped"*
 - [ ] **ACL saves accept older views holding null `scales`/`lastViewed`.** `setPublic`/`setUserAccess` validate the stored document as is. — *"testAclSavesAcceptOlderNullFields"*
 - [ ] **The Share dialog says what publishing skipped, and only for the dataset and publish it describes.** — *"togglePublic explains views and collections owned by others"*, *"togglePublic shows no notice when nothing was skipped"*, *"resetState clears all fields"*
+- [ ] **A publish response that lands after the dialog closed is dropped.** `resetState()` bumps the request token, so a late result cannot write its notice or checkbox state into the next dialog. — *"togglePublic drops a response that lands after the dialog reset"*
 
 ### Dataset-view writes
 

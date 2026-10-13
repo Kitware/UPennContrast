@@ -486,6 +486,8 @@ watch(dialog, (val) => {
 
 function resetState() {
   shareLinksRequest++;
+  publicRequest++;
+  publicLoading.value = false;
   shareLinks.value = [];
   createdLinkUrl.value = null;
   createdEmbedUrl.value = null;
@@ -563,25 +565,36 @@ function skippedNotice(result: ISetDatasetPublicResult) {
   );
 }
 
+// Bumped by resetState(): a publish still in flight when the dialog closes
+// must not write its result (or skipped notice) into the next dialog.
+let publicRequest = 0;
+
 async function togglePublic(newValue: boolean | null) {
   if (!props.dataset) return;
   const value = !!newValue;
+  const request = ++publicRequest;
+  const id = datasetId.value!;
+  const isCurrent = () => request === publicRequest && datasetId.value === id;
 
   publicLoading.value = true;
   showError.value = false;
   publicSkippedNotice.value = "";
   try {
-    const result = await store.api.setDatasetPublic(datasetId.value!, value);
+    const result = await store.api.setDatasetPublic(id, value);
+    if (!isCurrent()) return;
     isPublic.value = value;
     publicSkippedNotice.value = skippedNotice(result);
   } catch (error) {
     logError("Failed to toggle public access", error);
+    if (!isCurrent()) return;
     errorString.value = "Failed to update public access";
     showError.value = true;
     // Revert the checkbox
     isPublic.value = !value;
   } finally {
-    publicLoading.value = false;
+    if (isCurrent()) {
+      publicLoading.value = false;
+    }
   }
 }
 
