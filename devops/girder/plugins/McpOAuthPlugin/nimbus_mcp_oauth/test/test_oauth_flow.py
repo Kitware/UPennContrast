@@ -289,6 +289,9 @@ def testRefreshWithoutClientIdKeepsTheConnection(enabled, user):
         'refresh_token': first['refresh_token']})
     assert resp.json['error'] == 'invalid_request'
     assert introspect(enabled, first['access_token']).json['active']
+    # The refresh token was not spent: a corrected retry works.
+    retry = refresh(enabled, first['refresh_token'])
+    assert retry.json['access_token'].startswith('nio_')
 
 
 def testUnverifiedEmailCannotUseTokens(enabled, user):

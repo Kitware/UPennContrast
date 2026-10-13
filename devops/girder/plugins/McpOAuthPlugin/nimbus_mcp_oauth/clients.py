@@ -9,7 +9,8 @@ Two kinds, both public clients (PKCE, no secret):
   redirect URIs. This is "Use Claude's published identity" and Claude
   Code's default. Fetching a URL the client chose is a server-side request,
   so only allowed hosts are fetched, over https, without redirects, with a
-  short timeout and a size cap.
+  short timeout and a size cap. A document may only list Claude's
+  callbacks or loopback redirects.
 """
 import datetime
 import json

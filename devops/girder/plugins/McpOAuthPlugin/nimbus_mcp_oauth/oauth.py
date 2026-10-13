@@ -285,6 +285,9 @@ def _exchangeCode(params):
 
 
 def _refresh(params):
+    # Before claiming the token: a malformed request must not spend it.
+    if not params.get('client_id'):
+        raise OAuthError('invalid_request', 'client_id is required.')
     refresh = params.get('refresh_token') or ''
     refreshId = _hash(refresh)
     result = RefreshToken().update(
@@ -301,8 +304,6 @@ def _refresh(params):
     grant = Grant().findOne({'_id': doc['grantId']})
     if grant is None or expired(doc) or expired(grant):
         raise OAuthError('invalid_grant', 'The connection has ended.')
-    if not params.get('client_id'):
-        raise OAuthError('invalid_request', 'client_id is required.')
     if params.get('client_id') != grant['clientId']:
         revokeGrant(grant['_id'])
         raise OAuthError('invalid_grant', 'Token was issued to another '
