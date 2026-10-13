@@ -40,6 +40,8 @@ setup(
         "orjson",
         "numpy",
         "Pillow",
+        # raw_region writes full-bit-depth TIFFs (server/api/rawRegion.py)
+        "tifffile",
         "cryptography",
         "requests",
     ],

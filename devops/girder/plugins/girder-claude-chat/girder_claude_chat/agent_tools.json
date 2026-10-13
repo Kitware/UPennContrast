@@ -29,7 +29,7 @@
   },
   {
     "name": "get_annotation_summary",
-    "description": "Get annotation counts grouped by tag, shape and channel, plus the count of currently filtered and selected annotations. Read-only.",
+    "description": "Get the total annotation count and counts grouped by tag, shape and channel, computed on the server over the whole dataset (current filters do not narrow them), plus the count of currently filtered and selected annotations. Read-only.",
     "input_schema": {
       "type": "object",
       "properties": {},

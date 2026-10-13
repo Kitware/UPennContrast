@@ -1,28 +1,6 @@
 <template>
   <div class="snapshots-panel">
     <v-card v-if="store.configuration" class="snapshots-panel-card">
-      <v-dialog v-model="imageTooBigDialog">
-        <v-alert class="ma-0" type="error">
-          <div class="title">Image can't be downloaded</div>
-          <div class="ma-2">
-            Image size can't exceed {{ maxPixels }} pixels.<br />
-            When downloading raw channels, subsampling is not allowed.<br />
-            Downloading layers allows subsampling image to
-            {{ maxPixels }} pixels if the image is too big.
-          </div>
-          <div class="d-flex">
-            <v-spacer />
-            <v-btn
-              variant="flat"
-              color="primary"
-              size="small"
-              @click="imageTooBigDialog = false"
-              >OK</v-btn
-            >
-          </div>
-        </v-alert>
-      </v-dialog>
-
       <v-card-text>
         <v-row :currentArea="markCurrentArea()">
           <v-col class="title body-1"> Coordinates and size: </v-col>
@@ -673,6 +651,7 @@ import progress from "@/store/progress";
 import geojs from "geojs";
 import { formatDate } from "@/utils/date";
 import { downloadToClient } from "@/utils/download";
+import { buildSnapshotFilename } from "@/utils/snapshotFilename";
 import GIF from "gif.js";
 import { cloneDeep } from "lodash";
 import {
@@ -689,6 +668,7 @@ import {
   IGeoJSMap,
   ISnapshot,
   copyLayerWithoutPrivateAttributes,
+  NotificationType,
   ProgressType,
   TUnitLength,
 } from "@/store/model";
@@ -696,6 +676,7 @@ import { DeflateOptions, Zip, ZipDeflate } from "fflate";
 import girderResources from "@/store/girderResources";
 import {
   getChannelsDownloadUrls,
+  rawRegionMaxPixels,
   getDownloadParameters,
   getLayersDownloadUrls,
   getBaseURLFromDownloadParameters,
@@ -703,6 +684,7 @@ import {
 import { logError } from "@/utils/log";
 import { snapshotLoadRequest } from "@/commands/requests";
 import { snapshotKey } from "@/utils/snapshotKey";
+import { isKnownPixelSize } from "@/utils/scales";
 
 interface ISnapshotItem {
   name: string;
@@ -813,7 +795,6 @@ const saveSnapshotForm = ref<HTMLFormElement | null>(null);
 const movieDialog = ref(false);
 const jpegQuality = ref<number | string>(95);
 const downloading = ref(false);
-const imageTooBigDialog = ref(false);
 const createDialog = ref(false);
 const newName = ref("");
 const newDescription = ref("");
@@ -885,7 +866,13 @@ const tableHeaders: {
   { title: "Delete", key: "delete", sortable: false },
 ];
 
-const maxPixels = 4_000_000;
+// Crops above this are downsampled. 4096^2 exports a full 2048^2 frame (or
+// four) at full resolution, and fits raw_region's 64 MiB cap for a single
+// channel of up to 32 bits.
+const maxPixels = 4096 * 4096;
+// Movie frames keep the earlier limit: larger frames would go to the movie
+// encoder, which this limit change was not tested against.
+const maxMoviePixels = 4_000_000;
 
 const nameRules = [(name: string) => !!name.trim() || "Name is required"];
 
@@ -894,6 +881,24 @@ function sanitizeSnapshotFilename(name: string | null): string {
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
     .trim();
   return sanitized || "snapshot";
+}
+
+// Download URLs whose filename buildSnapshotFilename had to shorten, so the
+// download that eventually consumes them can tell the user.
+const shortenedFilenameUrls = new WeakSet<URL>();
+// Download URLs whose crop exceeded maxPixels and was downsampled, so the
+// download that consumes them can tell the user.
+const downsampledUrls = new WeakSet<URL>();
+// Width of the in-image part of each URL's crop. Scalebar specs are built from
+// the crop as drawn, which can run off the image edge; the bar must be sized
+// against the region actually returned.
+const cropWidthByUrl = new WeakMap<URL, number>();
+
+function scalebarSpecForUrl(url: URL, spec: IScalebarSpec): IScalebarSpec {
+  const cropWidth = cropWidthByUrl.get(url);
+  return cropWidth === undefined
+    ? spec
+    : { ...spec, datasetPixelWidth: cropWidth };
 }
 
 function getUniqueZipEntryName(name: string | null, filenames: Set<string>) {
@@ -1028,10 +1033,7 @@ const manualPixelSizeUnit = computed({
 
 const configurationPixelSize = computed((): IScalebarSettings => {
   const scale = store.configuration?.scales.pixelSize;
-  if (!scale) {
-    return { length: 1.0, unit: TScalebarUnit.PX };
-  }
-  if (scale.value === 0) {
+  if (!isKnownPixelSize(scale)) {
     return { length: 1.0, unit: TScalebarUnit.PX };
   }
   return { length: scale.value, unit: scale.unit as TScalebarUnit };
@@ -1921,9 +1923,6 @@ async function downloadImagesForCurrentState() {
       configuration.name,
       options,
     );
-    if (!urls) {
-      return;
-    }
     await downloadUrls(urls.map((url) => ({ url, scalebarSpec })));
   } catch (error) {
     downloadError.value =
@@ -2006,7 +2005,6 @@ async function downloadImagesForSetOfSnapshots(snapshots: ISnapshot[]) {
         configurationName,
         options,
       );
-      if (!currentUrls) return;
       allUrls.push(
         ...currentUrls.map((url) => ({
           url,
@@ -2063,17 +2061,6 @@ async function getUrlsForSnapshot(
   const dateStr = formatDate(new Date());
   const extension = options.format === "tiled" ? "tiff" : options.format;
 
-  const params = getDownloadParameters(
-    boundingBox,
-    options.format,
-    maxPixels,
-    options.jpegQuality,
-    options.mode,
-  );
-  if (params === null) {
-    imageTooBigDialog.value = true;
-    return;
-  }
   if (
     boundingBox.left >= dataset.width ||
     boundingBox.top >= dataset.height ||
@@ -2084,8 +2071,35 @@ async function getUrlsForSnapshot(
       "Snapshot crop is outside the image. Set a crop within the dataset.",
     );
   }
+  // The server reads only the part of the crop inside the image, so size the
+  // output (and decide whether it is downsampled) from that part.
+  const imageCrop = {
+    left: Math.max(0, boundingBox.left),
+    top: Math.max(0, boundingBox.top),
+    right: Math.min(dataset.width, boundingBox.right),
+    bottom: Math.min(dataset.height, boundingBox.bottom),
+  };
+  const useRawRegion = options.mode === "channels" && options.format === "tiff";
+  const params = getDownloadParameters(
+    imageCrop,
+    options.format,
+    useRawRegion
+      ? Math.min(maxPixels, rawRegionMaxPixels(anyImage.tileinfo))
+      : maxPixels,
+    options.jpegQuality,
+  );
+  const downsampled =
+    params.width! < imageCrop.right - imageCrop.left ||
+    params.height! < imageCrop.bottom - imageCrop.top;
   const apiRoot = store.girderRest.apiRoot;
-  const baseUrl = getBaseURLFromDownloadParameters(params, itemId, apiRoot);
+  // Raw channels keep the source bit depth; tiles/region would return a
+  // TIFF divided down to 8 bits.
+  const baseUrl = getBaseURLFromDownloadParameters(
+    params,
+    itemId,
+    apiRoot,
+    useRawRegion ? "raw_region" : "tiles/region",
+  );
 
   const urls: URL[] = [];
   const across = options.across;
@@ -2105,8 +2119,19 @@ async function getUrlsForSnapshot(
       for (const { url, channel } of channelUrls) {
         const channelName =
           dataset.channelNames.get(channel) ?? "Unknown channel";
-        const fileName = `${name} - ${channelName} - ${dataset.name} - ${configurationName} - ${dateStr}${coordinateSuffix}.${extension}`;
+        const { fileName, shortened } = buildSnapshotFilename({
+          snapshotName: name,
+          label: channelName,
+          datasetName: dataset.name,
+          configurationName,
+          dateStr,
+          coordinateSuffix,
+          extension,
+        });
         url.searchParams.set("contentDispositionFilename", fileName);
+        if (shortened) shortenedFilenameUrls.add(url);
+        if (downsampled) downsampledUrls.add(url);
+        cropWidthByUrl.set(url, imageCrop.right - imageCrop.left);
         urls.push(url);
       }
     } else {
@@ -2124,8 +2149,19 @@ async function getUrlsForSnapshot(
             layers.find((layer) => layer.id === layerId)?.name ??
             "Unknown layer",
         );
-        const fileName = `${name} - ${layerNames.join(" ")} - ${dataset.name} - ${configurationName} - ${dateStr}${coordinateSuffix}.${extension}`;
+        const { fileName, shortened } = buildSnapshotFilename({
+          snapshotName: name,
+          label: layerNames.join(" "),
+          datasetName: dataset.name,
+          configurationName,
+          dateStr,
+          coordinateSuffix,
+          extension,
+        });
         url.searchParams.set("contentDispositionFilename", fileName);
+        if (shortened) shortenedFilenameUrls.add(url);
+        if (downsampled) downsampledUrls.add(url);
+        cropWidthByUrl.set(url, imageCrop.right - imageCrop.left);
         urls.push(url);
       }
     }
@@ -2175,6 +2211,28 @@ async function downloadUrls(
   if (urls.length <= 0) {
     return;
   }
+  const shortenedNames = urls.some(({ url }) => shortenedFilenameUrls.has(url));
+  const downsampled = urls.some(({ url }) => downsampledUrls.has(url));
+  const warnAboutAdjustedFiles = () => {
+    if (shortenedNames) {
+      progress.createNotification({
+        type: NotificationType.WARNING,
+        title: "File names shortened",
+        message:
+          'Some file names were too long to save or unzip reliably, so their longest parts (collection and dataset names first) were shortened with "...". XY/T/Z positions are always kept.',
+        timeout: 10,
+      });
+    }
+    if (downsampled) {
+      progress.createNotification({
+        type: NotificationType.WARNING,
+        title: "Image too large: downsampled",
+        message:
+          "The crop is too large to export at full resolution, so the image was downsampled to fit, and its pixel values may be averaged. Use a smaller crop to export full-resolution raw values.",
+        timeout: 10,
+      });
+    }
+  };
 
   if (urls.length === 1) {
     const { url, scalebarSpec } = urls[0];
@@ -2182,7 +2240,10 @@ async function downloadUrls(
     // Use the same authenticated binary fetch for a single image and a ZIP.
     const data = await store.api.getSnapshotImage(url);
     const finalData = scalebarSpec
-      ? await addScalebarToImageBuffer(data, scalebarSpec)
+      ? await addScalebarToImageBuffer(
+          data,
+          scalebarSpecForUrl(url, scalebarSpec),
+        )
       : data;
     const objectUrl = URL.createObjectURL(new Blob([finalData]));
     try {
@@ -2195,6 +2256,7 @@ async function downloadUrls(
     } finally {
       URL.revokeObjectURL(objectUrl);
     }
+    warnAboutAdjustedFiles();
     return;
   }
 
@@ -2250,7 +2312,10 @@ async function downloadUrls(
       const data = await store.api.getSnapshotImage(url);
 
       const finalData = scalebarSpec
-        ? await addScalebarToImageBuffer(data, scalebarSpec)
+        ? await addScalebarToImageBuffer(
+            data,
+            scalebarSpecForUrl(url, scalebarSpec),
+          )
         : data;
 
       const zipFile = new ZipDeflate(fileName, deflateOptions);
@@ -2268,6 +2333,7 @@ async function downloadUrls(
     };
     downloadToClient(params);
     URL.revokeObjectURL(dataURL);
+    warnAboutAdjustedFiles();
   } finally {
     zip.terminate();
     if (!batchProgressId) progress.complete(progressId);
@@ -2295,17 +2361,7 @@ async function getUrlsForMovie(
   }
   const itemId = anyImage.item._id;
 
-  const params = getDownloadParameters(
-    boundingBox,
-    "png",
-    maxPixels,
-    95,
-    "layers",
-  );
-
-  if (params === null) {
-    throw new Error("Image size exceeds maximum allowed pixels");
-  }
+  const params = getDownloadParameters(boundingBox, "png", maxMoviePixels, 95);
 
   const apiRoot = store.girderRest.apiRoot;
   const baseUrl = getBaseURLFromDownloadParameters(params, itemId, apiRoot);
@@ -3054,7 +3110,6 @@ defineExpose({
   movieDialog,
   jpegQuality,
   downloading,
-  imageTooBigDialog,
   createDialog,
   newName,
   newDescription,
@@ -3171,5 +3226,6 @@ defineExpose({
   downloadMovieAsVideo,
   addTimeStampToCanvas,
   drawScalebarOnCanvas,
+  scalebarSpecForUrl,
 });
 </script>

@@ -172,6 +172,60 @@ class PixelSize(BaseModel):
         return other * self.value
 
 
+class PropertyStats(BaseModel):
+    """Statistics of one property path over the summarized annotations.
+
+    ``count`` is the number of annotations with a numeric value at the
+    path (strings, NaN, and missing values are skipped); the statistics are
+    None when ``count`` is 0, ``std`` (the sample standard deviation) also
+    below two values, and any statistic that is not finite (an Infinity
+    value is counted but makes mean/min/max infinite) is None too.
+    """
+
+    path: list[str]
+    count: int
+    mean: float | None = None
+    std: float | None = None
+    min: float | None = None
+    max: float | None = None
+
+
+class AnnotationSummary(BaseModel):
+    """Server-side aggregate over the annotations matching a filter.
+
+    ``tags``, ``shapes`` and ``channels`` map each tag, shape or channel
+    index to its annotation count, most common first (ties by name or
+    index). An annotation with several tags counts once per tag.
+    ``shapes`` and ``channels`` are None on servers that predate those
+    breakdowns.
+    """
+
+    total: int
+    tags: dict[str, int]
+    shapes: dict[str, int] | None = None
+    channels: dict[int, int] | None = None
+    properties: list[PropertyStats] = []
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "AnnotationSummary":
+        """Build from the POST upenn_annotation/summary response."""
+        shapes = data.get("shapes")
+        channels = data.get("channels")
+        return cls(
+            total=data["total"],
+            tags={row["tag"]: row["count"] for row in data["tags"]},
+            shapes=(
+                None if shapes is None
+                else {row["shape"]: row["count"] for row in shapes}
+            ),
+            channels=(
+                None if channels is None
+                else {row["channel"]: row["count"] for row in channels}
+            ),
+            properties=data.get("properties", []),
+        )
+
+
 class MultiSourceConfiguration(BaseModel):
     """Result of configuring a folder of image files as a dataset.
 
@@ -200,10 +254,25 @@ class MultiSourceConfiguration(BaseModel):
     assignments: dict = Field(default_factory=dict)
     transcode: bool = False
     transcode_default: bool = Field(False, alias="transcodeDefault")
-    # Whether compositing was actually applied. Not the same as asking for
-    # it: enable_compositing only takes effect for a single source with ND2
-    # frame metadata, and when it does, XY collapses to one position.
+    # Whether compositing was actually applied; when it is, XY collapses to
+    # one position. It needs ND2 files with stage positions (one
+    # multi-position file, or one file per tile with XY assigned): a dry run
+    # asking for it on other files reports False with a validation_error,
+    # and a real run fails instead of falling back to separate positions.
     compositing: bool = False
+    # Problems with the stage layout, reported whenever compositing is
+    # possible (requested or not): ``{"error", "warning", "tileCount"}``.
+    # An error (two XY positions at the same stage position) refuses
+    # compositing -- a real run asking for it fails with that message; a
+    # warning (tiles covering little of the mosaic, e.g. separate wells)
+    # does not. ``tileCount`` is the number of composited tiles (None with
+    # an error); more than 16 makes transcode the default.
+    compositing_check: dict = Field(
+        default_factory=lambda: {
+            "error": None, "warning": None, "tileCount": None,
+        },
+        alias="compositingCheck",
+    )
     is_rgb_file: bool = Field(False, alias="isRGBFile")
     rgb_band_count: int = Field(0, alias="rgbBandCount")
     validation_error: str | None = Field(None, alias="validationError")
