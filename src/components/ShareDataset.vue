@@ -2,7 +2,7 @@
   <v-dialog v-model="dialog" max-width="750px">
     <v-card>
       <v-card-title>
-        {{ isResourceAdmin ? "Share Dataset:" : "Sharing:" }}
+        {{ canManageUsers ? "Share Dataset:" : "Sharing:" }}
         {{ dataset ? dataset.name : "" }}
       </v-card-title>
       <v-card-text>
@@ -34,8 +34,13 @@
                 v-for="config in configurations"
                 :key="config.id"
                 v-model="selectedConfigIds"
-                :label="config.name"
+                :label="
+                  isConfigShareable(config)
+                    ? config.name
+                    : `${config.name} (you can't share this one)`
+                "
                 :value="config.id"
+                :disabled="!isConfigShareable(config)"
                 :hide-details="true"
                 density="compact"
               />
@@ -93,7 +98,7 @@
                         Access Level
                       </th>
                       <th
-                        v-if="isResourceAdmin"
+                        v-if="canManageUsers"
                         class="text-center"
                         style="width: 80px"
                       >
@@ -118,7 +123,7 @@
                         >
                           Admin (Owner)
                         </span>
-                        <template v-else-if="isResourceAdmin">
+                        <template v-else-if="canEditUser(user)">
                           <v-select
                             :model-value="user.level"
                             :items="accessLevelItems"
@@ -135,9 +140,9 @@
                           {{ accessLevelLabel(user.level) }}
                         </span>
                       </td>
-                      <td v-if="isResourceAdmin" class="text-center">
+                      <td v-if="canManageUsers" class="text-center">
                         <v-btn
-                          v-if="user.level !== 2"
+                          v-if="canEditUser(user)"
                           variant="text"
                           icon
                           size="small"
@@ -158,7 +163,11 @@
                               mdi-lock
                             </v-icon>
                           </template>
-                          <span>Cannot remove dataset owner</span>
+                          <span>{{
+                            user.level === 2
+                              ? "Cannot remove dataset owner"
+                              : "Cannot change a user above your own access"
+                          }}</span>
                         </v-tooltip>
                       </td>
                     </tr>
@@ -168,13 +177,17 @@
             </v-col>
           </v-row>
 
-          <!-- Add User Form (admin only) -->
-          <template v-if="isResourceAdmin">
+          <!-- Add User Form (WRITE or ADMIN; levels never exceed Write) -->
+          <template v-if="canManageUsers">
             <v-divider class="my-4" />
             <v-row>
               <v-col cols="12">
                 <div class="subtitle-2 mb-2">Add User:</div>
-                <v-row density="comfortable" align="center">
+                <div v-if="!canShareAny" class="text-body-2 text-grey">
+                  You can't share any of this dataset's collections: sharing
+                  needs edit access to a collection and to one of its views.
+                </div>
+                <v-row v-else density="comfortable" align="center">
                   <v-col cols="5">
                     <v-text-field
                       v-model="newUserEmail"
@@ -436,6 +449,16 @@ const isPublic = ref(false);
 const users = ref<IDatasetAccessUser[]>([]);
 const configurations = ref<IDatasetAccessConfiguration[]>([]);
 const selectedConfigIds = ref<string[]>([]);
+// The share endpoint needs WRITE on every view and configuration it is
+// sent, so only those the caller can write are ever included.
+const writableViewIds = ref<Set<string>>(new Set());
+
+// Every access-list load (fetchAccessInfo and refetchIfSelf) and
+// resetState claim the next number; a load commits only while it is still
+// the latest, so an older response can never overwrite a newer one.
+let accessRequest = 0;
+// The load that turned the spinner on turns it off, even if superseded
+let loadingRequest = 0;
 
 // Associated dataset views (needed for API calls)
 const associatedViews = ref<IDatasetView[]>([]);
@@ -458,11 +481,77 @@ const accessLevelItems = [
   { text: "Write", value: 1 },
 ];
 
-const isResourceAdmin = computed((): boolean => {
-  const userId = store.girderUser?._id;
-  if (!userId) return false;
-  return users.value.some((u) => u.id === userId && u.level === 2);
-});
+// The caller's effective level from the server (groups and site admin
+// included), not their direct row in the users list, which can be missing.
+const currentUserLevel = ref(-1);
+
+// Collections, public access and share links stay owner-only
+const isResourceAdmin = computed((): boolean => currentUserLevel.value >= 2);
+
+// WRITE collaborators may share too, but the server refuses any change
+// above the caller's own level, so mirror that here.
+const canManageUsers = computed((): boolean => currentUserLevel.value >= 1);
+
+// The server's reason (e.g. a level above the caller's own) beats a
+// generic message; only the unknown-user code needs translating.
+function shareErrorMessage(response: string, unknownUser: string): string {
+  return response === "badEmailOrUsername" ? unknownUser : response;
+}
+
+// Changing your own entry changes currentUserLevel, which only the server
+// can recompute (a group may still grant access). Re-read just the access
+// list so the collection selection and share links are left alone.
+async function refetchIfSelf(user: IDatasetAccessUser) {
+  const requestedDatasetId = datasetId.value;
+  if (user.id !== store.girderUser?._id || !requestedDatasetId) return;
+  // A full load still in flight (e.g. the dialog was reopened) must not be
+  // superseded by this partial one, or views, public state and the default
+  // selection never land; start a fresh full load instead.
+  if (loading.value) {
+    await fetchAccessInfo(requestedDatasetId);
+    return;
+  }
+  const request = ++accessRequest;
+  const isCurrent = () =>
+    request === accessRequest && datasetId.value === requestedDatasetId;
+  try {
+    const accessList = await store.api.getDatasetAccess(requestedDatasetId);
+    if (!isCurrent()) return;
+    users.value = accessList.users;
+    currentUserLevel.value = accessList.currentUserLevel;
+    configurations.value = accessList.configurations;
+    writableViewIds.value = new Set(accessList.writableViewIds);
+    // Keep the user's choice, minus anything they can no longer write
+    const writable = new Set(
+      accessList.configurations.filter(isConfigShareable).map((c) => c.id),
+    );
+    selectedConfigIds.value = selectedConfigIds.value.filter((id) =>
+      writable.has(id),
+    );
+  } catch (error) {
+    if (!isCurrent()) return;
+    // Removing your last access makes the list itself a 403: fail closed
+    logError(
+      `Failed to reload access for dataset ${requestedDatasetId}`,
+      error,
+    );
+    currentUserLevel.value = -1;
+  }
+}
+
+// With nothing shareable every add/edit/remove would fail, so offer none
+const canShareAny = computed((): boolean =>
+  configurations.value.some(isConfigShareable),
+);
+
+function canEditUser(user: IDatasetAccessUser): boolean {
+  return (
+    canManageUsers.value &&
+    canShareAny.value &&
+    user.level !== 2 &&
+    user.level <= currentUserLevel.value
+  );
+}
 
 watch(dialog, (val) => {
   if (val && props.dataset) {
@@ -474,6 +563,7 @@ watch(dialog, (val) => {
 
 function resetState() {
   shareLinksRequest++;
+  accessRequest++;
   shareLinks.value = [];
   createdLinkUrl.value = null;
   createdEmbedUrl.value = null;
@@ -484,8 +574,10 @@ function resetState() {
   errorString.value = "";
   isPublic.value = false;
   users.value = [];
+  currentUserLevel.value = -1;
   configurations.value = [];
   selectedConfigIds.value = [];
+  writableViewIds.value = new Set();
   associatedViews.value = [];
   newUserEmail.value = "";
   newUserAccessLevel.value = 0;
@@ -494,28 +586,39 @@ function resetState() {
 
 async function fetchAccessInfo(datasetId: string) {
   fetchShareLinks(datasetId);
+  const request = ++accessRequest;
+  loadingRequest = request;
   loading.value = true;
   showError.value = false;
   try {
     // Fetch access list from new endpoint
     const accessList = await store.api.getDatasetAccess(datasetId);
+    if (request !== accessRequest) return;
 
     isPublic.value = accessList.public;
     users.value = accessList.users;
+    currentUserLevel.value = accessList.currentUserLevel;
     configurations.value = accessList.configurations;
-    // Select all configurations by default
-    selectedConfigIds.value = accessList.configurations.map((c) => c.id);
+    writableViewIds.value = new Set(accessList.writableViewIds);
 
     // Also fetch dataset views for the share API calls
-    associatedViews.value = await store.api.findDatasetViews({
-      datasetId,
-    });
+    const views = await store.api.findDatasetViews({ datasetId });
+    if (request !== accessRequest) return;
+    associatedViews.value = views;
+    // Select every configuration the caller can share by default (needs
+    // the views, so only once they are loaded)
+    selectedConfigIds.value = configurations.value
+      .filter(isConfigShareable)
+      .map((c) => c.id);
   } catch (error) {
+    if (request !== accessRequest) return;
     logError(`Failed to fetch access info for dataset ${datasetId}`, error);
+    // Without the list we can't know the caller's rights: fail closed
+    currentUserLevel.value = -1;
     errorString.value = "Failed to load access information";
     showError.value = true;
   } finally {
-    loading.value = false;
+    if (loadingRequest === request) loading.value = false;
   }
 }
 
@@ -523,10 +626,27 @@ function close() {
   dialog.value = false;
 }
 
+// A configuration can be shared only with one of its views, and the share
+// endpoint needs WRITE on both. This one predicate decides selection,
+// checkbox enabling and pruning, so a collection is never shown selected
+// while getSelectedViews silently drops it.
+function isConfigShareable(config: IDatasetAccessConfiguration): boolean {
+  return (
+    config.currentUserLevel >= 1 &&
+    associatedViews.value.some(
+      (view) =>
+        view.configurationId === config.id &&
+        writableViewIds.value.has(view.id),
+    )
+  );
+}
+
 function getSelectedViews(): IDatasetView[] {
-  // Filter views to only include those with selected configurations
-  return associatedViews.value.filter((view) =>
-    selectedConfigIds.value.includes(view.configurationId),
+  // Views of the selected configurations that the caller can write
+  return associatedViews.value.filter(
+    (view) =>
+      selectedConfigIds.value.includes(view.configurationId) &&
+      writableViewIds.value.has(view.id),
   );
 }
 
@@ -568,10 +688,7 @@ async function updateUserAccess(user: IDatasetAccessUser, newLevel: number) {
     );
 
     if (typeof response === "string") {
-      errorString.value =
-        response === "badEmailOrUsername"
-          ? "User not found"
-          : "An error occurred";
+      errorString.value = shareErrorMessage(response, "User not found");
       showError.value = true;
     } else {
       // Update local state
@@ -579,6 +696,7 @@ async function updateUserAccess(user: IDatasetAccessUser, newLevel: number) {
       if (userIndex >= 0) {
         users.value[userIndex].level = newLevel as 0 | 1 | 2;
       }
+      await refetchIfSelf(user);
     }
   } catch (error) {
     logError("Failed to update user access", error);
@@ -613,18 +731,16 @@ async function removeUser() {
     const response = await store.api.shareDatasetView(
       selectedViews,
       user.login,
-      -1, // -1 to remove access (Girder convention)
+      -1, // -1 = remove; the server deletes the ACL entry
     );
 
     if (typeof response === "string") {
-      errorString.value =
-        response === "badEmailOrUsername"
-          ? "User not found"
-          : "An error occurred";
+      errorString.value = shareErrorMessage(response, "User not found");
       showError.value = true;
     } else {
       // Remove user from local state
       users.value = users.value.filter((u) => u.id !== user.id);
+      await refetchIfSelf(user);
     }
   } catch (error) {
     logError("Failed to remove user access", error);
@@ -743,10 +859,10 @@ async function addUser() {
     );
 
     if (typeof response === "string") {
-      errorString.value =
-        response === "badEmailOrUsername"
-          ? "Unknown user. Please check the username or email."
-          : "An error occurred";
+      errorString.value = shareErrorMessage(
+        response,
+        "Unknown user. Please check the username or email.",
+      );
       showError.value = true;
     } else {
       // Refresh the access list to show the new user
@@ -793,10 +909,16 @@ defineExpose({
   userToRemove,
   accessLevelItems,
   isResourceAdmin,
+  currentUserLevel,
+  canManageUsers,
+  canEditUser,
+  canShareAny,
   resetState,
   fetchAccessInfo,
   close,
   getSelectedViews,
+  isConfigShareable,
+  refetchIfSelf,
   togglePublic,
   updateUserAccess,
   confirmRemoveUser,
