@@ -208,9 +208,13 @@ class Annotation(AccessControlMixin, ProxiedModel):
 
     def multipleAnnotationsRemovedEvent(self, event):
         if event.info and len(event.info) > 0:
-            annotationStringIds = event.info
+            # Bulk delete passes string ids; the subscribers query ObjectId
+            # fields, where a string $in silently matches nothing. Convert
+            # here, once, so every subscriber gets ObjectIds (single delete
+            # already sends one).
             events.trigger(
-                "model.upenn_annotation.removeStringIds", annotationStringIds
+                "model.upenn_annotation.removeStringIds",
+                [ObjectId(str(i)) for i in event.info],
             )
 
     def initialize(self):
@@ -221,7 +225,8 @@ class Annotation(AccessControlMixin, ProxiedModel):
             self.cleanOrphaned,
         )
         # Cleaning the database when annotations are removed is done by a
-        # custom event: model.upenn_annotation.removeStringIds
+        # custom event: model.upenn_annotation.removeStringIds. Despite the
+        # name, its payload is a list of ObjectIds from both emitters below.
         events.bind(
             "model.upenn_annotation.remove",
             "upenn.connections.annotationRemovedEvent",

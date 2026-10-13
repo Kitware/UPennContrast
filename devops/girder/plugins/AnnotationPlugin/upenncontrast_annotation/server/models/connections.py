@@ -63,13 +63,11 @@ class AnnotationConnection(AccessControlMixin, ProxiedModel):
 
     def annotationsRemovedEvent(self, event):
         # Clean connections orphaned by the deletion of the annotations.
-        # Ids arrive as strings from bulk deletes and as ObjectIds from single
-        # deletes; childId/parentId are stored as ObjectIds, so normalize
-        # before the $in query (a string $in never matches an ObjectId field,
-        # which previously left bulk-deleted annotations' connections
-        # orphaned). Any connection whose child or parent is being removed is
-        # orphaned, so match on childId/parentId directly (both indexed).
-        annotationIds = [ObjectId(str(i)) for i in event.info]
+        # event.info is a list of ObjectIds (the emitters in
+        # models/annotation.py convert bulk deletes' string ids). Any
+        # connection whose child or parent is being removed is orphaned, so
+        # match on childId/parentId directly (both indexed).
+        annotationIds = event.info
         self.removeWithQuery({"$or": [
             {"childId": {"$in": annotationIds}},
             {"parentId": {"$in": annotationIds}},

@@ -708,6 +708,29 @@ class TestDeleteCleansUpConnections:
         ])
         assert self._connectionCount(other) == 2
 
+    def testDeleteRemovesConnectionsStoredInAnotherDataset(self, admin):
+        """Cleanup matches by annotation id, not by dataset: a connection
+        stored under dataset B that points at an annotation in dataset A goes
+        when that annotation is deleted. (Master's pipeline only looked in the
+        deleted annotation's own dataset.)"""
+        datasetA, idsA = self._chain(admin, count=1, name="ds-a")
+        datasetB, idsB = self._chain(admin, count=2, name="ds-b")
+        AnnotationConnection().create(
+            upenn_utilities.getSampleConnection(
+                idsA[0], idsB[0], datasetB["_id"]
+            )
+        )
+        assert self._connectionCount(datasetB) == 2
+
+        Annotation().delete(Annotation().load(idsA[0], force=True))
+
+        remaining = list(AnnotationConnection().find(
+            {"datasetId": datasetB["_id"]}
+        ))
+        assert [(c["parentId"], c["childId"]) for c in remaining] == [
+            (idsB[0], idsB[1])
+        ]
+
     def testSingleDeleteRemovesConnections(self, admin):
         dataset, annotationIds = self._chain(admin, count=2)
         Annotation().delete(Annotation().load(annotationIds[1], force=True))

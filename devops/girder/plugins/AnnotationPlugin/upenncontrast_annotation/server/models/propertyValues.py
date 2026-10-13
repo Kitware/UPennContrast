@@ -2,7 +2,6 @@ import re
 
 import fastjsonschema
 
-from bson.objectid import ObjectId
 from pymongo import DeleteMany, UpdateOne
 from pymongo.errors import BulkWriteError, DuplicateKeyError
 
@@ -103,12 +102,9 @@ class AnnotationPropertyValues(AccessControlMixin, ProxiedModel):
 
     def annotationsRemovedEvent(self, event):
         # Clean property values orphaned by the deletion of the annotations.
-        # Ids arrive as strings from bulk deletes and as ObjectIds from
-        # single deletes; annotationId is stored as an ObjectId, so normalize
-        # before the $in query (a string $in never matches an ObjectId field,
-        # which previously left bulk-deleted annotations' values orphaned).
-        annotationIds = [ObjectId(str(i)) for i in event.info]
-        self.removeWithQuery({"annotationId": {"$in": annotationIds}})
+        # event.info is a list of ObjectIds (the emitters in
+        # models/annotation.py convert bulk deletes' string ids).
+        self.removeWithQuery({"annotationId": {"$in": event.info}})
 
     def initialize(self):
         self.name = "annotation_property_values"
