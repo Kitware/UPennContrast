@@ -501,6 +501,97 @@ describe("ShareDataset", () => {
     expect(vm.isPublic).toBe(true);
   });
 
+  it("a failed load for the next dataset leaves no previous dataset state", async () => {
+    mockGetDatasetAccess.mockImplementation(async (id: string) => {
+      if (id === "dsB") throw new Error("Network error");
+      return { ...defaultAccessList };
+    });
+    const datasetB = { _id: "dsB", _modelType: "folder", name: "B" } as any;
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    expect(vm.isResourceAdmin).toBe(true);
+
+    await wrapper.setProps({ dataset: datasetB });
+    await flushPromises();
+
+    // ds1's users would keep the admin controls enabled, and its views
+    // would be what add/remove submit, while the dialog shows dsB.
+    expect(vm.showError).toBe(true);
+    expect(vm.users).toEqual([]);
+    expect(vm.isResourceAdmin).toBe(false);
+    expect(vm.configurations).toEqual([]);
+    expect(vm.selectedConfigIds).toEqual([]);
+    expect(vm.associatedViews).toEqual([]);
+  });
+
+  it("another dialog takes the publish result its overlapping load skipped", async () => {
+    let finish: (value: unknown) => void = () => {};
+    mockSetDatasetPublic.mockReturnValue(
+      new Promise((resolve) => (finish = resolve)),
+    );
+    // The second dialog's load reads the flag before the write commits.
+    mockGetDatasetAccess.mockResolvedValue({
+      ...defaultAccessList,
+      public: false,
+    });
+    const first = mountComponent();
+    const second = mountComponent();
+    const publishing = (first.vm as any).togglePublic(true);
+    await (second.vm as any).fetchAccessInfo("ds1");
+    expect((second.vm as any).isPublic).toBe(false);
+
+    finish({
+      dataset: "ds1",
+      public: true,
+      datasetViewsUpdated: 1,
+      configurationsUpdated: 1,
+      datasetViewsSkipped: 0,
+      configurationsSkipped: 0,
+    });
+    await publishing;
+    await flushPromises();
+
+    expect((second.vm as any).isPublic).toBe(true);
+    expect((first.vm as any).isPublic).toBe(true);
+  });
+
+  it("sharing and link responses that land after a reset leave the dialog alone", async () => {
+    const wrapper = mountComponent();
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    const user = vm.users[1];
+
+    // Remove fails late, after the dialog closed.
+    let failRemove: (error: unknown) => void = () => {};
+    mockShareDatasetView.mockReturnValueOnce(
+      new Promise((_, reject) => (failRemove = reject)),
+    );
+    vm.confirmRemoveUser(user);
+    const removing = vm.removeUser();
+    expect(vm.userLoading).toBe(user.id);
+    vm.resetState();
+    expect(vm.userLoading).toBeNull();
+    failRemove(new Error("late"));
+    await removing;
+    expect(vm.showError).toBe(false);
+    expect(vm.userLoading).toBeNull();
+
+    // A link created after the dialog closed: its one-time URL must not
+    // appear in the next dialog.
+    await vm.fetchAccessInfo("ds1");
+    vm.selectedConfigIds = ["cfg1"];
+    let finishCreate: (value: unknown) => void = () => {};
+    shareLinkMocks.create.mockReturnValueOnce(
+      new Promise((resolve) => (finishCreate = resolve)),
+    );
+    const creating = vm.createLink();
+    vm.resetState();
+    finishCreate({ _id: "link1", token: "secret-token" });
+    await creating;
+    expect(vm.createdLinkUrl).toBeNull();
+  });
+
   it("shares a pending publish across dialog instances", async () => {
     let finish: (value: unknown) => void = () => {};
     mockSetDatasetPublic.mockReturnValue(

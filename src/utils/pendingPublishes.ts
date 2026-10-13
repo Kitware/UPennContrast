@@ -12,6 +12,12 @@ const pending = reactive(new Set<string>());
 // overwrite the checkbox the publish already set.
 const settled = new Map<string, number>();
 
+// The public state each dataset's last publish left it in (the requested
+// value on success, the previous one on failure). Every dialog showing the
+// dataset takes it when the publish settles, including dialogs whose own
+// access load was skipped because it overlapped the publish.
+const settledValues = new Map<string, boolean>();
+
 export function isPublishPending(datasetId: string): boolean {
   return pending.has(datasetId);
 }
@@ -20,11 +26,17 @@ export function startPublish(datasetId: string) {
   pending.add(datasetId);
 }
 
-export function finishPublish(datasetId: string) {
-  pending.delete(datasetId);
+export function finishPublish(datasetId: string, publicValue: boolean) {
+  settledValues.set(datasetId, publicValue);
   settled.set(datasetId, publishSettleCount(datasetId) + 1);
+  // Last: removing it is what notifies watchers of isPublishPending.
+  pending.delete(datasetId);
 }
 
 export function publishSettleCount(datasetId: string): number {
   return settled.get(datasetId) ?? 0;
+}
+
+export function settledPublicValue(datasetId: string): boolean | undefined {
+  return settledValues.get(datasetId);
 }

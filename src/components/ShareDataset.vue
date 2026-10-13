@@ -387,6 +387,7 @@ import {
   finishPublish,
   isPublishPending,
   publishSettleCount,
+  settledPublicValue,
   startPublish,
 } from "@/utils/pendingPublishes";
 import { logError } from "@/utils/log";
@@ -502,6 +503,23 @@ watch(datasetId, (id, previousId) => {
   }
 });
 
+// When a publish of the shown dataset settles -- from this dialog or another
+// instance -- take its result: an access load that overlapped it skipped
+// the flag it read mid-write, so nothing else would correct the checkbox.
+// (Keyed on the dataset too: switching away from a pending dataset also
+// turns publicLoading off, and must not apply another dataset's result.)
+watch(
+  () => [datasetId.value, publicLoading.value] as const,
+  ([id, pending], [previousId, wasPending]) => {
+    if (id && id === previousId && wasPending && !pending) {
+      const value = settledPublicValue(id);
+      if (value !== undefined) {
+        isPublic.value = value;
+      }
+    }
+  },
+);
+
 function resetState() {
   shareLinksRequest++;
   dialogGeneration++;
@@ -523,6 +541,13 @@ function resetState() {
   newUserEmail.value = "";
   newUserAccessLevel.value = 0;
   userToRemove.value = null;
+  // In-progress flags of requests this reset disowned (claimDialog): their
+  // late finally blocks no longer touch the dialog, so clear them here.
+  userLoading.value = null;
+  addUserLoading.value = false;
+  creatingLink.value = false;
+  revokingLinkId.value = null;
+  confirmDialog.value = false;
 }
 
 // Bumped per fetch and by resetState(): only the latest fetch, for the
@@ -541,6 +566,13 @@ async function fetchAccessInfo(id: string) {
   showError.value = false;
   // The notice describes the last publish of the dataset it was shown for.
   publicSkippedNotice.value = "";
+  // Drop the previous load's dataset-scoped state up front: if this load
+  // fails, the dialog must not keep another dataset's users (whose admin
+  // entry enables the controls) or views (which add/remove would submit).
+  users.value = [];
+  configurations.value = [];
+  selectedConfigIds.value = [];
+  associatedViews.value = [];
   try {
     // Fetch access list from new endpoint
     const accessList = await store.api.getDatasetAccess(id);
@@ -599,11 +631,20 @@ function skippedNotice(result: ISetDatasetPublicResult) {
   );
 }
 
-// Bumped by resetState() only: a publish still in flight when the dialog
-// closes must not write its notice or error into the next dialog. Starting
-// another publish does not bump it -- a publish for one dataset must not
-// silence another's result (at most one is in flight per dataset).
+// The dialog's session, bumped by resetState(). This instance is reused
+// across datasets and across close/reopen, so every async handler captures
+// claimDialog() when it starts and writes its result, error or loading flag
+// back only while the dialog still shows that session and dataset; a late
+// response must not land in whatever the dialog shows now. Starting a request
+// does not bump the session: one dataset's request must not silence
+// another's.
 let dialogGeneration = 0;
+
+function claimDialog(): () => boolean {
+  const generation = dialogGeneration;
+  const id = datasetId.value;
+  return () => generation === dialogGeneration && datasetId.value === id;
+}
 
 async function togglePublic(newValue: boolean | null) {
   if (!props.dataset) return;
@@ -615,33 +656,28 @@ async function togglePublic(newValue: boolean | null) {
     isPublic.value = !value;
     return;
   }
-  const generation = dialogGeneration;
-  const isCurrent = () =>
-    generation === dialogGeneration && datasetId.value === id;
+  const isCurrent = claimDialog();
 
   startPublish(id);
   showError.value = false;
   publicSkippedNotice.value = "";
+  // What the checkbox should show once this settles; shared with every
+  // dialog instance showing the dataset (see the publicLoading watcher).
+  let settledValue = !value;
   try {
     const result = await store.api.setDatasetPublic(id, value);
-    // The checkbox shows the dataset's state, wherever the dialog is now.
-    if (datasetId.value === id) {
-      isPublic.value = value;
-    }
+    settledValue = value;
     if (isCurrent()) {
       publicSkippedNotice.value = skippedNotice(result);
     }
   } catch (error) {
     logError("Failed to toggle public access", error);
-    if (datasetId.value === id) {
-      isPublic.value = !value;
-    }
     if (isCurrent()) {
       errorString.value = "Failed to update public access";
       showError.value = true;
     }
   } finally {
-    finishPublish(id);
+    finishPublish(id, settledValue);
   }
 }
 
@@ -653,6 +689,7 @@ async function updateUserAccess(user: IDatasetAccessUser, newLevel: number) {
     return;
   }
 
+  const isCurrent = claimDialog();
   userLoading.value = user.id;
   showError.value = false;
   try {
@@ -661,6 +698,7 @@ async function updateUserAccess(user: IDatasetAccessUser, newLevel: number) {
       user.login,
       newLevel,
     );
+    if (!isCurrent()) return;
 
     if (typeof response === "string") {
       errorString.value =
@@ -677,10 +715,13 @@ async function updateUserAccess(user: IDatasetAccessUser, newLevel: number) {
     }
   } catch (error) {
     logError("Failed to update user access", error);
+    if (!isCurrent()) return;
     errorString.value = "Failed to update user access";
     showError.value = true;
   } finally {
-    userLoading.value = null;
+    if (isCurrent()) {
+      userLoading.value = null;
+    }
   }
 }
 
@@ -702,6 +743,7 @@ async function removeUser() {
     return;
   }
 
+  const isCurrent = claimDialog();
   userLoading.value = user.id;
   showError.value = false;
   try {
@@ -710,6 +752,7 @@ async function removeUser() {
       user.login,
       -1, // -1 to remove access (Girder convention)
     );
+    if (!isCurrent()) return;
 
     if (typeof response === "string") {
       errorString.value =
@@ -723,11 +766,14 @@ async function removeUser() {
     }
   } catch (error) {
     logError("Failed to remove user access", error);
+    if (!isCurrent()) return;
     errorString.value = "Failed to remove user access";
     showError.value = true;
   } finally {
-    userLoading.value = null;
-    userToRemove.value = null;
+    if (isCurrent()) {
+      userLoading.value = null;
+      userToRemove.value = null;
+    }
   }
 }
 
@@ -766,6 +812,7 @@ async function createLink() {
     showError.value = true;
     return;
   }
+  const isCurrent = claimDialog();
   creatingLink.value = true;
   showError.value = false;
   try {
@@ -774,6 +821,10 @@ async function createLink() {
       newLinkDays.value,
       newLinkLabel.value.trim(),
     );
+    // Closed or moved on: the link exists (it is listed, and revocable,
+    // the next time this dataset's dialog opens), but its URL must not
+    // appear in a dialog for another session or dataset.
+    if (!isCurrent()) return;
     createdLinkId = link._id;
     createdLinkUrl.value = shareLinkUrl(link.token);
     createdEmbedUrl.value = shareLinkUrl(link.token, true);
@@ -783,18 +834,23 @@ async function createLink() {
     }
   } catch (error) {
     logError("Failed to create a share link", error);
+    if (!isCurrent()) return;
     errorString.value = "Failed to create the share link";
     showError.value = true;
   } finally {
-    creatingLink.value = false;
+    if (isCurrent()) {
+      creatingLink.value = false;
+    }
   }
 }
 
 async function revokeLink(link: IShareLink) {
+  const isCurrent = claimDialog();
   revokingLinkId.value = link._id;
   showError.value = false;
   try {
     await store.shareLinkAPI.revoke(link._id);
+    if (!isCurrent()) return;
     shareLinksRequest++; // an in-flight list predates the revoke
     shareLinks.value = shareLinks.value.filter((l) => l._id !== link._id);
     // The new URL is not shown again: keep it unless it is the one revoked.
@@ -805,10 +861,13 @@ async function revokeLink(link: IShareLink) {
     }
   } catch (error) {
     logError("Failed to revoke a share link", error);
+    if (!isCurrent()) return;
     errorString.value = "Failed to revoke the share link";
     showError.value = true;
   } finally {
-    revokingLinkId.value = null;
+    if (isCurrent()) {
+      revokingLinkId.value = null;
+    }
   }
 }
 
@@ -828,6 +887,7 @@ async function addUser() {
     return;
   }
 
+  const isCurrent = claimDialog();
   addUserLoading.value = true;
   showError.value = false;
   try {
@@ -836,6 +896,7 @@ async function addUser() {
       newUserEmail.value,
       newUserAccessLevel.value,
     );
+    if (!isCurrent()) return;
 
     if (typeof response === "string") {
       errorString.value =
@@ -848,16 +909,20 @@ async function addUser() {
       if (props.dataset) {
         await fetchAccessInfo(datasetId.value!);
       }
+      if (!isCurrent()) return;
       // Clear the form
       newUserEmail.value = "";
       newUserAccessLevel.value = 0;
     }
   } catch (error) {
     logError("Failed to add user", error);
+    if (!isCurrent()) return;
     errorString.value = "Failed to add user";
     showError.value = true;
   } finally {
-    addUserLoading.value = false;
+    if (isCurrent()) {
+      addUserLoading.value = false;
+    }
   }
 }
 
