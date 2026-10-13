@@ -44,6 +44,10 @@ doc = Model().load(id, force=True)  # Admin bypass
 For detailed access patterns including sharing: read `references/access-control-patterns.md`
 When modifying sharing/access code: read `codebaseDocumentation/SHARING.md`
 
+### Ids that match nothing get no access check
+
+Bulk endpoints usually check access on the datasets of the documents an id list resolves to (`distinctDatasetIds` → `requireDatasetsAccess`). An id that matches no document resolves to no dataset, so nothing about it is checked. That is harmless only if nothing downstream acts on the raw id. The bulk-delete cleanup cascade did: it removed connections and property values pointing at the id in **any** dataset. Leftover orphans in other users' datasets could therefore be deleted by naming their dangling ids. Anything that fans out from caller-supplied ids (cascades, events, follow-up queries keyed on the id rather than the loaded document) must run only for ids that resolved to a document the caller was checked against. `Annotation.multipleAnnotationsRemovedEvent` filters to existing annotations before triggering cleanup (#1418, Codex P2).
+
 ### Never return a document that carries `access` raw
 
 `findWithPermissions` and `@loadmodel` decide which **documents** a caller sees. Neither decides which **fields** they see. Any plugin model built on `AccessControlledModel` (every `ProxiedModel`) stores an `access` ACL that lists every collaborator's user id, and `GET user/{id}` turns those ids into names. When a model defines no `exposeFields`, returning its raw doc hands that list to every reader, anonymous viewers of public datasets included. This has happened with dataset views, properties, worker interfaces and previews, and with the JSON export and Zenodo archive, which embed docs without going through any endpoint.
@@ -222,7 +226,7 @@ Note: `Model().load()` handles ObjectId conversion internally.
 
 ### A string `$in` silently matches nothing on an ObjectId field
 
-`{"childId": {"$in": ["61a4..."]}}` returns no documents when `childId` is stored as an ObjectId. No error, just an empty match. This bites events with more than one emitter. `model.upenn_annotation.removeStringIds` used to get ObjectIds from single delete but strings from bulk delete. Its subscribers (property-value and connection cleanup) therefore worked for single delete and silently orphaned documents on bulk delete. The first fix normalized inside one subscriber, so the other stayed broken for months (#1243). Normalize **where the event is triggered**, so every current and future subscriber gets one type. Despite its name, `removeStringIds` now carries ObjectIds from both emitters in `models/annotation.py`.
+`{"childId": {"$in": ["61a4..."]}}` returns no documents when `childId` is stored as an ObjectId. No error, just an empty match. This bites events with more than one emitter. `model.upenn_annotation.removeStringIds` used to get ObjectIds from single delete but strings from bulk delete. Its subscribers (property-value and connection cleanup) therefore worked for single delete and silently orphaned documents on bulk delete. The first fix normalized inside one subscriber, so the other stayed broken for months (#1243). Normalize **where the event is triggered**, so every current and future subscriber gets one type. Despite its name, `removeStringIds` now carries ObjectIds from both emitters in `models/annotation.py`. The bulk emitter also chunks the list at `MAX_IDS_PER_QUERY`, because a subscriber that puts the list in a query twice (`$or` of two `$in`s) passes the 16 MiB command limit long before the annotation removal's single `$in` does.
 
 ## API vs Model Layer Separation
 

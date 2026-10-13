@@ -742,6 +742,7 @@ Run `pnpm test src/utils/__tests__/connections.test.ts src/utils/__tests__/camer
 - [ ] **Saving state clears on failure.** — *"clears the saving state when the create request rejects"*
 - [ ] **Per-dataset state resets**, including the dedupe flag. — *"clears the dedupe flag on a dataset switch"*
 - [ ] **Deleting objects drops their connections on both ends.** The server cascade removes every connection touching a deleted annotation (`testBulkDeleteRemovesConnections`); the client store must drop the same ones without a reload, and must not replace the array when nothing matched. — *"drops connections whose parent or child was deleted"*, *"leaves the connection array untouched when none match"*
+- [ ] **The delete cascade runs only for annotations that exist, in bounded chunks.** An id matching no annotation gets no access check, so it must not reach the cleanup; and the connection query sends its id list twice, so an unchunked 700K-object delete exceeds MongoDB's 16 MiB command limit. — *"testBulkDeleteOfNonexistentIdsLeavesOtherDatasetsAlone"*, *"testBulkDeleteCleanupIsChunked"*
 
 ### Symmetric pairs — change one, check the other
 

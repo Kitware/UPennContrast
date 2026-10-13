@@ -36,7 +36,7 @@ from ..helpers.annotationRaster import (
     bumpDatasetRasterVersion,
     bumpGlobalRasterVersion,
 )
-from .propertyValues import AnnotationPropertyValues
+from .propertyValues import AnnotationPropertyValues, MAX_IDS_PER_QUERY
 
 # Ceiling on how many ObjectIds all analysis gates together may push into a
 # list query. Each id costs ~20 bytes in a BSON array (12-byte oid + index
@@ -207,15 +207,32 @@ class Annotation(AccessControlMixin, ProxiedModel):
             )
 
     def multipleAnnotationsRemovedEvent(self, event):
-        if event.info and len(event.info) > 0:
-            # Bulk delete passes string ids; the subscribers query ObjectId
-            # fields, where a string $in silently matches nothing. Convert
-            # here, once, so every subscriber gets ObjectIds (single delete
-            # already sends one).
-            events.trigger(
-                "model.upenn_annotation.removeStringIds",
-                [ObjectId(str(i)) for i in event.info],
-            )
+        if not event.info:
+            return
+        # Bulk delete passes string ids; the subscribers query ObjectId
+        # fields, where a string $in silently matches nothing. Convert here,
+        # once, so every subscriber gets ObjectIds (single delete already
+        # sends one). This fires before the annotations are removed.
+        annotationIds = [ObjectId(str(i)) for i in event.info]
+        for start in range(0, len(annotationIds), MAX_IDS_PER_QUERY):
+            # Chunked so each subscriber's $in stays under MongoDB's 16 MiB
+            # command limit (the connection cleanup sends the list twice).
+            # Only ids of annotations that exist go out: the REST delete
+            # checks access on the datasets of existing annotations, so a
+            # dangling id must not let the cleanup reach another dataset's
+            # orphaned connections or property values.
+            existingIds = [
+                annotation["_id"] for annotation in self.find(
+                    {"_id": {"$in": annotationIds[
+                        start:start + MAX_IDS_PER_QUERY
+                    ]}},
+                    fields=["_id"],
+                )
+            ]
+            if existingIds:
+                events.trigger(
+                    "model.upenn_annotation.removeStringIds", existingIds
+                )
 
     def initialize(self):
         self.name = "upenn_annotation"

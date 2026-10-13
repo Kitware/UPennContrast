@@ -12,6 +12,9 @@ from upenncontrast_annotation.server.models.propertyValues import (
     AnnotationPropertyValues,
 )
 from upenncontrast_annotation.server.models import connections
+from upenncontrast_annotation.server.models import (
+    annotation as annotationModule,
+)
 from upenncontrast_annotation.server.helpers.connections import (
     annotationToAnnotationDistance,
     isAPoint,
@@ -23,6 +26,7 @@ from upenncontrast_annotation.server.helpers.connections import (
 from . import girder_utilities as utilities
 from . import upenn_testing_utilities as upenn_utilities
 
+from girder import events
 from girder.exceptions import ValidationException
 from girder.models.folder import Folder
 
@@ -777,3 +781,66 @@ class TestDeleteCleansUpConnections:
         assert len(list(Annotation().find(
             {"datasetId": dataset["_id"]}
         ))) == 3
+
+    def _orphan(self, annotationId):
+        """Remove the annotation document without firing the cleanup event,
+        leaving its connections and property values behind: the state that
+        bulk deletes before #1243's fix left in existing datasets."""
+        Annotation().removeWithQuery({"_id": annotationId})
+
+    def testBulkDeleteOfNonexistentIdsLeavesOtherDatasetsAlone(
+        self, admin, user, server
+    ):
+        """An id that matches no annotation gets no access check (there is
+        no dataset to check), so it must not reach the cleanup either:
+        otherwise any user could delete another dataset's orphaned
+        connections and property values by naming their dangling ids."""
+        dataset, annotationIds = self._chain(admin, count=2)
+        AnnotationPropertyValues().appendValues(
+            {"propA": 1.0}, annotationIds[1], dataset["_id"]
+        )
+        self._orphan(annotationIds[1])
+
+        resp = server.request(
+            path="/upenn_annotation/multiple",
+            method="DELETE",
+            user=user,
+            body=json.dumps([str(annotationIds[1])]),
+            type="application/json",
+        )
+        assertStatusOk(resp)
+        assert self._connectionCount(dataset) == 1
+        assert AnnotationPropertyValues().findOne(
+            {"annotationId": annotationIds[1]}
+        ) is not None
+
+    def testBulkDeleteCleanupIsChunked(self, admin, monkeypatch):
+        """The cleanup event carries at most MAX_IDS_PER_QUERY ids, so the
+        subscribers' $in queries stay under MongoDB's 16 MiB command limit
+        for very large deletes (the connection query sends the list twice).
+        """
+        monkeypatch.setattr(annotationModule, "MAX_IDS_PER_QUERY", 2)
+        dataset, annotationIds = self._chain(admin, count=5)
+        for annotationId in annotationIds:
+            AnnotationPropertyValues().appendValues(
+                {"propA": 1.0}, annotationId, dataset["_id"]
+            )
+        payloadSizes = []
+        events.bind(
+            "model.upenn_annotation.removeStringIds",
+            "test.recordPayloadSizes",
+            lambda event: payloadSizes.append(len(event.info)),
+        )
+        try:
+            Annotation().deleteMultiple([str(i) for i in annotationIds])
+        finally:
+            events.unbind(
+                "model.upenn_annotation.removeStringIds",
+                "test.recordPayloadSizes",
+            )
+
+        assert payloadSizes == [2, 2, 1]
+        assert self._connectionCount(dataset) == 0
+        assert AnnotationPropertyValues().findOne(
+            {"annotationId": {"$in": annotationIds}}
+        ) is None
