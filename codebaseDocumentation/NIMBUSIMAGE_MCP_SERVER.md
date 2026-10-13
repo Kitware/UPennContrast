@@ -369,7 +369,7 @@ Anything that fails both returns `None`, which the SDK turns into a 401.
 **Built (Phase 3, 2026-10-13):** `devops/girder/plugins/McpOAuthPlugin/`, package
 `nimbus_mcp_oauth`, installed in `devops/girder/Dockerfile`; backend CI runs its tox. Code is
 split as the backend rules ask: `oauth.py` and `clients.py` hold the logic and raise
-`OAuthError`, `rest.py` maps that to HTTP. 69 tests, one or more per rule below; the PKCE,
+`OAuthError`, `rest.py` maps that to HTTP. 70 tests, one or more per rule below; the PKCE,
 refresh-reuse, resource and `redirect_uri` checks were each confirmed to fail their test
 when disabled.
 
@@ -441,7 +441,8 @@ another host.
 - The `resource` parameter is required and must equal a configured MCP server URL
   (compared in canonical form).
 - Refresh tokens rotate; reuse or a different client revokes the connection; a missing
-  `client_id` is an error that does not spend the token.
+  `client_id` or (from the right client) a non-matching `resource` is an error that does
+  not spend the token.
 - Disabled, unapproved or unverified accounts cannot exchange, refresh or introspect.
 - `authorize`, consent and `token` are rate-limited (the limiter is copied from
   `girder-claude-chat/girder_claude_chat/rate_limit.py`, not imported).
@@ -703,7 +704,7 @@ introspection, setting `AccessToken.resource` from the response), then the conse
 **Tests:**
 
 - Plugin tests with pytest via tox: one or more per security requirement in
-  [6.3](#63-girder-oauth-plugin), plus the disabled-setting 404s (done: 69 tests in
+  [6.3](#63-girder-oauth-plugin), plus the disabled-setting 404s (done: 70 tests in
   `nimbus_mcp_oauth/test/`).
 - Vitest for the consent page and the return-target validation.
 - End to end with Claude Code:
@@ -1042,10 +1043,11 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
 - [x] Refresh tokens rotate; reuse, or a different client, ends the connection; a
       malformed refresh (no `client_id`, wrong `resource`) does not spend the token.
       *"testRefreshRotates"*, *"testRefreshReuseRevokesTheConnection"*,
-      *"testRefreshFromAnotherClientRevokes"*, *"testRefreshWithoutClientIdKeepsTheConnection"*,
+      *"testRefreshFromAnotherClientRevokes"*, *"testAnotherClientCannotProbeWithAWrongResource"*,
+      *"testRefreshWithoutClientIdKeepsTheConnection"*,
       *"testRefreshWithWrongResourceKeepsTheToken"*
 - [x] `resource` is required, compared in canonical form, and bound to the tokens.
-      *"testResourceIsComparedInCanonicalForm"*, *"testResourceMismatchAtTokenIsInvalidTarget"*,
+      *"testBadRequestsRedirectBackWithError"*, *"testResourceIsComparedInCanonicalForm"*, *"testResourceMismatchAtTokenIsInvalidTarget"*,
       *"testIntrospectionReturnsAWorkingGirderSession"*
 - [x] Client documents are fetched only from allowed hosts, without redirects, and may only
       name Claude's callbacks or loopback. *"testDisallowedDocumentUrlsAreNeverFetched"*,

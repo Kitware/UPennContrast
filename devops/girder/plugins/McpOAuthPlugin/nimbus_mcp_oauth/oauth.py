@@ -295,7 +295,9 @@ def _refresh(params):
     if params.get('resource') is not None:
         peek = RefreshToken().findOne({'_id': refreshId, 'used': False})
         peekGrant = peek and Grant().findOne({'_id': peek['grantId']})
-        if peekGrant:
+        # Only for the right client: a wrong client falls through to the
+        # claim, which revokes the connection.
+        if peekGrant and peekGrant['clientId'] == params['client_id']:
             _checkResource(params, peekGrant['resource'])
     result = RefreshToken().update(
         {'_id': refreshId, 'used': False}, {'$set': {'used': True}},

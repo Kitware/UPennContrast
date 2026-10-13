@@ -29,6 +29,8 @@ def testEverythingIs404WhileDisabled(server, user):
         ('GET', '/mcp_oauth/authorize', authorizeParams(challenge), None),
         ('GET', '/mcp_oauth/request/abc', None, user),
         ('POST', '/mcp_oauth/request/abc/approve', None, user),
+        ('POST', '/mcp_oauth/request/abc/deny', None, user),
+        ('DELETE', '/mcp_oauth/grant/abc', None, user),
         ('POST', '/mcp_oauth/token', {'grant_type': 'refresh_token'}, None),
         ('POST', '/mcp_oauth/revoke', {'token': 'x'}, None),
         ('POST', '/mcp_oauth/introspect', {'token': 'x'}, None),
@@ -277,6 +279,19 @@ def testRefreshFromAnotherClientRevokes(enabled, user):
     first = connect(enabled, user)
     resp = refresh(enabled, first['refresh_token'],
                    clientId='https://claude.ai/other')
+    assert resp.json['error'] == 'invalid_grant'
+    assert introspect(enabled, first['access_token']).json == {
+        'active': False}
+
+
+def testAnotherClientCannotProbeWithAWrongResource(enabled, user):
+    # A wrong resource must not let another client test a refresh token
+    # without tripping the revocation.
+    first = connect(enabled, user)
+    resp = enabled.request('/mcp_oauth/token', method='POST', params={
+        'grant_type': 'refresh_token', 'refresh_token': first['refresh_token'],
+        'client_id': 'https://claude.ai/other',
+        'resource': 'https://other.example/mcp'})
     assert resp.json['error'] == 'invalid_grant'
     assert introspect(enabled, first['access_token']).json == {
         'active': False}
