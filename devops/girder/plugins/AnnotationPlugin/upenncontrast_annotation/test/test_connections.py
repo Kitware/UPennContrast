@@ -8,6 +8,9 @@ from upenncontrast_annotation.server.models.annotation import Annotation
 from upenncontrast_annotation.server.models.connections import (
     AnnotationConnection,
 )
+from upenncontrast_annotation.server.models.propertyValues import (
+    AnnotationPropertyValues,
+)
 from upenncontrast_annotation.server.models import connections
 from upenncontrast_annotation.server.helpers.connections import (
     annotationToAnnotationDistance,
@@ -636,3 +639,118 @@ class TestConnectionEndpoints:
         )
         assertStatusOk(resp)
         assert len(resp.json) == 3
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestDeleteCleansUpConnections:
+    """Deleting annotations must remove the connections that reference them.
+
+    Regression for issue #1243: bulk delete emits string ids into the
+    removeStringIds event, but childId/parentId are stored as ObjectIds, so
+    the cleanup's string $in matched nothing and bulk-deleted annotations
+    left their connections orphaned. (Single delete passes an ObjectId and
+    worked.)
+    """
+
+    def _chain(self, admin, count=3, name="cleanup-ds"):
+        """`count` annotations in a fresh dataset, linked parent -> child in
+        a chain."""
+        dataset = utilities.createFolder(
+            admin, name, upenn_utilities.datasetMetadata
+        )
+        annotations = [
+            Annotation().create(
+                upenn_utilities.getSampleAnnotation(dataset["_id"])
+            )
+            for _ in range(count)
+        ]
+        for parent, child in zip(annotations, annotations[1:]):
+            AnnotationConnection().create(
+                upenn_utilities.getSampleConnection(
+                    parent["_id"], child["_id"], dataset["_id"]
+                )
+            )
+        return dataset, [a["_id"] for a in annotations]
+
+    def _connectionCount(self, dataset):
+        return len(list(AnnotationConnection().find(
+            {"datasetId": dataset["_id"]}
+        )))
+
+    def testBulkDeleteRemovesConnections(self, admin):
+        dataset, annotationIds = self._chain(admin)
+        assert self._connectionCount(dataset) == 2
+
+        # The string-id path the REST endpoint uses.
+        Annotation().deleteMultiple([str(i) for i in annotationIds])
+
+        assert self._connectionCount(dataset) == 0
+
+    def testBulkDeleteKeepsUnrelatedConnections(self, admin):
+        """Only connections touching a deleted annotation go, here or in any
+        other dataset."""
+        dataset, annotationIds = self._chain(admin, count=4)
+        other, otherIds = self._chain(admin, name="other-ds")
+
+        # Delete the last annotation: only the connection 2 -> 3 references
+        # it; 0 -> 1 and 1 -> 2 must survive.
+        Annotation().deleteMultiple([str(annotationIds[3])])
+
+        remaining = list(AnnotationConnection().find(
+            {"datasetId": dataset["_id"]}
+        ))
+        assert sorted(
+            (c["parentId"], c["childId"]) for c in remaining
+        ) == sorted([
+            (annotationIds[0], annotationIds[1]),
+            (annotationIds[1], annotationIds[2]),
+        ])
+        assert self._connectionCount(other) == 2
+
+    def testSingleDeleteRemovesConnections(self, admin):
+        dataset, annotationIds = self._chain(admin, count=2)
+        Annotation().delete(Annotation().load(annotationIds[1], force=True))
+        assert self._connectionCount(dataset) == 0
+
+    def testBulkDeleteRemovesPropertyValues(self, admin):
+        """The property-value half of #1243 (fixed earlier); kept here so the
+        two cleanups of the same event are held together."""
+        dataset, annotationIds = self._chain(admin)
+        for annotationId in annotationIds:
+            AnnotationPropertyValues().appendValues(
+                {"propA": 1.0}, annotationId, dataset["_id"]
+            )
+
+        Annotation().deleteMultiple([str(i) for i in annotationIds])
+
+        assert list(AnnotationPropertyValues().find(
+            {"annotationId": {"$in": annotationIds}}
+        )) == []
+
+    def testUndoBulkDeleteRestoresConnections(self, admin, server):
+        """The cleanup runs inside the recorded request, so undoing the bulk
+        delete brings the connections back with the annotations."""
+        dataset, annotationIds = self._chain(admin)
+
+        resp = server.request(
+            path="/upenn_annotation/multiple",
+            method="DELETE",
+            user=admin,
+            body=json.dumps([str(i) for i in annotationIds]),
+            type="application/json",
+        )
+        assertStatusOk(resp)
+        assert self._connectionCount(dataset) == 0
+
+        resp = server.request(
+            path="/history/undo",
+            method="PUT",
+            user=admin,
+            params={"datasetId": str(dataset["_id"])},
+        )
+        assertStatusOk(resp)
+        assert self._connectionCount(dataset) == 2
+        assert len(list(Annotation().find(
+            {"datasetId": dataset["_id"]}
+        ))) == 3

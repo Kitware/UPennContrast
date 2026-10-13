@@ -220,6 +220,10 @@ query = {'_id': {'$in': [ObjectId(id) for id in string_ids]}}
 
 Note: `Model().load()` handles ObjectId conversion internally.
 
+### A string `$in` silently matches nothing on an ObjectId field
+
+`{"childId": {"$in": ["61a4..."]}}` returns no documents when `childId` is stored as an ObjectId. No error, just an empty match. This bites event handlers whose ids come from more than one emitter. `model.upenn_annotation.removeStringIds` gets ObjectIds from single delete but strings from bulk delete. Its subscribers (property-value and connection cleanup) therefore worked for single delete and silently orphaned documents on bulk delete. Normalize at the top of the handler with `[ObjectId(str(i)) for i in event.info]`, which accepts either type. When you fix one subscriber of an event, fix **every** subscriber: the property-value cleanup was fixed months before the connection cleanup, though both had the same bug (#1243).
+
 ## API vs Model Layer Separation
 
 The API and model layers have strict responsibilities. Never mix them.
