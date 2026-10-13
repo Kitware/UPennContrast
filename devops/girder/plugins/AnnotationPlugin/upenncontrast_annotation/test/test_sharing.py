@@ -728,6 +728,23 @@ class TestSetDatasetPublicOwnership:
         assert result["datasetViewsSkipped"] == 0
         assert result["configurationsSkipped"] == 0
 
+    def testAlreadyPublicResourcesAreNotCountedAsSkipped(self, user, server):
+        """Another user's view/configuration that is already public needed
+        nothing, so the dialog must not say it stayed private."""
+        dataset, _, _ = createDatasetWithView(user)
+        other = createOtherUser()
+        Folder().setUserAccess(dataset, other, AccessType.READ, save=True)
+        otherConfig, otherView = createViewWithOwnConfig(other, dataset)
+        Collection().setPublic(otherConfig, True, save=True)
+        DatasetViewModel().setPublic(otherView, True, save=True)
+        privateConfig, _ = createViewWithOwnConfig(other, dataset)
+
+        result = self._setPublic(server, user, dataset, True)
+
+        assert result["configurationsSkipped"] == 1
+        assert result["datasetViewsSkipped"] == 1
+        assert not isPublic(Collection(), privateConfig)
+
     def testDeletedConfigurationIsNotCountedAsSkipped(self, user, server):
         dataset, _, view = createDatasetWithView(user)
         # A view can outlive its configuration.

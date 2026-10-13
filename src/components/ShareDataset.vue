@@ -450,7 +450,15 @@ const selectedConfigIds = ref<string[]>([]);
 const associatedViews = ref<IDatasetView[]>([]);
 
 // Loading states
-const publicLoading = ref(false);
+// The dataset whose set_public request is in flight. Kept across a dialog
+// reset: the server keeps writing after the dialog closes, so reopening must
+// not allow an opposite request to interleave with it.
+const publishingDatasetId = ref<string | null>(null);
+const publicLoading = computed(
+  () =>
+    publishingDatasetId.value !== null &&
+    publishingDatasetId.value === datasetId.value,
+);
 // Set when publishing left views/collections owned by other users private:
 // publishing those is their owners' call, so "Public" may not cover them.
 const publicSkippedNotice = ref("");
@@ -487,7 +495,6 @@ watch(dialog, (val) => {
 function resetState() {
   shareLinksRequest++;
   publicRequest++;
-  publicLoading.value = false;
   shareLinks.value = [];
   createdLinkUrl.value = null;
   createdEmbedUrl.value = null;
@@ -566,34 +573,42 @@ function skippedNotice(result: ISetDatasetPublicResult) {
 }
 
 // Bumped by resetState(): a publish still in flight when the dialog closes
-// must not write its result (or skipped notice) into the next dialog.
+// must not write its notice or error into the next dialog.
 let publicRequest = 0;
 
 async function togglePublic(newValue: boolean | null) {
   if (!props.dataset) return;
+  const id = datasetId.value!;
+  // One publish per dataset at a time (the checkbox is disabled meanwhile).
+  if (publishingDatasetId.value === id) return;
   const value = !!newValue;
   const request = ++publicRequest;
-  const id = datasetId.value!;
   const isCurrent = () => request === publicRequest && datasetId.value === id;
 
-  publicLoading.value = true;
+  publishingDatasetId.value = id;
   showError.value = false;
   publicSkippedNotice.value = "";
   try {
     const result = await store.api.setDatasetPublic(id, value);
-    if (!isCurrent()) return;
-    isPublic.value = value;
-    publicSkippedNotice.value = skippedNotice(result);
+    // The checkbox shows the dataset's state, wherever the dialog is now.
+    if (datasetId.value === id) {
+      isPublic.value = value;
+    }
+    if (isCurrent()) {
+      publicSkippedNotice.value = skippedNotice(result);
+    }
   } catch (error) {
     logError("Failed to toggle public access", error);
-    if (!isCurrent()) return;
-    errorString.value = "Failed to update public access";
-    showError.value = true;
-    // Revert the checkbox
-    isPublic.value = !value;
-  } finally {
+    if (datasetId.value === id) {
+      isPublic.value = !value;
+    }
     if (isCurrent()) {
-      publicLoading.value = false;
+      errorString.value = "Failed to update public access";
+      showError.value = true;
+    }
+  } finally {
+    if (publishingDatasetId.value === id) {
+      publishingDatasetId.value = null;
     }
   }
 }

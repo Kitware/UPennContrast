@@ -184,9 +184,10 @@ Makes a dataset and all associated resources public or private.
 
 Other users can open a dataset they may read with their own configuration,
 creating their own view. Owning the dataset does not let the caller publish
-those: setting `public` is an ADMIN operation on each document. They stay
-private and are counted in the response's `datasetViewsSkipped` /
-`configurationsSkipped` (beside `datasetViewsUpdated` / `configurationsUpdated`);
+those: setting `public` is an ADMIN operation on each document. They are left
+as they are; those not already public are counted in the response's
+`datasetViewsSkipped` / `configurationsSkipped` (beside `datasetViewsUpdated` /
+`configurationsUpdated`);
 the Share dialog says when anything was skipped. Making the dataset private
 unpublishes all of them, including other users': that only restricts access, and
 it also clears views and configurations the pre-ownership `set_public` made
@@ -477,7 +478,8 @@ Run `pnpm test src/components/ShareDataset.test.ts` and, from
 - [ ] **Skipped counts ignore deleted configurations** (a view can outlive its configuration). — *"testDeletedConfigurationIsNotCountedAsSkipped"*
 - [ ] **ACL saves accept older views holding null `scales`/`lastViewed`.** `setPublic`/`setUserAccess` validate the stored document as is. — *"testAclSavesAcceptOlderNullFields"*
 - [ ] **The Share dialog says what publishing skipped, and only for the dataset and publish it describes.** — *"togglePublic explains views and collections owned by others"*, *"togglePublic shows no notice when nothing was skipped"*, *"resetState clears all fields"*
-- [ ] **A publish response that lands after the dialog closed is dropped.** `resetState()` bumps the request token, so a late result cannot write its notice or checkbox state into the next dialog. — *"togglePublic drops a response that lands after the dialog reset"*
+- [ ] **A publish in flight survives a dialog reset.** The server keeps writing after the dialog closes, so reopening keeps the checkbox disabled until it settles (no opposite request can interleave), and the late result updates the checkbox but not the reopened dialog's notice. — *"togglePublic keeps a publish in flight across a dialog reset"*
+- [ ] **Skipped counts only resources left in the wrong state.** Another user's view or configuration that is already public needed nothing; counting it made the dialog claim it "stayed private". — *"testAlreadyPublicResourcesAreNotCountedAsSkipped"*
 
 ### Dataset-view writes
 

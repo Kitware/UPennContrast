@@ -399,13 +399,24 @@ class DatasetView(Resource):
         for config in changedConfigs:
             CollectionModel().setPublic(config, public, save=True)
 
+        # Skipped: left unchanged although not already in the requested
+        # state (another user's resource that is already public was not
+        # skipped, it simply needed nothing).
+        def skipped(docs, changed):
+            changedIds = {doc['_id'] for doc in changed}
+            return sum(
+                1 for doc in docs
+                if doc['_id'] not in changedIds
+                and bool(doc.get('public', False)) != public
+            )
+
         return {
             'dataset': str(dataset['_id']),
             'public': public,
             'datasetViewsUpdated': len(views),
             'configurationsUpdated': len(changedConfigs),
-            'datasetViewsSkipped': len(datasetViews) - len(views),
-            'configurationsSkipped': len(configs) - len(changedConfigs),
+            'datasetViewsSkipped': skipped(datasetViews, views),
+            'configurationsSkipped': skipped(configs, changedConfigs),
         }
 
     @access.user(scope=TokenScope.DATA_READ)

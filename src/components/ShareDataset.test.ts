@@ -314,7 +314,7 @@ describe("ShareDataset", () => {
     expect(vm.publicSkippedNotice).toBe("");
   });
 
-  it("togglePublic drops a response that lands after the dialog reset", async () => {
+  it("togglePublic keeps a publish in flight across a dialog reset", async () => {
     let finish: (value: unknown) => void = () => {};
     mockSetDatasetPublic.mockReturnValue(
       new Promise((resolve) => (finish = resolve)),
@@ -324,8 +324,13 @@ describe("ShareDataset", () => {
 
     const publishing = vm.togglePublic(true);
     expect(vm.publicLoading).toBe(true);
-    // The user clicks Done before the publish returns.
+    // The user clicks Done before the publish returns, then reopens.
     vm.resetState();
+    // The server is still writing: no opposite request may start.
+    expect(vm.publicLoading).toBe(true);
+    await vm.togglePublic(false);
+    expect(mockSetDatasetPublic).toHaveBeenCalledTimes(1);
+
     finish({
       dataset: "ds1",
       public: true,
@@ -336,8 +341,10 @@ describe("ShareDataset", () => {
     });
     await publishing;
 
+    // The late result is not the reopened dialog's notice, but the
+    // checkbox reflects what the server did.
     expect(vm.publicSkippedNotice).toBe("");
-    expect(vm.isPublic).toBe(false);
+    expect(vm.isPublic).toBe(true);
     expect(vm.publicLoading).toBe(false);
   });
 
