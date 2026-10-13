@@ -290,6 +290,13 @@ def _refresh(params):
         raise OAuthError('invalid_request', 'client_id is required.')
     refresh = params.get('refresh_token') or ''
     refreshId = _hash(refresh)
+    # A resource that does not match the connection is a request error, so
+    # it is checked (on a peek) before the token is spent too.
+    if params.get('resource') is not None:
+        peek = RefreshToken().findOne({'_id': refreshId, 'used': False})
+        peekGrant = peek and Grant().findOne({'_id': peek['grantId']})
+        if peekGrant:
+            _checkResource(params, peekGrant['resource'])
     result = RefreshToken().update(
         {'_id': refreshId, 'used': False}, {'$set': {'used': True}},
         multi=False)
@@ -308,7 +315,6 @@ def _refresh(params):
         revokeGrant(grant['_id'])
         raise OAuthError('invalid_grant', 'Token was issued to another '
                          'client.')
-    _checkResource(params, grant['resource'])
     user = _activeUser(grant['userId'])
     if user is None:
         revokeGrant(grant['_id'])

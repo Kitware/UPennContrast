@@ -7,7 +7,9 @@ auth and 17 tools, run locally or as the compose `mcp` profile (see
 Placement decided (2026-10-12): a small separate service, see §11. Phase 2 done
 (2026-10-13): the header-key connector works from claude.ai and through `mcp-remote` behind
 a local HAProxy with the proposed production rules; see
-[Phase 2 results](#phase-2-results-2026-10-13). Phases 3 onward are proposals; the order was changed on 2026-10-12 so a header-key connector test through a
+[Phase 2 results](#phase-2-results-2026-10-13). Phase 3 in progress (2026-10-13): the OAuth
+plugin is built and reviewed ([6.3](#63-girder-oauth-plugin)); the verifier, consent page
+and end-to-end tests are next. Phases 4 onward are proposals. The order was changed on 2026-10-12 so a header-key connector test through a
 tunnel (Phase 2) comes before OAuth (Phase 3), because most users will be on Team/Enterprise
 plans and OAuth must follow soon, built on a verified connector path.
 **Last reviewed:** 2026-10-13 (Phase 2 routing and §7 Phase 4 rules against the
@@ -184,7 +186,7 @@ Key properties:
 |---|---|---|
 | MCP server | Exposes `ni_*` tools over streamable HTTP. Serves Protected Resource Metadata and the 401 challenge (the MCP Python SDK does both automatically when auth is configured). | `nimbusimage-mcp/` at the repo root; container image in ECR, run on its own small instance |
 | Token verifier | Accepts a Girder API key or an OAuth access token, resolves it to a Girder session token and user. | Inside the MCP server |
-| Girder OAuth plugin | Authorization server: metadata, authorize, approve, token, revoke, and an internal introspection endpoint. Off by default behind a setting. | New plugin under `devops/girder/plugins/` |
+| Girder OAuth plugin | Authorization server: metadata, authorize, consent (request, approve, deny), token, revoke, the user's connections, and an introspection endpoint for the MCP service. Off by default behind a setting. | `devops/girder/plugins/McpOAuthPlugin/` (built, Phase 3) |
 | Consent page | Frontend route that shows who is asking and approves the request with the user's own Girder token. | NimbusImage frontend (`src/views/`, router) |
 | HAProxy rules | Exact-path routes for `/mcp` and the two OAuth discovery documents; a static backend for the MCP service. | AWSDeploy `templates/startup_haproxy.tftpl` (the IP manager script should need no change; confirm with a test) |
 
@@ -221,7 +223,7 @@ sequenceDiagram
   C->>S: 1. MCP request, no token
   S-->>C: 401 + WWW-Authenticate (resource metadata URL)
   C->>G: 2. GET /.well-known/oauth-authorization-server
-  G-->>C: endpoints, PKCE S256, registration options
+  G-->>C: endpoints, PKCE S256, client ID metadata document support
   C->>B: 3. open authorize URL (client_id, redirect_uri, PKCE challenge, state, resource)
   B->>G: GET authorize
   G-->>B: redirect to the consent route with the request ID
@@ -230,7 +232,7 @@ sequenceDiagram
   G-->>B: redirect URL with one-time code + state
   B->>C: 5. callback with code
   C->>G: 6. POST token (code, PKCE verifier)
-  G-->>C: short-lived access token + refresh token
+  G-->>C: 8 h access token + rotating refresh token
   C->>S: 7. MCP call, Bearer ACCESS_TOKEN
   S->>G: introspect, then REST as that user
 ```
@@ -367,7 +369,7 @@ Anything that fails both returns `None`, which the SDK turns into a 401.
 **Built (Phase 3, 2026-10-13):** `devops/girder/plugins/McpOAuthPlugin/`, package
 `nimbus_mcp_oauth`, installed in `devops/girder/Dockerfile`; backend CI runs its tox. Code is
 split as the backend rules ask: `oauth.py` and `clients.py` hold the logic and raise
-`OAuthError`, `rest.py` maps that to HTTP. 68 tests, one or more per rule below; the PKCE,
+`OAuthError`, `rest.py` maps that to HTTP. 69 tests, one or more per rule below; the PKCE,
 refresh-reuse, resource and `redirect_uri` checks were each confirmed to fail their test
 when disabled.
 
@@ -398,7 +400,7 @@ REST root, e.g. `https://app.nimbusimage.com/girder/api/v1`), `mcp_oauth.fronten
 | `GET request/:id` | User | Client name, redirect host, whether it is a local redirect |
 | `POST request/:id/approve`, `/deny` | User (Girder token header), 30/min per user | Single use; approve issues a 60 s one-time code and returns the redirect URL (`code`, `state`, `iss`) |
 | `POST token` | Public, form-encoded, flood cap per address | `authorization_code` (PKCE verifier, same client, same redirect URI, `resource` if sent) and `refresh_token` (rotation; reuse or another client revokes the connection). OAuth-shaped errors, including 429. |
-| `POST revoke` | Public | RFC 7009; either token ends the connection |
+| `POST revoke` | Public, same cap as `token` | RFC 7009; either token ends the connection |
 | `POST introspect` | Shared secret header (`X-Mcp-Introspection-Secret`), else 404; hidden from the API docs | For the MCP service: active, user, client, scope, resource, expiry, and the Girder session token to act with |
 | `GET grant`, `DELETE grant/:id` | User | Your connected clients; disconnect (UI later) |
 
@@ -421,7 +423,8 @@ SHA-256 hashes; an access token's record holds the id of the Girder session behi
 
 **Clients:** the built-in client allows Claude's callbacks
 (`https://claude.ai/api/mcp/auth_callback`, and the `claude.com` variant as a hedge) and
-Claude Code's loopback callbacks on any port (RFC 8252). A client document is fetched over
+Claude Code's loopback callback, `http://localhost/callback` or `http://127.0.0.1/callback`
+on any port (RFC 8252). A client document is fetched over
 https from an allowed host only, without redirects, within 5 s and 64 KB; its `client_id`
 must equal its URL, it must be a public client, and its `redirect_uris` may only be Claude's
 callbacks or loopback, so JSON served anywhere on an allowed host cannot send codes to
@@ -453,8 +456,9 @@ another host.
   framed and tell users to approve only a request they just started.
 - The session behind an access token has full access, so it could mint an API key that
   outlives the connection; the MCP tools never do this.
-- The rate limits are per process, keyed on the last `X-Forwarded-For` hop (correct only
-  behind HAProxy, which is how production runs).
+- The rate limits are per process. Authorize, token and revoke are keyed on the last
+  `X-Forwarded-For` hop (correct only behind HAProxy, which is how production runs);
+  consent is keyed per user.
 
 ---
 
@@ -630,7 +634,8 @@ deleted afterwards. The compose `mcp` service now takes `NI_MCP_PUBLIC_URL`,
 Routing checked with and without HTTPS: plain HTTP to `/mcp` and both metadata paths
 redirects to HTTPS; `/.well-known/acme-challenge/phase2-test` is served by the static
 server over plain HTTP and HTTPS; `/.well-known/oauth-authorization-server` and
-`/.well-known/openid-configuration` reach Girder (404 until Phase 3); other unknown paths get
+`/.well-known/openid-configuration` reach Girder (404; the plugin serves only the first, and
+the second stays 404 on purpose); other unknown paths get
 the static server's `index.html`, as in production; every other Girder path is refused
 (403) through the tunnel, `//girder/` included.
 
@@ -689,7 +694,7 @@ Phase 2 tunnel with a Team or Enterprise org.
 - Verifier support for OAuth access tokens via the internal introspection endpoint.
 - Consent page at `#/oauth/consent?request=<id>` and return-after-login. API calls go in
   `src/store/GirderAPI.ts`, not in the component, per `CLAUDE.md`.
-- A pre-registered local test client.
+- The built-in public client `nimbusimage-claude` (done).
 
 **Progress:** the plugin is built and reviewed (two independent review rounds; see
 [6.3](#63-girder-oauth-plugin)). Next: the MCP server's verifier (`nio_` tokens via
@@ -697,13 +702,13 @@ introspection, setting `AccessToken.resource` from the response), then the conse
 
 **Tests:**
 
-- Plugin tests with pytest via tox, following
-  `devops/girder/plugins/AnnotationPlugin/upenncontrast_annotation/test/`: one test per
-  security requirement in [6.3](#63-girder-oauth-plugin), plus the disabled-setting 404s.
+- Plugin tests with pytest via tox: one or more per security requirement in
+  [6.3](#63-girder-oauth-plugin), plus the disabled-setting 404s (done: 69 tests in
+  `nimbus_mcp_oauth/test/`).
 - Vitest for the consent page and the return-target validation.
 - End to end with Claude Code:
-  `claude mcp add --transport http --client-id <id> --client-secret --callback-port <port> …`,
-  then `/mcp` to log in.
+  `claude mcp add --transport http …` (its default client document) or with
+  `--client-id nimbusimage-claude --callback-port <port>`, then `/mcp` to log in.
 - End to end with the MCP Inspector's OAuth flow.
 - Manual: revoke a grant and confirm the next MCP call fails.
 
@@ -1021,14 +1026,44 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_channel_checkboxes_canonical_map"*, *"test_strict_scalars"*,
       *"test_worker_run_fills_defaults_and_rejects_property_workers"*
 
+### OAuth plugin
+
+Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
+
+- [x] Every endpoint, and the metadata document, answers 404 while the setting is off.
+      *"testEverythingIs404WhileDisabled"*
+- [x] An unknown client or unregistered redirect URI gets a 400, never a redirect; the
+      only redirect leeway is the loopback port. *"testUnknownClientOrRedirectIsNeverRedirected"*,
+      *"testLoopbackPortWildcardIsTheOnlyLeeway"*
+- [x] PKCE S256 is required (plain and missing are refused), and the verifier is checked.
+      *"testBadRequestsRedirectBackWithError"*, *"testCodeExchangeChecks"*
+- [x] Codes work once and expire; a replayed code revokes what it issued.
+      *"testCodeWorksOnceAndReplayRevokesItsTokens"*, *"testExpiredCodeIsRefused"*
+- [x] Refresh tokens rotate; reuse, or a different client, ends the connection; a
+      malformed refresh (no `client_id`, wrong `resource`) does not spend the token.
+      *"testRefreshRotates"*, *"testRefreshReuseRevokesTheConnection"*,
+      *"testRefreshFromAnotherClientRevokes"*, *"testRefreshWithoutClientIdKeepsTheConnection"*,
+      *"testRefreshWithWrongResourceKeepsTheToken"*
+- [x] `resource` is required, compared in canonical form, and bound to the tokens.
+      *"testResourceIsComparedInCanonicalForm"*, *"testResourceMismatchAtTokenIsInvalidTarget"*,
+      *"testIntrospectionReturnsAWorkingGirderSession"*
+- [x] Client documents are fetched only from allowed hosts, without redirects, and may only
+      name Claude's callbacks or loopback. *"testDisallowedDocumentUrlsAreNeverFetched"*,
+      *"testBadDocumentsAreRefused"*
+- [x] Introspection needs the shared secret; disabled or unverified accounts and revoked
+      connections are inactive at once. *"testIntrospectionNeedsTheSecret"*,
+      *"testUnverifiedEmailCannotUseTokens"*, *"testDisabledUserCannotRefresh"*,
+      *"testRevokeEndsTheConnectionAndItsGirderSessions"*
+- [x] Secrets are stored hashed and never reach the audit log.
+      *"testSecretsAreStoredHashed"*, *"testSecretsStayOutOfTheAuditLog"*
+- [x] Users see and disconnect only their own connections.
+      *"testUsersSeeAndRevokeOnlyTheirOwnConnections"*
+
 ### Planned (no test yet)
 
-OAuth (Phase 3): PKCE S256 required and plain rejected; exact redirect URI match;
-single-use codes that expire; refresh tokens rotate and reuse revokes the grant;
-`resource` required and bound to the token; every endpoint 404s with the setting off;
-return-after-login accepts only in-app routes. Planned locations: the OAuth plugin's
-`test/test_authorize.py`, `test_token.py`, `test_settings.py`, and
-`src/views/oauth/OAuthConsent.test.ts`.
+Consent page (Phase 3): shows the client name and redirect host; return-after-login accepts
+only in-app routes; waits for login to be restored on load before treating the user as
+logged out. Planned location: `src/views/oauth/OAuthConsent.test.ts`.
 
 Deploy (Phases 4 and 5): no HAProxy rule matches `/.well-known/acme-challenge/*` except
 the static server; the IP manager's reconciliation leaves the static MCP backend alone
@@ -1060,10 +1095,9 @@ its fix.
 - The production Girder stack is defined in `CytoPixel/OutsetaLogin`, which was not read
   for this plan. With the separate MCP service it needs no MCP change, but how the service
   reaches Girder over the private network (`NI_API_URL`) is still to be decided.
-- Whether the Outseta login widgets can return users to a given page after login was not
-  checked.
-- Claude's OAuth callback URL for custom connectors comes from the connector dialog and was
-  not looked up.
+- Claude's OAuth callback URL (`https://claude.ai/api/mcp/auth_callback`) is from Claude's
+  connector documentation; it has not yet been observed in a real flow (Phase 3 tunnel
+  test).
 - MCP Python SDK names (`MCPServer`, `TokenVerifier`, `AuthSettings`,
   `validate_token_resource`, `stateless_http`) were confirmed against the pinned
   `mcp==2.3.0` in Phases 0 and 1. The request's verified token reaches sync tools (run in a

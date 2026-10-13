@@ -294,6 +294,21 @@ def testRefreshWithoutClientIdKeepsTheConnection(enabled, user):
     assert retry.json['access_token'].startswith('nio_')
 
 
+def testRefreshWithWrongResourceKeepsTheToken(enabled, user):
+    first = connect(enabled, user)
+    resp = enabled.request('/mcp_oauth/token', method='POST', params={
+        'grant_type': 'refresh_token', 'client_id': 'nimbusimage-claude',
+        'refresh_token': first['refresh_token'],
+        'resource': 'https://other.example/mcp'})
+    assert resp.json['error'] == 'invalid_target'
+    # Canonical form matches, and the token was not spent.
+    resp = enabled.request('/mcp_oauth/token', method='POST', params={
+        'grant_type': 'refresh_token', 'client_id': 'nimbusimage-claude',
+        'refresh_token': first['refresh_token'],
+        'resource': 'HTTPS://Nimbus.Example/mcp/'})
+    assert resp.json['access_token'].startswith('nio_')
+
+
 def testUnverifiedEmailCannotUseTokens(enabled, user):
     first = connect(enabled, user)
     Setting().set('core.email_verification', 'required')
