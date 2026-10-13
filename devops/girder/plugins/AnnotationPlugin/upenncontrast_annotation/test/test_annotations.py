@@ -704,7 +704,9 @@ class TestCreateMultipleValidation:
     def testNumericIdWithoutDatasetIdReturns400(self, admin, server):
         """With no datasetId, the @recordable finder looks the dataset up
         from the entry's id before the handler runs; a numeric id must not
-        500 there."""
+        500 there. (The 400 itself comes from schema validation: an entry
+        without a datasetId is never valid. The finder's own path is pinned
+        by TestUpdateMultipleNumericIds.)"""
         resp = self._post(server, admin, [{"_id": 123}])
         assertStatus(resp, 400)
 
@@ -719,6 +721,27 @@ class TestCreateMultipleValidation:
         resp = self._post(server, admin, samples)
         assertStatusOk(resp)
         assert len(resp.json) == 2
+
+    def testValidBodyIsRecordedForUndo(self, admin, server):
+        """The finder still returns the datasetId for a valid body, so the
+        create is recorded and undo removes it."""
+        dataset = utilities.createFolder(
+            admin, "create-multiple-undo-ds", upenn_utilities.datasetMetadata
+        )
+        samples = [
+            upenn_utilities.getSampleAnnotation(str(dataset["_id"]))
+            for _ in range(2)
+        ]
+        assertStatusOk(self._post(server, admin, samples))
+        assert len(list(Annotation().find({"datasetId": dataset["_id"]}))) == 2
+
+        assertStatusOk(server.request(
+            path="/history/undo",
+            method="PUT",
+            user=admin,
+            params={"datasetId": str(dataset["_id"])},
+        ))
+        assert len(list(Annotation().find({"datasetId": dataset["_id"]}))) == 0
 
 
 @pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
@@ -737,8 +760,11 @@ class TestUpdateMultipleNumericIds:
         )
 
     def testNumericIdReturns400(self, admin, server):
+        """The finder skips a numeric id (no load(), no TypeError) and the
+        handler's own id check rejects it."""
         resp = self._put(server, admin, [{"id": 123}])
         assertStatus(resp, 400)
+        assert resp.json["message"] == "annotation id is not a valid id"
 
     def testNumericDatasetIdReturns400(self, admin, server):
         dataset = utilities.createFolder(
@@ -751,3 +777,4 @@ class TestUpdateMultipleNumericIds:
             server, admin, [{"id": str(annotation["_id"]), "datasetId": 123}]
         )
         assertStatus(resp, 400)
+        assert resp.json["message"] == "datasetId is not a valid id"

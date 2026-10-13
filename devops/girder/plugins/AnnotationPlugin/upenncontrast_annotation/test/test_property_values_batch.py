@@ -432,6 +432,25 @@ class TestAddMultipleValidation:
         resp = self._post(server, admin, [entry])
         assertStatus(resp, 400)
 
+    def testMissingValuesReturns400(self, admin, server):
+        """An entry with no "values" used to pass every check and then
+        KeyError (500) in the upsert; the schema now requires it."""
+        dataset = utilities.createFolder(
+            admin, "add-multiple-ds", upenn_utilities.datasetMetadata
+        )
+        annotation = Annotation().create(
+            upenn_utilities.getSampleAnnotation(dataset["_id"])
+        )
+        entry = {
+            "datasetId": str(dataset["_id"]),
+            "annotationId": str(annotation["_id"]),
+        }
+        resp = self._post(server, admin, [entry])
+        assertStatus(resp, 400)
+        assert AnnotationPropertyValues().findOne(
+            {"annotationId": annotation["_id"]}
+        ) is None
+
     def testNumericAnnotationIdReturns400(self, admin, server):
         entry = {
             "datasetId": "012345678901234567890123",

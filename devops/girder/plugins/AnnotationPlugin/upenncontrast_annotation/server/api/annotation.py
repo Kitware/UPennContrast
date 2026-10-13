@@ -5,7 +5,6 @@ import re
 import orjson
 import cherrypy
 
-from bson.errors import InvalidId
 from bson.objectid import ObjectId
 
 from girder.api import access
@@ -158,12 +157,11 @@ def getDatasetIdFromAnnotationListInBody(self: "Annotation", *args, **kwargs):
     if annId:
         # This runs in the @recordable wrapper, before the handler validates
         # the body. load() already turns a malformed hex id into a 400, but a
-        # non-string id (a JSON number) raises TypeError: skip recording so
-        # the handler rejects it with a clean 400 instead of a 500.
-        try:
-            ann = AnnotationModel().load(annId, force=True)
-        except TypeError:
+        # non-string id (a JSON number) would raise TypeError there: skip
+        # recording so the handler rejects it with a clean 400, not a 500.
+        if not isinstance(annId, (str, ObjectId)):
             return None
+        ann = AnnotationModel().load(annId, force=True)
         if ann:
             return ann.get("datasetId")
     return None
@@ -368,13 +366,8 @@ class Annotation(Resource):
     @memoizeBodyJson
     @recordable("Update an annotation", getDatasetIdFromAnnotationListInBody)
     def updateMultiple(self, params, *args, **kwargs):
-        bodyJson = kwargs["memoizedBodyJson"]
-
         # --- Input validation (API layer responsibility) ---
-        if not isinstance(bodyJson, list):
-            raise RestException(
-                "Request body must be a JSON array."
-            )
+        bodyJson = requireList(kwargs["memoizedBodyJson"], "Request body")
         if len(bodyJson) == 0:
             return []
 
@@ -382,22 +375,14 @@ class Annotation(Resource):
         annotationIdToUpdate = {}
         newDatasetIds = set()
         for update in bodyJson:
-            if not isinstance(update, dict):
-                raise RestException(
-                    "Each annotation update must be a JSON object."
-                )
+            requireObjectBody(update, "Each annotation update")
             annId = update.get("id") or update.get("_id")
             if not annId:
                 raise RestException(
                     "Each annotation must have an 'id' or '_id'"
                     " field."
                 )
-            try:
-                objId = ObjectId(annId)
-            except (InvalidId, TypeError):
-                raise RestException(
-                    "Invalid annotation id: %s" % annId
-                )
+            objId = requireObjectId(annId, "annotation id")
             # Build clean update dict (no id keys, whitelist)
             updateDoc = update.copy()
             updateDoc.pop("id", None)
@@ -408,15 +393,7 @@ class Annotation(Resource):
                 )
             )
             if "datasetId" in updateDoc:
-                try:
-                    dsId = ObjectId(
-                        updateDoc["datasetId"]
-                    )
-                except (InvalidId, TypeError):
-                    raise RestException(
-                        "Invalid datasetId: %s"
-                        % updateDoc["datasetId"]
-                    )
+                dsId = requireObjectId(updateDoc["datasetId"], "datasetId")
                 updateDoc["datasetId"] = dsId
                 newDatasetIds.add(dsId)
             annotationIdToUpdate[objId] = updateDoc

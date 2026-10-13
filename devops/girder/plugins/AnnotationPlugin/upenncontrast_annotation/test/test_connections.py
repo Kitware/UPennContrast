@@ -705,3 +705,25 @@ class TestMultipleCreateValidation:
         resp = self._post(server, admin, [connection])
         assertStatusOk(resp)
         assert len(resp.json) == 1
+
+    def testValidBodyIsRecordedForUndo(self, admin, server):
+        """The finder still returns the datasetId for a valid body, so the
+        create is recorded and undo removes it."""
+        (parent, child, dataset) = createTwoAnnotations(admin)
+        connection = upenn_utilities.getSampleConnection(
+            str(parent["_id"]), str(child["_id"]), str(dataset["_id"])
+        )
+        assertStatusOk(self._post(server, admin, [connection]))
+        assert AnnotationConnection().findOne(
+            {"childId": child["_id"]}
+        ) is not None
+
+        assertStatusOk(server.request(
+            path="/history/undo",
+            method="PUT",
+            user=admin,
+            params={"datasetId": str(dataset["_id"])},
+        ))
+        assert AnnotationConnection().findOne(
+            {"childId": child["_id"]}
+        ) is None
