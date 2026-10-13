@@ -1,6 +1,8 @@
 import pytest
 import random
 
+from pytest_girder.assertions import assertStatus, assertStatusOk
+
 from upenncontrast_annotation.server.models.project import Project
 from upenncontrast_annotation.server.models import project
 from upenncontrast_annotation.server.models.collection import Collection
@@ -417,6 +419,9 @@ class TestProject:
         assert loaded is not None
 
 
+aclUserIds = utilities.aclUserIds
+
+
 def createDatasetWithView(creator):
     """Create a dataset folder, configuration, and
     dataset view for testing.
@@ -587,12 +592,12 @@ class TestProjectPermissionPropagation:
             level=AccessType.READ
         ) is not None
 
-        # Revoke (-1)
+        # Revoke (None, as the share endpoint passes)
         project_model.setUserAccess(
-            proj, user, -1, save=True
+            proj, user, None, save=True
         )
         project_model.propagateUserAccess(
-            proj, user, -1
+            proj, user, None
         )
 
         # User should no longer have access
@@ -1040,7 +1045,7 @@ class TestBulkPermissionOperations:
     def test_bulk_revoke_removes_all_resources(
         self, admin, user
     ):
-        """Revoking access (-1) via bulk removes user
+        """Revoking access (None) via bulk removes user
         from all resource types."""
         pm = Project()
 
@@ -1064,9 +1069,16 @@ class TestBulkPermissionOperations:
         ) is not None
 
         pm.setUserAccess(
-            proj, user, -1, save=True
+            proj, user, None, save=True
         )
-        pm.propagateUserAccess(proj, user, -1)
+        pm.propagateUserAccess(proj, user, None)
+        for model, doc_id in (
+            (pm, proj['_id']),
+            (Folder(), ds['_id']),
+            (Collection(), cfg['_id']),
+            (DatasetViewModel(), dv['_id']),
+        ):
+            assert user['_id'] not in aclUserIds(model, doc_id)
 
         # All resources should be inaccessible
         with pytest.raises(AccessException):
@@ -1084,3 +1096,156 @@ class TestBulkPermissionOperations:
                 dv['_id'], user=user,
                 level=AccessType.READ
             )
+
+
+@pytest.mark.usefixtures(
+    "unbindLargeImage", "unbindAnnotation"
+)
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestProjectShareEndpointRemove:
+    """POST /project/:id/share with accessType -1 must
+    drop the user's ACL entries, not store level -1."""
+
+    def _share(self, server, admin, proj, user, level):
+        return server.request(
+            path=f"/project/{proj['_id']}/share",
+            method="POST",
+            user=admin,
+            params={
+                'userMailOrUsername': user['login'],
+                'accessType': level,
+            },
+        )
+
+    def test_remove_drops_entries_everywhere(
+        self, admin, user, server
+    ):
+        pm = Project()
+        ds, cfg, dv = createDatasetWithView(admin)
+        proj = pm.createProject(
+            name="Endpoint Remove", creator=admin
+        )
+        proj = pm.addDataset(proj, str(ds['_id']))
+
+        assertStatusOk(self._share(
+            server, admin, proj, user, AccessType.READ
+        ))
+        assert user['_id'] in aclUserIds(Folder(), ds['_id'])
+
+        assertStatusOk(self._share(
+            server, admin, proj, user, AccessType.NONE
+        ))
+        for model, doc_id in (
+            (pm, proj['_id']),
+            (Folder(), ds['_id']),
+            (Collection(), cfg['_id']),
+            (DatasetViewModel(), dv['_id']),
+        ):
+            assert user['_id'] not in aclUserIds(model, doc_id)
+
+        resp = server.request(
+            path=f"/project/{proj['_id']}/access",
+            method="GET",
+            user=admin,
+        )
+        assertStatusOk(resp)
+        assert str(user['_id']) not in {
+            u['id'] for u in resp.json['users']
+        }
+        assert resp.json['currentUserLevel'] == AccessType.ADMIN
+
+    def test_legacy_negative_entry_not_propagated(
+        self, admin, user
+    ):
+        """A level -1 entry already on a project (from the
+        old endpoint) is not copied onto added datasets."""
+        pm = Project()
+        proj = pm.createProject(
+            name="Legacy -1", creator=admin
+        )
+        proj = pm.setUserAccess(
+            proj, user, AccessType.NONE, save=True
+        )
+        # Another user with a real grant shows the sync
+        # ran; only the -1 entry must be left behind.
+        other = User().createUser(
+            'legacyother', 'password', 'Other', 'User',
+            'legacyother@example.com'
+        )
+        proj = pm.setUserAccess(
+            proj, other, AccessType.READ, save=True
+        )
+        ds, cfg, dv = createDatasetWithView(admin)
+        proj = pm.addDataset(proj, str(ds['_id']))
+        pm.propagateAccessToDataset(proj, ds)
+
+        for model, doc_id in (
+            (Folder(), ds['_id']),
+            (Collection(), cfg['_id']),
+            (DatasetViewModel(), dv['_id']),
+        ):
+            acl = aclUserIds(model, doc_id)
+            assert other['_id'] in acl
+            assert user['_id'] not in acl
+
+    def test_invalid_access_type_is_400(
+        self, admin, user, server
+    ):
+        pm = Project()
+        proj = pm.createProject(
+            name="Bad level", creator=admin
+        )
+        for level in (100, 3, -2):
+            assertStatus(self._share(
+                server, admin, proj, user, level
+            ), 400)
+        assert user['_id'] not in aclUserIds(pm, proj['_id'])
+
+    def test_share_link_principal_is_not_a_target(
+        self, admin, server
+    ):
+        pm = Project()
+        proj = pm.createProject(
+            name="Link target", creator=admin
+        )
+        linkUser = User().createUser(
+            'share-cafef00d', 'password', 'Link', 'User',
+            'share-cafef00d@example.com'
+        )
+        linkUser['shareLink'] = True
+        User().save(linkUser)
+        resp = self._share(
+            server, admin, proj, linkUser, AccessType.READ
+        )
+        assertStatus(resp, 400)
+        assert resp.json['message'] == 'badEmailOrUsername'
+        assert linkUser['_id'] not in aclUserIds(pm, proj['_id'])
+
+    def test_resync_cleans_legacy_negative_entries(
+        self, admin, user
+    ):
+        """A resync pulls inert -1 entries the old share
+        endpoint left on a project's resources."""
+        pm = Project()
+        ds, cfg, dv = createDatasetWithView(admin)
+        for model, doc in (
+            (Folder(), ds), (Collection(), cfg),
+            (DatasetViewModel(), dv),
+        ):
+            model.setUserAccess(
+                doc, user, AccessType.NONE, save=True
+            )
+        proj = pm.createProject(
+            name="Resync cleanup", creator=admin
+        )
+        proj = pm.addDataset(proj, str(ds['_id']))
+        pm.propagateAccessToDataset(proj, ds)
+
+        for model, doc_id in (
+            (Folder(), ds['_id']),
+            (Collection(), cfg['_id']),
+            (DatasetViewModel(), dv['_id']),
+        ):
+            acl = aclUserIds(model, doc_id)
+            assert user['_id'] not in acl
+            assert admin['_id'] in acl

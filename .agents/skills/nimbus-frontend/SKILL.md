@@ -668,6 +668,12 @@ import store from "@/store";
 const result = await store.api.someMethod();
 ```
 
+### Your own rights come from the server's effective level, never an ACL row
+
+Don't decide what the current user may do by finding `store.girderUser._id` in an access list's `users`. That list holds only **direct** entries. Someone with access through a Girder group, or a site admin, has no row there, so the UI hides controls the server would allow. Codex caught this on the Share dialog (PR #1406). The access endpoints return `currentUserLevel` (Girder `getAccessLevel`) for this. For a Girder document already in hand, its `_accessLevel` is the same value. Two follow-ons:
+- **It's derived state.** After changing the caller's own entry, re-read it from the server: a group may still grant access. Removing your last access turns the access list itself into a 403, so fail closed (`-1`) instead of keeping the old level.
+- **Re-read narrowly.** Reloading the whole dialog after a self-change reset the user's collection selection.
+
 ### Replacing `girderRest` must reach the API classes too
 
 Every API class (`api`, `annotationsAPI`, `spatialAPI`, …) talks to Girder through

@@ -505,8 +505,8 @@ and dataset views. This is handled by the model-layer propagation methods in
 3. Calls `setUserAccess(project, targetUser, level)` on the project itself.
 4. Calls `propagateUserAccess(project, targetUser, level)` which:
    - Bulk-loads all datasets, collections, and dataset views via `_gatherAllResources()`
-   - Calls `setUserAccess()` on each resource with the same access level
-5. Level `-1` revokes access (removes user from ACLs on all resources).
+   - Applies the same level to every resource with bulk `$pull`/`$push` updates (`_bulkSetUserAccess`); `None` only pulls
+5. Level `-1` revokes access: the endpoint maps it to `None` (`parseShareAccessType`), which removes the user's entry from the project's ACL and every resource's ACL. Passing `-1` straight through would store an inert `level: -1` entry instead.
 
 **Making public/private (`POST /project/:id/set_public`):**
 1. Caller must have ADMIN access on the project.
