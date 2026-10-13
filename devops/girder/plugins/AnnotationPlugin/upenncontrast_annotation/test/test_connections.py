@@ -814,6 +814,27 @@ class TestDeleteCleansUpConnections:
             {"annotationId": annotationIds[1]}
         ) is not None
 
+    def testBulkDeleteWithMixedIdsCleansOnlyExistingOnes(
+        self, admin, server
+    ):
+        """One request naming a live annotation and a dangling id from
+        another dataset: the live one's connections go, the dangling id's
+        orphaned connection stays."""
+        own, ownIds = self._chain(admin, count=2, name="own-ds")
+        other, otherIds = self._chain(admin, count=2, name="other-ds")
+        self._orphan(otherIds[1])
+
+        resp = server.request(
+            path="/upenn_annotation/multiple",
+            method="DELETE",
+            user=admin,
+            body=json.dumps([str(ownIds[1]), str(otherIds[1])]),
+            type="application/json",
+        )
+        assertStatusOk(resp)
+        assert self._connectionCount(own) == 0
+        assert self._connectionCount(other) == 1
+
     def testBulkDeleteCleanupIsChunked(self, admin, monkeypatch):
         """The cleanup event carries at most MAX_IDS_PER_QUERY ids, so the
         subscribers' $in queries stay under MongoDB's 16 MiB command limit

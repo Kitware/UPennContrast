@@ -1144,8 +1144,9 @@ class Annotation(AccessControlMixin, ProxiedModel):
 
         Without any filter the statistics run over every property-value
         document of the dataset, so a value document orphaned by a deleted
-        annotation counts until the removal hook cleans it (excluding them
-        would cost a second full scan per request).
+        annotation counts (excluding them would cost a second full scan per
+        request). Deletes clean up their values, but orphans written before
+        bulk-delete cleanup was fixed (#1243) stay until purged.
         """
         selector = None
         matchingIds = None
