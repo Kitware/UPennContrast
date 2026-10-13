@@ -2,7 +2,7 @@
   <v-dialog v-model="dialog" max-width="750px">
     <v-card>
       <v-card-title>
-        {{ isResourceAdmin ? "Share Dataset:" : "Sharing:" }}
+        {{ canManageUsers ? "Share Dataset:" : "Sharing:" }}
         {{ dataset ? dataset.name : "" }}
       </v-card-title>
       <v-card-text>
@@ -93,7 +93,7 @@
                         Access Level
                       </th>
                       <th
-                        v-if="isResourceAdmin"
+                        v-if="canManageUsers"
                         class="text-center"
                         style="width: 80px"
                       >
@@ -118,7 +118,7 @@
                         >
                           Admin (Owner)
                         </span>
-                        <template v-else-if="isResourceAdmin">
+                        <template v-else-if="canEditUser(user)">
                           <v-select
                             :model-value="user.level"
                             :items="accessLevelItems"
@@ -135,9 +135,9 @@
                           {{ accessLevelLabel(user.level) }}
                         </span>
                       </td>
-                      <td v-if="isResourceAdmin" class="text-center">
+                      <td v-if="canManageUsers" class="text-center">
                         <v-btn
-                          v-if="user.level !== 2"
+                          v-if="canEditUser(user)"
                           variant="text"
                           icon
                           size="small"
@@ -158,7 +158,11 @@
                               mdi-lock
                             </v-icon>
                           </template>
-                          <span>Cannot remove dataset owner</span>
+                          <span>{{
+                            user.level === 2
+                              ? "Cannot remove dataset owner"
+                              : "Cannot change a user above your own access"
+                          }}</span>
                         </v-tooltip>
                       </td>
                     </tr>
@@ -168,8 +172,8 @@
             </v-col>
           </v-row>
 
-          <!-- Add User Form (admin only) -->
-          <template v-if="isResourceAdmin">
+          <!-- Add User Form (WRITE or ADMIN; levels never exceed Write) -->
+          <template v-if="canManageUsers">
             <v-divider class="my-4" />
             <v-row>
               <v-col cols="12">
@@ -458,11 +462,33 @@ const accessLevelItems = [
   { text: "Write", value: 1 },
 ];
 
-const isResourceAdmin = computed((): boolean => {
+// The current user's own entry in the dataset's access list (-1 if none)
+const currentUserLevel = computed((): number => {
   const userId = store.girderUser?._id;
-  if (!userId) return false;
-  return users.value.some((u) => u.id === userId && u.level === 2);
+  if (!userId) return -1;
+  return users.value.find((u) => u.id === userId)?.level ?? -1;
 });
+
+// Collections, public access and share links stay owner-only
+const isResourceAdmin = computed((): boolean => currentUserLevel.value === 2);
+
+// WRITE collaborators may share too, but the server refuses any change
+// above the caller's own level, so mirror that here.
+const canManageUsers = computed((): boolean => currentUserLevel.value >= 1);
+
+// The server's reason (e.g. a level above the caller's own) beats a
+// generic message; only the unknown-user code needs translating.
+function shareErrorMessage(response: string, unknownUser: string): string {
+  return response === "badEmailOrUsername" ? unknownUser : response;
+}
+
+function canEditUser(user: IDatasetAccessUser): boolean {
+  return (
+    canManageUsers.value &&
+    user.level !== 2 &&
+    user.level <= currentUserLevel.value
+  );
+}
 
 watch(dialog, (val) => {
   if (val && props.dataset) {
@@ -568,10 +594,7 @@ async function updateUserAccess(user: IDatasetAccessUser, newLevel: number) {
     );
 
     if (typeof response === "string") {
-      errorString.value =
-        response === "badEmailOrUsername"
-          ? "User not found"
-          : "An error occurred";
+      errorString.value = shareErrorMessage(response, "User not found");
       showError.value = true;
     } else {
       // Update local state
@@ -617,10 +640,7 @@ async function removeUser() {
     );
 
     if (typeof response === "string") {
-      errorString.value =
-        response === "badEmailOrUsername"
-          ? "User not found"
-          : "An error occurred";
+      errorString.value = shareErrorMessage(response, "User not found");
       showError.value = true;
     } else {
       // Remove user from local state
@@ -743,10 +763,10 @@ async function addUser() {
     );
 
     if (typeof response === "string") {
-      errorString.value =
-        response === "badEmailOrUsername"
-          ? "Unknown user. Please check the username or email."
-          : "An error occurred";
+      errorString.value = shareErrorMessage(
+        response,
+        "Unknown user. Please check the username or email.",
+      );
       showError.value = true;
     } else {
       // Refresh the access list to show the new user
@@ -793,6 +813,8 @@ defineExpose({
   userToRemove,
   accessLevelItems,
   isResourceAdmin,
+  canManageUsers,
+  canEditUser,
   resetState,
   fetchAccessInfo,
   close,

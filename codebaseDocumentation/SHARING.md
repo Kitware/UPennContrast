@@ -26,7 +26,10 @@ NimbusImage uses Girder's built-in access control system with three permission l
 
 **Key behaviors:**
 - Users automatically receive ADMIN access when they create a dataset
-- Only users with ADMIN access can modify sharing settings (add/remove users, toggle public)
+- Users with WRITE or ADMIN access can add, change and remove users, but never above their own
+  level: a WRITE collaborator can share Read or Write, and cannot grant Admin or change/remove
+  anyone above Write (the owner). Toggling public, choosing collections and share links stay
+  ADMIN-only
 - Any user with READ access can view the access list (who has access and at what level)
 - The dataset owner (ADMIN) cannot be removed from the access list
 
@@ -134,10 +137,13 @@ Returns the current access list for a configuration and its associated datasets.
 
 Grants, modifies, or revokes user access.
 
-**Required permission:** ADMIN on the dataset folder, and WRITE on every listed DatasetView and
-its configuration. All `datasetViewIds` must belong to one dataset (400 otherwise). Before
-2026-10-11 WRITE on the folder sufficed, which let a collaborator grant themselves ADMIN or
-remove the owner. *"testShareEndpointRequiresDatasetAdmin"*,
+**Required permission:** WRITE on the dataset folder and on every listed DatasetView and its
+configuration. All `datasetViewIds` must belong to one dataset (400 otherwise). On **each** of
+those documents (`requireCanSetUserAccess`), the caller cannot grant a level above their own,
+nor change or remove a user whose current entry is above their own; either is a 403 that changes
+nothing. Before 2026-10-11 only WRITE was checked, so a collaborator could grant themselves
+ADMIN or remove the owner. *"testWriteUserCanShareUpToWrite"*,
+*"testWriteUserCannotExceedOwnLevel"*, *"testOwnLevelIsCheckedPerDocument"*,
 *"testShareEndpointRejectsViewsOfSeveralDatasets"*
 
 **Request body:**
@@ -154,7 +160,7 @@ remove the owner. *"testShareEndpointRequiresDatasetAdmin"*,
 - `1` - WRITE access
 - `2` - ADMIN (owner) access
 - `-1` - Remove access entirely
-- Anything else (including `100`, SITE_ADMIN) is a 400 — *"testShareEndpointRejectsInvalidAccessType"*
+- Anything else (including `100` SITE_ADMIN, fractions like `1.9`, booleans) is a 400 — *"testShareEndpointRejectsInvalidAccessType"*
 
 **Behavior:**
 - Sets permissions on all specified DatasetViews
@@ -303,7 +309,8 @@ Location: `src/components/ShareDataset.vue`
 - Individual loading states per user row
 - Confirmation dialog before removing access
 - ADMIN users protected from removal (lock icon)
-- **Read-only mode** for non-admin users: when the current user doesn't have ADMIN (level 2) access, the dialog hides all edit controls (add user form, remove buttons, access level dropdowns, public toggle, collection checkboxes) and shows access levels as plain text. The dialog title changes from "Share Dataset:" to "Sharing:".
+- **WRITE collaborators** (`canManageUsers`) get the add-user form, plus level dropdowns and remove buttons on rows at or below their own level (`canEditUser`). Rows above it show a lock. Public toggle, collection checkboxes and share links stay ADMIN-only (`isResourceAdmin`). A refused share shows the server's reason.
+- **Read-only mode** for READ users: the dialog hides all edit controls (add user form, remove buttons, access level dropdowns, public toggle, collection checkboxes) and shows access levels as plain text. The dialog title changes from "Share Dataset:" to "Sharing:".
 
 ### State Management
 
@@ -394,7 +401,7 @@ interface IDatasetAccessList {
 +-----------------------------------------------+
 ```
 
-### Read-Only View (non-admin shared users)
+### Read-Only View (READ-level shared users)
 
 ```
 +-----------------------------------------------+
@@ -433,7 +440,7 @@ No collection checkboxes, public toggle, access level dropdowns, remove buttons,
 | File | Purpose |
 |------|---------|
 | `devops/girder/plugins/AnnotationPlugin/upenncontrast_annotation/server/api/datasetView.py` | Backend API endpoints |
-| `src/components/ShareDataset.vue` | Frontend share dialog (admin: full edit, non-admin: read-only) |
+| `src/components/ShareDataset.vue` | Frontend share dialog (admin: full edit, write: users up to Write, read: read-only) |
 | `src/components/SharingStatusDisplay.vue` | Inline sharing status card (public/private chip, user list) |
 | `src/components/SharingStatusIcon.vue` | Small sharing icon for list items |
 | `src/views/dataset/DatasetInfo.vue` | Dataset info page (embeds SharingStatusDisplay) |

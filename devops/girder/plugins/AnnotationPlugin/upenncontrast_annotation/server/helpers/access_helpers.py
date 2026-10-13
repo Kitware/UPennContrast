@@ -7,7 +7,6 @@ from girder.models.user import User
 
 from ..models.annotation import Annotation
 from ..models.propertyValues import MAX_IDS_PER_QUERY
-from .validation import requireInt
 
 SHARE_ACCESS_TYPES = (
     AccessType.NONE, AccessType.READ, AccessType.WRITE, AccessType.ADMIN
@@ -24,16 +23,48 @@ def parseShareAccessType(accessType):
 
     AccessType.validate would also accept SITE_ADMIN (100) and raises
     ValueError (a 500) on bad input, so the allowed set is checked here.
+    The value must already be an int: int() would truncate a JSON 1.9 to
+    WRITE, and bool is an int subclass.
 
     :param accessType: -1 (remove), 0 (READ), 1 (WRITE) or 2 (ADMIN).
     :returns: The AccessType level, or None to remove access.
     :raises RestException: 400 if accessType is not one of those levels.
     """
-    level = requireInt(accessType, "accessType")
-    if level not in SHARE_ACCESS_TYPES:
+    if (isinstance(accessType, bool) or not isinstance(accessType, int)
+            or accessType not in SHARE_ACCESS_TYPES):
         raise RestException(
             "accessType must be one of %s" % (SHARE_ACCESS_TYPES,), code=400)
-    return None if level == AccessType.NONE else level
+    return None if accessType == AccessType.NONE else accessType
+
+
+def requireCanSetUserAccess(model, document, user, targetUser, level):
+    """Refuse an ACL change that reaches above the caller's own level.
+
+    The caller may grant at most their own level, and may change or remove
+    only a user whose current entry is no higher than their own. So a WRITE
+    collaborator can share READ or WRITE, but can neither make anyone
+    (themselves included) ADMIN nor demote or remove an owner.
+
+    :param model: The AccessControlledModel the document belongs to.
+    :param document: The document whose ACL is about to change.
+    :param user: The user making the change.
+    :param targetUser: The user whose access is changing.
+    :param level: The new level, or None to remove access.
+    :raises AccessException: If the change exceeds the caller's level.
+    """
+    userLevel = model.getAccessLevel(document, user)
+    targetLevel = max(
+        (entry['level']
+         for entry in document.get('access', {}).get('users', [])
+         if entry['id'] == targetUser['_id']),
+        default=None,
+    )
+    if level is not None and level > userLevel:
+        raise AccessException(
+            'You cannot grant access above your own level')
+    if targetLevel is not None and targetLevel > userLevel:
+        raise AccessException(
+            'You cannot change access for a user above your own level')
 
 
 def requireDatasetsAccess(datasetIds, user, level=AccessType.WRITE):

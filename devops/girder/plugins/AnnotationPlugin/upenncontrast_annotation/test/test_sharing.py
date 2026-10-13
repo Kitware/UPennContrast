@@ -12,6 +12,7 @@ from pytest_girder.assertions import assertStatus, assertStatusOk
 from girder.constants import AccessType
 from girder.exceptions import AccessException
 from girder.models.folder import Folder
+from girder.models.user import User
 
 from upenncontrast_annotation.server.models.datasetView import (
     DatasetView as DatasetViewModel
@@ -64,6 +65,11 @@ def createDatasetWithView(creator):
 
 
 aclUserIds = utilities.aclUserIds
+
+
+def createUser(login):
+    return User().createUser(
+        login, "password", login, "User", f"{login}@example.com")
 
 
 def shareDatasetView(server, sharer, datasetView, target, accessType):
@@ -227,39 +233,91 @@ class TestSharing:
         assert user["_id"] not in aclUserIds(
             DatasetViewModel(), datasetView["_id"])
 
-    def testShareEndpointRequiresDatasetAdmin(self, admin, user, server):
-        """A WRITE collaborator can neither promote themselves to ADMIN
-        nor remove the owner: changing access needs ADMIN on the dataset."""
+    def _writeCollaborator(self, admin, user):
+        """A dataset owned by admin, with user at WRITE on all of it."""
         dataset, config, datasetView = createDatasetWithView(admin)
         for model, document in (
             (Folder(), dataset), (Collection(), config),
             (DatasetViewModel(), datasetView),
         ):
             model.setUserAccess(document, user, AccessType.WRITE, save=True)
+        return dataset, config, datasetView
+
+    def testWriteUserCanShareUpToWrite(self, admin, user, server):
+        """WRITE is enough to grant READ or WRITE, and to remove a peer."""
+        dataset, config, datasetView = self._writeCollaborator(admin, user)
+        third = createUser("third")
+
+        for level in (AccessType.READ, AccessType.WRITE):
+            assertStatusOk(shareDatasetView(
+                server, user, datasetView, third, level))
+            folder = Folder().load(dataset["_id"], force=True)
+            assert {u["id"]: u["level"] for u in folder["access"]["users"]}[
+                third["_id"]] == level
+
+        assertStatusOk(shareDatasetView(
+            server, user, datasetView, third, AccessType.NONE))
+        assert third["_id"] not in aclUserIds(Folder(), dataset["_id"])
+
+    def testWriteUserCannotExceedOwnLevel(self, admin, user, server):
+        """A WRITE collaborator can't make anyone (themselves included)
+        ADMIN, nor demote or remove the owner."""
+        dataset, config, datasetView = self._writeCollaborator(admin, user)
+        third = createUser("third")
 
         for target, level in ((user, AccessType.ADMIN),
+                              (third, AccessType.ADMIN),
+                              (admin, AccessType.WRITE),
                               (admin, AccessType.NONE)):
             assertStatus(shareDatasetView(
                 server, user, datasetView, target, level), 403)
 
+        for model, documentId in (
+            (Folder(), dataset["_id"]), (Collection(), config["_id"]),
+            (DatasetViewModel(), datasetView["_id"]),
+        ):
+            document = model.load(documentId, force=True)
+            levels = {u["id"]: u["level"]
+                      for u in document["access"]["users"]}
+            assert levels[user["_id"]] == AccessType.WRITE
+            assert levels[admin["_id"]] == AccessType.ADMIN
+            assert third["_id"] not in levels
+
+    def testOwnLevelIsCheckedPerDocument(self, admin, user, server):
+        """WRITE on the dataset doesn't let a caller demote someone who
+        owns the configuration; each touched document is checked, and a
+        refusal changes nothing."""
+        dataset, config, datasetView = self._writeCollaborator(admin, user)
+        configOwner = createUser("configowner")
+        Folder().setUserAccess(
+            dataset, configOwner, AccessType.READ, save=True)
+        Collection().setUserAccess(
+            config, configOwner, AccessType.ADMIN, save=True)
+
+        assertStatus(shareDatasetView(
+            server, user, datasetView, configOwner, AccessType.WRITE), 403)
         folder = Folder().load(dataset["_id"], force=True)
-        levels = {u["id"]: u["level"] for u in folder["access"]["users"]}
-        assert levels[user["_id"]] == AccessType.WRITE
-        assert levels[admin["_id"]] == AccessType.ADMIN
+        assert {u["id"]: u["level"] for u in folder["access"]["users"]}[
+            configOwner["_id"]] == AccessType.READ
+        config = Collection().load(config["_id"], force=True)
+        assert {u["id"]: u["level"] for u in config["access"]["users"]}[
+            configOwner["_id"]] == AccessType.ADMIN
 
     def testShareEndpointRejectsViewsOfSeveralDatasets(
             self, admin, user, server):
-        """The ADMIN check covers one dataset, so mixing views is a 400."""
+        """Views of several datasets in one request are a 400."""
         _, _, viewA = createDatasetWithView(admin)
         datasetB, _, viewB = createDatasetWithView(admin)
         assertStatus(shareDatasetView(
             server, admin, [viewA, viewB], user, AccessType.READ), 400)
         assert user["_id"] not in aclUserIds(Folder(), datasetB["_id"])
 
-    @pytest.mark.parametrize("accessType", [100, 3, -2, "write"])
+    @pytest.mark.parametrize(
+        "accessType", [100, 3, -2, "write", 1.9, 0.5, True])
     def testShareEndpointRejectsInvalidAccessType(
             self, admin, user, server, accessType):
-        """Only -1/0/1/2 are share levels; SITE_ADMIN (100) and garbage
+        """Only the ints -1/0/1/2 are share levels; SITE_ADMIN (100),
+        fractions (1.9 must not truncate to WRITE), booleans and garbage
         are a clean 400, not a stored level or a 500."""
         dataset, config, datasetView = createDatasetWithView(admin)
         resp = server.request(

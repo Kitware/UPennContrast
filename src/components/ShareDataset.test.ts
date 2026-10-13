@@ -61,13 +61,14 @@ const defaultViews = [
   { configurationId: "cfg2", datasetId: "ds1" },
 ];
 
-function mountComponent(props: any = {}) {
+function mountComponent(props: any = {}, renderStubDefaultSlot = false) {
   return shallowMount(ShareDataset, {
     props: {
       dataset: { _id: "ds1", _modelType: "folder", name: "TestDataset" },
       modelValue: false,
       ...props,
     },
+    global: { renderStubDefaultSlot },
   });
 }
 
@@ -474,5 +475,79 @@ describe("ShareDataset", () => {
       await vm.togglePublic(true);
       expect(mockSetDatasetPublic).toHaveBeenCalledWith("ds1", true);
     }
+  });
+
+  it("the owner sees public access and share links", async () => {
+    const wrapper = mountComponent({ modelValue: true }, true);
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    await wrapper.vm.$nextTick();
+    const html = wrapper.html();
+    expect(html).toContain("Make Public");
+    expect(html).toContain("Share links</div>");
+    expect(html).toContain("Add User:");
+  });
+
+  describe("a WRITE collaborator", () => {
+    const writeAccessList = {
+      ...defaultAccessList,
+      users: [
+        { id: "owner", login: "o", name: "O", email: "o@t.com", level: 2 },
+        { id: "u1", login: "me", name: "Me", email: "me@t.com", level: 1 },
+        { id: "u3", login: "r", name: "R", email: "r@t.com", level: 0 },
+      ],
+    };
+
+    it("can manage users at or below Write but not the owner", async () => {
+      mockGetDatasetAccess.mockResolvedValue(writeAccessList);
+      // Render stub slots so the dialog's content is in the HTML
+      const wrapper = mountComponent({ modelValue: true }, true);
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+      await wrapper.vm.$nextTick();
+
+      expect(vm.canManageUsers).toBe(true);
+      expect(vm.isResourceAdmin).toBe(false);
+      const [owner, me, reader] = writeAccessList.users;
+      expect(vm.canEditUser(owner)).toBe(false);
+      expect(vm.canEditUser(me)).toBe(true);
+      expect(vm.canEditUser(reader)).toBe(true);
+
+      const html = wrapper.html();
+      expect(html).toContain("Add User:");
+      // Public access, collection choice and share links stay owner-only
+      expect(html).not.toContain("Make Public");
+      expect(html).not.toContain("Share links</div>");
+    });
+
+    it("a READ user can manage nobody", async () => {
+      mockGetDatasetAccess.mockResolvedValue({
+        ...writeAccessList,
+        users: writeAccessList.users.map((u) =>
+          u.id === "u1" ? { ...u, level: 0 } : u,
+        ),
+      });
+      const wrapper = mountComponent({ modelValue: true }, true);
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.html()).toContain("Current Access:");
+      expect(vm.canManageUsers).toBe(false);
+      expect(vm.canEditUser(writeAccessList.users[2])).toBe(false);
+      expect(wrapper.html()).not.toContain("Add User:");
+    });
+  });
+
+  it("shows the server's reason when a share is refused", async () => {
+    const reason = "You cannot grant access above your own level";
+    mockShareDatasetView.mockResolvedValue(reason);
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+
+    vm.newUserEmail = "someone";
+    await vm.addUser();
+    expect(vm.errorString).toBe(reason);
   });
 });
