@@ -87,9 +87,11 @@ Returns the current access list for a dataset.
     {
       "id": "string",
       "name": "string",
-      "public": true
+      "public": true,
+      "currentUserLevel": 0
     }
-  ]
+  ],
+  "writableViewIds": ["string"]
 }
 ```
 
@@ -97,6 +99,13 @@ Returns the current access list for a dataset.
 count). The same `formatAccessList` adds it to `/dataset_view/configuration_access/:id` and
 `/project/:id/access`. Clients must use it for their own rights, not their row in `users`: that list
 holds only direct entries, so access held through a group has no row. *"testAccessListReportsEffectiveCurrentUserLevel"*
+
+Each configuration also carries the caller's level, and `writableViewIds` lists the dataset's views
+the caller can write. `POST /dataset_view/share` needs WRITE on every view and configuration it is
+sent, so the dialog pre-selects only writable configurations, disables an owner's checkbox for a
+read-only one, and sends only writable views. Without this, a WRITE collaborator with READ on one
+collection had every share refused. *"testAccessListReportsWhatTheCallerCanShare"*,
+*"selects writable collections and sends writable views"*
 
 **Implementation notes:**
 - Uses `Folder().getFullAccessList()` for user list (doesn't include emails)

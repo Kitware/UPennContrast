@@ -710,6 +710,8 @@ export interface IDatasetAccessConfiguration {
   id: string;
   name: string;
   public: boolean;
+  /** The caller's effective level on this configuration. */
+  currentUserLevel: number;
 }
 
 export interface IDatasetAccessList {
@@ -720,6 +722,8 @@ export interface IDatasetAccessList {
   configurations: IDatasetAccessConfiguration[];
   /** The caller's effective level (groups and site admin included). */
   currentUserLevel: number;
+  /** Views of this dataset the caller can write (and so share). */
+  writableViewIds: string[];
 }
 
 export interface IConfigurationAccessDataset {

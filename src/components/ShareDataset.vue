@@ -34,8 +34,13 @@
                 v-for="config in configurations"
                 :key="config.id"
                 v-model="selectedConfigIds"
-                :label="config.name"
+                :label="
+                  isConfigWritable(config)
+                    ? config.name
+                    : `${config.name} (read-only for you)`
+                "
                 :value="config.id"
+                :disabled="!isConfigWritable(config)"
                 :hide-details="true"
                 density="compact"
               />
@@ -440,6 +445,9 @@ const isPublic = ref(false);
 const users = ref<IDatasetAccessUser[]>([]);
 const configurations = ref<IDatasetAccessConfiguration[]>([]);
 const selectedConfigIds = ref<string[]>([]);
+// The share endpoint needs WRITE on every view and configuration it is
+// sent, so only those the caller can write are ever included.
+const writableViewIds = ref<Set<string>>(new Set());
 
 // Associated dataset views (needed for API calls)
 const associatedViews = ref<IDatasetView[]>([]);
@@ -490,6 +498,15 @@ async function refetchIfSelf(user: IDatasetAccessUser) {
     if (!dialog.value || datasetId.value !== requestedDatasetId) return;
     users.value = accessList.users;
     currentUserLevel.value = accessList.currentUserLevel;
+    configurations.value = accessList.configurations;
+    writableViewIds.value = new Set(accessList.writableViewIds);
+    // Keep the user's choice, minus anything they can no longer write
+    const writable = new Set(
+      accessList.configurations.filter(isConfigWritable).map((c) => c.id),
+    );
+    selectedConfigIds.value = selectedConfigIds.value.filter((id) =>
+      writable.has(id),
+    );
   } catch (error) {
     // Removing your last access makes the list itself a 403: fail closed
     logError(
@@ -531,6 +548,7 @@ function resetState() {
   currentUserLevel.value = -1;
   configurations.value = [];
   selectedConfigIds.value = [];
+  writableViewIds.value = new Set();
   associatedViews.value = [];
   newUserEmail.value = "";
   newUserAccessLevel.value = 0;
@@ -549,8 +567,11 @@ async function fetchAccessInfo(datasetId: string) {
     users.value = accessList.users;
     currentUserLevel.value = accessList.currentUserLevel;
     configurations.value = accessList.configurations;
-    // Select all configurations by default
-    selectedConfigIds.value = accessList.configurations.map((c) => c.id);
+    writableViewIds.value = new Set(accessList.writableViewIds);
+    // Select every configuration the caller can share by default
+    selectedConfigIds.value = accessList.configurations
+      .filter(isConfigWritable)
+      .map((c) => c.id);
 
     // Also fetch dataset views for the share API calls
     associatedViews.value = await store.api.findDatasetViews({
@@ -571,10 +592,16 @@ function close() {
   dialog.value = false;
 }
 
+function isConfigWritable(config: IDatasetAccessConfiguration): boolean {
+  return config.currentUserLevel >= 1;
+}
+
 function getSelectedViews(): IDatasetView[] {
-  // Filter views to only include those with selected configurations
-  return associatedViews.value.filter((view) =>
-    selectedConfigIds.value.includes(view.configurationId),
+  // Views of the selected configurations that the caller can write
+  return associatedViews.value.filter(
+    (view) =>
+      selectedConfigIds.value.includes(view.configurationId) &&
+      writableViewIds.value.has(view.id),
   );
 }
 
@@ -844,6 +871,7 @@ defineExpose({
   fetchAccessInfo,
   close,
   getSelectedViews,
+  isConfigWritable,
   togglePublic,
   updateUserAccess,
   confirmRemoveUser,

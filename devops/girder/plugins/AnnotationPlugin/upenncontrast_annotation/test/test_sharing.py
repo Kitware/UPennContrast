@@ -470,6 +470,46 @@ class TestGetDatasetAccess:
         assert accessOf(datasetPath, admin)["currentUserLevel"] == (
             AccessType.ADMIN)
 
+    def testAccessListReportsWhatTheCallerCanShare(
+            self, admin, user, server):
+        """Per-configuration levels and writableViewIds tell the dialog
+        which views and configurations a share request may include, since
+        the share endpoint needs WRITE on each one."""
+        dataset, config, datasetView = createDatasetWithView(admin)
+        Folder().setUserAccess(dataset, user, AccessType.WRITE, save=True)
+        Collection().setUserAccess(config, user, AccessType.READ, save=True)
+        otherConfig = Collection().createCollection(
+            name=f"other_{random.random()}", creator=admin, folder=dataset,
+            metadata={"subtype": "contrastDataset", "compatibility": {},
+                      "layers": [], "tools": [], "propertyIds": [],
+                      "snapshots": [], "scales": {}},
+            description="")
+        otherView = DatasetViewModel().create(admin, {
+            "datasetId": dataset["_id"],
+            "configurationId": otherConfig["_id"],
+            "lastLocation": {"xy": 0, "z": 0, "time": 0},
+            "layerContrasts": {}})
+        Collection().setUserAccess(
+            otherConfig, user, AccessType.WRITE, save=True)
+        DatasetViewModel().setUserAccess(
+            otherView, user, AccessType.WRITE, save=True)
+
+        resp = server.request(
+            path=f"/dataset_view/access/{dataset['_id']}", method="GET",
+            user=user)
+        assertStatusOk(resp)
+        levels = {c["id"]: c["currentUserLevel"]
+                  for c in resp.json["configurations"]}
+        assert levels == {str(config["_id"]): AccessType.READ,
+                          str(otherConfig["_id"]): AccessType.WRITE}
+        assert resp.json["writableViewIds"] == [str(otherView["_id"])]
+
+        # Sharing only what was reported writable succeeds
+        viewer = createUser("viewer")
+        assertStatusOk(shareDatasetView(
+            server, user, otherView, viewer, AccessType.READ))
+        assert viewer["_id"] in aclUserIds(Folder(), dataset["_id"])
+
     def testAccessListHidesLegacyNegativeEntries(self, admin, user, server):
         """Level -1 entries left by the old share endpoint grant nothing,
         so the dataset and configuration access lists omit them."""

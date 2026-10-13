@@ -52,14 +52,15 @@ const defaultAccessList = {
     },
   ],
   configurations: [
-    { id: "cfg1", name: "Config 1", public: false },
-    { id: "cfg2", name: "Config 2", public: false },
+    { id: "cfg1", name: "Config 1", public: false, currentUserLevel: 2 },
+    { id: "cfg2", name: "Config 2", public: false, currentUserLevel: 2 },
   ],
+  writableViewIds: ["v1", "v2"],
 };
 
 const defaultViews = [
-  { configurationId: "cfg1", datasetId: "ds1" },
-  { configurationId: "cfg2", datasetId: "ds1" },
+  { id: "v1", configurationId: "cfg1", datasetId: "ds1" },
+  { id: "v2", configurationId: "cfg2", datasetId: "ds1" },
 ];
 
 function mountComponent(props: any = {}, renderStubDefaultSlot = false) {
@@ -652,5 +653,88 @@ describe("ShareDataset", () => {
     mockGetDatasetAccess.mockRejectedValue(new Error("network"));
     await vm.fetchAccessInfo("ds1");
     expect(vm.canManageUsers).toBe(false);
+  });
+
+  describe("only writable views and collections are shared", () => {
+    // WRITE on the dataset, but READ on cfg2 and on the view of cfg1
+    const partlyWritable = {
+      ...defaultAccessList,
+      currentUserLevel: 1,
+      configurations: [
+        { id: "cfg1", name: "Config 1", public: false, currentUserLevel: 1 },
+        { id: "cfg2", name: "Config 2", public: false, currentUserLevel: 0 },
+        { id: "cfg3", name: "Config 3", public: false, currentUserLevel: 1 },
+      ],
+      writableViewIds: ["v3"],
+    };
+    const views = [
+      { id: "v1", configurationId: "cfg1", datasetId: "ds1" },
+      { id: "v2", configurationId: "cfg2", datasetId: "ds1" },
+      { id: "v3", configurationId: "cfg3", datasetId: "ds1" },
+    ];
+
+    it("selects writable collections and sends writable views", async () => {
+      mockGetDatasetAccess.mockResolvedValue(partlyWritable);
+      mockFindDatasetViews.mockResolvedValue(views);
+      const wrapper = mountComponent({ modelValue: true });
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+
+      expect(vm.selectedConfigIds).toEqual(["cfg1", "cfg3"]);
+      vm.newUserEmail = "someone";
+      await vm.addUser();
+      expect(mockShareDatasetView).toHaveBeenCalledWith(
+        [views[2]],
+        "someone",
+        0,
+      );
+    });
+
+    it("disables an owner's checkbox for a read-only collection", async () => {
+      mockGetDatasetAccess.mockResolvedValue({
+        ...partlyWritable,
+        currentUserLevel: 2,
+      });
+      mockFindDatasetViews.mockResolvedValue(views);
+      const wrapper = mountComponent({ modelValue: true }, true);
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+      await wrapper.vm.$nextTick();
+
+      const boxes = wrapper.findAllComponents({ name: "v-checkbox" });
+      const readOnly = boxes.find((b) =>
+        String(b.props("label") ?? b.attributes("label")).includes("Config 2"),
+      );
+      expect(readOnly).toBeDefined();
+      expect(
+        readOnly!.props("disabled") ?? readOnly!.attributes("disabled"),
+      ).toBeTruthy();
+    });
+
+    it("a self-change prunes collections you can no longer write", async () => {
+      mockGetDatasetAccess.mockResolvedValue({
+        ...partlyWritable,
+        users: [
+          { id: "u1", login: "me", name: "Me", email: "me@t.com", level: 1 },
+        ],
+      });
+      mockFindDatasetViews.mockResolvedValue(views);
+      mockShareDatasetView.mockResolvedValue(true);
+      const wrapper = mountComponent({ modelValue: true });
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+      expect(vm.selectedConfigIds).toEqual(["cfg1", "cfg3"]);
+
+      mockGetDatasetAccess.mockResolvedValue({
+        ...partlyWritable,
+        configurations: partlyWritable.configurations.map((c) =>
+          c.id === "cfg3" ? { ...c, currentUserLevel: 0 } : c,
+        ),
+        writableViewIds: [],
+      });
+      await vm.updateUserAccess(vm.users[0], 1);
+      expect(vm.selectedConfigIds).toEqual(["cfg1"]);
+      expect(vm.getSelectedViews()).toEqual([]);
+    });
   });
 });

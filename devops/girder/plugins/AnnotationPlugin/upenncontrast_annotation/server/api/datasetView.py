@@ -395,6 +395,10 @@ class DatasetView(Resource):
             - List of users with their access levels
             - Public status of the dataset
             - Associated configurations with their public status
+            - currentUserLevel: the caller's effective level on the dataset
+              and on each configuration
+            - writableViewIds: the dataset's views the caller can write,
+              i.e. the ones a share request from them may include
 
             Requires READ access to the dataset folder.
         """)
@@ -407,7 +411,8 @@ class DatasetView(Resource):
     def getDatasetAccess(self, dataset):
         """Return the full access list for a dataset
         and its configurations."""
-        result = formatAccessList(Folder(), dataset, self.getCurrentUser())
+        user = self.getCurrentUser()
+        result = formatAccessList(Folder(), dataset, user)
         result['datasetId'] = str(dataset['_id'])
 
         # Find all DatasetViews for this dataset
@@ -425,6 +430,10 @@ class DatasetView(Resource):
         configs = list(CollectionModel().find({
             '_id': {'$in': list(configIds)}
         }))
+        # The share endpoint needs WRITE on every view and configuration it
+        # touches, so tell the client which ones the caller can include
+        # (from the documents already loaded, no extra queries).
+        collectionModel = CollectionModel()
         result['configurations'] = [
             {
                 'id': str(config['_id']),
@@ -432,8 +441,15 @@ class DatasetView(Resource):
                 'public': config.get(
                     'public', False
                 ),
+                'currentUserLevel': collectionModel.getAccessLevel(
+                    config, user),
             }
             for config in configs
+        ]
+        result['writableViewIds'] = [
+            str(view['_id']) for view in datasetViews
+            if self._datasetViewModel.hasAccess(
+                view, user, AccessType.WRITE)
         ]
         return result
 
