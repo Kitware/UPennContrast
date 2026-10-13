@@ -226,7 +226,7 @@ class Annotation(AccessControlMixin, ProxiedModel):
         )
         # Cleaning the database when annotations are removed is done by a
         # custom event: model.upenn_annotation.removeStringIds. Despite the
-        # name, its payload is a list of ObjectIds from both emitters below.
+        # name, its payload is a list of ObjectIds from both emitters above.
         events.bind(
             "model.upenn_annotation.remove",
             "upenn.connections.annotationRemovedEvent",

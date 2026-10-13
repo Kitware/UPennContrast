@@ -646,11 +646,11 @@ class TestConnectionEndpoints:
 class TestDeleteCleansUpConnections:
     """Deleting annotations must remove the connections that reference them.
 
-    Regression for issue #1243: bulk delete emits string ids into the
+    Regression for issue #1243: bulk delete used to emit string ids into the
     removeStringIds event, but childId/parentId are stored as ObjectIds, so
     the cleanup's string $in matched nothing and bulk-deleted annotations
-    left their connections orphaned. (Single delete passes an ObjectId and
-    worked.)
+    left their connections orphaned. (Single delete passed an ObjectId and
+    worked.) The emitter now converts to ObjectIds.
     """
 
     def _chain(self, admin, count=3, name="cleanup-ds"):
