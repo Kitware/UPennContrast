@@ -10,8 +10,9 @@ a local HAProxy with the proposed production rules; see
 [Phase 2 results](#phase-2-results-2026-10-13). Phases 3 onward are proposals; the order was changed on 2026-10-12 so a header-key connector test through a
 tunnel (Phase 2) comes before OAuth (Phase 3), because most users will be on Team/Enterprise
 plans and OAuth must follow soon, built on a verified connector path.
-**Last reviewed:** 2026-10-11, against NimbusImage `82a746f`, the AWSDeploy HAProxy
-template and deploy playbook, and the current Claude and MCP documentation listed in
+**Last reviewed:** 2026-10-13 (Phase 2 routing and §7 Phase 4 rules against the
+AWSDeploy HAProxy template, including its static server); otherwise 2026-10-11, against
+NimbusImage `82a746f`, the AWSDeploy HAProxy template and deploy playbook, and the current Claude and MCP documentation listed in
 [References](#13-references).
 **Supersedes:** the architecture, auth, and implementation sections of
 [`NIMBUSIMAGE_MCP_DESIGN.md`](NIMBUSIMAGE_MCP_DESIGN.md). That document's proposed tool
@@ -19,8 +20,8 @@ list is still a useful reference for tool naming.
 
 This document records the architecture we landed on for exposing NimbusImage to Claude
 through the Model Context Protocol (MCP), and the plan for getting there: a local spike
-first, then local OAuth, a public tunnel test, an AWS test-environment rehearsal, and
-finally production.
+first, then a public tunnel test with API keys, OAuth, an AWS test-environment rehearsal,
+and finally production.
 
 ---
 
@@ -550,9 +551,12 @@ latency is acceptable, the proposed HAProxy rules behave).
 
 **Safety:**
 
-- The local stack uses the default `admin`/`password`. Change it before opening a tunnel.
-- Use a throwaway local database with test data only.
-- Shut the tunnel down when done.
+- The local stack uses the default `admin`/`password` and is shared, so Girder must not be
+  reachable through the tunnel at all (the local HAProxy refuses it), and the connector
+  uses a dedicated non-admin test user's key over test data only. (The original plan, a
+  changed admin password and a throwaway database, was replaced by this on 2026-10-12
+  because the local database is shared with other work.)
+- Shut the tunnel down when done, and delete the test user, its key, data and jobs.
 
 **Exit criteria:**
 
@@ -589,8 +593,10 @@ deleted afterwards. The compose `mcp` service now takes `NI_MCP_PUBLIC_URL`,
 
 Routing checked with and without HTTPS: plain HTTP to `/mcp` and both metadata paths
 redirects to HTTPS; `/.well-known/acme-challenge/phase2-test` is served by the static
-server over plain HTTP and HTTPS; `/.well-known/oauth-authorization-server` reaches
-Girder (404 until Phase 3).
+server over plain HTTP and HTTPS; `/.well-known/oauth-authorization-server` and
+`/.well-known/openid-configuration` reach Girder (404 until Phase 3); other unknown paths get
+the static server's `index.html`, as in production; every other Girder path is refused
+(403) through the tunnel, `//girder/` included.
 
 **Connector observations (for Phase 3 and 4).**
 
@@ -599,8 +605,11 @@ Girder (404 until Phase 3).
   `GET /.well-known/oauth-protected-resource/mcp` (the URL in the challenge), then
   `GET /.well-known/oauth-authorization-server` and
   `GET /.well-known/openid-configuration`, both at the **root**, because the advertised
-  issuer had no path. It does this even for a "No sign in" connector, and 404s there are
-  fine. Phase 3 consequences: the issuer should be the bare origin
+  issuer had no path. It does this even for a "No sign in" connector, and the 404s did
+  not stop it. Production's static server answers any unknown path with `index.html` and
+  a 200 (`try_files $uri /index.html`), so `openid-configuration` must be routed to Girder
+  too (404), or claude.ai would get HTML where it expects JSON; the local static server
+  now has the same fallback, and that route is in the Phase 4 rules. Phase 3 consequences: the issuer should be the bare origin
   (`https://app.nimbusimage.com`), and the OAuth plugin must answer
   `/.well-known/oauth-authorization-server` at Girder's **root**, not under `/api/v1`,
   since HAProxy passes that path through unchanged.
@@ -702,14 +711,17 @@ with NimbusImage's Girder image like the other plugins.
 - `templates/startup_haproxy.tftpl`:
   - Exact-path ACLs for `/mcp`, `/.well-known/oauth-protected-resource/mcp` (the
     path-suffixed metadata URL the 401 challenge names; the bare path as well is
-    harmless), and `/.well-known/oauth-authorization-server`. No `path_beg /.well-known/`
+    harmless), `/.well-known/oauth-authorization-server`, and
+    `/.well-known/openid-configuration` (clients probe it next; without a rule the static
+    server would answer with `index.html`). No `path_beg /.well-known/`
     rule. Rehearsed in `nimbusimage-mcp/deploy/local-haproxy/haproxy.cfg` (Phase 2).
   - Narrow the existing HTTPS-redirect exemption (`acl acme_challenge path_beg
     /.well-known/`) to `/.well-known/acme-challenge/`, so OAuth metadata is never served
     over plain HTTP.
   - A new **static** backend for the MCP service (its fixed private address), not part
     of the dynamic Girder backend. `/mcp` and `/.well-known/oauth-protected-resource/mcp`
-    route to it; `/.well-known/oauth-authorization-server` routes to Girder.
+    route to it; `/.well-known/oauth-authorization-server` and
+    `/.well-known/openid-configuration` route to Girder.
 - `templates/load_balancer_ip_manager_script.py`: **no change needed** with a static MCP
   backend; this is the main reason the separate service was chosen over a sidecar on
   each Girder host (a second dynamic backend there risks a site-wide 503). Confirm the
@@ -975,9 +987,11 @@ return-after-login accepts only in-app routes. Planned locations: the OAuth plug
 `test/test_authorize.py`, `test_token.py`, `test_settings.py`, and
 `src/views/oauth/OAuthConsent.test.ts`.
 
-Deploy (Phases 2, 4 and 5): no HAProxy rule matches `/.well-known/acme-challenge/*` except
+Deploy (Phases 4 and 5): no HAProxy rule matches `/.well-known/acme-challenge/*` except
 the static server; the IP manager's reconciliation leaves the static MCP backend alone
-(AWSDeploy `tests/test_load_balancer_ip_manager.py`).
+(AWSDeploy `tests/test_load_balancer_ip_manager.py`). In Phase 2 the routing was checked by
+hand with curl against `nimbusimage-mcp/deploy/local-haproxy/` (plain and HTTPS, with and
+without the tunnel header); a scripted version is still to be written.
 
 Process rules carried over from `CLAUDE.md`: verify from a fresh start against data that
 actually has the property under test, and use `git stash` to confirm a test fails without

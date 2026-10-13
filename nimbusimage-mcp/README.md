@@ -94,12 +94,14 @@ access on the next request.
 
 claude.ai connectors call from Anthropic's servers, so they need an HTTPS URL.
 `deploy/local-haproxy/` runs HAProxy with the proposed production routing in
-front of the `mcp` service (Girder is refused to tunnel traffic). From the repo
-root of the main checkout:
+front of the `mcp` service (Girder is refused to tunnel traffic). HAProxy finds
+`mcp` through Docker's DNS, so the order below works and `mcp` can be recreated
+while it runs. From the repo root of the main checkout:
 
 ```bash
 docker compose -f nimbusimage-mcp/deploy/local-haproxy/docker-compose.yaml up -d
-cloudflared tunnel --url http://localhost:8090          # prints https://<name>.trycloudflare.com
+# in another terminal (stays in the foreground); prints https://<name>.trycloudflare.com
+cloudflared tunnel --url http://localhost:8090
 NI_MCP_PUBLIC_URL=https://<name>.trycloudflare.com/mcp \
 NI_MCP_ISSUER_URL=https://<name>.trycloudflare.com NI_MCP_MAX_JOB_WAIT=85 \
   COMPOSE_BAKE=false docker compose --profile mcp up -d --no-deps mcp
