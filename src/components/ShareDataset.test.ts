@@ -1,5 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { flushPromises, shallowMount } from "@vue/test-utils";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  enableAutoUnmount,
+  flushPromises,
+  shallowMount,
+} from "@vue/test-utils";
 
 const mockGetDatasetAccess = vi.fn();
 const mockFindDatasetViews = vi.fn();
@@ -72,6 +76,12 @@ function mountComponent(props: any = {}) {
 }
 
 describe("ShareDataset", () => {
+  // The pending/settle registries are module-level, so a dialog left mounted
+  // (and open) by one test would react to the next test's changes -- e.g.
+  // refresh the access list and make a "refreshes" assertion pass for the
+  // wrong reason. Unmount every wrapper after each test.
+  enableAutoUnmount(afterEach);
+
   beforeEach(() => {
     vi.restoreAllMocks();
     mockGetDatasetAccess.mockResolvedValue({ ...defaultAccessList });
@@ -610,13 +620,14 @@ describe("ShareDataset", () => {
     );
     vm.confirmRemoveUser(user);
     const removing = vm.removeUser();
-    expect(vm.userLoading).toBe(user.id);
+    expect(vm.isUserPending(user.id)).toBe(true);
     vm.resetState();
-    expect(vm.userLoading).toBeNull();
+    // Still running on the server: the user's controls stay locked.
+    expect(vm.isUserPending(user.id)).toBe(true);
     failRemove(new Error("late"));
     await removing;
     expect(vm.showError).toBe(false);
-    expect(vm.userLoading).toBeNull();
+    expect(vm.isUserPending(user.id)).toBe(false);
 
     // A link created after the dialog closed: its one-time URL must not
     // appear in the next dialog.
@@ -631,6 +642,156 @@ describe("ShareDataset", () => {
     finishCreate({ _id: "link1", token: "secret-token" });
     await creating;
     expect(vm.createdLinkUrl).toBeNull();
+  });
+
+  it("a sharing change in flight blocks an overlapping one after a reopen", async () => {
+    const wrapper = mountComponent();
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    const user = vm.users[1];
+
+    // An access change still running when the dialog closes and reopens...
+    let finishChange: (value: unknown) => void = () => {};
+    mockShareDatasetView.mockReturnValueOnce(
+      new Promise((resolve) => (finishChange = resolve)),
+    );
+    const changing = vm.updateUserAccess(user, 1);
+    vm.resetState();
+    await vm.fetchAccessInfo("ds1");
+    // ...keeps that user's controls locked, so a newer change cannot race
+    // it on the server and be overwritten when the older one lands last.
+    expect(vm.isUserPending(user.id)).toBe(true);
+    await vm.updateUserAccess(vm.users[1], 0);
+    expect(mockShareDatasetView).toHaveBeenCalledTimes(1);
+    finishChange({});
+    await changing;
+    expect(vm.isUserPending(user.id)).toBe(false);
+
+    // Likewise one Create at a time: a repeat would mint a second link
+    // whose one-time token is never shown.
+    vm.selectedConfigIds = ["cfg1"];
+    let finishCreate: (value: unknown) => void = () => {};
+    shareLinkMocks.create.mockReturnValueOnce(
+      new Promise((resolve) => (finishCreate = resolve)),
+    );
+    const creating = vm.createLink();
+    vm.resetState();
+    await vm.fetchAccessInfo("ds1");
+    vm.selectedConfigIds = ["cfg1"];
+    expect(vm.creatingLink).toBe(true);
+    await vm.createLink();
+    expect(shareLinkMocks.create).toHaveBeenCalledTimes(1);
+    finishCreate({ _id: "link1", token: "secret-token" });
+    await creating;
+    expect(vm.creatingLink).toBe(false);
+  });
+
+  it("a change settling refreshes a dialog that loaded while it ran", async () => {
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    const user = vm.users[1];
+
+    let finishChange: (value: unknown) => void = () => {};
+    mockShareDatasetView.mockReturnValueOnce(
+      new Promise((resolve) => (finishChange = resolve)),
+    );
+    const changing = vm.updateUserAccess(user, 1);
+    // Closed and reopened mid-change: this load reads the old level, and the
+    // change's own result is dropped (it belongs to the earlier session).
+    vm.resetState();
+    await vm.fetchAccessInfo("ds1");
+    expect(vm.users[1].level).toBe(0);
+
+    const changed = {
+      ...defaultAccessList,
+      users: [defaultAccessList.users[0], { ...user, level: 1 }],
+    };
+    mockGetDatasetAccess.mockResolvedValue(changed);
+    finishChange({});
+    await changing;
+    await flushPromises();
+
+    expect(vm.users[1].level).toBe(1);
+  });
+
+  it("one removal finishing leaves another removal's confirmation alone", async () => {
+    const wrapper = mountComponent();
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    const [userX, userY] = [vm.users[1], { ...vm.users[1], id: "u3" }];
+
+    let finishRemove: (value: unknown) => void = () => {};
+    mockShareDatasetView.mockReturnValueOnce(
+      new Promise((resolve) => (finishRemove = resolve)),
+    );
+    vm.confirmRemoveUser(userX);
+    const removing = vm.removeUser();
+    // Y's removal is confirmed while X's still runs.
+    vm.confirmRemoveUser(userY);
+    finishRemove({});
+    await removing;
+
+    expect(vm.userToRemove).toEqual(userY);
+    expect(vm.confirmDialog).toBe(true);
+  });
+
+  it("a revoke does not drop a create's refreshed link list", async () => {
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+    const oldLink = { _id: "old", configurationId: "cfg1", created: "" };
+    const newLink = { _id: "new", configurationId: "cfg1", created: "" };
+    shareLinkMocks.list.mockResolvedValue([oldLink]);
+    await vm.fetchAccessInfo("ds1");
+    await flushPromises();
+    vm.selectedConfigIds = ["cfg1"];
+
+    let finishCreate: (value: unknown) => void = () => {};
+    shareLinkMocks.create.mockReturnValueOnce(
+      new Promise((resolve) => (finishCreate = resolve)),
+    );
+    const creating = vm.createLink();
+    // The old link is revoked while the create runs.
+    await vm.revokeLink(oldLink);
+    shareLinkMocks.list.mockResolvedValue([newLink]);
+    finishCreate({ _id: "new", token: "t" });
+    await creating;
+    await flushPromises();
+
+    expect(vm.shareLinks.map((l: any) => l._id)).toEqual(["new"]);
+  });
+
+  it("an Add and a change to any user's access exclude each other", async () => {
+    const wrapper = mountComponent();
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    const user = vm.users[1];
+
+    let finishChange: (value: unknown) => void = () => {};
+    mockShareDatasetView.mockReturnValueOnce(
+      new Promise((resolve) => (finishChange = resolve)),
+    );
+    const changing = vm.updateUserAccess(user, 1);
+    // The Add could name this same user: it waits for the change.
+    expect(vm.addUserLoading).toBe(true);
+    vm.newUserEmail = user.login;
+    await vm.addUser();
+    expect(mockShareDatasetView).toHaveBeenCalledTimes(1);
+    finishChange({});
+    await changing;
+
+    let finishAdd: (value: unknown) => void = () => {};
+    mockShareDatasetView.mockReturnValueOnce(
+      new Promise((resolve) => (finishAdd = resolve)),
+    );
+    vm.newUserEmail = "someone@example.test";
+    const adding = vm.addUser();
+    // ...and every user's controls wait for an Add.
+    expect(vm.isUserPending(user.id)).toBe(true);
+    await vm.updateUserAccess(user, 0);
+    expect(mockShareDatasetView).toHaveBeenCalledTimes(2);
+    finishAdd({});
+    await adding;
   });
 
   it("a request from before A -> B -> A does not write into the new A session", async () => {
@@ -789,23 +950,29 @@ describe("ShareDataset", () => {
   });
 
   it("addUser calls shareDatasetView and refreshes access", async () => {
-    const wrapper = mountComponent();
+    const wrapper = mountComponent({ modelValue: true });
     const vm = wrapper.vm as any;
     await vm.fetchAccessInfo("ds1");
+    // The user picked one collection; the refresh after the add keeps it.
+    vm.selectedConfigIds = ["cfg1"];
     mockGetDatasetAccess.mockClear();
     mockFindDatasetViews.mockClear();
 
     vm.newUserEmail = "newuser@test.com";
     vm.newUserAccessLevel = 1;
     await vm.addUser();
+    await flushPromises();
 
     expect(mockShareDatasetView).toHaveBeenCalledWith(
       expect.any(Array),
       "newuser@test.com",
       1,
     );
-    // Refreshes access info
+    // Refreshes access info once the add settles, quietly: no spinner, and
+    // the collection selection survives.
     expect(mockGetDatasetAccess).toHaveBeenCalledWith("ds1");
+    expect(vm.loading).toBe(false);
+    expect(vm.selectedConfigIds).toEqual(["cfg1"]);
     // Form cleared
     expect(vm.newUserEmail).toBe("");
     expect(vm.newUserAccessLevel).toBe(0);

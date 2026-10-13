@@ -134,8 +134,8 @@
                             item-value="value"
                             density="compact"
                             hide-details
-                            :loading="userLoading === user.id"
-                            :disabled="userLoading === user.id"
+                            :loading="isUserPending(user.id)"
+                            :disabled="isUserPending(user.id)"
                             @update:model-value="updateUserAccess(user, $event)"
                           />
                         </template>
@@ -150,8 +150,8 @@
                           icon
                           size="small"
                           color="error"
-                          :loading="userLoading === user.id"
-                          :disabled="userLoading === user.id"
+                          :loading="isUserPending(user.id)"
+                          :disabled="isUserPending(user.id)"
                           @click="confirmRemoveUser(user)"
                         >
                           <v-icon size="small">mdi-close</v-icon>
@@ -265,7 +265,8 @@
                           size="x-small"
                           variant="text"
                           color="error"
-                          :loading="revokingLinkId === link._id"
+                          :loading="isRevoking(link._id)"
+                          :disabled="isRevoking(link._id)"
                           @click="revokeLink(link)"
                         >
                           Revoke
@@ -390,6 +391,14 @@ import {
   settledPublicValue,
   startPublish,
 } from "@/utils/pendingPublishes";
+import {
+  finishMutation,
+  isMutationPending,
+  isUserMutationPending,
+  mutationKeys,
+  mutationSettleCount,
+  startMutation,
+} from "@/utils/pendingMutations";
 import { logError } from "@/utils/log";
 import { accessLevelLabel } from "@/utils/accessLevel";
 import {
@@ -440,8 +449,6 @@ const LINK_EXPIRY_OPTIONS = [
 const shareLinks = ref<IShareLink[]>([]);
 const newLinkLabel = ref("");
 const newLinkDays = ref(30);
-const creatingLink = ref(false);
-const revokingLinkId = ref<string | null>(null);
 const createdLinkUrl = ref<string | null>(null);
 const createdEmbedUrl = ref<string | null>(null);
 // The link whose URL is shown above: only revoking that one hides it.
@@ -466,8 +473,30 @@ const publicLoading = computed(
 // other state: changing those is their owners' call, so the checkbox may not
 // cover them.
 const publicSkippedNotice = ref("");
-const userLoading = ref<string | null>(null);
-const addUserLoading = ref(false);
+// In-progress state of the other sharing changes, read from the shared
+// registry so it lasts until the server responds, across dialog sessions
+// and instances (utils/pendingMutations).
+// Add is unavailable while any user's access to the dataset is changing (it
+// can name any of them), and each user's controls while an Add is running.
+const addUserLoading = computed(
+  () => datasetId.value !== null && isUserMutationPending(datasetId.value),
+);
+const creatingLink = computed(
+  () =>
+    datasetId.value !== null &&
+    isMutationPending(mutationKeys.createLink(datasetId.value)),
+);
+function isUserPending(userId: string): boolean {
+  const id = datasetId.value;
+  return (
+    id !== null &&
+    (isMutationPending(mutationKeys.user(id, userId)) ||
+      isMutationPending(mutationKeys.addUser(id)))
+  );
+}
+function isRevoking(linkId: string): boolean {
+  return isMutationPending(mutationKeys.revokeLink(linkId));
+}
 
 // Add user form
 const newUserEmail = ref("");
@@ -522,6 +551,25 @@ watch(
   },
 );
 
+// The counterpart for the other sharing changes: when one on the shown
+// dataset settles -- from this dialog session, an earlier one, or another
+// instance -- refresh from the server. A dialog that loaded while the change
+// was in flight (or whose session dropped the change's result) would
+// otherwise keep stale rows; loads are latest-wins, so the refresh after the
+// last change settles is the one that sticks.
+watch(
+  () =>
+    [
+      datasetId.value,
+      datasetId.value === null ? 0 : mutationSettleCount(datasetId.value),
+    ] as const,
+  ([id, count], [previousId, previousCount]) => {
+    if (dialog.value && id && id === previousId && count !== previousCount) {
+      fetchAccessInfo(id, true);
+    }
+  },
+);
+
 // Everything that belongs to the dataset the dialog shows. Moving to another
 // dataset clears all of it (and closing the dialog clears it too, via
 // resetState); keep every dataset-scoped field here, so the two paths cannot
@@ -557,12 +605,8 @@ function resetDatasetState() {
   newUserEmail.value = "";
   newUserAccessLevel.value = 0;
   newLinkLabel.value = "";
-  // In-progress flags of requests now disowned (claimDialog checks the
-  // dataset): their late finally blocks no longer touch the dialog.
-  userLoading.value = null;
-  addUserLoading.value = false;
-  creatingLink.value = false;
-  revokingLinkId.value = null;
+  // In-progress flags are not reset here: they follow the requests
+  // themselves (utils/pendingMutations), which keep running on the server.
 }
 
 // Closing the dialog: the same full reset as a dataset switch.
@@ -574,7 +618,14 @@ function resetState() {
 // dataset still shown, may write the dialog's state.
 let accessRequest = 0;
 
-async function fetchAccessInfo(id: string) {
+// Loads the dataset's access list, links and views. A full load (opening the
+// dialog) shows the spinner, starts from a clean slate and selects every
+// collection. A refresh (after a sharing change settles, see the
+// mutation-settle watcher) keeps the content up, the notice, and the user's
+// collection selection; a refresh that supersedes a full load still in
+// progress finishes it as a full load.
+async function fetchAccessInfo(id: string, refresh = false) {
+  const full = !refresh || loading.value;
   fetchShareLinks(id);
   const request = ++accessRequest;
   const isCurrent = () => request === accessRequest && datasetId.value === id;
@@ -582,17 +633,19 @@ async function fetchAccessInfo(id: string) {
   // is writing) the public flag this fetch reads; its own response sets the
   // checkbox instead.
   const settledAtStart = publishSettleCount(id);
-  loading.value = true;
-  showError.value = false;
-  // The notice describes the last publish of the dataset it was shown for.
-  publicSkippedNotice.value = "";
-  // Drop the previous load's dataset-scoped state up front: if this load
-  // fails, the dialog must not keep another dataset's users (whose admin
-  // entry enables the controls) or views (which add/remove would submit).
-  users.value = [];
-  configurations.value = [];
-  selectedConfigIds.value = [];
-  associatedViews.value = [];
+  if (full) {
+    loading.value = true;
+    showError.value = false;
+    // The notice describes the last publish of the dataset it was shown for.
+    publicSkippedNotice.value = "";
+    // Drop the previous load's dataset-scoped state up front: if this load
+    // fails, the dialog must not keep another dataset's users (whose admin
+    // entry enables the controls) or views (which add/remove would submit).
+    users.value = [];
+    configurations.value = [];
+    selectedConfigIds.value = [];
+    associatedViews.value = [];
+  }
   try {
     // Fetch access list from new endpoint
     const accessList = await store.api.getDatasetAccess(id);
@@ -603,8 +656,12 @@ async function fetchAccessInfo(id: string) {
     }
     users.value = accessList.users;
     configurations.value = accessList.configurations;
-    // Select all configurations by default
-    selectedConfigIds.value = accessList.configurations.map((c) => c.id);
+    const configIds = accessList.configurations.map((c) => c.id);
+    // A full load selects every collection; a refresh keeps the selection,
+    // minus collections that went away.
+    selectedConfigIds.value = full
+      ? configIds
+      : selectedConfigIds.value.filter((c) => configIds.includes(c));
 
     // Also fetch dataset views for the share API calls
     const views = await store.api.findDatasetViews({ datasetId: id });
@@ -713,8 +770,15 @@ async function updateUserAccess(user: IDatasetAccessUser, newLevel: number) {
     return;
   }
 
+  const id = datasetId.value;
+  if (!id) return;
+  // One change per user at a time, across dialog sessions and instances
+  // (see utils/pendingMutations), and none while an Add (which can name this
+  // user) is in flight; the controls are disabled meanwhile.
+  const key = mutationKeys.user(id, user.id);
+  if (isUserPending(user.id)) return;
   const isCurrent = claimDialog();
-  userLoading.value = user.id;
+  startMutation(key);
   showError.value = false;
   try {
     const response = await store.api.shareDatasetView(
@@ -743,9 +807,7 @@ async function updateUserAccess(user: IDatasetAccessUser, newLevel: number) {
     errorString.value = "Failed to update user access";
     showError.value = true;
   } finally {
-    if (isCurrent()) {
-      userLoading.value = null;
-    }
+    finishMutation(key, id);
   }
 }
 
@@ -757,7 +819,10 @@ function confirmRemoveUser(user: IDatasetAccessUser) {
 async function removeUser() {
   if (!userToRemove.value) return;
 
+  // Consume the confirmation now: it is this click's, and another removal
+  // may be confirmed while this one runs.
   const user = userToRemove.value;
+  userToRemove.value = null;
   confirmDialog.value = false;
 
   const selectedViews = getSelectedViews();
@@ -767,8 +832,13 @@ async function removeUser() {
     return;
   }
 
+  const id = datasetId.value;
+  if (!id) return;
+  // Same key as an access change: both rewrite this user's access.
+  const key = mutationKeys.user(id, user.id);
+  if (isUserPending(user.id)) return;
   const isCurrent = claimDialog();
-  userLoading.value = user.id;
+  startMutation(key);
   showError.value = false;
   try {
     const response = await store.api.shareDatasetView(
@@ -794,10 +864,7 @@ async function removeUser() {
     errorString.value = "Failed to remove user access";
     showError.value = true;
   } finally {
-    if (isCurrent()) {
-      userLoading.value = null;
-      userToRemove.value = null;
-    }
+    finishMutation(key, id);
   }
 }
 
@@ -805,9 +872,9 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleDateString();
 }
 
-// Only the latest list request may commit: the dialog lists on open, again
-// after a create, and a revoke edits the list locally, so an older answer
-// could otherwise hide a new link or bring back a revoked one.
+// Only the latest list request may commit. The dialog lists on open and
+// refreshes after every link create/revoke settles (the mutation-settle
+// watcher), so the list after the last change is the one that sticks.
 let shareLinksRequest = 0;
 
 async function fetchShareLinks(id: string) {
@@ -836,8 +903,14 @@ async function createLink() {
     showError.value = true;
     return;
   }
+  const id = datasetId.value;
+  if (!id) return;
+  // One create per dataset at a time: a repeat while the first is in
+  // flight would mint a second link whose token is never shown.
+  const key = mutationKeys.createLink(id);
+  if (isMutationPending(key)) return;
   const isCurrent = claimDialog();
-  creatingLink.value = true;
+  startMutation(key);
   showError.value = false;
   try {
     const link = await store.shareLinkAPI.create(
@@ -849,33 +922,34 @@ async function createLink() {
     // the next time this dataset's dialog opens), but its URL must not
     // appear in a dialog for another session or dataset.
     if (!isCurrent()) return;
+    // The list refreshes when this settles (mutation-settle watcher).
     createdLinkId = link._id;
     createdLinkUrl.value = shareLinkUrl(link.token);
     createdEmbedUrl.value = shareLinkUrl(link.token, true);
     newLinkLabel.value = "";
-    if (datasetId.value) {
-      await fetchShareLinks(datasetId.value);
-    }
   } catch (error) {
     logError("Failed to create a share link", error);
     if (!isCurrent()) return;
     errorString.value = "Failed to create the share link";
     showError.value = true;
   } finally {
-    if (isCurrent()) {
-      creatingLink.value = false;
-    }
+    finishMutation(key, id);
   }
 }
 
 async function revokeLink(link: IShareLink) {
+  const id = datasetId.value;
+  if (!id) return;
+  const key = mutationKeys.revokeLink(link._id);
+  if (isMutationPending(key)) return;
   const isCurrent = claimDialog();
-  revokingLinkId.value = link._id;
+  startMutation(key);
   showError.value = false;
   try {
     await store.shareLinkAPI.revoke(link._id);
     if (!isCurrent()) return;
-    shareLinksRequest++; // an in-flight list predates the revoke
+    // Drop it now; the refresh when this settles confirms it. (No longer
+    // bumps the list counter: that dropped a create's newer list.)
     shareLinks.value = shareLinks.value.filter((l) => l._id !== link._id);
     // The new URL is not shown again: keep it unless it is the one revoked.
     if (link._id === createdLinkId) {
@@ -889,9 +963,7 @@ async function revokeLink(link: IShareLink) {
     errorString.value = "Failed to revoke the share link";
     showError.value = true;
   } finally {
-    if (isCurrent()) {
-      revokingLinkId.value = null;
-    }
+    finishMutation(key, id);
   }
 }
 
@@ -911,8 +983,14 @@ async function addUser() {
     return;
   }
 
+  const id = datasetId.value;
+  if (!id) return;
+  const key = mutationKeys.addUser(id);
+  // The login/email can name any user of the dataset: no Add while any
+  // user's access is being changed, and vice versa (isUserPending).
+  if (isUserMutationPending(id)) return;
   const isCurrent = claimDialog();
-  addUserLoading.value = true;
+  startMutation(key);
   showError.value = false;
   try {
     const response = await store.api.shareDatasetView(
@@ -929,12 +1007,8 @@ async function addUser() {
           : "An error occurred";
       showError.value = true;
     } else {
-      // Refresh the access list to show the new user
-      if (props.dataset) {
-        await fetchAccessInfo(datasetId.value!);
-      }
-      if (!isCurrent()) return;
-      // Clear the form
+      // The access list refreshes when this settles (mutation-settle
+      // watcher), keeping the collection selection.
       newUserEmail.value = "";
       newUserAccessLevel.value = 0;
     }
@@ -944,9 +1018,7 @@ async function addUser() {
     errorString.value = "Failed to add user";
     showError.value = true;
   } finally {
-    if (isCurrent()) {
-      addUserLoading.value = false;
-    }
+    finishMutation(key, id);
   }
 }
 
@@ -970,8 +1042,10 @@ defineExpose({
   associatedViews,
   publicLoading,
   publicSkippedNotice,
-  userLoading,
+  isUserPending,
+  isRevoking,
   addUserLoading,
+  creatingLink,
   newUserEmail,
   newUserAccessLevel,
   confirmDialog,
