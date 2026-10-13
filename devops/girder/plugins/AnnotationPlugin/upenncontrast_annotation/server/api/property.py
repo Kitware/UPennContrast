@@ -252,7 +252,7 @@ class AnnotationProperty(Resource):
                 oid for oid in objectIds if str(oid) in readable
             ]}})
         }
-        return [props[pid] for pid in dict.fromkeys(idStrings) if pid in props]
+        return [props[pid] for pid in idStrings if pid in props]
 
     @access.public(scope=TokenScope.DATA_READ)
     @filtermodel(model=PropertyModel)

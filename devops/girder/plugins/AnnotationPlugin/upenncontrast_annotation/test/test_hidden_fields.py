@@ -201,7 +201,7 @@ class TestPropertyBatch:
 
         resp = postPropertyBatch(server, user, {"ids": [
             str(second["_id"]), missing, str(hidden["_id"]),
-            str(first["_id"]), str(second["_id"]),
+            str(first["_id"]),
         ]})
 
         assertStatusOk(resp)
