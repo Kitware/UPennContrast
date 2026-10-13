@@ -241,6 +241,47 @@ Watch out for stringify cost on large objects.
 
 Not every `{ deep: true }` is this bug — it only applies when the watched source is a **getter function that rebuilds a fresh object/array on each call** (a Vuex/Pinia getter, a `computed`, or a plain function reading store state). A `ref()`/`reactive()` passed **directly** as the watch source (not wrapped in a function) is the correct, safe use of `deep: true` — Vue tracks its stable identity and only fires on genuine in-place mutations. Don't blanket-remove `deep: true` without checking which case you're in.
 
+### An "unknown" value needs ONE spelling and ONE predicate
+
+An uncalibrated dataset's pixel size had three stored spellings — `0` (the intended marker), `null` (JSON's rendering of a `NaN` from `(undefined + undefined) / 2`) and `{1, "m"}` (the configuration default) — and every consumer checked a different subset: the scale bar and blob-metrics worker tested `0`, the line scan tested `1 m`, nothing tested `null`. Each gap was a real bug: a 1.5 km scale bar, a worker crash on `None * 1e-3`, the spatial plugin refusing to adopt a size because "1 m" looked set.
+
+When a value can be "unknown", give it one representation (`unknownPixelSize()` in `src/utils/scales.ts`), one predicate every consumer calls (`isKnownPixelSize`), and normalize legacy spellings at the read boundary (`normalizeScales` in the `scales`/`configurationScales` getters), so workers that receive the value see only real-or-marker. Sweep with a concept search ("where is this value tested for unset?"), not a grep for one spelling. Backend ports of frontend defaults (`server/helpers/default_configuration.py`) are the twin — change both.
+
+### Don't re-key a dataset/configuration watcher on ids
+
+`Viewer.vue`'s `watch([dataset, configuration], fetchAnnotationData)` looks like it should key on ids ("a reload of the same object shouldn't refetch"), but **`refreshDataset()` depends on the object swap**: it re-runs `setSelectedDataset` with the same id, which resets annotation and property state, and only this watcher repopulates it. Keying on ids left the viewer empty after unroll toggles and `addLargeImage` (caught in review of issue #1379). Before narrowing any watcher on `store.dataset`/`store.configuration`, find what resets state on a same-id reload and who repopulates it.
+
+Switching dataset views loads the dataset and configuration **concurrently**, so this watcher sees a mismatched pair (new configuration, old dataset) first. Gate per-dataset fetches on both matching `store.datasetView`, and guard the store action with a sequence token so a superseded fetch can't commit (`fetchAnnotations`, `src/store/__tests__/fetchAnnotationsStale.test.ts`).
+
+### `this.dataset` is the OUTGOING dataset while a view loads
+
+`setDatasetViewId` sets the location (from `?xy=&z=&time=` or the view's
+`lastLocation`) before the new dataset arrives, and `this.dataset` still holds
+the previous one until `setSelectedDataset` commits. Anything that validates
+against `this.dataset` in that window checks the wrong dataset. A setter-side
+clamp would cut a deep link that is valid for the incoming dataset, and a save
+would write one view's location into another (issue #1388). The location
+setters therefore read `locationDataset` (null while `sync.datasetLoading`), and
+the location is clamped where the dataset lands (`clampLocationToDatasetImpl`
+in `setSelectedDataset` and at the end of `setDatasetViewId`). Per-feature
+guards in consumers are not needed. Each clamp site must also schedule
+`updateLastLocationInDatasetView`, or the view reopens at the old saved
+location. The first cut missed this in `setSelectedDataset`, which
+large-image refreshes reach without going through a view load. Do not clamp an
+UNROLLED axis: `parseTiles` collapses it to one entry, so the clamp sends a
+grid-cell click (which sets the frame, then clears the flag) to frame 0. The
+roll-up reload clamps it against the real dimensions. And "unrolled" must mean
+the shape `this.dataset` was FETCHED with (`datasetUnroll`), not the live
+`unrollZ` flag: a refresh started before a toggle can land after it.
+The pending save is the reverse problem: it is only accepted while
+`this.dataset` matches `datasetView.datasetId`, so whatever replaces EITHER one
+must flush it first. `setDatasetViewId` flushes before replacing the view, and
+`setSelectedDataset` before replacing the dataset (`Dataset.vue` switches
+datasets with the old view still loaded). Out-of-range indices also travel in
+URLs: the breadcrumb view switcher keeps the current query when it moves to
+another dataset. See `codebaseDocumentation/DATASET_LOCATION.md` and its
+regression checklist.
+
 ### Every `throttle`/`debounce` needs a `cancel()` in `onBeforeUnmount`
 
 A trailing call that fires after teardown runs against a dead view — in
@@ -627,6 +668,61 @@ import store from "@/store";
 const result = await store.api.someMethod();
 ```
 
+### Replacing `girderRest` must reach the API classes too
+
+Every API class (`api`, `annotationsAPI`, `spatialAPI`, …) talks to Girder through
+`girderRestProxy`, not through `state.main.girderRest` directly. Two credentials are
+therefore in play, and a change to one is not a change to the other. The proxy must
+resolve the **live** module state (`liveGirderRest`): the object a class-field
+initializer sees as `this` is the construction-time instance, which a mutation never
+updates. Before the fix, `openShareLink` committed the link's own client to state while
+every API call kept the boot client — so a share view ran as the owner's stored login
+(full write access) or, for a recipient with no login, anonymously (private dataset
+fails). Its tests asserted `main.girderRest.token` and passed; the regression test now
+also asserts `main.api.client.token` (`index.test.ts`, "commits only the latest
+validated link"). When you swap or re-token the client, assert on an API class's
+client, and check live with `store.state.main.api.client.get('user/me')` — not with
+`girderRest`.
+
+### An optional plugin's missing route is a network error, not a 404
+
+A Girder route that was never registered (its plugin is not installed) gets
+cherrypy's bare 404 **without CORS headers**, and its preflight gets 405. From the
+dev server or any cross-origin frontend the browser blocks it, so axios reports
+`Network Error` with no `error.response`. Code that maps 404 to "nothing here" therefore
+reads "plugin missing" as "could not ask". This put a Transcripts error button on every
+dataset when the server lacked `upenncontrast_spatial`. Don't probe an optional
+plugin's routes to discover it. Ask `GET system/loaded_plugins` (public, cached per
+`apiRoot`; see `SpatialAPI.isPluginLoaded`) and skip the calls when it is absent. To
+test, run a second Girder from the same image with the plugin `pip uninstall`ed on another
+port, and point a dev server at it with `VITE_GIRDER_URL` plus the persisted `girderUrl`
+localStorage key, which overrides the env var.
+
+## Palette content stays mounted: gate server work on visibility
+
+`FloatingPalette` hides a closed palette with `display: none`; its content is
+mounted at app boot and stays mounted. So `onMounted` runs for every user, and
+watchers keep firing while nobody can see the panel. Anything that costs
+server work must take a visibility prop and defer: the Object Browser's
+server-backed list used to refetch on every filter or gate change with its
+palette closed — with an analysis gate that is a whole-dataset gate
+resolution (8 s on 709K objects) competing with the gate the user just drew.
+Pattern: `App.vue` passes the palette's open state (`:visible="annotationPanel"`),
+the container forwards `visible && activeTab === '…'`, and the component
+records a deferred request while hidden and runs it once when shown
+(`AnnotationList.fetchServerPageWhenShown`; `AnalysisPanel`'s required
+`visible` prop is the same idea). Test both halves: nothing while hidden, one
+catch-up fetch when shown.
+
+## An omitted optional boolean prop is `false`, not `undefined`
+
+Vue casts an absent `Boolean` prop to `false`. So `defineProps<{ visible?:
+boolean }>()` plus a check like `props.visible !== false` ("undefined means
+visible") reads every caller that omits the prop as *hidden*. A `:visible`
+gate threaded down to `PropertyCategoryFilter` silently stopped all value
+loading this way until tests caught it. When the omitted case should mean
+true, use `withDefaults(defineProps<...>(), { visible: true })`.
+
 ## Opening a palette from a component that has no palette registry
 
 App.vue owns palette (right/left panel) visibility in local refs, so a
@@ -833,9 +929,15 @@ Shared mocks in this repo return constants chosen for the tests that existed whe
 - `mockGeoJSAnnotation` doesn't derive `coordinates()` from the `vertices` option, so a feature built by the real draw path has correct `options()` and no usable geometry.
 - `geojsAnnotationFactory` drops its options argument unless you re-forward it — assertions on a feature's constructed `style` see `undefined`.
 
+### Unhandled rejections are invisible in tests by default — twice over
+
+`vitest.config.js` sets `dangerouslyIgnoreUnhandledErrors: true`, so an abandoned promise that later rejects never fails a run. Listening with `process.on("unhandledRejection", spy)` (then waiting a `setTimeout` turn, not a microtask flush) isn't enough on its own: **a promise returned by a `vi.fn` is already "handled"**, because vitest attaches handlers to record `mock.settledResults`. A test for "the superseded call's connections request rejects unobserved" passed with and without the fix until the request came from a plain function instead of a `vi.fn` (`fetchAnnotationsStale.test.ts`, PR #1380). Any test about an unobserved rejection must produce the promise from a non-spy function.
+
 Before concluding "the code doesn't work", check what the relevant mock actually returns. Equally: when a component test needs a *component* to do something, prefer asserting the side effect the component owns over re-deriving geometry through the mock.
 
 **Unmount components that register global listeners.** A wrapper left mounted by an earlier test keeps its `window` listener attached, so the next test's dispatch fires it too and a spy is called twice. Track the wrapper and unmount it in `afterEach`. If you see "expected 1 call, got 2", suspect a leaked mount before suspecting the code — and then ask whether the *product* can also mount that component more than once, because that is the same bug in production.
+
+The same leak bites through **reactive shared store mocks**: a component that writes into a mocked store from a watcher (e.g. AnnotationList publishing its page to `montage.listPageItems`) keeps doing so from every wrapper earlier tests left mounted. Flip a reactive flag they all watch and the mock's final value can come from a stale instance. Assert on the instance's own computed (`wrapper.vm.x`), or trigger the write through state only that instance owns (its own `page`), rather than reading the shared mock's last value.
 
 ## Codebase Documentation References
 

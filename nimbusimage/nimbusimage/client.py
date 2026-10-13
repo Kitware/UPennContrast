@@ -14,6 +14,31 @@ from nimbusimage.projects import Project
 from nimbusimage.urls import DEFAULT_FRONTEND_URL
 
 
+# Girder's Folder.exposeFields at READ level: what GET folder/{id} returns
+# (besides _accessLevel and _modelType).
+_FOLDER_READ_FIELDS = frozenset({
+    "_id", "name", "public", "publicFlags", "description", "created",
+    "updated", "size", "meta", "parentId", "parentCollection", "creatorId",
+    "baseParentType", "baseParentId",
+})
+
+
+def _access_level(doc: dict, user: dict) -> int:
+    """The caller's access level on a raw document, as Girder's
+    AccessControlledModel.getAccessLevel computes it for a logged-in user:
+    ADMIN (2) for a site admin, else the best of the user's own and their
+    groups' grants, else NONE (-1). ``public`` does not count here."""
+    if user.get("admin"):
+        return 2
+    access = doc.get("access") or {}
+    groups = set(user.get("groups") or [])
+    levels = [g["level"] for g in access.get("groups", [])
+              if g["id"] in groups]
+    levels += [u["level"] for u in access.get("users", [])
+               if u["id"] == user["_id"]]
+    return max(levels, default=-1)
+
+
 class NimbusClient:
     """Authenticated session to a NimbusImage server.
 
@@ -172,19 +197,59 @@ class NimbusClient:
             List of dataset folder dicts with _id, name, meta.
         """
         views = self._gc.get("dataset_view", parameters={"limit": 0})
-        seen: set[str] = set()
-        datasets: list[dict] = []
-        for v in views:
-            did = v.get("datasetId")
-            if did and did not in seen:
-                seen.add(did)
-                try:
-                    datasets.append(self._gc.get(f"folder/{did}"))
-                except girder_client.HttpError:
-                    # A view can be shared while its dataset folder is not;
-                    # skip those. Anything else propagates.
-                    pass
-        return datasets
+        dataset_ids = list(dict.fromkeys(
+            v["datasetId"] for v in views if v.get("datasetId")
+        ))
+        if not dataset_ids:
+            return []
+        # A view can be shared while its dataset folder is not; those are
+        # left out.
+        if not self._gc.token:
+            # Anonymous: resource/batch requires a user, so fetch each
+            # public folder (public datasets are few).
+            return self._readable_folders_one_by_one(dataset_ids)
+        # One access-checked lookup for every folder, not a GET per
+        # dataset; the server omits folders the caller cannot read.
+        folders = self._gc.post(
+            "resource/batch", json={"folder": dataset_ids}
+        ).get("folder", {})
+        me = self._gc.get("user/me")
+        # resource/batch returns raw documents, including the ACL (other
+        # users' ids and levels); keep what GET folder/{id} exposes,
+        # including the caller's _accessLevel, computed from that ACL.
+        return [
+            {
+                **{k: v for k, v in folders[did].items()
+                   if k in _FOLDER_READ_FIELDS},
+                "_accessLevel": folders[did].get(
+                    "_accessLevel", _access_level(folders[did], me)
+                ),
+                "_modelType": "folder",
+            }
+            for did in dataset_ids if did in folders
+        ]
+
+    def _readable_folders_one_by_one(self, folder_ids: list[str]) -> list:
+        folders = []
+        for folder_id in folder_ids:
+            try:
+                folders.append(self._gc.get(f"folder/{folder_id}"))
+            except girder_client.HttpError:
+                # Not readable; anything else propagates.
+                pass
+        return folders
+
+    # --- Jobs ---
+
+    def job(self, job_id: str) -> Job:
+        """A job by id, e.g. the transcode job ``Dataset.configure()``
+        returns::
+
+            result = ds.configure()
+            if result.job_id and not client.job(result.job_id).wait():
+                ...
+        """
+        return Job(self._gc, self._gc.get(f"job/{job_id}"))
 
     # --- Projects ---
 

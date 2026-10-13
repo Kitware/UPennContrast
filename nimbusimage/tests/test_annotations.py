@@ -193,6 +193,23 @@ class TestAnnotationCount:
         assert result == 42
 
 
+class TestTagQueryEncoding:
+    """Tags are free text: "+" must not decode to a space and "&" must not
+    split the query string."""
+
+    @pytest.mark.parametrize("call", ["count", "list"])
+    def test_special_characters_survive(self, mock_gc, call):
+        from urllib.parse import parse_qs, urlsplit
+
+        mock_gc.get.return_value = {"count": 0} if call == "count" else []
+        accessor = AnnotationAccessor(mock_gc, "ds_001")
+
+        getattr(accessor, call)(tags=["CD8+", "a&b", "with space"])
+        query = parse_qs(urlsplit(mock_gc.get.call_args[0][0]).query)
+        assert query["tags"] == ['["CD8+", "a&b", "with space"]']
+        assert query["datasetId"] == ["ds_001"]
+
+
 class TestAnnotationCreate:
     def test_create_single(self, mock_gc, sample_annotation_dict):
         mock_gc.post.return_value = sample_annotation_dict
@@ -278,3 +295,143 @@ class TestAnnotationDelete:
         args = mock_gc.sendRestRequest.call_args
         assert args[0][0] == "DELETE"
         assert "multiple" in args[0][1]
+
+
+class TestGetMany:
+    def test_one_hydrate_request(self, mock_gc, sample_annotation_dict):
+        mock_gc.post.return_value = [sample_annotation_dict]
+        accessor = AnnotationAccessor(mock_gc, "dataset_001")
+        result = accessor.get_many(["ann_001", "ann_missing"])
+        mock_gc.post.assert_called_once_with(
+            "upenn_annotation/hydrate", json=["ann_001", "ann_missing"]
+        )
+        assert [a.id for a in result] == ["ann_001"]
+
+    def test_scoped_to_the_dataset(self, mock_gc, sample_annotation_dict):
+        other = {**sample_annotation_dict, "_id": "x", "datasetId": "other"}
+        mock_gc.post.return_value = [sample_annotation_dict, other]
+        result = AnnotationAccessor(mock_gc, "dataset_001").get_many(
+            ["ann_001", "x"]
+        )
+        assert [a.id for a in result] == ["ann_001"]
+
+    def test_accepts_a_numpy_array(self, mock_gc, sample_annotation_dict):
+        import numpy as np
+
+        mock_gc.post.return_value = [sample_annotation_dict]
+        ids = np.array(["ann_001", "ann_002"], dtype=object)
+        AnnotationAccessor(mock_gc, "dataset_001").get_many(ids)
+        mock_gc.post.assert_called_once_with(
+            "upenn_annotation/hydrate", json=["ann_001", "ann_002"]
+        )
+
+    def test_empty_list_makes_no_request(self, mock_gc):
+        assert AnnotationAccessor(mock_gc, "dataset_001").get_many([]) == []
+        mock_gc.post.assert_not_called()
+
+
+class TestAnnotationSummary:
+    """ds.annotations.summary() wraps POST upenn_annotation/summary."""
+
+    RESPONSE = {
+        "total": 4,
+        "tags": [{"tag": "A", "count": 3}, {"tag": "B", "count": 1}],
+        "shapes": [
+            {"shape": "polygon", "count": 3}, {"shape": "point", "count": 1},
+        ],
+        "channels": [
+            {"channel": 2, "count": 3}, {"channel": 0, "count": 1},
+        ],
+        "properties": [
+            {"path": ["p", "Area"], "count": 2, "mean": 10.0, "std": 7.07,
+             "min": 5.0, "max": 15.0},
+            {"path": ["p", "Nope"], "count": 0, "mean": None, "std": None,
+             "min": None, "max": None},
+        ],
+    }
+
+    def test_posts_the_summary_request_and_parses_it(self, mock_gc):
+        mock_gc.post.return_value = self.RESPONSE
+        accessor = AnnotationAccessor(mock_gc, "ds_001")
+
+        s = accessor.summary(property_paths=[("p", "Area"), ["p", "Nope"]])
+
+        mock_gc.post.assert_called_once_with("upenn_annotation/summary", json={
+            "datasetId": "ds_001",
+            "filters": {},
+            "propertyPaths": [["p", "Area"], ["p", "Nope"]],
+        })
+        assert s.total == 4
+        # Server order (count desc) is kept.
+        assert list(s.tags.items()) == [("A", 3), ("B", 1)]
+        assert s.shapes == {"polygon": 3, "point": 1}
+        # Keyed by channel index (an int, as the app's layers use), in the
+        # server's count order.
+        assert list(s.channels.items()) == [(2, 3), (0, 1)]
+        assert s.properties[0].path == ["p", "Area"]
+        assert s.properties[0].mean == 10.0
+        assert s.properties[1].count == 0 and s.properties[1].mean is None
+
+    def test_shape_and_tags_become_list_filters(self, mock_gc):
+        mock_gc.post.return_value = self.RESPONSE
+        accessor = AnnotationAccessor(mock_gc, "ds_001")
+        extra = {"location": {"Z": 0}}
+
+        accessor.summary(
+            shape="point", tags=["CD8+"], exclusive=True, filters=extra,
+        )
+
+        assert mock_gc.post.call_args.kwargs["json"]["filters"] == {
+            "location": {"Z": 0},
+            "shape": "point",
+            "tags": {"values": ["CD8+"], "exclusive": True},
+        }
+        assert extra == {"location": {"Z": 0}}  # caller's dict untouched
+
+    @pytest.mark.parametrize("kwargs", [
+        {"shape": "point", "filters": {"shape": "polygon"}},
+        {"tags": ["A"], "filters": {"tags": {"values": ["B"]}}},
+    ])
+    def test_rejects_the_same_filter_twice(self, mock_gc, kwargs):
+        with pytest.raises(ValueError, match="not both"):
+            AnnotationAccessor(mock_gc, "ds_001").summary(**kwargs)
+        mock_gc.post.assert_not_called()
+
+    @pytest.mark.parametrize("kwargs, error", [
+        ({"tags": "cell"}, TypeError),
+        ({"property_paths": ["prop.Area"]}, TypeError),
+        ({"exclusive": True}, ValueError),
+    ])
+    def test_rejects_misshapen_arguments(self, mock_gc, kwargs, error):
+        """A bare string would be split into characters and silently match
+        the wrong thing; exclusive without tags would be ignored."""
+        with pytest.raises(error):
+            AnnotationAccessor(mock_gc, "ds_001").summary(**kwargs)
+        mock_gc.post.assert_not_called()
+
+    def test_duplicate_tags_are_sent_once(self, mock_gc):
+        """The server's exclusive match compares the tag-set size with
+        len(values); a duplicate would make it match nothing."""
+        mock_gc.post.return_value = self.RESPONSE
+        AnnotationAccessor(mock_gc, "ds_001").summary(
+            tags=["a", "b", "a"], exclusive=True,
+        )
+        assert mock_gc.post.call_args.kwargs["json"]["filters"]["tags"] == {
+            "values": ["a", "b"], "exclusive": True,
+        }
+
+    def test_empty_tag_list_is_a_filter_not_absent(self, mock_gc):
+        """tags=[] is sent (the server reads empty values as no tag
+        filter); only None leaves the key out."""
+        mock_gc.post.return_value = self.RESPONSE
+        AnnotationAccessor(mock_gc, "ds_001").summary(tags=[])
+        assert mock_gc.post.call_args.kwargs["json"]["filters"] == {
+            "tags": {"values": [], "exclusive": False},
+        }
+
+    def test_shapes_is_none_on_servers_without_the_breakdown(self, mock_gc):
+        mock_gc.post.return_value = {"total": 0, "tags": [], "properties": []}
+        s = AnnotationAccessor(mock_gc, "ds_001").summary()
+        assert s.shapes is None
+        assert s.channels is None
+        assert s.tags == {} and s.properties == []

@@ -537,9 +537,7 @@ def _build_annotation_json(
 
     properties = []
     if property_ids:
-        properties = list(property_model.find(
-            {'_id': {'$in': list(property_ids)}}
-        ))
+        properties = property_model.findClientFields(property_ids)
 
     # Get property values
     # (same pattern as export.py _getPropertyValues)

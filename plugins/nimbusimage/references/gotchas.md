@@ -95,7 +95,11 @@ Following numpy convention: `ds.shape` returns `(rows, cols)` = `(height, width)
 
 ## Composite needs layer settings
 
-`ds.images.get_composite()` reads layer configuration from `ds.collections.layers`. If no collection/layers are configured for the dataset, it returns a blank image. You may need to set up layers in the UI first.
+`ds.images.get_composite()` reads layer configuration from `ds.collections.layers` (the configuration of the caller's own view) and their per-view contrast overrides. If no collection/layers are configured for the dataset, it returns a blank image. You may need to set up layers in the UI first. For a large slide pass `max_size=` (e.g. 1024) so the server downsamples instead of sending every channel at full resolution.
+
+## Pixel size can be None
+
+`ds.pixel_size` is what the app uses (view scales over configuration scales, then the file's calibration). It is `None` when the size is unknown, so check before converting: `ps = ds.pixel_size; um = ps.to('um').value if ps else None`.
 
 ## Job status 3 is SUCCESS
 

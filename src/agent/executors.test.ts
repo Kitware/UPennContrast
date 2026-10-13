@@ -79,6 +79,7 @@ vi.mock("@/store", () => ({
     setBackgroundColor: vi.fn(),
     setDrawAnnotationConnections: vi.fn(),
     agentAPI: { getHelpTopic: vi.fn() },
+    annotationsAPI: { fetchAnnotationSummary: vi.fn() },
   },
 }));
 
@@ -133,7 +134,9 @@ vi.mock("@/tools/creation/toolFromCatalog", () => ({
 vi.mock("@/store/annotation", () => ({
   default: {
     annotations: [],
+    annotationCount: 0,
     selectedAnnotationIds: new Set<string>(),
+    resolvedSelectedAnnotationIds: [] as string[],
     annotationTags: new Set<string>(),
     setSelected: vi.fn(),
     selectAnnotations: vi.fn(),
@@ -272,7 +275,19 @@ beforeEach(() => {
   mockMain.layers = [];
   mockMain.maps = [];
   mockAnnotations.annotations = [];
+  mockAnnotations.annotationCount = 0;
   mockAnnotations.selectedAnnotationIds = new Set();
+  mockAnnotations.resolvedSelectedAnnotationIds = [];
+  // clearAllMocks keeps implementations, so a test's summary would leak
+  // into the next; start each from an empty dataset.
+  mockMain.annotationsAPI.fetchAnnotationSummary = vi.fn(async () => ({
+    total: 0,
+    tags: [],
+    shapes: [],
+    channels: [],
+    properties: [],
+  }));
+  mockFilters.filteredAnnotations = [];
   mockJobs.jobIdForToolId = {};
   mockJobs.jobIdForPropertyId = {};
   mockProperties.workerImageList = {};
@@ -470,6 +485,92 @@ describe("executeAgentTool", () => {
     expect(lastPage.result.returned).toBe(1);
     expect(lastPage.result.hasMore).toBe(false);
     expect(lastPage.result.nextOffset).toBeUndefined();
+  });
+
+  describe("get_annotation_summary", () => {
+    it("reports the server summary, not the loaded annotations", async () => {
+      // Stub-only mode: annotations[] is empty, the server sees 250K.
+      mockAnnotations.annotations = [];
+      mockMain.annotationsAPI.fetchAnnotationSummary.mockResolvedValue({
+        total: 250000,
+        tags: [
+          { tag: "cell", count: 200000 },
+          { tag: "nucleus", count: 50000 },
+        ],
+        shapes: [
+          { shape: "polygon", count: 240000 },
+          { shape: "point", count: 10000 },
+        ],
+        channels: [
+          { channel: 1, count: 150000 },
+          { channel: 0, count: 100000 },
+        ],
+        properties: [],
+      });
+      mockFilters.filteredAnnotations = [makeAnnotation({ id: "a1" })];
+      // "gone" is a stale id a delete left in the selection.
+      mockAnnotations.selectedAnnotationIds = new Set(["a1", "a2", "gone"]);
+      mockAnnotations.resolvedSelectedAnnotationIds = ["a1", "a2"];
+
+      const { result } = await executeAgentTool(
+        "get_annotation_summary",
+        {},
+        context,
+      );
+
+      // The whole dataset, unfiltered, with no property statistics.
+      expect(
+        mockMain.annotationsAPI.fetchAnnotationSummary,
+      ).toHaveBeenCalledWith("ds1", {}, []);
+      expect(result).toEqual({
+        total: 250000,
+        filtered: 1,
+        selected: 2,
+        byTag: { cell: 200000, nucleus: 50000 },
+        byShape: { polygon: 240000, point: 10000 },
+        byChannel: { "0": 100000, "1": 150000 },
+      });
+    });
+
+    it("aborts when the dataset changes during the request", async () => {
+      // The switch happens while the request is in flight, so only a check
+      // after the await can catch it.
+      let switched = false;
+      mockMain.annotationsAPI.fetchAnnotationSummary.mockImplementation(
+        async () => {
+          switched = true;
+          return {
+            total: 1,
+            tags: [],
+            shapes: [],
+            channels: [],
+            properties: [],
+          };
+        },
+      );
+      await expect(
+        executeAgentTool(
+          "get_annotation_summary",
+          {},
+          { ...context, hasViewIdentityChanged: () => switched },
+        ),
+      ).rejects.toThrow(/dataset changed/);
+    });
+
+    it("errors without an open dataset instead of calling the server", async () => {
+      const dataset = mockMain.dataset;
+      mockMain.dataset = null;
+      try {
+        await expect(
+          executeAgentTool("get_annotation_summary", {}, context),
+        ).rejects.toThrow(ToolExecutionError);
+        expect(
+          mockMain.annotationsAPI.fetchAnnotationSummary,
+        ).not.toHaveBeenCalled();
+      } finally {
+        mockMain.dataset = dataset;
+      }
+    });
   });
 
   it("hints toward get_annotation_summary for large result sets", async () => {
@@ -3037,6 +3138,14 @@ describe("analysis panel tools", () => {
     expect(mockFilters.removeAnalysisPlot).toHaveBeenCalledTimes(2);
     expect(mockFilters.refreshAnalysis).toHaveBeenCalled();
     expect(out.result.removed).toBe(2);
+  });
+
+  it("reports the dataset's annotation count in stub-only mode", () => {
+    // annotations[] is empty above the stub threshold; annotationCount
+    // counts the stubs, which hold the whole population.
+    mockAnnotations.annotations = [];
+    mockAnnotations.annotationCount = 250000;
+    expect((buildInterfaceState() as any).annotations.total).toBe(250000);
   });
 
   it("reports gates in the interface state so the model can explain counts", () => {

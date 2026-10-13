@@ -193,7 +193,8 @@
         item-value="annotation.id"
         v-model="selectedIds"
         :page="page"
-        :items-per-page-options="[10, 50, 200]"
+        :items-per-page="itemsPerPage"
+        :items-per-page-options="[10, 50, 100, 200]"
         :sort-by="sortBy"
         @update:items-per-page="itemsPerPage = $event"
         @update:page="page = $event"
@@ -267,7 +268,7 @@
         v-model="selectedIds"
         :page="annotationListServer.page"
         :items-per-page="annotationListServer.pageSize"
-        :items-per-page-options="[10, 50, 200]"
+        :items-per-page-options="[10, 50, 100, 200]"
         @update:options="onServerOptions"
         class="compact-table"
         :class="{ 'is-loading': serverLoading }"
@@ -325,6 +326,7 @@ import { debounce } from "lodash";
 import store from "@/store";
 import annotationStore from "@/store/annotation";
 import annotationListServer from "@/store/annotationListServer";
+import montageStore, { IMontageListItem } from "@/store/montage";
 import { TOUR_ANCHORS } from "@/tours/anchors";
 import propertyStore from "@/store/properties";
 import filterStore from "@/store/filters";
@@ -384,6 +386,17 @@ interface IAnnotationListItem {
   // baked into the item, so toggling a selection doesn't re-map the page array.
   properties: IAnnotationPropertyValues[string];
 }
+
+// Shown (palette open, Objects tab active). Hidden, a server-mode refetch is
+// deferred rather than run: the list stays mounted while its palette is
+// closed, and with an analysis gate every refetch is a whole-dataset gate
+// resolution — seconds of server work competing with the gate the user
+// just drew, for a table no one can see. The deferred fetch runs once the
+// list is shown again.
+const props = withDefaults(defineProps<{ visible?: boolean }>(), {
+  visible: true,
+});
+let serverRefetchDeferred = false;
 
 const emit = defineEmits<{
   (e: "clickedTag", tag: string): void;
@@ -895,6 +908,37 @@ async function onHoveredIdOrItemsPerPageChanged() {
 // Stacked @Watch("hoveredId") @Watch("itemsPerPage") → single watch
 watch([hoveredId, itemsPerPage], onHoveredIdOrItemsPerPageChanged);
 
+// --- Montage ---------------------------------------------------------------
+// The montage shows exactly this list's current page, so publish it (ids in
+// display order + the Index column value). Gated on the montage being open
+// first: the client path sorts every filtered item (dataTableItems), which is
+// wasted work while nobody is looking.
+const currentPageForMontage = computed((): IMontageListItem[] => {
+  if (!montageStore.isOpen) {
+    return [];
+  }
+  if (isServerMode.value) {
+    return serverRowItems.value.map(({ annotation, index }) => ({
+      id: annotation.id,
+      index,
+    }));
+  }
+  const items = dataTableItems.value;
+  const perPage = Math.max(1, itemsPerPage.value);
+  // Vuetify clamps an out-of-range page when the list shrinks; mirror that.
+  const pageCount = Math.max(1, Math.ceil(items.length / perPage));
+  const start = (Math.min(page.value, pageCount) - 1) * perPage;
+  return items
+    .slice(start, start + perPage)
+    .map(({ annotation, index }) => ({ id: annotation.id, index }));
+});
+
+watch(
+  () => JSON.stringify(currentPageForMontage.value),
+  () => montageStore.setListPageItems(currentPageForMontage.value),
+  { immediate: true },
+);
+
 // --- Server-mode reactive refetch -----------------------------------------
 // Each watch body is a no-op in client mode (the client set is reactive on its
 // own). In server mode, a change to any query input resets to page 1 and
@@ -905,9 +949,26 @@ watch([hoveredId, itemsPerPage], onHoveredIdOrItemsPerPageChanged);
 // rapid filter/frame changes would otherwise fire one slow /list request per
 // keystroke. State (idSubstring, page reset) is updated synchronously so the
 // store is always consistent; only the network fetch is deferred.
-const debouncedServerRefetch = debounce(() => {
+// Fetch now if shown, otherwise once shown (see `visible`).
+function fetchServerPageWhenShown() {
+  if (!props.visible) {
+    serverRefetchDeferred = true;
+    return;
+  }
   annotationListServer.fetchPage();
-}, 300);
+}
+
+const debouncedServerRefetch = debounce(fetchServerPageWhenShown, 300);
+
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible && serverRefetchDeferred && isServerMode.value) {
+      serverRefetchDeferred = false;
+      annotationListServer.fetchPage();
+    }
+  },
+);
 
 watch(localIdFilter, (value) => {
   if (!isServerMode.value) {
@@ -985,7 +1046,7 @@ watch(
 watch(isServerMode, (value) => {
   if (value) {
     annotationListServer.setOptions({ page: 1 });
-    annotationListServer.fetchPage();
+    fetchServerPageWhenShown();
   }
 });
 
@@ -1017,7 +1078,7 @@ onBeforeUnmount(() => {
 
 onMounted(() => {
   if (isServerMode.value) {
-    annotationListServer.fetchPage();
+    fetchServerPageWhenShown();
   }
 });
 
@@ -1110,6 +1171,8 @@ async function deleteUnselected() {
 }
 
 defineExpose({
+  currentPageForMontage,
+  fetchServerPageWhenShown,
   isLoggedIn,
   isDeletingAnnotations,
   isServerMode,

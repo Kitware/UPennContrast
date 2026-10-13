@@ -1,7 +1,7 @@
 from girder.api import access
 from girder.api.describe import Description, describeRoute
 from girder.constants import AccessType, TokenScope
-from girder.api.rest import Resource, loadmodel
+from girder.api.rest import Resource, filtermodel, loadmodel
 from girder.models.folder import Folder
 from ..helpers.validation import (
     requireCountWithin,
@@ -159,7 +159,16 @@ class AnnotationProperty(Resource):
             for propertyId in propertyIds
         ]
 
+    def _propertyBody(self):
+        """The request body reduced to the client-owned fields. Anything
+        else -- `access`, `public`, or the `_id`/`_modelType` an exported
+        property carries -- is dropped, so a caller cannot set the ACL of
+        the property they create or update."""
+        return self._propertyModel.filterUpdateFields(
+            requireObjectBody(self.getBodyJson()))
+
     @access.user(scope=TokenScope.DATA_WRITE)
+    @filtermodel(model=PropertyModel)
     @describeRoute(
         Description("Create a new property").param(
             "body", "Property Object", paramType="body"
@@ -169,7 +178,7 @@ class AnnotationProperty(Resource):
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException("User not found", "currentUser")
-        return self._propertyModel.create(currentUser, self.getBodyJson())
+        return self._propertyModel.create(currentUser, self._propertyBody())
 
     @describeRoute(
         Description("Delete an existing property")
@@ -205,13 +214,11 @@ class AnnotationProperty(Resource):
         level=AccessType.WRITE,
     )
     def update(self, annotation_property, params):
-        filtered = self._propertyModel.filterUpdateFields(
-            self.getBodyJson()
-        )
-        annotation_property.update(filtered)
+        annotation_property.update(self._propertyBody())
         self._propertyModel.save(annotation_property)
 
     @access.public(scope=TokenScope.DATA_READ)
+    @filtermodel(model=PropertyModel)
     @describeRoute(
         Description("Search for properties")
         .responseClass("property")
@@ -285,6 +292,7 @@ class AnnotationProperty(Resource):
         return {"count": count}
 
     @access.public(scope=TokenScope.DATA_READ)
+    @filtermodel(model=PropertyModel)
     @describeRoute(
         Description("Get a property by its id.").param(
             "id", "The annotation property's id", paramType="path"

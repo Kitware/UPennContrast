@@ -32,6 +32,13 @@ nuclei = ds.annotations.list(shape="polygon", tags=["nucleus"])
 # Count without fetching
 n = ds.annotations.count(shape="polygon", tags=["nucleus"])
 
+# Composition and property statistics without fetching (one aggregation)
+s = ds.annotations.summary()
+s.total, s.tags, s.shapes          # {"cell": 465534, ...}, {"polygon": ...}
+s.channels                         # {0: 34154, 3: 9246, ...} (channel index → count)
+s = ds.annotations.summary(tags=["cell"], property_paths=[[prop.id, "Area"]])
+s.properties[0].mean               # count/mean/std/min/max per path
+
 # Stable pagination for large or changing result sets
 for ann in ds.annotations.iter_all(
     shape="polygon",
