@@ -723,15 +723,31 @@ class TestCreateMultipleValidation:
 
 @pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
 @pytest.mark.plugin("upenncontrast_annotation")
-class TestUpdateMultipleNumericId:
-    def testNumericIdReturns400(self, admin, server):
-        """PUT /upenn_annotation/multiple with a numeric id is a 400: the
-        handler's ObjectId() raises TypeError for it, not InvalidId."""
-        resp = server.request(
+class TestUpdateMultipleNumericIds:
+    """PUT /upenn_annotation/multiple with a numeric id or datasetId is a
+    400: ObjectId() raises TypeError for a non-string, not InvalidId."""
+
+    def _put(self, server, user, body):
+        return server.request(
             path="/upenn_annotation/multiple",
             method="PUT",
-            user=admin,
-            body=json.dumps([{"id": 123}]),
+            user=user,
+            body=json.dumps(body),
             type="application/json",
+        )
+
+    def testNumericIdReturns400(self, admin, server):
+        resp = self._put(server, admin, [{"id": 123}])
+        assertStatus(resp, 400)
+
+    def testNumericDatasetIdReturns400(self, admin, server):
+        dataset = utilities.createFolder(
+            admin, "update-multiple-ds", upenn_utilities.datasetMetadata
+        )
+        annotation = Annotation().create(
+            upenn_utilities.getSampleAnnotation(dataset["_id"])
+        )
+        resp = self._put(
+            server, admin, [{"id": str(annotation["_id"]), "datasetId": 123}]
         )
         assertStatus(resp, 400)

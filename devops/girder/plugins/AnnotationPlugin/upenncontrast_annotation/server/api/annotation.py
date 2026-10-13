@@ -412,7 +412,7 @@ class Annotation(Resource):
                     dsId = ObjectId(
                         updateDoc["datasetId"]
                     )
-                except InvalidId:
+                except (InvalidId, TypeError):
                     raise RestException(
                         "Invalid datasetId: %s"
                         % updateDoc["datasetId"]
