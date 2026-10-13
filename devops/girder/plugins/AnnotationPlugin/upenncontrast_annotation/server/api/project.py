@@ -356,7 +356,7 @@ class Project(Resource):
     )
     def getAccess(self, project):
         result = formatAccessList(
-            self._projectModel, project
+            self._projectModel, project, self.getCurrentUser()
         )
         result['projectId'] = str(project['_id'])
         return result

@@ -407,7 +407,7 @@ class DatasetView(Resource):
     def getDatasetAccess(self, dataset):
         """Return the full access list for a dataset
         and its configurations."""
-        result = formatAccessList(Folder(), dataset)
+        result = formatAccessList(Folder(), dataset, self.getCurrentUser())
         result['datasetId'] = str(dataset['_id'])
 
         # Find all DatasetViews for this dataset
@@ -470,7 +470,7 @@ class DatasetView(Resource):
         """Return the access list for a configuration
         and its datasets."""
         result = formatAccessList(
-            CollectionModel(), configuration
+            CollectionModel(), configuration, self.getCurrentUser()
         )
         result['configurationId'] = str(
             configuration['_id']

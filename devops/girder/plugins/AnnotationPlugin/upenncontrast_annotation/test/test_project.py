@@ -1152,6 +1152,7 @@ class TestProjectShareEndpointRemove:
         assert str(user['_id']) not in {
             u['id'] for u in resp.json['users']
         }
+        assert resp.json['currentUserLevel'] == AccessType.ADMIN
 
     def test_legacy_negative_entry_not_propagated(
         self, admin, user

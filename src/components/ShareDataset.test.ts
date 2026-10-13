@@ -34,6 +34,7 @@ import ShareDataset from "./ShareDataset.vue";
 
 const defaultAccessList = {
   public: false,
+  currentUserLevel: 2,
   users: [
     {
       id: "u1",
@@ -491,6 +492,7 @@ describe("ShareDataset", () => {
   describe("a WRITE collaborator", () => {
     const writeAccessList = {
       ...defaultAccessList,
+      currentUserLevel: 1,
       users: [
         { id: "owner", login: "o", name: "O", email: "o@t.com", level: 2 },
         { id: "u1", login: "me", name: "Me", email: "me@t.com", level: 1 },
@@ -523,6 +525,7 @@ describe("ShareDataset", () => {
     it("a READ user can manage nobody", async () => {
       mockGetDatasetAccess.mockResolvedValue({
         ...writeAccessList,
+        currentUserLevel: 0,
         users: writeAccessList.users.map((u) =>
           u.id === "u1" ? { ...u, level: 0 } : u,
         ),
@@ -549,5 +552,105 @@ describe("ShareDataset", () => {
     vm.newUserEmail = "someone";
     await vm.addUser();
     expect(vm.errorString).toBe(reason);
+  });
+
+  it("takes management rights from the server's effective level", async () => {
+    // WRITE through a group (or site admin): no direct row for the caller
+    mockGetDatasetAccess.mockResolvedValue({
+      ...defaultAccessList,
+      currentUserLevel: 1,
+      users: defaultAccessList.users.filter((u) => u.id !== "u1"),
+    });
+    const wrapper = mountComponent({ modelValue: true }, true);
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    await wrapper.vm.$nextTick();
+
+    expect(vm.canManageUsers).toBe(true);
+    expect(vm.isResourceAdmin).toBe(false);
+    expect(wrapper.html()).toContain("Add User:");
+  });
+
+  describe("changing your own entry", () => {
+    const selfOnly = {
+      ...defaultAccessList,
+      currentUserLevel: 1,
+      users: [
+        { id: "u1", login: "me", name: "Me", email: "me@t.com", level: 1 },
+        { id: "u3", login: "r", name: "R", email: "r@t.com", level: 0 },
+      ],
+    };
+
+    async function openAsWriteUser() {
+      mockGetDatasetAccess.mockResolvedValue(selfOnly);
+      const wrapper = mountComponent({ modelValue: true });
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+      vm.selectedConfigIds = ["cfg1"];
+      mockShareDatasetView.mockResolvedValue(true);
+      return { vm, wrapper };
+    }
+
+    it("removing your last access fails closed on the 403", async () => {
+      const { vm } = await openAsWriteUser();
+      // The real endpoint needs READ, so it rejects once you're gone
+      mockGetDatasetAccess.mockRejectedValue(new Error("403"));
+      vm.confirmRemoveUser(vm.users[0]);
+      await vm.removeUser();
+
+      expect(mockGetDatasetAccess).toHaveBeenCalledTimes(2);
+      expect(vm.canManageUsers).toBe(false);
+    });
+
+    it("re-reads your level but keeps the collection selection", async () => {
+      const { vm } = await openAsWriteUser();
+      mockGetDatasetAccess.mockResolvedValue({
+        ...selfOnly,
+        currentUserLevel: 0,
+        users: selfOnly.users.map((u) =>
+          u.id === "u1" ? { ...u, level: 0 } : u,
+        ),
+      });
+      await vm.updateUserAccess(vm.users[0], 0);
+
+      expect(vm.canManageUsers).toBe(false);
+      expect(vm.selectedConfigIds).toEqual(["cfg1"]);
+      expect(shareLinkMocks.list).toHaveBeenCalledTimes(1);
+    });
+
+    it("changing someone else does not refetch", async () => {
+      const { vm } = await openAsWriteUser();
+      await vm.updateUserAccess(vm.users[1], 1);
+      expect(mockGetDatasetAccess).toHaveBeenCalledTimes(1);
+    });
+
+    it("drops a reload that lands after the dialog closed", async () => {
+      const { vm, wrapper } = await openAsWriteUser();
+      let resolveReload: (value: unknown) => void = () => {};
+      mockGetDatasetAccess.mockReturnValue(
+        new Promise((resolve) => (resolveReload = resolve)),
+      );
+      vm.confirmRemoveUser(vm.users[0]);
+      const removal = vm.removeUser();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      // Closing through the prop runs the dialog watcher's resetState
+      await wrapper.setProps({ modelValue: false });
+      expect(vm.currentUserLevel).toBe(-1);
+      resolveReload({ ...selfOnly, currentUserLevel: 2 });
+      await removal;
+
+      expect(vm.currentUserLevel).toBe(-1);
+    });
+  });
+
+  it("a failed access load hides management controls", async () => {
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    expect(vm.isResourceAdmin).toBe(true);
+
+    mockGetDatasetAccess.mockRejectedValue(new Error("network"));
+    await vm.fetchAccessInfo("ds1");
+    expect(vm.canManageUsers).toBe(false);
   });
 });

@@ -141,10 +141,13 @@ def fetchNamedUserEmails(userIds):
     }
 
 
-def formatAccessList(model, document):
+def formatAccessList(model, document, currentUser):
     """Format a document's access list with user emails.
 
-    Returns dict with 'public', 'users', and 'groups' keys.
+    Returns dict with 'public', 'users', 'groups' and 'currentUserLevel'.
+    currentUserLevel is the caller's effective level (groups and site admin
+    included, the same getAccessLevel the share endpoints authorize with),
+    so a client never infers its own rights from the direct-user rows.
     Users include id, login, name, email, and level. Share-link principals
     are managed only through the link list, never the named sharing table.
     Entries with a negative level grant nothing; they are leftovers from
@@ -153,7 +156,8 @@ def formatAccessList(model, document):
 
     :param model: The Girder model instance.
     :param document: The document to get access for.
-    :returns: Dict with public, users, groups.
+    :param currentUser: The user making the request.
+    :returns: Dict with public, users, groups, currentUserLevel.
     """
     accessList = model.getFullAccessList(document)
     userIds = [
@@ -176,4 +180,5 @@ def formatAccessList(model, document):
             if u['id'] in userEmails and u['level'] >= AccessType.READ
         ],
         'groups': accessList.get('groups', []),
+        'currentUserLevel': model.getAccessLevel(document, currentUser),
     }

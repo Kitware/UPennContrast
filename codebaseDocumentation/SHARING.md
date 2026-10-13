@@ -82,6 +82,7 @@ Returns the current access list for a dataset.
     }
   ],
   "groups": [],
+  "currentUserLevel": 1,
   "configurations": [
     {
       "id": "string",
@@ -91,6 +92,11 @@ Returns the current access list for a dataset.
   ]
 }
 ```
+
+`currentUserLevel` is the caller's **effective** level (`getAccessLevel`, so groups and site admin
+count). The same `formatAccessList` adds it to `/dataset_view/configuration_access/:id` and
+`/project/:id/access`. Clients must use it for their own rights, not their row in `users`: that list
+holds only direct entries, so access held through a group has no row. *"testAccessListReportsEffectiveCurrentUserLevel"*
 
 **Implementation notes:**
 - Uses `Folder().getFullAccessList()` for user list (doesn't include emails)
@@ -309,6 +315,7 @@ Location: `src/components/ShareDataset.vue`
 - Individual loading states per user row
 - Confirmation dialog before removing access
 - ADMIN users protected from removal (lock icon)
+- Rights come from the access response's `currentUserLevel`, not the caller's row (*"takes management rights from the server's effective level"*). Changing your own entry re-reads it without resetting the collection selection. Any failed load, including the 403 after removing your last access, fails closed (*"removing your last access fails closed on the 403"*).
 - **WRITE collaborators** (`canManageUsers`) get the add-user form, plus level dropdowns and remove buttons on rows at or below their own level (`canEditUser`). Rows above it show a lock. Public toggle, collection checkboxes and share links stay ADMIN-only (`isResourceAdmin`). A refused share shows the server's reason.
 - **Read-only mode** for READ users: the dialog hides all edit controls (add user form, remove buttons, access level dropdowns, public toggle, collection checkboxes) and shows access levels as plain text. The dialog title changes from "Share Dataset:" to "Sharing:".
 

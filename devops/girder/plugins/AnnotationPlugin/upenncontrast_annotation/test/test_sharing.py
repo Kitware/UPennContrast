@@ -12,6 +12,7 @@ from pytest_girder.assertions import assertStatus, assertStatusOk
 from girder.constants import AccessType
 from girder.exceptions import AccessException
 from girder.models.folder import Folder
+from girder.models.group import Group
 from girder.models.user import User
 
 from upenncontrast_annotation.server.models.datasetView import (
@@ -442,6 +443,32 @@ class TestGetDatasetAccess:
         userIds = {u["id"] for u in accessList["users"]}
         assert admin["_id"] in userIds
         assert user["_id"] in userIds
+
+    def testAccessListReportsEffectiveCurrentUserLevel(
+            self, admin, user, server):
+        """currentUserLevel is the caller's effective level, so WRITE held
+        through a group (no direct row) still lets the dialog share."""
+        dataset, config, datasetView = createDatasetWithView(admin)
+        group = Group().createGroup("writers", admin)
+        Group().addUser(group, user, level=AccessType.READ)
+        Folder().setGroupAccess(dataset, group, AccessType.WRITE, save=True)
+        Collection().setGroupAccess(config, group, AccessType.READ, save=True)
+
+        def accessOf(path, caller):
+            resp = server.request(path=path, method="GET", user=caller)
+            assertStatusOk(resp)
+            return resp.json
+
+        datasetPath = f"/dataset_view/access/{dataset['_id']}"
+        configPath = f"/dataset_view/configuration_access/{config['_id']}"
+        datasetAccess = accessOf(datasetPath, user)
+        assert str(user["_id"]) not in {
+            u["id"] for u in datasetAccess["users"]}
+        assert datasetAccess["currentUserLevel"] == AccessType.WRITE
+        assert accessOf(configPath, user)["currentUserLevel"] == (
+            AccessType.READ)
+        assert accessOf(datasetPath, admin)["currentUserLevel"] == (
+            AccessType.ADMIN)
 
     def testAccessListHidesLegacyNegativeEntries(self, admin, user, server):
         """Level -1 entries left by the old share endpoint grant nothing,

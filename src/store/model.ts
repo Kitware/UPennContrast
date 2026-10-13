@@ -718,6 +718,8 @@ export interface IDatasetAccessList {
   users: IDatasetAccessUser[];
   groups: unknown[]; // Future use
   configurations: IDatasetAccessConfiguration[];
+  /** The caller's effective level (groups and site admin included). */
+  currentUserLevel: number;
 }
 
 export interface IConfigurationAccessDataset {
@@ -732,6 +734,8 @@ export interface IConfigurationAccessList {
   users: IDatasetAccessUser[];
   groups: unknown[];
   datasets: IConfigurationAccessDataset[];
+  /** The caller's effective level (groups and site admin included). */
+  currentUserLevel: number;
 }
 
 export interface IProjectAccessList {
@@ -739,6 +743,8 @@ export interface IProjectAccessList {
   public: boolean;
   users: IDatasetAccessUser[];
   groups: unknown[];
+  /** The caller's effective level (groups and site admin included). */
+  currentUserLevel: number;
 }
 
 export interface IProjectDatasetReference {

@@ -462,15 +462,12 @@ const accessLevelItems = [
   { text: "Write", value: 1 },
 ];
 
-// The current user's own entry in the dataset's access list (-1 if none)
-const currentUserLevel = computed((): number => {
-  const userId = store.girderUser?._id;
-  if (!userId) return -1;
-  return users.value.find((u) => u.id === userId)?.level ?? -1;
-});
+// The caller's effective level from the server (groups and site admin
+// included), not their direct row in the users list, which can be missing.
+const currentUserLevel = ref(-1);
 
 // Collections, public access and share links stay owner-only
-const isResourceAdmin = computed((): boolean => currentUserLevel.value === 2);
+const isResourceAdmin = computed((): boolean => currentUserLevel.value >= 2);
 
 // WRITE collaborators may share too, but the server refuses any change
 // above the caller's own level, so mirror that here.
@@ -480,6 +477,27 @@ const canManageUsers = computed((): boolean => currentUserLevel.value >= 1);
 // generic message; only the unknown-user code needs translating.
 function shareErrorMessage(response: string, unknownUser: string): string {
   return response === "badEmailOrUsername" ? unknownUser : response;
+}
+
+// Changing your own entry changes currentUserLevel, which only the server
+// can recompute (a group may still grant access). Re-read just the access
+// list so the collection selection and share links are left alone.
+async function refetchIfSelf(user: IDatasetAccessUser) {
+  const requestedDatasetId = datasetId.value;
+  if (user.id !== store.girderUser?._id || !requestedDatasetId) return;
+  try {
+    const accessList = await store.api.getDatasetAccess(requestedDatasetId);
+    if (!dialog.value || datasetId.value !== requestedDatasetId) return;
+    users.value = accessList.users;
+    currentUserLevel.value = accessList.currentUserLevel;
+  } catch (error) {
+    // Removing your last access makes the list itself a 403: fail closed
+    logError(
+      `Failed to reload access for dataset ${requestedDatasetId}`,
+      error,
+    );
+    currentUserLevel.value = -1;
+  }
 }
 
 function canEditUser(user: IDatasetAccessUser): boolean {
@@ -510,6 +528,7 @@ function resetState() {
   errorString.value = "";
   isPublic.value = false;
   users.value = [];
+  currentUserLevel.value = -1;
   configurations.value = [];
   selectedConfigIds.value = [];
   associatedViews.value = [];
@@ -528,6 +547,7 @@ async function fetchAccessInfo(datasetId: string) {
 
     isPublic.value = accessList.public;
     users.value = accessList.users;
+    currentUserLevel.value = accessList.currentUserLevel;
     configurations.value = accessList.configurations;
     // Select all configurations by default
     selectedConfigIds.value = accessList.configurations.map((c) => c.id);
@@ -538,6 +558,8 @@ async function fetchAccessInfo(datasetId: string) {
     });
   } catch (error) {
     logError(`Failed to fetch access info for dataset ${datasetId}`, error);
+    // Without the list we can't know the caller's rights: fail closed
+    currentUserLevel.value = -1;
     errorString.value = "Failed to load access information";
     showError.value = true;
   } finally {
@@ -602,6 +624,7 @@ async function updateUserAccess(user: IDatasetAccessUser, newLevel: number) {
       if (userIndex >= 0) {
         users.value[userIndex].level = newLevel as 0 | 1 | 2;
       }
+      await refetchIfSelf(user);
     }
   } catch (error) {
     logError("Failed to update user access", error);
@@ -645,6 +668,7 @@ async function removeUser() {
     } else {
       // Remove user from local state
       users.value = users.value.filter((u) => u.id !== user.id);
+      await refetchIfSelf(user);
     }
   } catch (error) {
     logError("Failed to remove user access", error);
@@ -813,6 +837,7 @@ defineExpose({
   userToRemove,
   accessLevelItems,
   isResourceAdmin,
+  currentUserLevel,
   canManageUsers,
   canEditUser,
   resetState,
