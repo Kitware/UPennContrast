@@ -115,8 +115,9 @@ def requireBulkCreateBody(body, model, itemName):
     body or non-dict entry would otherwise trip AttributeError/TypeError in
     convertIdsToObjectIds; a malformed hex id raises bson.InvalidId and a
     non-string id (a JSON number) raises TypeError. All are a 400, not a 500.
-    A null id is not rejected here: ObjectId(None) mints a fresh id, which
-    the caller's access or existence checks then refuse.
+    A null id is not rejected here: ObjectId(None) mints a fresh id. A null
+    datasetId is then refused by the dataset access check, but other id
+    fields (e.g. a connection's parentId) are not checked for existence.
     Returns the entries with their ids converted in place."""
     requireList(body, "Request body")
     for entry in body:
