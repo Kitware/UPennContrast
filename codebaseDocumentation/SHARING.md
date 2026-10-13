@@ -454,3 +454,35 @@ No collection checkboxes, public toggle, access level dropdowns, remove buttons,
 | `src/views/configuration/ConfigurationInfo.vue` | Configuration info page (embeds SharingStatusDisplay) |
 | `src/store/GirderAPI.ts` | API client methods |
 | `src/store/model.ts` | TypeScript interfaces |
+
+## Regression checklist
+
+Each line below was a real defect in sharing, found in review of PR #1403 or by
+Codex, and names the test that holds it. Changing sharing, publishing, the
+share-link guard or dataset-view writes means re-checking this list.
+
+Run `pnpm test src/components/ShareDataset.test.ts` and, from
+`devops/girder/plugins/AnnotationPlugin`, `tox -- upenncontrast_annotation/test/test_sharing.py upenncontrast_annotation/test/test_share_link.py upenncontrast_annotation/test/test_export.py`.
+
+### Share-link guard
+
+- [ ] **The download/export guard refuses link users only.** Its `rest.*.before` listener needs an access level, or Girder makes every guarded route site-admin-only. Test with a non-admin owner, not the `admin` fixture. — *"testNonAdminOwnerCanStillDownload"*
+- [ ] **Anonymous viewers of a public dataset can still download and export it.** The admin lockout broke this too (`requireAdmin(None)`). — *"testAnonymousUsersCanDownloadAndExportAPublicDataset"*
+- [ ] **Link users are refused by the guard itself.** Assert the guard's message on every route, not just a 403, which also passed while every non-admin was refused. — *"testBearerReadsOnlyTheSharedDataset"*
+
+### Publishing (`dataset_view/set_public`)
+
+- [ ] **Publishing changes only the caller's own views and configurations; making private unpublishes all of them.** — *"testPublishesOnlyOwnButUnpublishesAll"*
+- [ ] **A site admin skips nothing.** — *"testSiteAdminStillChangesEverything"*
+- [ ] **Skipped counts ignore deleted configurations** (a view can outlive its configuration). — *"testDeletedConfigurationIsNotCountedAsSkipped"*
+- [ ] **ACL saves accept older views holding null `scales`/`lastViewed`.** `setPublic`/`setUserAccess` validate the stored document as is. — *"testAclSavesAcceptOlderNullFields"*
+- [ ] **The Share dialog says what publishing skipped, and only for the dataset and publish it describes.** — *"togglePublic explains views and collections owned by others"*, *"togglePublic shows no notice when nothing was skipped"*, *"resetState clears all fields"*
+
+### Dataset-view writes
+
+- [ ] **Create and update keep only the view's own fields.** A body's `access`/`public` must never reach the ACL (WRITE → ADMIN escalation). — *"testWriteUserCannotRewriteTheAcl"*, *"testCreateIgnoresAclFields"*
+- [ ] **Create needs both ids and READ on the dataset and configuration**, and a non-object body is a 400. — *"testCreateValidatesAndChecksBothIds"*, *"testNonObjectBodyIsRejected"*
+
+### Export
+
+- [ ] **`export/json` without `configurationId` skips configurations the caller cannot read** instead of failing; publishing now leaves other users' configurations private. — *"testReaderExportsAroundAnotherUsersPrivateConfiguration"*
