@@ -507,13 +507,28 @@ describe("ShareDataset", () => {
       return { ...defaultAccessList };
     });
     const datasetB = { _id: "dsB", _modelType: "folder", name: "B" } as any;
+    shareLinkMocks.list.mockImplementation(async (id: string) => {
+      if (id === "dsB") throw new Error("Network error");
+      return [{ _id: "linkA", configurationId: "cfg1", created: "" }];
+    });
     const wrapper = mountComponent({ modelValue: true });
     const vm = wrapper.vm as any;
     await vm.fetchAccessInfo("ds1");
+    await flushPromises();
     expect(vm.isResourceAdmin).toBe(true);
+    expect(vm.shareLinks).toHaveLength(1);
+    // A removal awaiting confirmation and a just-created link's one-time URL.
+    vm.confirmRemoveUser(vm.users[1]);
+    vm.createdLinkUrl = "https://example.test/#/shared/secret";
 
     await wrapper.setProps({ dataset: datasetB });
     await flushPromises();
+
+    // None of dataset ds1's state may act on dsB.
+    expect(vm.confirmDialog).toBe(false);
+    expect(vm.userToRemove).toBeNull();
+    expect(vm.shareLinks).toEqual([]);
+    expect(vm.createdLinkUrl).toBeNull();
 
     // ds1's users would keep the admin controls enabled, and its views
     // would be what add/remove submit, while the dialog shows dsB.

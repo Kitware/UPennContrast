@@ -495,10 +495,11 @@ watch(dialog, (val) => {
   }
 });
 
-// The dialog is reused: when it moves to another dataset while open, reload
-// rather than keep showing the previous dataset's access, state and notice.
+// The dialog is reused: when it moves to another dataset while open, drop
+// everything that belonged to the previous one and reload.
 watch(datasetId, (id, previousId) => {
   if (dialog.value && id && id !== previousId) {
+    resetDatasetState();
     fetchAccessInfo(id);
   }
 });
@@ -520,15 +521,20 @@ watch(
   },
 );
 
-function resetState() {
+// Everything that belongs to the dataset the dialog shows. Moving to another
+// dataset clears all of it (and closing the dialog clears it too, via
+// resetState); keep every dataset-scoped field here, so the two paths cannot
+// drift apart -- a field missed here survives a dataset switch and acts on
+// the wrong dataset (a pending removal confirmation, a link list, a
+// one-time link URL).
+function resetDatasetState() {
+  // Disown in-flight loads: they belong to the previous dataset.
   shareLinksRequest++;
-  dialogGeneration++;
   accessRequest++;
   shareLinks.value = [];
   createdLinkUrl.value = null;
   createdEmbedUrl.value = null;
   createdLinkId = null;
-  newLinkLabel.value = "";
   loading.value = false;
   showError.value = false;
   errorString.value = "";
@@ -538,16 +544,24 @@ function resetState() {
   configurations.value = [];
   selectedConfigIds.value = [];
   associatedViews.value = [];
-  newUserEmail.value = "";
-  newUserAccessLevel.value = 0;
   userToRemove.value = null;
-  // In-progress flags of requests this reset disowned (claimDialog): their
-  // late finally blocks no longer touch the dialog, so clear them here.
+  confirmDialog.value = false;
+  // In-progress flags of requests now disowned (claimDialog checks the
+  // dataset): their late finally blocks no longer touch the dialog.
   userLoading.value = null;
   addUserLoading.value = false;
   creatingLink.value = false;
   revokingLinkId.value = null;
-  confirmDialog.value = false;
+}
+
+function resetState() {
+  // A new session: requests from this one no longer write back, even for
+  // the same dataset (claimDialog).
+  dialogGeneration++;
+  resetDatasetState();
+  newLinkLabel.value = "";
+  newUserEmail.value = "";
+  newUserAccessLevel.value = 0;
 }
 
 // Bumped per fetch and by resetState(): only the latest fetch, for the
