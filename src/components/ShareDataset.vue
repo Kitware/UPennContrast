@@ -2,7 +2,7 @@
   <v-dialog v-model="dialog" max-width="750px">
     <v-card>
       <v-card-title>
-        {{ isResourceAdmin ? "Share Dataset:" : "Sharing:" }}
+        {{ canManageUsers ? "Share Dataset:" : "Sharing:" }}
         {{ dataset ? dataset.name : "" }}
       </v-card-title>
       <v-card-text>
@@ -34,8 +34,13 @@
                 v-for="config in configurations"
                 :key="config.id"
                 v-model="selectedConfigIds"
-                :label="config.name"
+                :label="
+                  isConfigShareable(config)
+                    ? config.name
+                    : `${config.name} (you can't share this one)`
+                "
                 :value="config.id"
+                :disabled="!isConfigShareable(config)"
                 :hide-details="true"
                 density="compact"
               />
@@ -93,7 +98,7 @@
                         Access Level
                       </th>
                       <th
-                        v-if="isResourceAdmin"
+                        v-if="canManageUsers"
                         class="text-center"
                         style="width: 80px"
                       >
@@ -118,7 +123,7 @@
                         >
                           Admin (Owner)
                         </span>
-                        <template v-else-if="isResourceAdmin">
+                        <template v-else-if="canEditUser(user)">
                           <v-select
                             :model-value="user.level"
                             :items="accessLevelItems"
@@ -135,9 +140,9 @@
                           {{ accessLevelLabel(user.level) }}
                         </span>
                       </td>
-                      <td v-if="isResourceAdmin" class="text-center">
+                      <td v-if="canManageUsers" class="text-center">
                         <v-btn
-                          v-if="user.level !== 2"
+                          v-if="canEditUser(user)"
                           variant="text"
                           icon
                           size="small"
@@ -158,7 +163,11 @@
                               mdi-lock
                             </v-icon>
                           </template>
-                          <span>Cannot remove dataset owner</span>
+                          <span>{{
+                            user.level === 2
+                              ? "Cannot remove dataset owner"
+                              : "Cannot change a user above your own access"
+                          }}</span>
                         </v-tooltip>
                       </td>
                     </tr>
@@ -168,13 +177,17 @@
             </v-col>
           </v-row>
 
-          <!-- Add User Form (admin only) -->
-          <template v-if="isResourceAdmin">
+          <!-- Add User Form (WRITE or ADMIN; levels never exceed Write) -->
+          <template v-if="canManageUsers">
             <v-divider class="my-4" />
             <v-row>
               <v-col cols="12">
                 <div class="subtitle-2 mb-2">Add User:</div>
-                <v-row density="comfortable" align="center">
+                <div v-if="!canShareAny" class="text-body-2 text-grey">
+                  You can't share any of this dataset's collections: sharing
+                  needs edit access to a collection and to one of its views.
+                </div>
+                <v-row v-else density="comfortable" align="center">
                   <v-col cols="5">
                     <v-text-field
                       v-model="newUserEmail"
@@ -212,6 +225,124 @@
                     </v-btn>
                   </v-col>
                 </v-row>
+              </v-col>
+            </v-row>
+          </template>
+          <!-- Share-view links (admin only): capability URLs that open one
+               collection's view read-only, without making the dataset
+               public. See SHARING.md "Share links". -->
+          <template v-if="isResourceAdmin">
+            <v-divider class="my-4" />
+            <v-row>
+              <v-col cols="12">
+                <div class="subtitle-2 mb-1">Share links</div>
+                <div class="text-caption text-medium-emphasis mb-2">
+                  A link opens exactly one collection (select one above),
+                  read-only, for anyone who has it — no sign-in needed; the
+                  files themselves cannot be downloaded through it. Links can
+                  expire and can be revoked here.
+                </div>
+                <v-table v-if="shareLinks.length > 0" density="compact">
+                  <thead>
+                    <tr>
+                      <th>Label</th>
+                      <th>Collection</th>
+                      <th>Created</th>
+                      <th>Expires</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="link in shareLinks" :key="link._id">
+                      <td>{{ link.label || "—" }}</td>
+                      <td>{{ configurationName(link.configurationId) }}</td>
+                      <td>{{ formatDate(link.created) }}</td>
+                      <td>
+                        {{
+                          link.expiresAt
+                            ? formatDate(link.expiresAt) +
+                              (link.expired ? " (expired)" : "")
+                            : "never"
+                        }}
+                      </td>
+                      <td class="text-right">
+                        <v-btn
+                          size="x-small"
+                          variant="text"
+                          color="error"
+                          :loading="revokingLinkId === link._id"
+                          @click="revokeLink(link)"
+                        >
+                          Revoke
+                        </v-btn>
+                      </td>
+                    </tr>
+                  </tbody>
+                </v-table>
+                <v-row class="mt-2" align="center">
+                  <v-col cols="5">
+                    <v-text-field
+                      v-model="newLinkLabel"
+                      label="Label (optional)"
+                      density="compact"
+                      variant="outlined"
+                      hide-details
+                      :maxlength="120"
+                    />
+                  </v-col>
+                  <v-col cols="4">
+                    <v-select
+                      v-model="newLinkDays"
+                      :items="LINK_EXPIRY_OPTIONS"
+                      item-title="title"
+                      item-value="value"
+                      label="Expires"
+                      density="compact"
+                      variant="outlined"
+                      hide-details
+                    />
+                  </v-col>
+                  <v-col cols="3">
+                    <v-btn
+                      variant="flat"
+                      color="primary"
+                      size="small"
+                      :loading="creatingLink"
+                      :disabled="creatingLink || selectedConfigIds.length !== 1"
+                      @click="createLink"
+                    >
+                      <v-icon start size="small">mdi-link-plus</v-icon>
+                      Create
+                    </v-btn>
+                  </v-col>
+                </v-row>
+                <v-alert
+                  v-if="createdLinkUrl"
+                  type="success"
+                  variant="tonal"
+                  density="compact"
+                  class="mt-3"
+                >
+                  <div class="text-caption">
+                    Copy this link now; it is not shown again.
+                  </div>
+                  <div class="d-flex align-center">
+                    <code class="created-link flex-grow-1">{{
+                      createdLinkUrl
+                    }}</code>
+                    <v-btn
+                      size="x-small"
+                      variant="text"
+                      icon="mdi-content-copy"
+                      aria-label="Copy link"
+                      @click="copyCreatedLink"
+                    />
+                  </div>
+                  <div class="text-caption mt-1">
+                    Embed (no toolbar):
+                    <code class="created-link">{{ createdEmbedUrl }}</code>
+                  </div>
+                </v-alert>
               </v-col>
             </v-row>
           </template>
@@ -255,6 +386,7 @@
 import { ref, computed, watch } from "vue";
 import { IGirderSelectAble } from "@/girder";
 import store from "@/store";
+import { shareLinkUrl } from "@/store/ShareLinkAPI";
 import { logError } from "@/utils/log";
 import { accessLevelLabel } from "@/utils/accessLevel";
 import {
@@ -262,6 +394,7 @@ import {
   IDatasetAccessUser,
   IDatasetAccessConfiguration,
   IDatasetView,
+  IShareLink,
 } from "@/store/model";
 import CopyLinkButton from "@/components/CopyLinkButton.vue";
 
@@ -294,11 +427,38 @@ const loading = ref(false);
 const showError = ref(false);
 const errorString = ref("");
 
+// Share links (admin only)
+const LINK_EXPIRY_OPTIONS = [
+  { value: 7, title: "7 days" },
+  { value: 30, title: "30 days" },
+  { value: 90, title: "90 days" },
+  { value: 0, title: "Never" },
+];
+const shareLinks = ref<IShareLink[]>([]);
+const newLinkLabel = ref("");
+const newLinkDays = ref(30);
+const creatingLink = ref(false);
+const revokingLinkId = ref<string | null>(null);
+const createdLinkUrl = ref<string | null>(null);
+const createdEmbedUrl = ref<string | null>(null);
+// The link whose URL is shown above: only revoking that one hides it.
+let createdLinkId: string | null = null;
+
 // Access list data
 const isPublic = ref(false);
 const users = ref<IDatasetAccessUser[]>([]);
 const configurations = ref<IDatasetAccessConfiguration[]>([]);
 const selectedConfigIds = ref<string[]>([]);
+// The share endpoint needs WRITE on every view and configuration it is
+// sent, so only those the caller can write are ever included.
+const writableViewIds = ref<Set<string>>(new Set());
+
+// Every access-list load (fetchAccessInfo and refetchIfSelf) and
+// resetState claim the next number; a load commits only while it is still
+// the latest, so an older response can never overwrite a newer one.
+let accessRequest = 0;
+// The load that turned the spinner on turns it off, even if superseded
+let loadingRequest = 0;
 
 // Associated dataset views (needed for API calls)
 const associatedViews = ref<IDatasetView[]>([]);
@@ -321,11 +481,77 @@ const accessLevelItems = [
   { text: "Write", value: 1 },
 ];
 
-const isResourceAdmin = computed((): boolean => {
-  const userId = store.girderUser?._id;
-  if (!userId) return false;
-  return users.value.some((u) => u.id === userId && u.level === 2);
-});
+// The caller's effective level from the server (groups and site admin
+// included), not their direct row in the users list, which can be missing.
+const currentUserLevel = ref(-1);
+
+// Collections, public access and share links stay owner-only
+const isResourceAdmin = computed((): boolean => currentUserLevel.value >= 2);
+
+// WRITE collaborators may share too, but the server refuses any change
+// above the caller's own level, so mirror that here.
+const canManageUsers = computed((): boolean => currentUserLevel.value >= 1);
+
+// The server's reason (e.g. a level above the caller's own) beats a
+// generic message; only the unknown-user code needs translating.
+function shareErrorMessage(response: string, unknownUser: string): string {
+  return response === "badEmailOrUsername" ? unknownUser : response;
+}
+
+// Changing your own entry changes currentUserLevel, which only the server
+// can recompute (a group may still grant access). Re-read just the access
+// list so the collection selection and share links are left alone.
+async function refetchIfSelf(user: IDatasetAccessUser) {
+  const requestedDatasetId = datasetId.value;
+  if (user.id !== store.girderUser?._id || !requestedDatasetId) return;
+  // A full load still in flight (e.g. the dialog was reopened) must not be
+  // superseded by this partial one, or views, public state and the default
+  // selection never land; start a fresh full load instead.
+  if (loading.value) {
+    await fetchAccessInfo(requestedDatasetId);
+    return;
+  }
+  const request = ++accessRequest;
+  const isCurrent = () =>
+    request === accessRequest && datasetId.value === requestedDatasetId;
+  try {
+    const accessList = await store.api.getDatasetAccess(requestedDatasetId);
+    if (!isCurrent()) return;
+    users.value = accessList.users;
+    currentUserLevel.value = accessList.currentUserLevel;
+    configurations.value = accessList.configurations;
+    writableViewIds.value = new Set(accessList.writableViewIds);
+    // Keep the user's choice, minus anything they can no longer write
+    const writable = new Set(
+      accessList.configurations.filter(isConfigShareable).map((c) => c.id),
+    );
+    selectedConfigIds.value = selectedConfigIds.value.filter((id) =>
+      writable.has(id),
+    );
+  } catch (error) {
+    if (!isCurrent()) return;
+    // Removing your last access makes the list itself a 403: fail closed
+    logError(
+      `Failed to reload access for dataset ${requestedDatasetId}`,
+      error,
+    );
+    currentUserLevel.value = -1;
+  }
+}
+
+// With nothing shareable every add/edit/remove would fail, so offer none
+const canShareAny = computed((): boolean =>
+  configurations.value.some(isConfigShareable),
+);
+
+function canEditUser(user: IDatasetAccessUser): boolean {
+  return (
+    canManageUsers.value &&
+    canShareAny.value &&
+    user.level !== 2 &&
+    user.level <= currentUserLevel.value
+  );
+}
 
 watch(dialog, (val) => {
   if (val && props.dataset) {
@@ -336,13 +562,22 @@ watch(dialog, (val) => {
 });
 
 function resetState() {
+  shareLinksRequest++;
+  accessRequest++;
+  shareLinks.value = [];
+  createdLinkUrl.value = null;
+  createdEmbedUrl.value = null;
+  createdLinkId = null;
+  newLinkLabel.value = "";
   loading.value = false;
   showError.value = false;
   errorString.value = "";
   isPublic.value = false;
   users.value = [];
+  currentUserLevel.value = -1;
   configurations.value = [];
   selectedConfigIds.value = [];
+  writableViewIds.value = new Set();
   associatedViews.value = [];
   newUserEmail.value = "";
   newUserAccessLevel.value = 0;
@@ -350,28 +585,40 @@ function resetState() {
 }
 
 async function fetchAccessInfo(datasetId: string) {
+  fetchShareLinks(datasetId);
+  const request = ++accessRequest;
+  loadingRequest = request;
   loading.value = true;
   showError.value = false;
   try {
     // Fetch access list from new endpoint
     const accessList = await store.api.getDatasetAccess(datasetId);
+    if (request !== accessRequest) return;
 
     isPublic.value = accessList.public;
     users.value = accessList.users;
+    currentUserLevel.value = accessList.currentUserLevel;
     configurations.value = accessList.configurations;
-    // Select all configurations by default
-    selectedConfigIds.value = accessList.configurations.map((c) => c.id);
+    writableViewIds.value = new Set(accessList.writableViewIds);
 
     // Also fetch dataset views for the share API calls
-    associatedViews.value = await store.api.findDatasetViews({
-      datasetId,
-    });
+    const views = await store.api.findDatasetViews({ datasetId });
+    if (request !== accessRequest) return;
+    associatedViews.value = views;
+    // Select every configuration the caller can share by default (needs
+    // the views, so only once they are loaded)
+    selectedConfigIds.value = configurations.value
+      .filter(isConfigShareable)
+      .map((c) => c.id);
   } catch (error) {
+    if (request !== accessRequest) return;
     logError(`Failed to fetch access info for dataset ${datasetId}`, error);
+    // Without the list we can't know the caller's rights: fail closed
+    currentUserLevel.value = -1;
     errorString.value = "Failed to load access information";
     showError.value = true;
   } finally {
-    loading.value = false;
+    if (loadingRequest === request) loading.value = false;
   }
 }
 
@@ -379,10 +626,27 @@ function close() {
   dialog.value = false;
 }
 
+// A configuration can be shared only with one of its views, and the share
+// endpoint needs WRITE on both. This one predicate decides selection,
+// checkbox enabling and pruning, so a collection is never shown selected
+// while getSelectedViews silently drops it.
+function isConfigShareable(config: IDatasetAccessConfiguration): boolean {
+  return (
+    config.currentUserLevel >= 1 &&
+    associatedViews.value.some(
+      (view) =>
+        view.configurationId === config.id &&
+        writableViewIds.value.has(view.id),
+    )
+  );
+}
+
 function getSelectedViews(): IDatasetView[] {
-  // Filter views to only include those with selected configurations
-  return associatedViews.value.filter((view) =>
-    selectedConfigIds.value.includes(view.configurationId),
+  // Views of the selected configurations that the caller can write
+  return associatedViews.value.filter(
+    (view) =>
+      selectedConfigIds.value.includes(view.configurationId) &&
+      writableViewIds.value.has(view.id),
   );
 }
 
@@ -424,10 +688,7 @@ async function updateUserAccess(user: IDatasetAccessUser, newLevel: number) {
     );
 
     if (typeof response === "string") {
-      errorString.value =
-        response === "badEmailOrUsername"
-          ? "User not found"
-          : "An error occurred";
+      errorString.value = shareErrorMessage(response, "User not found");
       showError.value = true;
     } else {
       // Update local state
@@ -435,6 +696,7 @@ async function updateUserAccess(user: IDatasetAccessUser, newLevel: number) {
       if (userIndex >= 0) {
         users.value[userIndex].level = newLevel as 0 | 1 | 2;
       }
+      await refetchIfSelf(user);
     }
   } catch (error) {
     logError("Failed to update user access", error);
@@ -469,18 +731,16 @@ async function removeUser() {
     const response = await store.api.shareDatasetView(
       selectedViews,
       user.login,
-      -1, // -1 to remove access (Girder convention)
+      -1, // -1 = remove; the server deletes the ACL entry
     );
 
     if (typeof response === "string") {
-      errorString.value =
-        response === "badEmailOrUsername"
-          ? "User not found"
-          : "An error occurred";
+      errorString.value = shareErrorMessage(response, "User not found");
       showError.value = true;
     } else {
       // Remove user from local state
       users.value = users.value.filter((u) => u.id !== user.id);
+      await refetchIfSelf(user);
     }
   } catch (error) {
     logError("Failed to remove user access", error);
@@ -489,6 +749,93 @@ async function removeUser() {
   } finally {
     userLoading.value = null;
     userToRemove.value = null;
+  }
+}
+
+function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString();
+}
+
+// Only the latest list request may commit: the dialog lists on open, again
+// after a create, and a revoke edits the list locally, so an older answer
+// could otherwise hide a new link or bring back a revoked one.
+let shareLinksRequest = 0;
+
+async function fetchShareLinks(id: string) {
+  const request = ++shareLinksRequest;
+  try {
+    const links = await store.shareLinkAPI.list(id);
+    if (request === shareLinksRequest && datasetId.value === id) {
+      shareLinks.value = links;
+    }
+  } catch (error) {
+    logError("Failed to list share links", error);
+  }
+}
+
+function configurationName(configurationId: string): string {
+  return (
+    configurations.value.find((c) => c.id === configurationId)?.name ??
+    configurationId
+  );
+}
+
+async function createLink() {
+  const selectedViews = getSelectedViews();
+  if (selectedViews.length !== 1) {
+    errorString.value = "Select exactly one collection for the link";
+    showError.value = true;
+    return;
+  }
+  creatingLink.value = true;
+  showError.value = false;
+  try {
+    const link = await store.shareLinkAPI.create(
+      selectedViews[0].id,
+      newLinkDays.value,
+      newLinkLabel.value.trim(),
+    );
+    createdLinkId = link._id;
+    createdLinkUrl.value = shareLinkUrl(link.token);
+    createdEmbedUrl.value = shareLinkUrl(link.token, true);
+    newLinkLabel.value = "";
+    if (datasetId.value) {
+      await fetchShareLinks(datasetId.value);
+    }
+  } catch (error) {
+    logError("Failed to create a share link", error);
+    errorString.value = "Failed to create the share link";
+    showError.value = true;
+  } finally {
+    creatingLink.value = false;
+  }
+}
+
+async function revokeLink(link: IShareLink) {
+  revokingLinkId.value = link._id;
+  showError.value = false;
+  try {
+    await store.shareLinkAPI.revoke(link._id);
+    shareLinksRequest++; // an in-flight list predates the revoke
+    shareLinks.value = shareLinks.value.filter((l) => l._id !== link._id);
+    // The new URL is not shown again: keep it unless it is the one revoked.
+    if (link._id === createdLinkId) {
+      createdLinkId = null;
+      createdLinkUrl.value = null;
+      createdEmbedUrl.value = null;
+    }
+  } catch (error) {
+    logError("Failed to revoke a share link", error);
+    errorString.value = "Failed to revoke the share link";
+    showError.value = true;
+  } finally {
+    revokingLinkId.value = null;
+  }
+}
+
+async function copyCreatedLink() {
+  if (createdLinkUrl.value) {
+    await navigator.clipboard.writeText(createdLinkUrl.value);
   }
 }
 
@@ -512,10 +859,10 @@ async function addUser() {
     );
 
     if (typeof response === "string") {
-      errorString.value =
-        response === "badEmailOrUsername"
-          ? "Unknown user. Please check the username or email."
-          : "An error occurred";
+      errorString.value = shareErrorMessage(
+        response,
+        "Unknown user. Please check the username or email.",
+      );
       showError.value = true;
     } else {
       // Refresh the access list to show the new user
@@ -538,6 +885,13 @@ async function addUser() {
 defineExpose({
   dialog,
   datasetId,
+  shareLinks,
+  createLink,
+  revokeLink,
+  fetchShareLinks,
+  createdLinkUrl,
+  newLinkDays,
+  newLinkLabel,
   loading,
   showError,
   errorString,
@@ -555,10 +909,16 @@ defineExpose({
   userToRemove,
   accessLevelItems,
   isResourceAdmin,
+  currentUserLevel,
+  canManageUsers,
+  canEditUser,
+  canShareAny,
   resetState,
   fetchAccessInfo,
   close,
   getSelectedViews,
+  isConfigShareable,
+  refetchIfSelf,
   togglePublic,
   updateUserAccess,
   confirmRemoveUser,
@@ -566,3 +926,10 @@ defineExpose({
   addUser,
 });
 </script>
+
+<style lang="scss" scoped>
+.created-link {
+  word-break: break-all;
+  font-size: 0.75rem;
+}
+</style>

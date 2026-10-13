@@ -6,9 +6,17 @@ const mockFindDatasetViews = vi.fn();
 const mockShareDatasetView = vi.fn();
 const mockSetDatasetPublic = vi.fn();
 
+const shareLinkMocks = vi.hoisted(() => ({
+  list: vi.fn(),
+  create: vi.fn(),
+  revoke: vi.fn(),
+}));
+
 vi.mock("@/store", () => ({
   default: {
     dataset: { _id: "ds1", name: "TestDataset" },
+    girderUser: { _id: "u1" },
+    shareLinkAPI: shareLinkMocks,
     api: {
       getDatasetAccess: (...args: any[]) => mockGetDatasetAccess(...args),
       findDatasetViews: (...args: any[]) => mockFindDatasetViews(...args),
@@ -26,6 +34,7 @@ import ShareDataset from "./ShareDataset.vue";
 
 const defaultAccessList = {
   public: false,
+  currentUserLevel: 2,
   users: [
     {
       id: "u1",
@@ -43,23 +52,25 @@ const defaultAccessList = {
     },
   ],
   configurations: [
-    { id: "cfg1", name: "Config 1", public: false },
-    { id: "cfg2", name: "Config 2", public: false },
+    { id: "cfg1", name: "Config 1", public: false, currentUserLevel: 2 },
+    { id: "cfg2", name: "Config 2", public: false, currentUserLevel: 2 },
   ],
+  writableViewIds: ["v1", "v2"],
 };
 
 const defaultViews = [
-  { configurationId: "cfg1", datasetId: "ds1" },
-  { configurationId: "cfg2", datasetId: "ds1" },
+  { id: "v1", configurationId: "cfg1", datasetId: "ds1" },
+  { id: "v2", configurationId: "cfg2", datasetId: "ds1" },
 ];
 
-function mountComponent(props: any = {}) {
+function mountComponent(props: any = {}, renderStubDefaultSlot = false) {
   return shallowMount(ShareDataset, {
     props: {
       dataset: { _id: "ds1", _modelType: "folder", name: "TestDataset" },
       modelValue: false,
       ...props,
     },
+    global: { renderStubDefaultSlot },
   });
 }
 
@@ -70,6 +81,81 @@ describe("ShareDataset", () => {
     mockFindDatasetViews.mockResolvedValue([...defaultViews]);
     mockShareDatasetView.mockResolvedValue({});
     mockSetDatasetPublic.mockResolvedValue(undefined);
+    shareLinkMocks.list.mockReset().mockResolvedValue([]);
+    shareLinkMocks.create.mockReset();
+    shareLinkMocks.revoke.mockReset().mockResolvedValue({});
+  });
+
+  it("lists, creates and revokes share links for an admin", async () => {
+    const link = {
+      _id: "l1",
+      datasetId: "ds1",
+      datasetViewId: "v1",
+      configurationId: "cfg1",
+      label: "reviewers",
+      created: "2026-09-03T00:00:00Z",
+      expiresAt: null,
+      expired: false,
+      createdBy: "u1",
+    };
+    shareLinkMocks.list.mockResolvedValue([link]);
+    shareLinkMocks.create.mockResolvedValue({ ...link, token: "tok" });
+    mockFindDatasetViews.mockResolvedValue([
+      { id: "v1", configurationId: "cfg1", datasetId: "ds1" },
+    ]);
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(shareLinkMocks.list).toHaveBeenCalledWith("ds1");
+    expect(vm.shareLinks).toEqual([link]);
+
+    vm.selectedConfigIds = ["cfg1"];
+    vm.newLinkLabel = " reviewers ";
+    vm.newLinkDays = 7;
+    await vm.createLink();
+    expect(shareLinkMocks.create).toHaveBeenCalledWith("v1", 7, "reviewers");
+    expect(vm.createdLinkUrl).toContain("#/shared/tok");
+
+    // Revoking an older link keeps the new URL, which is not shown again.
+    await vm.revokeLink({ ...link, _id: "l0" });
+    expect(shareLinkMocks.revoke).toHaveBeenCalledWith("l0");
+    expect(vm.createdLinkUrl).toContain("#/shared/tok");
+
+    await vm.revokeLink(link);
+    expect(shareLinkMocks.revoke).toHaveBeenCalledWith("l1");
+    expect(vm.shareLinks).toEqual([]);
+    expect(vm.createdLinkUrl).toBeNull();
+  });
+
+  it("an older share-link list cannot overwrite a newer one", async () => {
+    const link = {
+      _id: "l1",
+      datasetId: "ds1",
+      datasetViewId: "v1",
+      configurationId: "cfg1",
+      label: "",
+      created: "2026-09-03T00:00:00Z",
+      expiresAt: null,
+      expired: false,
+      createdBy: "u1",
+    };
+    let finishOld!: (links: any[]) => void;
+    shareLinkMocks.list
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishOld = resolve;
+        }),
+      )
+      .mockResolvedValue([link]);
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1"); // opens the (slow) first list
+    await vm.fetchShareLinks("ds1"); // e.g. after a create: newer
+    expect(vm.shareLinks).toEqual([link]);
+    finishOld([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(vm.shareLinks).toEqual([link]);
   });
 
   it("dialog computed getter returns value prop", () => {
@@ -391,5 +477,411 @@ describe("ShareDataset", () => {
       await vm.togglePublic(true);
       expect(mockSetDatasetPublic).toHaveBeenCalledWith("ds1", true);
     }
+  });
+
+  it("the owner sees public access and share links", async () => {
+    const wrapper = mountComponent({ modelValue: true }, true);
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    await wrapper.vm.$nextTick();
+    const html = wrapper.html();
+    expect(html).toContain("Make Public");
+    expect(html).toContain("Share links</div>");
+    expect(html).toContain("Add User:");
+  });
+
+  describe("a WRITE collaborator", () => {
+    const writeAccessList = {
+      ...defaultAccessList,
+      currentUserLevel: 1,
+      users: [
+        { id: "owner", login: "o", name: "O", email: "o@t.com", level: 2 },
+        { id: "u1", login: "me", name: "Me", email: "me@t.com", level: 1 },
+        { id: "u3", login: "r", name: "R", email: "r@t.com", level: 0 },
+      ],
+    };
+
+    it("can manage users at or below Write but not the owner", async () => {
+      mockGetDatasetAccess.mockResolvedValue(writeAccessList);
+      // Render stub slots so the dialog's content is in the HTML
+      const wrapper = mountComponent({ modelValue: true }, true);
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+      await wrapper.vm.$nextTick();
+
+      expect(vm.canManageUsers).toBe(true);
+      expect(vm.isResourceAdmin).toBe(false);
+      const [owner, me, reader] = writeAccessList.users;
+      expect(vm.canEditUser(owner)).toBe(false);
+      expect(vm.canEditUser(me)).toBe(true);
+      expect(vm.canEditUser(reader)).toBe(true);
+
+      const html = wrapper.html();
+      expect(html).toContain("Add User:");
+      // Public access, collection choice and share links stay owner-only
+      expect(html).not.toContain("Make Public");
+      expect(html).not.toContain("Share links</div>");
+    });
+
+    it("a READ user can manage nobody", async () => {
+      mockGetDatasetAccess.mockResolvedValue({
+        ...writeAccessList,
+        currentUserLevel: 0,
+        users: writeAccessList.users.map((u) =>
+          u.id === "u1" ? { ...u, level: 0 } : u,
+        ),
+      });
+      const wrapper = mountComponent({ modelValue: true }, true);
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.html()).toContain("Current Access:");
+      expect(vm.canManageUsers).toBe(false);
+      expect(vm.canEditUser(writeAccessList.users[2])).toBe(false);
+      expect(wrapper.html()).not.toContain("Add User:");
+    });
+  });
+
+  it("shows the server's reason when a share is refused", async () => {
+    const reason = "You cannot grant access above your own level";
+    mockShareDatasetView.mockResolvedValue(reason);
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+
+    vm.newUserEmail = "someone";
+    await vm.addUser();
+    expect(vm.errorString).toBe(reason);
+  });
+
+  it("takes management rights from the server's effective level", async () => {
+    // WRITE through a group (or site admin): no direct row for the caller
+    mockGetDatasetAccess.mockResolvedValue({
+      ...defaultAccessList,
+      currentUserLevel: 1,
+      users: defaultAccessList.users.filter((u) => u.id !== "u1"),
+    });
+    const wrapper = mountComponent({ modelValue: true }, true);
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    await wrapper.vm.$nextTick();
+
+    expect(vm.canManageUsers).toBe(true);
+    expect(vm.isResourceAdmin).toBe(false);
+    expect(wrapper.html()).toContain("Add User:");
+  });
+
+  describe("changing your own entry", () => {
+    const selfOnly = {
+      ...defaultAccessList,
+      currentUserLevel: 1,
+      users: [
+        { id: "u1", login: "me", name: "Me", email: "me@t.com", level: 1 },
+        { id: "u3", login: "r", name: "R", email: "r@t.com", level: 0 },
+      ],
+    };
+
+    async function openAsWriteUser() {
+      mockGetDatasetAccess.mockResolvedValue(selfOnly);
+      const wrapper = mountComponent({ modelValue: true });
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+      vm.selectedConfigIds = ["cfg1"];
+      mockShareDatasetView.mockResolvedValue(true);
+      return { vm, wrapper };
+    }
+
+    it("removing your last access fails closed on the 403", async () => {
+      const { vm } = await openAsWriteUser();
+      // The real endpoint needs READ, so it rejects once you're gone
+      mockGetDatasetAccess.mockRejectedValue(new Error("403"));
+      vm.confirmRemoveUser(vm.users[0]);
+      await vm.removeUser();
+
+      expect(mockGetDatasetAccess).toHaveBeenCalledTimes(2);
+      expect(vm.canManageUsers).toBe(false);
+    });
+
+    it("re-reads your level but keeps the collection selection", async () => {
+      const { vm } = await openAsWriteUser();
+      mockGetDatasetAccess.mockResolvedValue({
+        ...selfOnly,
+        currentUserLevel: 0,
+        users: selfOnly.users.map((u) =>
+          u.id === "u1" ? { ...u, level: 0 } : u,
+        ),
+      });
+      await vm.updateUserAccess(vm.users[0], 0);
+
+      expect(vm.canManageUsers).toBe(false);
+      expect(vm.selectedConfigIds).toEqual(["cfg1"]);
+      expect(shareLinkMocks.list).toHaveBeenCalledTimes(1);
+    });
+
+    it("changing someone else does not refetch", async () => {
+      const { vm } = await openAsWriteUser();
+      await vm.updateUserAccess(vm.users[1], 1);
+      expect(mockGetDatasetAccess).toHaveBeenCalledTimes(1);
+    });
+
+    it("an older self-change reload cannot overwrite a newer load", async () => {
+      // Codex: change your own entry, then add a user before that reload
+      // returns; the add's newer load must win when the old one lands last.
+      const { vm } = await openAsWriteUser();
+      let resolveOld: (value: unknown) => void = () => {};
+      mockGetDatasetAccess.mockReturnValueOnce(
+        new Promise((resolve) => (resolveOld = resolve)),
+      );
+      const selfChange = vm.updateUserAccess(vm.users[0], 1);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const newer = {
+        ...selfOnly,
+        users: [
+          ...selfOnly.users,
+          { id: "u9", login: "new", name: "New", email: "n@t.com", level: 0 },
+        ],
+      };
+      mockGetDatasetAccess.mockResolvedValue(newer);
+      vm.newUserEmail = "new";
+      await vm.addUser();
+      expect(vm.users.map((u: any) => u.id)).toContain("u9");
+
+      resolveOld({ ...selfOnly, currentUserLevel: 0 });
+      await selfChange;
+      expect(vm.users.map((u: any) => u.id)).toContain("u9");
+      expect(vm.currentUserLevel).toBe(1);
+    });
+
+    it("overlapping full loads commit only the latest", async () => {
+      const { vm } = await openAsWriteUser();
+      let resolveFirst: (value: unknown) => void = () => {};
+      mockGetDatasetAccess.mockReturnValueOnce(
+        new Promise((resolve) => (resolveFirst = resolve)),
+      );
+      const first = vm.fetchAccessInfo("ds1");
+      mockGetDatasetAccess.mockResolvedValueOnce({
+        ...selfOnly,
+        currentUserLevel: 2,
+      });
+      await vm.fetchAccessInfo("ds1");
+      expect(vm.currentUserLevel).toBe(2);
+
+      resolveFirst({ ...selfOnly, currentUserLevel: 0 });
+      await first;
+      expect(vm.currentUserLevel).toBe(2);
+      expect(vm.loading).toBe(false);
+    });
+
+    it("a load superseded by a self-change reload still clears loading", async () => {
+      const { vm } = await openAsWriteUser();
+      let resolveFull: (value: unknown) => void = () => {};
+      mockGetDatasetAccess.mockReturnValueOnce(
+        new Promise((resolve) => (resolveFull = resolve)),
+      );
+      const full = vm.fetchAccessInfo("ds1");
+      expect(vm.loading).toBe(true);
+
+      mockGetDatasetAccess.mockResolvedValueOnce(selfOnly);
+      await vm.refetchIfSelf(vm.users[0]);
+      resolveFull(selfOnly);
+      await full;
+      expect(vm.loading).toBe(false);
+    });
+
+    it("a self-change during a reopen's load still fills the dialog", async () => {
+      // Review: close and reopen while your own change is pending; the
+      // self-change reload must not leave views/selection/public unset.
+      const { vm } = await openAsWriteUser();
+      let resolveShare: (value: unknown) => void = () => {};
+      mockShareDatasetView.mockReturnValueOnce(
+        new Promise((resolve) => (resolveShare = resolve)),
+      );
+      const selfChange = vm.updateUserAccess(vm.users[0], 1);
+
+      vm.resetState();
+      let resolveReopen: (value: unknown) => void = () => {};
+      mockGetDatasetAccess.mockReturnValueOnce(
+        new Promise((resolve) => (resolveReopen = resolve)),
+      );
+      const reopen = vm.fetchAccessInfo("ds1");
+      mockGetDatasetAccess.mockResolvedValue({ ...selfOnly, public: true });
+
+      resolveShare(true);
+      await selfChange;
+      resolveReopen({ ...selfOnly, public: true });
+      await reopen;
+
+      expect(vm.loading).toBe(false);
+      expect(vm.isPublic).toBe(true);
+      expect(vm.associatedViews.length).toBe(defaultViews.length);
+      expect(vm.selectedConfigIds.length).toBeGreaterThan(0);
+    });
+
+    it("drops a reload that lands after the dialog closed", async () => {
+      const { vm, wrapper } = await openAsWriteUser();
+      let resolveReload: (value: unknown) => void = () => {};
+      mockGetDatasetAccess.mockReturnValue(
+        new Promise((resolve) => (resolveReload = resolve)),
+      );
+      vm.confirmRemoveUser(vm.users[0]);
+      const removal = vm.removeUser();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      // Closing through the prop runs the dialog watcher's resetState
+      await wrapper.setProps({ modelValue: false });
+      expect(vm.currentUserLevel).toBe(-1);
+      resolveReload({ ...selfOnly, currentUserLevel: 2 });
+      await removal;
+
+      expect(vm.currentUserLevel).toBe(-1);
+    });
+  });
+
+  it("a failed access load hides management controls", async () => {
+    const wrapper = mountComponent({ modelValue: true });
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    expect(vm.isResourceAdmin).toBe(true);
+
+    mockGetDatasetAccess.mockRejectedValue(new Error("network"));
+    await vm.fetchAccessInfo("ds1");
+    expect(vm.canManageUsers).toBe(false);
+  });
+
+  describe("only writable views and collections are shared", () => {
+    // WRITE on the dataset, but READ on cfg2 and on the view of cfg1
+    const partlyWritable = {
+      ...defaultAccessList,
+      currentUserLevel: 1,
+      configurations: [
+        { id: "cfg1", name: "Config 1", public: false, currentUserLevel: 1 },
+        { id: "cfg2", name: "Config 2", public: false, currentUserLevel: 0 },
+        { id: "cfg3", name: "Config 3", public: false, currentUserLevel: 1 },
+      ],
+      writableViewIds: ["v3"],
+    };
+    const views = [
+      { id: "v1", configurationId: "cfg1", datasetId: "ds1" },
+      { id: "v2", configurationId: "cfg2", datasetId: "ds1" },
+      { id: "v3", configurationId: "cfg3", datasetId: "ds1" },
+    ];
+
+    it("selects writable collections and sends writable views", async () => {
+      mockGetDatasetAccess.mockResolvedValue(partlyWritable);
+      mockFindDatasetViews.mockResolvedValue(views);
+      const wrapper = mountComponent({ modelValue: true });
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+
+      // cfg1 is writable but its only view is not, so it can't be shared
+      expect(vm.selectedConfigIds).toEqual(["cfg3"]);
+      expect(vm.isConfigShareable(partlyWritable.configurations[0])).toBe(
+        false,
+      );
+      vm.newUserEmail = "someone";
+      await vm.addUser();
+      expect(mockShareDatasetView).toHaveBeenCalledWith(
+        [views[2]],
+        "someone",
+        0,
+      );
+    });
+
+    it("never shows a collection selected that would not be shared", async () => {
+      // Every selected collection must contribute a view to the request
+      mockGetDatasetAccess.mockResolvedValue({
+        ...partlyWritable,
+        currentUserLevel: 2,
+      });
+      mockFindDatasetViews.mockResolvedValue(views);
+      const wrapper = mountComponent({ modelValue: true });
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+
+      const sharedConfigs = new Set(
+        vm.getSelectedViews().map((v: any) => v.configurationId),
+      );
+      expect(new Set(vm.selectedConfigIds)).toEqual(sharedConfigs);
+    });
+
+    it("disables an owner's checkbox for a read-only collection", async () => {
+      mockGetDatasetAccess.mockResolvedValue({
+        ...partlyWritable,
+        currentUserLevel: 2,
+      });
+      mockFindDatasetViews.mockResolvedValue(views);
+      const wrapper = mountComponent({ modelValue: true }, true);
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+      await wrapper.vm.$nextTick();
+
+      const boxes = wrapper.findAllComponents({ name: "v-checkbox" });
+      // Config 2 is read-only; Config 1 is writable but has no writable view
+      for (const name of ["Config 1", "Config 2"]) {
+        const box = boxes.find((b) =>
+          String(b.props("label") ?? b.attributes("label")).includes(name),
+        );
+        expect(box).toBeDefined();
+        expect(
+          box!.props("disabled") ?? box!.attributes("disabled"),
+        ).toBeTruthy();
+      }
+      const shareable = boxes.find((b) =>
+        String(b.props("label") ?? b.attributes("label")).includes("Config 3"),
+      );
+      expect(
+        shareable!.props("disabled") ?? shareable!.attributes("disabled"),
+      ).toBeFalsy();
+    });
+
+    it("a self-change prunes collections you can no longer write", async () => {
+      mockGetDatasetAccess.mockResolvedValue({
+        ...partlyWritable,
+        users: [
+          { id: "u1", login: "me", name: "Me", email: "me@t.com", level: 1 },
+        ],
+      });
+      mockFindDatasetViews.mockResolvedValue(views);
+      mockShareDatasetView.mockResolvedValue(true);
+      const wrapper = mountComponent({ modelValue: true });
+      const vm = wrapper.vm as any;
+      await vm.fetchAccessInfo("ds1");
+      expect(vm.selectedConfigIds).toEqual(["cfg3"]);
+
+      mockGetDatasetAccess.mockResolvedValue({
+        ...partlyWritable,
+        configurations: partlyWritable.configurations.map((c) =>
+          c.id === "cfg3" ? { ...c, currentUserLevel: 0 } : c,
+        ),
+        writableViewIds: [],
+      });
+      await vm.updateUserAccess(vm.users[0], 1);
+      expect(vm.selectedConfigIds).toEqual([]);
+      expect(vm.getSelectedViews()).toEqual([]);
+    });
+  });
+
+  it("with nothing shareable, a WRITE user gets a note, not controls", async () => {
+    mockGetDatasetAccess.mockResolvedValue({
+      ...defaultAccessList,
+      currentUserLevel: 1,
+      users: [
+        { id: "u1", login: "me", name: "Me", email: "me@t.com", level: 1 },
+        { id: "u3", login: "r", name: "R", email: "r@t.com", level: 0 },
+      ],
+      writableViewIds: [],
+    });
+    const wrapper = mountComponent({ modelValue: true }, true);
+    const vm = wrapper.vm as any;
+    await vm.fetchAccessInfo("ds1");
+    await wrapper.vm.$nextTick();
+
+    expect(vm.canManageUsers).toBe(true);
+    expect(vm.canShareAny).toBe(false);
+    expect(vm.canEditUser(vm.users[1])).toBe(false);
+    const html = wrapper.html();
+    expect(html).toContain("You can't share any of this dataset's collections");
+    expect(html).not.toContain('label="Username or Email"');
   });
 });

@@ -149,3 +149,94 @@ class TestFolderAccessGuard:
                 )
         finally:
             rest.getCurrentUser = original_get
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestCreatorGuardOnSharePaths:
+    """The plugin's share paths check the creator guard before writing
+    anything: dataset_view/share writes views and configurations before the
+    folder, and project propagation uses bulk updates that fire no folder
+    save event, so the save listener alone would either leave a partial
+    write or never run."""
+
+    @staticmethod
+    def levels(user, dataset, config, view):
+        from upenncontrast_annotation.server.models.collection import (
+            Collection,
+        )
+        from upenncontrast_annotation.server.models.datasetView import (
+            DatasetView,
+        )
+        out = []
+        for model, doc in ((Folder(), dataset), (Collection(), config),
+                           (DatasetView(), view)):
+            stored = model.load(doc["_id"], force=True)
+            out.append(next((u["level"] for u in stored["access"]["users"]
+                             if u["id"] == user["_id"]), None))
+        return tuple(out)
+
+    def testCreatorCannotRemoveThemselvesViaDatasetShare(self, user, server):
+        from .test_sharing import createDatasetWithView, shareDatasetView
+        dataset, config, view = createDatasetWithView(user)
+
+        resp = shareDatasetView(server, user, view, user, -1)
+
+        assertStatus(resp, 400)
+        assert "creator" in resp.json["message"].lower()
+        # Nothing was written: the views and configuration keep the
+        # creator too, not just the folder.
+        assert self.levels(user, dataset, config, view) == (
+            AccessType.ADMIN, AccessType.ADMIN, AccessType.ADMIN)
+
+    def testCoOwnerCannotDemoteTheCreatorViaDatasetShare(
+            self, user, server):
+        from girder.models.user import User
+        from .test_sharing import createDatasetWithView, shareDatasetView
+        coOwner = User().createUser(
+            "coowner", "password", "Co", "Owner", "coowner@example.com")
+        dataset, config, view = createDatasetWithView(user)
+        assertStatusOk(shareDatasetView(
+            server, user, view, coOwner, AccessType.ADMIN))
+
+        resp = shareDatasetView(server, coOwner, view, user, AccessType.READ)
+
+        assertStatus(resp, 400)
+        assert self.levels(user, dataset, config, view) == (
+            AccessType.ADMIN, AccessType.ADMIN, AccessType.ADMIN)
+
+    def testCreatorCannotRemoveThemselvesViaProjectShare(self, user, server):
+        from upenncontrast_annotation.server.models.project import Project
+        from .test_sharing import createDatasetWithView
+        dataset, config, view = createDatasetWithView(user)
+        resp = server.request(path="/project", method="POST", user=user,
+                              params={"name": "guarded project"})
+        assertStatusOk(resp)
+        project = resp.json
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/dataset", method="POST",
+            user=user, params={"datasetId": str(dataset["_id"])}))
+
+        resp = server.request(
+            path=f"/project/{project['_id']}/share", method="POST",
+            user=user, params={"userMailOrUsername": user["login"],
+                               "accessType": -1})
+
+        assertStatus(resp, 400)
+        assert self.levels(user, dataset, config, view) == (
+            AccessType.ADMIN, AccessType.ADMIN, AccessType.ADMIN)
+        stored = Project().load(project["_id"], force=True)
+        assert any(u["id"] == user["_id"] and u["level"] == AccessType.ADMIN
+                   for u in stored["access"]["users"])
+
+    def testOwnerCanStillShareAndRemoveOthers(self, user, server):
+        from girder.models.user import User
+        from .test_sharing import createDatasetWithView, shareDatasetView
+        other = User().createUser(
+            "guardother", "password", "G", "Other", "guardother@example.com")
+        dataset, config, view = createDatasetWithView(user)
+
+        assertStatusOk(shareDatasetView(
+            server, user, view, other, AccessType.WRITE))
+        assertStatusOk(shareDatasetView(server, user, view, other, -1))
+        assert self.levels(other, dataset, config, view) == (None, None, None)

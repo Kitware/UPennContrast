@@ -152,13 +152,17 @@ Plugin endpoints are registered in `__init__.py` (lines 159-173). Endpoint names
 | `/api/v1/history` | `server/api/history.py` | Undo/redo history |
 | `/api/v1/user_assetstore` | `server/api/user_assetstore.py` | Per-user storage |
 | `/api/v1/user_colors` | `server/api/user_colors.py` | User color preferences |
-| `/api/v1/export` | `server/api/export.py` | JSON/CSV export |
+| `/api/v1/export` | `server/api/export.py` | JSON/CSV/GeoJSON export (see `codebaseDocumentation/ANNOTATION_IMPORT_EXPORT.md`) |
 | `/api/v1/annotation_import` | `server/api/dataImport.py` | Server-side JSON import (annotations, connections, property values) |
 | `/api/v1/project` | `server/api/project.py` | Project management |
 | `/api/v1/resource` | `server/api/resource.py` | Custom resource search |
+| `/api/v1/share_link` | `server/api/shareLink.py` | Share-view links: a hidden read-only Girder user + `DATA_READ`/`USER_INFO_READ` token per link (create/list/me/revoke). See `codebaseDocumentation/SHARING.md` "Share links". |
+| `/api/v1/spatial` | `SpatialPlugin/upenncontrast_spatial/server/api/spatial.py` | **Separate plugin** (`upenncontrast_spatial`): a dataset's spatial-transcriptomics expression table (`spatial.zarr.zip` item) — register, schema, feature search, column/row, aggregate over a list-filter object, materialize a gene panel into a property. See `codebaseDocumentation/SPATIAL_PLUGIN.md`. |
+| `/api/v1/item/{id}/raw_region` | `server/api/rawRegion.py` | Added to Girder's core `item` route (via `system.addSystemEndpoints`). One frame's region as an uncompressed single-page TIFF in the source dtype. Coordinates are clamped to the image (no negative-offset semantics), downsampling uses `resample=None` (nearest neighbour from the level large_image reads, which may be a lower, averaged pyramid level), and output is capped at `MAX_RAW_REGION_BYTES` (64 MiB of samples, counting dtype and bands). Use it instead of large_image's `tiles/region?encoding=TIFF`, which divides 16-bit data down to 8 bits. Serves raw-channel snapshot TIFFs and line scans. |
+| `/api/v1/system/loaded_plugins` | `system.py` | Public list of loaded Girder plugin names. The client asks it once per server so the optional `upenncontrast_spatial` UI stays out of deployments that do not install it (an unregistered route reaches a cross-origin client as a CORS-less network error, not a 404). |
 | `/api/v1/system/authenticated_users` | `system.py` | Admin-only usage metric: count of distinct users who obtained an auth token within a look-back `window` (default `1d`). Added to Girder's core `system` route via `addSystemEndpoints`, not a plugin resource. |
 
-All source files under `devops/girder/plugins/AnnotationPlugin/upenncontrast_annotation/`. Swagger UI at `http://localhost:8080/api/v1#!/`.
+All source files under `devops/girder/plugins/AnnotationPlugin/upenncontrast_annotation/` except the `/spatial` resource, which lives in the sibling plugin `devops/girder/plugins/SpatialPlugin/` (its own `tox.ini`; it imports the annotation plugin's models and validation helpers). Swagger UI at `http://localhost:8080/api/v1#!/`.
 
 **Authenticated-users metric — what it measures:** a user is counted for the window if the `token` collection holds a token whose `created` timestamp falls inside it, i.e. they authenticated (logged in / refreshed a session) during the window. The count is deduplicated per user (`$group` on `userId`). It is deliberately **not** a general "used the app" metric: clients reuse a stored token across requests, so a user only mints a new token on a fresh login (or after their token expires) — someone using the app daily on a still-valid token won't reappear in a short window. Treat it as distinct authentications, not activity. Because Girder deletes tokens once they expire (default ~180 days), counts for windows longer than the token lifetime are bounded by token retention.
 
@@ -279,7 +283,7 @@ JobModel().scheduleJob(job)
 
 ### Turn review findings into durable artifacts, not one-off fixes
 
-A reviewer flags **one instance** of a pattern per round. Fixing only that instance means the next round flags the next instance — a ten-round review of one feature here produced roughly twenty findings that reduced to **two underlying shapes**. Three obligations follow, and they apply to every branch, not just large ones.
+A reviewer flags **one instance** of a pattern per round. Fixing only that instance means the next round flags the next instance — a ten-round review of one feature here produced roughly twenty findings that reduced to **two underlying shapes**. Four obligations follow, and they apply to every branch, not just large ones.
 
 **1. Generalize the finding, then sweep the branch.** Before fixing, name the shape ("a rule applied to one of two symmetric paths", "expensive work before the cheap guard that would skip it"). Then grep the whole diff for other instances and fix those in the same pass. If a sweep comes back clean, ask what the query structurally cannot see — a grep for `throw` once found every deliberate thrower and missed every silent propagator.
 
@@ -290,6 +294,8 @@ The single most repeated shape in this repo is **one of two symmetric paths**. W
 Making a function `await` anything is the sharpest version: it inserts a suspension point into every caller, so anything read before it and acted on after it is now a race. Prefer confirming the effect landed (*"is my item actually in the list?"*) over re-reading the precondition, which is the same check-then-act one tick later.
 
 **3. Write the lesson into a skill.** If the finding would recur in *other* features, it belongs in `.claude/skills/` — `fixing-review-findings` for review patterns, `nimbus-frontend` / `nimbus-geojs` / `nimbus-backend` for domain traps. Skills are the mechanism by which a review round improves the next feature instead of only this one. Skills live in two trees and CI enforces parity, so run `python3 plugins/nimbusimage/scripts/sync_skills.py --write` after editing (see *Editing skills* below).
+
+**4. Run a regression pass before every push of a behavior change.** Obligations 1–3 react to a finding; this one runs before the reviewer has anything to find. List every behavior the branch changes as *"on master X; now Y"* (original commits and review fixes alike), then grep and **read** every caller of each. Look hardest at callers that set a value and then change what it is checked against, and at overlapping async calls. When it is your own branch, give the diff to a fresh-context subagent for an independent pass, verify what it reports, and push only after. On PR #1389, three Codex rounds each found one caller of a changed setter that nobody had read, one of them a regression created by an earlier round's fix; the independent pass then found two more. Also check a finding's *proposed* behavior against callers that need the opposite, not just whether the bug is real. Details: `branch-review` Cross-Cutting check 4, `fixing-review-findings` step 5.
 
 Record test-harness traps too, not just product bugs. A shared mock returning a fixed value silently defeats new tests: `distance2dToLineSquared` returns `100`, `pointDistance` returns `undefined`, `geojsAnnotationFactory` drops its options. Each caused a test that passed **before** its fix — worse than no test at all.
 

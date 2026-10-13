@@ -17,6 +17,7 @@ from girder.models.user import User
 from girder.exceptions import ValidationException, GirderException
 
 from ..helpers.fastjsonschema import customJsonSchemaCompile
+from ..helpers.folder_access_guard import require_creator_keeps_admin
 from ..helpers.proxiedModel import ProxiedModel
 from ..models.datasetView import DatasetView as DatasetViewModel
 from ..models.collection import Collection as CollectionModel
@@ -363,7 +364,7 @@ class Project(ProxiedModel):
         :param doc_ids: List of document ObjectIds.
         :param model: The Girder model instance.
         :param user_id: The user's ObjectId.
-        :param level: AccessType level, or -1 to remove.
+        :param level: AccessType level, or None to remove.
         """
         if not doc_ids:
             return
@@ -374,7 +375,7 @@ class Project(ProxiedModel):
                 'access.users': {'id': user_id}
             }}
         )
-        if level is not None and level >= 0:
+        if level is not None and level >= AccessType.READ:
             model.update(
                 query,
                 {'$push': {'access.users': {
@@ -435,18 +436,22 @@ class Project(ProxiedModel):
                 'flags': u.get('flags', [])
             }
             for u in project_users
-            if u['id'] in valid_ids
+            # Negative levels grant nothing; don't spread legacy -1 entries
+            if u['id'] in valid_ids and u['level'] >= AccessType.READ
         ]
         if not entries:
             return
         query = {'_id': {'$in': list(doc_ids)}}
         valid_user_ids = [e['id'] for e in entries]
+        # Also drop inert level -1 entries left by the old
+        # share endpoints, so a resync cleans them up.
         model.update(
             query,
             {'$pull': {
-                'access.users': {
-                    'id': {'$in': valid_user_ids}
-                }
+                'access.users': {'$or': [
+                    {'id': {'$in': valid_user_ids}},
+                    {'level': {'$lt': AccessType.READ}},
+                ]}
             }}
         )
         model.update(
@@ -487,10 +492,14 @@ class Project(ProxiedModel):
 
         :param project: The project document.
         :param targetUser: The Girder user document.
-        :param level: AccessType level (0, 1, 2) or -1
+        :param level: AccessType level (0, 1, 2) or None
                       to remove access.
         """
         resources = self._gatherAllResources(project)
+        # Bulk updates fire no folder save event, so check the
+        # creator guard on every dataset before writing any.
+        for dataset in resources['datasets']:
+            require_creator_keeps_admin(dataset, targetUser, level)
         uid = targetUser['_id']
         self._applyToAllResourceTypes(
             resources,

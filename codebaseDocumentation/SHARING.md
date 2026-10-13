@@ -26,9 +26,19 @@ NimbusImage uses Girder's built-in access control system with three permission l
 
 **Key behaviors:**
 - Users automatically receive ADMIN access when they create a dataset
-- Only users with ADMIN access can modify sharing settings (add/remove users, toggle public)
+- Users with WRITE or ADMIN access can add, change and remove users, but never above their own
+  level: a WRITE collaborator can share Read or Write, and cannot grant Admin or change/remove
+  anyone above Write (the owner). Toggling public, choosing collections and share links stay
+  ADMIN-only
 - Any user with READ access can view the access list (who has access and at what level)
-- The dataset owner (ADMIN) cannot be removed from the access list
+- Owners (ADMIN) can't be changed or removed by anyone below ADMIN (`requireCanSetUserAccess`).
+  The dialog also locks owner rows for everyone. Another ADMIN can change a co-owner through the
+  API, but nobody except a site admin can take the dataset's **creator** below ADMIN, themselves
+  included (`folder_access_guard`): both share endpoints check it before writing anything, and a
+  folder-save listener backs up Girder's raw `PUT folder/{id}/access`.
+  *"testCreatorCannotRemoveThemselvesViaDatasetShare"*,
+  *"testCoOwnerCannotDemoteTheCreatorViaDatasetShare"*,
+  *"testCreatorCannotRemoveThemselvesViaProjectShare"*
 
 This last invariant is enforced by a `model.folder.save` listener installed in `server/helpers/folder_access_guard.py`. It rejects any save of a `contrastDataset` folder whose access list does not include the creator at ADMIN level. Site admins can override (recovery path). This guard plugs a gap in core Girder's `setAccessList`, which otherwise accepts any ACL including one that locks the owner out — see `BUG_OWNER_CAN_REMOVE_SELF_FROM_DATASET.md`.
 
@@ -43,6 +53,17 @@ When sharing a dataset, permissions are set on multiple Girder resources:
 3. **Configurations (Collections)** - Tool definitions, layer settings, scales
 
 All three resource types must have matching permissions for proper access.
+
+### Property documents never carry the ACL
+
+Annotation properties (`annotation_property`) carry a Girder `access` ACL of their own, but it does not decide who reads them: `GET /annotation_property` and `GET /annotation_property/:id` admit anyone with READ on a configuration whose `meta.propertyIds` lists the property, including anonymous viewers of a public dataset. So no response may include that ACL, which names every user the property was shared with.
+
+- `AnnotationProperty.CLIENT_FIELDS` (`name`, `image`, `tags`, `shape`, `workerInterface`) plus `_id` are the only fields exposed. The get, list and create endpoints use `@filtermodel`; the JSON export and the Zenodo archive project to the same fields via `findClientFields`.
+- Create and update store only `CLIENT_FIELDS`. A body's `access`, `public` or exported `_id` is dropped.
+- Responses carry no `_accessLevel`. A level computed from the property's own ACL would be wrong (`-1` for a collaborator who reads it through a configuration), so `UngatedAclFilterMixin` filters by exposed fields alone.
+- `worker_interface` and `worker_preview` responses are filtered the same way (`_id`, `image`, and `interface` or `preview`). There is one document per worker image, readable by any user, with an ACL naming whoever first created it. Their write paths need no allow-list because the model builds the document itself.
+
+Tests: `test/test_property_fields.py`.
 
 ### Data Flow
 
@@ -81,15 +102,33 @@ Returns the current access list for a dataset.
     }
   ],
   "groups": [],
+  "currentUserLevel": 1,
   "configurations": [
     {
       "id": "string",
       "name": "string",
-      "public": true
+      "public": true,
+      "currentUserLevel": 0
     }
-  ]
+  ],
+  "writableViewIds": ["string"]
 }
 ```
+
+`currentUserLevel` is the caller's **effective** level (`getAccessLevel`, so groups and site admin
+count). The same `formatAccessList` adds it to `/dataset_view/configuration_access/:id` and
+`/project/:id/access`. Clients must use it for their own rights, not their row in `users`: that list
+holds only direct entries, so access held through a group has no row. *"testAccessListReportsEffectiveCurrentUserLevel"*
+
+Each configuration also carries the caller's level, and `writableViewIds` lists the dataset's views
+the caller can write. `POST /dataset_view/share` needs WRITE on every view and configuration it is
+sent, so the dialog sends only writable views, and treats a configuration as shareable only when
+the caller can write it **and** at least one of its views (`isConfigShareable`). That one predicate
+drives the default selection, the owner's checkbox enabling and the pruning after a self-change, so
+a collection is never shown selected while its views are silently dropped
+(*"never shows a collection selected that would not be shared"*). Without this, a WRITE collaborator with READ on one
+collection had every share refused. *"testAccessListReportsWhatTheCallerCanShare"*,
+*"selects writable collections and sends writable views"*
 
 **Implementation notes:**
 - Uses `Folder().getFullAccessList()` for user list (doesn't include emails)
@@ -136,7 +175,14 @@ Returns the current access list for a configuration and its associated datasets.
 
 Grants, modifies, or revokes user access.
 
-**Required permission:** WRITE access to the dataset and configurations
+**Required permission:** WRITE on the dataset folder and on every listed DatasetView and its
+configuration. All `datasetViewIds` must belong to one dataset (400 otherwise). On **each** of
+those documents (`requireCanSetUserAccess`), the caller cannot grant a level above their own,
+nor change or remove a user whose current entry is above their own; either is a 403 that changes
+nothing. Before 2026-10-11 only WRITE was checked, so a collaborator could grant themselves
+ADMIN or remove the owner. *"testWriteUserCanShareUpToWrite"*,
+*"testWriteUserCannotExceedOwnLevel"*, *"testOwnLevelIsCheckedPerDocument"*,
+*"testShareEndpointRejectsViewsOfSeveralDatasets"*
 
 **Request body:**
 ```json
@@ -150,12 +196,21 @@ Grants, modifies, or revokes user access.
 **Access type values:**
 - `0` - READ access
 - `1` - WRITE access
-- `null` - Remove access entirely
+- `2` - ADMIN (owner) access
+- `-1` - Remove access entirely
+- Anything else (including `100` SITE_ADMIN, fractions like `1.9`, booleans) is a 400 — *"testShareEndpointRejectsInvalidAccessType"*
 
 **Behavior:**
 - Sets permissions on all specified DatasetViews
 - Also sets permissions on the parent Dataset folder
 - Also sets permissions on associated Configurations
+- `-1` is mapped to `None` (`parseShareAccessType` in `server/helpers/access_helpers.py`)
+  before `setUserAccess`, which deletes the user's entry from each ACL. Girder removes an
+  entry only for `None`; passing `-1` through would store an inert `level: -1` entry that
+  grants nothing but kept the user in the sharing table (fixed 2026-10-11).
+  `formatAccessList` drops negative entries, so leftovers from before the fix stay hidden.
+  Tests: *"testShareEndpointRemoveDropsAclEntries"*, *"testAccessListHidesLegacyNegativeEntries"*,
+  *"test_remove_drops_entries_everywhere"* (project), *"test_legacy_negative_entry_not_propagated"*.
 
 #### `POST /dataset_view/set_public`
 
@@ -172,6 +227,111 @@ Makes a dataset and all associated resources public or private.
 - All DatasetViews for the dataset
 - All Configurations used by those DatasetViews
 
+## Share links (share a view without making the dataset public)
+
+A **share link** is a capability URL — `#/shared/<token>` (or `#/embed/<token>` for the
+chrome-less viewer) — that opens one dataset view read-only for anyone who has it. It does
+not make the dataset public and does not require the recipient to have an account.
+
+**How the bearer is bounded.** A Girder token's scope is global (a `DATA_READ` token for
+the owner would read everything the owner can), so each link creates a hidden Girder user
+`share-<hex>` (random password, `shareLink` marker), grants it READ on the dataset folder,
+the dataset view and its configuration through the same `setUserAccess` calls the named
+sharing uses, and mints a Girder token for *that* user scoped to `DATA_READ` plus
+`USER_INFO_READ` (the client's `user/me` bootstrap; nothing else). The bearer sees
+exactly this dataset (ACL) and cannot write (scope: write endpoints answer 401). Girder has no
+view-only scope — `DATA_READ` would also open `folder/{id}/download`, `item/{id}/download`,
+`file/{id}/download`, `resource/download` and the plugin's `/export` routes — so
+`server/helpers/shareLinkGuards.py` binds `rest.<method>.<route>.before` on those routes and
+refuses a link user (403) before the handler runs; the same module drops link users from
+`GET user` listings. The shared access-list formatter also excludes link principals
+from dataset, configuration, and project named-user tables without changing their ACLs.
+Manage those principals through the Share links list instead. Tiles, annotations,
+properties and the spatial routes stay open: a link
+shows a view, it does not hand out the files. Revoking
+deletes the user — Girder's `cleanupDeletedEntity` drops its ACL entries — and its tokens.
+Deleting the dataset revokes all of its links (a `model.folder.remove` hook), since the
+revoke endpoint can no longer load the folder afterwards.
+The link user is `public: False` but does exist in the user collection; it never receives
+storage and cannot be signed into (nobody knows its password).
+
+| Method | Endpoint | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/v1/share_link` `{datasetViewId, days? (0 = never, ≤ 3650), label?}` | ADMIN on the dataset, WRITE on the view and its configuration (as named sharing) | Create; the response carries `token` **once** |
+| `GET` | `/api/v1/share_link?datasetId=` | WRITE on the dataset | Live links (no tokens) |
+| `GET` | `/api/v1/share_link/me` | the bearer | Which view the request's token opens; 404 for an ordinary login or an expired link. Does not mutate browser cookies. |
+| `DELETE` | `/api/v1/share_link/{id}` | ADMIN on the dataset | Revoke (idempotent) |
+
+Model: `server/models/shareLink.py` (`share_link` collection: `datasetId, datasetViewId,
+configurationId, linkUserId, tokenId, label, createdBy, created, expiresAt, revoked`).
+Expiry is enforced by Girder on the token and reported by `/me`; datetimes are compared as
+aware UTC (Girder's token expiry is aware, Mongo's round trip may be naive). The link user
+is saved `status: enabled` so a registration policy of "approve" does not e-mail the admins
+for every link; it still gets Girder's default Public/Private folders (empty, no quota).
+A recipient who is signed in to this Girder on the same browser keeps their own cookie.
+Shared-view image, annotation-raster, and transcript-density tile URLs explicitly carry the
+in-memory link bearer as a `token` query parameter, so Girder authorizes those image requests
+as the link user instead of the ambient login.
+
+**Client.** `src/store/ShareLinkAPI.ts`; `store.openShareLink({token, signal})` validates the token
+on an isolated REST client **in memory only**, fetching the link user and asking `/me`
+before committing either credentials or Vuex identity. Failed or superseded attempts
+leave the current session and user-dependent state untouched. The route aborts its
+signal on token changes or unmount; the store checks cancellation before committing
+identity, so an abandoned bootstrap cannot log in after navigation. A signed-in user's
+persisted login survives a visit, and leaving the shared route in the same tab
+(`store.leaveShareLink`, from `SharedView`'s unmount) restores the session the link
+replaced — also after hopping between links — unless a login or logout replaced the
+link's session meanwhile. The tile URL builders add that bearer only when the fetched user has the `shareLink`
+marker. `src/views/SharedView.vue` renders the viewer on the original token-bearing
+route, so refresh revalidates the bearer without changing the owner's stored login.
+The normal login bootstrap is skipped on shared routes to avoid racing the bearer.
+App.vue recognizes `/embed/<token>` to hide the toolbar and palettes (`embedMode`).
+Route defaults and later palette-open requests respect embed mode; the Time Lapse
+palette is hidden without changing the underlying viewer mode. The Share dialog's
+**Share links** section (admins) lists, creates (label, 7/30/90 days/never) and revokes
+links; the URL is shown once with its embed variant.
+
+Tests: `test/test_share_link.py` (bearer reads only the shared dataset and cannot write or
+mint links; create needs ADMIN and valid input; list/revoke; deleting the dataset revokes its links; ordinary login is not a link;
+expired links refused), `ShareLinkAPI.test.ts`, `SharedView.test.ts`,
+`ShareDataset.test.ts`.
+
+### Share-link regression checklist
+
+- The API classes send the link's bearer, not the boot client's token (the stored login,
+  or none for a recipient): `girderRestProxy` resolves the live `girderRest` —
+  `index.test.ts` (`commits only the latest validated link and does not persist its
+  bearer`, which asserts `main.api.client.token`). Verified live: a share view's
+  `api.client` `user/me` is the `share-…` user, the view's `_accessLevel` is 0 and
+  `canEditDatasetView` is false.
+- Leaving the shared route cancels pending authentication before identity commits —
+  `SharedView.test.ts` (`cancels pending authentication when leaving the shared route`),
+  `index.test.ts` (`does not commit a share bootstrap after its route is cancelled`).
+- Failed link validation cannot commit attempted identity or reset user state;
+  only the latest successful bootstrap commits, without persisting its bearer —
+  `index.test.ts` (`does not commit an attempted identity when link validation fails`,
+  `commits only the latest validated link and does not persist its bearer`).
+
+- Hide link principals from dataset/configuration access lists while their bearer stays
+  readable — `test_share_link.py::testLinkUsersStayOutOfAccessLists`.
+
+- Keep the bearer URL on initial open and reload/remount without replacing the owner's
+  persisted login — `SharedView.test.ts` (`acts as the link's bearer and opens its dataset view`).
+- Leaving the shared route restores the replaced session, from before the first of
+  several links — `index.test.ts` (`restores the replaced session when the shared
+  route is left`), `SharedView.test.ts` (`gives back the viewer's own session when the
+  route is left`).
+- Recognize the embed route without redirecting away from its credential —
+  `SharedView.test.ts` (`marks the embed route so the chrome is dropped`).
+- Keep palettes closed through route initialization and late viewer requests, and
+  restore normal controls when leaving embed — `App.test.ts`
+  (`keeps palettes closed after entering an embedded viewer`, both route and query variants).
+- Display expired/invalid link errors without opening an unrelated viewer —
+  `SharedView.test.ts` (`explains a dead link instead of navigating`).
+- Preserve saved virtual gene columns and gates when a shared configuration is hydrated —
+  `annotationBrowserConfig.test.ts` (`preserves virtual columns, filters, labels and gates on reload`).
+
 ## Frontend Implementation
 
 ### Component: `ShareDataset.vue`
@@ -187,7 +347,12 @@ Location: `src/components/ShareDataset.vue`
 - Individual loading states per user row
 - Confirmation dialog before removing access
 - ADMIN users protected from removal (lock icon)
-- **Read-only mode** for non-admin users: when the current user doesn't have ADMIN (level 2) access, the dialog hides all edit controls (add user form, remove buttons, access level dropdowns, public toggle, collection checkboxes) and shows access levels as plain text. The dialog title changes from "Share Dataset:" to "Sharing:".
+- Rights come from the access response's `currentUserLevel`, not the caller's row (*"takes management rights from the server's effective level"*). Changing your own entry re-reads it without resetting the collection selection. Any failed load, including the 403 after removing your last access, fails closed (*"removing your last access fails closed on the 403"*).
+- Only the latest access load commits: `fetchAccessInfo`, `refetchIfSelf` and `resetState` share one request counter, and a self-change during an in-flight full load (a reopen) restarts the full load instead of superseding it (*"an older self-change reload cannot overwrite a newer load"*, *"a self-change during a reopen's load still fills the dialog"*).
+- Share targets are named users only. `findShareTarget` treats share-link principals as unknown on both share endpoints (*"testShareEndpointRejectsShareLinkPrincipals"*).
+- With nothing shareable (`canShareAny`), the add form becomes a note and the row controls are hidden (*"with nothing shareable, a WRITE user gets a note, not controls"*).
+- **WRITE collaborators** (`canManageUsers`) get the add-user form, plus level dropdowns and remove buttons on rows at or below their own level (`canEditUser`). Rows above it show a lock. Public toggle, collection checkboxes and share links stay ADMIN-only (`isResourceAdmin`). A refused share shows the server's reason.
+- **Read-only mode** for READ users: the dialog hides all edit controls (add user form, remove buttons, access level dropdowns, public toggle, collection checkboxes) and shows access levels as plain text. The dialog title changes from "Share Dataset:" to "Sharing:".
 
 ### State Management
 
@@ -212,11 +377,11 @@ Located in `src/store/GirderAPI.ts`:
 // Fetch current access list
 async getDatasetAccess(datasetId: string): Promise<IDatasetAccessList>
 
-// Share with a user (or revoke with accessType: null)
+// Share with a user (or revoke with accessType: -1)
 async shareDatasetView(
   datasetViews: IDatasetView[],
   userMailOrUsername: string,
-  accessType: number | null
+  accessType: number
 ): Promise<true | string>
 
 // Toggle public access
@@ -240,6 +405,7 @@ interface IDatasetAccessConfiguration {
   id: string;
   name: string;
   public: boolean;
+  currentUserLevel: number; // caller's effective level on this configuration
 }
 
 interface IDatasetAccessList {
@@ -248,6 +414,8 @@ interface IDatasetAccessList {
   users: IDatasetAccessUser[];
   groups: unknown[];
   configurations: IDatasetAccessConfiguration[];
+  currentUserLevel: number; // caller's effective level on the dataset
+  writableViewIds: string[]; // views the caller can write (and so share)
 }
 ```
 
@@ -278,7 +446,7 @@ interface IDatasetAccessList {
 +-----------------------------------------------+
 ```
 
-### Read-Only View (non-admin shared users)
+### Read-Only View (READ-level shared users)
 
 ```
 +-----------------------------------------------+
@@ -317,7 +485,7 @@ No collection checkboxes, public toggle, access level dropdowns, remove buttons,
 | File | Purpose |
 |------|---------|
 | `devops/girder/plugins/AnnotationPlugin/upenncontrast_annotation/server/api/datasetView.py` | Backend API endpoints |
-| `src/components/ShareDataset.vue` | Frontend share dialog (admin: full edit, non-admin: read-only) |
+| `src/components/ShareDataset.vue` | Frontend share dialog (admin: full edit, write: users up to Write, read: read-only) |
 | `src/components/SharingStatusDisplay.vue` | Inline sharing status card (public/private chip, user list) |
 | `src/components/SharingStatusIcon.vue` | Small sharing icon for list items |
 | `src/views/dataset/DatasetInfo.vue` | Dataset info page (embeds SharingStatusDisplay) |

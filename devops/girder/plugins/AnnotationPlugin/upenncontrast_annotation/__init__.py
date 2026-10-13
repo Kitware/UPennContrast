@@ -32,6 +32,8 @@ from .server.models.history import History as HistoryModel
 from .server.models.documentChange import DocumentChange as DocumentChangeModel
 from .server.models.project import Project as ProjectModel
 from .server.helpers import folder_access_guard
+from .server.models.shareLink import ShareLink as ShareLinkModel
+from .server.helpers import shareLinkGuards
 
 
 # Taken from HistomicsUI
@@ -117,6 +119,7 @@ class UPennContrastAnnotationAPIPlugin(GirderPlugin):
         from .server.api.project import Project
         from .server.api.zenodo import Zenodo
         from .server.api.zenodo_credentials import ZenodoCredentials
+        from .server.api.shareLink import ShareLink
 
         ModelImporter.registerModel(
             "upenn_annotation", AnnotationModel, "upenncontrast_annotation"
@@ -159,6 +162,9 @@ class UPennContrastAnnotationAPIPlugin(GirderPlugin):
         ModelImporter.registerModel(
             "upenn_project", ProjectModel, "upenncontrast_annotation"
         )
+        ModelImporter.registerModel(
+            "share_link", ShareLinkModel, "upenncontrast_annotation"
+        )
         allowedDeleteTypes.add("upenn_project")
 
         info["apiRoot"].resource = CustomResource()
@@ -179,6 +185,8 @@ class UPennContrastAnnotationAPIPlugin(GirderPlugin):
         info["apiRoot"].project = Project()
         info["apiRoot"].zenodo = Zenodo()
         info["apiRoot"].zenodo_credentials = ZenodoCredentials()
+        info["apiRoot"].share_link = ShareLink()
+        shareLinkGuards.bind()
         system.addSystemEndpoints(info["apiRoot"])
 
         # Prevent owners from removing their own ADMIN access on

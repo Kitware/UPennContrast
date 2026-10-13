@@ -10,12 +10,10 @@ from girder.api import access
 from girder.api.rest import Resource, filtermodel, loadmodel
 from girder.api.describe import Description, autoDescribeRoute
 from girder.constants import AccessType, TokenScope
-from girder.exceptions import RestException
 from girder.models.folder import Folder
-from girder.models.user import User
 
 from upenncontrast_annotation.server.helpers.access_helpers import (
-    formatAccessList
+    findShareTarget, formatAccessList, parseShareAccessType
 )
 from upenncontrast_annotation.server.models.project import (
     Project as ProjectModel
@@ -279,6 +277,7 @@ class Project(Resource):
             Set accessType to:
             - 0 (READ) for view-only access
             - 1 (WRITE) for edit access
+            - 2 (ADMIN) for owner access
             - -1 to remove user's access entirely
         """)
         .modelParam(
@@ -294,7 +293,7 @@ class Project(Resource):
         .param(
             'accessType',
             'Access level: -1 (remove), 0 (READ), '
-            '1 (WRITE).',
+            '1 (WRITE), 2 (ADMIN).',
             dataType='integer', required=True
         )
         .errorResponse()
@@ -311,22 +310,18 @@ class Project(Resource):
         # can grant others access via project sharing.
         # For now, the project-level ADMIN check
         # (above) is the only gate.
-        accessType = AccessType().validate(accessType)
+        accessType = parseShareAccessType(accessType)
 
-        targetUser = User().findOne(
-            {"$or": [
-                {"login": userMailOrUsername},
-                {"email": userMailOrUsername},
-            ]}
-        )
-        if not targetUser:
-            raise RestException("badEmailOrUsername")
+        targetUser = findShareTarget(userMailOrUsername)
 
-        self._projectModel.setUserAccess(
-            project, targetUser, accessType, save=True
-        )
+        # Propagation checks the dataset-creator guard before writing
+        # anything, so run it first: a refused share leaves the
+        # project's own ACL unchanged too.
         self._projectModel.propagateUserAccess(
             project, targetUser, accessType
+        )
+        self._projectModel.setUserAccess(
+            project, targetUser, accessType, save=True
         )
 
         return True
@@ -355,7 +350,7 @@ class Project(Resource):
     )
     def getAccess(self, project):
         result = formatAccessList(
-            self._projectModel, project
+            self._projectModel, project, self.getCurrentUser()
         )
         result['projectId'] = str(project['_id'])
         return result

@@ -18,7 +18,7 @@ description: "Use when writing or modifying Python code in the Girder backend pl
 
 **Important:** `AccessType.ADMIN` means **owner of that document**, not a site-wide admin. The creator of a project/dataset gets ADMIN on it and can share it with others.
 
-Use `-1` (not `null`) to remove a user's access.
+**Removing access:** the share endpoints take `-1` on the wire, but Girder's `setUserAccess(doc, user, level)` deletes the entry **only when `level is None`**. Pass `-1` and Girder stores an inert `{id, level: -1}` entry: the user can't read anything, yet still shows up in access lists. Convert at the API boundary with `parseShareAccessType()` (`server/helpers/access_helpers.py`). A test that checks only "user can no longer read" passes with the bug present, so assert the user has **no entry** in `doc['access']['users']`.
 
 ### Access Decorators (Endpoint-Level)
 
@@ -43,6 +43,20 @@ doc = Model().load(id, force=True)  # Admin bypass
 
 For detailed access patterns including sharing: read `references/access-control-patterns.md`
 When modifying sharing/access code: read `codebaseDocumentation/SHARING.md`
+
+### Never return a document that carries `access` raw
+
+`findWithPermissions` and `@loadmodel` decide which **documents** a caller sees. Neither decides which **fields** they see. Any plugin model built on `AccessControlledModel` (every `ProxiedModel`) stores an `access` ACL that lists every collaborator's user id, and `GET user/{id}` turns those ids into names. When a model defines no `exposeFields`, returning its raw doc hands that list to every reader, anonymous viewers of public datasets included. This has happened with dataset views, properties, worker interfaces and previews, and with the JSON export and Zenodo archive, which embed docs without going through any endpoint.
+
+- Give the model `CLIENT_FIELDS` and `exposeFields(level=READ, fields=("_id",) + CLIENT_FIELDS)` in `initialize()`, and put `@filtermodel(model=...)` on every endpoint that returns its docs (get, find/list, **create**, update).
+- For exports, which bypass `filter()`, use a `fields=` projection (`AnnotationProperty.findClientFields`).
+- Treat the write side as the twin: a create or update that stores the raw body lets the caller set `access` or `public`. Allow-list the body with `filterUpdateFields(requireObjectBody(...))`.
+- `filter()` adds `_accessLevel`, computed from the doc's own ACL. If that ACL is not what grants reads (properties are read through configurations; worker docs by anyone), the value is wrong, so mix in `UngatedAclFilterMixin` (`helpers/customModel.py`).
+- Test with a READ-only caller and an anonymous one, and assert both that `access` is absent and that every field the consumers read survives.
+
+### `rest.*.before` listeners need their own access level
+
+Girder runs `Resource._defaultAccess` on every listener bound to a `rest.<method>.<route>.before` event. A listener with no `accessLevel` attribute makes Girder demand **site admin for the whole route**. `shareLinkGuards.refuseDownloadForLinkUsers` shipped this way, and every non-admin user's folder/item/file downloads and JSON/CSV/GeoJSON exports returned 403 "Administrator access required." Decorate such listeners with `@access.public`. That only sets the attribute; the route handler's own decorator still enforces access afterwards. Tests that exercise only the `admin` fixture can't see this, so test guarded routes with a non-admin `user`, and assert the refusal **message**, not just the 403.
 
 ## Model Parameters: Security
 
@@ -222,6 +236,47 @@ The API and model layers have strict responsibilities. Never mix them.
 - Must be abstract from HTTP/API concerns
 - Should not know about request parameters or HTTP status codes
 
+### Validating caller input is an API job — even when the model "could" do it
+
+The layer rule is about **whose data it is**, not which exception type gets
+raised. A check that asks *"is what this caller sent consistent with what they
+are authorized for?"* — does this `annotationId` belong to the `datasetId`
+they have WRITE on, does this property id exist in this dataset, is this
+parent in the same dataset as the child — is input validation, and it goes in
+the API method (or a `server/helpers/` function the API calls), next to the
+access check it completes. The model receives already-validated data and does
+the DB modification (pchoisel, PR #1358: *"This check needs to be done at the
+API level, not in the model. The API is responsible for validating the input
+data and passing it to the model for the DB modification"*).
+
+- Raising `ValidationException` instead of `RestException` does **not** make a
+  request-input check belong in the model. PR #1358 put a
+  "annotation belongs to dataset" lookup in
+  `AnnotationPropertyValues.appendMultipleValues` raising
+  `ValidationException`; it passed every layer grep and was still flagged.
+- Putting it in the model also taxes internal callers that already know the
+  answer (the import path writes values for annotations it just created in
+  that dataset) and forces tests to bypass the model (`collection.insert_one`)
+  to set up legitimate fixtures — both are tells the check is misplaced.
+- When several endpoints need the same check, write it once in
+  `server/helpers/` (e.g. `requireAnnotationsInDatasets` in
+  `helpers/access_helpers.py`, beside `requireDatasetsAccess`), batch-load with
+  `$in`, raise `RestException(code=400)`, and call it from each endpoint.
+- Document the precondition in the model method's docstring ("callers must
+  ensure each annotation belongs to its datasetId") so internal callers know
+  the model trusts them.
+- Test it at the endpoint (`server.request(...)` → `assertStatus(resp, 400)`),
+  not by calling the model directly.
+- **Moving a check up a layer reorders it ahead of the model's schema
+  validation.** The model's `jsonValidate` used to turn a non-object entry
+  into a 400; once the API helper ran first and called `entry.get(...)`, a
+  string entry or a dict-instead-of-list body became a 500. Guard the body's
+  shape (`requireList`, `requireObjectBody` per entry) before the new check,
+  and use `.get()` for ids the schema doesn't require.
+
+Domain invariants that hold regardless of who calls (schema shape, "a
+connection can't link an annotation to itself") still belong in the model.
+
 ```python
 # Good - API handles input, model handles logic
 # In server/api/annotation.py
@@ -394,6 +449,153 @@ Rules:
    and ignores it*, with a clause that would visibly narrow the result if it
    were applied — otherwise "stripped" and "applied but harmless" look the
    same.
+
+## Concurrent writers: no read-merge-write, no delete-then-insert
+
+Property workers run in bursts (4–5 jobs within a second, several over the
+same annotations), so any write path is hit concurrently in production.
+Issue #1356: `saveMany` "updated" documents by `removeWithQuery` then
+`insert_many`, and property values merged by reading the stored doc in
+Python first. Two writers raced into `E11000 ... index: _id_`, the loser had
+already deleted its batch (lost data), and a stale merge overwrote a
+sibling's values.
+
+- **Merge on the server.** `UpdateOne({key: k}, {"$set": {"values.<id>": v}},
+  upsert=True)` per document in one `bulk_write` — never find, merge in
+  Python, then write back.
+- **Replace in place.** `ReplaceOne({"_id": id}, doc, upsert=True)` is atomic
+  per document; delete-then-insert is not.
+- **Racing upserts duplicate documents** unless the filter key is unique.
+  If adding a unique index would need a data migration, set
+  `_id` to the natural key on insert (`$setOnInsert: {"_id": annotationId}`):
+  the loser gets an `11000` on `_id` instead of a second document, and one
+  retry of just those ops (`ordered=False`, retry by `writeErrors[].index`)
+  merges into the winner's.
+- **`BulkWriteError.details` / `WriteError.details` are dicts.** Format them
+  (`"%s" % ...`) and `raise ... from e`; `"msg" + e.details` turned the real
+  error into a `TypeError` 500 (issue #1357).
+- **Authorize by the key the write matches on.** The endpoint checked WRITE
+  on the body's `datasetId`, but the upsert matched by `annotationId` alone,
+  so WRITE on your own dataset let you overwrite another dataset's values
+  (Codex P1, PR #1358). When the check and the write key differ, verify
+  they agree first (batch-load the annotations' `datasetId`s and reject
+  mismatches) — in the **API layer**: `requireAnnotationsInDatasets` in
+  `helpers/access_helpers.py`, called by both endpoints. It first landed in
+  the model and was flagged (see "Validating caller input is an API job").
+- **Test with real threads + a `threading.Barrier`** over a few hundred
+  documents and several rounds (`test/test_save_many.py`). It fails reliably
+  without the fix; a single-threaded test cannot see the race.
+
+## Index changes on existing collections: not at startup
+
+Any `create_index` / `drop_index` / `ensureIndices` you add to a model
+`__init__` or `initialize` runs on **every Girder start, in every uvicorn
+worker at once** (production: 9), against production-sized collections
+(`annotation_property_values` is 35M documents). PR #1347 dropped the
+non-unique `annotationId_1` there and rebuilt it unique. In production
+(2026-10-09) that left the collection with **no index for 6 h** and Girder
+crash-looping:
+
+- **Workers race.** One drops the index; the rest hit `IndexNotFound`.
+- **Builds outlive the 60 s client socket timeout.** The worker raises
+  `TimeoutError` and restarts; the server-side build does **not** stop. Each
+  restart queues another `createIndexes`, and Mongo runs the queue serially
+  long after the instance is gone (72 builds, ~4 h).
+- **Drop-then-build leaves nothing** when the build is slow or fails.
+- **A unique build fails outright on existing duplicates**, and an
+  `except DuplicateKeyError: coalesce()` fallback never fires if the
+  client timed out first. 765k duplicate groups were in the data.
+- The production app DB user cannot run `collMod`, `currentOp`, or read
+  Atlas logs, so you can't watch or convert an index from the app.
+
+Rules:
+
+- **Ship index changes on existing collections as an operator step**: a
+  script run once, with a report-only mode, then verified, and run BEFORE
+  the new backend boots. Example:
+  `upenncontrast_annotation/scripts/dedup_property_values.py`. Such a
+  script must not instantiate the model whose `__init__` changes the index.
+  `ensureIndices` on a **new** (empty) collection at startup is fine.
+- **Never drop an index before its replacement exists.** Build the new one
+  alongside, or convert in place (`collMod` `prepareUnique` → `unique`)
+  where permitted.
+- **Before adding a uniqueness constraint, count the violations** on real
+  data (stream the index in key order and count adjacent repeats; see the
+  script) and ship the merge as part of the operator step.
+- **Startup code must work before and after the operator step.** E.g.
+  #1347's startup is safe once the index is already unique: no drop, and
+  `create_index(unique=True)` is an instant no-op.
+- **Flag it in the PR description** under a "Deploy" heading: which
+  collection, its production size, and the command the operator must run
+  before rolling backends.
+
+Full incident, numbers, and procedure:
+`codebaseDocumentation/PROPERTY_VALUES_UNIQUE_INDEX.md`.
+
+## Returning a large JSON body from numpy (orjson + raw response)
+
+Two traps, both hit by the spatial plugin's `column` endpoint (hundreds of thousands
+of `(annotationId, value)` pairs):
+
+- **Girder JSON-encodes whatever the handler returns.** Returning `orjson.dumps(...)`
+  bytes without marking the response raw ships a JSON *string* containing JSON — the
+  client's `resp.json` is a `str`. Call `setRawResponse()` (from `girder.api.rest`)
+  and set the `Content-Type` header yourself, or return a generator (the annotation
+  plugin's `_streamJsonArray` pattern).
+- **`orjson.OPT_SERIALIZE_NUMPY` takes numeric and bool arrays only.** A unicode
+  (`U24`) array of ids raises `TypeError: unsupported datatype in numpy array`;
+  `.tolist()` the string array, keep the numeric one as numpy. Cast integral floats
+  to `int64` first if the sibling endpoint returns ints, so the two agree.
+
+```python
+setRawResponse()
+setResponseHeader("Content-Type", "application/json")
+return orjson.dumps(
+    {"annotationIds": ids.tolist(), "values": values},
+    option=orjson.OPT_SERIALIZE_NUMPY,
+)
+```
+
+## Virtual property paths (`helpers/valueProviders.py`)
+
+A property path whose first segment is a registered prefix is answered by another
+plugin's provider, not Mongo. If you add a new consumer of property paths (anything that
+reads `values.<path>` or filters/sorts on one), route it through the hook or refuse
+virtual paths explicitly — the six existing consumers are listed in
+`codebaseDocumentation/SPATIAL_PLUGIN.md` "Phase 2". Two traps from wiring them:
+
+- Providers key by id **string**; Mongo paths yield ObjectIds. `colorByProperty`'s
+  membership guard compared the two and silently emptied the map ("No values found").
+  Convert at the boundary.
+- `appendMultipleValues` `$set`s every property id it is given, so writing a virtual
+  path through it would persist (and then shadow) the provider's value — providers are
+  read-only; never store a virtual path.
+- **A derived table's rows are not the dataset's cells.** The spatial table keeps rows for
+  deleted or moved cells until a recompute, so any read meaning "all cells" (an
+  unfiltered aggregate, `values()`, a complement like "everything else") must go through
+  `store.liveRowMask()`, never `rows=None` / `~maskA` / `store.annotationIds`. Codex found
+  this one call site per round for four rounds; the fix was one cached mask used by all.
+  The Mongo twin: property values are scoped by `datasetId`, so anything that moves an
+  annotation between datasets must move its value documents too (`updateMultiple`).
+
+## A second plugin next to `upenncontrast_annotation`
+
+`upenncontrast_spatial` (`devops/girder/plugins/SpatialPlugin/`) is the template:
+
+- Declare the dependency by calling `getPlugin("upenncontrast_annotation").load(info)`
+  first thing in `load()` — Girder 5 has no `dependencies` attribute; the wrapper makes
+  the second load a no-op.
+- The annotation plugin's `server/` tree has no `__init__.py`, so its sdist/wheel does
+  **not** ship it (its own tests import from the source tree). A sibling plugin's tox must
+  install it **editable**: `deps = -e {toxinidir}/../AnnotationPlugin`. That install
+  leaves `AnnotationPlugin/build/` behind — gitignored.
+- Import the annotation plugin's `validation.py` helpers, access helpers and models;
+  never mirror a private method's field list. When you need one (the spatial API needed
+  `_hasAnnotationFieldFilters`), add a public method on the annotation model
+  (`narrowsPopulation`) and call that.
+- `@pytest.mark.plugin("upenncontrast_spatial")` loads both plugins; the "Event binding
+  already exists" warnings in the test log are the annotation plugin's handlers being
+  bound once per plugin load and are harmless.
 
 ## Loading Plugin Changes Into the Running Backend
 

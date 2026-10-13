@@ -159,9 +159,9 @@ method — the executor registry (§6) is a thin table, not new logic.
 
 | Tool | Returns | Maps to |
 |------|---------|---------|
-| `get_interface_state` | Structured snapshot: dataset/collection ids+names, location (xy/z/time + maxes), layer mode, camera, layers (id, name, channel, color, contrast, visible), selected tool, active filters, annotation counts by shape/tag, selection count | assembled from `main`, `filters`, `annotation` getters |
+| `get_interface_state` | Structured snapshot: dataset/collection ids+names, location (xy/z/time + maxes), layer mode, camera, layers (id, name, channel, color, contrast, visible), selected tool, active filters, annotation counts (total via `annotationCount`, which counts stubs in stub-only mode; filtered; selected) and the tag list | assembled from `main`, `filters`, `annotation` getters |
 | `capture_screenshot` | `{interface?, viewport?}` images, pushed into the conversation as image blocks | `captureInterfaceScreenshot` / `captureViewportScreenshot` (PR #1224 helpers) |
-| `get_annotation_summary` | Counts grouped by tag/shape/channel, optionally within current filters or current frame | `annotation`/`filters` getters |
+| `get_annotation_summary` | Dataset-wide `total` and `byTag`/`byShape`/`byChannel` counts, resolved server-side so they hold at any dataset size; plus the client's `filtered` and `selected` counts | `annotationsAPI.fetchAnnotationSummary` (`POST upenn_annotation/summary`, see `SELECTION_SUMMARY.md`); `filters`/`annotation` getters |
 | `list_annotations` | Paged, trimmed annotation records (id, shape, tags, location, centroid, color) matching a filter query | `filters.filteredAnnotations` / annotation store |
 | `list_tools` | Tools in the current configuration + available tool templates | `main.tools`, `main.toolTemplateList` |
 | `list_workers` | Available worker images with labels/descriptions | `properties.workerImageList` |
@@ -317,7 +317,8 @@ never enters the model's context**, even for datasets with millions of objects:
   the batch backend endpoint. "Randomly color the annotations" over a million
   objects costs the model a single tool call and a single number back.
 - **Reads return aggregates.** `get_annotation_summary` returns counts by
-  tag/shape/channel; `get_property_values` returns per-property
+  tag/shape/channel, aggregated on the server over the whole dataset;
+  `get_property_values` returns per-property
   `{count, mean, min, max}`, not raw values; `get_interface_state` returns
   counts plus the tag list.
 - **`list_annotations` is the only raw-row path, and it is hard-capped** at
@@ -327,9 +328,14 @@ never enters the model's context**, even for datasets with millions of objects:
   window.
 
 **The real ceiling is not the agent** — it is that `queryAnnotations` filters
-`annotationStore.annotations`, i.e. the frontend already holds every annotation
-in browser memory (a pre-existing app-wide limit, ~tens of thousands before it
-hurts). The agent inherits that ceiling; it does not add one.
+`annotationStore.annotations`, the full annotations the frontend holds in
+browser memory. Above the stub threshold (`stubThreshold`, 100K by default) the
+store loads stubs only and `annotations` is empty, so the query-based tools
+see nothing there. `get_annotation_summary` already avoids this by asking the
+server. The query/mutation tools, the analysis tools (`get_property_values`,
+histograms, plots and sample values, which intersect with the loaded ids), and
+`set_location`'s `fit` do not yet, so in stub-only mode they can report zero
+while the summary reports the whole dataset.
 
 **Future (defer until there is real demand):** when datasets genuinely outgrow
 the in-memory set, query/mutation resolution must move **server-side** — a
