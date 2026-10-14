@@ -89,9 +89,7 @@ describe("ShareProject", () => {
     expect(vm.impactSummary).toContain("refused if it would grant more");
     expect(vm.impactSummary).not.toContain("all associated");
     // Publishing skips configurations of owned datasets the caller only edits
-    expect(vm.impactSummary).toContain(
-      "publishing changes only what you own",
-    );
+    expect(vm.impactSummary).toContain("publishing changes only what you own");
   });
 
   it("shows the server's reason when a share is refused", () => {
