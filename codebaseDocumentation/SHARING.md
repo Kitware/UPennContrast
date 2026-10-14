@@ -127,6 +127,7 @@ collection had every share refused. *"testAccessListReportsWhatTheCallerCanShare
 - Uses `Folder().getFullAccessList()` for user list (doesn't include emails)
 - Requires separate bulk query to fetch user emails
 - Bulk loads configurations to avoid N+1 queries
+- Lists only configurations the caller can READ (`findWithPermissions`): another user may have opened the dataset with a private configuration of theirs
 
 #### `GET /dataset_view/configuration_access/:configurationId`
 
@@ -163,6 +164,7 @@ Returns the current access list for a configuration and its associated datasets.
 - Uses `Collection().getFullAccessList()` for user list (doesn't include emails)
 - Requires separate bulk query to fetch user emails
 - Bulk loads datasets to avoid N+1 queries
+- Lists only datasets the caller can READ (`findWithPermissions`): other users may have opened their own private datasets with this configuration
 
 #### `POST /dataset_view/share`
 
@@ -204,6 +206,17 @@ ADMIN or remove the owner. *"testWriteUserCanShareUpToWrite"*,
   `formatAccessList` drops negative entries, so leftovers from before the fix stay hidden.
   Tests: *"testShareEndpointRemoveDropsAclEntries"*, *"testAccessListHidesLegacyNegativeEntries"*,
   *"test_remove_drops_entries_everywhere"* (project), *"test_legacy_negative_entry_not_propagated"*.
+
+**Limits (`server/helpers/aclLimits.py`):** sharing never hands out more than the
+caller holds. WRITE is enough to share, but an explicit request (this endpoint,
+`project/:id/share`) is refused if it would exceed the caller's level on any touched
+document or change a user above it (its owner). Copying a project's ACL onto a resource
+newly added to it caps each entry at the caller's level instead (`cappedCopyLevel`), so
+adding a dataset never fails over someone else's grant. Project propagation reaches only
+what the caller could share here (`limitToShareable`: datasets, their views and
+collections the caller can edit). Before this, a WRITE collaborator could grant
+themselves ADMIN (`accessType: 2` on their own login). Tests:
+`test/test_share_escalation.py`; invariants are in `PROJECTS.md` "Regression checklist".
 
 #### `POST /dataset_view/set_public`
 

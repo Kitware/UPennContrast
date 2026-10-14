@@ -56,7 +56,13 @@ Bulk endpoints usually check access on the datasets of the documents an id list 
 - For exports, which bypass `filter()`, use a `fields=` projection (`AnnotationProperty.findClientFields`).
 - Treat the write side as the twin: a create or update that stores the raw body lets the caller set `access` or `public`. Allow-list the body with `filterUpdateFields(requireObjectBody(...))`.
 - `filter()` adds `_accessLevel`, computed from the doc's own ACL. If that ACL is not what grants reads (properties are read through configurations; worker docs by anyone), the value is wrong, so mix in `UngatedAclFilterMixin` (`helpers/customModel.py`).
+- A response that **names** related resources leaks too: an access list or summary built with plain `find()` (e.g. `configuration_access` listing every dataset opened with a configuration) must use `findWithPermissions` for the caller.
+- A caller-supplied Mongo query probes hidden fields through *which* documents match, even when the response is filtered (`{"access.users.id": X}` on `folder/query` was an ACL-membership oracle). Validate it with `requireQueryOnFields(query, exposedFields)` from `helpers/validation.py`.
 - Test with a READ-only caller and an anonymous one, and assert both that `access` is absent and that every field the consumers read survives.
+
+### Gate on the ACL that actually grants access
+
+The fields rule above has a twin on the access side. A property's own ACL names only its creator and is never shared, so `@loadmodel(level=READ)` or `findWithPermissions` on properties refuses every collaborator, even though they read the property through a shared configuration. Property compute shipped this way: a WRITE collaborator's "Compute all" returned 403 for every property they could see. Before gating an endpoint on a model's ACL, check whether that ACL is what grants reads (the `UngatedAclFilterMixin` models). For properties, use `_readableThroughConfigurations` in `api/property.py`: one `$in` query returns the requested ids that some READ-able configuration's `meta.propertyIds` references. `getBatch` and the compute endpoints (`_loadComputableProperties`, which also accepts the property's own ACL) both use it. Test it with a collaborator who is not on the document's ACL.
 
 ### `rest.*.before` listeners need their own access level
 
@@ -244,6 +250,44 @@ The API and model layers have strict responsibilities. Never mix them.
 - Must be abstract from HTTP/API concerns
 - Should not know about request parameters or HTTP status codes
 
+### Helpers report; the endpoint decides the HTTP error
+
+A shared helper in `server/helpers/` must not raise an HTTP-flavoured error
+for a condition it detects -- `RestException`, or an `AccessException`
+standing in for one ("these no longer exist; discard and re-upload"). It
+returns what it found (the ids that exist, the entries that failed) or
+raises a domain error, and the endpoint that called it raises
+`RestException` with the status and message that fit *that* endpoint
+(pchoisel, PR #1410: *"A helper should not raise this kind of API-related
+exceptions. The API that uses this helper should receive an error from this
+helper then should raise this kind of exception"*).
+
+Why it matters, beyond layering: the same helper often has callers that need
+the opposite answer. `requireResourcesAccess` grew a `requireAll=True` flag
+that raised for missing resources, needed by Zenodo *publish* (a deleted
+resource's files are still in the draft: refuse) while the upload *job*
+calls the same helper and must just drop what vanished. A flag that switches
+the helper into "raise for the API" mode is the tell; return the found set
+and let each caller compare.
+
+- **Look for it:** `raise RestException` / `raise AccessException(...)`
+  with a hand-written message in `server/helpers/*.py`, and boolean
+  parameters (`requireAll`, `strict`, `raiseIfMissing`) whose only effect is
+  to raise.
+- **Fix:** return the result (`existingIds, docsById` or a list of bad
+  entries); in the endpoint, compute what is missing/invalid and raise
+  `RestException(message, code=...)` there. Pick the status in the endpoint
+  (a missing resource in a stored draft is a 409 conflict, not a 403).
+- **Test both halves:** the endpoint test asserts the status *and* message;
+  a helper test asserts it returns the partial result instead of raising.
+- **Still fine in a helper:** Girder's own `model.requireAccess(doc, user,
+  level)` (the model's access check, not a message the helper invented),
+  and the request validators in `helpers/validation.py`, which exist to map
+  malformed request fields to a 400 and are only called from API code.
+- Older helpers that raise `RestException` themselves
+  (`requireAnnotationsInDatasets`) predate this rule; convert them when you
+  next change them rather than copying the pattern.
+
 ### Validating caller input is an API job — even when the model "could" do it
 
 The layer rule is about **whose data it is**, not which exception type gets
@@ -267,9 +311,10 @@ data and passing it to the model for the DB modification"*).
   that dataset) and forces tests to bypass the model (`collection.insert_one`)
   to set up legitimate fixtures — both are tells the check is misplaced.
 - When several endpoints need the same check, write it once in
-  `server/helpers/` (e.g. `requireAnnotationsInDatasets` in
-  `helpers/access_helpers.py`, beside `requireDatasetsAccess`), batch-load with
-  `$in`, raise `RestException(code=400)`, and call it from each endpoint.
+  `server/helpers/` (beside `requireDatasetsAccess` in
+  `helpers/access_helpers.py`), batch-load with `$in`, and call it from each
+  endpoint -- but have the helper **report** the problem and let each
+  endpoint raise the HTTP error (next section).
 - Document the precondition in the model method's docstring ("callers must
   ensure each annotation belongs to its datasetId") so internal callers know
   the model trusts them.

@@ -264,6 +264,13 @@ curl -s -X POST -H "Girder-Token: $TOKEN" -H "Content-Type: application/json" \
     "independentVariables": []
   }' "http://localhost:8080/api/v1/annotation_property"
 
+# Fetch several property definitions at once (the frontend's configuration
+# load). Returns readable ones in request order; unknown/unreadable ids are
+# omitted. Responses never include the `access` ACL.
+curl -s -X POST -H "Girder-Token: $TOKEN" -H "Content-Type: application/json" \
+  -d '{"ids": ["PROPERTY_ID_1", "PROPERTY_ID_2"]}' \
+  "http://localhost:8080/api/v1/annotation_property/batch"
+
 # Compute property for entire dataset
 curl -s -X POST -H "Girder-Token: $TOKEN" \
   "http://localhost:8080/api/v1/annotation_property/$PROPERTY_ID/compute?datasetId=$DATASET_ID"

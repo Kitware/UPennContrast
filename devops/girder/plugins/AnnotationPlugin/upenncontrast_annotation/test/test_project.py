@@ -504,7 +504,7 @@ class TestProjectPermissionPropagation:
             proj, user, AccessType.READ, save=True
         )
         project_model.propagateUserAccess(
-            proj, user, AccessType.READ
+            proj, user, AccessType.READ, admin
         )
 
         # User should now have READ access to
@@ -552,7 +552,7 @@ class TestProjectPermissionPropagation:
             proj, user, AccessType.READ, save=True
         )
         project_model.propagateUserAccess(
-            proj, user, AccessType.READ
+            proj, user, AccessType.READ, admin
         )
 
         # User should now have READ access
@@ -583,7 +583,7 @@ class TestProjectPermissionPropagation:
             proj, user, AccessType.READ, save=True
         )
         project_model.propagateUserAccess(
-            proj, user, AccessType.READ
+            proj, user, AccessType.READ, admin
         )
 
         # Verify access was granted
@@ -597,7 +597,7 @@ class TestProjectPermissionPropagation:
             proj, user, None, save=True
         )
         project_model.propagateUserAccess(
-            proj, user, None
+            proj, user, None, admin
         )
 
         # User should no longer have access
@@ -638,7 +638,7 @@ class TestProjectPermissionPropagation:
             proj, str(dataset['_id'])
         )
         project_model.propagateAccessToDataset(
-            proj, dataset
+            proj, dataset, admin
         )
 
         # User should now have READ access
@@ -666,7 +666,7 @@ class TestProjectPermissionPropagation:
         project_model.setPublic(
             proj, True, save=True
         )
-        project_model.propagatePublic(proj, True)
+        project_model.propagatePublic(proj, True, admin)
 
         # Verify resources are public
         assert Folder().load(
@@ -682,7 +682,7 @@ class TestProjectPermissionPropagation:
         project_model.setPublic(
             proj, False, save=True
         )
-        project_model.propagatePublic(proj, False)
+        project_model.propagatePublic(proj, False, admin)
 
         # Verify resources are no longer public
         with pytest.raises(AccessException):
@@ -723,7 +723,7 @@ class TestProjectPermissionPropagation:
             proj, str(dataset['_id'])
         )
         project_model.propagatePublicToDataset(
-            proj, dataset
+            proj, dataset, admin
         )
 
         # Dataset, view, and config should now be public
@@ -772,7 +772,7 @@ class TestProjectPermissionPropagation:
             proj, str(config['_id'])
         )
         project_model.propagatePublicToCollection(
-            proj, config
+            proj, config, admin
         )
 
         # Collection, view, and dataset should be public
@@ -808,7 +808,7 @@ class TestProjectPermissionPropagation:
             proj, str(dataset['_id'])
         )
         project_model.propagatePublicToDataset(
-            proj, dataset
+            proj, dataset, admin
         )
 
         # Dataset should still not be public
@@ -850,7 +850,7 @@ class TestBulkPermissionOperations:
             proj, user, AccessType.READ, save=True
         )
         pm.propagateUserAccess(
-            proj, user, AccessType.READ
+            proj, user, AccessType.READ, admin
         )
 
         # All 6 resources should be accessible
@@ -887,7 +887,7 @@ class TestBulkPermissionOperations:
         proj = pm.addDataset(proj, str(ds2['_id']))
 
         pm.setPublic(proj, True, save=True)
-        pm.propagatePublic(proj, True)
+        pm.propagatePublic(proj, True, admin)
 
         # All resources should be publicly accessible
         for ds in [ds1, ds2]:
@@ -937,7 +937,7 @@ class TestBulkPermissionOperations:
         # Create a new dataset and add to project
         ds, cfg, dv = createDatasetWithView(admin)
         proj = pm.addDataset(proj, str(ds['_id']))
-        pm.propagateAccessToDataset(proj, ds)
+        pm.propagateAccessToDataset(proj, ds, admin)
 
         # user should have READ access
         assert Folder().load(
@@ -985,7 +985,7 @@ class TestBulkPermissionOperations:
             proj, user, AccessType.READ, save=True
         )
         pm.propagateUserAccess(
-            proj, user, AccessType.READ
+            proj, user, AccessType.READ, admin
         )
 
         # User can read but not write
@@ -1004,7 +1004,7 @@ class TestBulkPermissionOperations:
             proj, user, AccessType.WRITE, save=True
         )
         pm.propagateUserAccess(
-            proj, user, AccessType.WRITE
+            proj, user, AccessType.WRITE, admin
         )
 
         # User should now have WRITE access
@@ -1037,10 +1037,10 @@ class TestBulkPermissionOperations:
             proj, user, AccessType.READ, save=True
         )
         pm.propagateUserAccess(
-            proj, user, AccessType.READ
+            proj, user, AccessType.READ, admin
         )
-        pm.propagatePublic(proj, True)
-        pm.propagatePublic(proj, False)
+        pm.propagatePublic(proj, True, admin)
+        pm.propagatePublic(proj, False, admin)
 
     def test_bulk_revoke_removes_all_resources(
         self, admin, user
@@ -1060,7 +1060,7 @@ class TestBulkPermissionOperations:
             proj, user, AccessType.READ, save=True
         )
         pm.propagateUserAccess(
-            proj, user, AccessType.READ
+            proj, user, AccessType.READ, admin
         )
         # Verify granted
         assert Folder().load(
@@ -1071,7 +1071,7 @@ class TestBulkPermissionOperations:
         pm.setUserAccess(
             proj, user, None, save=True
         )
-        pm.propagateUserAccess(proj, user, None)
+        pm.propagateUserAccess(proj, user, None, admin)
         for model, doc_id in (
             (pm, proj['_id']),
             (Folder(), ds['_id']),
@@ -1177,7 +1177,7 @@ class TestProjectShareEndpointRemove:
         )
         ds, cfg, dv = createDatasetWithView(admin)
         proj = pm.addDataset(proj, str(ds['_id']))
-        pm.propagateAccessToDataset(proj, ds)
+        pm.propagateAccessToDataset(proj, ds, admin)
 
         for model, doc_id in (
             (Folder(), ds['_id']),
@@ -1239,7 +1239,7 @@ class TestProjectShareEndpointRemove:
             name="Resync cleanup", creator=admin
         )
         proj = pm.addDataset(proj, str(ds['_id']))
-        pm.propagateAccessToDataset(proj, ds)
+        pm.propagateAccessToDataset(proj, ds, admin)
 
         for model, doc_id in (
             (Folder(), ds['_id']),

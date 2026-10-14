@@ -19,6 +19,10 @@ from girder.constants import AccessType
 from girder.exceptions import RestException
 from girder_jobs.models.job import Job as JobModel
 
+from ..helpers.access_helpers import (
+    requireProjectContentsAccess,
+    requireResourcesAccess,
+)
 from ..helpers.zenodo_client import (
     ZenodoError,
     get_zenodo_client_for_user,
@@ -144,6 +148,11 @@ class Zenodo(Resource):
             starts uploading all project data to Zenodo
             as a background job.
 
+            Requires ADMIN on the project and on every
+            dataset and collection it lists. Configurations
+            reached only through the datasets' views are
+            exported only if the caller owns them.
+
             If the project was previously published, this
             creates a new version of the existing
             deposition.
@@ -174,6 +183,9 @@ class Zenodo(Resource):
             project_id, user=user,
             level=AccessType.ADMIN, exc=True,
         )
+        # Publishing hands out every file in the project: an owner
+        # operation on each dataset and collection, not just the project.
+        requireProjectContentsAccess(project, user)
 
         # Check if upload is already in progress
         # (cheap check before hitting Zenodo API)
@@ -312,6 +324,9 @@ class Zenodo(Resource):
             WARNING: Publishing is irreversible. The
             record will receive a permanent DOI and
             cannot be deleted.
+
+            Requires ADMIN on the project and on every
+            resource the upload recorded in the draft.
         """)
         .param(
             'projectId', 'The project ID',
@@ -319,6 +334,12 @@ class Zenodo(Resource):
         )
         .errorResponse('Project not found.', 404)
         .errorResponse('No draft to publish.', 400)
+        .errorResponse(
+            'Admin access denied on a resource in the draft.', 403)
+        .errorResponse(
+            'The draft predates ownership checks, or a resource '
+            'in it no longer exists; discard it and upload '
+            'again.', 409)
     )
     def publish(self, projectId):
         user = self.getCurrentUser()
@@ -326,7 +347,6 @@ class Zenodo(Resource):
             projectId, user=user,
             level=AccessType.ADMIN, exc=True,
         )
-
         zenodo = project['meta'].get('zenodo', {})
         if zenodo.get('status') != 'draft':
             raise RestException(
@@ -339,6 +359,29 @@ class Zenodo(Resource):
         if not dep_id:
             raise RestException(
                 "No deposition ID found.", code=400
+            )
+
+        # Check what the draft contains, not the project's membership by
+        # now: datasets can be removed from the project after the upload.
+        # A draft uploaded before resources were recorded cannot be
+        # checked, so it must be uploaded again.
+        uploaded = zenodo.get('uploadedResources')
+        if not uploaded:
+            raise RestException(
+                "This draft predates ownership checks; discard it and "
+                "upload again.", code=409,
+            )
+        recordedDatasetIds = set(uploaded.get('datasetIds', []))
+        recordedCollectionIds = set(uploaded.get('collectionIds', []))
+        existingDatasetIds, existingCollections = requireResourcesAccess(
+            recordedDatasetIds, recordedCollectionIds, user)
+        # A deleted resource cannot be checked, and the draft still holds
+        # its files.
+        if (recordedDatasetIds - set(existingDatasetIds)
+                or recordedCollectionIds - set(existingCollections)):
+            raise RestException(
+                "Some datasets or collections in this draft no longer "
+                "exist; discard the draft and upload again.", code=409,
             )
 
         client = self._getZenodoClient(user)

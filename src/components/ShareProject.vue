@@ -16,10 +16,23 @@
           {{ errorString }}
         </v-alert>
 
+        <!-- Partial-result notice (resources the caller doesn't own) -->
+        <v-alert
+          v-if="noticeString"
+          type="warning"
+          density="compact"
+          closable
+          class="mb-4"
+          @click:close="noticeString = ''"
+        >
+          {{ noticeString }}
+        </v-alert>
+
         <!-- Info Alert -->
         <v-alert type="info" density="compact" class="mb-4">
-          Sharing this project will grant access to all datasets and collections
-          within it.
+          Sharing this project also shares the datasets and collections in it
+          that you can edit, with their views and configurations, up to your own
+          access level. Anything else keeps its own sharing settings.
         </v-alert>
 
         <!-- Loading State -->
@@ -194,15 +207,7 @@
         <v-card-title class="text-h6">{{ confirmTitle }}</v-card-title>
         <v-card-text>
           <div>{{ confirmMessage }}</div>
-          <div class="mt-3 text-body-2">
-            This will affect
-            <strong>{{ datasetCount }}</strong>
-            {{ datasetCount === 1 ? "dataset" : "datasets" }}
-            and
-            <strong>{{ collectionCount }}</strong>
-            {{ collectionCount === 1 ? "collection" : "collections" }}
-            in this project, along with all associated configurations and views.
-          </div>
+          <div class="mt-3 text-body-2">{{ impactSummary }}</div>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
@@ -251,6 +256,7 @@ const dialog = computed({
 const loading = ref(false);
 const showError = ref(false);
 const errorString = ref("");
+const noticeString = ref("");
 
 const isPublic = ref(false);
 const users = ref<IDatasetAccessUser[]>([]);
@@ -289,6 +295,24 @@ const collectionCount = computed((): number => {
   return props.project?.meta.collections.length ?? 0;
 });
 
+// The client doesn't know which of these the caller can edit or owns, so it
+// states the totals and the rules rather than a count of what will change.
+const impactSummary = computed((): string => {
+  const datasets = `${datasetCount.value} ${
+    datasetCount.value === 1 ? "dataset" : "datasets"
+  }`;
+  const collections = `${collectionCount.value} ${
+    collectionCount.value === 1 ? "collection" : "collections"
+  }`;
+  return (
+    `This project has ${datasets} and ${collections}. Sharing changes the ` +
+    "ones you can edit, with the views and configurations of those " +
+    "datasets, and is refused if it would grant more than your own access; " +
+    "publishing changes only what you own. Everything " +
+    "else keeps its own settings."
+  );
+});
+
 watch(dialog, (val) => {
   if (val && props.project) {
     fetchAccessInfo(props.project.id);
@@ -301,6 +325,7 @@ function resetState() {
   loading.value = false;
   showError.value = false;
   errorString.value = "";
+  noticeString.value = "";
   isPublic.value = false;
   users.value = [];
   newUserEmail.value = "";
@@ -360,6 +385,11 @@ function shareErrorMessage(error: unknown): string {
   ) {
     return "Unknown user. Please check the username or email.";
   }
+  // A refusal (e.g. a level above your own on a dataset in the project)
+  // carries the server's reason; show it rather than a generic message.
+  if (isAxiosError(error) && error.response?.data?.message) {
+    return error.response.data.message;
+  }
   return "An error occurred while updating sharing";
 }
 
@@ -370,7 +400,8 @@ function confirmTogglePublic(newValue: boolean | null) {
     showConfirm(
       "Make Project Public",
       "This will grant read-only access to everyone, including " +
-        "anonymous users who are not logged in.",
+        "anonymous users who are not logged in, to the project and the " +
+        "datasets and collections in it that you own.",
       "Make Public",
       "primary",
       () => togglePublic(true),
@@ -378,8 +409,9 @@ function confirmTogglePublic(newValue: boolean | null) {
   } else {
     showConfirm(
       "Make Project Private",
-      "This will remove public access. Only users explicitly shared " +
-        "on this project will retain access.",
+      "This will remove public access from the project and the " +
+        "resources in it that you own. Only users explicitly shared on " +
+        "this project will retain access to them.",
       "Make Private",
       "warning",
       () => togglePublic(false),
@@ -394,8 +426,19 @@ async function togglePublic(newValue: boolean) {
   publicLoading.value = true;
   showError.value = false;
   try {
-    await store.projectsAPI.setProjectPublic(props.project.id, newValue);
+    const { skipped } = await store.projectsAPI.setProjectPublic(
+      props.project.id,
+      newValue,
+    );
     isPublic.value = newValue;
+    noticeString.value =
+      skipped === 1
+        ? "1 dataset, collection or view in this project that you don't " +
+          "own kept its own visibility."
+        : skipped > 1
+          ? `${skipped} datasets, collections or views in this project ` +
+            "that you don't own kept their own visibility."
+          : "";
   } catch (error) {
     logError("Failed to toggle public access", error);
     errorString.value = "Failed to update public access";
@@ -412,7 +455,8 @@ function confirmUpdateUserAccess(user: IDatasetAccessUser, newLevel: number) {
   showConfirm(
     "Change Access Level",
     `Change access for ${user.name || user.login} to ${levelLabel}? ` +
-      "This will update their permissions on all resources in this project.",
+      "This will update their permissions on the resources in this project " +
+      "that you can share.",
     "Change",
     "primary",
     () => updateUserAccess(user, newLevel),
@@ -449,8 +493,8 @@ function confirmRemoveUser(user: IDatasetAccessUser) {
   showConfirm(
     "Remove Access",
     `Remove access for ${user.name || user.login}? ` +
-      "This will also remove their access to all datasets and " +
-      "collections in this project.",
+      "This will also remove their access to the datasets and " +
+      "collections in this project that you can share.",
     "Remove",
     "error",
     () => removeUser(),
@@ -483,8 +527,8 @@ function confirmAddUser() {
   showConfirm(
     "Share Project",
     `Grant ${levelLabel} access to "${newUserEmail.value}"? ` +
-      "This will give them access to all datasets and collections " +
-      "in this project.",
+      "This will also give them access to the datasets and " +
+      "collections you can edit in this project.",
     "Share",
     "primary",
     () => addUser(),
@@ -518,6 +562,7 @@ defineExpose({
   loading,
   showError,
   errorString,
+  noticeString,
   isPublic,
   users,
   publicLoading,
@@ -536,6 +581,7 @@ defineExpose({
   accessLevelLabels,
   datasetCount,
   collectionCount,
+  impactSummary,
   resetState,
   fetchAccessInfo,
   close,

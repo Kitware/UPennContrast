@@ -50,6 +50,9 @@ class PropertySchema:
                 },
             },
         },
+        # Every writer sends all three; without "values" the upsert would hit
+        # a KeyError (500) after the access checks had already passed.
+        "required": ["annotationId", "datasetId", "values"],
         # 'additionalProperties': False
     }
 
