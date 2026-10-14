@@ -6,23 +6,30 @@ Girder uses numeric access levels on individual documents (not site-wide):
 
 | Value | Constant | Meaning |
 |-------|----------|---------|
-| -1 | (none) | No access / Remove access |
+| -1 | `AccessType.NONE` | Wire value for "remove" in share requests; map to `None` before `setUserAccess` |
 | 0 | `AccessType.READ` | View-only access |
 | 1 | `AccessType.WRITE` | Edit access |
 | 2 | `AccessType.ADMIN` | Owner — can manage access (share, set public, delete) |
 
 **Important:** `AccessType.ADMIN` means **owner of that specific document**, not a site-wide admin. The creator of a project/dataset gets ADMIN on it. This is distinct from `@access.admin` (the endpoint decorator), which requires the user to be a site-wide Girder admin.
 
-Use `-1` (not `null`) to remove a user's access. This is Girder's convention and simplifies validation:
+`-1` is the **wire value** the share endpoints accept for "remove access". It is **not** a level to hand to Girder. `setUserAccess` removes the entry only when `level is None` (from Girder's `_setAccess`: `if level is not None: ... $set/$push entry` / `else: $pull`). Anything else, `-1` included, is stored as `{id, level: -1}`. That entry grants nothing, because `_hasUserAccess` requires `level >= requested`. It also isn't a deny rule: group and public access still apply. Its only effect is that the user reappears in the sharing table with no level. (Commit `7e763d9c1` switched the wire value from `null` to `-1` and dropped the `None` mapping, which caused exactly that.)
 
 ```python
-# Good - use -1 to remove access
-accessType = AccessType().validate(body["accessType"])  # Handles -1, 0, 1, 2
+# Good - validate the wire value, map -1 to None at the API boundary
+from ..helpers.access_helpers import parseShareAccessType
+level = parseShareAccessType(body["accessType"])  # -1 -> None; 0/1/2 kept
+Model().setUserAccess(doc, targetUser, level, save=True)
 
-# Bad - don't use null/None for no access
-if rawAccessType is None:
-    accessType = None  # Unnecessary special case
+# Bad - stores a level -1 entry instead of removing the user
+Model().setUserAccess(doc, targetUser, AccessType().validate(-1), save=True)
 ```
+
+`parseShareAccessType` also restricts the level to -1/0/1/2 with a 400. `AccessType().validate` alone accepts `SITE_ADMIN` (100) and raises `ValueError`, which surfaces as a 500. A share endpoint must also stop a caller from reaching **above their own level**. With only a WRITE check, a collaborator can grant themselves ADMIN or remove the owner; the dataset share endpoint allowed this until 2026-10-11. Call `requireCanSetUserAccess(model, doc, user, target, level)` on **every** document whose ACL changes, before changing any of them. It refuses a grant above the caller's level and any change to a user whose current entry is above it. Checking one document isn't enough: WRITE on the folder says nothing about the configuration, which someone else may own. Requiring ADMIN outright also closes the hole, but then WRITE collaborators can't share at all.
+
+Bulk `$pull`/`$push` helpers (`ProjectModel._bulkSetUserAccess`) must likewise push only `level >= AccessType.READ`. Code that copies one ACL onto another (`_bulkSetAllUsersAccess`) must skip negative entries so leftover ones don't spread. `formatAccessList` hides negative entries left over from before the fix.
+
+**Testing removal:** assert `user['_id'] not in {u['id'] for u in doc['access']['users']}` after reloading the document with `force=True`. "User can no longer read" passes with the `-1` bug present. So does checking the GET access list, because `formatAccessList` filters negatives.
 
 ## Setting User Access
 
@@ -30,8 +37,8 @@ if rawAccessType is None:
 # Grant access
 Model().setUserAccess(doc, targetUser, AccessType.WRITE, save=True)
 
-# Remove access (use -1, not None)
-Model().setUserAccess(doc, targetUser, -1, save=True)
+# Remove access (None, never -1)
+Model().setUserAccess(doc, targetUser, None, save=True)
 ```
 
 ## Setting Public Access
@@ -72,7 +79,7 @@ Resources affected by sharing:
                schema={
                    "datasetViewIds": ["id1", "id2"],
                    "userMailOrUsername": "user@example.com",
-                   "accessType": 0  # 0=READ, 1=WRITE, -1=remove
+                   "accessType": 0  # 0=READ, 1=WRITE, -1=remove (-> None)
                })
 )
 def share(self, body):

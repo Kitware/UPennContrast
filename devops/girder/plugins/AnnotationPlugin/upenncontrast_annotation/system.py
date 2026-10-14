@@ -22,6 +22,9 @@ from girder.models.user import User
 from girder_jobs.constants import JobStatus
 from girder_large_image.models.image_item import ImageItem
 
+from .server.api.rawRegion import getRawRegion
+from .server.helpers.validation import requireQueryOnFields
+
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +56,7 @@ def addSystemEndpoints(apiRoot):
     # Added to the item route
     apiRoot.item.route("GET", ("query",), getItemsByQuery)
     apiRoot.item.route("PUT", (":itemId", "cache_maxmerge"), cacheMaxMerge)
+    apiRoot.item.route("GET", (":itemId", "raw_region"), getRawRegion)
     # Added to the folder route
     apiRoot.folder.route("GET", ("query",), getFoldersByQuery)
     # Added to the system route (admin-only usage metrics)
@@ -92,6 +96,7 @@ def addSystemEndpoints(apiRoot):
 @boundHandler()
 def getItemsByQuery(self, query, limit, offset, sort):
     user = self.getCurrentUser()
+    _requireVisibleQueryFields(Item(), user, query, sort)
     return Item().findWithPermissions(
         query, offset=offset, limit=limit, sort=sort, user=user
     )
@@ -114,9 +119,29 @@ def getItemsByQuery(self, query, limit, offset, sort):
 @boundHandler()
 def getFoldersByQuery(self, query, limit, offset, sort):
     user = self.getCurrentUser()
+    _requireVisibleQueryFields(Folder(), user, query, sort)
     return Folder().findWithPermissions(
         query, offset=offset, limit=limit, sort=sort, user=user
     )
+
+
+def _requireVisibleQueryFields(model, user, query, sort):
+    """Refuse a query or sort on a field `model.filter` hides from `user`.
+
+    @filtermodel strips hidden fields from the response, but the query runs
+    against the raw documents, so matching or ordering on a hidden field
+    (e.g. the `access` ACL) would still reveal it."""
+    # Girder has no public accessor for the exposed-field whitelist that
+    # exposeFields() builds and filter() applies.
+    allowedFields = set(model._filterKeys[AccessType.READ])
+    if user and user["admin"]:
+        allowedFields |= model._filterKeys[AccessType.SITE_ADMIN]
+    requireQueryOnFields(query, allowedFields)
+    for field, _direction in sort or ():
+        if field.split(".", 1)[0] not in allowedFields:
+            raise RestException(
+                "sort may not use the field %s" % field, code=400
+            )
 
 
 def _parseAuthenticatedUsersWindow(window):

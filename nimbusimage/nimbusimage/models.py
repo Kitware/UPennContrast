@@ -193,27 +193,34 @@ class PropertyStats(BaseModel):
 class AnnotationSummary(BaseModel):
     """Server-side aggregate over the annotations matching a filter.
 
-    ``tags`` and ``shapes`` map each tag or shape to its annotation count,
-    most common first (ties by name). An annotation with several tags
-    counts once per tag. ``shapes`` is None on servers that predate the
-    shape breakdown.
+    ``tags``, ``shapes`` and ``channels`` map each tag, shape or channel
+    index to its annotation count, most common first (ties by name or
+    index). An annotation with several tags counts once per tag.
+    ``shapes`` and ``channels`` are None on servers that predate those
+    breakdowns.
     """
 
     total: int
     tags: dict[str, int]
     shapes: dict[str, int] | None = None
+    channels: dict[int, int] | None = None
     properties: list[PropertyStats] = []
 
     @classmethod
     def from_dict(cls, data: dict) -> "AnnotationSummary":
         """Build from the POST upenn_annotation/summary response."""
         shapes = data.get("shapes")
+        channels = data.get("channels")
         return cls(
             total=data["total"],
             tags={row["tag"]: row["count"] for row in data["tags"]},
             shapes=(
                 None if shapes is None
                 else {row["shape"]: row["count"] for row in shapes}
+            ),
+            channels=(
+                None if channels is None
+                else {row["channel"]: row["count"] for row in channels}
             ),
             properties=data.get("properties", []),
         )

@@ -1,8 +1,11 @@
 from girder.api import access
-from girder.api.describe import Description, describeRoute
+from girder.api.describe import Description, autoDescribeRoute, describeRoute
 from girder.constants import AccessType, TokenScope
-from girder.api.rest import Resource, loadmodel
-from ..helpers.validation import requireObjectBody
+from girder.api.rest import Resource, filtermodel, loadmodel
+from ..helpers import validation
+from ..helpers.validation import (
+    requireList, requireObjectBody, requireObjectId,
+)
 from ..models.property import AnnotationProperty as PropertyModel
 from ..models.collection import Collection as CollectionModel
 from girder.exceptions import RestException, AccessException
@@ -22,6 +25,7 @@ class AnnotationProperty(Resource):
         self.route("GET", (), self.getAllProperties)
         self.route("GET", ("count",), self.count)
         self.route("POST", (), self.create)
+        self.route("POST", ("batch",), self.getBatch)
         self.route("PUT", (":id",), self.update)
         self.route(
             "POST",
@@ -70,7 +74,16 @@ class AnnotationProperty(Resource):
             )
         return {}
 
+    def _propertyBody(self):
+        """The request body reduced to the client-owned fields. Anything
+        else -- `access`, `public`, or the `_id`/`_modelType` an exported
+        property carries -- is dropped, so a caller cannot set the ACL of
+        the property they create or update."""
+        return self._propertyModel.filterUpdateFields(
+            requireObjectBody(self.getBodyJson()))
+
     @access.user(scope=TokenScope.DATA_WRITE)
+    @filtermodel(model=PropertyModel)
     @describeRoute(
         Description("Create a new property").param(
             "body", "Property Object", paramType="body"
@@ -80,7 +93,7 @@ class AnnotationProperty(Resource):
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException("User not found", "currentUser")
-        return self._propertyModel.create(currentUser, self.getBodyJson())
+        return self._propertyModel.create(currentUser, self._propertyBody())
 
     @describeRoute(
         Description("Delete an existing property")
@@ -116,13 +129,11 @@ class AnnotationProperty(Resource):
         level=AccessType.WRITE,
     )
     def update(self, annotation_property, params):
-        filtered = self._propertyModel.filterUpdateFields(
-            self.getBodyJson()
-        )
-        annotation_property.update(filtered)
+        annotation_property.update(self._propertyBody())
         self._propertyModel.save(annotation_property)
 
     @access.public(scope=TokenScope.DATA_READ)
+    @filtermodel(model=PropertyModel)
     @describeRoute(
         Description("Search for properties")
         .responseClass("property")
@@ -196,6 +207,55 @@ class AnnotationProperty(Resource):
         return {"count": count}
 
     @access.public(scope=TokenScope.DATA_READ)
+    @filtermodel(model=PropertyModel)
+    @autoDescribeRoute(
+        Description("Get several properties by id (READ OPERATION via POST)")
+        .notes(
+            "POST avoids URL length limits. Returns the readable properties "
+            "in request order; ids that do not exist or that no "
+            "configuration readable by the caller references are omitted."
+        )
+        .jsonParam(
+            "body", 'Object with "ids": a list of property ids.',
+            paramType="body", requireObject=True,
+        )
+    )
+    def getBatch(self, body):
+        propertyIds = requireList(body.get("ids"), "ids")
+        validation.requireCountWithin(
+            len(propertyIds), validation.MAX_PROPERTY_IDS, "ids"
+        )
+        objectIds = [requireObjectId(pid, "ids") for pid in propertyIds]
+        idStrings = [str(oid) for oid in objectIds]
+
+        # As in get: a property is readable through any readable
+        # configuration that references it (meta.propertyIds holds strings).
+        # Only meta.propertyIds is needed: configurations carry layers,
+        # tools and snapshots, and many can list the same property. The
+        # permission check is part of the query, unaffected by the
+        # projection.
+        requested = set(idStrings)
+        readable = {
+            pid
+            for config in CollectionModel().findWithPermissions(
+                {"meta.propertyIds": {"$in": idStrings}},
+                user=self.getCurrentUser(),
+                level=AccessType.READ,
+                fields=["meta.propertyIds"],
+            )
+            for pid in config["meta"]["propertyIds"]
+            if pid in requested
+        }
+        props = {
+            str(prop["_id"]): prop
+            for prop in self._propertyModel.find({"_id": {"$in": [
+                oid for oid in objectIds if str(oid) in readable
+            ]}})
+        }
+        return [props[pid] for pid in idStrings if pid in props]
+
+    @access.public(scope=TokenScope.DATA_READ)
+    @filtermodel(model=PropertyModel)
     @describeRoute(
         Description("Get a property by its id.").param(
             "id", "The annotation property's id", paramType="path"

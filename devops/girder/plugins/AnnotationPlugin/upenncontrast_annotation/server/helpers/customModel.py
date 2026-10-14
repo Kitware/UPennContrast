@@ -1,6 +1,6 @@
 from girder import events
 from girder.exceptions import ValidationException
-from girder.models.model_base import AccessControlledModel
+from girder.models.model_base import AccessControlledModel, Model
 
 from pymongo import InsertOne, ReplaceOne
 from pymongo.errors import BulkWriteError
@@ -131,3 +131,18 @@ class CustomNimbusImageModel(AccessControlledModel):
             key for key in self.schema["properties"]
             if self.schema["properties"][key].get("type") == "objectId"]
         return convertIdsToObjectIds(objOrObjs, keysToConvert)
+
+
+class UngatedAclFilterMixin:
+    """For models whose documents carry a Girder ACL that does not decide
+    who may read them -- a property is readable through the configurations
+    that reference it, a worker interface or preview by any user.
+
+    AccessControlledModel.filter() would report the caller's level on that
+    ACL as `_accessLevel`, which is wrong for these documents (NONE for a
+    collaborator who can read them), so filter by the exposed fields alone.
+    Mix in ahead of the model base class.
+    """
+
+    def filter(self, doc, user=None, additionalKeys=None):
+        return Model.filter(self, doc, user, additionalKeys)

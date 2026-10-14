@@ -18,7 +18,7 @@ description: "Use when writing or modifying Python code in the Girder backend pl
 
 **Important:** `AccessType.ADMIN` means **owner of that document**, not a site-wide admin. The creator of a project/dataset gets ADMIN on it and can share it with others.
 
-Use `-1` (not `null`) to remove a user's access.
+**Removing access:** the share endpoints take `-1` on the wire, but Girder's `setUserAccess(doc, user, level)` deletes the entry **only when `level is None`**. Pass `-1` and Girder stores an inert `{id, level: -1}` entry: the user can't read anything, yet still shows up in access lists. Convert at the API boundary with `parseShareAccessType()` (`server/helpers/access_helpers.py`). A test that checks only "user can no longer read" passes with the bug present, so assert the user has **no entry** in `doc['access']['users']`.
 
 ### Access Decorators (Endpoint-Level)
 
@@ -43,6 +43,22 @@ doc = Model().load(id, force=True)  # Admin bypass
 
 For detailed access patterns including sharing: read `references/access-control-patterns.md`
 When modifying sharing/access code: read `codebaseDocumentation/SHARING.md`
+
+### Never return a document that carries `access` raw
+
+`findWithPermissions` and `@loadmodel` decide which **documents** a caller sees. Neither decides which **fields** they see. Any plugin model built on `AccessControlledModel` (every `ProxiedModel`) stores an `access` ACL that lists every collaborator's user id, and `GET user/{id}` turns those ids into names. When a model defines no `exposeFields`, returning its raw doc hands that list to every reader, anonymous viewers of public datasets included. This has happened with dataset views, properties, worker interfaces and previews, and with the JSON export and Zenodo archive, which embed docs without going through any endpoint.
+
+- Give the model `CLIENT_FIELDS` and `exposeFields(level=READ, fields=("_id",) + CLIENT_FIELDS)` in `initialize()`, and put `@filtermodel(model=...)` on every endpoint that returns its docs (get, find/list, **create**, update).
+- For exports, which bypass `filter()`, use a `fields=` projection (`AnnotationProperty.findClientFields`).
+- Treat the write side as the twin: a create or update that stores the raw body lets the caller set `access` or `public`. Allow-list the body with `filterUpdateFields(requireObjectBody(...))`.
+- `filter()` adds `_accessLevel`, computed from the doc's own ACL. If that ACL is not what grants reads (properties are read through configurations; worker docs by anyone), the value is wrong, so mix in `UngatedAclFilterMixin` (`helpers/customModel.py`).
+- A response that **names** related resources leaks too: an access list or summary built with plain `find()` (e.g. `configuration_access` listing every dataset opened with a configuration) must use `findWithPermissions` for the caller.
+- A caller-supplied Mongo query probes hidden fields through *which* documents match, even when the response is filtered (`{"access.users.id": X}` on `folder/query` was an ACL-membership oracle). Validate it with `requireQueryOnFields(query, exposedFields)` from `helpers/validation.py`.
+- Test with a READ-only caller and an anonymous one, and assert both that `access` is absent and that every field the consumers read survives.
+
+### `rest.*.before` listeners need their own access level
+
+Girder runs `Resource._defaultAccess` on every listener bound to a `rest.<method>.<route>.before` event. A listener with no `accessLevel` attribute makes Girder demand **site admin for the whole route**. `shareLinkGuards.refuseDownloadForLinkUsers` shipped this way, and every non-admin user's folder/item/file downloads and JSON/CSV/GeoJSON exports returned 403 "Administrator access required." Decorate such listeners with `@access.public`. That only sets the attribute; the route handler's own decorator still enforces access afterwards. Tests that exercise only the `admin` fixture can't see this, so test guarded routes with a non-admin `user`, and assert the refusal **message**, not just the 403.
 
 ## Model Parameters: Security
 
