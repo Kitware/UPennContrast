@@ -100,9 +100,8 @@ class TestJobRefresh:
 
 class TestJobScopeError:
     """NIM-005: a 401 from job/{id} usually means the API key lacks the
-    'List and read jobs' scope (or, on older servers, full access), not
-    that the job is missing. Re-raise with a
-    message that names the real culprit instead of the raw Girder 401.
+    'List and read jobs' scope, not that the job is missing. Re-raise with
+    a message that names the real culprit instead of the raw Girder 401.
     """
 
     def _http_error(self, status):

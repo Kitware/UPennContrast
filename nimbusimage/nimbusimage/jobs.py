@@ -16,24 +16,17 @@ _SECRET = re.compile(
     r"[A-Za-z0-9]{40,}(?![A-Za-z0-9])"
 )
 
-# GET job/{id} recognizes a custom-scoped key only if it carries
-# jobs.rest.list_job ("List and read jobs" in Girder's API key dialog). That
-# scope exists from girder-jobs 5.0.19; on older servers GET job/{id} has no
-# declared scope, so only a full-access key ("Allow all actions on behalf of
-# my user", i.e. core.user_auth) can poll. Either way a key without it can
-# submit jobs, which then run, but gets a 401 whose raw message misattributes
-# the cause (NIM-005).
+# GET job/{id} accepts a custom-scoped key only if it carries
+# jobs.rest.list_job ("List and read jobs" in Girder's API key dialog). A key
+# without it can still submit jobs, which then run, but gets a 401 whose raw
+# message misattributes the cause (NIM-005).
 _JOB_SCOPE_HINT = (
-    "Could not read job status (HTTP 401). Your API key is most likely a "
-    "custom-scoped key (e.g. only 'Read data'/'Write data'), which can "
-    "submit jobs but cannot poll their status. The job itself is not "
-    "affected and may still be running. To watch jobs, add the 'List and "
-    "read jobs' permission to the key, or use a full-access key ('Allow "
-    "all actions on behalf of my user'); servers older than girder-jobs "
-    "5.0.19 don't offer 'List and read jobs', so there only full access "
-    "works. Meanwhile you can confirm the job ran by checking for its "
-    "output annotations or property values. See the nimbusimage README "
-    "(Authentication)."
+    "Could not read job status (HTTP 401). Your API key is most likely "
+    "missing the 'List and read jobs' permission, so it can submit jobs but "
+    "cannot poll their status or logs. The job itself is not affected and "
+    "may still be running. Add 'List and read jobs' to the key, or use a "
+    "full-access key ('Allow all actions on behalf of my user'). See the "
+    "nimbusimage README (Authentication)."
 )
 
 # Girder job status codes

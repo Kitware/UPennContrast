@@ -213,9 +213,7 @@ Status codes: 0=inactive, 1=queued, 2=running, **3=success**, 4=error, 5=cancell
 
 ### When you can't see what a job is doing
 
-**Not being able to observe a job is different from the job not running.** A custom-scoped API key without **"List and read jobs"** (e.g. only *Read data* / *Write data*) can submit jobs, and they run, but it can't read their status or logs: `refresh()` / `wait()` raise `PermissionError`. To watch jobs, the key needs "List and read jobs" (`jobs.rest.list_job`, from girder-jobs 5.0.19) or full access ("Allow all actions on behalf of my user"). On older servers only full access works.
-
-Before you conclude that jobs aren't executing, or tell the user their key is wrong and they need a new one, **check the outputs directly**. Count annotations with the output tags before and after (`ds.annotations.count(tags=[...])`), or read `ds.properties.get_values()` for property workers, and give the job a realistic amount of time (queueing and image pulls can take minutes). If outputs show up, the pipeline works. Tell the user that status/logs aren't visible with this key and keep going. See "Can't see a job's status ≠ the job didn't run" in `references/gotchas.md` for the full decision table.
+A `PermissionError` from `refresh()` / `wait()` means the API key lacks **"List and read jobs"**. The job still runs; the key just can't watch it. Ask the user to add that permission to the key (or use a full-access key), and meanwhile confirm the job ran by checking its outputs. See "Can't see a job's status ≠ the job didn't run" in `references/gotchas.md`.
 
 ## Rate limits (HTTP 429)
 
@@ -315,6 +313,6 @@ values = ds.properties.get_values()
 - The `connect_to` dict must always include `"tags"` — use `{"tags": []}` for no connections.
 - Property workers require the property to be created and registered before running.
 - `job.wait()` blocks the Python process. For long-running workers, consider non-blocking polling.
-- A `PermissionError` while polling means you can't *watch* the job, not that it didn't run. Verify by checking for its outputs before blaming the API key.
+- A `PermissionError` while polling means the key lacks "List and read jobs", not that the job didn't run.
 
 For worker-related accessor signatures, read `references/api-overview.md`. Before submitting work, read `references/gotchas.md`, especially exact interface keys and job status codes.
