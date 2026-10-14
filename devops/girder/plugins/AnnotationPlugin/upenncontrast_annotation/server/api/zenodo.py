@@ -335,11 +335,11 @@ class Zenodo(Resource):
         .errorResponse('Project not found.', 404)
         .errorResponse('No draft to publish.', 400)
         .errorResponse(
-            'Admin access denied on a resource in the draft, '
-            'or one no longer exists.', 403)
+            'Admin access denied on a resource in the draft.', 403)
         .errorResponse(
-            'The draft predates ownership checks; discard it '
-            'and upload again.', 409)
+            'The draft predates ownership checks, or a resource '
+            'in it no longer exists; discard it and upload '
+            'again.', 409)
     )
     def publish(self, projectId):
         user = self.getCurrentUser()
@@ -371,10 +371,18 @@ class Zenodo(Resource):
                 "This draft predates ownership checks; discard it and "
                 "upload again.", code=409,
             )
-        requireResourcesAccess(
-            uploaded.get('datasetIds', []),
-            uploaded.get('collectionIds', []), user,
-            requireAll=True)
+        recordedDatasetIds = set(uploaded.get('datasetIds', []))
+        recordedCollectionIds = set(uploaded.get('collectionIds', []))
+        existingDatasetIds, existingCollections = requireResourcesAccess(
+            recordedDatasetIds, recordedCollectionIds, user)
+        # A deleted resource cannot be checked, and the draft still holds
+        # its files.
+        if (recordedDatasetIds - set(existingDatasetIds)
+                or recordedCollectionIds - set(existingCollections)):
+            raise RestException(
+                "Some datasets or collections in this draft no longer "
+                "exist; discard the draft and upload again.", code=409,
+            )
 
         client = self._getZenodoClient(user)
         try:

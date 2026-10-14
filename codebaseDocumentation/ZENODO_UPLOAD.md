@@ -88,7 +88,7 @@ views again. The finished draft records what the job actually uploaded in
 that record, uploaded before these checks, is refused with 409: discard it and upload
 again), since datasets can be removed from the project between upload and publish. A
 recorded resource deleted after the upload, including during the upload itself,
-blocks publishing (403). Tests: `test/test_share_escalation.py`
+blocks publishing (409). Tests: `test/test_share_escalation.py`
 (`TestZenodoRequiresOwnership`).
 
 The upload endpoint returns a `jobId` that the frontend uses for SSE-based progress tracking.

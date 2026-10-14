@@ -754,8 +754,27 @@ class TestZenodoRequiresOwnership:
             path=f"/zenodo/publish/{project['_id']}", method="POST",
             user=owner)
 
-        assertStatus(resp, 403)
+        assertStatus(resp, 409)
         assert "no longer exist" in resp.json["message"]
+
+    def testResourcesAccessHelperReportsMissingInsteadOfRaising(
+            self, owner):
+        """Helpers report a missing resource; the endpoint decides the HTTP
+        error (Paul, PR #1410)."""
+        from bson import ObjectId
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireResourcesAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        goneDataset, goneConfig = ObjectId(), ObjectId()
+
+        datasetIds, collections = requireResourcesAccess(
+            [dataset["_id"], goneDataset], [config["_id"], goneConfig],
+            owner)
+
+        assert datasetIds == [dataset["_id"]]
+        assert list(collections) == [config["_id"]]
 
     def testUploadRecordsOnlyResourcesThatExist(self, server, owner):
         """A reference deleted before the upload is skipped by the export,

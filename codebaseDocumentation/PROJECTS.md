@@ -747,9 +747,11 @@ that writes an ACL or a public flag, or that exports a project.
 - Publishing a draft checks the resources the upload recorded
   (`meta.zenodo.uploadedResources`), not the project's membership by then —
   *"testPublishChecksWhatTheDraftContains"*.
-- A recorded resource that was deleted after the upload blocks publishing (its files
-  are still in the draft and it can no longer be checked); upload still skips deleted
-  references — *"testPublishRefusesDraftWithDeletedResources"*.
+- A recorded resource that was deleted after the upload blocks publishing with 409 (its
+  files are still in the draft and it can no longer be checked); upload still skips
+  deleted references — *"testPublishRefusesDraftWithDeletedResources"*. The shared
+  helper only reports what no longer exists; the endpoint decides that is an error —
+  *"testResourcesAccessHelperReportsMissingInsteadOfRaising"*.
 - The draft records only resources that existed and were exported (not references
   already deleted, nor configurations reached through a deleted dataset's views), or
   publish would refuse a valid draft — *"testUploadRecordsOnlyResourcesThatExist"*;

@@ -141,30 +141,23 @@ def _requireDocsAccess(model, ids, user, level, fields):
 
 
 def requireResourcesAccess(datasetIds, collectionIds, user,
-                           level=AccessType.ADMIN, requireAll=False):
+                           level=AccessType.ADMIN):
     """Check access on datasets and collections loaded in two queries.
 
-    :param requireAll: Refuse ids that no longer resolve instead of
-        ignoring them. A Zenodo draft still holds a deleted resource's
-        files, and a missing document cannot be checked.
-    :raises AccessException: If user lacks access to any of them, or (with
-        requireAll) any of them no longer exists.
+    Ids that no longer resolve are left out of the result rather than
+    refused: whether a missing resource is an error is the caller's call
+    (publishing a Zenodo draft refuses it, since the draft still holds its
+    files; the upload job just drops it).
+
+    :raises AccessException: If user lacks access to any that exist.
     :returns: (ids of the datasets that exist, collection documents that
         exist by id, with meta.propertyIds).
     """
-    datasetIds = set(datasetIds)
-    collectionIds = set(collectionIds)
     datasets = _requireDocsAccess(
-        Folder(), datasetIds, user, level, ['access', 'public'])
+        Folder(), set(datasetIds), user, level, ['access', 'public'])
     collections = _requireDocsAccess(
-        Collection(), collectionIds, user, level,
+        Collection(), set(collectionIds), user, level,
         ['access', 'public', 'meta.propertyIds'])
-    if requireAll and (
-            len(datasets) < len(datasetIds)
-            or len(collections) < len(collectionIds)):
-        raise AccessException(
-            'Some datasets or collections in this draft no longer exist; '
-            'discard the draft and upload again.')
     return list(datasets), collections
 
 
