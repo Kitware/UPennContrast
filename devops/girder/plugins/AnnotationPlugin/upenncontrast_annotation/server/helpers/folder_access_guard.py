@@ -6,11 +6,12 @@ removes the caller. A non-admin folder owner can therefore lock
 themselves out of their own dataset — see
 `codebaseDocumentation/BUG_OWNER_CAN_REMOVE_SELF_FROM_DATASET.md`.
 
-This module installs a `model.folder.save` listener that rejects any
-save of a `contrastDataset` folder whose `access.users` does not include
-the creator at ADMIN level. Site admins can bypass the check (recovery
-path); ownership transfer is supported by updating `creatorId` in the
-same save.
+This module installs a `model.folder.save` listener that rejects a save
+of a `contrastDataset` folder that takes the creator off ADMIN in
+`access.users`. Site admins can bypass the check (recovery path) and are
+the only way to move a dataset to another owner. A folder whose creator
+already lacked ADMIN before the save (damaged before this guard existed,
+or changed by a site admin) is left editable rather than frozen.
 """
 from bson import ObjectId
 
@@ -18,13 +19,13 @@ from girder import events
 from girder.api import rest
 from girder.constants import AccessType
 from girder.exceptions import ValidationException
+from girder.models.folder import Folder
 
 
 CONTRAST_DATASET_SUBTYPE = "contrastDataset"
 CREATOR_MUST_KEEP_ADMIN = (
-    "Dataset creator must retain ADMIN access on the folder. "
-    "If you want to transfer ownership, add the new owner first "
-    "and then have them remove your access."
+    "The dataset's creator must keep ADMIN access. "
+    "Ask a site admin to change the dataset's owner."
 )
 EVENT_LISTENER_NAME = "upenn.folder.preserve_creator_admin"
 
@@ -54,10 +55,7 @@ def _caller_is_site_admin_or_internal():
     """Site admins can override (recovery path); outside a REST context
     (workers, scripts) there is no caller and internal code is not blocked.
     """
-    try:
-        current = rest.getCurrentUser()
-    except Exception:
-        current = None
+    current = rest.getCurrentUser()
     return current is None or bool(current.get("admin"))
 
 
@@ -69,7 +67,9 @@ def require_creator_keeps_admin(folder, target_user, level):
     share paths: dataset_view/share writes the views and configurations
     before the folder (so a rejected folder save would leave them changed),
     and project propagation writes folders with bulk updates that fire no
-    save event at all. Both call this first.
+    save event at all. Both check every touched document with
+    access_helpers.requireCanSetUserAccess before writing, which calls this
+    for folders.
 
     :param folder: The dataset folder whose ACL is about to change.
     :param target_user: The user whose access is changing.
@@ -83,13 +83,22 @@ def require_creator_keeps_admin(folder, target_user, level):
         return
     if level is not None and level >= AccessType.ADMIN:
         return
+    if not _creator_has_admin(folder):
+        # Already off ADMIN: this change can't take it away (the
+        # listener's rule too).
+        return
     if _caller_is_site_admin_or_internal():
         return
     raise ValidationException(CREATOR_MUST_KEEP_ADMIN, field="access")
 
 
 def _ensure_creator_admin_access(event):
-    """model.folder.save listener that enforces creator-stays-ADMIN."""
+    """model.folder.save listener that enforces creator-stays-ADMIN.
+
+    Only a save that removes the creator's ADMIN is refused: the stored
+    folder is compared, so one already missing it (a damaged dataset)
+    can still be renamed, shared or published by its other owners.
+    """
     doc = event.info
     if not isinstance(doc, dict):
         return
@@ -102,6 +111,12 @@ def _ensure_creator_admin_access(event):
     if not _is_contrast_dataset(doc):
         return
     if _creator_has_admin(doc):
+        return
+    stored = Folder().findOne(
+        {"_id": doc["_id"]}, fields=["access"])
+    if stored is None or not _creator_has_admin(
+            {"creatorId": doc.get("creatorId"),
+             "access": stored.get("access")}):
         return
 
     if _caller_is_site_admin_or_internal():

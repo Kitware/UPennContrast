@@ -240,3 +240,32 @@ class TestCreatorGuardOnSharePaths:
             server, user, view, other, AccessType.WRITE))
         assertStatusOk(shareDatasetView(server, user, view, other, -1))
         assert self.levels(other, dataset, config, view) == (None, None, None)
+
+    def testDamagedDatasetStaysShareable(self, user, server):
+        """A dataset whose creator already lost ADMIN (before the guard
+        existed, or via a site admin) is not frozen: its other owners can
+        still share and rename it. Only taking ADMIN away is refused."""
+        from girder.models.user import User
+        from .test_sharing import createDatasetWithView, shareDatasetView
+        coOwner = User().createUser(
+            "dmgowner", "password", "D", "Owner", "dmgowner@example.com")
+        third = User().createUser(
+            "dmgthird", "password", "D", "Third", "dmgthird@example.com")
+        dataset, config, view = createDatasetWithView(user)
+        assertStatusOk(shareDatasetView(
+            server, user, view, coOwner, AccessType.ADMIN))
+        # Damage the folder without a save event, as old data looks.
+        stored = Folder().load(dataset["_id"], force=True)
+        Folder().update({"_id": dataset["_id"]}, {"$set": {
+            "access.users": [
+                dict(entry, level=AccessType.READ)
+                if entry["id"] == user["_id"] else entry
+                for entry in stored["access"]["users"]]}})
+
+        assertStatusOk(shareDatasetView(
+            server, coOwner, view, third, AccessType.READ))
+        assert self.levels(third, dataset, config, view) == (
+            AccessType.READ, AccessType.READ, AccessType.READ)
+        assertStatusOk(server.request(
+            path=f"/folder/{dataset['_id']}", method="PUT", user=coOwner,
+            params={"name": "renamed damaged dataset"}))

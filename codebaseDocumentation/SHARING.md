@@ -40,7 +40,7 @@ NimbusImage uses Girder's built-in access control system with three permission l
   *"testCoOwnerCannotDemoteTheCreatorViaDatasetShare"*,
   *"testCreatorCannotRemoveThemselvesViaProjectShare"*
 
-This last invariant is enforced by a `model.folder.save` listener installed in `server/helpers/folder_access_guard.py`. It rejects any save of a `contrastDataset` folder whose access list does not include the creator at ADMIN level. Site admins can override (recovery path). This guard plugs a gap in core Girder's `setAccessList`, which otherwise accepts any ACL including one that locks the owner out — see `BUG_OWNER_CAN_REMOVE_SELF_FROM_DATASET.md`.
+This last invariant is enforced by a `model.folder.save` listener installed in `server/helpers/folder_access_guard.py`. It rejects a save of a `contrastDataset` folder that takes the creator off ADMIN, comparing against the stored folder: a dataset whose creator had already lost ADMIN (damaged before the guard, or changed by a site admin) stays editable by its other owners instead of being frozen (*"testDamagedDatasetStaysShareable"*). Site admins can override (recovery path), and are the only way to change a dataset's owner. This guard plugs a gap in core Girder's `setAccessList`, which otherwise accepts any ACL including one that locks the owner out — see `BUG_OWNER_CAN_REMOVE_SELF_FROM_DATASET.md`.
 
 ## Architecture
 
