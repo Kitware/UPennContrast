@@ -426,6 +426,10 @@ function trackJob(jobId: string) {
     jobId,
     datasetId: null,
     eventCallback: (jobData: IJobEventData) => {
+      // This job may already be released (the status poll can see it end
+      // before its events arrive) and a newer upload tracked; its late
+      // progress or terminal event must not touch that one.
+      if (trackedJobId.value !== jobId) return;
       // Parse progress from job log text (JSON lines)
       const text = jobData.text;
       if (text && typeof text === "string") {

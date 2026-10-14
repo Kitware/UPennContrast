@@ -373,6 +373,43 @@ describe("ZenodoPublish", () => {
     }
   });
 
+  it("a late event from an ended job doesn't touch a newer upload", async () => {
+    vi.useFakeTimers();
+    try {
+      // Upload A is tracked; the poll sees it end before its SSE events.
+      const w = await mountComponent("uploading");
+      const jobA = jobsMock.addJob.mock.calls[0][0];
+      mocks.getUploadStatus.mockResolvedValue({ status: "error" });
+      await vi.advanceTimersByTimeAsync(10_000);
+      await w.setProps({ project: project("error") });
+
+      // Upload B starts.
+      mocks.uploadProject.mockResolvedValue({ jobId: "job-2", totalFiles: 5 });
+      await clickButton(w, "Upload to Zenodo");
+      expect(jobsMock.addJob.mock.calls[1][0].jobId).toBe("job-2");
+
+      // A's delayed events arrive.
+      jobA.eventCallback({
+        text: JSON.stringify({
+          progress: 0.5,
+          current: 1,
+          total: 2,
+          message: "Uploading A",
+        }),
+      });
+      jobA.eventCallback({ status: 4 });
+      await flushPromises();
+
+      const discard = w
+        .findAll("button")
+        .find((b) => b.text().includes("Discard Draft"))!;
+      expect(discard.attributes("disabled")).toBeDefined();
+      expect(w.text()).not.toContain("Uploading A");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("stops polling when unmounted", async () => {
     vi.useFakeTimers();
     try {
