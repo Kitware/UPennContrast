@@ -423,6 +423,10 @@ class DatasetView(Resource):
                 and bool(doc.get('public', False)) != public
             )
 
+        # The Share dialog shows the Skipped counts (what other users' items
+        # stayed as they were). The Updated counts are not displayed yet:
+        # the tests use them to check that only the caller's own items
+        # changed, and they let a future UI report what a publish did.
         return {
             'dataset': str(dataset['_id']),
             'public': public,
