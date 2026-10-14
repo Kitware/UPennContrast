@@ -1,5 +1,6 @@
+from ..helpers.customModel import UngatedAclFilterMixin
 from ..helpers.proxiedModel import ProxiedModel
-from girder.exceptions import ValidationException, RestException
+from girder.exceptions import ValidationException
 from girder.constants import AccessType
 from ..helpers.tasks import runJobRequest
 
@@ -28,7 +29,16 @@ class PropertySchema:
     }
 
 
-class AnnotationProperty(ProxiedModel):
+class AnnotationProperty(UngatedAclFilterMixin, ProxiedModel):
+    # The client-owned fields of a property: the only ones the API accepts
+    # in a create/update body and, with `_id`, the only ones it returns or
+    # exports. Everything else on the document is server-owned -- above all
+    # `access`, which lists every user the property was shared with, while
+    # readers include anyone who can read a referencing configuration.
+    # Keep in sync with IAnnotationPropertyConfiguration in
+    # src/store/model.ts.
+    CLIENT_FIELDS = ("name", "image", "tags", "shape", "workerInterface")
+
     # TODO: write lock
     # TODO: delete hooks: remove all computed values if the property is
     #   deleted ? (big operation)
@@ -44,6 +54,8 @@ class AnnotationProperty(ProxiedModel):
 
     def initialize(self):
         self.name = "annotation_property"
+        self.exposeFields(
+            level=AccessType.READ, fields=("_id",) + self.CLIENT_FIELDS)
 
     def validate(self, document):
         try:
@@ -59,17 +71,31 @@ class AnnotationProperty(ProxiedModel):
         )
         return self.save(property)
 
+    def findClientFields(self, propertyIds):
+        """The properties with these ids, client-owned fields only -- for
+        exports, which embed the documents without passing through
+        filter()."""
+        return list(self.find(
+            {"_id": {"$in": list(propertyIds)}},
+            fields=list(self.CLIENT_FIELDS),
+        ))
+
     def delete(self, property):
         self.remove(property)
 
     def getPropertyById(self, id, user=None):
         return self.load(id, user=user)
 
-    def compute(self, property, datasetId, params):
+    def validateCompute(self, property):
         image = property.get("image", None)
         if not image:
-            raise RestException(code=500, message="Invalid property: no image")
+            raise ValueError(
+                "Invalid property '%s' (%s): no image"
+                % (property.get("name"), property.get("_id"))
+            )
+        return image
 
-        if property:
-            return runJobRequest(image, datasetId, params, "compute")
-        return {}
+    def compute(self, property, datasetId, params):
+        return runJobRequest(
+            self.validateCompute(property), datasetId, params, "compute"
+        )

@@ -16,6 +16,7 @@ from collections import defaultdict
 import orjson
 
 from bson import ObjectId
+from girder.exceptions import AccessException
 from girder.models.file import File
 from girder.models.folder import Folder
 from girder.models.item import Item
@@ -23,6 +24,11 @@ from girder.models.user import User
 from girder_jobs.constants import JobStatus
 from girder_jobs.models.job import Job
 
+from .access_helpers import (
+    ProjectContents,
+    requireProjectContentsAccess,
+    requireResourcesAccess,
+)
 from .serialization import orJsonDefaults
 from .zenodo_client import (
     get_zenodo_client_for_user,
@@ -34,9 +40,6 @@ from ..models.collection import (
 )
 from ..models.connections import (
     AnnotationConnection as ConnectionModel,
-)
-from ..models.datasetView import (
-    DatasetView as DatasetViewModel,
 )
 from ..models.project import Project as ProjectModel
 from ..models.property import (
@@ -81,6 +84,18 @@ def run(job):
         )
         return
 
+    # The upload endpoint checked ownership, but anyone with WRITE on the
+    # project can add resources before this reload: check the snapshot
+    # this job actually exports.
+    try:
+        contents = requireProjectContentsAccess(project, user)
+    except AccessException as e:
+        _fail(
+            job, job_model, project_id, project_model,
+            str(e),
+        )
+        return
+
     try:
         client = get_zenodo_client_for_user(user)
     except Exception as e:
@@ -94,7 +109,7 @@ def run(job):
         _do_upload(
             job, job_model,
             project, user, project_id,
-            project_model, client,
+            project_model, client, contents,
         )
     except Exception as e:
         log.exception(
@@ -239,8 +254,13 @@ def _batch_load_collections(project, collection_model):
 
 
 def _do_upload(job, job_model, project, user, project_id,
-               project_model, client):
-    """Perform the full Zenodo upload."""
+               project_model, client, contents):
+    """Perform the full Zenodo upload.
+
+    :param contents: What requireProjectContentsAccess checked. The export
+        uses its configurations instead of re-querying views that may have
+        changed, and the draft records its ids for the publish check.
+    """
     zenodo_meta = project['meta'].get('zenodo', {})
 
     # Create deposition or new version
@@ -277,6 +297,35 @@ def _do_upload(job, job_model, project, user, project_id,
         },
     }, project_model=project_model)
 
+    # Ownership was checked before the Zenodo calls above, which can take
+    # a while; check again immediately before reading any data, so access
+    # revoked meanwhile stops the export. (Revocation during the file
+    # uploads themselves still blocks publishing: publish rechecks.)
+    existing_dataset_ids, existing_collections = requireResourcesAccess(
+        contents.datasetIds, contents.collectionIds, user
+    )
+    existing_dataset_ids = set(existing_dataset_ids)
+    # Drop anything deleted since the first check, so it is neither
+    # exported from the stale snapshot nor recorded (publish refuses
+    # recorded resources that no longer exist).
+    contents = ProjectContents(
+        datasetIds=[
+            ds_id for ds_id in contents.datasetIds
+            if ds_id in existing_dataset_ids
+        ],
+        collectionIds=[
+            coll_id for coll_id in contents.collectionIds
+            if coll_id in existing_collections
+        ],
+        configsByDataset={
+            ds_id: [
+                config for config in configs
+                if config['_id'] in existing_collections
+            ]
+            for ds_id, configs in contents.configsByDataset.items()
+        },
+    )
+
     # Batch load all project data upfront
     (folders_by_id, items_by_folder,
      files_by_item, image_file_count) = (
@@ -291,7 +340,6 @@ def _do_upload(job, job_model, project, user, project_id,
     # Models for annotation export
     annotation_model = AnnotationModel()
     connection_model = ConnectionModel()
-    dataset_view_model = DatasetViewModel()
     property_model = PropertyModel()
     property_values_model = PropertyValuesModel()
 
@@ -372,10 +420,9 @@ def _do_upload(job, job_model, project, user, project_id,
         )
 
         ann_json = _build_annotation_json(
-            ds_id, annotation_model,
-            connection_model, collection_model,
-            dataset_view_model, property_model,
-            property_values_model,
+            ds_id, annotation_model, connection_model,
+            contents.configsByDataset.get(ds_id, []),
+            property_model, property_values_model,
         )
         ann_filename = (
             f"{folder_name}_annotations.json"
@@ -464,8 +511,27 @@ def _do_upload(job, job_model, project, user, project_id,
     zenodo_metadata = _build_zenodo_metadata(project)
     client.set_metadata(dep_id, zenodo_metadata)
 
-    # Done - mark as draft (ready to publish)
+    # Done - mark as draft (ready to publish). Publishing checks the
+    # resources recorded here, which is what the draft contains, not the
+    # project's membership by then. Record only what was uploaded: a
+    # resource deleted after the check was skipped above, and publish
+    # refuses recorded resources that no longer exist.
+    uploaded_dataset_ids = [
+        ds_id for ds_id in contents.datasetIds if ds_id in folders_by_id
+    ]
+    uploaded_collection_ids = {
+        coll_id for coll_id in contents.collectionIds
+        if coll_id in colls_by_id
+    } | {
+        config['_id']
+        for ds_id in uploaded_dataset_ids
+        for config in contents.configsByDataset.get(ds_id, [])
+    }
     update_zenodo_meta(project_id, {
+        'uploadedResources': {
+            'datasetIds': uploaded_dataset_ids,
+            'collectionIds': list(uploaded_collection_ids),
+        },
         'depositionId': dep_id,
         'depositionUrl': deposition['links']['html'],
         'status': 'draft',
@@ -497,8 +563,7 @@ def _do_upload(job, job_model, project, user, project_id,
 
 def _build_annotation_json(
     dataset_id, annotation_model, connection_model,
-    collection_model, dataset_view_model,
-    property_model, property_values_model,
+    configs, property_model, property_values_model,
 ):
     """Build annotation export JSON for a dataset.
 
@@ -515,40 +580,33 @@ def _build_annotation_json(
         connection_model.find({'datasetId': ds_oid})
     )
 
-    # Get properties via DatasetViews -> Configurations
-    # (same pattern as export.py _getProperties)
-    dataset_views = list(
-        dataset_view_model.collection.find(
-            {'datasetId': ds_oid}
-        )
-    )
-    config_ids = list({
-        dv['configurationId'] for dv in dataset_views
-    })
+    # Properties of the configurations this dataset's views use
+    # (same pattern as export.py _getProperties), as checked at the
+    # start of the job: never re-query views here.
     property_ids = set()
-    if config_ids:
-        for config in collection_model.find(
-            {'_id': {'$in': config_ids}}
-        ):
-            if ('meta' in config
-                    and 'propertyIds' in config['meta']):
-                for pid in config['meta']['propertyIds']:
-                    property_ids.add(ObjectId(pid))
+    for config in configs:
+        for pid in config.get('meta', {}).get('propertyIds', []):
+            property_ids.add(ObjectId(pid))
 
     properties = []
     if property_ids:
-        properties = list(property_model.find(
-            {'_id': {'$in': list(property_ids)}}
-        ))
+        properties = property_model.findClientFields(property_ids)
 
     # Get property values
     # (same pattern as export.py _getPropertyValues)
+    # Only values of the properties defined above: values of a property
+    # whose configuration was left out would ship without a definition.
+    exported_property_ids = {str(pid) for pid in property_ids}
     prop_values = {}
     for doc in property_values_model.find(
         {'datasetId': ds_oid}
     ):
         ann_id = str(doc['annotationId'])
-        prop_values[ann_id] = doc.get('values', {})
+        prop_values[ann_id] = {
+            pid: value
+            for pid, value in doc.get('values', {}).items()
+            if pid in exported_property_ids
+        }
 
     data = {
         'annotations': annotations,
