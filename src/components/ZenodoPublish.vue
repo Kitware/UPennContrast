@@ -541,15 +541,22 @@ function scheduleUploadStatusPoll() {
   uploadStatusPoll = setTimeout(async () => {
     uploadStatusPoll = null;
     if (!uploadRunning.value) return;
+    // The upload this answer is about. A newer one can start while the
+    // request is out; the answer must not release it.
+    const polledJobId = trackedJobId.value;
     try {
       const { status } = await store.zenodoAPI.getUploadStatus(
         props.project.id,
       );
       if (unmounted) return;
-      if (status !== "uploading") {
+      if (
+        status !== "uploading" &&
+        trackedJobId.value === polledJobId &&
+        !startingUpload.value
+      ) {
         // The server says it's over: release the job (its terminal event
-        // may never come) and re-read the project. Keep polling until the
-        // card's status changes, in case that re-read fails.
+        // may never come) and re-read the project. While the project copy
+        // still reads "uploading", keep polling in case that re-read fails.
         trackedJobId.value = null;
         localProgress.value = null;
         emit("updated");

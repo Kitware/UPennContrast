@@ -341,6 +341,38 @@ describe("ZenodoPublish", () => {
     }
   });
 
+  it("a slow poll doesn't release a newer upload", async () => {
+    vi.useFakeTimers();
+    try {
+      // Upload A is tracked; a poll for it goes out and stalls.
+      let resolvePoll!: (status: unknown) => void;
+      const w = await mountComponent("uploading");
+      mocks.getUploadStatus.mockReturnValueOnce(
+        new Promise((r) => (resolvePoll = r)),
+      );
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      // A ends over SSE, the project re-reads as "error", and the user
+      // starts upload B before the stalled poll answers.
+      jobsMock.addJob.mock.calls[0][0].eventCallback({ status: 4 });
+      await w.setProps({ project: project("error") });
+      mocks.uploadProject.mockResolvedValue({ jobId: "job-2", totalFiles: 1 });
+      await clickButton(w, "Upload to Zenodo");
+      expect(jobsMock.addJob.mock.calls[1][0].jobId).toBe("job-2");
+
+      // The stale answer about A arrives.
+      resolvePoll({ status: "error" });
+      await vi.advanceTimersByTimeAsync(0);
+
+      const discard = w
+        .findAll("button")
+        .find((b) => b.text().includes("Discard Draft"))!;
+      expect(discard.attributes("disabled")).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("stops polling when unmounted", async () => {
     vi.useFakeTimers();
     try {
