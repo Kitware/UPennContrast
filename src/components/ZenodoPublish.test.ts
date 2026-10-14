@@ -292,11 +292,50 @@ describe("ZenodoPublish", () => {
         .mockRejectedValueOnce(new Error("Network Error"))
         .mockResolvedValue({ status: "draft" });
       const w = await mountComponent("uploading");
-      expect(w.emitted("updated")).toBeUndefined();
+      // A failed lookup asks for a re-read.
+      expect(w.emitted("updated")).toHaveLength(1);
 
       await vi.advanceTimersByTimeAsync(10_000);
       // The poll saw the upload end and re-read the project.
+      expect(w.emitted("updated")).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("polls a tracked upload too, in case its job events stop", async () => {
+    // The notification socket gives up after repeated errors; then no
+    // terminal event will ever say the job ended.
+    vi.useFakeTimers();
+    try {
+      const w = await mountComponent("uploading");
+      expect(jobsMock.addJob).toHaveBeenCalledTimes(1);
+      mocks.getUploadStatus.mockResolvedValue({ status: "draft" });
+
+      await vi.advanceTimersByTimeAsync(10_000);
+
       expect(w.emitted("updated")).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("releases the actions when the server says the upload ended", async () => {
+    // Started here, but the refresh never lands: the card still shows
+    // "error" and follows the job, so only the poll can unlock it.
+    vi.useFakeTimers();
+    try {
+      mocks.uploadProject.mockResolvedValue({ jobId: "job-1", totalFiles: 3 });
+      const w = await mountComponent("error");
+      await clickButton(w, "Upload to Zenodo");
+      const discard = () =>
+        w.findAll("button").find((b) => b.text().includes("Discard Draft"))!;
+      expect(discard().attributes("disabled")).toBeDefined();
+
+      mocks.getUploadStatus.mockResolvedValue({ status: "error" });
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(discard().attributes("disabled")).toBeUndefined();
     } finally {
       vi.useRealTimers();
     }

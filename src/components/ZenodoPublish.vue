@@ -304,15 +304,17 @@ const cardErrorRequests = computed(() =>
 // The upload job this card is subscribed to, so it subscribes once per job.
 const trackedJobId = ref<string | null>(null);
 const recoveringJob = ref(false);
-// While the project reports an upload whose job this user can't see (a
-// co-owner's), poll the upload status: no job event will say when it ends.
-const INVISIBLE_UPLOAD_POLL_MS = 10_000;
-let invisibleUploadPoll: ReturnType<typeof setTimeout> | null = null;
+// While an upload runs, poll its status: the one signal that always says
+// when it ends. Job SSE events add live progress and an earlier end, but
+// may never come: a co-owner's job is invisible to this user, and the
+// notification socket gives up after repeated errors.
+const UPLOAD_STATUS_POLL_MS = 10_000;
+let uploadStatusPoll: ReturnType<typeof setTimeout> | null = null;
 let unmounted = false;
 
-function stopInvisibleUploadPoll() {
-  if (invisibleUploadPoll !== null) clearTimeout(invisibleUploadPoll);
-  invisibleUploadPoll = null;
+function stopUploadStatusPoll() {
+  if (uploadStatusPoll !== null) clearTimeout(uploadStatusPoll);
+  uploadStatusPoll = null;
 }
 
 // Local progress state, updated from job SSE events
@@ -534,25 +536,30 @@ async function discardDraft() {
   }
 }
 
-function scheduleInvisibleUploadPoll() {
-  stopInvisibleUploadPoll();
-  invisibleUploadPoll = setTimeout(async () => {
-    invisibleUploadPoll = null;
-    if (zenodoStatus.value !== "uploading" || trackedJobId.value) return;
+function scheduleUploadStatusPoll() {
+  stopUploadStatusPoll();
+  uploadStatusPoll = setTimeout(async () => {
+    uploadStatusPoll = null;
+    if (!uploadRunning.value) return;
     try {
       const { status } = await store.zenodoAPI.getUploadStatus(
         props.project.id,
       );
-      // Ended: re-read the project. Keep polling until the card's status
-      // changes, in case that re-read fails.
-      if (status !== "uploading") emit("updated");
+      if (unmounted) return;
+      if (status !== "uploading") {
+        // The server says it's over: release the job (its terminal event
+        // may never come) and re-read the project. Keep polling until the
+        // card's status changes, in case that re-read fails.
+        trackedJobId.value = null;
+        localProgress.value = null;
+        emit("updated");
+      }
     } catch (error) {
       logError("Failed to check Zenodo upload status", error);
     }
-    // Unmounted, or the status moved on, while the request was in flight.
-    if (unmounted || zenodoStatus.value !== "uploading") return;
-    scheduleInvisibleUploadPoll();
-  }, INVISIBLE_UPLOAD_POLL_MS);
+    if (unmounted || !uploadRunning.value) return;
+    scheduleUploadStatusPoll();
+  }, UPLOAD_STATUS_POLL_MS);
 }
 
 async function recoverActiveJob(): Promise<boolean> {
@@ -574,11 +581,9 @@ async function recoverActiveJob(): Promise<boolean> {
       // The project says "uploading" but there is no live upload job this
       // user can see: the project copy is stale (cached, or a refresh
       // landed out of order), or the upload is a co-owner's, whose job
-      // Girder never shows us. Re-read the project now, then watch the
-      // cheap status endpoint until the upload ends (the status watcher
-      // stops the poll).
+      // Girder never shows us. Re-read the project; the status poll covers
+      // the rest.
       emit("updated");
-      scheduleInvisibleUploadPoll();
       return false;
     }
     trackJob(jobId);
@@ -592,10 +597,10 @@ async function recoverActiveJob(): Promise<boolean> {
     }
     return true;
   } catch (error) {
-    // The status still shows from project meta; keep checking it so the
-    // card can't stick on "uploading" after a failed lookup.
+    // Re-read the project; while it says "uploading" the status poll keeps
+    // checking, so a failed lookup can't leave the card stuck.
     logError("Failed to look up the Zenodo upload job", error);
-    if (!unmounted) scheduleInvisibleUploadPoll();
+    if (!unmounted) emit("updated");
     return false;
   } finally {
     recoveringJob.value = false;
@@ -607,7 +612,6 @@ async function recoverActiveJob(): Promise<boolean> {
 watch(
   zenodoStatus,
   (status, oldStatus) => {
-    if (status !== "uploading") stopInvisibleUploadPoll();
     // The server says the upload is over. Drop the subscription even if its
     // terminal job event never arrived (the notification socket can give
     // up), or every action would stay disabled. Only on leaving
@@ -628,8 +632,20 @@ onMounted(() => {
   checkToken();
 });
 
+// An upload is running as far as this card knows: the project says so, or
+// the card follows a job (its project copy can lag behind a just-started
+// upload or a 409).
+const uploadRunning = computed(
+  () => zenodoStatus.value === "uploading" || !!trackedJobId.value,
+);
+watch(
+  uploadRunning,
+  (running) => (running ? scheduleUploadStatusPoll() : stopUploadStatusPoll()),
+  { immediate: true },
+);
+
 onBeforeUnmount(() => {
   unmounted = true;
-  stopInvisibleUploadPoll();
+  stopUploadStatusPoll();
 });
 </script>
