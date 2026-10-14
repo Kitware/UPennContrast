@@ -2,7 +2,7 @@ import json
 import pytest
 import math
 
-from pytest_girder.assertions import assertStatusOk
+from pytest_girder.assertions import assertStatus, assertStatusOk
 
 from upenncontrast_annotation.server.models.annotation import Annotation
 from upenncontrast_annotation.server.models.connections import (
@@ -636,3 +636,94 @@ class TestConnectionEndpoints:
         )
         assertStatusOk(resp)
         assert len(resp.json) == 3
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestMultipleCreateValidation:
+    """POST /annotation_connection/multiple must reject malformed input.
+
+    Regression for issue #1242: the bulk-create endpoint didn't validate its
+    body shape, so a non-list body, a non-dict entry, or a malformed id
+    raised a 500 instead of a 400. The non-list and non-dict cases also
+    crashed the @recordable finder, which runs before the handler.
+    """
+
+    def _post(self, server, user, body):
+        return server.request(
+            path="/annotation_connection/multiple",
+            method="POST",
+            user=user,
+            body=json.dumps(body),
+            type="application/json",
+        )
+
+    def testNonListBodyReturns400(self, admin, server):
+        resp = self._post(server, admin, {"not": "a list"})
+        assertStatus(resp, 400)
+
+    def testNonDictEntryReturns400(self, admin, server):
+        resp = self._post(server, admin, [123])
+        assertStatus(resp, 400)
+
+    def testEntryWithoutDatasetIdReturns400(self, admin, server):
+        """The finder used to index connections[0]["datasetId"] directly
+        (KeyError -> 500). It now skips recording, and schema validation
+        rejects the entry before anything is saved."""
+        (parent, child, dataset) = createTwoAnnotations(admin)
+        connection = upenn_utilities.getSampleConnection(
+            str(parent["_id"]), str(child["_id"]), str(dataset["_id"])
+        )
+        del connection["datasetId"]
+        resp = self._post(server, admin, [connection])
+        assertStatus(resp, 400)
+        assert AnnotationConnection().findOne(
+            {"childId": child["_id"]}
+        ) is None
+
+    def testMalformedIdReturns400(self, admin, server):
+        (parent, child, dataset) = createTwoAnnotations(admin)
+        connection = upenn_utilities.getSampleConnection(
+            str(parent["_id"]), "not-a-valid-object-id", str(dataset["_id"])
+        )
+        resp = self._post(server, admin, [connection])
+        assertStatus(resp, 400)
+
+    def testNumericIdReturns400(self, admin, server):
+        (parent, child, dataset) = createTwoAnnotations(admin)
+        connection = upenn_utilities.getSampleConnection(
+            str(parent["_id"]), 123, str(dataset["_id"])
+        )
+        resp = self._post(server, admin, [connection])
+        assertStatus(resp, 400)
+
+    def testValidBodyStillCreates(self, admin, server):
+        (parent, child, dataset) = createTwoAnnotations(admin)
+        connection = upenn_utilities.getSampleConnection(
+            str(parent["_id"]), str(child["_id"]), str(dataset["_id"])
+        )
+        resp = self._post(server, admin, [connection])
+        assertStatusOk(resp)
+        assert len(resp.json) == 1
+
+    def testValidBodyIsRecordedForUndo(self, admin, server):
+        """The finder still returns the datasetId for a valid body, so the
+        create is recorded and undo removes it."""
+        (parent, child, dataset) = createTwoAnnotations(admin)
+        connection = upenn_utilities.getSampleConnection(
+            str(parent["_id"]), str(child["_id"]), str(dataset["_id"])
+        )
+        assertStatusOk(self._post(server, admin, [connection]))
+        assert AnnotationConnection().findOne(
+            {"childId": child["_id"]}
+        ) is not None
+
+        assertStatusOk(server.request(
+            path="/history/undo",
+            method="PUT",
+            user=admin,
+            params={"datasetId": str(dataset["_id"])},
+        ))
+        assert AnnotationConnection().findOne(
+            {"childId": child["_id"]}
+        ) is None
