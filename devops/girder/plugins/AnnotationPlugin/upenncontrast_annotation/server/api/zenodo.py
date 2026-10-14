@@ -24,7 +24,10 @@ from ..helpers.zenodo_client import (
     get_zenodo_client_for_user,
     update_zenodo_meta,
 )
-from ..helpers.zenodo_job import batch_load_project_data
+from ..helpers.zenodo_job import (
+    batch_load_project_data,
+    has_live_upload_job,
+)
 from ..models.collection import Collection as CollectionModel
 from ..models.project import Project as ProjectModel
 
@@ -256,6 +259,11 @@ class Zenodo(Resource):
                 },
                 asynchronous=True,
             )
+            # Before scheduling, so the job can't finish before the
+            # project names it.
+            update_zenodo_meta(project['_id'], {
+                'jobId': str(job['_id']),
+            }, project_model=self._projectModel)
             JobModel().scheduleJob(job)
         except Exception:
             update_zenodo_meta(project['_id'], {
@@ -300,6 +308,7 @@ class Zenodo(Resource):
             'progress': zenodo.get('progress'),
             'error': zenodo.get('error'),
             'lastPublished': zenodo.get('lastPublished'),
+            'jobId': zenodo.get('jobId'),
         }
 
     @access.user
@@ -392,6 +401,7 @@ class Zenodo(Resource):
         )
         .errorResponse('Project not found.', 404)
         .errorResponse('No draft to discard.', 400)
+        .errorResponse('An upload is in progress.', 409)
     )
     def discard(self, projectId):
         user = self.getCurrentUser()
@@ -407,6 +417,16 @@ class Zenodo(Resource):
             raise RestException(
                 "No draft deposition to discard.",
                 code=400,
+            )
+
+        # 'uploading' is accepted so a project whose upload job died can be
+        # reset, but not while the job is alive: it is using the deposition,
+        # and a stale card in another tab can still ask.
+        if (zenodo.get('status') == 'uploading'
+                and has_live_upload_job(zenodo)):
+            raise RestException(
+                "An upload is in progress for this project.",
+                code=409,
             )
 
         dep_id = zenodo.get('depositionId')

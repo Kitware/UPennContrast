@@ -487,10 +487,13 @@ async function startUpload() {
     localProgress.value = null;
     logError("Failed to start Zenodo upload", error);
     showRequestError("upload", error);
-    // 409: another tab or session is already uploading. Refresh so the
-    // card shows that upload instead of offering this one again.
+    // 409: another tab or session is already uploading. Follow that upload
+    // before startingUpload clears, so the actions stay locked through the
+    // window before the refreshed status lands, then refresh so the card
+    // shows it. (With no visible job, recovery has already asked for the
+    // refresh.)
     if (isAxiosError(error) && error.response?.status === 409) {
-      emit("updated");
+      if (await recoverActiveJob()) emit("updated");
     }
   } finally {
     startingUpload.value = false;
@@ -552,39 +555,48 @@ function scheduleInvisibleUploadPoll() {
   }, INVISIBLE_UPLOAD_POLL_MS);
 }
 
-async function recoverActiveJob() {
-  // An upload this card didn't start (page load mid-upload, or another tab
-  // per a 409): find its job and subscribe to its SSE stream.
+async function recoverActiveJob(): Promise<boolean> {
+  // An upload this card didn't start (page load mid-upload, a 409, another
+  // tab): ask the server which job it is (this card's project copy may be
+  // stale) and subscribe to its SSE stream. Returns whether it subscribed.
   recoveringJob.value = true;
   try {
-    const activeJob = await store.zenodoAPI.findActiveUploadJob(
-      props.project.id,
-    );
+    const status = await store.zenodoAPI.getUploadStatus(props.project.id);
     // Unmounted (e.g. switched project), or startUpload subscribed, while
     // this was in flight.
-    if (unmounted || trackedJobId.value) return;
-    if (!activeJob) {
-      // The project says "uploading" but this user has no upload job: the
-      // project copy is stale (cached, or a refresh landed out of order),
-      // or the upload is a co-owner's, whose job Girder never shows us.
-      // Re-read the project now, then watch the cheap status endpoint until
-      // the upload ends (the status watcher stops the poll).
+    if (unmounted || trackedJobId.value) return false;
+    const jobId =
+      status.status === "uploading" && status.jobId
+        ? await store.zenodoAPI.getLiveUploadJobId(status.jobId)
+        : null;
+    if (unmounted || trackedJobId.value) return false;
+    if (!jobId) {
+      // The project says "uploading" but there is no live upload job this
+      // user can see: the project copy is stale (cached, or a refresh
+      // landed out of order), or the upload is a co-owner's, whose job
+      // Girder never shows us. Re-read the project now, then watch the
+      // cheap status endpoint until the upload ends (the status watcher
+      // stops the poll).
       emit("updated");
       scheduleInvisibleUploadPoll();
-      return;
+      return false;
     }
-    trackJob(activeJob._id);
-    // Seed progress from project meta until the next SSE event arrives.
-    const progress = zenodoMeta.value?.progress;
-    if (progress) {
+    trackJob(jobId);
+    // Seed progress until the next SSE event arrives.
+    if (status.progress) {
       localProgress.value = {
-        current: progress.current,
-        total: progress.total,
-        message: progress.message,
+        current: status.progress.current,
+        total: status.progress.total,
+        message: status.progress.message,
       };
     }
-  } catch {
-    // Not critical — status will still show from project meta
+    return true;
+  } catch (error) {
+    // The status still shows from project meta; keep checking it so the
+    // card can't stick on "uploading" after a failed lookup.
+    logError("Failed to look up the Zenodo upload job", error);
+    if (!unmounted) scheduleInvisibleUploadPoll();
+    return false;
   } finally {
     recoveringJob.value = false;
   }

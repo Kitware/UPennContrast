@@ -49,6 +49,27 @@ from ..models.propertyValues import (
 log = logging.getLogger(__name__)
 
 
+LIVE_JOB_STATUSES = (
+    JobStatus.INACTIVE, JobStatus.QUEUED, JobStatus.RUNNING,
+)
+
+
+def has_live_upload_job(zenodo):
+    """Whether the upload job recorded on a project's Zenodo meta is still
+    alive (a local job is INACTIVE until its thread marks it RUNNING).
+
+    The project records the job id because job kwargs can't serve: Girder
+    stores them serialized and exposes them only to site admins.
+    """
+    jobId = zenodo.get('jobId')
+    if not jobId:
+        return False
+    # force: an internal state check, not a read on the caller's behalf
+    # (a project co-owner may not own the job).
+    job = Job().load(jobId, force=True)
+    return job is not None and job['status'] in LIVE_JOB_STATUSES
+
+
 def run(job):
     """Entry point for the local job handler.
 

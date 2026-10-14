@@ -7,8 +7,8 @@ const mocks = vi.hoisted(() => ({
   uploadProject: vi.fn(),
   publishProject: vi.fn(),
   discardDraft: vi.fn(),
-  findActiveUploadJob: vi.fn(),
   getUploadStatus: vi.fn(),
+  getLiveUploadJobId: vi.fn(),
 }));
 
 vi.mock("@/store", () => ({
@@ -78,7 +78,12 @@ function requestError(w: VueWrapper) {
 describe("ZenodoPublish", () => {
   beforeEach(() => {
     mocks.getCredentials.mockResolvedValue({ hasToken: true, sandbox: false });
-    mocks.findActiveUploadJob.mockResolvedValue({ _id: "job-1" });
+    // The server's view: an upload is running as job-1, visible to this user.
+    mocks.getUploadStatus.mockResolvedValue({
+      status: "uploading",
+      jobId: "job-1",
+    });
+    mocks.getLiveUploadJobId.mockResolvedValue("job-1");
   });
 
   afterEach(() => {
@@ -182,15 +187,35 @@ describe("ZenodoPublish", () => {
     expect(requestError(w).text()).toContain(
       "An upload is already in progress for this project.",
     );
-    expect(w.emitted("updated")).toHaveLength(1);
-
-    // The refreshed project reports the other upload: follow its job, so
-    // the card leaves "uploading" when that job ends.
-    await w.setProps({ project: project("uploading") });
-    await flushPromises();
-    expect(mocks.findActiveUploadJob).toHaveBeenCalledWith("p1");
+    // Follows the other upload's job straight away (the server names it;
+    // this card's project copy is stale), so the card leaves "uploading"
+    // when that job ends.
+    expect(mocks.getUploadStatus).toHaveBeenCalledWith("p1");
+    expect(mocks.getLiveUploadJobId).toHaveBeenCalledWith("job-1");
     expect(jobsMock.addJob).toHaveBeenCalledTimes(1);
     expect(jobsMock.addJob.mock.calls[0][0].jobId).toBe("job-1");
+    expect(w.emitted("updated")).toHaveLength(1);
+
+    // The refreshed project reports it; no second subscription.
+    await w.setProps({ project: project("uploading") });
+    await flushPromises();
+    expect(jobsMock.addJob).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the actions locked after a 409 until the refresh lands", async () => {
+    // The card still shows a stale "error"; the other tab's upload must not
+    // be discarded in the window before the refreshed status arrives.
+    mocks.uploadProject.mockRejectedValue(
+      serverError(409, "An upload is already in progress for this project."),
+    );
+    const w = await mountComponent("error");
+
+    await clickButton(w, "Upload to Zenodo");
+
+    const discard = w
+      .findAll("button")
+      .find((b) => b.text().includes("Discard Draft"))!;
+    expect(discard.attributes("disabled")).toBeDefined();
   });
 
   it("tracks an upload once, and again after it ends", async () => {
@@ -203,7 +228,7 @@ describe("ZenodoPublish", () => {
     // The refresh this upload triggers must not subscribe a second time.
     await w.setProps({ project: project("uploading") });
     await flushPromises();
-    expect(mocks.findActiveUploadJob).not.toHaveBeenCalled();
+    expect(mocks.getLiveUploadJobId).not.toHaveBeenCalled();
     expect(jobsMock.addJob).toHaveBeenCalledTimes(1);
 
     // The job ends; a later upload (from another tab) is followed again.
@@ -211,14 +236,14 @@ describe("ZenodoPublish", () => {
     await w.setProps({ project: project("draft") });
     await w.setProps({ project: project("uploading") });
     await flushPromises();
-    expect(mocks.findActiveUploadJob).toHaveBeenCalledTimes(1);
+    expect(mocks.getLiveUploadJobId).toHaveBeenCalledTimes(1);
     expect(jobsMock.addJob).toHaveBeenCalledTimes(2);
   });
 
   it("re-reads the project when the reported upload has no job", async () => {
     // A cached project can still say "uploading" after its job ended (the
     // store doesn't refetch a cached project on navigation).
-    mocks.findActiveUploadJob.mockResolvedValue(null);
+    mocks.getLiveUploadJobId.mockResolvedValue(null);
     const w = await mountComponent("uploading");
 
     expect(jobsMock.addJob).not.toHaveBeenCalled();
@@ -230,16 +255,17 @@ describe("ZenodoPublish", () => {
     // the project status can say when it ends.
     vi.useFakeTimers();
     try {
-      mocks.findActiveUploadJob.mockResolvedValue(null);
-      mocks.getUploadStatus.mockResolvedValue({ status: "uploading" });
+      mocks.getLiveUploadJobId.mockResolvedValue(null);
       const w = await mountComponent("uploading");
-      // One immediate re-read, in case the project copy is just stale.
+      // One status check to find the job, and an immediate re-read in case
+      // the project copy is just stale.
+      expect(mocks.getUploadStatus).toHaveBeenCalledTimes(1);
       expect(w.emitted("updated")).toHaveLength(1);
 
       // Polls the light status endpoint; no project re-read while the
       // upload is still running.
       await vi.advanceTimersByTimeAsync(20_000);
-      expect(mocks.getUploadStatus).toHaveBeenCalledTimes(2);
+      expect(mocks.getUploadStatus).toHaveBeenCalledTimes(3);
       expect(mocks.getUploadStatus).toHaveBeenCalledWith("p1");
       expect(w.emitted("updated")).toHaveLength(1);
 
@@ -252,8 +278,25 @@ describe("ZenodoPublish", () => {
       expect(w.emitted("updated")).toHaveLength(3);
       await w.setProps({ project: project("draft") });
       await vi.advanceTimersByTimeAsync(30_000);
-      expect(mocks.getUploadStatus).toHaveBeenCalledTimes(4);
+      expect(mocks.getUploadStatus).toHaveBeenCalledTimes(5);
       expect(w.emitted("updated")).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps checking when the job lookup fails", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.getUploadStatus
+        .mockRejectedValueOnce(new Error("Network Error"))
+        .mockResolvedValue({ status: "draft" });
+      const w = await mountComponent("uploading");
+      expect(w.emitted("updated")).toBeUndefined();
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      // The poll saw the upload end and re-read the project.
+      expect(w.emitted("updated")).toHaveLength(1);
     } finally {
       vi.useRealTimers();
     }
@@ -262,13 +305,13 @@ describe("ZenodoPublish", () => {
   it("stops polling when unmounted", async () => {
     vi.useFakeTimers();
     try {
-      mocks.findActiveUploadJob.mockResolvedValue(null);
-      mocks.getUploadStatus.mockResolvedValue({ status: "uploading" });
+      mocks.getLiveUploadJobId.mockResolvedValue(null);
       const w = await mountComponent("uploading");
       w.unmount();
       wrapper = null;
       await vi.advanceTimersByTimeAsync(30_000);
-      expect(mocks.getUploadStatus).not.toHaveBeenCalled();
+      // Only the mount-time job lookup; no poll.
+      expect(mocks.getUploadStatus).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }
@@ -277,17 +320,19 @@ describe("ZenodoPublish", () => {
   it("schedules nothing if unmounted while looking up the job", async () => {
     vi.useFakeTimers();
     try {
-      let resolveLookup!: (job: null) => void;
-      mocks.findActiveUploadJob.mockReturnValue(
-        new Promise((r) => (resolveLookup = r)),
+      let resolveStatus!: (status: unknown) => void;
+      mocks.getUploadStatus.mockReturnValueOnce(
+        new Promise((r) => (resolveStatus = r)),
       );
-      mocks.getUploadStatus.mockResolvedValue({ status: "uploading" });
       const w = await mountComponent("uploading");
       w.unmount();
       wrapper = null;
-      resolveLookup(null);
+      resolveStatus({ status: "uploading", jobId: "job-1" });
       await vi.advanceTimersByTimeAsync(30_000);
-      expect(mocks.getUploadStatus).not.toHaveBeenCalled();
+      // No job read, subscription or poll from the dead card.
+      expect(mocks.getUploadStatus).toHaveBeenCalledTimes(1);
+      expect(mocks.getLiveUploadJobId).not.toHaveBeenCalled();
+      expect(jobsMock.addJob).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
@@ -352,7 +397,7 @@ describe("ZenodoPublish", () => {
 
   it("follows an upload already running when it mounts", async () => {
     await mountComponent("uploading");
-    expect(mocks.findActiveUploadJob).toHaveBeenCalledTimes(1);
+    expect(mocks.getLiveUploadJobId).toHaveBeenCalledWith("job-1");
     expect(jobsMock.addJob).toHaveBeenCalledTimes(1);
   });
 

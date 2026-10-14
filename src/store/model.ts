@@ -802,6 +802,8 @@ export interface IProjectZenodo {
   progress?: IZenodoProgress | null;
   error?: string | null;
   lastPublished?: string;
+  // The upload job, once an upload has been started.
+  jobId?: string | null;
 }
 
 export interface IProject {
