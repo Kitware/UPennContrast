@@ -26,9 +26,14 @@ NimbusImage uses Girder's built-in access control system with three permission l
 
 **Key behaviors:**
 - Users automatically receive ADMIN access when they create a dataset
-- Only users with ADMIN access can modify sharing settings (add/remove users, toggle public)
+- Users with WRITE or ADMIN access can add, change and remove users, but never above their own
+  level: a WRITE collaborator can share Read or Write, and cannot grant Admin or change/remove
+  anyone above Write (the owner). Toggling public, choosing collections and share links stay
+  ADMIN-only
 - Any user with READ access can view the access list (who has access and at what level)
-- The dataset owner (ADMIN) cannot be removed from the access list
+- Owners (ADMIN) can't be changed or removed by anyone below ADMIN (`requireCanSetUserAccess`).
+  The dialog also locks owner rows for everyone. Another ADMIN can still change an owner through
+  the API.
 
 ## Architecture
 
@@ -90,20 +95,39 @@ Returns the current access list for a dataset.
     }
   ],
   "groups": [],
+  "currentUserLevel": 1,
   "configurations": [
     {
       "id": "string",
       "name": "string",
-      "public": true
+      "public": true,
+      "currentUserLevel": 0
     }
-  ]
+  ],
+  "writableViewIds": ["string"]
 }
 ```
+
+`currentUserLevel` is the caller's **effective** level (`getAccessLevel`, so groups and site admin
+count). The same `formatAccessList` adds it to `/dataset_view/configuration_access/:id` and
+`/project/:id/access`. Clients must use it for their own rights, not their row in `users`: that list
+holds only direct entries, so access held through a group has no row. *"testAccessListReportsEffectiveCurrentUserLevel"*
+
+Each configuration also carries the caller's level, and `writableViewIds` lists the dataset's views
+the caller can write. `POST /dataset_view/share` needs WRITE on every view and configuration it is
+sent, so the dialog sends only writable views, and treats a configuration as shareable only when
+the caller can write it **and** at least one of its views (`isConfigShareable`). That one predicate
+drives the default selection, the owner's checkbox enabling and the pruning after a self-change, so
+a collection is never shown selected while its views are silently dropped
+(*"never shows a collection selected that would not be shared"*). Without this, a WRITE collaborator with READ on one
+collection had every share refused. *"testAccessListReportsWhatTheCallerCanShare"*,
+*"selects writable collections and sends writable views"*
 
 **Implementation notes:**
 - Uses `Folder().getFullAccessList()` for user list (doesn't include emails)
 - Requires separate bulk query to fetch user emails
 - Bulk loads configurations to avoid N+1 queries
+- Lists only configurations the caller can READ (`findWithPermissions`): another user may have opened the dataset with a private configuration of theirs
 
 #### `GET /dataset_view/configuration_access/:configurationId`
 
@@ -140,12 +164,20 @@ Returns the current access list for a configuration and its associated datasets.
 - Uses `Collection().getFullAccessList()` for user list (doesn't include emails)
 - Requires separate bulk query to fetch user emails
 - Bulk loads datasets to avoid N+1 queries
+- Lists only datasets the caller can READ (`findWithPermissions`): other users may have opened their own private datasets with this configuration
 
 #### `POST /dataset_view/share`
 
 Grants, modifies, or revokes user access.
 
-**Required permission:** WRITE access to the dataset and configurations
+**Required permission:** WRITE on the dataset folder and on every listed DatasetView and its
+configuration. All `datasetViewIds` must belong to one dataset (400 otherwise). On **each** of
+those documents (`requireCanSetUserAccess`), the caller cannot grant a level above their own,
+nor change or remove a user whose current entry is above their own; either is a 403 that changes
+nothing. Before 2026-10-11 only WRITE was checked, so a collaborator could grant themselves
+ADMIN or remove the owner. *"testWriteUserCanShareUpToWrite"*,
+*"testWriteUserCannotExceedOwnLevel"*, *"testOwnLevelIsCheckedPerDocument"*,
+*"testShareEndpointRejectsViewsOfSeveralDatasets"*
 
 **Request body:**
 ```json
@@ -159,12 +191,21 @@ Grants, modifies, or revokes user access.
 **Access type values:**
 - `0` - READ access
 - `1` - WRITE access
-- `null` - Remove access entirely
+- `2` - ADMIN (owner) access
+- `-1` - Remove access entirely
+- Anything else (including `100` SITE_ADMIN, fractions like `1.9`, booleans) is a 400 — *"testShareEndpointRejectsInvalidAccessType"*
 
 **Behavior:**
 - Sets permissions on all specified DatasetViews
 - Also sets permissions on the parent Dataset folder
 - Also sets permissions on associated Configurations
+- `-1` is mapped to `None` (`parseShareAccessType` in `server/helpers/access_helpers.py`)
+  before `setUserAccess`, which deletes the user's entry from each ACL. Girder removes an
+  entry only for `None`; passing `-1` through would store an inert `level: -1` entry that
+  grants nothing but kept the user in the sharing table (fixed 2026-10-11).
+  `formatAccessList` drops negative entries, so leftovers from before the fix stay hidden.
+  Tests: *"testShareEndpointRemoveDropsAclEntries"*, *"testAccessListHidesLegacyNegativeEntries"*,
+  *"test_remove_drops_entries_everywhere"* (project), *"test_legacy_negative_entry_not_propagated"*.
 
 #### `POST /dataset_view/set_public`
 
@@ -301,7 +342,12 @@ Location: `src/components/ShareDataset.vue`
 - Individual loading states per user row
 - Confirmation dialog before removing access
 - ADMIN users protected from removal (lock icon)
-- **Read-only mode** for non-admin users: when the current user doesn't have ADMIN (level 2) access, the dialog hides all edit controls (add user form, remove buttons, access level dropdowns, public toggle, collection checkboxes) and shows access levels as plain text. The dialog title changes from "Share Dataset:" to "Sharing:".
+- Rights come from the access response's `currentUserLevel`, not the caller's row (*"takes management rights from the server's effective level"*). Changing your own entry re-reads it without resetting the collection selection. Any failed load, including the 403 after removing your last access, fails closed (*"removing your last access fails closed on the 403"*).
+- Only the latest access load commits: `fetchAccessInfo`, `refetchIfSelf` and `resetState` share one request counter, and a self-change during an in-flight full load (a reopen) restarts the full load instead of superseding it (*"an older self-change reload cannot overwrite a newer load"*, *"a self-change during a reopen's load still fills the dialog"*).
+- Share targets are named users only. `findShareTarget` treats share-link principals as unknown on both share endpoints (*"testShareEndpointRejectsShareLinkPrincipals"*).
+- With nothing shareable (`canShareAny`), the add form becomes a note and the row controls are hidden (*"with nothing shareable, a WRITE user gets a note, not controls"*).
+- **WRITE collaborators** (`canManageUsers`) get the add-user form, plus level dropdowns and remove buttons on rows at or below their own level (`canEditUser`). Rows above it show a lock. Public toggle, collection checkboxes and share links stay ADMIN-only (`isResourceAdmin`). A refused share shows the server's reason.
+- **Read-only mode** for READ users: the dialog hides all edit controls (add user form, remove buttons, access level dropdowns, public toggle, collection checkboxes) and shows access levels as plain text. The dialog title changes from "Share Dataset:" to "Sharing:".
 
 ### State Management
 
@@ -326,11 +372,11 @@ Located in `src/store/GirderAPI.ts`:
 // Fetch current access list
 async getDatasetAccess(datasetId: string): Promise<IDatasetAccessList>
 
-// Share with a user (or revoke with accessType: null)
+// Share with a user (or revoke with accessType: -1)
 async shareDatasetView(
   datasetViews: IDatasetView[],
   userMailOrUsername: string,
-  accessType: number | null
+  accessType: number
 ): Promise<true | string>
 
 // Toggle public access
@@ -354,6 +400,7 @@ interface IDatasetAccessConfiguration {
   id: string;
   name: string;
   public: boolean;
+  currentUserLevel: number; // caller's effective level on this configuration
 }
 
 interface IDatasetAccessList {
@@ -362,6 +409,8 @@ interface IDatasetAccessList {
   users: IDatasetAccessUser[];
   groups: unknown[];
   configurations: IDatasetAccessConfiguration[];
+  currentUserLevel: number; // caller's effective level on the dataset
+  writableViewIds: string[]; // views the caller can write (and so share)
 }
 ```
 
@@ -392,7 +441,7 @@ interface IDatasetAccessList {
 +-----------------------------------------------+
 ```
 
-### Read-Only View (non-admin shared users)
+### Read-Only View (READ-level shared users)
 
 ```
 +-----------------------------------------------+
@@ -431,7 +480,7 @@ No collection checkboxes, public toggle, access level dropdowns, remove buttons,
 | File | Purpose |
 |------|---------|
 | `devops/girder/plugins/AnnotationPlugin/upenncontrast_annotation/server/api/datasetView.py` | Backend API endpoints |
-| `src/components/ShareDataset.vue` | Frontend share dialog (admin: full edit, non-admin: read-only) |
+| `src/components/ShareDataset.vue` | Frontend share dialog (admin: full edit, write: users up to Write, read: read-only) |
 | `src/components/SharingStatusDisplay.vue` | Inline sharing status card (public/private chip, user list) |
 | `src/components/SharingStatusIcon.vue` | Small sharing icon for list items |
 | `src/views/dataset/DatasetInfo.vue` | Dataset info page (embeds SharingStatusDisplay) |

@@ -54,15 +54,18 @@ export default class PropertiesAPI {
       });
   }
 
+  // One request for the whole configuration. The server returns the
+  // readable properties in request order and omits ids it cannot resolve
+  // (e.g. a property deleted while a configuration still lists it), so one
+  // stale id no longer prevents every other property from loading.
   async getProperties(propertyIds: string[]): Promise<IAnnotationProperty[]> {
-    const promises: Promise<IAnnotationProperty>[] = [];
-    for (const id of propertyIds) {
-      const propertyPromise = this.client
-        .get(`annotation_property/${id}`)
-        .then((res) => this.toProperty(res.data));
-      promises.push(propertyPromise);
+    if (propertyIds.length === 0) {
+      return [];
     }
-    return Promise.all(promises);
+    const response = await this.client.post("annotation_property/batch", {
+      ids: propertyIds,
+    });
+    return response.data.map((item: any) => this.toProperty(item));
   }
 
   async getPropertyHistogram(
