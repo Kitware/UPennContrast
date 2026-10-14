@@ -1581,7 +1581,13 @@ const registry: { [name: string]: IAgentToolEntry } = {
           return { matching, page, stubNames };
         },
       );
-      const annotations = page.map((a) => {
+      // Serialize each row from the store as it is now, not the pre-await
+      // object: coloring by property replaces stubs without moving
+      // contentRevision (no analysis input depends on color), so the snapshot
+      // check above cannot see it.
+      const resolve = annotationStore.getAnnotationOrStubFromId;
+      const annotations = page.map((captured) => {
+        const a = resolve(captured.id) ?? captured;
         let centroid: { x: number; y: number };
         if (isHydratedAnnotation(a)) {
           const n = a.coordinates.length || 1;

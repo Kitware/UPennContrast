@@ -3941,6 +3941,34 @@ describe("stub-only mode", () => {
       expect(result.annotations.map((a: any) => a.id)).toEqual(["s2"]);
     });
 
+    it("reports a color changed during the name fetch", async () => {
+      // Coloring by property replaces stubs without bumping contentRevision
+      // (no analysis input depends on color), so the rows must be read from
+      // the store after the await rather than from the pre-await snapshot.
+      mockMain.annotationsAPI.hydrateAnnotations = vi.fn(
+        async (ids: string[]) => {
+          const stub = mockAnnotations.annotationStubs.get("s1");
+          mockAnnotations.annotationStubs.set("s1", {
+            ...stub,
+            color: "#00ff00",
+          });
+          return ids.map((id) => makeAnnotation({ id, name: `name-${id}` }));
+        },
+      );
+      const { result } = await executeAgentTool(
+        "list_annotations",
+        { query: { tags: ["nucleus"] } },
+        context,
+      );
+      expect(result.annotations[0]).toMatchObject({
+        id: "s1",
+        color: "#00ff00",
+      });
+      expect(mockMain.annotationsAPI.hydrateAnnotations).toHaveBeenCalledTimes(
+        1,
+      );
+    });
+
     it("gives up with an error when annotations keep changing", async () => {
       mockMain.annotationsAPI.hydrateAnnotations = vi.fn(async () => {
         mockAnnotations.contentRevision++;

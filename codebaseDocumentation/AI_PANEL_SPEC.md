@@ -902,7 +902,9 @@ Analysis reads the dataset, not the viewport:
   An unrelated change (the revision is global) neither refetches nor fails —
   *"keeps the result when a change leaves the query's matches unchanged"*.
   `list_annotations` does the same around its name fetch —
-  *"re-reads the page when annotations change during the name fetch"*.
+  *"re-reads the page when annotations change during the name fetch"*. Rows are
+  serialized from the store after that await, so a recolor (which does not move
+  the revision) is not lost — *"reports a color changed during the name fetch"*.
 - Property paths come from the fetched values, not the 512-document sample, so
   a property computed on a subset is still summarized —
   *"get_property_values finds a property the path sample missed"*,

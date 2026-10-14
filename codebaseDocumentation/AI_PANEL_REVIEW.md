@@ -426,3 +426,34 @@ Kidney (protein) dataset in stub-only mode, running the fixed and the pre-fix
 - The local Girder image predates master's `annotation_property/batch` and the
   summary `shapes` field, so property definitions were loaded through a
   page-only shim and `get_annotation_summary` was not exercised.
+
+---
+
+# PR #1405 — Codex round 2 (2026-10-14, head dddb2f0b)
+
+## [S2-1] currentFrameOnly queries don't re-check the frame across the await (P2)
+**Location:** `src/agent/executors.ts` `queryAnnotations` (reads `main.xy/z/time`)
+**Status:** by-design — declined with the user (2026-10-14)
+
+If the user changes XY/Z/time during a value fetch or name hydrate, the result
+describes the frame that was current when the tool was called. That is the
+frame the request was about, and the ids, values and rows all belong to it, so
+the answer is internally consistent; each `list_annotations` row also reports
+its own `location`. Tracking the frame would instead let a navigation in the
+middle of a request change which frame the answer is about. (When the content
+revision does move, the re-resolution uses the then-current frame, so a
+mid-request navigation plus an edit answers for the new frame.)
+
+## [S2-2] list_annotations returned a color stale since before the name fetch (P2)
+**Location:** `src/agent/executors.ts` `list_annotations`
+**Status:** fixed
+
+`applyColorAssignment` (color by property, and its clear) replaces stubs
+without bumping `contentRevision`, deliberately, because no analysis input
+depends on color. So the snapshot check accepted a page whose captured stub
+objects predated a recolor. Rows are now serialized from
+`getAnnotationOrStubFromId` after the await, which also covers any other
+mutation that doesn't move the revision. Test: "reports a color changed during
+the name fetch". Swept the other awaiting tools: the analysis tools read tags
+through the resolver after their await, and the query/mutation tools don't
+await before reading.
