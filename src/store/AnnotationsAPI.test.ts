@@ -185,6 +185,8 @@ describe("AnnotationsAPI.fetchAnnotationSummary", () => {
     expect(result).toEqual({
       total: 0,
       tags: [],
+      shapes: [],
+      channels: [],
       properties: [
         {
           path: ["p", "Area"],

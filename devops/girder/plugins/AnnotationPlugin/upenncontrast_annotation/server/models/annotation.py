@@ -20,6 +20,7 @@ from ..helpers.aggregation import (
     AGGREGATION_MAX_TIME_MS,
     prefetchedDocuments,
 )
+from ..helpers.constants import ANNOTATIONS_REMOVED_EVENT, MAX_IDS_PER_QUERY
 from ..helpers.colormaps import (
     CONTINUOUS_COLORMAPS,
     DEFAULT_COLORMAP,
@@ -202,16 +203,33 @@ class Annotation(AccessControlMixin, ProxiedModel):
 
     def annotationRemovedEvent(self, event):
         if event.info and event.info["_id"]:
-            events.trigger(
-                "model.upenn_annotation.removeStringIds", [event.info["_id"]]
-            )
+            events.trigger(ANNOTATIONS_REMOVED_EVENT, [event.info["_id"]])
 
     def multipleAnnotationsRemovedEvent(self, event):
-        if event.info and len(event.info) > 0:
-            annotationStringIds = event.info
-            events.trigger(
-                "model.upenn_annotation.removeStringIds", annotationStringIds
-            )
+        if not event.info:
+            return
+        # Bulk delete passes string ids; the subscribers query ObjectId
+        # fields, where a string $in silently matches nothing. Convert here,
+        # once, so every subscriber gets ObjectIds (single delete already
+        # sends one). This fires before the annotations are removed.
+        annotationIds = [ObjectId(str(i)) for i in event.info]
+        for start in range(0, len(annotationIds), MAX_IDS_PER_QUERY):
+            # Chunked so each subscriber's $in stays under MongoDB's 16 MiB
+            # command limit (the connection cleanup sends the list twice).
+            # Only ids of annotations that exist go out: the REST delete
+            # checks access on the datasets of existing annotations, so a
+            # dangling id must not let the cleanup reach another dataset's
+            # orphaned connections or property values.
+            existingIds = [
+                annotation["_id"] for annotation in self.find(
+                    {"_id": {"$in": annotationIds[
+                        start:start + MAX_IDS_PER_QUERY
+                    ]}},
+                    fields=["_id"],
+                )
+            ]
+            if existingIds:
+                events.trigger(ANNOTATIONS_REMOVED_EVENT, existingIds)
 
     def initialize(self):
         self.name = "upenn_annotation"
@@ -221,7 +239,8 @@ class Annotation(AccessControlMixin, ProxiedModel):
             self.cleanOrphaned,
         )
         # Cleaning the database when annotations are removed is done by a
-        # custom event: model.upenn_annotation.removeStringIds
+        # custom event, ANNOTATIONS_REMOVED_EVENT, triggered by both
+        # emitters above with the ObjectIds of the annotations being removed.
         events.bind(
             "model.upenn_annotation.remove",
             "upenn.connections.annotationRemovedEvent",
@@ -1103,7 +1122,8 @@ class Annotation(AccessControlMixin, ProxiedModel):
     def summarize(self, datasetId, filters, propertyPaths):
         """Aggregate statistics over the annotations matching `filters`.
 
-        Returns {total, tags: [{tag, count}] (count desc, then tag), and
+        Returns {total, tags: [{tag, count}], shapes: [{shape, count}] and
+        channels: [{channel, count}] (each count desc, then key), and
         properties: [{path, count, mean, std, min, max}]} — one entry per
         requested path, in request order. `count` is the number of matching
         annotations holding a NUMERIC value at the path; non-numeric, NaN
@@ -1116,13 +1136,14 @@ class Annotation(AccessControlMixin, ProxiedModel):
         complement (`_idSelector`), as the gate resolver does: a broad
         filter that keeps most of a 700K dataset would otherwise ship a
         dataset-sized `$in` twice. Annotation-field-only filters skip the
-        property-value join, so the tag facet runs on them directly and only
-        the statistics need the ids.
+        property-value join, so the composition facets run on them
+        directly and only the statistics need the ids.
 
         Without any filter the statistics run over every property-value
         document of the dataset, so a value document orphaned by a deleted
-        annotation counts until the removal hook cleans it (excluding them
-        would cost a second full scan per request).
+        annotation counts (excluding them would cost a second full scan per
+        request). Deletes clean up their values, but orphans written before
+        bulk-delete cleanup was fixed (#1243) stay until purged.
         """
         selector = None
         matchingIds = None
@@ -1139,20 +1160,41 @@ class Annotation(AccessControlMixin, ProxiedModel):
 
         pipeline = self._buildListMatchStages(datasetId, facetFilters)
         pipeline.append({"$facet": {
-            "total": [{"$count": "count"}],
             "tags": [
                 {"$unwind": "$tags"},
                 {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
                 {"$sort": {"count": -1, "_id": 1}},
             ],
+            # Shapes and channels ride the same scan as the tags: separate
+            # count-by-field queries would each re-read every annotation in
+            # the dataset (there is no datasetId+shape/channel index). The
+            # shape facet also gives the total (every annotation lands in one
+            # shape group, a missing shape in the null group), so no separate
+            # $count facet is needed.
+            "shapes": [
+                {"$group": {"_id": "$shape", "count": {"$sum": 1}}},
+                {"$sort": {"count": -1, "_id": 1}},
+            ],
+            "channels": [
+                {"$group": {"_id": "$channel", "count": {"$sum": 1}}},
+                {"$sort": {"count": -1, "_id": 1}},
+            ],
         }})
         facets = next(self._aggregate(self.collection, pipeline))
-        total = facets["total"][0]["count"] if facets["total"] else 0
+        total = sum(doc["count"] for doc in facets["shapes"])
         return {
             "total": total,
             "tags": [
                 {"tag": doc["_id"], "count": doc["count"]}
                 for doc in facets["tags"]
+            ],
+            "shapes": [
+                {"shape": doc["_id"], "count": doc["count"]}
+                for doc in facets["shapes"]
+            ],
+            "channels": [
+                {"channel": doc["_id"], "count": doc["count"]}
+                for doc in facets["channels"]
             ],
             "properties": self._propertyStats(
                 datasetId, selector, matchingIds, propertyPaths, total

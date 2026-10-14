@@ -1,4 +1,14 @@
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
+
+// A timestamp from stored data may be missing (e.g. a dataset view created
+// through the REST API carries no lastViewed). date-fns `format` throws
+// "RangeError: Invalid time value" on such dates, which during a render
+// takes the whole component down, so these helpers return "" instead.
+function toValidDate(timestamp: number | undefined | null): Date | null {
+  if (timestamp == null) return null;
+  const date = new Date(timestamp);
+  return isValid(date) ? date : null;
+}
 
 export function formatDate(d: Date): string {
   const year = d.getFullYear();
@@ -21,26 +31,24 @@ export function formatDateString(dateString: string) {
   }
 }
 
-export function formatDateNumber(timestamp: number) {
-  const date = new Date(timestamp).toLocaleString();
-  try {
-    return format(date, "MMM d, yyyy h:mm a");
-  } catch (e) {
-    return date;
-  }
+export function formatDateNumber(timestamp?: number | null): string {
+  const date = toValidDate(timestamp);
+  return date ? format(date, "MMM d, yyyy h:mm a") : "";
 }
 
 // Short calendar day, dropping the year when it matches the current year.
 // e.g. "Apr 24" (current year) or "Apr 24, 2024" (other years).
-export function formatDayShort(timestamp: number): string {
-  const date = new Date(timestamp);
+export function formatDayShort(timestamp?: number | null): string {
+  const date = toValidDate(timestamp);
+  if (!date) return "";
   const sameYear = date.getFullYear() === new Date().getFullYear();
   return format(date, sameYear ? "MMM d" : "MMM d, yyyy");
 }
 
 // Time of day in 12-hour format with AM/PM, e.g. "10:50 AM".
-export function formatTimeOfDay(timestamp: number): string {
-  return format(new Date(timestamp), "h:mm a");
+export function formatTimeOfDay(timestamp?: number | null): string {
+  const date = toValidDate(timestamp);
+  return date ? format(date, "h:mm a") : "";
 }
 
 export function formatDuration(milliseconds: number): string {

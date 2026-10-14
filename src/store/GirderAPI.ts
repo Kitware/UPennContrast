@@ -53,6 +53,7 @@ import { logError, logWarning } from "@/utils/log";
 import { markRaw } from "vue";
 import { inferZStepFromDimensionLabelsUm } from "@/utils/dimensionLabels";
 import { BATCH_RESOURCES_CHUNK_SIZE } from "@/store/constants";
+import { pixelSizeFromTileInfo } from "@/utils/scales";
 import { IRawImageData, parseRawTiff } from "@/utils/tiff";
 
 // Modern browsers limit concurrency to a single domain at 6 requests (though
@@ -119,6 +120,17 @@ function mergeBatchKind<K extends keyof IBatchResourcesResult>(
   if (source[kind]) {
     target[kind] = Object.assign({}, target[kind], source[kind]);
   }
+}
+
+// POST dataset_view/set_public. Views and collections owned by other users
+// are left unchanged and counted as skipped.
+export interface ISetDatasetPublicResult {
+  dataset: string;
+  public: boolean;
+  datasetViewsUpdated: number;
+  configurationsUpdated: number;
+  datasetViewsSkipped: number;
+  configurationsSkipped: number;
 }
 
 export default class GirderAPI {
@@ -483,18 +495,13 @@ export default class GirderAPI {
       return null;
     }
     const scale = Math.min(1, maxDim / Math.max(regionWidth, regionHeight));
-    const params: { [key: string]: number | string } = {
-      ...region,
-      units: "base_pixels",
-      frame,
-      encoding: "TIFF",
-      tiffCompression: "raw",
-    };
+    const params: { [key: string]: number } = { ...region, frame };
     if (scale < 1) {
       params.width = Math.round(regionWidth * scale);
       params.height = Math.round(regionHeight * scale);
     }
-    const response = await this.client.get(`item/${itemId}/tiles/region`, {
+    // Not tiles/region: its TIFF encoding divides 16-bit samples down to 8
+    const response = await this.client.get(`item/${itemId}/raw_region`, {
       params,
       responseType: "arraybuffer",
     });
@@ -757,7 +764,10 @@ export default class GirderAPI {
     return response.data;
   }
 
-  async setDatasetPublic(datasetId: string, isPublic: boolean) {
+  async setDatasetPublic(
+    datasetId: string,
+    isPublic: boolean,
+  ): Promise<ISetDatasetPublicResult> {
     const response = await this.client.post("dataset_view/set_public", null, {
       params: {
         datasetId,
@@ -1341,12 +1351,7 @@ export function getDatasetCompatibility(
 export function getDatasetScales(dataset: IDataset): IScales {
   const scales = exampleConfigurationBase().scales;
   const tileInfo = dataset.anyImage()?.tileinfo;
-  if (tileInfo) {
-    scales.pixelSize = {
-      value: (tileInfo.mm_x + tileInfo.mm_y) / 2,
-      unit: "mm",
-    };
-  }
+  scales.pixelSize = pixelSizeFromTileInfo(tileInfo?.mm_x, tileInfo?.mm_y);
   const zStepUm = inferZStepFromDimensionLabelsUm(dataset.dimensionLabels);
   if (zStepUm !== null && zStepUm > 0) {
     scales.zStep = {

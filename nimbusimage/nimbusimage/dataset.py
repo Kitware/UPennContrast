@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
+
+import girder_client
 
 from nimbusimage.annotations import AnnotationAccessor
 from nimbusimage.collections import CollectionAccessor
@@ -27,8 +28,10 @@ from nimbusimage.urls import (
     open_url,
 )
 
-if TYPE_CHECKING:
-    import girder_client
+# exampleConfigurationBase().scales.pixelSize in src/store/model.ts: the
+# app's default when a configuration has no scales.
+_PLACEHOLDER_PIXEL_SIZE = {"value": 1, "unit": "m"}
+_KNOWN_UNITS = {"m", "mm", "um", "µm", "micron", "microns", "nm"}
 
 
 class Dataset:
@@ -132,12 +135,39 @@ class Dataset:
         return self._tiles.get("channels", [])
 
     @property
-    def pixel_size(self) -> PixelSize:
+    def pixel_size(self) -> PixelSize | None:
+        """Physical size of one pixel, or None when it is unknown.
+
+        Read the way the app reads it: the caller's view scales over the
+        dataset's configuration scales (``collections.scales``), which the
+        app seeds from the file's calibration and the user can edit. Without
+        a configuration, the file's own ``mm_x``. What the app stores for
+        "no calibration" counts as unknown: 0 or null (``getDatasetScales``
+        on a file without ``mm_x``) or its 1 m placeholder.
+        """
+        try:
+            configured = self.collections.scales.get("pixelSize") or {}
+        except girder_client.HttpError as error:
+            # The view is readable but its configuration is not (or is
+            # gone): use the file's calibration. Anything else, such as a
+            # server error, must not silently swap in different units.
+            if error.status not in (403, 404):
+                raise
+            configured = {}
+        value, unit = configured.get("value"), configured.get("unit")
+        # A file without mm_x makes the app store 0, or null (NaN), and a
+        # configuration without scales gets the 1 m placeholder.
+        if (
+            isinstance(value, (int, float)) and value > 0
+            and unit in _KNOWN_UNITS
+            and configured != _PLACEHOLDER_PIXEL_SIZE
+        ):
+            return PixelSize(value=value, unit=unit)
         self._ensure_metadata()
         mm_x = self._tiles.get("mm_x")
         if mm_x is not None:
             return PixelSize(value=mm_x, unit="mm")
-        return PixelSize(value=1.0, unit="um")
+        return None
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -375,26 +405,26 @@ class Dataset:
         return MultiSourceConfiguration(**result)
 
     def _invalidate_cache(self) -> None:
-        """Drop the lazily-fetched metadata after the folder changes."""
+        """Drop the lazily-fetched metadata after the folder changes,
+        including the view/configuration and frame map derived from it."""
         self._tiles = None
         self._item_id = None
         self._folder_data = None
+        self.collections.refresh()
+        self.images._frame_map = None
 
     # --- URLs ---
 
     def _get_view_id(self) -> str | None:
-        """Get the first dataset view ID for this dataset."""
-        views = self.collections.list_views()
-        if views:
-            return views[0].get("_id")
-        return None
+        """The default view's ID (the caller's own view, if any), looked
+        up fresh so a view created since the settings were cached counts."""
+        view = self.collections.default_view()
+        return view.get("_id") if view else None
 
     def _get_config_id(self) -> str | None:
-        """Get the first configuration ID for this dataset."""
-        views = self.collections.list_views()
-        if views:
-            return views[0].get("configurationId")
-        return None
+        """The default view's configuration ID, looked up fresh."""
+        view = self.collections.default_view()
+        return view.get("configurationId") if view else None
 
     def info_url(self) -> str:
         """URL for the dataset info page."""

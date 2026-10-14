@@ -55,6 +55,12 @@
           </div>
         </template>
       </span>
+      <div
+        v-if="item.key === 'pixelSize' && !pixelSizeKnown"
+        class="text-caption text-medium-emphasis mt-1 unknown-pixel-size-hint"
+      >
+        {{ unknownPixelSizeHint }}
+      </div>
     </v-list-item>
     <v-list-item>
       <pixel-scale-bar-setting class="mx-2" />
@@ -83,6 +89,7 @@ import {
 
 import { convertLength, convertTime } from "@/utils/conversion";
 import { getDatasetScales } from "@/store/GirderAPI";
+import { isKnownPixelSize } from "@/utils/scales";
 
 import ColorPickerMenu from "@/components/ColorPickerMenu.vue";
 import PixelScaleBarSetting from "@/components/PixelScaleBarSetting.vue";
@@ -102,12 +109,26 @@ const props = withDefaults(
 
 const viewScales = computed(() => store.viewScales);
 
-const scales = computed(() => {
-  if (props.configurationOnly) {
-    return store.configurationScales;
-  }
-  return { ...store.configurationScales, ...viewScales.value };
-});
+// The store's normalized scales, so a legacy placeholder in a per-user view
+// override (e.g. {1, "m"} from an old Reset from dataset) is edited as the
+// unknown marker it is, not converted into a real size. The raw viewScales
+// only says whether an override exists.
+const scales = computed(() =>
+  props.configurationOnly ? store.configurationScales : store.scales,
+);
+
+const pixelSizeKnown = computed(() => isKnownPixelSize(scales.value.pixelSize));
+
+// "Unknown" also covers configurations created before the dataset's tile
+// metadata was read, so the file may be calibrated after all.
+const unknownPixelSizeHint = computed(
+  () =>
+    "No physical pixel size is set. Enter one to show a distance scale bar " +
+    "and measure in physical units" +
+    (props.configurationOnly
+      ? "."
+      : ", or use Reset from dataset if the image file is calibrated."),
+);
 
 const scaleItems = computed<IScaleItem[]>(() => {
   const items: IScaleItem[] = [];
@@ -220,6 +241,7 @@ function getUnitValues(unit: IScaleItem["unit"]) {
 
 defineExpose({
   scales,
+  pixelSizeKnown,
   scaleItems,
   scalebarColor,
   defaultSaveScale,

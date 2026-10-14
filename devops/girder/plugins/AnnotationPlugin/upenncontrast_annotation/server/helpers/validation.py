@@ -80,6 +80,10 @@ MAX_SUMMARY_PROPERTY_PATHS = 200
 MAX_DISTINCT_VALUES = 20_000
 MAX_DISTINCT_SEARCH_LENGTH = 200
 
+# Property ids one POST /annotation_property/batch request may resolve. A
+# configuration holds a few dozen properties at most.
+MAX_PROPERTY_IDS = 10_000
+
 
 def requireCountWithin(count, limit, name):
     """Raise RestException(400) if `count` exceeds `limit`."""
@@ -110,6 +114,27 @@ def requireList(value, field):
     if not isinstance(value, list):
         raise RestException("%s must be a list" % field, code=400)
     return value
+
+
+def requireBulkCreateBody(body, model, itemName):
+    """Validate a bulk-create request body and convert its id fields.
+
+    The body must be a list of JSON objects, and each object's id fields (the
+    model schema's `objectId` properties) must parse as ObjectIds. A non-list
+    body or non-dict entry would otherwise trip AttributeError/TypeError in
+    convertIdsToObjectIds; a malformed hex id raises bson.InvalidId and a
+    non-string id (a JSON number) raises TypeError. All are a 400, not a 500.
+    A null id is not rejected here: ObjectId(None) mints a fresh id. A null
+    datasetId is then refused by the dataset access check, but other id
+    fields (e.g. a connection's parentId) are not checked for existence.
+    Returns the entries with their ids converted in place."""
+    requireList(body, "Request body")
+    for entry in body:
+        requireObjectBody(entry, "Each %s" % itemName)
+    try:
+        return model.convertIdsToObjectIds(body)
+    except (InvalidId, TypeError):
+        raise RestException("Invalid id in %s" % itemName, code=400)
 
 
 def validateAnnotationIdCount(count):
@@ -644,3 +669,40 @@ def validateListInputs(filters, sort=None, propertyPaths=None):
             )
     if propertyPaths is not None:
         validatePropertyPaths(propertyPaths)
+
+
+# Logical operators a caller-supplied find query may combine clauses with.
+# Every other top-level operator is refused: $expr, $where and $jsonSchema
+# can each read any field of the document.
+QUERY_LOGICAL_OPERATORS = ("$and", "$or", "$nor")
+
+
+def requireQueryOnFields(query, allowedFields, name="query"):
+    """Raise RestException(400) unless every field `query` matches on is one
+    of `allowedFields` (or a subfield of one).
+
+    A find query evaluates against the raw document, so a match on a field
+    the response filter hides still reveals its value through which
+    documents come back: {"access.users.id": X} lists every readable folder
+    shared with user X. Restricting queries to the fields the caller would
+    see closes that oracle. Values are not inspected: operators inside a
+    field's value ($in, $elemMatch, ...) only reach that field's subtree."""
+    if not isinstance(query, dict):
+        raise RestException("%s must be a JSON object" % name, code=400)
+    for key, value in query.items():
+        if key in QUERY_LOGICAL_OPERATORS:
+            # Mongo also rejects an empty list, as a 500 at iteration time.
+            if not isinstance(value, list) or not value:
+                raise RestException(
+                    "%s.%s must be a non-empty list" % (name, key), code=400
+                )
+            for clause in value:
+                requireQueryOnFields(clause, allowedFields, name)
+        elif key.startswith("$"):
+            raise RestException(
+                "%s may not use the %s operator" % (name, key), code=400
+            )
+        elif key.split(".", 1)[0] not in allowedFields:
+            raise RestException(
+                "%s may not match on the field %s" % (name, key), code=400
+            )

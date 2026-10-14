@@ -16,6 +16,7 @@ from ..helpers.validation import (
     MAX_DISTINCT_SEARCH_LENGTH,
     MAX_DISTINCT_VALUES,
     isValidPropertyPath,
+    requireBulkCreateBody,
     requireInt,
     requireList,
     requireObjectBody,
@@ -92,11 +93,11 @@ class PropertyValues(Resource):
         )
     )
     def addMultiple(self, params):
-        body = requireList(self.getBodyJson(), "Request body")
-        for entry in body:
-            requireObjectBody(entry, "Each property value entry")
-        propertyValuesList = self._annotationPropertyValuesModel.\
-            convertIdsToObjectIds(body)
+        propertyValuesList = requireBulkCreateBody(
+            self.getBodyJson(),
+            self._annotationPropertyValuesModel,
+            "property value entry",
+        )
         datasetIds = {
             entry["datasetId"]
             for entry in propertyValuesList

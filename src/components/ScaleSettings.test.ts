@@ -40,9 +40,11 @@ vi.mock("@/utils/conversion", () => ({
   convertTime: vi.fn().mockReturnValue(60),
 }));
 
+import { normalizeScales } from "@/utils/scales";
 import ScaleSettings from "./ScaleSettings.vue";
 import store from "@/store/index";
 import { getDatasetScales } from "@/store/GirderAPI";
+import { convertLength } from "@/utils/conversion";
 
 function mountComponent(props = {}) {
   return mount(ScaleSettings, {
@@ -72,6 +74,15 @@ describe("ScaleSettings", () => {
       zStep: { value: 1, unit: "nm" },
       tStep: { value: 1, unit: "s" },
     };
+    // Mirrors the real getter: view over configuration, normalized.
+    Object.defineProperty(store, "scales", {
+      configurable: true,
+      get: () =>
+        normalizeScales({
+          ...(store as any).configurationScales,
+          ...(store as any).viewScales,
+        }),
+    });
     (store as any).scalebarColor = "#ffffff";
     (getDatasetScales as any).mockReturnValue({
       pixelSize: { value: 0.5, unit: "mm" },
@@ -146,5 +157,61 @@ describe("ScaleSettings", () => {
     const vm = wrapper.vm as any;
     vm.resetFromDataset("pixelSize");
     expect(getDatasetScales).not.toHaveBeenCalled();
+  });
+
+  it("hints that the pixel size is unknown only when it is", () => {
+    (store as any).configurationScales = {
+      pixelSize: { value: 0, unit: "mm" },
+      zStep: { value: 1, unit: "nm" },
+      tStep: { value: 1, unit: "s" },
+    };
+    const unknown = mountComponent();
+    expect((unknown.vm as any).pixelSizeKnown).toBe(false);
+    expect(unknown.find(".unknown-pixel-size-hint").exists()).toBe(true);
+    expect(unknown.find(".unknown-pixel-size-hint").text()).toContain(
+      "Reset from dataset",
+    );
+    // The collection-only editor has no Reset from dataset button.
+    expect(
+      mountComponent({ configurationOnly: true })
+        .find(".unknown-pixel-size-hint")
+        .text(),
+    ).not.toContain("Reset from dataset");
+
+    (store as any).configurationScales = {
+      pixelSize: { value: 0.65, unit: "µm" },
+      zStep: { value: 1, unit: "nm" },
+      tStep: { value: 1, unit: "s" },
+    };
+    const known = mountComponent();
+    expect((known.vm as any).pixelSizeKnown).toBe(true);
+    expect(known.find(".unknown-pixel-size-hint").exists()).toBe(false);
+  });
+
+  it("keeps a unit picked for an unknown pixel size in the collection editor", async () => {
+    // The real getter, not the mock: normalization used to replace
+    // {0, "µm"} with {0, "mm"}, snapping the unit selector back.
+    const { normalizeScales } = await import("@/utils/scales");
+    (store as any).configurationScales = normalizeScales({
+      pixelSize: { value: 0, unit: "µm" },
+      zStep: { value: 1, unit: "nm" },
+      tStep: { value: 1, unit: "s" },
+    });
+    const vm = mountComponent({ configurationOnly: true }).vm as any;
+    expect(vm.scales.pixelSize).toEqual({ value: 0, unit: "µm" });
+    expect(vm.pixelSizeKnown).toBe(false);
+  });
+
+  it("edits a legacy 1 m view override as unknown instead of converting it", () => {
+    (store as any).viewScales = { pixelSize: { value: 1, unit: "m" } };
+    const vm = mountComponent().vm as any;
+    expect(vm.scales.pixelSize).toEqual({ value: 0, unit: "mm" });
+    expect(vm.pixelSizeKnown).toBe(false);
+
+    // Picking µm used to convert (and persist) the placeholder's 1 m as a
+    // real 1,000,000 µm; now it converts the unknown marker's 0.
+    // (convertLength is mocked, so assert its input, not its output.)
+    vm.setUnitValueForItem(vm.scaleItems[0], "µm");
+    expect(convertLength).toHaveBeenCalledWith(0, "mm", "µm");
   });
 });

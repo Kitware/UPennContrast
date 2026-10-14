@@ -137,3 +137,12 @@ def testAccessControl(self, admin, user):
             level=AccessType.WRITE
         )
 ```
+
+## The first user is a site admin
+
+Girder makes the first user created in a fresh test database a site
+admin, and a site admin holds ADMIN on every document. A fixture like
+`makeUser("owner")` that runs before `admin` silently produces an admin
+"owner", and an access test then passes or fails for the wrong reason.
+Make custom user fixtures depend on `admin` (as pytest-girder's `user`
+does), and never use `admin` as the actor in a permission-limit test.

@@ -1,13 +1,28 @@
+import logging
+
 from girder.api import access
-from girder.api.describe import Description, describeRoute
+from girder.api.describe import Description, autoDescribeRoute, describeRoute
 from girder.constants import AccessType, TokenScope
-from girder.api.rest import Resource, loadmodel
-from ..helpers.validation import requireObjectBody
+from girder.api.rest import Resource, filtermodel, loadmodel
+from girder.models.folder import Folder
+from girder_jobs.models.job import Job
+from ..helpers import validation
+from ..helpers.validation import (
+    requireCountWithin,
+    requireList,
+    requireObjectBody,
+    requireObjectId,
+)
 from ..models.property import AnnotationProperty as PropertyModel
 from ..models.collection import Collection as CollectionModel
 from girder.exceptions import RestException, AccessException
 from bson import ObjectId
 from bson.errors import InvalidId
+
+
+MAX_COMPUTE_PROPERTIES = 100
+
+logger = logging.getLogger(__name__)
 
 
 class AnnotationProperty(Resource):
@@ -22,6 +37,8 @@ class AnnotationProperty(Resource):
         self.route("GET", (), self.getAllProperties)
         self.route("GET", ("count",), self.count)
         self.route("POST", (), self.create)
+        self.route("POST", ("batch",), self.getBatch)
+        self.route("POST", ("compute",), self.computeMultiple)
         self.route("PUT", (":id",), self.update)
         self.route(
             "POST",
@@ -47,7 +64,7 @@ class AnnotationProperty(Resource):
                 "The dataset for whose annotations "
                 "the property should be computed"
             ),
-            required=False,
+            required=True,
         )
         .param(
             "body",
@@ -55,22 +72,172 @@ class AnnotationProperty(Resource):
             paramType="body",
         )
     )
-    @loadmodel(
-        model="annotation_property",
-        plugin="upenncontrast_annotation",
-        level=AccessType.READ,
-    )
-    def compute(self, annotation_property, params):
-        datasetId = params.get("datasetId", None)
-        if datasetId and id:
-            return self._propertyModel.compute(
-                annotation_property,
-                datasetId,
-                requireObjectBody(self.getBodyJson(), "Parameters"),
-            )
-        return {}
+    def compute(self, id, params):
+        propertyId = requireObjectId(id, "id")
+        parameters = requireObjectBody(self.getBodyJson(), "Parameters")
+        datasetId = requireObjectId(params.get("datasetId"), "datasetId")
+        return self._computeProperties(
+            datasetId, [propertyId], {str(propertyId): parameters}
+        )[0]["jobs"]
 
     @access.user(scope=TokenScope.DATA_WRITE)
+    @describeRoute(
+        Description("Compute multiple properties for one dataset")
+        .param(
+            "body",
+            "Dataset id and property computation requests",
+            paramType="body",
+        )
+    )
+    def computeMultiple(self, params):
+        body = requireObjectBody(self.getBodyJson())
+        datasetId = requireObjectId(body.get("datasetId"), "datasetId")
+        requests = requireList(body.get("properties", []), "properties")
+        requireCountWithin(
+            len(requests), MAX_COMPUTE_PROPERTIES, "properties"
+        )
+
+        propertyIds = []
+        parametersById = {}
+        for request in requests:
+            request = requireObjectBody(request, "each property request")
+            propertyId = requireObjectId(request.get("id"), "property id")
+            propertyKey = str(propertyId)
+            if propertyKey in parametersById:
+                raise RestException(
+                    "property ids must be unique", code=400
+                )
+            propertyIds.append(propertyId)
+            parametersById[propertyKey] = requireObjectBody(
+                request.get("parameters"), "property parameters"
+            )
+
+        return self._computeProperties(
+            datasetId, propertyIds, parametersById
+        )
+
+    def _computeProperties(self, datasetId, propertyIds, parametersById):
+        """Schedule one compute job per property, in request order, after
+        checking dataset WRITE, property access and every property's
+        definition. All or nothing: an invalid later property is rejected
+        before anything is scheduled, and a failure scheduling one (a broker
+        error) cancels the jobs already queued for the earlier ones. Shared
+        by the single and batch endpoints."""
+        currentUser = self.getCurrentUser()
+        Folder().load(
+            datasetId,
+            user=currentUser,
+            level=AccessType.WRITE,
+            exc=True,
+        )
+        properties = self._loadComputableProperties(propertyIds, currentUser)
+        try:
+            for annotationProperty in properties:
+                self._propertyModel.validateCompute(annotationProperty)
+        except ValueError as error:
+            raise RestException(str(error), code=400) from error
+
+        submissions = []
+        try:
+            for annotationProperty in properties:
+                propertyKey = str(annotationProperty["_id"])
+                submissions.append({
+                    "propertyId": propertyKey,
+                    "jobs": self._propertyModel.compute(
+                        annotationProperty,
+                        str(datasetId),
+                        parametersById[propertyKey],
+                    ),
+                })
+        except Exception:
+            # The caller gets an error and never learns these job ids, so it
+            # could neither track nor cancel them, and a retry would run
+            # them twice. Cancel them best-effort, then re-raise the
+            # original error.
+            for submission in submissions:
+                for job in filter(None, submission["jobs"]):
+                    try:
+                        Job().cancelJob(job)
+                    except Exception:
+                        logger.exception(
+                            "Could not cancel compute job %s for property %s",
+                            job.get("_id"),
+                            submission["propertyId"],
+                        )
+            raise
+        return submissions
+
+    def _loadComputableProperties(self, propertyIds, user):
+        """The properties with these ids, in request order. A property is
+        computable by a caller who can read it through its own ACL (only
+        its creator is ever on it) or through a configuration that
+        references it -- the rule `get` applies, so a collaborator on a
+        shared dataset can compute the properties they can see."""
+        propertiesById = {
+            annotationProperty["_id"]: annotationProperty
+            for annotationProperty in self._propertyModel.find(
+                {"_id": {"$in": propertyIds}}
+            )
+        }
+        missing = [
+            str(propertyId)
+            for propertyId in propertyIds
+            if propertyId not in propertiesById
+        ]
+        if missing:
+            raise RestException(
+                "No such property: %s" % ", ".join(missing), code=404
+            )
+
+        unreadable = {
+            str(propertyId)
+            for propertyId, annotationProperty in propertiesById.items()
+            if not self._propertyModel.hasAccess(
+                annotationProperty, user=user, level=AccessType.READ
+            )
+        }
+        if unreadable:
+            unreadable -= self._readableThroughConfigurations(
+                unreadable, user
+            )
+        if unreadable:
+            raise AccessException(
+                "Read access denied for property %s"
+                % ", ".join(sorted(unreadable))
+            )
+        return [propertiesById[propertyId] for propertyId in propertyIds]
+
+    def _readableThroughConfigurations(self, propertyIds, user):
+        """The subset of these property ids (strings, as
+        meta.propertyIds stores them) that some configuration readable by
+        the user references -- the rule that makes a property readable.
+        One query; only meta.propertyIds is projected, since configurations
+        carry layers, tools and snapshots and many can list the same
+        property. The permission check is part of the query, unaffected by
+        the projection."""
+        requested = set(propertyIds)
+        return {
+            propertyId
+            for config in CollectionModel().findWithPermissions(
+                {"meta.propertyIds": {"$in": sorted(requested)}},
+                user=user,
+                level=AccessType.READ,
+                fields=["meta.propertyIds"],
+            )
+            for propertyId in config["meta"]["propertyIds"]
+            if propertyId in requested
+        }
+
+    def _propertyBody(self):
+        """The request body reduced to the client-owned fields. Anything
+        else -- `access`, `public`, or the `_id`/`_modelType` an exported
+        property carries -- is dropped, so a caller cannot set the ACL of
+        the property they create or update."""
+        return self._propertyModel.filterUpdateFields(
+            requireObjectBody(self.getBodyJson()))
+
+    @access.user(scope=TokenScope.DATA_WRITE)
+    @filtermodel(model=PropertyModel)
     @describeRoute(
         Description("Create a new property").param(
             "body", "Property Object", paramType="body"
@@ -80,7 +247,7 @@ class AnnotationProperty(Resource):
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException("User not found", "currentUser")
-        return self._propertyModel.create(currentUser, self.getBodyJson())
+        return self._propertyModel.create(currentUser, self._propertyBody())
 
     @describeRoute(
         Description("Delete an existing property")
@@ -116,13 +283,11 @@ class AnnotationProperty(Resource):
         level=AccessType.WRITE,
     )
     def update(self, annotation_property, params):
-        filtered = self._propertyModel.filterUpdateFields(
-            self.getBodyJson()
-        )
-        annotation_property.update(filtered)
+        annotation_property.update(self._propertyBody())
         self._propertyModel.save(annotation_property)
 
     @access.public(scope=TokenScope.DATA_READ)
+    @filtermodel(model=PropertyModel)
     @describeRoute(
         Description("Search for properties")
         .responseClass("property")
@@ -196,6 +361,41 @@ class AnnotationProperty(Resource):
         return {"count": count}
 
     @access.public(scope=TokenScope.DATA_READ)
+    @filtermodel(model=PropertyModel)
+    @autoDescribeRoute(
+        Description("Get several properties by id (READ OPERATION via POST)")
+        .notes(
+            "POST avoids URL length limits. Returns the readable properties "
+            "in request order; ids that do not exist or that no "
+            "configuration readable by the caller references are omitted."
+        )
+        .jsonParam(
+            "body", 'Object with "ids": a list of property ids.',
+            paramType="body", requireObject=True,
+        )
+    )
+    def getBatch(self, body):
+        propertyIds = requireList(body.get("ids"), "ids")
+        requireCountWithin(
+            # Read through the module so tests can lower the cap.
+            len(propertyIds), validation.MAX_PROPERTY_IDS, "ids"
+        )
+        objectIds = [requireObjectId(pid, "ids") for pid in propertyIds]
+        idStrings = [str(oid) for oid in objectIds]
+
+        readable = self._readableThroughConfigurations(
+            idStrings, self.getCurrentUser()
+        )
+        props = {
+            str(prop["_id"]): prop
+            for prop in self._propertyModel.find({"_id": {"$in": [
+                oid for oid in objectIds if str(oid) in readable
+            ]}})
+        }
+        return [props[pid] for pid in idStrings if pid in props]
+
+    @access.public(scope=TokenScope.DATA_READ)
+    @filtermodel(model=PropertyModel)
     @describeRoute(
         Description("Get a property by its id.").param(
             "id", "The annotation property's id", paramType="path"
@@ -219,21 +419,12 @@ class AnnotationProperty(Resource):
         # ACLs, exc=True raises exception if not found)
         prop = self._propertyModel.load(propertyId, force=True, exc=True)
 
-        # 3. Check if user has READ access to ANY configuration that
-        # references this property.
-        # Note: CollectionSchema defines propertyIds as strings, so we pass
-        # 'id' directly.
-        accessible_configs = CollectionModel().findWithPermissions(
-            {'meta.propertyIds': id},
-            user=user,
-            level=AccessType.READ,
-            limit=1  # Optimization: We only need to know if ONE exists
-        )
-
-        # 4. If the cursor is empty, access is denied
-        if accessible_configs.count() == 0:
-            # If the user is anonymous and fails check, usually 401 is better,
-            # but 403 or 404 is standard for "hidden" items.
+        # 3. The user must be able to READ some configuration that
+        # references this property; otherwise access is denied (403 or 404
+        # is standard for "hidden" items).
+        if str(propertyId) not in self._readableThroughConfigurations(
+            [str(propertyId)], user
+        ):
             raise AccessException(f'Read access denied for property {id}')
 
         return prop
