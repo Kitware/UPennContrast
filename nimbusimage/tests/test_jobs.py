@@ -49,30 +49,72 @@ class TestJobProperties:
 class TestJobRefresh:
     def test_refresh_updates_status(self):
         gc = MagicMock()
-        gc.get.side_effect = [
-            {"_id": "j1", "status": STATUS_SUCCESS, "title": "Done"},
-            [],  # log response
-        ]
+        gc.get.return_value = {
+            "_id": "j1", "status": STATUS_SUCCESS, "title": "Done",
+        }
         job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
         job.refresh()
         assert job.status == STATUS_SUCCESS
 
-    def test_refresh_fetches_log(self):
+    def test_refresh_reads_log_from_job_document(self):
+        """girder_jobs returns the log inside GET job/{id}; there is no
+        job/{id}/log route, so asking for one left job.log always empty.
+        """
         gc = MagicMock()
-        gc.get.side_effect = [
-            {"_id": "j1", "status": STATUS_SUCCESS},
-            ["line 1", "line 2"],
-        ]
+        gc.get.return_value = {
+            "_id": "j1",
+            "status": STATUS_SUCCESS,
+            "log": ["line 1\n", "line 2\n"],
+        }
         job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
         job.refresh()
-        assert "line 1" in job.log
-        assert "line 2" in job.log
+        assert job.log == "line 1\nline 2\n"
+        gc.get.assert_called_once_with("job/j1")
+
+    def test_refresh_redacts_tokens(self):
+        # A worker's launch line carries a live Girder token; it must not
+        # reach a terminal or a model through job.log or job.wait().
+        token = (
+            "6g18cliYHP4RaujW68NBQPscNrg214NVqUJaBDhaEeF8JQ8VFuUqoAsqdCz060mi"
+        )
+        digest = "0123456789abcdef" * 4
+        gc = MagicMock()
+        gc.get.return_value = {"_id": "j1", "status": STATUS_SUCCESS, "log": [
+            f"Running container: args: ['--token', '{token}', '--x']\n",
+            f"pulled sha256:{digest}, dataset 6accce3ebabab1576b6bdaf8\n",
+        ]}
+        job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
+        job.refresh()
+        assert token not in job.log
+        assert "'--token', '[redacted]', '--x'" in job.log
+        # Hex digests and ObjectIds are not secrets
+        assert digest in job.log and "6accce3ebabab1576b6bdaf8" in job.log
+
+    def test_init_reads_log_from_job_data(self):
+        # client.job(id) builds the Job from a full GET job/{id} document;
+        # its log must be readable without a second request.
+        token = "aB" * 32
+        gc = MagicMock()
+        job = Job(gc, {
+            "_id": "j1",
+            "status": STATUS_SUCCESS,
+            "log": [f"--token {token}\n", "done\n"],
+        })
+        assert job.log == "--token [redacted]\ndone\n"
+        gc.get.assert_not_called()
+
+    def test_refresh_without_log_field(self):
+        gc = MagicMock()
+        gc.get.return_value = {"_id": "j1", "status": STATUS_RUNNING}
+        job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
+        job.refresh()
+        assert job.log == ""
 
 
 class TestJobScopeError:
     """NIM-005: a 401 from job/{id} usually means the API key lacks the
-    'core.user_auth' scope, not that the job is missing. Re-raise with a
-    message that names the real culprit instead of the raw Girder 401.
+    'List and read jobs' scope, not that the job is missing. Re-raise with
+    a message that names the real culprit instead of the raw Girder 401.
     """
 
     def _http_error(self, status):
@@ -85,21 +127,66 @@ class TestJobScopeError:
             method="GET",
         )
 
-    def test_refresh_401_names_user_auth_scope(self):
+    def test_refresh_401_names_full_access_key(self):
         gc = MagicMock()
         gc.get.side_effect = self._http_error(401)
         job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
 
-        with pytest.raises(PermissionError, match="core.user_auth"):
+        with pytest.raises(PermissionError, match="Allow all actions"):
             job.refresh()
 
-    def test_wait_401_names_user_auth_scope(self):
+    def test_refresh_401_names_list_and_read_jobs_scope(self):
         gc = MagicMock()
         gc.get.side_effect = self._http_error(401)
         job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
 
-        with pytest.raises(PermissionError, match="core.user_auth"):
+        with pytest.raises(PermissionError, match="List and read jobs"):
+            job.refresh()
+
+    def test_wait_401_names_full_access_key(self):
+        gc = MagicMock()
+        gc.get.side_effect = self._http_error(401)
+        job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
+
+        with pytest.raises(PermissionError, match="Allow all actions"):
             job.wait(verbose=False)
+
+    def _girder_401(self, allowed):
+        import json
+        from girder_client import HttpError
+
+        return HttpError(
+            status=401,
+            text=json.dumps({
+                "message": "Invalid token scope.\nRequired: "
+                f"jobs.job_j1.\nAllowed: {allowed}",
+                "type": "access",
+            }),
+            url="job/j1",
+            method="GET",
+        )
+
+    def test_refresh_401_with_scopes_names_list_and_read_jobs(self):
+        gc = MagicMock()
+        gc.get.side_effect = self._girder_401(
+            "core.data.read core.data.write"
+        )
+        job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
+
+        with pytest.raises(PermissionError, match="List and read jobs"):
+            job.refresh()
+
+    def test_refresh_401_without_scopes_blames_token_not_scope(self):
+        # Expired, revoked or missing tokens also get a 401, but Girder
+        # lists no allowed scopes; naming a permission there misleads.
+        gc = MagicMock()
+        gc.get.side_effect = self._girder_401("")
+        job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
+
+        with pytest.raises(PermissionError) as info:
+            job.refresh()
+        assert "did not accept this session's token" in str(info.value)
+        assert "List and read jobs" not in str(info.value)
 
     def test_refresh_non_401_propagates_unchanged(self):
         from girder_client import HttpError
@@ -118,7 +205,6 @@ class TestJobWait:
         gc = MagicMock()
         gc.get.side_effect = [
             {"_id": "j1", "status": STATUS_SUCCESS},
-            [],
         ]
         job = Job(gc, {"_id": "j1", "status": STATUS_SUCCESS})
         assert job.wait(verbose=False) is True
@@ -127,7 +213,6 @@ class TestJobWait:
         gc = MagicMock()
         gc.get.side_effect = [
             {"_id": "j1", "status": STATUS_ERROR},
-            [],
         ]
         job = Job(gc, {"_id": "j1", "status": STATUS_ERROR})
         assert job.wait(verbose=False) is False
@@ -138,10 +223,8 @@ class TestJobWait:
         gc.get.side_effect = [
             # First poll: running
             {"_id": "j1", "status": STATUS_RUNNING},
-            [],
             # Second poll: success
             {"_id": "j1", "status": STATUS_SUCCESS},
-            [],
         ]
         job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
         result = job.wait(poll_interval=1.0, verbose=False)
@@ -154,7 +237,6 @@ class TestJobWait:
         gc = MagicMock()
         gc.get.side_effect = [
             {"_id": "j1", "status": STATUS_RUNNING},
-            [],
         ] * 10  # keep returning running
         mock_monotonic.side_effect = [0.0, 0.0, 11.0]  # start, check, timeout
 

@@ -211,6 +211,10 @@ job.log           # str: job log output
 
 Status codes: 0=inactive, 1=queued, 2=running, **3=success**, 4=error, 5=cancelled. Note: status 3 is SUCCESS, not "still running" — easy to confuse.
 
+### When you can't see what a job is doing
+
+A `PermissionError` from `refresh()` / `wait()` means the API key lacks **"List and read jobs"**. The job still runs; the key just can't watch it. The user should add that permission to the key if they can edit it, or ask the server's admin (support, for nimbusimage.com) to; a full-access key also works. Meanwhile, confirm the job ran by checking its outputs. See "Can't see a job's status ≠ the job didn't run" in `references/gotchas.md`.
+
 ## Rate limits (HTTP 429)
 
 The production server (app.nimbusimage.com) rate-limits worker submissions from this client, per
@@ -309,5 +313,6 @@ values = ds.properties.get_values()
 - The `connect_to` dict must always include `"tags"` — use `{"tags": []}` for no connections.
 - Property workers require the property to be created and registered before running.
 - `job.wait()` blocks the Python process. For long-running workers, consider non-blocking polling.
+- A `PermissionError` while polling means the key lacks "List and read jobs", not that the job didn't run.
 
 For worker-related accessor signatures, read `references/api-overview.md`. Before submitting work, read `references/gotchas.md`, especially exact interface keys and job status codes.
