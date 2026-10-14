@@ -1,6 +1,13 @@
-"""Bearer API key -> Girder session token, as an MCP TokenVerifier.
+"""Bearer credential -> Girder session token, as an MCP TokenVerifier.
 
-Plan: codebaseDocumentation/NIMBUSIMAGE_MCP_SERVER.md §6.1-6.2.
+Plan: codebaseDocumentation/NIMBUSIMAGE_MCP_SERVER.md §6.1-6.3.
+
+Two credentials are accepted (``NimbusVerifier`` picks by shape):
+
+- A Girder API key (below), for Claude Code and Pro/Max header connectors.
+- An OAuth access token (``nio_...``) issued by the Girder plugin
+  ``nimbus_mcp_oauth`` (``GirderOAuthVerifier``), for connectors that sign
+  users in, such as Team and Enterprise orgs.
 
 A client sends ``Authorization: Bearer <Girder API key>``. The verifier
 exchanges the key for a Girder session token (``POST api_key/token``)
@@ -24,6 +31,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import re
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -206,3 +214,92 @@ class GirderApiKeyVerifier:
                 "login": session.login,
             },
         )
+
+
+# --- OAuth access tokens -------------------------------------------------
+
+# nimbus_mcp_oauth's access tokens: "nio_" + 43 base64url characters. The
+# underscore never occurs in a Girder key or token, so the shapes cannot
+# collide.
+OAUTH_PREFIX = "nio_"
+OAUTH_TOKEN_RE = re.compile(r"nio_[A-Za-z0-9\-_]{43}")
+INTROSPECTION_HEADER = "X-Mcp-Introspection-Secret"
+
+
+class GirderOAuthVerifier:
+    """Resolve an OAuth access token through the plugin's introspection
+    endpoint, on every request: there is no cache, so a disconnected
+    client, a disabled account or a revoked token fails on its next call.
+    Each request costs one Girder call, as the API-key session check does.
+
+    The plugin answers 404 when it is off or the shared secret is wrong;
+    both refuse the token (401) and log a warning, since either is a
+    deployment mistake rather than a bad token.
+    """
+
+    def __init__(
+        self,
+        api_url: str,
+        secret: str,
+        http: httpx.AsyncClient | None = None,
+    ):
+        self._url = f"{api_url.rstrip('/')}/mcp_oauth/introspect"
+        self._secret = secret
+        self._http = http or httpx.AsyncClient(timeout=30)
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        if not OAUTH_TOKEN_RE.fullmatch(token):
+            return None
+        for attempt in range(CHECK_ATTEMPTS):
+            response = await self._http.post(
+                self._url, data={"token": token},
+                headers={INTROSPECTION_HEADER: self._secret},
+            )
+            if response.status_code not in TRANSIENT_STATUSES:
+                break
+            await asyncio.sleep(0.25 * 2 ** attempt)
+        if response.status_code == 404:
+            log.warning(
+                "OAuth introspection answered 404: the mcp_oauth plugin is "
+                "off, or NI_MCP_INTROSPECTION_SECRET does not match its "
+                "mcp_oauth.introspection_secret setting"
+            )
+            return None
+        response.raise_for_status()
+        info = response.json()
+        if not info.get("active"):
+            return None
+        return AccessToken(
+            token=_key_hash(token),
+            client_id=str(info["client_id"]),
+            scopes=str(info.get("scope", "")).split(),
+            expires_at=int(info["exp"]),
+            # The SDK compares this with the server's own URL (audience):
+            # a token issued for another MCP server is refused.
+            resource=info["resource"],
+            subject=str(info["sub"]),
+            claims={
+                "girder_token": info["girder_token"],
+                "login": str(info.get("username", "")),
+            },
+        )
+
+
+class NimbusVerifier:
+    """Route a bearer credential to the verifier for its kind."""
+
+    def __init__(
+        self,
+        api_keys: GirderApiKeyVerifier,
+        oauth: GirderOAuthVerifier | None = None,
+    ):
+        self._api_keys = api_keys
+        self._oauth = oauth
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        if token.startswith(OAUTH_PREFIX):
+            # Without a secret configured, OAuth is off here.
+            if self._oauth is None:
+                return None
+            return await self._oauth.verify_token(token)
+        return await self._api_keys.verify_token(token)

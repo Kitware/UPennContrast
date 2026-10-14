@@ -69,12 +69,14 @@ NI_API_URL=http://localhost:8080/api/v1 nimbusimage-mcp/.venv/bin/nimbusimage-mc
 | `NI_API_URL` | `http://localhost:8080/api/v1` | Girder REST root the server calls |
 | `NI_MCP_HOST` / `NI_MCP_PORT` | `127.0.0.1` / `8000` | Where it listens (the image uses `0.0.0.0`) |
 | `NI_MCP_PUBLIC_URL` | `http://localhost:<port>/mcp` | This server's public URL (the OAuth resource id) |
-| `NI_MCP_ISSUER_URL` | `http://localhost:8080` | Advertised authorization server (Girder) |
+| `NI_MCP_ISSUER_URL` | `http://localhost:8080` | Advertised authorization server: the `nimbus_mcp_oauth` plugin's `mcp_oauth.issuer` (the site's bare origin) |
+| `NI_MCP_INTROSPECTION_SECRET` | unset | Shared with the plugin's `mcp_oauth.introspection_secret` (32+ characters). Unset: OAuth tokens are refused and only API keys work |
 | `NI_MCP_CALL_LOG` | unset | JSON-lines call log (tool, user id, arguments, seconds, bytes, error), for evals. The server log has the same records without arguments or error messages (only the kind of error) |
 | `NI_MCP_MAX_JOB_WAIT` | `240` | Longest `ni_job_wait` (and cap on a worker-interface fetch, at most 60 s), in seconds, at least 1; keep it under every HTTP timeout in front of the server. Each request to Girder separately times out after 330 s (behind a proxy with a shorter timeout, such as HAProxy, the client sees the proxy's timeout first) |
 
 `NI_API_KEY` and `NI_TOKEN` must **not** be set: the server refuses to start
-with a service credential.
+with a service credential. (The introspection secret is not one: it only
+lets this service ask Girder who a token belongs to.)
 
 ## Connecting Claude Code
 
@@ -114,6 +116,19 @@ survive overnight. Shut it down afterwards and recreate `mcp` without the
 overrides. Results: the plan's "Phase 2 results".
 
 ## How auth works
+
+Two kinds of bearer credential:
+
+- **A Girder API key** (Claude Code, and Pro/Max connectors with a fixed
+  header), described below.
+- **An OAuth access token** (`nio_…`) from the `nimbus_mcp_oauth` Girder
+  plugin, for connectors that sign each user in (Team and Enterprise
+  orgs). The server asks the plugin's introspection endpoint about it on
+  every request, so a disconnected client or disabled account fails on
+  its next call; the token must have been issued for this server's URL
+  (`NI_MCP_PUBLIC_URL`), or it is refused.
+
+For API keys:
 
 - `Authorization: Bearer <key>` is exchanged with `POST api_key/token` and the
   session is cached by SHA-256 of the key until an hour before it expires, so a

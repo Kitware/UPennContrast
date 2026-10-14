@@ -192,6 +192,20 @@ def test_settings_refuse_a_nonpositive_job_wait():
             Settings.from_env({"NI_MCP_MAX_JOB_WAIT": value})
 
 
+def test_settings_introspection_secret():
+    from nimbusimage_mcp.config import Settings
+    from nimbusimage_mcp.server import build_verifier
+    with pytest.raises(ValueError, match="at least 32"):
+        Settings.from_env({"NI_MCP_INTROSPECTION_SECRET": "short"})
+    secret = "s" * 40
+    settings = Settings.from_env({"NI_MCP_INTROSPECTION_SECRET": secret})
+    assert settings.introspection_secret == secret
+    assert secret not in repr(settings)
+    assert build_verifier(settings)._oauth is not None
+    # Unset: OAuth is off and only API keys are accepted.
+    assert build_verifier(Settings.from_env({}))._oauth is None
+
+
 def test_known_scale_drops_placeholders():
     assert datasets.known_scale({"value": 1, "unit": "m"}) is None
     assert datasets.known_scale({"value": 0, "unit": "mm"}) is None

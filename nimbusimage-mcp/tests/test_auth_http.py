@@ -17,7 +17,9 @@ import pytest
 import nimbusimage as ni
 
 from nimbusimage_mcp import _common
-from nimbusimage_mcp.auth import GirderApiKeyVerifier
+from nimbusimage_mcp.auth import (
+    GirderApiKeyVerifier, GirderOAuthVerifier, NimbusVerifier,
+)
 from nimbusimage_mcp.server import build_app
 
 from conftest import make_settings, serve
@@ -34,11 +36,16 @@ def girder():
     return fake
 
 
+OAUTH = "nio_" + "B" * 43
+
+
 @pytest.fixture
 def server(girder):
     settings = make_settings()
-    app = build_app(settings, GirderApiKeyVerifier(
-        API, settings.public_url, http=girder.http()
+    app = build_app(settings, NimbusVerifier(
+        GirderApiKeyVerifier(API, settings.public_url, http=girder.http()),
+        GirderOAuthVerifier(API, girder.introspection_secret,
+                            http=girder.http()),
     ))
     with serve(app) as url:
         yield url
@@ -59,6 +66,44 @@ def test_rejects_bad_credentials(server, girder):
     assert response.status_code == 401
     # The challenge points clients at the protected resource metadata.
     assert "resource_metadata=" in response.headers["www-authenticate"]
+
+
+def test_oauth_tokens_act_as_their_user(server, girder, monkeypatch):
+    girder.add_oauth(OAUTH, "carol")
+    tokens = []
+
+    def connect(api_url, token):
+        tokens.append(token)
+        fake = MagicMock()
+        fake.list_datasets.return_value = []
+        return fake
+
+    monkeypatch.setattr(_common.ni, "connect", connect)
+    call_tool(server, OAUTH, "ni_datasets_list", {})
+    (token,) = tokens
+    assert girder.tokens[token]["user"]["login"] == "carol"
+
+
+def test_oauth_rejections_are_401(server, girder):
+    tools_list = ("tools/list", {})
+    # Unknown, then revoked.
+    assert rpc(server, *tools_list, key=OAUTH).status_code == 401
+    girder.add_oauth(OAUTH, "carol")
+    assert rpc(server, *tools_list, key=OAUTH).status_code == 200
+    girder.oauth[OAUTH] = {"active": False}
+    assert rpc(server, *tools_list, key=OAUTH).status_code == 401
+
+
+def test_token_for_another_mcp_server_is_refused(server, girder):
+    # Audience: the plugin issued it for a different resource.
+    girder.add_oauth(OAUTH, "carol", resource="https://other.example/mcp")
+    assert rpc(server, "tools/list", {}, key=OAUTH).status_code == 401
+
+
+def test_expired_oauth_token_is_refused(server, girder):
+    girder.add_oauth(OAUTH, "carol")
+    girder.oauth[OAUTH]["exp"] = 1
+    assert rpc(server, "tools/list", {}, key=OAUTH).status_code == 401
 
 
 def test_protected_resource_metadata_is_public(server):

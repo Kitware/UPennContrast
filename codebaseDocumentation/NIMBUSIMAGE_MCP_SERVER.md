@@ -348,8 +348,17 @@ The verifier accepts two credential types:
    returns the user, client, scopes, `resource`, and the Girder session token to use. Set
    `AccessToken.resource` from the grant so the SDK's resource check works.
 
-The verifier tries the cheap check first by token shape, then falls back to the other.
-Anything that fails both returns `None`, which the SDK turns into a 401.
+**Built (Phase 3, 2026-10-14):** `NimbusVerifier` in `nimbusimage-mcp/nimbusimage_mcp/auth.py`
+routes by shape with no fallback: a `nio_` token goes to `GirderOAuthVerifier`, everything
+else to the API-key verifier (which only accepts letters and digits, so the two cannot
+cross). OAuth tokens are introspected on **every** request (`POST mcp_oauth/introspect` with
+the `X-Mcp-Introspection-Secret` header from `NI_MCP_INTROSPECTION_SECRET`), with no cache:
+one Girder call per request, as the API-key session check costs, and a disconnected client
+or disabled account fails on its next call. Without the secret configured, OAuth tokens are
+refused and only API keys work. A 404 from introspection (plugin off or secret mismatch) is
+a 401 plus a warning; an outage is a server error. `AccessToken.resource` comes from the
+grant, so the SDK's audience check refuses a token issued for another MCP server. Anything
+refused returns `None`, which the SDK turns into a 401.
 
 ### 6.2 Side effects to plan for
 
@@ -697,9 +706,9 @@ Phase 2 tunnel with a Team or Enterprise org.
   `src/store/GirderAPI.ts`, not in the component, per `CLAUDE.md`.
 - The built-in public client `nimbusimage-claude` (done).
 
-**Progress:** the plugin is built and reviewed (two independent review rounds; see
-[6.3](#63-girder-oauth-plugin)). Next: the MCP server's verifier (`nio_` tokens via
-introspection, setting `AccessToken.resource` from the response), then the consent page.
+**Progress:** the plugin is built and reviewed (four independent review rounds; see
+[6.3](#63-girder-oauth-plugin)), and the MCP server accepts its tokens
+([6.1](#61-token-verifier-in-the-mcp-server)). Next: the consent page, then end to end.
 
 **Tests:**
 
@@ -905,7 +914,18 @@ the local stack. Add an item whenever a review finds something this list missed.
       the cache (integration). *"test_revoked_key_rejected_live"*,
       *"test_deactivated_key_rejected_live"*, *"test_deleted_key_stops_working_at_once"*
 - [x] A Girder outage is a server error, not "bad key".
-      *"test_girder_outage_is_an_error_not_a_bad_key"*
+      *"test_girder_outage_is_an_error_not_a_bad_key"*,
+      *"test_introspection_outage_is_an_error_not_a_bad_token"*
+- [x] OAuth access tokens act as their user, are introspected on every request (no
+      cache: a disconnected client fails at once), and API keys keep working beside them.
+      *"test_oauth_tokens_act_as_their_user"*, *"test_oauth_is_checked_on_every_request"*,
+      *"test_api_keys_still_work_alongside_oauth"*
+- [x] Unknown, revoked, expired, malformed, and other-server (audience) OAuth tokens are
+      401; without the shared secret OAuth is off, and a wrong secret warns without
+      logging it. *"test_oauth_rejections_are_401"*, *"test_token_for_another_mcp_server_is_refused"*,
+      *"test_expired_oauth_token_is_refused"*, *"test_malformed_oauth_tokens_never_reach_girder"*,
+      *"test_oauth_refused_without_secret_or_with_a_wrong_one"*,
+      *"test_settings_introspection_secret"*
 - [x] The server refuses to start with a service credential in its environment.
       *"test_settings_refuse_a_service_credential"*
 - [x] Credentials are never logged; the log names the user id. The server log carries

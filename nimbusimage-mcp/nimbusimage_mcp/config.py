@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -22,7 +22,8 @@ class Settings:
     # base of /.well-known/oauth-protected-resource.
     public_url: str
     # Advertised as the authorization server in the protected resource
-    # metadata. Phase 1 has no OAuth server; this is Girder's public root.
+    # metadata: the nimbus_mcp_oauth plugin's issuer (its mcp_oauth.issuer
+    # setting), the site's bare origin.
     issuer_url: str
     host: str = "127.0.0.1"
     port: int = 8000
@@ -31,6 +32,10 @@ class Settings:
     # ni_job_wait's longest wait. Must stay below every HTTP timeout
     # between the client and this server (client, HAProxy).
     max_job_wait: float = 240.0
+    # Shared with the nimbus_mcp_oauth plugin (its
+    # mcp_oauth.introspection_secret). Unset: OAuth tokens are refused and
+    # only API keys work. Not a user credential; kept out of repr.
+    introspection_secret: str | None = field(default=None, repr=False)
 
     @classmethod
     def from_env(cls, environ=os.environ) -> "Settings":
@@ -44,6 +49,11 @@ class Settings:
         if not math.isfinite(max_job_wait) or max_job_wait < 1:
             raise ValueError("NI_MCP_MAX_JOB_WAIT must be at least 1 second.")
         host = environ.get("NI_MCP_HOST", "127.0.0.1")
+        secret = environ.get("NI_MCP_INTROSPECTION_SECRET") or None
+        if secret is not None and len(secret) < 32:
+            raise ValueError(
+                "NI_MCP_INTROSPECTION_SECRET must be at least 32 characters."
+            )
         return cls(
             api_url=environ.get(
                 "NI_API_URL", "http://localhost:8080/api/v1"
@@ -58,4 +68,5 @@ class Settings:
             port=port,
             call_log=environ.get("NI_MCP_CALL_LOG") or None,
             max_job_wait=max_job_wait,
+            introspection_secret=secret,
         )

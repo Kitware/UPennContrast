@@ -1,7 +1,8 @@
 """The NimbusImage MCP server: stateless streamable HTTP at /mcp.
 
-Every request must carry ``Authorization: Bearer <Girder API key>``;
-tools then run as that user (see auth.py). The SDK answers requests
+Every request must carry ``Authorization: Bearer <credential>``, a Girder
+API key or an OAuth access token from the nimbus_mcp_oauth plugin; tools
+then run as that user (see auth.py). The SDK answers requests
 without a valid key with 401 and serves the protected resource metadata
 at /.well-known/oauth-protected-resource/mcp.
 
@@ -16,11 +17,14 @@ import sys
 
 import uvicorn
 from mcp.server import MCPServer
+from mcp.server.auth.provider import TokenVerifier
 from mcp.server.auth.settings import AuthSettings
 from starlette.applications import Starlette
 
 from nimbusimage_mcp import _common
-from nimbusimage_mcp.auth import GirderApiKeyVerifier
+from nimbusimage_mcp.auth import (
+    GirderApiKeyVerifier, GirderOAuthVerifier, NimbusVerifier,
+)
 from nimbusimage_mcp.config import Settings
 from nimbusimage_mcp.tools import TOOLS
 
@@ -36,8 +40,19 @@ INSTRUCTIONS = (
 )
 
 
+def build_verifier(settings: Settings) -> NimbusVerifier:
+    oauth = None
+    if settings.introspection_secret:
+        oauth = GirderOAuthVerifier(
+            settings.api_url, settings.introspection_secret
+        )
+    return NimbusVerifier(
+        GirderApiKeyVerifier(settings.api_url, settings.public_url), oauth
+    )
+
+
 def build_server(
-    settings: Settings, verifier: GirderApiKeyVerifier | None = None
+    settings: Settings, verifier: TokenVerifier | None = None
 ) -> MCPServer:
     _common.configure(settings)
     # The SDK logs each failed tool call's message at INFO ("Tool X
@@ -49,9 +64,7 @@ def build_server(
     mcp = MCPServer(
         name="nimbusimage",
         instructions=INSTRUCTIONS,
-        token_verifier=verifier or GirderApiKeyVerifier(
-            settings.api_url, settings.public_url
-        ),
+        token_verifier=verifier or build_verifier(settings),
         auth=AuthSettings(
             issuer_url=settings.issuer_url,
             resource_server_url=settings.public_url,
@@ -66,7 +79,7 @@ def build_server(
 
 
 def build_app(
-    settings: Settings, verifier: GirderApiKeyVerifier | None = None
+    settings: Settings, verifier: TokenVerifier | None = None
 ) -> Starlette:
     return build_server(settings, verifier).streamable_http_app(
         stateless_http=True, json_response=True, host=settings.host

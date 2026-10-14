@@ -205,3 +205,74 @@ def test_cache_is_bounded(girder, monkeypatch):
 
     run(all_keys())
     assert len(v._cache) == 3
+
+
+# --- OAuth access tokens --------------------------------------------------
+
+OAUTH = "nio_" + "A" * 43
+
+
+def oauth_verifier(girder: FakeGirder, secret=None) -> auth.NimbusVerifier:
+    oauth = auth.GirderOAuthVerifier(
+        API, secret or girder.introspection_secret, http=girder.http())
+    return auth.NimbusVerifier(verifier(girder), oauth)
+
+
+def test_oauth_token_resolves_through_introspection(girder):
+    user = girder.add_oauth(OAUTH, "carol")
+    access = run(oauth_verifier(girder).verify_token(OAUTH))
+    assert access.subject == user["_id"]
+    assert access.claims["login"] == "carol"
+    assert girder.tokens[access.claims["girder_token"]]["user"] == user
+    assert access.client_id == "nimbusimage-claude"
+    assert access.scopes == ["nimbusimage"]
+    assert access.resource == RESOURCE
+    assert OAUTH not in access.model_dump_json()
+
+
+def test_oauth_is_checked_on_every_request(girder):
+    girder.add_oauth(OAUTH, "carol")
+    v = oauth_verifier(girder)
+
+    async def calls():
+        first = await v.verify_token(OAUTH)
+        girder.oauth[OAUTH] = {"active": False}  # disconnected
+        return first, await v.verify_token(OAUTH)
+
+    first, second = run(calls())
+    assert first is not None and second is None
+    assert girder.introspections == 2
+    # Neither path touched the API-key endpoints.
+    assert girder.exchanges == 0 and girder.checks == 0
+
+
+def test_oauth_refused_without_secret_or_with_a_wrong_one(girder, caplog):
+    girder.add_oauth(OAUTH, "carol")
+    no_oauth = auth.NimbusVerifier(verifier(girder))
+    assert run(no_oauth.verify_token(OAUTH)) is None
+    assert girder.introspections == 0
+    with caplog.at_level("WARNING"):
+        assert run(oauth_verifier(girder, secret="w" * 40)
+                   .verify_token(OAUTH)) is None
+    assert "answered 404" in caplog.text
+    assert "w" * 40 not in caplog.text
+
+
+def test_malformed_oauth_tokens_never_reach_girder(girder):
+    v = oauth_verifier(girder)
+    for token in ("nio_short", "nio_" + "A" * 44, "nio_" + "!" * 43):
+        assert run(v.verify_token(token)) is None
+    assert girder.introspections == 0
+
+
+def test_api_keys_still_work_alongside_oauth(girder):
+    access = run(oauth_verifier(girder).verify_token(KEY))
+    assert access.claims["login"] == "alice"
+    assert girder.introspections == 0
+
+
+def test_introspection_outage_is_an_error_not_a_bad_token(girder):
+    girder.add_oauth(OAUTH, "carol")
+    girder.fail_with = 500
+    with pytest.raises(httpx.HTTPStatusError):
+        run(oauth_verifier(girder).verify_token(OAUTH))

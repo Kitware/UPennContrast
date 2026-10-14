@@ -76,6 +76,9 @@ services:
       NI_MCP_ISSUER_URL: "${NI_MCP_ISSUER_URL-http://localhost:${GIRDER_PORT-8080}}"
       # Keep under every proxy timeout in front (a Cloudflare tunnel: 100 s)
       NI_MCP_MAX_JOB_WAIT: "${NI_MCP_MAX_JOB_WAIT-240}"
+      # Shared with the nimbus_mcp_oauth plugin's
+      # mcp_oauth.introspection_secret; unset means API keys only.
+      NI_MCP_INTROSPECTION_SECRET: "${NI_MCP_INTROSPECTION_SECRET-}"
     ports:
       - "${MCP_PORT-8001}:8000"
     depends_on:

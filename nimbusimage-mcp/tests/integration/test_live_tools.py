@@ -190,6 +190,9 @@ def test_live_worker_run_and_wait(live):
         done = call_tool(url, key, "ni_job_wait",
                          {"job_id": job["job_id"], "timeout_seconds": 180})
         assert done["succeeded"], done
+        # Every worker job logs at least its container start (with its
+        # token redacted by nimbusimage).
+        assert done["log_tail"].strip(), done
         assert ds.annotations.count(tags=[tag]) == 3
     finally:
         leftovers = ds.annotations.list(tags=[tag])
