@@ -181,12 +181,13 @@ class TestPropertyResponseFields:
                 assert "_accessLevel" not in doc, label
 
     def testZenodoArchiveDoesNotEmbedAccess(self, admin, user):
-        dataset, _, prop = createSharedProperty(admin, user)
+        dataset, config, prop = createSharedProperty(admin, user)
 
+        # The job exports the properties of the configurations its
+        # ownership check authorized (#1410), passed in as documents.
         archived = orjson.loads(zenodo_job._build_annotation_json(
             dataset["_id"], Annotation(), AnnotationConnection(),
-            Collection(), DatasetView(), AnnotationProperty(),
-            AnnotationPropertyValues(),
+            [config], AnnotationProperty(), AnnotationPropertyValues(),
         ))
         doc = next(
             p for p in archived["annotationProperties"]
