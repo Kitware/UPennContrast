@@ -8,10 +8,11 @@ themselves out of their own dataset — see
 
 This module installs a `model.folder.save` listener that rejects a save
 of a `contrastDataset` folder that takes the creator off ADMIN in
-`access.users`. Site admins can bypass the check (recovery path) and are
-the only way to move a dataset to another owner. A folder whose creator
-already lacked ADMIN before the save (damaged before this guard existed,
-or changed by a site admin) is left editable rather than frozen.
+`access.users`, or marks a folder a dataset without it. Site admins can
+bypass the check (recovery path) and are the only way to move a dataset
+to another owner. A dataset whose creator already lacked ADMIN before the
+save (damaged before this guard existed, or changed by a site admin) is
+left editable rather than frozen.
 """
 from bson import ObjectId
 
@@ -95,9 +96,10 @@ def require_creator_keeps_admin(folder, target_user, level):
 def _ensure_creator_admin_access(event):
     """model.folder.save listener that enforces creator-stays-ADMIN.
 
-    Only a save that removes the creator's ADMIN is refused: the stored
-    folder is compared, so one already missing it (a damaged dataset)
-    can still be renamed, shared or published by its other owners.
+    Only a save that removes the creator's ADMIN, or makes a folder a
+    dataset without it, is refused: the stored folder is compared, so a
+    dataset already missing it (a damaged one) can still be renamed,
+    shared or published by its other owners.
     """
     doc = event.info
     if not isinstance(doc, dict):
@@ -113,10 +115,15 @@ def _ensure_creator_admin_access(event):
     if _creator_has_admin(doc):
         return
     stored = Folder().findOne(
-        {"_id": doc["_id"]}, fields=["access"])
-    if stored is None or not _creator_has_admin(
-            {"creatorId": doc.get("creatorId"),
-             "access": stored.get("access")}):
+        {"_id": doc["_id"]}, fields=["access", "meta"])
+    if stored is None or (
+            _is_contrast_dataset(stored) and not _creator_has_admin(
+                {"creatorId": doc.get("creatorId"),
+                 "access": stored.get("access")})):
+        # Already a dataset missing the grant: this save didn't remove it.
+        # Becoming a dataset without it is refused, or clearing the
+        # subtype, demoting the creator and re-marking would get around
+        # the guard.
         return
 
     if _caller_is_site_admin_or_internal():

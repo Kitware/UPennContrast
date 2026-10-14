@@ -269,3 +269,28 @@ class TestCreatorGuardOnSharePaths:
         assertStatusOk(server.request(
             path=f"/folder/{dataset['_id']}", method="PUT", user=coOwner,
             params={"name": "renamed damaged dataset"}))
+
+    def testFolderCannotBecomeADatasetWithoutCreatorAdmin(
+            self, user, server):
+        """The damaged-dataset exception covers folders that were already
+        datasets. Otherwise clearing the subtype, demoting the creator and
+        re-importing the folder would get around the guard."""
+        from girder.models.user import User
+        coOwner = User().createUser(
+            "reimport", "password", "R", "Owner", "reimport@example.com")
+        plain = Folder().createFolder(
+            name="reimported", creator=user,
+            parent=utilities.namedFolder(user))
+        Folder().update({"_id": plain["_id"]}, {"$set": {"access.users": [
+            {"id": user["_id"], "level": AccessType.WRITE, "flags": []},
+            {"id": coOwner["_id"], "level": AccessType.ADMIN, "flags": []},
+        ]}})
+
+        resp = server.request(
+            path=f"/folder/{plain['_id']}/metadata", method="PUT",
+            user=coOwner, body=json.dumps({"subtype": "contrastDataset"}),
+            type="application/json")
+
+        assertStatus(resp, 400)
+        stored = Folder().load(plain["_id"], force=True)
+        assert "subtype" not in (stored.get("meta") or {})
