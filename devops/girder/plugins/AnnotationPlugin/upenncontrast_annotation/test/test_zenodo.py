@@ -472,6 +472,69 @@ class TestDiscardFromUploading:
         reloaded = pm.load(proj['_id'], force=True)
         assert reloaded['meta']['zenodo']['status'] == 'uploading'
 
+    def test_discard_refused_while_upload_initializing(self, server, admin):
+        """Between the upload endpoint's 'uploading' write and its jobId
+        write there is no job to check: fail closed (force overrides, as
+        for a project stuck from before job ids were recorded)."""
+        from girder_jobs.constants import JobStatus
+
+        pm, proj = self._uploadingProject(admin, "Initializing Upload Test")
+        # A previous upload's job, long finished, must not count either.
+        self._uploadJob(admin, proj, JobStatus.ERROR)
+        update_zenodo_meta(proj['_id'], {'jobId': None})
+
+        refused = server.request(
+            path=f"/zenodo/discard/{proj['_id']}",
+            method="POST", user=admin,
+        )
+        assertStatus(refused, 409)
+        forced = server.request(
+            path=f"/zenodo/discard/{proj['_id']}",
+            method="POST", user=admin, params={'force': 'true'},
+        )
+        assertStatusOk(forced)
+
+    def test_upload_clears_previous_job_id_with_status(
+        self, server, admin, monkeypatch
+    ):
+        """The 'uploading' write drops the previous upload's jobId in the
+        same update, so a discard in the window before the new id is
+        recorded can't mistake the old, ended job for this upload."""
+        from girder_jobs.models.job import Job as JobModel
+        from upenncontrast_annotation.server.api import zenodo as zenodoApi
+
+        pm = ProjectModel()
+        proj = pm.createProject(name="Clear Job Id Test", creator=admin)
+        update_zenodo_meta(proj['_id'], {
+            'status': 'error', 'jobId': '000000000000000000000000',
+        })
+        seen = []
+        original = JobModel.createLocalJob
+
+        def recordMetaAtJobCreation(self, *args, **kwargs):
+            meta = pm.load(proj['_id'], force=True)['meta']
+            seen.append(dict(meta['zenodo']))
+            return original(self, *args, **kwargs)
+
+        monkeypatch.setattr(
+            JobModel, 'createLocalJob', recordMetaAtJobCreation,
+        )
+        monkeypatch.setattr(
+            zenodoApi.Zenodo, '_getZenodoClient',
+            lambda self, user: MagicMock(),
+        )
+        monkeypatch.setattr(JobModel, 'scheduleJob', lambda self, job: job)
+
+        resp = server.request(
+            path="/zenodo/upload", method="POST", user=admin,
+            body=json.dumps({'projectId': str(proj['_id'])}),
+            type="application/json",
+        )
+
+        assertStatusOk(resp)
+        assert seen[0]['status'] == 'uploading'
+        assert seen[0]['jobId'] is None
+
     def test_discard_resets_stuck_upload(self, server, admin):
         """'uploading' whose job is no longer live (it died) can still be
         reset: that is what discarding from 'uploading' is for."""

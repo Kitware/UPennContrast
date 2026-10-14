@@ -26,7 +26,7 @@ from ..helpers.zenodo_client import (
 )
 from ..helpers.zenodo_job import (
     batch_load_project_data,
-    has_live_upload_job,
+    upload_may_be_running,
 )
 from ..models.collection import Collection as CollectionModel
 from ..models.project import Project as ProjectModel
@@ -230,6 +230,10 @@ class Zenodo(Resource):
         # duplicate uploads from concurrent requests
         update_zenodo_meta(project['_id'], {
             'status': 'uploading',
+            # In the same write: a discard before the new job is recorded
+            # must see "no job yet" (and refuse), not the previous upload's
+            # ended job.
+            'jobId': None,
             'progress': {
                 'current': 0,
                 'total': 0,
@@ -426,12 +430,13 @@ class Zenodo(Resource):
             )
 
         # 'uploading' is accepted so a project whose upload job died can be
-        # reset, but not while the job is alive: it is using the deposition,
-        # and a stale card in another tab can still ask. Girder never sweeps
-        # local jobs, so a job whose thread died in a restart stays RUNNING
-        # forever; `force` is the way out for that.
+        # reset, but not while an upload may be using the deposition (its
+        # job is live, or it is still starting): a stale card in another tab
+        # can still ask. Girder never sweeps local jobs, so a job whose
+        # thread died in a restart stays RUNNING forever; `force` is the way
+        # out for that.
         if (zenodo.get('status') == 'uploading' and not force
-                and has_live_upload_job(zenodo)):
+                and upload_may_be_running(zenodo)):
             raise RestException(
                 "An upload is in progress for this project.",
                 code=409,
