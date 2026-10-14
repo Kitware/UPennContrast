@@ -5,7 +5,6 @@ import re
 import orjson
 import cherrypy
 
-from bson.errors import InvalidId
 from bson.objectid import ObjectId
 
 from girder.api import access
@@ -33,6 +32,7 @@ from ..helpers.validation import (
     dropNoOpPropertyFilters,
     isFiniteNumber,
     isValidPropertyPath,
+    requireBulkCreateBody,
     requireCountWithin,
     requireFloat,
     requireInt,
@@ -155,6 +155,12 @@ def getDatasetIdFromAnnotationListInBody(self: "Annotation", *args, **kwargs):
     # For partial updates (e.g. updateMultiple), look up from DB
     annId = first.get("id") or first.get("_id")
     if annId:
+        # This runs in the @recordable wrapper, before the handler validates
+        # the body. load() already turns a malformed hex id into a 400, but a
+        # non-string id (a JSON number) would raise TypeError there: skip
+        # recording so the handler rejects it with a clean 400, not a 500.
+        if not isinstance(annId, (str, ObjectId)):
+            return None
         ann = AnnotationModel().load(annId, force=True)
         if ann:
             return ann.get("datasetId")
@@ -262,8 +268,9 @@ class Annotation(Resource):
         "Create multiple annotations", getDatasetIdFromAnnotationListInBody
     )
     def createMultiple(self, params, *args, **kwargs):
-        bodyJson = kwargs["memoizedBodyJson"]
-        annotations = self._annotationModel.convertIdsToObjectIds(bodyJson)
+        annotations = requireBulkCreateBody(
+            kwargs["memoizedBodyJson"], self._annotationModel, "annotation"
+        )
         datasetIds = {
             ann["datasetId"] for ann in annotations
             if "datasetId" in ann
@@ -359,13 +366,8 @@ class Annotation(Resource):
     @memoizeBodyJson
     @recordable("Update an annotation", getDatasetIdFromAnnotationListInBody)
     def updateMultiple(self, params, *args, **kwargs):
-        bodyJson = kwargs["memoizedBodyJson"]
-
         # --- Input validation (API layer responsibility) ---
-        if not isinstance(bodyJson, list):
-            raise RestException(
-                "Request body must be a JSON array."
-            )
+        bodyJson = requireList(kwargs["memoizedBodyJson"], "Request body")
         if len(bodyJson) == 0:
             return []
 
@@ -373,22 +375,14 @@ class Annotation(Resource):
         annotationIdToUpdate = {}
         newDatasetIds = set()
         for update in bodyJson:
-            if not isinstance(update, dict):
-                raise RestException(
-                    "Each annotation update must be a JSON object."
-                )
+            requireObjectBody(update, "Each annotation update")
             annId = update.get("id") or update.get("_id")
             if not annId:
                 raise RestException(
                     "Each annotation must have an 'id' or '_id'"
                     " field."
                 )
-            try:
-                objId = ObjectId(annId)
-            except InvalidId:
-                raise RestException(
-                    "Invalid annotation id: %s" % annId
-                )
+            objId = requireObjectId(annId, "annotation id")
             # Build clean update dict (no id keys, whitelist)
             updateDoc = update.copy()
             updateDoc.pop("id", None)
@@ -399,15 +393,7 @@ class Annotation(Resource):
                 )
             )
             if "datasetId" in updateDoc:
-                try:
-                    dsId = ObjectId(
-                        updateDoc["datasetId"]
-                    )
-                except InvalidId:
-                    raise RestException(
-                        "Invalid datasetId: %s"
-                        % updateDoc["datasetId"]
-                    )
+                dsId = requireObjectId(updateDoc["datasetId"], "datasetId")
                 updateDoc["datasetId"] = dsId
                 newDatasetIds.add(dsId)
             annotationIdToUpdate[objId] = updateDoc

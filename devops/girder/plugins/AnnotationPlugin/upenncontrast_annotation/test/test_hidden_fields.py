@@ -413,6 +413,14 @@ class TestDatasetViewHiddenFields:
         # POSTing a view that already exists updates and returns that view,
         # which here is admin's, shared with user for writing.
         view = createSharedView(admin, user, AccessType.WRITE)
+        # Creating (or re-posting) a view needs READ on its dataset and
+        # configuration (#1403), which a real share grants alongside it.
+        Folder().setUserAccess(
+            Folder().load(view["datasetId"], force=True), user,
+            AccessType.READ, save=True)
+        Collection().setUserAccess(
+            Collection().load(view["configurationId"], force=True), user,
+            AccessType.READ, save=True)
 
         resp = server.request(
             path="/dataset_view",

@@ -214,6 +214,17 @@ ADMIN or remove the owner. *"testWriteUserCanShareUpToWrite"*,
   Tests: *"testShareEndpointRemoveDropsAclEntries"*, *"testAccessListHidesLegacyNegativeEntries"*,
   *"test_remove_drops_entries_everywhere"* (project), *"test_legacy_negative_entry_not_propagated"*.
 
+**Limits (`server/helpers/aclLimits.py`):** sharing never hands out more than the
+caller holds. WRITE is enough to share, but an explicit request (this endpoint,
+`project/:id/share`) is refused if it would exceed the caller's level on any touched
+document or change a user above it (its owner). Copying a project's ACL onto a resource
+newly added to it caps each entry at the caller's level instead (`cappedCopyLevel`), so
+adding a dataset never fails over someone else's grant. Project propagation reaches only
+what the caller could share here (`limitToShareable`: datasets, their views and
+collections the caller can edit). Before this, a WRITE collaborator could grant
+themselves ADMIN (`accessType: 2` on their own login). Tests:
+`test/test_share_escalation.py`; invariants are in `PROJECTS.md` "Regression checklist".
+
 #### `POST /dataset_view/set_public`
 
 Makes a dataset and all associated resources public or private.
@@ -226,8 +237,23 @@ Makes a dataset and all associated resources public or private.
 
 **Affected resources:**
 - Dataset folder
-- All DatasetViews for the dataset
-- All Configurations used by those DatasetViews
+- The DatasetViews for the dataset that the caller administers
+- The Configurations used by those DatasetViews that the caller administers
+
+Other users can open a dataset they may read with their own configuration,
+creating their own view. Owning the dataset does not let the caller publish or
+unpublish those: setting `public` is an ADMIN operation on each document, and a
+configuration can also serve another owner's public dataset, which unpublishing it
+would break. They are left as they are in both directions; those not already in the
+requested state are counted in the response's `datasetViewsSkipped` /
+`configurationsSkipped` (beside `datasetViewsUpdated` / `configurationsUpdated`),
+and the Share dialog says what stayed public or private. Views and configurations the
+pre-ownership `set_public` published stay public until their owners (or a site
+admin) change them. A site admin administers everything, so nothing is skipped for
+them.
+
+Who may share a dataset, and what project sharing and `project/:id/set_public`
+may reach, are handled in PRs #1406 and #1410.
 
 ## Share links (share a view without making the dataset public)
 
@@ -245,7 +271,9 @@ exactly this dataset (ACL) and cannot write (scope: write endpoints answer 401).
 view-only scope — `DATA_READ` would also open `folder/{id}/download`, `item/{id}/download`,
 `file/{id}/download`, `resource/download` and the plugin's `/export` routes — so
 `server/helpers/shareLinkGuards.py` binds `rest.<method>.<route>.before` on those routes and
-refuses a link user (403) before the handler runs; the same module drops link users from
+refuses a link user (403) before the handler runs. The guard is decorated `@access.public`:
+Girder demands a site admin for any `before` handler without an access level, which
+had silently made every download and export admin-only. The same module drops link users from
 `GET user` listings. The shared access-list formatter also excludes link principals
 from dataset, configuration, and project named-user tables without changing their ACLs.
 Manage those principals through the Share links list instead. Tiles, annotations,
@@ -350,7 +378,7 @@ Location: `src/components/ShareDataset.vue`
 - Confirmation dialog before removing access
 - ADMIN users protected from removal (lock icon)
 - Rights come from the access response's `currentUserLevel`, not the caller's row (*"takes management rights from the server's effective level"*). Changing your own entry re-reads it without resetting the collection selection. Any failed load, including the 403 after removing your last access, fails closed (*"removing your last access fails closed on the 403"*).
-- Only the latest access load commits: `fetchAccessInfo`, `refetchIfSelf` and `resetState` share one request counter, and a self-change during an in-flight full load (a reopen) restarts the full load instead of superseding it (*"an older self-change reload cannot overwrite a newer load"*, *"a self-change during a reopen's load still fills the dialog"*).
+- Only the latest access load commits: full loads and refreshes (`fetchAccessInfo(id, refresh)`) share one request counter with `resetState`, and a refresh that supersedes an in-flight full load (a reopen) finishes it as a full load (*"an older refresh cannot overwrite a newer load"*, *"a self-change during a reopen's load still fills the dialog"*). The refresh that follows every settled sharing change is also what re-reads the caller's own level after they change their own entry; a failed refresh (the 403 after removing your last access) fails closed without an error banner (*"removing your last access fails closed on the 403"*).
 - Share targets are named users only. `findShareTarget` treats share-link principals as unknown on both share endpoints (*"testShareEndpointRejectsShareLinkPrincipals"*).
 - With nothing shareable (`canShareAny`), the add form becomes a note and the row controls are hidden (*"with nothing shareable, a WRITE user gets a note, not controls"*).
 - **WRITE collaborators** (`canManageUsers`) get the add-user form, plus level dropdowns and remove buttons on rows at or below their own level (`canEditUser`). Rows above it show a lock. Public toggle, collection checkboxes and share links stay ADMIN-only (`isResourceAdmin`). A refused share shows the server's reason.
@@ -494,3 +522,48 @@ No collection checkboxes, public toggle, access level dropdowns, remove buttons,
 | `src/views/configuration/ConfigurationInfo.vue` | Configuration info page (embeds SharingStatusDisplay) |
 | `src/store/GirderAPI.ts` | API client methods |
 | `src/store/model.ts` | TypeScript interfaces |
+
+## Regression checklist
+
+Each line below was a real defect in sharing, found in review of PR #1403 or by
+Codex, and names the test that holds it. Changing sharing, publishing, the
+share-link guard or dataset-view writes means re-checking this list.
+
+Run `pnpm test src/components/ShareDataset.test.ts` and, from
+`devops/girder/plugins/AnnotationPlugin`, `tox -- upenncontrast_annotation/test/test_sharing.py upenncontrast_annotation/test/test_share_link.py upenncontrast_annotation/test/test_export.py`.
+
+### Share-link guard
+
+- [ ] **The download/export guard refuses link users only.** Its `rest.*.before` listener needs an access level, or Girder makes every guarded route site-admin-only. Test with a non-admin owner, not the `admin` fixture. — *"testNonAdminOwnerCanStillDownload"*
+- [ ] **Anonymous viewers of a public dataset can still download and export it.** The admin lockout broke this too (`requireAdmin(None)`). — *"testAnonymousUsersCanDownloadAndExportAPublicDataset"*
+- [ ] **Link users are refused by the guard itself.** Assert the guard's message on every route, not just a 403, which also passed while every non-admin was refused. — *"testBearerReadsOnlyTheSharedDataset"*
+
+### Publishing (`dataset_view/set_public`)
+
+- [ ] **Publishing and making private both change only the caller's own views and configurations.** Unpublishing another owner's configuration would break any public dataset of theirs that uses it. — *"testChangesOnlyOwnViewsAndConfigurations"*, *"togglePublic explains what making private left public"*
+- [ ] **A site admin skips nothing.** — *"testSiteAdminStillChangesEverything"*
+- [ ] **Skipped counts ignore deleted configurations** (a view can outlive its configuration). — *"testDeletedConfigurationIsNotCountedAsSkipped"*
+- [ ] **ACL saves accept older views holding null `scales`/`lastViewed`.** `setPublic`/`setUserAccess` validate the stored document as is. — *"testAclSavesAcceptOlderNullFields"*
+- [ ] **The Share dialog says what publishing skipped, and only for the dataset and publish it describes.** — *"togglePublic explains views and collections owned by others"*, *"togglePublic shows no notice when nothing was skipped"*, *"resetState clears all fields"*
+- [ ] **A publish in flight survives a dialog reset.** The server keeps writing after the dialog closes, so reopening keeps the checkbox disabled until it settles (no opposite request can interleave), and the late result updates the checkbox but not the reopened dialog's notice. Pending publishes are tracked per dataset and shared by every dialog instance (`utils/pendingPublishes.ts`: one dialog is mounted per file-browser row), since the reused dialog can move to another dataset and back. — *"togglePublic keeps a publish in flight across a dialog reset"*, *"togglePublic tracks a pending publish per dataset"*, *"togglePublic shows a dataset's notice after another dataset's publish"*, *"shares a pending publish across dialog instances"*
+- [ ] **Every async handler in the Share dialog writes back only while the dialog still shows the session and dataset it started in.** The root cause behind most findings above: one dialog instance is reused across datasets and across close/reopen, so a late response landed in whatever it showed by then. Handlers capture `claimDialog()` before awaiting; every reset (closing the dialog or moving it to another dataset) starts a new session. Every ownership check compares against a counter that only increases; the dataset id alone recurs (A → B → A). — *"sharing and link responses that land after a reset leave the dialog alone"*, *"a request from before A -> B -> A does not write into the new A session"*, *"a failed load for the next dataset leaves no previous dataset state"*, *"another dialog takes the publish result its overlapping load skipped"*
+- [ ] **Sharing changes are server operations: their guards outlive the dialog, and every open dialog resyncs when one settles.** Add user, change/remove a user's access, create and revoke link keep running after the dialog closes, so their in-progress state lives in `utils/pendingMutations.ts` (shared by every instance, keyed by what they change; an Add can name any user, so it excludes every user change). When one settles, every open dialog showing the dataset refreshes quietly (selection and notice kept), so none keeps rows read mid-change. The other lifetime -- what the dialog shows -- stays per session (claimDialog). — *"a sharing change in flight blocks an overlapping one after a reopen"*, *"a change settling refreshes a dialog that loaded while it ran"*, *"an Add and a change to any user's access exclude each other"*, *"one removal finishing leaves another removal's confirmation alone"*, *"a revoke does not drop a create's refreshed link list"*, *"addUser calls shareDatasetView and refreshes access"*
+- [ ] **The dialog shows only the current dataset's access state.** Moving the open dialog to another dataset reloads it; a load for a dataset no longer shown, or one that overlapped a publish (it read the flag mid-write), does not overwrite the checkbox. — *"reloads access info when the open dialog moves to another dataset"*, *"ignores an access load for a dataset no longer shown"*, *"an access load overlapping a publish leaves the checkbox to the publish"*
+- [ ] **Skipped counts only resources left in the wrong state.** Another user's view or configuration that is already public needed nothing; counting it made the dialog claim it "stayed private". — *"testAlreadyPublicResourcesAreNotCountedAsSkipped"*
+
+### Named-user sharing (`dataset_view/share`, `project/:id/share`)
+
+- [ ] **Removing a user deletes their ACL entries.** `-1` is the wire value only; Girder removes an entry only for `None` (`parseShareAccessType`), so a stored `level: -1` reappeared in the dialog. — *"testShareEndpointRemoveDropsAclEntries"*, *"test_remove_drops_entries_everywhere"*, *"testAccessListHidesLegacyNegativeEntries"*
+- [ ] **WRITE can share, but never above the caller's own level, checked on every touched document.** No grant above it, no change to a user above it (the owner). — *"testWriteUserCanShareUpToWrite"*, *"testWriteUserCannotExceedOwnLevel"*, *"testOwnLevelIsCheckedPerDocument"*
+- [ ] **Only ints -1/0/1/2 are levels** (no SITE_ADMIN, fractions or booleans). — *"testShareEndpointRejectsInvalidAccessType"*, *"test_invalid_access_type_is_400"*
+- [ ] **Share-link principals are not share targets.** — *"testShareEndpointRejectsShareLinkPrincipals"*, *"test_share_link_principal_is_not_a_target"*
+- [ ] **The dialog takes the caller's rights from the server's effective level and shares only writable views of shareable collections.** — *"takes management rights from the server's effective level"*, *"selects writable collections and sends writable views"*, *"never shows a collection selected that would not be shared"*, *"removing your last access fails closed on the 403"*
+
+### Dataset-view writes
+
+- [ ] **Create and update keep only the view's own fields.** A body's `access`/`public` must never reach the ACL (WRITE → ADMIN escalation). — *"testWriteUserCannotRewriteTheAcl"*, *"testCreateIgnoresAclFields"*
+- [ ] **Create needs both ids and READ on the dataset and configuration**, and a non-object body is a 400. — *"testCreateValidatesAndChecksBothIds"*, *"testNonObjectBodyIsRejected"*
+
+### Export
+
+- [ ] **`export/json` without `configurationId` skips configurations the caller cannot read** instead of failing; publishing now leaves other users' configurations private. — *"testReaderExportsAroundAnotherUsersPrivateConfiguration"*

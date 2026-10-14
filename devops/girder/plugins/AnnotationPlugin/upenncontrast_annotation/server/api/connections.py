@@ -7,6 +7,7 @@ from girder.models.folder import Folder
 
 from ..helpers.access_helpers import requireDatasetsAccess
 from ..helpers.proxiedModel import recordable, memoizeBodyJson
+from ..helpers.validation import requireBulkCreateBody
 from ..models.annotation import Annotation as AnnotationModel
 from ..models.connections import AnnotationConnection as ConnectionModel
 
@@ -27,7 +28,15 @@ def getDatasetIdFromConnectionListInBody(
     self: "AnnotationConnection", *args, **kwargs
 ):
     connections = kwargs["memoizedBodyJson"]
-    return None if len(connections) <= 0 else connections[0]["datasetId"]
+    # This runs in the @recordable wrapper, before the handler validates the
+    # body: a malformed body must skip recording (return None), not raise a
+    # 500, so the handler can reject it with a clean 400.
+    if not isinstance(connections, list) or len(connections) <= 0:
+        return None
+    first = connections[0]
+    if not isinstance(first, dict):
+        return None
+    return first.get("datasetId")
 
 
 def getDatasetIdFromLoadedConnection(
@@ -122,8 +131,9 @@ class AnnotationConnection(Resource):
         "Create multiple connections", getDatasetIdFromConnectionListInBody
     )
     def multipleCreate(self, params, *args, **kwargs):
-        bodyJson = kwargs["memoizedBodyJson"]
-        connections = self._connectionModel.convertIdsToObjectIds(bodyJson)
+        connections = requireBulkCreateBody(
+            kwargs["memoizedBodyJson"], self._connectionModel, "connection"
+        )
         datasetIds = {
             conn["datasetId"] for conn in connections
             if "datasetId" in conn
