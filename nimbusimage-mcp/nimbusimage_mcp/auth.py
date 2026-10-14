@@ -72,6 +72,17 @@ class _Session:
         )
 
 
+async def _with_retries(send) -> httpx.Response:
+    """Send a read-only request, retrying Girder's transient answers with
+    backoff; no wait after the last attempt."""
+    for attempt in range(CHECK_ATTEMPTS):
+        response = await send()
+        if response.status_code not in TRANSIENT_STATUSES or \
+                attempt == CHECK_ATTEMPTS - 1:
+            return response
+        await asyncio.sleep(0.25 * 2 ** attempt)
+
+
 def _key_hash(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
@@ -187,14 +198,10 @@ class GirderApiKeyVerifier:
         )
 
     async def _still_valid(self, session: _Session) -> bool:
-        for attempt in range(CHECK_ATTEMPTS):
-            response = await self._http.get(
-                f"{self._api_url}/token/current",
-                headers={"Girder-Token": session.girder_token},
-            )
-            if response.status_code not in TRANSIENT_STATUSES:
-                break
-            await asyncio.sleep(0.25 * 2 ** attempt)
+        response = await _with_retries(lambda: self._http.get(
+            f"{self._api_url}/token/current",
+            headers={"Girder-Token": session.girder_token},
+        ))
         if response.status_code == 401:
             return False
         response.raise_for_status()
@@ -250,14 +257,10 @@ class GirderOAuthVerifier:
     async def verify_token(self, token: str) -> AccessToken | None:
         if not OAUTH_TOKEN_RE.fullmatch(token):
             return None
-        for attempt in range(CHECK_ATTEMPTS):
-            response = await self._http.post(
-                self._url, data={"token": token},
-                headers={INTROSPECTION_HEADER: self._secret},
-            )
-            if response.status_code not in TRANSIENT_STATUSES:
-                break
-            await asyncio.sleep(0.25 * 2 ** attempt)
+        response = await _with_retries(lambda: self._http.post(
+            self._url, data={"token": token},
+            headers={INTROSPECTION_HEADER: self._secret},
+        ))
         if response.status_code == 404:
             log.warning(
                 "OAuth introspection answered 404: the mcp_oauth plugin is "

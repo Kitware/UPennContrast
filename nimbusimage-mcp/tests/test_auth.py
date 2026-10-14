@@ -271,6 +271,24 @@ def test_api_keys_still_work_alongside_oauth(girder):
     assert girder.introspections == 0
 
 
+def test_transient_introspection_failures_are_retried(girder, monkeypatch):
+    girder.add_oauth(OAUTH, "carol")
+    monkeypatch.setattr(auth.asyncio, "sleep", _no_sleep)
+    real = girder.handler
+    answers = iter([503, 502])
+
+    def flaky(request):
+        status = next(answers, None)
+        if status:
+            girder.introspections += 1
+            return httpx.Response(status)
+        return real(request)
+
+    girder.handler = flaky
+    assert run(oauth_verifier(girder).verify_token(OAUTH)) is not None
+    assert girder.introspections == 3
+
+
 def test_introspection_outage_is_an_error_not_a_bad_token(girder):
     girder.add_oauth(OAUTH, "carol")
     girder.fail_with = 500
