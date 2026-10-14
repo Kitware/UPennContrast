@@ -20,7 +20,10 @@ inspection on the large local dataset.
   #1334 added `POST /annotation_property/compute` and switched the client to
   a single request. The endpoint validates all input, requires dataset WRITE,
   loads the properties with one `$in` query, and checks them all before
-  scheduling any job. It shares that path with the single-property endpoint.
+  scheduling any job. If scheduling a later property fails (a broker error),
+  it cancels the jobs already queued and re-raises, so the batch is
+  all-or-nothing and a retry cannot run those jobs twice. It shares that path
+  with the single-property endpoint.
   A property is computable by a caller who can read it through its own ACL,
   which names only the creator, or through a configuration that references
   it. That is the rule `GET /annotation_property/:id` applies, so dataset
@@ -111,6 +114,10 @@ test that holds the invariant.
       configuration, and a deleted property is a 404 rather than an access
       error — _"testCollaboratorComputesPropertyReadableThroughConfiguration"_
       and _"testComputeMultipleReportsMissingPropertyAs404"_.
+- [x] A scheduling failure partway through a batch cancels the jobs already
+      queued, so the client's "all failed" is true and a retry does not
+      duplicate them —
+      _"testComputeMultipleCancelsQueuedJobsWhenSchedulingFails"_.
 - [x] Submission, missing-job, worker-failure, and refresh-failure paths always
       clear running/progress state and surface an error —
       _"cleans up and surfaces an API submission failure"_,

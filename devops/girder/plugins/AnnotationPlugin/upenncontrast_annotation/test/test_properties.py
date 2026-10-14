@@ -13,6 +13,7 @@ from upenncontrast_annotation.server.models.collection import Collection
 
 from girder.constants import AccessType
 from girder.models.folder import Folder
+from girder_jobs.models.job import Job
 
 from . import girder_utilities as utilities
 
@@ -221,7 +222,9 @@ class TestPropertyEndpoints:
         assertStatus(resp, 403)
         compute.assert_not_called()
 
-    def _postComputeMultiple(self, server, user, datasetId, properties):
+    def _postComputeMultiple(
+        self, server, user, datasetId, properties, **kwargs
+    ):
         return server.request(
             path="/annotation_property/compute",
             method="POST",
@@ -239,6 +242,7 @@ class TestPropertyEndpoints:
                 }
             ),
             type="application/json",
+            **kwargs,
         )
 
     def testComputeMultipleRequiresDatasetWriteAccess(
@@ -356,3 +360,61 @@ class TestPropertyEndpoints:
         ]
         assertStatusOk(single)
         assert single.json == [{"_id": "job-1"}]
+
+    def testComputeMultipleCancelsQueuedJobsWhenSchedulingFails(
+        self, admin, server
+    ):
+        """A broker failure scheduling a later property cancels the jobs
+        already queued for earlier ones, so the batch stays all-or-nothing
+        and a retry does not run them twice."""
+        dataset = utilities.createFolder(admin, "batch-broker-failure", {})
+        first = self._createProperty(admin)
+        second = self._createProperty(admin)
+        queued = {"_id": "job-1"}
+
+        with mock.patch.object(
+            AnnotationProperty,
+            "compute",
+            side_effect=[(queued,), RuntimeError("broker unavailable")],
+        ), mock.patch.object(Job, "cancelJob") as cancelJob:
+            resp = self._postComputeMultiple(
+                server, admin, dataset["_id"], [first, second],
+                exception=True,
+            )
+
+        assertStatus(resp, 500)
+        cancelJob.assert_called_once_with(queued)
+
+    def testComputeMultipleRaisesOriginalErrorWhenCancelFails(
+        self, admin, server
+    ):
+        """A failing cancel is logged, the remaining jobs are still
+        cancelled, and the scheduling error -- not the cancel error -- is
+        what the caller gets."""
+        dataset = utilities.createFolder(admin, "batch-cancel-failure", {})
+        first, second, third = (
+            self._createProperty(admin) for _ in range(3)
+        )
+        firstJob, secondJob = {"_id": "job-1"}, {"_id": "job-2"}
+
+        with mock.patch.object(
+            AnnotationProperty,
+            "compute",
+            side_effect=[
+                (firstJob,),
+                (secondJob,),
+                RuntimeError("broker unavailable"),
+            ],
+        ), mock.patch.object(
+            Job, "cancelJob", side_effect=[RuntimeError("cancel failed"), None]
+        ) as cancelJob:
+            resp = self._postComputeMultiple(
+                server, admin, dataset["_id"], [first, second, third],
+                exception=True,
+            )
+
+        assertStatus(resp, 500)
+        assert "broker unavailable" in resp.json["message"]
+        assert [c.args[0] for c in cancelJob.call_args_list] == [
+            firstJob, secondJob
+        ]

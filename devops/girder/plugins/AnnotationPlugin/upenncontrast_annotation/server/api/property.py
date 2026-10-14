@@ -1,8 +1,11 @@
+import logging
+
 from girder.api import access
 from girder.api.describe import Description, autoDescribeRoute, describeRoute
 from girder.constants import AccessType, TokenScope
 from girder.api.rest import Resource, filtermodel, loadmodel
 from girder.models.folder import Folder
+from girder_jobs.models.job import Job
 from ..helpers import validation
 from ..helpers.validation import (
     requireCountWithin,
@@ -18,6 +21,8 @@ from bson.errors import InvalidId
 
 
 MAX_COMPUTE_PROPERTIES = 100
+
+logger = logging.getLogger(__name__)
 
 
 class AnnotationProperty(Resource):
@@ -114,8 +119,10 @@ class AnnotationProperty(Resource):
     def _computeProperties(self, datasetId, propertyIds, parametersById):
         """Schedule one compute job per property, in request order, after
         checking dataset WRITE, property access and every property's
-        definition -- so an invalid later property cannot leave an earlier
-        subset scheduled. Shared by the single and batch endpoints."""
+        definition. All or nothing: an invalid later property is rejected
+        before anything is scheduled, and a failure scheduling one (a broker
+        error) cancels the jobs already queued for the earlier ones. Shared
+        by the single and batch endpoints."""
         currentUser = self.getCurrentUser()
         Folder().load(
             datasetId,
@@ -130,17 +137,35 @@ class AnnotationProperty(Resource):
         except ValueError as error:
             raise RestException(str(error), code=400) from error
 
-        return [
-            {
-                "propertyId": str(annotationProperty["_id"]),
-                "jobs": self._propertyModel.compute(
-                    annotationProperty,
-                    str(datasetId),
-                    parametersById[str(annotationProperty["_id"])],
-                ),
-            }
-            for annotationProperty in properties
-        ]
+        submissions = []
+        try:
+            for annotationProperty in properties:
+                propertyKey = str(annotationProperty["_id"])
+                submissions.append({
+                    "propertyId": propertyKey,
+                    "jobs": self._propertyModel.compute(
+                        annotationProperty,
+                        str(datasetId),
+                        parametersById[propertyKey],
+                    ),
+                })
+        except Exception:
+            # The caller gets an error and never learns these job ids, so it
+            # could neither track nor cancel them, and a retry would run
+            # them twice. Cancel them best-effort, then re-raise the
+            # original error.
+            for submission in submissions:
+                for job in filter(None, submission["jobs"]):
+                    try:
+                        Job().cancelJob(job)
+                    except Exception:
+                        logger.exception(
+                            "Could not cancel compute job %s for property %s",
+                            job.get("_id"),
+                            submission["propertyId"],
+                        )
+            raise
+        return submissions
 
     def _loadComputableProperties(self, propertyIds, user):
         """The properties with these ids, in request order. A property is
@@ -172,20 +197,36 @@ class AnnotationProperty(Resource):
             )
         }
         if unreadable:
-            # One query for every property still unaccounted for.
-            for config in CollectionModel().findWithPermissions(
-                {"meta.propertyIds": {"$in": sorted(unreadable)}},
-                user=user,
-                level=AccessType.READ,
-                fields=["meta.propertyIds"],
-            ):
-                unreadable.difference_update(config["meta"]["propertyIds"])
+            unreadable -= self._readableThroughConfigurations(
+                unreadable, user
+            )
         if unreadable:
             raise AccessException(
                 "Read access denied for property %s"
                 % ", ".join(sorted(unreadable))
             )
         return [propertiesById[propertyId] for propertyId in propertyIds]
+
+    def _readableThroughConfigurations(self, propertyIds, user):
+        """The subset of these property ids (strings, as
+        meta.propertyIds stores them) that some configuration readable by
+        the user references -- the rule that makes a property readable.
+        One query; only meta.propertyIds is projected, since configurations
+        carry layers, tools and snapshots and many can list the same
+        property. The permission check is part of the query, unaffected by
+        the projection."""
+        requested = set(propertyIds)
+        return {
+            propertyId
+            for config in CollectionModel().findWithPermissions(
+                {"meta.propertyIds": {"$in": sorted(requested)}},
+                user=user,
+                level=AccessType.READ,
+                fields=["meta.propertyIds"],
+            )
+            for propertyId in config["meta"]["propertyIds"]
+            if propertyId in requested
+        }
 
     def _propertyBody(self):
         """The request body reduced to the client-owned fields. Anything
@@ -335,30 +376,16 @@ class AnnotationProperty(Resource):
     )
     def getBatch(self, body):
         propertyIds = requireList(body.get("ids"), "ids")
-        validation.requireCountWithin(
+        requireCountWithin(
+            # Read through the module so tests can lower the cap.
             len(propertyIds), validation.MAX_PROPERTY_IDS, "ids"
         )
         objectIds = [requireObjectId(pid, "ids") for pid in propertyIds]
         idStrings = [str(oid) for oid in objectIds]
 
-        # As in get: a property is readable through any readable
-        # configuration that references it (meta.propertyIds holds strings).
-        # Only meta.propertyIds is needed: configurations carry layers,
-        # tools and snapshots, and many can list the same property. The
-        # permission check is part of the query, unaffected by the
-        # projection.
-        requested = set(idStrings)
-        readable = {
-            pid
-            for config in CollectionModel().findWithPermissions(
-                {"meta.propertyIds": {"$in": idStrings}},
-                user=self.getCurrentUser(),
-                level=AccessType.READ,
-                fields=["meta.propertyIds"],
-            )
-            for pid in config["meta"]["propertyIds"]
-            if pid in requested
-        }
+        readable = self._readableThroughConfigurations(
+            idStrings, self.getCurrentUser()
+        )
         props = {
             str(prop["_id"]): prop
             for prop in self._propertyModel.find({"_id": {"$in": [
@@ -392,21 +419,12 @@ class AnnotationProperty(Resource):
         # ACLs, exc=True raises exception if not found)
         prop = self._propertyModel.load(propertyId, force=True, exc=True)
 
-        # 3. Check if user has READ access to ANY configuration that
-        # references this property.
-        # Note: CollectionSchema defines propertyIds as strings, so we pass
-        # 'id' directly.
-        accessible_configs = CollectionModel().findWithPermissions(
-            {'meta.propertyIds': id},
-            user=user,
-            level=AccessType.READ,
-            limit=1  # Optimization: We only need to know if ONE exists
-        )
-
-        # 4. If the cursor is empty, access is denied
-        if accessible_configs.count() == 0:
-            # If the user is anonymous and fails check, usually 401 is better,
-            # but 403 or 404 is standard for "hidden" items.
+        # 3. The user must be able to READ some configuration that
+        # references this property; otherwise access is denied (403 or 404
+        # is standard for "hidden" items).
+        if str(propertyId) not in self._readableThroughConfigurations(
+            [str(propertyId)], user
+        ):
             raise AccessException(f'Read access denied for property {id}')
 
         return prop
