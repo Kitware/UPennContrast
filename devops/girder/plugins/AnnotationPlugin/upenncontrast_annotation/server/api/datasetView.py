@@ -15,6 +15,9 @@ from upenncontrast_annotation.server.helpers.access_helpers import (
     requireCanSetUserAccess
 )
 from upenncontrast_annotation.server.helpers.params import getBooleanParam
+from upenncontrast_annotation.server.helpers.validation import (
+    requireObjectBody, requireObjectId
+)
 from upenncontrast_annotation.server.models.datasetView import \
     DatasetView as DatasetViewModel
 from upenncontrast_annotation.server.models.collection import \
@@ -69,15 +72,28 @@ class DatasetView(Resource):
         )
     )
     def create(self, params):
-        new_document = self._datasetViewModel.convertIdsToObjectIds(
-            self.getBodyJson())
+        # Keep only the schema's fields: the body is saved as the document,
+        # so an `access` or `public` key would otherwise land in the ACL.
+        body = self._datasetViewModel.filterUpdateFields(
+            requireObjectBody(self.getBodyJson()))
         currentUser = self.getCurrentUser()
         if not currentUser:
             raise AccessException("User not found", "currentUser")
+        # A view pairs a dataset with a configuration; the caller must be
+        # able to read both (and a missing id is a 400, not a KeyError 500).
+        datasetId = requireObjectId(body.get("datasetId"), "datasetId")
+        configurationId = requireObjectId(
+            body.get("configurationId"), "configurationId")
+        Folder().load(
+            datasetId, user=currentUser, level=AccessType.READ, exc=True)
+        CollectionModel().load(
+            configurationId, user=currentUser, level=AccessType.READ,
+            exc=True)
+        new_document = self._datasetViewModel.convertIdsToObjectIds(body)
         # Check with same datasetId and configurationId already exists
         query = {
-            "datasetId": new_document["datasetId"],
-            "configurationId": new_document["configurationId"],
+            "datasetId": datasetId,
+            "configurationId": configurationId,
         }
         cursor = self._datasetViewModel.findWithPermissions(
             query, user=currentUser, level=AccessType.WRITE
@@ -124,8 +140,11 @@ class DatasetView(Resource):
         level=AccessType.WRITE,
     )
     def update(self, dataset_view, params):
+        # As in create: a WRITE user's body must not reach `access`/`public`
+        # (granting themselves ADMIN on the view) or other Girder fields.
         new_dataset_view = self._datasetViewModel.convertIdsToObjectIds(
-            self.getBodyJson())
+            self._datasetViewModel.filterUpdateFields(
+                requireObjectBody(self.getBodyJson())))
         self._datasetViewModel.updateDatasetView(
             dataset_view, new_dataset_view)
 
@@ -339,8 +358,14 @@ class DatasetView(Resource):
         .notes("""
             Sets public READ access on:
             - The dataset folder itself
-            - All datasetViews for this dataset
-            - All configurations used by those datasetViews
+            - The datasetViews for this dataset that the caller administers
+            - The configurations used by those datasetViews that the caller
+              administers
+
+            Views and configurations owned by other users are left as they
+            are, whether publishing or making private; those not already in
+            the requested state are counted in datasetViewsSkipped /
+            configurationsSkipped.
 
             Write operations remain restricted to users with WRITE permissions.
         """)
@@ -350,37 +375,65 @@ class DatasetView(Resource):
                dataType='boolean', required=True)
     )
     def setDatasetPublic(self, dataset, public):
-        """Set a dataset and all associated resources to public or private."""
+        """Make a dataset, and the views/configurations of it the caller
+        administers, public or private."""
+        user = self.getCurrentUser()
 
         # 1. Set the dataset (folder) itself to public
         Folder().setPublic(dataset, public, save=True)
 
-        # 2. Find all DatasetViews (force=True bypasses permissions for admin)
+        # 2. Find all DatasetViews of the dataset, and the configurations
+        # they use. Other users may have opened the dataset with their own
+        # configuration, so both lists can hold documents the caller does
+        # not own.
         datasetViews = list(self._datasetViewModel.find({
             'datasetId': dataset['_id']
         }))
+        viewQuery = {'_id': {'$in': [dv['_id'] for dv in datasetViews]}}
+        configQuery = {'_id': {'$in': list(
+            {dv['configurationId'] for dv in datasetViews}
+        )}}
+        # Counted against configurations that still exist: a view can
+        # outlive its (deleted) configuration.
+        configs = list(CollectionModel().find(configQuery))
 
-        # 3. Collect unique configuration IDs
-        configIds = {dv['configurationId'] for dv in datasetViews}
-
-        # 4. Set permissions on DatasetViews
-        # Note: setPublic must be called individually as it modifies ACLs
-        for dv in datasetViews:
+        # 3. Change only what the caller administers, in both directions:
+        # setting public is an ADMIN operation, and owning the dataset must
+        # not let the caller publish or unpublish another user's
+        # configuration or view. A configuration can also serve another
+        # owner's public dataset, which unpublishing it would break.
+        # setPublic must be called individually as it modifies ACLs.
+        views = list(self._datasetViewModel.findWithPermissions(
+            viewQuery, user=user, level=AccessType.ADMIN))
+        changedConfigs = list(CollectionModel().findWithPermissions(
+            configQuery, user=user, level=AccessType.ADMIN))
+        for dv in views:
             self._datasetViewModel.setPublic(dv, public, save=True)
-
-        # 5. Bulk load configurations, then set permissions
-        # (Bulk load avoids N+1 queries; setPublic must still be individual)
-        configs = list(CollectionModel().find({
-            '_id': {'$in': list(configIds)}
-        }))
-        for config in configs:
+        for config in changedConfigs:
             CollectionModel().setPublic(config, public, save=True)
 
+        # Skipped: left unchanged although not already in the requested
+        # state (another user's resource that is already public was not
+        # skipped, it simply needed nothing).
+        def skipped(docs, changed):
+            changedIds = {doc['_id'] for doc in changed}
+            return sum(
+                1 for doc in docs
+                if doc['_id'] not in changedIds
+                and bool(doc.get('public', False)) != public
+            )
+
+        # The Share dialog shows the Skipped counts (what other users' items
+        # stayed as they were). The Updated counts are not displayed yet:
+        # the tests use them to check that only the caller's own items
+        # changed, and they let a future UI report what a publish did.
         return {
             'dataset': str(dataset['_id']),
             'public': public,
-            'datasetViewsUpdated': len(datasetViews),
-            'configurationsUpdated': len(configs)
+            'datasetViewsUpdated': len(views),
+            'configurationsUpdated': len(changedConfigs),
+            'datasetViewsSkipped': skipped(datasetViews, views),
+            'configurationsSkipped': skipped(configs, changedConfigs),
         }
 
     @access.user(scope=TokenScope.DATA_READ)
