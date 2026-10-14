@@ -7,7 +7,7 @@
  * ("draft" from a finished upload) can replace a newer one ("uploading" from
  * the upload that followed). Imports the REAL projects store.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const h = vi.hoisted(() => ({
   main: {
@@ -35,6 +35,11 @@ function snapshot(status: string) {
 }
 
 describe("fetchProject", () => {
+  beforeEach(() => {
+    // The real store is a singleton: start every case from an empty list.
+    projects.setProjects([]);
+  });
+
   it("keeps the newest snapshot when refreshes resolve out of order", async () => {
     let resolveOlder!: (p: unknown) => void;
     h.main.projectsAPI.getProject
@@ -48,21 +53,6 @@ describe("fetchProject", () => {
 
     const stored = projects.projects.find((p) => p.id === "p1");
     expect(stored?.meta.zenodo?.status).toBe("uploading");
-  });
-
-  it("re-reads a cached project when it is selected again", async () => {
-    // Navigating away mid-operation drops the card's refresh; coming back
-    // must not show the cached pre-operation state.
-    h.main.projectsAPI.getProject.mockResolvedValueOnce(snapshot("draft"));
-    await projects.fetchProject("p1");
-    h.main.projectsAPI.getProject.mockResolvedValueOnce(snapshot("published"));
-
-    await projects.setSelectedProject("p1");
-    await vi.waitFor(() =>
-      expect(
-        projects.projects.find((p) => p.id === "p1")?.meta.zenodo?.status,
-      ).toBe("published"),
-    );
   });
 
   it("keeps the cached object when a re-read finds no change", async () => {
@@ -118,6 +108,36 @@ describe("fetchProject", () => {
 
     h.main.projectsAPI.deleteProject.mockResolvedValueOnce(undefined);
     await projects.deleteProject("p1");
+    resolveRead(snapshot("draft"));
+    await read;
+
+    expect(projects.projects.find((p) => p.id === "p1")).toBeUndefined();
+  });
+
+  it("returns the stored project, not a response it discarded", async () => {
+    let resolveOlder!: (p: unknown) => void;
+    h.main.projectsAPI.getProject
+      .mockReturnValueOnce(new Promise((r) => (resolveOlder = r)))
+      .mockResolvedValueOnce(snapshot("uploading"));
+
+    const older = projects.fetchProject("p1");
+    await projects.fetchProject("p1");
+    resolveOlder(snapshot("draft"));
+
+    expect((await older)?.meta.zenodo?.status).toBe("uploading");
+  });
+
+  it("doesn't bring back a project a list refresh dropped", async () => {
+    h.main.projectsAPI.getProject.mockResolvedValueOnce(snapshot("draft"));
+    await projects.fetchProject("p1");
+    let resolveRead!: (p: unknown) => void;
+    h.main.projectsAPI.getProject.mockReturnValueOnce(
+      new Promise((r) => (resolveRead = r)),
+    );
+    const read = projects.fetchProject("p1");
+
+    // The list no longer has p1 (deleted or unshared elsewhere).
+    projects.setProjects([]);
     resolveRead(snapshot("draft"));
     await read;
 

@@ -62,6 +62,9 @@ export class Projects extends VuexModule {
   // Mutations
   @Mutation
   setProjects(projects: IProject[]) {
+    // Both lists: a project the new list drops was changed (deleted or
+    // unshared) too.
+    this.projects.forEach((p) => stampProject(p.id));
     projects.forEach((p) => stampProject(p.id));
     this.projects = projects;
   }
@@ -141,7 +144,9 @@ export class Projects extends VuexModule {
         this.addProjectImpl(project);
       }
       sync.setSaving(false);
-      return project;
+      // What the store holds: a response that lost to a newer read or a
+      // write was not committed, and must not be handed out as current.
+      return project ? this.getProjectById(projectId) ?? null : project;
     } catch (error) {
       logError(`Failed to fetch project ${projectId}:`, error);
       sync.setSaving(error as Error);
@@ -386,16 +391,9 @@ export class Projects extends VuexModule {
   @Action
   async setSelectedProject(projectId: string | null): Promise<void> {
     this.setCurrentProjectId(projectId);
-    if (!projectId) return;
-    if (!this.getProjectById(projectId)) {
+    if (projectId && !this.getProjectById(projectId)) {
       await this.fetchProject(projectId);
-      return;
     }
-    // Show the cached copy now, but re-read it: it can be stale (e.g. an
-    // operation finished after the user navigated away, so the view that
-    // started it never refreshed it). fetchProject handles its own errors,
-    // and its sequence guard keeps an older read from landing last.
-    this.fetchProject(projectId);
   }
 
   @Action

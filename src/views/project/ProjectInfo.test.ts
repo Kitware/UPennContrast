@@ -6,6 +6,7 @@ const mockUpdateProject = vi.fn();
 const mockUpdateProjectStatus = vi.fn();
 const mockUpdateProjectMetadata = vi.fn();
 const mockDeleteProject = vi.fn();
+const mockFetchProject = vi.fn();
 const mockRemoveDatasetFromProject = vi.fn();
 const mockRemoveCollectionFromProject = vi.fn();
 const mockWatchFolder = vi.fn();
@@ -54,6 +55,7 @@ vi.mock("@/store/projects", async () => {
       updateProjectMetadata: (...args: any[]) =>
         mockUpdateProjectMetadata(...args),
       deleteProject: (...args: any[]) => mockDeleteProject(...args),
+      fetchProject: (...args: any[]) => mockFetchProject(...args),
       removeDatasetFromProject: (...args: any[]) =>
         mockRemoveDatasetFromProject(...args),
       removeCollectionFromProject: (...args: any[]) =>
@@ -154,6 +156,31 @@ describe("ProjectInfo", () => {
     // Errors, upload progress and job tracking are per project: a reused
     // instance would show project 1's state on project 2.
     expect(second.vm).not.toBe(first.vm);
+  });
+
+  it("re-reads the project it shows, on entry and on switch", async () => {
+    // The store keeps a cached copy across navigation; an operation that
+    // finished while the user was elsewhere (its card unmounted, so its
+    // refresh was dropped) must not leave this page showing the old state.
+    mountComponent();
+    await flushPromises();
+    expect(mockFetchProject).toHaveBeenCalledWith("proj-1");
+
+    (projects as any).currentProject = {
+      ...(projects as any).currentProject,
+      id: "proj-2",
+    };
+    await flushPromises();
+    expect(mockFetchProject).toHaveBeenLastCalledWith("proj-2");
+
+    // A refreshed copy of the same project is not another entry.
+    mockFetchProject.mockClear();
+    (projects as any).currentProject = {
+      ...(projects as any).currentProject,
+      name: "Renamed",
+    };
+    await flushPromises();
+    expect(mockFetchProject).not.toHaveBeenCalled();
   });
 
   it("project returns from projects store", () => {
