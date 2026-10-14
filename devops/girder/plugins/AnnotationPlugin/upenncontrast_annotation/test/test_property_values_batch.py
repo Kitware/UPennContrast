@@ -398,3 +398,64 @@ class TestFindByAnnotationIds:
         assert values.findOne(
             {"annotationId": ObjectId(ids[0])}
         )["datasetId"] == source["_id"]
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestAddMultipleValidation:
+    """POST /annotation_property_values/multiple must reject malformed input
+    with a 400 (issue #1242), including ids that fail to parse."""
+
+    def _post(self, server, user, body):
+        return server.request(
+            path="/annotation_property_values/multiple",
+            method="POST",
+            user=user,
+            body=json.dumps(body),
+            type="application/json",
+        )
+
+    def testNonListBodyReturns400(self, admin, server):
+        resp = self._post(server, admin, {"not": "a list"})
+        assertStatus(resp, 400)
+
+    def testNonDictEntryReturns400(self, admin, server):
+        resp = self._post(server, admin, [123])
+        assertStatus(resp, 400)
+
+    def testMalformedDatasetIdReturns400(self, admin, server):
+        entry = {
+            "datasetId": "not-a-valid-object-id",
+            "annotationId": "012345678901234567890123",
+            "values": {"propA": 1},
+        }
+        resp = self._post(server, admin, [entry])
+        assertStatus(resp, 400)
+
+    def testMissingValuesReturns400(self, admin, server):
+        """An entry with no "values" used to pass every check and then
+        KeyError (500) in the upsert; the schema now requires it."""
+        dataset = utilities.createFolder(
+            admin, "add-multiple-ds", upenn_utilities.datasetMetadata
+        )
+        annotation = Annotation().create(
+            upenn_utilities.getSampleAnnotation(dataset["_id"])
+        )
+        entry = {
+            "datasetId": str(dataset["_id"]),
+            "annotationId": str(annotation["_id"]),
+        }
+        resp = self._post(server, admin, [entry])
+        assertStatus(resp, 400)
+        assert AnnotationPropertyValues().findOne(
+            {"annotationId": annotation["_id"]}
+        ) is None
+
+    def testNumericAnnotationIdReturns400(self, admin, server):
+        entry = {
+            "datasetId": "012345678901234567890123",
+            "annotationId": 123,
+            "values": {"propA": 1},
+        }
+        resp = self._post(server, admin, [entry])
+        assertStatus(resp, 400)

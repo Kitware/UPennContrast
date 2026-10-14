@@ -388,8 +388,8 @@ type TProjectStatus = 'draft' | 'exporting' | 'exported';
 | DELETE | `/project/:id/collection/:collectionId` | Remove collection from project |
 | PUT | `/project/:id/status` | Update project status |
 | PUT | `/project/:id/metadata` | Update publication metadata |
-| POST | `/project/:id/share` | Share project with user (propagates to all resources) |
-| POST | `/project/:id/set_public` | Make project and all resources public/private |
+| POST | `/project/:id/share` | Share project with user (propagates to the resources the caller can share) |
+| POST | `/project/:id/set_public` | Make project and the resources the caller owns public/private |
 | GET | `/project/:id/access` | Get access list for a project (requires ADMIN) |
 
 ---
@@ -470,10 +470,13 @@ Opened from ProjectInfo. Allows the project owner to manage access:
 - **Add user form**: Username/email field + access level selector + Add button
 
 **Confirmation dialogs**: Every sharing action shows a confirmation dialog before
-executing, because all actions propagate to every dataset, collection, configuration,
-and dataset view in the project. The dialog displays:
+executing, because actions propagate to the datasets, collections, configurations
+and dataset views in the project that the caller can share (see "Permission
+Propagation"). The dialog displays:
 - Action-specific message explaining what will happen
-- Resource counts: "This will affect X datasets and Y collections..."
+- Resource counts: "This project has X datasets and Y collections; only the ones you own
+  change..." (`impactSummary`; the client doesn't know ownership, so it states totals
+  and the rule, not a count of what will change)
 
 The confirmation is implemented with a single reusable `v-dialog` driven by a
 `showConfirm()` helper that stores a pending action callback, executed on confirm.
@@ -499,25 +502,58 @@ and dataset views. This is handled by the model-layer propagation methods in
 
 ### How It Works
 
+Every propagation runs **as the acting user** (the `actor` argument) and changes a
+contained resource only as far as that user could share it directly
+(`server/helpers/aclLimits.py`, the same rules as `POST /dataset_view/share`):
+
+- a dataset (folder) if the actor can edit it (WRITE), a dataset view if the actor can
+  edit both the view and its dataset (also for views reached through a project
+  collection whose dataset is not itself in the project), and a configuration if the
+  actor can edit it (`limitToShareable`);
+- an explicit share (`POST /project/:id/share`) is refused (403, nothing written) if it
+  would grant more than the actor's level on any reached document, or change a user
+  whose entry there is above it (`requireCanSetUserAccess`, as in
+  `dataset_view/share`);
+- copying the project's whole ACL onto a newly added resource caps each entry at the
+  actor's level instead (`cappedCopyLevel`), so adding a dataset never fails over
+  someone else's grant, and never lowers an existing entry, so adding your own dataset
+  to a project where you are only WRITE keeps you its owner;
+- the public flag only on resources the actor has ADMIN on.
+
+`POST /project/:id/set_public` returns `skipped`, the number of contained resources the
+caller can see but does not own, which it left unchanged (other users' private views are
+not counted). Owner self-lockout (an owner removing or lowering their own ADMIN) is
+PR #1165's concern. Zenodo upload needs ADMIN on every dataset and
+collection the project lists; configurations reached only through views are exported
+only if the uploader owns them; publish checks what the draft recorded
+(`codebaseDocumentation/ZENODO_UPLOAD.md`). Invariants: "Regression checklist" below.
+
+Without this, adding a dataset you could only edit to a project you own copied the
+project's ACL -- where you are ADMIN -- onto the dataset, and `addCollection` reached
+every dataset using the collection, even ones you could not read. Tests:
+`test/test_share_escalation.py`.
+
 **Sharing with a user (`POST /project/:id/share`):**
 1. Caller must have ADMIN access on the project.
-2. Looks up the target user by email or username.
-3. Calls `setUserAccess(project, targetUser, level)` on the project itself.
-4. Calls `propagateUserAccess(project, targetUser, level)` which:
+2. Looks up the target user by email or username (`findShareTarget`; share-link users are unknown).
+3. Calls `propagateUserAccess(project, targetUser, level, actor)` first, which:
    - Bulk-loads all datasets, collections, and dataset views via `_gatherAllResources()`
-   - Applies the same level to every resource with bulk `$pull`/`$push` updates (`_bulkSetUserAccess`); `None` only pulls
-5. Level `-1` revokes access: the endpoint maps it to `None` (`parseShareAccessType`), which removes the user's entry from the project's ACL and every resource's ACL. Passing `-1` straight through would store an inert `level: -1` entry instead.
+   - Checks every reached resource first (`requireCanSetUserAccess`) and refuses the whole share (403, nothing written, the project's own ACL included) if it would grant more than the actor's level on one, or change a user whose entry there is above it
+   - Then applies the same level to every reached resource with bulk `$pull`/`$push` updates (`_bulkSetUserAccess`); `None` only pulls
+4. Only then calls `setUserAccess(project, targetUser, level)` on the project itself, so a refused share leaves the project unchanged.
+5. Level `-1` revokes access: the endpoint maps it to `None` (`parseShareAccessType`), which removes the user's entry from the project's ACL and every reached resource's ACL. Passing `-1` straight through would store an inert `level: -1` entry instead.
 
 **Making public/private (`POST /project/:id/set_public`):**
 1. Caller must have ADMIN access on the project.
 2. Calls `setPublic(project, public)` on the project itself.
-3. Calls `propagatePublic(project, public)` which:
+3. Calls `propagatePublic(project, public, actor)` which:
    - Bulk-loads all resources via `_gatherAllResources()`
-   - Calls `setPublic()` on each dataset, collection, and dataset view
+   - Sets `public` on each dataset, collection, and dataset view the actor owns
 
 **Adding a resource to an already-shared project:**
-- `addDataset` → calls `propagateAccessToDataset()` which applies the project's full
-  user ACL to the new dataset, its dataset views, and their configurations.
+- `addDataset` → calls `propagateAccessToDataset()` which applies the project's
+  user ACL to the new dataset, its dataset views, and their configurations, as the
+  caller may (above).
 - `addCollection` → calls `propagateAccessToCollection()` similarly.
 
 ### Resource Discovery (`_gatherAllResources`)
@@ -619,6 +655,129 @@ both flags defaulted to `false`.
 | `src/store/ProjectsAPI.ts` | `toProject()` maps `public` and `_accessLevel` |
 | `src/store/model.ts` | `IProject` includes `public?` and `_accessLevel?` |
 | `src/views/project/ProjectInfo.vue` | `isProjectPublic` / `isProjectShared` computed properties |
+
+---
+
+## Regression checklist
+
+Sharing limits (`server/helpers/aclLimits.py`, `test/test_share_escalation.py`). Each
+invariant names the test that holds it; re-check the group when you change any code
+that writes an ACL or a public flag, or that exports a project.
+
+**Direct sharing (`POST /dataset_view/share`)**
+- A WRITE collaborator cannot grant ADMIN, to themselves or another account (403) —
+  *"testWriteCollaboratorCannotGrantThemselvesAdmin"*,
+  *"testWriteCollaboratorCannotGrantAdminToAnotherAccount"*.
+- WRITE is enough to share, up to the caller's own level —
+  *"testWriteCollaboratorCanShareUpToTheirLevel"*.
+- A non-owner cannot remove the owner — *"testWriteCollaboratorCannotRemoveOwner"*.
+- Owners can grant and remove ADMIN (nimbusimage `access="admin"`) —
+  *"testOwnerCanGrantAdmin"*, *"testOwnerCanRemoveAccess"*.
+- The level check runs on every touched document: granting ADMIN when the caller can
+  only edit a configuration, or changing that configuration's owner, is refused and
+  changes nothing — *"testGrantAboveCallersLevelOnConfigurationIsRefused"*,
+  *"testConfigurationOwnerIsNotDowngraded"*.
+- Views must belong to one dataset; an empty list is a 400, not a 500 —
+  *"testViewsMustShareOneDataset"*, *"testEmptyViewListIsRejected"*.
+- (Owner self-lockout -- an owner removing or lowering their own ADMIN -- is handled
+  by PR #1165, not here.)
+
+**Project propagation**
+- Adding a dataset you can only edit to your own project does not make you its owner —
+  *"testAddingDatasetToOwnProjectDoesNotGrantAdmin"*.
+- `addCollection` does not reach datasets the caller cannot edit —
+  *"testAddingCollectionDoesNotReachUnsharedDatasets"*.
+- Sharing a project reaches what the caller could share directly (datasets, their
+  views and collections the caller can edit) and is refused, project included, if it
+  would exceed the caller's level on any of them —
+  *"testSharingProjectReachesDatasetsCallerCanEdit"*,
+  *"testSharingProjectReachesCollectionsCallerCanEdit"*,
+  *"testSharingProjectAboveCallersLevelIsRefused"*.
+- Copying the project ACL never lowers an existing entry, so the adder stays owner
+  and a public project publishes all of their dataset —
+  *"testAddingOwnDatasetToProjectKeepsOwnership"*,
+  *"testAddingOwnDatasetToPublicProjectPublishesAllOfIt"*.
+- Revoking a project member who owns a contained dataset (above the caller's level) is
+  refused, so owners are never removed —
+  *"testRevokingProjectMemberWhoOwnsAContainedDatasetIsRefused"*.
+- A refused project share writes nothing on any dataset (all checks before any write) —
+  *"testRefusedProjectShareWritesNothingAcrossDatasets"*.
+- A view reached through a project collection travels only if the caller can edit its
+  dataset — *"testCollectionViewOfOutsideDatasetNeedsThatDatasetEditable"*.
+- Copying the project's ACL onto an added dataset caps every member's entry at the
+  adder's level, not just the adder's — *"testAddedDatasetCapsOtherMembersAtTheAddersLevel"*.
+- An owner sharing a project still grants ADMIN on its contents —
+  *"testOwnerSharingProjectGrantsAdmin"*.
+- `set_public` publishes only what the caller owns and reports the rest it can see, and
+  the dialog shows that count — *"testPublishingProjectSkipsDatasetsCallerDoesNotOwn"*,
+  *"testPublishingProjectReportsSkippedResources"*,
+  *"testSkippedCountsOnlyResourcesTheCallerCanSee"*,
+  *"words the notice for a single skipped resource"*,
+  *"reports contained resources set_public left unchanged"*,
+  *"shows no notice when set_public changed everything"*.
+- The confirmation dialog does not claim every project resource is affected —
+  *"does not claim every project resource is affected"*.
+
+**Publishing (Zenodo)**
+- Upload and publish need ADMIN on every dataset and collection the project lists —
+  *"testUploadRefusesDatasetsCallerDoesNotOwn"*,
+  *"testPublishRefusesDatasetsCallerDoesNotOwn"*,
+  *"testUploadRefusesListedCollectionsCallerDoesNotOwn"*,
+  *"testOwnerPassesTheOwnershipCheck"*.
+- A configuration reached only through a dataset's views is exported (its property
+  definitions) only if the uploader owns it, and otherwise left out, with its
+  properties' values, rather than refusing the upload: anyone can create a view naming
+  any dataset, and make it public — *"testExportSkipsConfigurationsCallerDoesNotOwn"*,
+  *"testPublicStrangersViewDoesNotBlockTheExport"*,
+  *"testStrangersViewsDoNotBlockTheExport"*,
+  *"testExportOmitsValuesOfPropertiesItDoesNotDefine"*.
+- Only views the uploader can edit count, so a stranger's view (even public, even
+  pointing at the uploader's own configuration) cannot choose what the export contains
+  — *"testStrangersViewCannotAddUploadersConfiguration"*.
+- The upload job rechecks the project it reloads (resources can be added after the
+  endpoint's check) — *"testUploadJobRechecksTheProjectItExports"* — and checks again
+  immediately before reading any data, after its Zenodo calls —
+  *"testUploadRechecksOwnershipBeforeReadingData"*.
+- Anything deleted between the job's first check and that recheck is dropped, not
+  exported from the stale snapshot nor recorded —
+  *"testConfigurationDeletedBeforeTheRecheckIsNotExported"*.
+- The export publishes the configurations the check returned, never re-queried views
+  (a view can be repointed after the check) —
+  *"testExportUsesTheConfigurationsItChecked"*.
+- Publishing a draft checks the resources the upload recorded
+  (`meta.zenodo.uploadedResources`), not the project's membership by then —
+  *"testPublishChecksWhatTheDraftContains"*.
+- A recorded resource that was deleted after the upload blocks publishing with 409 (its
+  files are still in the draft and it can no longer be checked); upload still skips
+  deleted references — *"testPublishRefusesDraftWithDeletedResources"*. The shared
+  helper only reports what no longer exists; the endpoint decides that is an error —
+  *"testResourcesAccessHelperReportsMissingInsteadOfRaising"*.
+- The draft records only resources that existed and were exported (not references
+  already deleted, nor configurations reached through a deleted dataset's views), or
+  publish would refuse a valid draft — *"testUploadRecordsOnlyResourcesThatExist"*;
+  the record is built from what the job loaded for upload, so a resource deleted
+  between the check and that load is not recorded either (one deleted during the file
+  uploads is recorded and then blocks publishing) —
+  *"testDraftRecordsWhatTheJobUploaded"*.
+- A draft without an upload record (from before these checks) cannot be published; it
+  must be discarded and uploaded again (409) —
+  *"testPublishRefusesDraftsWithoutAnUploadRecord"*.
+
+**Process rules this feature proved**
+- Test fixtures: Girder makes the first user in a fresh database a site admin, who holds
+  ADMIN on everything; create custom users after `admin` and never use `admin` as the
+  actor in a limits test.
+- When a container (project) grants or exports, check every path that reaches a
+  contained resource, including ones found indirectly (views, a collection's datasets,
+  a view's configuration).
+- Check what you act on, not a re-query of it: the Zenodo path took several review
+  rounds because the endpoint, the job, the export and publish each derived the
+  resource set separately. The check now returns the set (`ProjectContents`), the
+  export uses it, and the draft records what was uploaded from it for publish.
+- Refusing because of a resource someone else can attach is a denial of service:
+  views reference datasets without any access check, so the export skips
+  configurations the uploader does not own instead of refusing them, and filtering by
+  "readable" is not enough (public views are readable by everyone).
 
 ---
 

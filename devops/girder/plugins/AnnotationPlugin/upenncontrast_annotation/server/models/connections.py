@@ -12,6 +12,7 @@ from girder.utility.acl_mixin import AccessControlMixin
 from .annotation import Annotation
 
 from ..helpers.connections import annotationToAnnotationDistance
+from ..helpers.constants import ANNOTATIONS_REMOVED_EVENT
 from ..helpers.fastjsonschema import customJsonSchemaCompile
 from ..helpers.proxiedModel import ProxiedModel
 
@@ -62,36 +63,16 @@ class AnnotationConnection(AccessControlMixin, ProxiedModel):
     )
 
     def annotationsRemovedEvent(self, event):
-        # Clean connections orphaned by the deletion of the annotations
-        annotationStringIds = event.info
-        pipeline = [
-            # Select the first annotation from the array
-            {"$match": {"_id": annotationStringIds[0]}},
-            # Bring up all connections who share the same datasetId
-            {"$lookup":
-                {
-                    "from": "annotation_connection",
-                    "localField": "datasetId",
-                    "foreignField": "datasetId",
-                    "as": "datasetConnections"
-                }},
-            # Replace root with connections (remove unnecessary annotation
-            # information)
-            {"$unwind": "$datasetConnections"},
-            {"$replaceRoot": {"newRoot": "$datasetConnections"}},
-            # Only match connections whose childId or parentId match one of
-            # the annotations to remove
-            {"$match": {"$or": [
-                {"childId": {"$in": annotationStringIds}},
-                {"parentId": {"$in": annotationStringIds}}
-            ]}},
-            # Only keep the necessary information
-            {"$project": {"_id": 1}}
-        ]
-        connectionsToRemove = [
-            connection["_id"]
-            for connection in Annotation().collection.aggregate(pipeline)]
-        self.removeWithQuery({"_id": {"$in": connectionsToRemove}})
+        # Clean connections orphaned by the deletion of the annotations.
+        # event.info is a list of ObjectIds of annotations being removed
+        # (see ANNOTATIONS_REMOVED_EVENT in helpers/constants.py). Any
+        # connection whose child or parent is being removed is orphaned, so
+        # match on childId/parentId directly (both indexed).
+        annotationIds = event.info
+        self.removeWithQuery({"$or": [
+            {"childId": {"$in": annotationIds}},
+            {"parentId": {"$in": annotationIds}},
+        ]})
 
     def folderRemovedEvent(self, event):
         if event.info and event.info["_id"]:
@@ -103,7 +84,7 @@ class AnnotationConnection(AccessControlMixin, ProxiedModel):
     def initialize(self):
         self.name = "annotation_connection"
         events.bind(
-            "model.upenn_annotation.removeStringIds",
+            ANNOTATIONS_REMOVED_EVENT,
             "upenn.connections.annotationsRemovedEvent",
             self.annotationsRemovedEvent,
         )

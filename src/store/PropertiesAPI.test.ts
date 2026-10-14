@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 // PropertiesAPI -> @/utils/fetch -> @/store/progress -> @/store root, which
 // creates a circular import when the API class is loaded in isolation. Mock
@@ -7,6 +9,7 @@ vi.mock("@/utils/fetch", () => ({ fetchAllPages: vi.fn() }));
 
 import PropertiesAPI from "./PropertiesAPI";
 import type { IAnnotationProperty } from "./model";
+import { MAX_PROPERTY_COMPUTE_BATCH } from "./constants";
 
 const makeProperty = (
   id: string,
@@ -55,6 +58,43 @@ describe("PropertiesAPI.getUncomputedCounts", () => {
 
     expect(result).toEqual({});
     expect(post).not.toHaveBeenCalled();
+  });
+});
+
+describe("PropertiesAPI.computeProperties", () => {
+  it("submits every property in one request", async () => {
+    const post = vi.fn().mockResolvedValue({ data: [] });
+    const api = new PropertiesAPI({ post } as any);
+    const properties = [
+      makeProperty("p1", "point", ["nucleus"], false),
+      makeProperty("p2", "polygon", [], true),
+    ];
+    const scales = { pixelSize: { value: 1, unit: "um" } } as any;
+
+    await api.computeProperties("dataset-1", properties, scales);
+
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post).toHaveBeenCalledWith("annotation_property/compute", {
+      datasetId: "dataset-1",
+      properties: properties.map((property) => ({
+        id: property.id,
+        parameters: { ...property, scales },
+      })),
+    });
+  });
+});
+
+describe("property compute batch cap", () => {
+  it("matches the server's MAX_COMPUTE_PROPERTIES", () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        "../../devops/girder/plugins/AnnotationPlugin/upenncontrast_annotation/server/api/property.py",
+      ),
+      "utf8",
+    );
+    const serverCap = source.match(/^MAX_COMPUTE_PROPERTIES = (\d+)$/m)?.[1];
+    expect(Number(serverCap)).toBe(MAX_PROPERTY_COMPUTE_BATCH);
   });
 });
 

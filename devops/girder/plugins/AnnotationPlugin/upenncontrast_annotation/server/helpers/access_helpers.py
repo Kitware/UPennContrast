@@ -1,12 +1,19 @@
 """Shared helpers for access control endpoints."""
 
+from collections import defaultdict
+from dataclasses import dataclass, field
+
+from bson import ObjectId
+
 from girder.constants import AccessType
 from girder.exceptions import AccessException, RestException
 from girder.models.folder import Folder
 from girder.models.user import User
 
+from .constants import MAX_IDS_PER_QUERY
 from ..models.annotation import Annotation
-from ..models.propertyValues import MAX_IDS_PER_QUERY
+from ..models.collection import Collection
+from ..models.datasetView import DatasetView
 
 SHARE_ACCESS_TYPES = (
     AccessType.NONE, AccessType.READ, AccessType.WRITE, AccessType.ADMIN
@@ -113,6 +120,115 @@ def requireDatasetsAccess(datasetIds, user, level=AccessType.WRITE):
         )
     for dataset in datasets:
         folderModel.requireAccess(dataset, user, level)
+
+
+@dataclass
+class ProjectContents:
+    """What a project's export publishes, as an access check saw it."""
+    datasetIds: list
+    collectionIds: list
+    # dataset id -> configuration docs (with meta.propertyIds) its views use
+    configsByDataset: dict = field(default_factory=dict)
+
+
+def _requireDocsAccess(model, ids, user, level, fields):
+    """Check access on the docs among `ids` that exist; return them by id."""
+    docs = {}
+    for doc in model.find({'_id': {'$in': list(ids)}}, fields=fields):
+        model.requireAccess(doc, user, level)
+        docs[doc['_id']] = doc
+    return docs
+
+
+def requireResourcesAccess(datasetIds, collectionIds, user,
+                           level=AccessType.ADMIN):
+    """Check access on datasets and collections loaded in two queries.
+
+    Ids that no longer resolve are left out of the result rather than
+    refused: whether a missing resource is an error is the caller's call
+    (publishing a Zenodo draft refuses it, since the draft still holds its
+    files; the upload job just drops it).
+
+    :raises AccessException: If user lacks access to any that exist.
+    :returns: (ids of the datasets that exist, collection documents that
+        exist by id, with meta.propertyIds).
+    """
+    datasets = _requireDocsAccess(
+        Folder(), set(datasetIds), user, level, ['access', 'public'])
+    collections = _requireDocsAccess(
+        Collection(), set(collectionIds), user, level,
+        ['access', 'public', 'meta.propertyIds'])
+    return list(datasets), collections
+
+
+def requireProjectContentsAccess(project, user, level=AccessType.ADMIN):
+    """Check access on everything a project's export publishes.
+
+    Project-level access says nothing about the resources in it: a dataset
+    can be added by someone with only WRITE on it, and a project admin may
+    not be able to read it at all. Publishing a project (Zenodo) is an owner
+    operation on each dataset and collection it lists. Configurations
+    reached only through views of its datasets are exported (their
+    property definitions) only when the user owns them, and otherwise left
+    out; only views the user can edit count. References to deleted
+    resources are skipped, as the export skips them, and left out of the
+    result.
+
+    Views and project membership can change after the check, so the export
+    must use what this returns rather than query them again, and publishing
+    a draft must check what was uploaded (requireResourcesAccess on the
+    returned ids), not the project as it is by then.
+
+    :raises AccessException: If user lacks access to any of them.
+    :returns: A ProjectContents of what was checked and exists.
+    """
+    meta = project.get('meta', {})
+    datasetIds = list(_requireDocsAccess(
+        Folder(),
+        {ObjectId(d['datasetId']) for d in meta.get('datasets', [])},
+        user, level, ['access', 'public']))
+    # Collections the project lists are published as such: the user must
+    # own them.
+    collectionsById = _requireDocsAccess(
+        Collection(),
+        {ObjectId(c['collectionId']) for c in meta.get('collections', [])},
+        user, level, ['access', 'public', 'meta.propertyIds'])
+    # Configurations reached only through views of the uploaded datasets
+    # contribute their property definitions only if the user owns them,
+    # and are otherwise left out rather than refused. Only views the user
+    # can edit count: anyone can create a view naming any dataset (and
+    # make it public, which grants READ but never WRITE), so a stranger's
+    # view must neither block the upload nor choose what it contains.
+    configIdsByDataset = defaultdict(set)
+    if datasetIds:
+        datasetViewModel = DatasetView()
+        for view in datasetViewModel.find(
+                {'datasetId': {'$in': datasetIds}},
+                fields=['datasetId', 'configurationId', 'access',
+                        'public']):
+            if not datasetViewModel.hasAccess(
+                    view, user, AccessType.WRITE):
+                continue
+            configIdsByDataset[view['datasetId']].add(
+                view['configurationId'])
+    viewConfigIds = set().union(*configIdsByDataset.values()) - set(
+        collectionsById)
+    collectionModel = Collection()
+    for doc in collectionModel.find(
+            {'_id': {'$in': list(viewConfigIds)}},
+            fields=['access', 'public', 'meta.propertyIds']):
+        if collectionModel.hasAccess(doc, user, level):
+            collectionsById[doc['_id']] = doc
+    return ProjectContents(
+        datasetIds=datasetIds,
+        collectionIds=list(collectionsById),
+        configsByDataset={
+            datasetId: [
+                collectionsById[c] for c in configIds
+                if c in collectionsById]
+            for datasetId, configIds in configIdsByDataset.items()
+        },
+    )
 
 
 def requireAnnotationsInDatasets(entries):

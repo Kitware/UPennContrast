@@ -116,8 +116,9 @@ are chosen to survive that migration (aggregates in, aggregates out).
 Scope of "the annotations": analysis is restricted to annotations that
 currently exist (the live set: full annotations, or stubs in stub-only mode),
 not to every property-value document.
-The two can diverge — the backend leaves property values orphaned after
-annotation deletion (issue #1243) — and analysis must reflect real objects, so
+The two can diverge — bulk annotation deletion used to leave property values
+orphaned (issue #1243; the cleanup is fixed, but values orphaned before the fix
+may remain in existing datasets) — and analysis must reflect real objects, so
 the tools intersect with the live set (§5.1). A query narrows within that set;
 no query means all live annotations.
 
@@ -305,9 +306,10 @@ iterates the query's matches when a query was given (`queryAnnotations`,
 already restricted to live annotations), else every id in the live annotation
 set (`liveAnnotationIdSet()` = `annotationStore.allAnnotationIds`, stub ids in
 stub-only mode) — never the raw value keys.** This matters: property-value documents can outlive
-their annotation (a backend cleanup gap leaves values orphaned after
-deletion — tracked in
-[issue #1243](https://github.com/arjunrajlaboratory/NimbusImage/issues/1243)),
+their annotation (bulk deletion used to leave values orphaned —
+[issue #1243](https://github.com/arjunrajlaboratory/NimbusImage/issues/1243);
+the cleanup is fixed, but orphans written before the fix may remain in existing
+datasets),
 so iterating `propertyValues` directly would count deleted annotations and add
 a spurious "untagged" group to tag-grouped plots. The extended
 `get_property_values`, `get_property_histogram`, and all three plot tools go
