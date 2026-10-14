@@ -13,13 +13,12 @@ from girder.utility.acl_mixin import AccessControlMixin
 from ..helpers.aggregation import AGGREGATION_MAX_TIME_MS
 from ..helpers.customModel import bulkWriteErrorMessage
 from ..helpers.fastjsonschema import customJsonSchemaCompile
+from ..helpers.constants import ANNOTATIONS_REMOVED_EVENT, MAX_IDS_PER_QUERY
 from ..helpers.proxiedModel import ProxiedModel
 from ..helpers import valueProviders
 
 
 DUPLICATE_KEY_ERROR = 11000
-# Chunk $in queries so a large batch can't build a pathological query.
-MAX_IDS_PER_QUERY = 50000
 
 
 class PropertySchema:
@@ -105,14 +104,14 @@ class AnnotationPropertyValues(AccessControlMixin, ProxiedModel):
 
     def annotationsRemovedEvent(self, event):
         # Clean property values orphaned by the deletion of the annotations.
-        # event.info is a list of ObjectIds (the emitters in
-        # models/annotation.py convert bulk deletes' string ids).
+        # event.info is a list of ObjectIds of annotations being removed
+        # (see ANNOTATIONS_REMOVED_EVENT in helpers/constants.py).
         self.removeWithQuery({"annotationId": {"$in": event.info}})
 
     def initialize(self):
         self.name = "annotation_property_values"
         events.bind(
-            "model.upenn_annotation.removeStringIds",
+            ANNOTATIONS_REMOVED_EVENT,
             "upenn.annotation_values.annotationsRemovedEvent",
             self.annotationsRemovedEvent,
         )

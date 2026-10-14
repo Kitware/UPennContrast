@@ -12,6 +12,7 @@ from girder.utility.acl_mixin import AccessControlMixin
 from .annotation import Annotation
 
 from ..helpers.connections import annotationToAnnotationDistance
+from ..helpers.constants import ANNOTATIONS_REMOVED_EVENT
 from ..helpers.fastjsonschema import customJsonSchemaCompile
 from ..helpers.proxiedModel import ProxiedModel
 
@@ -63,8 +64,8 @@ class AnnotationConnection(AccessControlMixin, ProxiedModel):
 
     def annotationsRemovedEvent(self, event):
         # Clean connections orphaned by the deletion of the annotations.
-        # event.info is a list of ObjectIds (the emitters in
-        # models/annotation.py convert bulk deletes' string ids). Any
+        # event.info is a list of ObjectIds of annotations being removed
+        # (see ANNOTATIONS_REMOVED_EVENT in helpers/constants.py). Any
         # connection whose child or parent is being removed is orphaned, so
         # match on childId/parentId directly (both indexed).
         annotationIds = event.info
@@ -83,7 +84,7 @@ class AnnotationConnection(AccessControlMixin, ProxiedModel):
     def initialize(self):
         self.name = "annotation_connection"
         events.bind(
-            "model.upenn_annotation.removeStringIds",
+            ANNOTATIONS_REMOVED_EVENT,
             "upenn.connections.annotationsRemovedEvent",
             self.annotationsRemovedEvent,
         )

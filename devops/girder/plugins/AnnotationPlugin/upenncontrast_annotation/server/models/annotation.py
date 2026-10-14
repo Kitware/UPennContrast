@@ -20,6 +20,7 @@ from ..helpers.aggregation import (
     AGGREGATION_MAX_TIME_MS,
     prefetchedDocuments,
 )
+from ..helpers.constants import ANNOTATIONS_REMOVED_EVENT, MAX_IDS_PER_QUERY
 from ..helpers.colormaps import (
     CONTINUOUS_COLORMAPS,
     DEFAULT_COLORMAP,
@@ -36,7 +37,7 @@ from ..helpers.annotationRaster import (
     bumpDatasetRasterVersion,
     bumpGlobalRasterVersion,
 )
-from .propertyValues import AnnotationPropertyValues, MAX_IDS_PER_QUERY
+from .propertyValues import AnnotationPropertyValues
 
 # Ceiling on how many ObjectIds all analysis gates together may push into a
 # list query. Each id costs ~20 bytes in a BSON array (12-byte oid + index
@@ -202,9 +203,7 @@ class Annotation(AccessControlMixin, ProxiedModel):
 
     def annotationRemovedEvent(self, event):
         if event.info and event.info["_id"]:
-            events.trigger(
-                "model.upenn_annotation.removeStringIds", [event.info["_id"]]
-            )
+            events.trigger(ANNOTATIONS_REMOVED_EVENT, [event.info["_id"]])
 
     def multipleAnnotationsRemovedEvent(self, event):
         if not event.info:
@@ -230,9 +229,7 @@ class Annotation(AccessControlMixin, ProxiedModel):
                 )
             ]
             if existingIds:
-                events.trigger(
-                    "model.upenn_annotation.removeStringIds", existingIds
-                )
+                events.trigger(ANNOTATIONS_REMOVED_EVENT, existingIds)
 
     def initialize(self):
         self.name = "upenn_annotation"
@@ -242,8 +239,8 @@ class Annotation(AccessControlMixin, ProxiedModel):
             self.cleanOrphaned,
         )
         # Cleaning the database when annotations are removed is done by a
-        # custom event: model.upenn_annotation.removeStringIds. Despite the
-        # name, its payload is a list of ObjectIds from both emitters above.
+        # custom event, ANNOTATIONS_REMOVED_EVENT, triggered by both
+        # emitters above with the ObjectIds of the annotations being removed.
         events.bind(
             "model.upenn_annotation.remove",
             "upenn.connections.annotationRemovedEvent",

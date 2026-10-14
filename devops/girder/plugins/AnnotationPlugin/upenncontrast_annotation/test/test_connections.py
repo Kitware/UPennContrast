@@ -11,6 +11,9 @@ from upenncontrast_annotation.server.models.connections import (
 from upenncontrast_annotation.server.models.propertyValues import (
     AnnotationPropertyValues,
 )
+from upenncontrast_annotation.server.helpers.constants import (
+    ANNOTATIONS_REMOVED_EVENT,
+)
 from upenncontrast_annotation.server.models import connections
 from upenncontrast_annotation.server.models import (
     annotation as annotationModule,
@@ -651,10 +654,10 @@ class TestDeleteCleansUpConnections:
     """Deleting annotations must remove the connections that reference them.
 
     Regression for issue #1243: bulk delete used to emit string ids into the
-    removeStringIds event, but childId/parentId are stored as ObjectIds, so
-    the cleanup's string $in matched nothing and bulk-deleted annotations
-    left their connections orphaned. (Single delete passed an ObjectId and
-    worked.) The emitter now converts to ObjectIds.
+    annotation-removal cleanup event, but childId/parentId are stored as
+    ObjectIds, so the cleanup's string $in matched nothing and bulk-deleted
+    annotations left their connections orphaned. (Single delete passed an
+    ObjectId and worked.) The emitter now converts to ObjectIds.
     """
 
     def _chain(self, admin, count=3, name="cleanup-ds"):
@@ -848,7 +851,7 @@ class TestDeleteCleansUpConnections:
             )
         payloadSizes = []
         events.bind(
-            "model.upenn_annotation.removeStringIds",
+            ANNOTATIONS_REMOVED_EVENT,
             "test.recordPayloadSizes",
             lambda event: payloadSizes.append(len(event.info)),
         )
@@ -856,7 +859,7 @@ class TestDeleteCleansUpConnections:
             Annotation().deleteMultiple([str(i) for i in annotationIds])
         finally:
             events.unbind(
-                "model.upenn_annotation.removeStringIds",
+                ANNOTATIONS_REMOVED_EVENT,
                 "test.recordPayloadSizes",
             )
 

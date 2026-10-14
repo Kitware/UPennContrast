@@ -10,10 +10,10 @@ from girder.exceptions import AccessException, RestException
 from girder.models.folder import Folder
 from girder.models.user import User
 
+from .constants import MAX_IDS_PER_QUERY
 from ..models.annotation import Annotation
 from ..models.collection import Collection
 from ..models.datasetView import DatasetView
-from ..models.propertyValues import MAX_IDS_PER_QUERY
 
 SHARE_ACCESS_TYPES = (
     AccessType.NONE, AccessType.READ, AccessType.WRITE, AccessType.ADMIN
