@@ -463,9 +463,9 @@ function trackJob(jobId: string) {
 async function startUpload() {
   // Render the progress section immediately (indeterminate) so the user
   // sees something while the request to kick off the job is in flight,
-  // before zenodoStatus refreshes to "uploading". This also hides the
-  // upload button (it is gated on !localProgress), so we don't need a
-  // separate "uploading" flag.
+  // before zenodoStatus refreshes to "uploading". localProgress hides the
+  // upload button; startingUpload (via requestInFlight) disables the other
+  // actions.
   localProgress.value = {
     current: 0,
     total: 0,
@@ -560,8 +560,9 @@ async function recoverActiveJob() {
     const activeJob = await store.zenodoAPI.findActiveUploadJob(
       props.project.id,
     );
-    // startUpload may have subscribed while this was in flight.
-    if (trackedJobId.value) return;
+    // Unmounted (e.g. switched project), or startUpload subscribed, while
+    // this was in flight.
+    if (unmounted || trackedJobId.value) return;
     if (!activeJob) {
       // The project says "uploading" but this user has no upload job: the
       // project copy is stale (cached, or a refresh landed out of order),
@@ -593,8 +594,17 @@ async function recoverActiveJob() {
 // it, so the card leaves "uploading" when the job ends.
 watch(
   zenodoStatus,
-  (status) => {
+  (status, oldStatus) => {
     if (status !== "uploading") stopInvisibleUploadPoll();
+    // The server says the upload is over. Drop the subscription even if its
+    // terminal job event never arrived (the notification socket can give
+    // up), or every action would stay disabled. Only on leaving
+    // "uploading": right after startUpload the status can still read
+    // "error" while the new job runs.
+    if (oldStatus === "uploading" && status !== "uploading") {
+      trackedJobId.value = null;
+      localProgress.value = null;
+    }
     if (status === "uploading" && !trackedJobId.value && !recoveringJob.value) {
       recoverActiveJob();
     }

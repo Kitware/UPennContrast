@@ -274,6 +274,42 @@ describe("ZenodoPublish", () => {
     }
   });
 
+  it("schedules nothing if unmounted while looking up the job", async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveLookup!: (job: null) => void;
+      mocks.findActiveUploadJob.mockReturnValue(
+        new Promise((r) => (resolveLookup = r)),
+      );
+      mocks.getUploadStatus.mockResolvedValue({ status: "uploading" });
+      const w = await mountComponent("uploading");
+      w.unmount();
+      wrapper = null;
+      resolveLookup(null);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(mocks.getUploadStatus).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("re-enables the actions when the upload ends without its job event", async () => {
+    // e.g. the notification socket gave up: the terminal event never comes,
+    // but the re-read project says the upload is over.
+    mocks.uploadProject.mockResolvedValue({ jobId: "job-1", totalFiles: 3 });
+    const w = await mountComponent();
+    await clickButton(w, "Upload to Zenodo");
+    await w.setProps({ project: project("uploading") });
+    await w.setProps({ project: project("draft") });
+    await flushPromises();
+
+    const mint = w
+      .findAll("button")
+      .find((b) => b.text().includes("Publish (Mint DOI)"))!;
+    expect(mint.attributes("disabled")).toBeUndefined();
+    expect(w.text()).not.toContain("Upload in progress");
+  });
+
   it("can't upload while a discard is running", async () => {
     mocks.discardDraft.mockReturnValue(new Promise(() => {}));
     const w = await mountComponent("error");
