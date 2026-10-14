@@ -128,14 +128,16 @@ describe("ZenodoPublish", () => {
 
   it("shows a project-level 403 without the dataset hint", async () => {
     mocks.uploadProject.mockRejectedValue(
-      serverError(403, "Admin access denied for project p1 (user u1)."),
+      serverError(403, "Admin access denied for upenn_project p1 (user u1)."),
     );
     const w = await mountComponent();
 
     await clickButton(w, "Upload to Zenodo");
 
     const text = requestError(w).text();
-    expect(text).toContain("Admin access denied for project p1 (user u1).");
+    expect(text).toContain(
+      "Admin access denied for upenn_project p1 (user u1).",
+    );
     expect(text).not.toContain(OWNER_HINT);
   });
 
@@ -562,7 +564,10 @@ describe("ZenodoPublish", () => {
 
   it("shows the server's message in the publish dialog", async () => {
     mocks.publishProject.mockRejectedValue(
-      serverError(403, "Admin access denied for collection c1 (user u1)."),
+      serverError(
+        403,
+        "Admin access denied for upenn_collection c1 (user u1).",
+      ),
     );
     const w = await mountComponent("draft");
 
@@ -579,7 +584,7 @@ describe("ZenodoPublish", () => {
       '[data-testid="zenodo-publish-error"]',
     );
     expect(alert?.textContent).toContain(
-      "Admin access denied for collection c1 (user u1).",
+      "Admin access denied for upenn_collection c1 (user u1).",
     );
     expect(alert?.textContent).toContain(OWNER_HINT);
     // Dialog stays open on failure, and the card doesn't repeat the error.

@@ -382,10 +382,12 @@ const CONTENTS_ACCESS_HINT =
   "collection in the project. Ask their owners for owner access, or " +
   "remove them from the project.";
 
-// Girder's AccessException names the model: "Admin access denied for
-// folder <id> (user <id>)." Only a dataset (folder) or collection refusal
-// gets the hint; a project-level refusal is explained by its own message.
-const CONTENTS_ACCESS_DENIED = /access denied for (folder|collection)\b/i;
+// Girder's AccessException names the model by its collection name: "Admin
+// access denied for folder <id> (user <id>)." for a dataset, and
+// "upenn_collection" / "upenn_project" for the plugin's models. Only a
+// dataset or collection refusal gets the hint; a project-level refusal is
+// explained by its own message.
+const CONTENTS_ACCESS_DENIED = /access denied for (folder|upenn_collection) /i;
 
 function showRequestError(request: TZenodoRequest, error: unknown) {
   const message = extractErrorMessage(error);

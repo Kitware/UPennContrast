@@ -336,7 +336,8 @@ curl -s -H "Girder-Token: $TOKEN" http://localhost:8080/api/v1/zenodo/status/PRO
 - **Publish without draft**: Returns 400 "No draft deposition to publish"
 - **Discard during a live upload**: Returns 409 "An upload is in progress for this project." Discard still accepts `uploading` so a project whose job died can be reset, but not while an upload may be using the deposition: `meta.zenodo.jobId` names a live job, or no job is recorded yet. The upload endpoint's `uploading` write clears the previous `jobId` in the same update and records the new one before scheduling, so the window in between fails closed rather than reading the previous upload's ended job. Without this, a stale card in another tab could delete the deposition the job is using. A job whose thread died stays live-looking only if it never reached ERROR, which is what a Girder restart mid-upload leaves (Girder never sweeps local jobs: the job stays RUNNING, or INACTIVE if the restart came before its thread started). For that, and for a project stuck in `uploading` from before job ids were recorded, `POST zenodo/discard/:projectId?force=true` resets the project anyway.
 - **Not the owner of a dataset or collection in the project**: Upload and publish return
-  403 "Admin access denied for folder|collection ..." (the ownership check added by PR #1410,
+  403 "Admin access denied for folder <id> ..." or "... for upenn_collection <id> ..." (Girder names
+  the model by its collection name; the ownership check added by PR #1410,
   `requireProjectContentsAccess`)
 
 In the UI, `ZenodoPublish.vue` shows the server's `response.data.message` for every
@@ -426,7 +427,7 @@ Run `pnpm test src/components/ZenodoPublish.test.ts src/store/ZenodoAPI.test.ts 
 ### Error display
 
 - [ ] **The server's message reaches the user**, on the card for upload and discard, inside the dialog for publish (which stays open). — *"shows the server's message when the upload is refused"*, *"shows the server's message in the publish dialog"*
-- [ ] **The owner-access hint only follows an upload/publish 403 that names a folder or collection.** A project-level 403 and every discard error are shown as sent. — *"explains owner access when a dataset refuses the upload"*, *"shows a project-level 403 without the dataset hint"*, *"shows a discard refusal without the publishing hint"*
+- [ ] **The owner-access hint only follows an upload/publish 403 that names a folder or collection.** A project-level 403 and every discard error are shown as sent. — *"explains owner access when a dataset refuses the upload"*, *"shows the server's message in the publish dialog"* (an `upenn_collection` refusal), *"shows a project-level 403 without the dataset hint"*, *"shows a discard refusal without the publishing hint"*
 - [ ] **One error per request.** A request starting or failing never hides or relabels another's. — *"keeps each request's error in its own place"*
 - [ ] **Stale errors clear** on retry and on saving a token. — *"clears the error on retry and after saving a token"*
 
