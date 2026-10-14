@@ -139,7 +139,7 @@
         color="error"
         size="small"
         :loading="discarding"
-        :disabled="publishing || !!localProgress"
+        :disabled="requestInFlight"
         @click="discardDraft"
       >
         <v-icon start>mdi-delete</v-icon>
@@ -153,7 +153,7 @@
         color="success"
         size="small"
         :loading="publishing"
-        :disabled="discarding"
+        :disabled="requestInFlight"
         @click="openPublishConfirm"
       >
         <v-icon start>mdi-earth</v-icon>
@@ -176,7 +176,7 @@
               variant="flat"
               color="primary"
               size="small"
-              :disabled="!hasToken"
+              :disabled="!hasToken || requestInFlight"
               @click="startUpload"
             >
               <v-icon start>mdi-cloud-upload</v-icon>
@@ -249,7 +249,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import store from "@/store";
 import jobs from "@/store/jobs";
 import { logError } from "@/utils/log";
@@ -276,6 +276,19 @@ const hasToken = ref(false);
 const isSandbox = ref(false);
 const publishing = ref(false);
 const discarding = ref(false);
+const startingUpload = ref(false);
+// Upload, publish and discard all change the same deposition and
+// meta.zenodo, so only one may be in flight. Every action button checks
+// this one flag rather than a pairwise guard per combination.
+const requestInFlight = computed(
+  () =>
+    publishing.value ||
+    discarding.value ||
+    startingUpload.value ||
+    // An upload this card started or follows is still running; the project
+    // may not say "uploading" yet (the refresh hasn't landed).
+    !!trackedJobId.value,
+);
 // The server's refusal message for each request, or null. Kept per request
 // so one request starting or failing never hides or relabels another's.
 type TZenodoRequest = "upload" | "discard" | "publish";
@@ -291,6 +304,16 @@ const cardErrorRequests = computed(() =>
 // The upload job this card is subscribed to, so it subscribes once per job.
 const trackedJobId = ref<string | null>(null);
 const recoveringJob = ref(false);
+// While the project reports an upload whose job this user can't see (a
+// co-owner's), poll the upload status: no job event will say when it ends.
+const INVISIBLE_UPLOAD_POLL_MS = 10_000;
+let invisibleUploadPoll: ReturnType<typeof setTimeout> | null = null;
+let unmounted = false;
+
+function stopInvisibleUploadPoll() {
+  if (invisibleUploadPoll !== null) clearTimeout(invisibleUploadPoll);
+  invisibleUploadPoll = null;
+}
 
 // Local progress state, updated from job SSE events
 const localProgress = ref<{
@@ -448,6 +471,7 @@ async function startUpload() {
     total: 0,
     message: "Starting upload…",
   };
+  startingUpload.value = true;
   requestErrors.value.upload = null;
   try {
     const response = await store.zenodoAPI.uploadProject(props.project.id);
@@ -468,6 +492,8 @@ async function startUpload() {
     if (isAxiosError(error) && error.response?.status === 409) {
       emit("updated");
     }
+  } finally {
+    startingUpload.value = false;
   }
 }
 
@@ -505,6 +531,27 @@ async function discardDraft() {
   }
 }
 
+function scheduleInvisibleUploadPoll() {
+  stopInvisibleUploadPoll();
+  invisibleUploadPoll = setTimeout(async () => {
+    invisibleUploadPoll = null;
+    if (zenodoStatus.value !== "uploading" || trackedJobId.value) return;
+    try {
+      const { status } = await store.zenodoAPI.getUploadStatus(
+        props.project.id,
+      );
+      // Ended: re-read the project. Keep polling until the card's status
+      // changes, in case that re-read fails.
+      if (status !== "uploading") emit("updated");
+    } catch (error) {
+      logError("Failed to check Zenodo upload status", error);
+    }
+    // Unmounted, or the status moved on, while the request was in flight.
+    if (unmounted || zenodoStatus.value !== "uploading") return;
+    scheduleInvisibleUploadPoll();
+  }, INVISIBLE_UPLOAD_POLL_MS);
+}
+
 async function recoverActiveJob() {
   // An upload this card didn't start (page load mid-upload, or another tab
   // per a 409): find its job and subscribe to its SSE stream.
@@ -516,11 +563,13 @@ async function recoverActiveJob() {
     // startUpload may have subscribed while this was in flight.
     if (trackedJobId.value) return;
     if (!activeJob) {
-      // The project says "uploading" but no upload is running: the
-      // project is stale (a cached copy, or a refresh that landed out of
-      // order). Re-read it. This can't loop: the watcher only fires when
-      // the status changes.
+      // The project says "uploading" but this user has no upload job: the
+      // project copy is stale (cached, or a refresh landed out of order),
+      // or the upload is a co-owner's, whose job Girder never shows us.
+      // Re-read the project now, then watch the cheap status endpoint until
+      // the upload ends (the status watcher stops the poll).
       emit("updated");
+      scheduleInvisibleUploadPoll();
       return;
     }
     trackJob(activeJob._id);
@@ -545,6 +594,7 @@ async function recoverActiveJob() {
 watch(
   zenodoStatus,
   (status) => {
+    if (status !== "uploading") stopInvisibleUploadPoll();
     if (status === "uploading" && !trackedJobId.value && !recoveringJob.value) {
       recoverActiveJob();
     }
@@ -554,5 +604,10 @@ watch(
 
 onMounted(() => {
   checkToken();
+});
+
+onBeforeUnmount(() => {
+  unmounted = true;
+  stopInvisibleUploadPoll();
 });
 </script>

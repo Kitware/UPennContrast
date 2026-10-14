@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   publishProject: vi.fn(),
   discardDraft: vi.fn(),
   findActiveUploadJob: vi.fn(),
+  getUploadStatus: vi.fn(),
 }));
 
 vi.mock("@/store", () => ({
@@ -222,6 +223,82 @@ describe("ZenodoPublish", () => {
 
     expect(jobsMock.addJob).not.toHaveBeenCalled();
     expect(w.emitted("updated")).toHaveLength(1);
+  });
+
+  it("keeps re-reading while the upload's job is invisible", async () => {
+    // A co-owner's upload: Girder never shows this user its job, so only
+    // the project status can say when it ends.
+    vi.useFakeTimers();
+    try {
+      mocks.findActiveUploadJob.mockResolvedValue(null);
+      mocks.getUploadStatus.mockResolvedValue({ status: "uploading" });
+      const w = await mountComponent("uploading");
+      // One immediate re-read, in case the project copy is just stale.
+      expect(w.emitted("updated")).toHaveLength(1);
+
+      // Polls the light status endpoint; no project re-read while the
+      // upload is still running.
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(mocks.getUploadStatus).toHaveBeenCalledTimes(2);
+      expect(mocks.getUploadStatus).toHaveBeenCalledWith("p1");
+      expect(w.emitted("updated")).toHaveLength(1);
+
+      // The upload ended: re-read the project. If that re-read doesn't
+      // land, keep asking; stop once the card's status changes.
+      mocks.getUploadStatus.mockResolvedValue({ status: "draft" });
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(w.emitted("updated")).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(w.emitted("updated")).toHaveLength(3);
+      await w.setProps({ project: project("draft") });
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(mocks.getUploadStatus).toHaveBeenCalledTimes(4);
+      expect(w.emitted("updated")).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops polling when unmounted", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.findActiveUploadJob.mockResolvedValue(null);
+      mocks.getUploadStatus.mockResolvedValue({ status: "uploading" });
+      const w = await mountComponent("uploading");
+      w.unmount();
+      wrapper = null;
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(mocks.getUploadStatus).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("can't upload while a discard is running", async () => {
+    mocks.discardDraft.mockReturnValue(new Promise(() => {}));
+    const w = await mountComponent("error");
+
+    await clickButton(w, "Discard Draft");
+
+    // Both would change the same deposition and meta.zenodo.
+    const upload = w
+      .findAll("button")
+      .find((b) => b.text().includes("Upload to Zenodo"))!;
+    expect(upload.attributes("disabled")).toBeDefined();
+  });
+
+  it("can't discard an upload that started before the refresh lands", async () => {
+    mocks.uploadProject.mockResolvedValue({ jobId: "job-1", totalFiles: 3 });
+    const w = await mountComponent("error");
+
+    await clickButton(w, "Upload to Zenodo");
+
+    // The request finished, but the project still says "error" until the
+    // refresh: Discard is still shown and must stay disabled.
+    const discard = w
+      .findAll("button")
+      .find((b) => b.text().includes("Discard Draft"))!;
+    expect(discard.attributes("disabled")).toBeDefined();
   });
 
   it("can't discard while an upload is starting", async () => {
