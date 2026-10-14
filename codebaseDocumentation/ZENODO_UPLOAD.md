@@ -334,9 +334,8 @@ the success path writes `draft` before SUCCESS), because the card re-reads the p
 when the terminal status arrives. `ProjectInfo.vue` keys the card by project id: the
 route reuses the view across projects, and errors, progress and the job subscription
 belong to one project.
-Tests: `src/components/ZenodoPublish.test.ts`, `ProjectInfo.test.ts` ("gives each
-project its own ZenodoPublish instance"), `test_zenodo.py`
-(`test_fail_writes_project_status_before_job_status`).
+The tests for each of these are listed in the regression checklist at the end of this
+document.
 
 ### curl Quick Reference
 
@@ -390,3 +389,35 @@ The following scenarios have been verified end-to-end against `sandbox.zenodo.or
 | Job progress tracking | all | JSON log lines parsed correctly (0% → 25% → 50% → 100%) |
 | SSE-based frontend tracking | all | `jobs.addJob()` receives progress events in real time |
 | Recovery on page reload | all | `recoverActiveJob()` re-subscribes to the active job when the status is `uploading` (on mount, or after a refresh) |
+
+## Regression checklist
+
+Each item was a review finding on the error-display and upload-tracking work (PR #1414),
+and several were **consequences of an earlier round's fix**: making the 409 refresh the
+project exposed mount-only job tracking; tracking a job in the shared in-flight flag
+needed the lost-terminal-event release. Change any of this code and re-check the list.
+
+Run `pnpm test src/components/ZenodoPublish.test.ts src/store/ZenodoAPI.test.ts src/views/project/ProjectInfo.test.ts`, plus `tox -- upenncontrast_annotation/test/test_zenodo.py` from `devops/girder/plugins/AnnotationPlugin`.
+
+### Error display
+
+- [ ] **The server's message reaches the user**, on the card for upload and discard, inside the dialog for publish (which stays open). — *"shows the server's message when the upload is refused"*, *"shows the server's message in the publish dialog"*
+- [ ] **The owner-access hint only follows an upload/publish 403 that names a folder or collection.** A project-level 403 and every discard error are shown as sent. — *"explains owner access when a dataset refuses the upload"*, *"shows a project-level 403 without the dataset hint"*, *"shows a discard refusal without the publishing hint"*
+- [ ] **One error per request.** A request starting or failing never hides or relabels another's. — *"keeps each request's error in its own place"*
+- [ ] **Stale errors clear** on retry and on saving a token. — *"clears the error on retry and after saving a token"*
+
+### Concurrency
+
+- [ ] **Only one request at a time.** Every action checks the single `requestInFlight` flag; pairwise guards missed a direction three rounds running. — *"does not let publish and discard overlap"*, *"can't upload while a discard is running"*, *"can't discard while an upload is starting"*, *"can't discard an upload that started before the refresh lands"*
+- [ ] **A lost terminal job event can't leave the actions disabled**: leaving `uploading` releases the subscription. — *"re-enables the actions when the upload ends without its job event"*
+
+### Upload tracking
+
+- [ ] **Tracking follows the reported status, not the mount**: on load, after a 409, and after another tab starts an upload; once per job. — *"follows an upload already running when it mounts"*, *"refreshes the project when an upload is already in progress"*, *"tracks an upload once, and again after it ends"*
+- [ ] **A just-started job is found** (local jobs sit at INACTIVE until their thread runs). — *"includes jobs not yet picked up by their thread"*
+- [ ] **`uploading` with no visible job is re-read, then polled** (a stale cached project, or a co-owner's upload), and the poll stops on a status change or unmount, including mid-lookup. — *"re-reads the project when the reported upload has no job"*, *"keeps re-reading while the upload's job is invisible"*, *"stops polling when unmounted"*, *"schedules nothing if unmounted while looking up the job"*
+- [ ] **Project status is written before the job's terminal status** on failure as on success, because the card re-reads the project on that event. — *"test_fail_writes_project_status_before_job_status"*
+
+### Project switch
+
+- [ ] **Each project gets its own card instance**, so errors, progress and the job subscription never carry over. — *"gives each project its own ZenodoPublish instance"*
