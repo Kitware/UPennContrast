@@ -1,6 +1,6 @@
 from ..helpers.customModel import UngatedAclFilterMixin
 from ..helpers.proxiedModel import ProxiedModel
-from girder.exceptions import ValidationException, RestException
+from girder.exceptions import ValidationException
 from girder.constants import AccessType
 from ..helpers.tasks import runJobRequest
 
@@ -86,11 +86,16 @@ class AnnotationProperty(UngatedAclFilterMixin, ProxiedModel):
     def getPropertyById(self, id, user=None):
         return self.load(id, user=user)
 
-    def compute(self, property, datasetId, params):
+    def validateCompute(self, property):
         image = property.get("image", None)
         if not image:
-            raise RestException(code=500, message="Invalid property: no image")
+            raise ValueError(
+                "Invalid property '%s' (%s): no image"
+                % (property.get("name"), property.get("_id"))
+            )
+        return image
 
-        if property:
-            return runJobRequest(image, datasetId, params, "compute")
-        return {}
+    def compute(self, property, datasetId, params):
+        return runJobRequest(
+            self.validateCompute(property), datasetId, params, "compute"
+        )

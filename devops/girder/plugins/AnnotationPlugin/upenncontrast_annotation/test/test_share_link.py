@@ -128,22 +128,22 @@ class TestShareLink:
         ), 401)
         # ...nor download the dataset's files, although its READ ACL would
         # otherwise allow it (Girder has no view-only scope).
-        assertStatus(request(
-            server, "GET", "/folder/%s/download" % dataset["_id"], token=token
-        ), 403)
-        refused = request(
-            server, "GET", "/export/json", token=token,
-            params={"datasetId": str(dataset["_id"])},
-        )
-        assertStatus(refused, 403)
-        # Refused by the share-link guard, not by a blanket admin check.
-        assert "Share links show a view" in refused.json["message"]
-        # Every export format, not only JSON.
-        for route in ("/export/csv", "/export/geojson"):
-            assertStatus(request(
-                server, "POST", route, token=token,
-                body={"datasetId": str(dataset["_id"])},
-            ), 403)
+        # Assert the guard's own message: a bare 403 also passed while the
+        # guard refused every non-admin user.
+        refusals = [
+            request(server, "GET", "/folder/%s/download" % dataset["_id"],
+                    token=token),
+            request(server, "GET", "/export/json", token=token,
+                    params={"datasetId": str(dataset["_id"])}),
+        ] + [
+            # Every export format, not only JSON.
+            request(server, "POST", route, token=token,
+                    body={"datasetId": str(dataset["_id"])})
+            for route in ("/export/csv", "/export/geojson")
+        ]
+        for resp in refusals:
+            assertStatus(resp, 403)
+            assert "Share links show a view" in resp.json["message"]
         # The owner still can.
         assertStatusOk(server.request(
             path="/folder/%s/download" % dataset["_id"], method="GET",
@@ -316,6 +316,24 @@ class TestShareLink:
             server, "GET", "/share_link/me", token=kept["token"]
         ))
         assert User().find({"login": {"$regex": "^share-"}}).count() == 1
+
+    def testAnonymousUsersCanDownloadAndExportAPublicDataset(
+        self, user, server
+    ):
+        """The admin lockout also refused anonymous downloads of public
+        datasets (requireAdmin(None))."""
+        dataset, _, _ = createDatasetWithView(user)
+        assert Folder().load(dataset["_id"], force=True)["public"]
+        datasetId = str(dataset["_id"])
+
+        assertStatusOk(server.request(
+            path="/folder/%s/download" % datasetId, method="GET",
+            isJson=False,
+        ))
+        assertStatusOk(server.request(
+            path="/export/json", method="GET",
+            params={"datasetId": datasetId}, isJson=False,
+        ))
 
     def testOrdinaryLoginIsNotALink(self, admin, server):
         resp = request(server, "GET", "/share_link/me", user=admin)

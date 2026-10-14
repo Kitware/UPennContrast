@@ -64,6 +64,10 @@ function makeAnnotation(id: string) {
   };
 }
 
+function makeConnection(id: string, parentId: string, childId: string) {
+  return { id, parentId, childId, label: "", tags: [], datasetId: "ds" };
+}
+
 function makeStub(id: string) {
   return {
     id,
@@ -82,6 +86,7 @@ describe("deleteAnnotations state cleanup", () => {
     annotationStore.setStubOnlyMode(false);
     annotationStore.setSelected([]);
     annotationStore.setHoveredAnnotationId(null);
+    annotationStore.setConnections([]);
   });
 
   it("prunes deleted ids from the selection in full mode", async () => {
@@ -122,5 +127,35 @@ describe("deleteAnnotations state cleanup", () => {
     expect(annotationStore.hoveredAnnotationId).toBeNull();
     expect(annotationStore.annotationStubs.has("s2")).toBe(false);
     expect(annotationStore.annotationCount).toBe(1);
+  });
+
+  it("drops connections whose parent or child was deleted", async () => {
+    annotationStore.setAnnotations([
+      makeAnnotation("a"),
+      makeAnnotation("b"),
+      makeAnnotation("c"),
+    ]);
+    annotationStore.setConnections([
+      makeConnection("ab", "a", "b"),
+      makeConnection("bc", "b", "c"),
+      makeConnection("ca", "c", "a"),
+    ]);
+    await annotationStore.deleteAnnotations(["b"]);
+    expect(annotationStore.annotationConnections.map((c) => c.id)).toEqual([
+      "ca",
+    ]);
+  });
+
+  it("leaves the connection array untouched when none match", async () => {
+    annotationStore.setAnnotations([
+      makeAnnotation("a"),
+      makeAnnotation("b"),
+      makeAnnotation("z"),
+    ]);
+    annotationStore.setConnections([makeConnection("ab", "a", "b")]);
+    const connections = annotationStore.annotationConnections;
+    await annotationStore.deleteAnnotations(["z"]);
+    // Same array: no mutation, so connection watchers don't re-run.
+    expect(annotationStore.annotationConnections).toBe(connections);
   });
 });

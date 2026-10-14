@@ -300,7 +300,7 @@ class NimbusClient:
             if result.job_id and not client.job(result.job_id).wait():
                 ...
         """
-        return Job(self._gc, self._gc.get(f"job/{job_id}"))
+        return Job.fetch(self._gc, job_id)
 
     # --- Projects ---
 

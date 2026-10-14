@@ -1,0 +1,986 @@
+"""Sharing must never hand out more access than the caller holds.
+
+Before these checks, a WRITE collaborator could grant themselves ADMIN on a
+dataset through POST dataset_view/share (accessType 2 on their own login), or
+by adding the dataset to a project they own (the project's ACL, where they are
+ADMIN, was copied onto the dataset). WRITE is enough to share, but never above
+the caller's own level: explicit requests are refused, copies onto added
+resources are capped. See helpers/aclLimits.py.
+"""
+import json
+import random
+
+import pytest
+from pytest_girder.assertions import assertStatus, assertStatusOk
+
+from girder.constants import AccessType
+from girder.models.folder import Folder
+from girder.models.user import User
+
+from upenncontrast_annotation.server.models.collection import Collection
+from upenncontrast_annotation.server.models.datasetView import (
+    DatasetView as DatasetViewModel
+)
+from upenncontrast_annotation.server.models.project import Project
+
+from . import girder_utilities as utilities
+from . import upenn_testing_utilities as upenn_utilities
+
+CONFIG_META = {
+    "subtype": "contrastDataset",
+    "compatibility": {},
+    "layers": [],
+    "tools": [],
+    "propertyIds": [],
+    "snapshots": [],
+    "scales": {},
+}
+
+
+def makeUser(login):
+    return User().createUser(
+        login=login, password="password", firstName=login,
+        lastName="User", email=f"{login}@girder.test", admin=False,
+    )
+
+
+# Girder makes the first user in a fresh database a site admin, and a site
+# admin holds ADMIN on everything; requesting `admin` first keeps these
+# ordinary users.
+@pytest.fixture
+def owner(admin):
+    return makeUser("owner")
+
+
+@pytest.fixture
+def third(admin):
+    return makeUser("third")
+
+
+def createConfiguration(creator, dataset):
+    return Collection().createCollection(
+        name=f"config_{random.random()}", creator=creator, folder=dataset,
+        metadata=CONFIG_META, description="")
+
+
+def ownFolder(user):
+    """A folder of user's own: a configuration inherits its folder's ACL."""
+    return utilities.createPrivateFolder(
+        user, f"folder_{random.random()}", {})
+
+
+def createView(creator, dataset, config):
+    return DatasetViewModel().create(creator, {
+        "datasetId": dataset["_id"],
+        "configurationId": config["_id"],
+        "lastLocation": {"xy": 0, "z": 0, "time": 0},
+        "layerContrasts": {},
+    })
+
+
+def createDataset(creator):
+    dataset = utilities.createPrivateFolder(
+        creator, f"dataset_{random.random()}",
+        upenn_utilities.datasetMetadata)
+    config = createConfiguration(creator, dataset)
+    return dataset, config, createView(creator, dataset, config)
+
+
+def grant(doc, model, user, level):
+    model.setUserAccess(doc, user, level, save=True)
+
+
+def levelOf(model, doc, user):
+    return model.getAccessLevel(model.load(doc["_id"], force=True), user)
+
+
+def levels(user, dataset, config, view):
+    return (
+        levelOf(Folder(), dataset, user),
+        levelOf(Collection(), config, user),
+        levelOf(DatasetViewModel(), view, user),
+    )
+
+
+def share(server, actor, views, target, level):
+    return server.request(
+        path="/dataset_view/share", method="POST", user=actor,
+        type="application/json",
+        body=json.dumps({
+            "datasetViewIds": [str(v["_id"]) for v in views],
+            "userMailOrUsername": target["login"],
+            "accessType": level,
+        }))
+
+
+def shareWithWrite(dataset, config, view, user):
+    for doc, model in ((dataset, Folder()), (config, Collection()),
+                       (view, DatasetViewModel())):
+        grant(doc, model, user, AccessType.WRITE)
+
+
+NO_ACCESS = AccessType.NONE
+READ, WRITE, ADMIN = AccessType.READ, AccessType.WRITE, AccessType.ADMIN
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestDatasetViewShareLimits:
+
+    def testWriteCollaboratorCannotGrantThemselvesAdmin(
+            self, server, owner, user):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+
+        resp = share(server, user, [view], user, ADMIN)
+
+        assertStatus(resp, 403)
+        assert "above your own level" in resp.json["message"]
+        assert levels(user, dataset, config, view) == (WRITE, WRITE, WRITE)
+
+    def testWriteCollaboratorCannotGrantAdminToAnotherAccount(
+            self, server, owner, user, third):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+
+        resp = share(server, user, [view], third, ADMIN)
+
+        assertStatus(resp, 403)
+        assert "above your own level" in resp.json["message"]
+        assert levels(third, dataset, config, view) == (
+            NO_ACCESS, NO_ACCESS, NO_ACCESS)
+
+    def testWriteCollaboratorCanShareUpToTheirLevel(
+            self, server, owner, user, third):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+
+        assertStatusOk(share(server, user, [view], third, WRITE))
+
+        assert levels(third, dataset, config, view) == (WRITE, WRITE, WRITE)
+
+    def testWriteCollaboratorCannotRemoveOwner(self, server, owner, user):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+
+        resp = share(server, user, [view], owner, -1)
+
+        assertStatus(resp, 403)
+        assert levels(owner, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+
+    def testOwnerCanGrantAdmin(self, server, owner, third):
+        dataset, config, view = createDataset(owner)
+
+        assertStatusOk(share(server, owner, [view], third, ADMIN))
+
+        assert levels(third, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+
+    def testOwnerCanRemoveAccess(self, server, owner, third):
+        dataset, config, view = createDataset(owner)
+        assertStatusOk(share(server, owner, [view], third, WRITE))
+
+        assertStatusOk(share(server, owner, [view], third, -1))
+
+        assert levels(third, dataset, config, view) == (
+            NO_ACCESS, NO_ACCESS, NO_ACCESS)
+
+    def testGrantAboveCallersLevelOnConfigurationIsRefused(
+            self, server, owner, user, third):
+        """The owner of a dataset can edit, but does not own, a
+        configuration a collaborator made: granting ADMIN would exceed the
+        caller's level on it, so the whole request is refused.
+        """
+        dataset, _, _ = createDataset(owner)
+        theirConfig = createConfiguration(user, ownFolder(user))
+        grant(theirConfig, Collection(), owner, WRITE)
+        view = createView(owner, dataset, theirConfig)
+
+        resp = share(server, owner, [view], third, ADMIN)
+
+        assertStatus(resp, 403)
+        assert levels(third, dataset, theirConfig, view) == (
+            NO_ACCESS, NO_ACCESS, NO_ACCESS)
+
+    def testConfigurationOwnerIsNotDowngraded(self, server, owner, user):
+        """Changing a user who owns one of the touched documents (above the
+        caller's level there) is refused, and nothing changes."""
+        dataset, _, _ = createDataset(owner)
+        theirConfig = createConfiguration(user, ownFolder(user))
+        grant(theirConfig, Collection(), owner, WRITE)
+        view = createView(owner, dataset, theirConfig)
+
+        resp = share(server, owner, [view], user, READ)
+
+        assertStatus(resp, 403)
+        assert levelOf(Folder(), dataset, user) == NO_ACCESS
+        assert levelOf(Collection(), theirConfig, user) == ADMIN
+
+    def testViewsMustShareOneDataset(self, server, owner, third):
+        _, _, viewA = createDataset(owner)
+        datasetB, configB, viewB = createDataset(owner)
+
+        resp = share(server, owner, [viewA, viewB], third, READ)
+
+        assertStatus(resp, 400)
+        assert "one dataset" in resp.json["message"]
+        assert levelOf(Folder(), datasetB, third) == NO_ACCESS
+
+    def testEmptyViewListIsRejected(self, server, owner, third):
+        resp = share(server, owner, [], third, READ)
+
+        assertStatus(resp, 400)
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestProjectShareLimits:
+
+    def createProject(self, server, creator):
+        resp = server.request(
+            path="/project", method="POST", user=creator,
+            params={"name": f"project_{random.random()}"})
+        assertStatusOk(resp)
+        return resp.json
+
+    def addDataset(self, server, actor, project, dataset):
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/dataset", method="POST",
+            user=actor, params={"datasetId": str(dataset["_id"])}))
+
+    def testAddingDatasetToOwnProjectDoesNotGrantAdmin(
+            self, server, owner, user):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+        project = self.createProject(server, user)
+
+        self.addDataset(server, user, project, dataset)
+
+        assert levels(user, dataset, config, view) == (WRITE, WRITE, WRITE)
+
+    def testAddingCollectionDoesNotReachUnsharedDatasets(
+            self, server, owner, user):
+        dataset, config, view = createDataset(owner)
+        grant(config, Collection(), user, WRITE)
+        project = self.createProject(server, user)
+
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/collection", method="POST",
+            user=user, params={"collectionId": str(config["_id"])}))
+
+        assert levels(user, dataset, config, view) == (
+            NO_ACCESS, WRITE, NO_ACCESS)
+
+    def testSharingProjectAboveCallersLevelIsRefused(
+            self, server, owner, user, third):
+        """dataset_view/share would refuse ADMIN from a WRITE collaborator,
+        so sharing the project at ADMIN is refused too, project included."""
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+        project = self.createProject(server, user)
+        self.addDataset(server, user, project, dataset)
+
+        resp = server.request(
+            path=f"/project/{project['_id']}/share", method="POST",
+            user=user, params={
+                "userMailOrUsername": third["login"],
+                "accessType": ADMIN})
+
+        assertStatus(resp, 403)
+        assert levels(third, dataset, config, view) == (
+            NO_ACCESS, NO_ACCESS, NO_ACCESS)
+        assert levelOf(Project(), project, third) == NO_ACCESS
+
+    def testSharingProjectReachesDatasetsCallerCanEdit(
+            self, server, owner, user, third):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+        project = self.createProject(server, user)
+        self.addDataset(server, user, project, dataset)
+
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/share", method="POST",
+            user=user, params={
+                "userMailOrUsername": third["login"],
+                "accessType": WRITE}))
+
+        assert levels(third, dataset, config, view) == (WRITE, WRITE, WRITE)
+        assert levelOf(Project(), project, third) == WRITE
+
+    def testAddingOwnDatasetToProjectKeepsOwnership(
+            self, server, owner, user):
+        """A WRITE member adding their own dataset must not be demoted to
+        the project's level on it."""
+        project = self.createProject(server, owner)
+        grant(Project().load(project["_id"], force=True), Project(), user,
+              WRITE)
+        dataset, config, view = createDataset(user)
+
+        self.addDataset(server, user, project, dataset)
+
+        assert levels(user, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+        assert levels(owner, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+
+    def testAddingOwnDatasetToPublicProjectPublishesAllOfIt(
+            self, server, owner, user):
+        project = self.createProject(server, owner)
+        projectDoc = Project().load(project["_id"], force=True)
+        grant(projectDoc, Project(), user, WRITE)
+        Project().setPublic(projectDoc, True, save=True)
+        dataset, config, view = createDataset(user)
+
+        self.addDataset(server, user, project, dataset)
+
+        for model, doc in ((Folder(), dataset), (Collection(), config),
+                           (DatasetViewModel(), view)):
+            assert model.load(doc["_id"], force=True).get("public")
+
+    def testSharingProjectReachesCollectionsCallerCanEdit(
+            self, server, owner, user, third):
+        """WRITE is enough to share (dataset_view/share's rule), so a
+        collection the caller can edit is shared with the project."""
+        _, config, _ = createDataset(owner)
+        grant(config, Collection(), user, WRITE)
+        project = self.createProject(server, user)
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/collection", method="POST",
+            user=user, params={"collectionId": str(config["_id"])}))
+
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/share", method="POST",
+            user=user, params={
+                "userMailOrUsername": third["login"],
+                "accessType": READ}))
+
+        assert levelOf(Collection(), config, third) == READ
+        assert levelOf(Project(), project, third) == READ
+
+    def testRevokingProjectMemberWhoOwnsAContainedDatasetIsRefused(
+            self, server, owner, user):
+        """Removing someone above the caller's level on a reached dataset
+        (its owner) is refused, like dataset_view/share; nothing changes."""
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+        project = self.createProject(server, user)
+        self.addDataset(server, user, project, dataset)
+        projectDoc = Project().load(project["_id"], force=True)
+        grant(projectDoc, Project(), owner, WRITE)
+
+        resp = server.request(
+            path=f"/project/{project['_id']}/share", method="POST",
+            user=user, params={
+                "userMailOrUsername": owner["login"], "accessType": -1})
+
+        assertStatus(resp, 403)
+        assert levels(owner, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+        assert levelOf(Project(), project, owner) == WRITE
+
+    def addCollection(self, server, actor, project, collection):
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/collection", method="POST",
+            user=actor, params={"collectionId": str(collection["_id"])}))
+
+    def shareProject(self, server, actor, project, target, level):
+        return server.request(
+            path=f"/project/{project['_id']}/share", method="POST",
+            user=actor, params={
+                "userMailOrUsername": target["login"],
+                "accessType": level})
+
+    @pytest.mark.parametrize("datasetLevel, viewReached", [
+        (WRITE, True), (READ, False)])
+    def testCollectionViewOfOutsideDatasetNeedsThatDatasetEditable(
+            self, server, owner, user, third, datasetLevel, viewReached):
+        """A project collection reaches the views using it, even of
+        datasets not in the project; such a view travels only if the caller
+        could share its dataset (limitToShareable's outside-dataset path)."""
+        dataset, config, view = createDataset(owner)
+        grant(config, Collection(), user, WRITE)
+        grant(view, DatasetViewModel(), user, WRITE)
+        grant(dataset, Folder(), user, datasetLevel)
+        project = self.createProject(server, user)
+        self.addCollection(server, user, project, config)
+
+        assertStatusOk(self.shareProject(server, user, project, third, READ))
+
+        assert levelOf(Collection(), config, third) == READ
+        assert levelOf(DatasetViewModel(), view, third) == (
+            READ if viewReached else NO_ACCESS)
+
+    def testAddedDatasetCapsOtherMembersAtTheAddersLevel(
+            self, server, owner, user, third):
+        """Copying the project's ACL onto an added dataset caps every entry
+        at the adder's level, not just the adder's own: a project ADMIN
+        member gets WRITE on a dataset a WRITE member adds."""
+        project = self.createProject(server, owner)
+        assertStatusOk(self.shareProject(server, owner, project, third, ADMIN))
+        grant(Project().load(project["_id"], force=True), Project(), user,
+              WRITE)
+        someone = makeUser("someone")
+        dataset, config, view = createDataset(someone)
+        shareWithWrite(dataset, config, view, user)
+
+        self.addDataset(server, user, project, dataset)
+
+        assert levels(third, dataset, config, view) == (WRITE, WRITE, WRITE)
+        assert levels(someone, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+
+    def testRefusedProjectShareWritesNothingAcrossDatasets(
+            self, server, owner, user, third):
+        """Every reached document is checked before any is written: with one
+        dataset the caller owns and one they can only edit, ADMIN is refused
+        and neither dataset changes."""
+        ownDataset, ownConfig, ownView = createDataset(user)
+        theirs = createDataset(owner)
+        shareWithWrite(*theirs, user)
+        project = self.createProject(server, user)
+        self.addDataset(server, user, project, ownDataset)
+        self.addDataset(server, user, project, theirs[0])
+
+        resp = self.shareProject(server, user, project, third, ADMIN)
+
+        assertStatus(resp, 403)
+        assert levels(third, ownDataset, ownConfig, ownView) == (
+            NO_ACCESS, NO_ACCESS, NO_ACCESS)
+        assert levels(third, *theirs) == (NO_ACCESS, NO_ACCESS, NO_ACCESS)
+        assert levelOf(Project(), project, third) == NO_ACCESS
+
+    def testOwnerSharingProjectGrantsAdmin(self, server, owner, third):
+        dataset, config, view = createDataset(owner)
+        project = self.createProject(server, owner)
+        self.addDataset(server, owner, project, dataset)
+
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/share", method="POST",
+            user=owner, params={
+                "userMailOrUsername": third["login"],
+                "accessType": ADMIN}))
+
+        assert levels(third, dataset, config, view) == (ADMIN, ADMIN, ADMIN)
+
+    def testPublishingProjectSkipsDatasetsCallerDoesNotOwn(
+            self, server, owner, user):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+        project = self.createProject(server, user)
+        self.addDataset(server, user, project, dataset)
+
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/set_public", method="POST",
+            user=user, params={"public": True}))
+
+        for model, doc in ((Folder(), dataset), (Collection(), config),
+                           (DatasetViewModel(), view)):
+            assert not model.load(doc["_id"], force=True).get("public")
+
+    def testPublishingProjectReportsSkippedResources(
+            self, server, owner, user):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+        project = self.createProject(server, user)
+        self.addDataset(server, user, project, dataset)
+
+        resp = server.request(
+            path=f"/project/{project['_id']}/set_public", method="POST",
+            user=user, params={"public": True})
+
+        assertStatusOk(resp)
+        # dataset, configuration and view are all the owner's
+        assert resp.json["skipped"] == 3
+
+    def testSkippedCountsOnlyResourcesTheCallerCanSee(
+            self, server, owner, user):
+        """Another user's private view of your dataset is not yours to
+        publish, but it is not something you can see kept private either."""
+        dataset, _, _ = createDataset(owner)
+        createView(user, dataset, createConfiguration(user, ownFolder(user)))
+        project = self.createProject(server, owner)
+        self.addDataset(server, owner, project, dataset)
+
+        resp = server.request(
+            path=f"/project/{project['_id']}/set_public", method="POST",
+            user=owner, params={"public": True})
+
+        assertStatusOk(resp)
+        assert resp.json["skipped"] == 0
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestZenodoRequiresOwnership:
+    """Publishing a project hands out every file in it, so it needs ADMIN on
+    each dataset and collection, not only on the project."""
+
+    def projectWithDatasetOf(self, server, owner, user):
+        dataset, config, view = createDataset(owner)
+        shareWithWrite(dataset, config, view, user)
+        project = TestProjectShareLimits().createProject(server, user)
+        TestProjectShareLimits().addDataset(server, user, project, dataset)
+        return project
+
+    def testUploadRefusesDatasetsCallerDoesNotOwn(self, server, owner, user):
+        project = self.projectWithDatasetOf(server, owner, user)
+
+        resp = server.request(
+            path="/zenodo/upload", method="POST", user=user,
+            type="application/json",
+            body=json.dumps({"projectId": project["_id"]}))
+
+        assertStatus(resp, 403)
+        assert "Admin access denied" in resp.json["message"]
+
+    def testPublishRefusesDatasetsCallerDoesNotOwn(self, server, owner, user):
+        project = self.projectWithDatasetOf(server, owner, user)
+        projectDoc = Project().load(project["_id"], force=True)
+        projectDoc["meta"]["zenodo"] = {
+            "status": "draft", "depositionId": 1,
+            "uploadedResources": {
+                "datasetIds": [
+                    d["datasetId"] for d in projectDoc["meta"]["datasets"]],
+                "collectionIds": [],
+            },
+        }
+        Project().save(projectDoc)
+
+        resp = server.request(
+            path=f"/zenodo/publish/{project['_id']}", method="POST",
+            user=user)
+
+        assertStatus(resp, 403)
+
+    def testExportSkipsConfigurationsCallerDoesNotOwn(
+            self, server, owner, user):
+        """A configuration reached only through a view of the dataset is
+        published (its property definitions) only if the uploader owns it;
+        otherwise it is left out rather than blocking the upload."""
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, ownConfig, _ = createDataset(user)
+        theirConfig = createConfiguration(owner, ownFolder(owner))
+        grant(theirConfig, Collection(), user, WRITE)
+        createView(user, dataset, theirConfig)
+        project = TestProjectShareLimits().createProject(server, user)
+        TestProjectShareLimits().addDataset(server, user, project, dataset)
+
+        contents = requireProjectContentsAccess(
+            Project().load(project["_id"], force=True), user)
+
+        assert theirConfig["_id"] not in contents.collectionIds
+        assert ownConfig["_id"] in contents.collectionIds
+        assert [c["_id"] for c in contents.configsByDataset[
+            dataset["_id"]]] == [ownConfig["_id"]]
+
+    def testUploadRefusesListedCollectionsCallerDoesNotOwn(
+            self, server, owner, user):
+        _, theirConfig, _ = createDataset(owner)
+        grant(theirConfig, Collection(), user, WRITE)
+        project = TestProjectShareLimits().createProject(server, user)
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/collection", method="POST",
+            user=user, params={"collectionId": str(theirConfig["_id"])}))
+
+        resp = server.request(
+            path="/zenodo/upload", method="POST", user=user,
+            type="application/json",
+            body=json.dumps({"projectId": project["_id"]}))
+
+        assertStatus(resp, 403)
+        assert "Admin access denied" in resp.json["message"]
+
+    def testPublicStrangersViewDoesNotBlockTheExport(
+            self, server, owner, user):
+        """A public view is readable by everyone; it still must not make the
+        owner's upload depend on the stranger's configuration."""
+        dataset, _, _ = createDataset(owner)
+        strangersConfig = createConfiguration(user, ownFolder(user))
+        strangersView = createView(user, dataset, strangersConfig)
+        DatasetViewModel().setPublic(strangersView, True, save=True)
+        Collection().setPublic(strangersConfig, True, save=True)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+
+        resp = server.request(
+            path="/zenodo/upload", method="POST", user=owner,
+            type="application/json",
+            body=json.dumps({"projectId": project["_id"]}))
+
+        assertStatus(resp, 400)
+        assert "No Zenodo token" in resp.json["message"]
+
+    def testExportOmitsValuesOfPropertiesItDoesNotDefine(
+            self, server, owner):
+        from unittest.mock import MagicMock
+        from bson import ObjectId
+        from upenncontrast_annotation.server.helpers import zenodo_job
+        from upenncontrast_annotation.server.models.annotation import (
+            Annotation,
+        )
+        from upenncontrast_annotation.server.models.connections import (
+            AnnotationConnection,
+        )
+
+        dataset, _, _ = createDataset(owner)
+        exported, omitted = ObjectId(), ObjectId()
+        config = {"_id": ObjectId(),
+                  "meta": {"propertyIds": [str(exported)]}}
+        propertyModel = MagicMock()
+        # Exports read properties through findClientFields (master)
+        propertyModel.findClientFields.return_value = []
+        valuesModel = MagicMock()
+        valuesModel.find.return_value = [{
+            "annotationId": ObjectId(),
+            "values": {str(exported): 1, str(omitted): 2},
+        }]
+
+        data = zenodo_job._build_annotation_json(
+            dataset["_id"], Annotation(), AnnotationConnection(), [config],
+            propertyModel, valuesModel)
+
+        if isinstance(data, (bytes, str)):
+            data = json.loads(data)
+        values = list(data["annotationPropertyValues"].values())
+        assert values == [{str(exported): 1}]
+
+    def testUploadJobRechecksTheProjectItExports(self, server, owner, user):
+        """The job reloads the project; a dataset added after the endpoint's
+        check (WRITE on the project is enough to add one) must not ship."""
+        from girder_jobs.constants import JobStatus
+        from girder_jobs.models.job import Job
+        from upenncontrast_annotation.server.helpers import zenodo_job
+
+        project = self.projectWithDatasetOf(server, owner, user)
+        job = Job().createJob(
+            title="Zenodo Upload", type="zenodo_upload", user=user,
+            kwargs={"projectId": project["_id"], "userId": str(user["_id"])})
+
+        zenodo_job.run(job)
+
+        assert Job().load(job["_id"], force=True)["status"] == JobStatus.ERROR
+        meta = Project().load(project["_id"], force=True)["meta"]["zenodo"]
+        assert meta["status"] == "error"
+        assert "Admin access denied" in meta["error"]
+
+    def testExportUsesTheConfigurationsItChecked(self, server, owner, user):
+        """A view pointed at someone else's configuration after the check
+        must not reach the export: it publishes what was checked."""
+        from unittest.mock import MagicMock
+        from bson import ObjectId
+        from upenncontrast_annotation.server.helpers import zenodo_job
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+        from upenncontrast_annotation.server.models.annotation import (
+            Annotation,
+        )
+        from upenncontrast_annotation.server.models.connections import (
+            AnnotationConnection,
+        )
+
+        dataset, ownConfig, _ = createDataset(user)
+        ownProperty, theirProperty = ObjectId(), ObjectId()
+        ownConfig["meta"]["propertyIds"] = [str(ownProperty)]
+        Collection().save(ownConfig)
+        theirConfig = createConfiguration(owner, ownFolder(owner))
+        theirConfig["meta"]["propertyIds"] = [str(theirProperty)]
+        Collection().save(theirConfig)
+        grant(theirConfig, Collection(), user, WRITE)
+        project = TestProjectShareLimits().createProject(server, user)
+        TestProjectShareLimits().addDataset(server, user, project, dataset)
+
+        checked = requireProjectContentsAccess(
+            Project().load(project["_id"], force=True), user)
+        createView(user, dataset, theirConfig)  # after the check
+        propertyModel = MagicMock()
+        # Exports read properties through findClientFields (master)
+        propertyModel.findClientFields.return_value = []
+        valuesModel = MagicMock()
+        valuesModel.find.return_value = []
+        zenodo_job._build_annotation_json(
+            dataset["_id"], Annotation(), AnnotationConnection(),
+            checked.configsByDataset.get(dataset["_id"], []),
+            propertyModel, valuesModel)
+
+        exportedIds = propertyModel.findClientFields.call_args.args[0]
+        assert set(exportedIds) == {ownProperty}
+
+    def testPublishChecksWhatTheDraftContains(self, server, owner, user):
+        """Removing a dataset from the project after the upload does not
+        make its draft publishable by someone who lost access to it."""
+        dataset, config, view = createDataset(owner)
+        for doc, model in ((dataset, Folder()), (config, Collection()),
+                           (view, DatasetViewModel())):
+            grant(doc, model, user, ADMIN)
+        project = TestProjectShareLimits().createProject(server, user)
+        TestProjectShareLimits().addDataset(server, user, project, dataset)
+        projectDoc = Project().load(project["_id"], force=True)
+        projectDoc["meta"]["zenodo"] = {
+            "status": "draft", "depositionId": 1,
+            "uploadedResources": {
+                "datasetIds": [dataset["_id"]],
+                "collectionIds": [config["_id"]],
+            },
+        }
+        Project().save(projectDoc)
+        # The dataset's owner revokes; the publisher drops it from the project
+        grant(Folder().load(dataset["_id"], force=True), Folder(), user, WRITE)
+        assertStatusOk(server.request(
+            path=f"/project/{project['_id']}/dataset/{dataset['_id']}",
+            method="DELETE", user=user))
+
+        resp = server.request(
+            path=f"/zenodo/publish/{project['_id']}", method="POST",
+            user=user)
+
+        assertStatus(resp, 403)
+
+    def testPublishRefusesDraftWithDeletedResources(self, server, owner):
+        """A recorded resource that no longer exists cannot be checked, and
+        the draft still holds its files: refuse to publish it."""
+        dataset, config, _ = createDataset(owner)
+        project = TestProjectShareLimits().createProject(server, owner)
+        projectDoc = Project().load(project["_id"], force=True)
+        projectDoc["meta"]["zenodo"] = {
+            "status": "draft", "depositionId": 1,
+            "uploadedResources": {
+                "datasetIds": [dataset["_id"]],
+                "collectionIds": [config["_id"]],
+            },
+        }
+        Project().save(projectDoc)
+        Folder().remove(Folder().load(dataset["_id"], force=True))
+
+        resp = server.request(
+            path=f"/zenodo/publish/{project['_id']}", method="POST",
+            user=owner)
+
+        assertStatus(resp, 409)
+        assert "no longer exist" in resp.json["message"]
+
+    def testResourcesAccessHelperReportsMissingInsteadOfRaising(
+            self, owner):
+        """Helpers report a missing resource; the endpoint decides the HTTP
+        error (Paul, PR #1410)."""
+        from bson import ObjectId
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireResourcesAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        goneDataset, goneConfig = ObjectId(), ObjectId()
+
+        datasetIds, collections = requireResourcesAccess(
+            [dataset["_id"], goneDataset], [config["_id"], goneConfig],
+            owner)
+
+        assert datasetIds == [dataset["_id"]]
+        assert list(collections) == [config["_id"]]
+
+    def testUploadRecordsOnlyResourcesThatExist(self, server, owner):
+        """A reference deleted before the upload is skipped by the export,
+        so it must not be recorded either: publish would refuse it."""
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        goneDataset, goneConfig, _ = createDataset(owner)
+        project = TestProjectShareLimits().createProject(server, owner)
+        for ds in (dataset, goneDataset):
+            TestProjectShareLimits().addDataset(server, owner, project, ds)
+        Folder().remove(Folder().load(goneDataset["_id"], force=True))
+
+        contents = requireProjectContentsAccess(
+            Project().load(project["_id"], force=True), owner)
+
+        assert contents.datasetIds == [dataset["_id"]]
+        assert goneConfig["_id"] not in contents.collectionIds
+
+    def testDraftRecordsWhatTheJobUploaded(self, server, owner):
+        """A dataset deleted after the job's check is skipped by the upload,
+        so the draft must not record it (publish would refuse the draft)."""
+        from unittest.mock import MagicMock
+        from girder_jobs.models.job import Job
+        from upenncontrast_annotation.server.helpers import zenodo_job
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        goneDataset, goneConfig, _ = createDataset(owner)
+        project = TestProjectShareLimits().createProject(server, owner)
+        for ds in (dataset, goneDataset):
+            TestProjectShareLimits().addDataset(server, owner, project, ds)
+        projectDoc = Project().load(project["_id"], force=True)
+        contents = requireProjectContentsAccess(projectDoc, owner)
+        Folder().remove(Folder().load(goneDataset["_id"], force=True))
+        client = MagicMock()
+        client.base_url = "https://sandbox.zenodo.org"
+        client.create_deposition.return_value = {
+            "id": 1, "links": {"bucket": "b", "html": "h"}}
+        client.upload_file.return_value = {}
+        from girder_jobs.constants import JobStatus
+        job = Job().createJob(title="t", type="zenodo_upload", user=owner)
+        job = Job().updateJob(job, status=JobStatus.RUNNING)
+
+        zenodo_job._do_upload(
+            job, Job(), projectDoc, owner, project["_id"], Project(),
+            client, contents)
+
+        recorded = Project().load(project["_id"], force=True)[
+            "meta"]["zenodo"]["uploadedResources"]
+        assert recorded["datasetIds"] == [dataset["_id"]]
+        assert config["_id"] in recorded["collectionIds"]
+        assert goneConfig["_id"] not in recorded["collectionIds"]
+
+    def testStrangersViewsDoNotBlockTheExport(self, server, owner, user):
+        """Anyone can create a view naming any dataset; a view the uploader
+        cannot read must not join (or block) the export."""
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        strangersConfig = createConfiguration(user, ownFolder(user))
+        createView(user, dataset, strangersConfig)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+
+        contents = requireProjectContentsAccess(
+            Project().load(project["_id"], force=True), owner)
+
+        assert strangersConfig["_id"] not in contents.collectionIds
+        assert config["_id"] in contents.collectionIds
+
+    def testPublishRefusesDraftsWithoutAnUploadRecord(self, server, owner):
+        dataset, _, _ = createDataset(owner)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+        projectDoc = Project().load(project["_id"], force=True)
+        projectDoc["meta"]["zenodo"] = {"status": "draft", "depositionId": 1}
+        Project().save(projectDoc)
+
+        resp = server.request(
+            path=f"/zenodo/publish/{project['_id']}", method="POST",
+            user=owner)
+
+        assertStatus(resp, 409)
+        assert "upload again" in resp.json["message"]
+
+    def testUploadRechecksOwnershipBeforeReadingData(
+            self, server, owner, user):
+        """Access revoked while the job waits on Zenodo stops it before it
+        reads or uploads any of the dataset."""
+        from unittest.mock import MagicMock
+        from girder.exceptions import AccessException
+        from girder_jobs.constants import JobStatus
+        from girder_jobs.models.job import Job
+        from upenncontrast_annotation.server.helpers import zenodo_job
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, view = createDataset(owner)
+        for doc, model in ((dataset, Folder()), (config, Collection()),
+                           (view, DatasetViewModel())):
+            grant(doc, model, user, ADMIN)
+        project = TestProjectShareLimits().createProject(server, user)
+        TestProjectShareLimits().addDataset(server, user, project, dataset)
+        projectDoc = Project().load(project["_id"], force=True)
+        contents = requireProjectContentsAccess(projectDoc, user)
+
+        def revokeThenCreate():
+            grant(Folder().load(dataset["_id"], force=True), Folder(), user,
+                  WRITE)
+            return {"id": 1, "links": {"bucket": "b", "html": "h"}}
+
+        client = MagicMock()
+        client.base_url = "https://sandbox.zenodo.org"
+        client.create_deposition.side_effect = revokeThenCreate
+        job = Job().updateJob(
+            Job().createJob(title="t", type="zenodo_upload", user=user),
+            status=JobStatus.RUNNING)
+
+        with pytest.raises(AccessException):
+            zenodo_job._do_upload(
+                job, Job(), projectDoc, user, project["_id"], Project(),
+                client, contents)
+        client.upload_file.assert_not_called()
+
+    def testConfigurationDeletedBeforeTheRecheckIsNotExported(
+            self, server, owner):
+        """A view's configuration deleted after the job's first check is
+        neither exported nor recorded (publish would refuse the draft)."""
+        from unittest.mock import MagicMock
+        from girder_jobs.constants import JobStatus
+        from girder_jobs.models.job import Job
+        from upenncontrast_annotation.server.helpers import zenodo_job
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        extraConfig = createConfiguration(owner, ownFolder(owner))
+        createView(owner, dataset, extraConfig)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+        projectDoc = Project().load(project["_id"], force=True)
+        contents = requireProjectContentsAccess(projectDoc, owner)
+        assert extraConfig["_id"] in contents.collectionIds
+
+        def deleteThenCreate():
+            Collection().remove(Collection().load(
+                extraConfig["_id"], force=True))
+            return {"id": 1, "links": {"bucket": "b", "html": "h"}}
+
+        client = MagicMock()
+        client.base_url = "https://sandbox.zenodo.org"
+        client.create_deposition.side_effect = deleteThenCreate
+        client.upload_file.return_value = {}
+        job = Job().updateJob(
+            Job().createJob(title="t", type="zenodo_upload", user=owner),
+            status=JobStatus.RUNNING)
+
+        zenodo_job._do_upload(
+            job, Job(), projectDoc, owner, project["_id"], Project(),
+            client, contents)
+
+        recorded = Project().load(project["_id"], force=True)[
+            "meta"]["zenodo"]["uploadedResources"]
+        assert extraConfig["_id"] not in recorded["collectionIds"]
+        assert config["_id"] in recorded["collectionIds"]
+
+    def testStrangersViewCannotAddUploadersConfiguration(
+            self, server, owner, user):
+        """A view anyone created must not decide what the export contains,
+        even when it points at a configuration the uploader owns."""
+        from upenncontrast_annotation.server.helpers.access_helpers import (
+            requireProjectContentsAccess,
+        )
+
+        dataset, config, _ = createDataset(owner)
+        unrelated = createConfiguration(owner, ownFolder(owner))
+        strangersView = createView(user, dataset, unrelated)
+        DatasetViewModel().setPublic(strangersView, True, save=True)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+
+        contents = requireProjectContentsAccess(
+            Project().load(project["_id"], force=True), owner)
+
+        assert unrelated["_id"] not in contents.collectionIds
+        assert config["_id"] in contents.collectionIds
+
+    def testOwnerPassesTheOwnershipCheck(self, server, owner):
+        dataset, _, _ = createDataset(owner)
+        project = TestProjectShareLimits().createProject(server, owner)
+        TestProjectShareLimits().addDataset(server, owner, project, dataset)
+
+        resp = server.request(
+            path="/zenodo/upload", method="POST", user=owner,
+            type="application/json",
+            body=json.dumps({"projectId": project["_id"]}))
+
+        # Next gate: the owner has no Zenodo token configured
+        assertStatus(resp, 400)
+        assert "No Zenodo token" in resp.json["message"]

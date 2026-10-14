@@ -81,6 +81,9 @@ let propertyValuesGeneration = 0;
 // Ordinary values are independent of the active expression table. A table
 // switch cancels virtual reads, but must not drop the initial ordinary load.
 let propertyDatasetGeneration = 0;
+// Ids of properties being created: added to the local configuration but not
+// yet registered server-side, so a batch fetch omits them (fetchProperties).
+const pendingPropertyIds = new Set<string>();
 
 export interface IPropertyStatus {
   running: boolean;
@@ -951,41 +954,44 @@ export class Properties extends VuexModule {
     if (runs.length === 0) {
       return [];
     }
-    // Submit each property through the existing per-property endpoint. The
-    // requests are sequential and small-N (bounded by the batch cap); a
-    // batch submission endpoint is planned as a follow-up backend PR.
+    const properties = runs.map(({ property }) => property);
+
+    let submissions;
+    try {
+      submissions = await this.propertiesAPI.computeProperties(
+        datasetId,
+        properties,
+        main.scales,
+      );
+    } catch (error) {
+      for (const [index, run] of runs.entries()) {
+        finishPropertyRun(run, false, {
+          title: "Property submission failed",
+          value: error,
+          notify: index === 0,
+        });
+      }
+      return [];
+    }
+
+    const submissionsByProperty = new Map(
+      submissions.map((submission) => [submission.propertyId, submission]),
+    );
     const tracked: {
       run: (typeof runs)[number];
       job: IPropertyComputeJob;
       completion: Promise<boolean>;
     }[] = [];
-    let submissionNotificationShown = false;
+    let missingJobNotificationShown = false;
     for (const run of runs) {
-      let jobId;
-      try {
-        const response = await this.propertiesAPI.computeProperty(
-          run.property.id,
-          datasetId,
-          run.property,
-          main.scales,
-        );
-        jobId = response.data[0]?._id;
-      } catch (error) {
-        finishPropertyRun(run, false, {
-          title: "Property submission failed",
-          value: error,
-          notify: !submissionNotificationShown,
-        });
-        submissionNotificationShown = true;
-        continue;
-      }
+      const jobId = submissionsByProperty.get(run.property.id)?.jobs[0]?._id;
       if (!jobId) {
         finishPropertyRun(run, false, {
           title: "Property submission failed",
           value: "The server did not return a compute job.",
-          notify: !submissionNotificationShown,
+          notify: !missingJobNotificationShown,
         });
-        submissionNotificationShown = true;
+        missingJobNotificationShown = true;
         continue;
       }
       const job: IPropertyComputeJob = {
@@ -1304,10 +1310,30 @@ export class Properties extends VuexModule {
   // This action should be called when changing configuration
   async fetchProperties() {
     if (main.configuration) {
-      const properties = await this.propertiesAPI.getProperties(
-        main.configuration.propertyIds,
+      const propertyIds = main.configuration.propertyIds;
+      // The server omits ids it cannot resolve. A deleted property should
+      // drop out, but one being created is in the local configuration before
+      // its propertyIds save lands, so the server omits it too. Keep the
+      // loaded copy of those only (pending now, or when the request went
+      // out), or the next setProperties would persist the drop.
+      const pendingAtRequest = new Set(pendingPropertyIds);
+      const fetched = new Map(
+        (await this.propertiesAPI.getProperties(propertyIds)).map(
+          (property) => [property.id, property],
+        ),
       );
-      this.setPropertiesImpl(properties);
+      const loaded = new Map(
+        this.properties.map((property) => [property.id, property]),
+      );
+      const isPending = (id: string) =>
+        pendingAtRequest.has(id) || pendingPropertyIds.has(id);
+      this.setPropertiesImpl(
+        propertyIds.flatMap((id) => {
+          const property =
+            fetched.get(id) ?? (isPending(id) ? loaded.get(id) : undefined);
+          return property ? [property] : [];
+        }),
+      );
       // Properties may load after fetchPropertyValues already ran (the stub
       // fetch can resolve first when cached), so trigger the count fetch here
       // too; the guard in fetchUncomputedCounts dedupes (no-op in wholesale
@@ -1464,7 +1490,14 @@ export class Properties extends VuexModule {
   async createProperty(property: IAnnotationPropertyConfiguration) {
     const newProperty = await this.propertiesAPI.createProperty(property);
     if (newProperty) {
-      await this.setProperties([...this.properties, newProperty]);
+      // Pending until the configuration's propertyIds save settles; see
+      // fetchProperties.
+      pendingPropertyIds.add(newProperty.id);
+      try {
+        await this.setProperties([...this.properties, newProperty]);
+      } finally {
+        pendingPropertyIds.delete(newProperty.id);
+      }
     }
     return newProperty;
   }
