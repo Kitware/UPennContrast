@@ -142,6 +142,8 @@ vi.mock("@/store/annotation", () => ({
     // store's stub-aware ones so a test flips modes by setting these two.
     stubOnlyMode: false,
     annotationStubs: new Map<string, any>(),
+    // Bumped by every content/membership mutation in the real store.
+    contentRevision: 0,
     get allAnnotationIds(): string[] {
       return this.stubOnlyMode
         ? Array.from(this.annotationStubs.keys())
@@ -205,6 +207,7 @@ vi.mock("@/store/properties", () => ({
     properties: [] as any[],
     propertyValues: {} as any,
     computedPropertyPaths: [] as string[][],
+    allVirtualPropertyPaths: [] as string[][],
     propertyStatuses: {} as any,
     // Real store: a getter returning (path) => "Prop / sub" | null. Default to
     // null here so propertyPathLabel falls back to the dotted path.
@@ -296,6 +299,7 @@ beforeEach(() => {
   mockMain.maps = [];
   mockAnnotations.annotations = [];
   mockAnnotations.stubOnlyMode = false;
+  mockAnnotations.contentRevision = 0;
   mockAnnotations.annotationStubs = new Map();
   mockAnnotations.annotationCount = 0;
   mockAnnotations.selectedAnnotationIds = new Set();
@@ -316,6 +320,7 @@ beforeEach(() => {
   mockProperties.properties = [];
   mockProperties.propertyValues = {};
   mockProperties.computedPropertyPaths = [];
+  mockProperties.allVirtualPropertyPaths = [];
   mockProperties.propertyStatuses = {};
   mockProperties.getWorkerInterface = vi.fn(() => ({}));
   // Reassigned (not just cleared) by tests that make a persist reject, so
@@ -3681,7 +3686,7 @@ describe("stub-only mode", () => {
       expect(fetchValues).toHaveBeenCalledWith(
         "ds1",
         ["s1", "s2", "s3"],
-        [["prop1", "mean"]],
+        [["prop1"]],
       );
     });
 
@@ -3699,7 +3704,7 @@ describe("stub-only mode", () => {
       );
       expect(
         mockProperties.propertiesAPI.getPropertyValuesForIds,
-      ).toHaveBeenCalledWith("ds1", ["s1", "s2"], [["prop1", "mean"]]);
+      ).toHaveBeenCalledWith("ds1", ["s1", "s2"], [["prop1"]]);
       expect(result.stats[0]).toMatchObject({ count: 2, max: 20 });
     });
 
@@ -3838,16 +3843,140 @@ describe("stub-only mode", () => {
     });
   });
 
+  describe("property paths beyond the sampled documents", () => {
+    // In stub-only mode computedPropertyPaths is a 512-document sample. A
+    // property computed on a subset of annotations can be absent from it.
+    beforeEach(() => {
+      mockProperties.computedPropertyPaths = [];
+      mockProperties.properties = [
+        { id: "prop1", name: "Intensity" },
+        { id: "prop2", name: "Spot count" },
+      ];
+      serveValues({
+        s1: { prop1: { mean: 10 } },
+        s2: { prop1: { mean: 20 } },
+        s3: { prop2: { count: 4 } },
+      });
+    });
+
+    it("get_property_values finds a property the path sample missed", async () => {
+      const { result } = await executeAgentTool(
+        "get_property_values",
+        { propertyId: "prop2" },
+        context,
+      );
+      expect(result.stats).toEqual([
+        expect.objectContaining({
+          propertyId: "prop2",
+          propertyPath: ["prop2", "count"],
+          count: 1,
+          mean: 4,
+        }),
+      ]);
+      expect(
+        mockProperties.propertiesAPI.getPropertyValuesForIds,
+      ).toHaveBeenCalledWith("ds1", ["s1", "s2", "s3"], [["prop2"]]);
+    });
+
+    it("get_property_values summarizes every property's paths", async () => {
+      const { result } = await executeAgentTool(
+        "get_property_values",
+        {},
+        context,
+      );
+      expect(result.stats.map((s: any) => s.propertyPath).sort()).toEqual([
+        ["prop1", "mean"],
+        ["prop2", "count"],
+      ]);
+    });
+
+    it("get_property_values includes virtual paths", async () => {
+      mockProperties.allVirtualPropertyPaths = [["spatial", "GENE1"]];
+      serveValues({ s1: { spatial: { GENE1: 3 } } });
+      const { result } = await executeAgentTool(
+        "get_property_values",
+        {},
+        context,
+      );
+      expect(result.stats.map((s: any) => s.propertyPath)).toEqual([
+        ["spatial", "GENE1"],
+      ]);
+      expect(
+        mockProperties.propertiesAPI.getPropertyValuesForIds,
+      ).toHaveBeenCalledWith(
+        "ds1",
+        ["s1", "s2", "s3"],
+        [["prop1"], ["prop2"], ["spatial", "GENE1"]],
+      );
+    });
+
+    it("list_properties does not report a sampled-out property as uncomputed", async () => {
+      mockProperties.computedPropertyPaths = [["prop1", "mean"]];
+      const { result } = await executeAgentTool("list_properties", {}, context);
+      expect(result.properties.map((p: any) => [p.id, p.computed])).toEqual([
+        ["prop1", true],
+        ["prop2", null],
+      ]);
+    });
+  });
+
+  describe("list_annotations revalidation", () => {
+    it("re-reads the page when annotations change during the name fetch", async () => {
+      let calls = 0;
+      mockMain.annotationsAPI.hydrateAnnotations = vi.fn(
+        async (ids: string[]) => {
+          if (calls++ === 0) {
+            mockAnnotations.annotationStubs.get("s1").tags = ["spot"];
+            mockAnnotations.contentRevision++;
+          }
+          return ids.map((id) => makeAnnotation({ id, name: `name-${id}` }));
+        },
+      );
+      const { result } = await executeAgentTool(
+        "list_annotations",
+        { query: { tags: ["nucleus"] } },
+        context,
+      );
+      expect(result.totalMatching).toBe(1);
+      expect(result.annotations.map((a: any) => a.id)).toEqual(["s2"]);
+    });
+
+    it("gives up with an error when annotations keep changing", async () => {
+      mockMain.annotationsAPI.hydrateAnnotations = vi.fn(async () => {
+        mockAnnotations.contentRevision++;
+        return [];
+      });
+      await expect(
+        executeAgentTool("list_annotations", {}, context),
+      ).rejects.toThrow(/kept changing/);
+      expect(mockMain.annotationsAPI.hydrateAnnotations).toHaveBeenCalledTimes(
+        2,
+      );
+    });
+  });
+
   describe("analysis edge cases", () => {
-    it("drops an annotation deleted while its values were loading", async () => {
+    // A content change during the fetch (a worker adding annotations, a
+    // retag, a delete) bumps contentRevision; the query is resolved again.
+    function changeDuringFirstFetch(change: () => void) {
+      let calls = 0;
       mockProperties.propertiesAPI.getPropertyValuesForIds = vi.fn(
         async (_datasetId: string, ids: string[]) => {
-          mockAnnotations.annotationStubs.delete("s2");
+          if (calls++ === 0) {
+            change();
+            mockAnnotations.contentRevision++;
+          }
           return ids.map((id) => ({
             annotationId: id,
             values: { prop1: { mean: 10 } },
           }));
         },
+      );
+    }
+
+    it("re-resolves the query when an annotation is deleted during the fetch", async () => {
+      changeDuringFirstFetch(() =>
+        mockAnnotations.annotationStubs.delete("s2"),
       );
       const { result } = await executeAgentTool(
         "get_property_values",
@@ -3855,6 +3984,72 @@ describe("stub-only mode", () => {
         context,
       );
       expect(result.stats[0].count).toBe(1);
+      expect(
+        mockProperties.propertiesAPI.getPropertyValuesForIds,
+      ).toHaveBeenLastCalledWith("ds1", ["s1"], [["prop1"]]);
+    });
+
+    it("re-resolves the query when matching annotations are added during the fetch", async () => {
+      changeDuringFirstFetch(() =>
+        mockAnnotations.annotationStubs.set(
+          "s4",
+          makeStub({ id: "s4", tags: ["nucleus"] }),
+        ),
+      );
+      const { result } = await executeAgentTool(
+        "get_property_values",
+        { query: { tags: ["nucleus"] } },
+        context,
+      );
+      expect(result.stats[0].count).toBe(3);
+    });
+
+    it("re-resolves the query when an annotation is retagged during the fetch", async () => {
+      changeDuringFirstFetch(() => {
+        mockAnnotations.annotationStubs.get("s3").tags = ["nucleus"];
+      });
+      const { result } = await executeAgentTool(
+        "get_property_histogram",
+        { propertyPath: ["prop1", "mean"], query: { tags: ["nucleus"] } },
+        context,
+      );
+      expect(result.totalCount).toBe(3);
+    });
+
+    it("gives up with an error when the matching annotations keep changing", async () => {
+      let added = 0;
+      mockProperties.propertiesAPI.getPropertyValuesForIds = vi.fn(async () => {
+        added++;
+        mockAnnotations.annotationStubs.set(
+          `new${added}`,
+          makeStub({ id: `new${added}` }),
+        );
+        mockAnnotations.contentRevision++;
+        return [];
+      });
+      await expect(
+        executeAgentTool("get_property_values", {}, context),
+      ).rejects.toThrow(/kept changing/);
+      expect(
+        mockProperties.propertiesAPI.getPropertyValuesForIds,
+      ).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the result when a change leaves the query's matches unchanged", async () => {
+      // The revision is global: retagging an annotation the query does not
+      // match must not refetch, let alone fail.
+      changeDuringFirstFetch(() => {
+        mockAnnotations.annotationStubs.get("s3").tags = ["spot", "bright"];
+      });
+      const { result } = await executeAgentTool(
+        "get_property_values",
+        { query: { tags: ["nucleus"] } },
+        context,
+      );
+      expect(result.stats[0].count).toBe(2);
+      expect(
+        mockProperties.propertiesAPI.getPropertyValuesForIds,
+      ).toHaveBeenCalledTimes(1);
     });
 
     it("rejects groupByTag with several paths before fetching values", async () => {

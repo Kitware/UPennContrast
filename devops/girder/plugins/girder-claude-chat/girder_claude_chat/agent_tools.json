@@ -827,7 +827,7 @@
   },
   {
     "name": "list_properties",
-    "description": "List the annotation property definitions (measurements) set up in this collection, with id, name, worker image, the annotation shape they apply to, tags, and whether they have been computed. Read-only. Use to find a property id to compute or read, and to avoid creating duplicates.",
+    "description": "List the annotation property definitions (measurements) set up in this collection, with id, name, worker image, the annotation shape they apply to, tags, and whether they have been computed (computed is null when that is unknown on a very large dataset; call get_property_values with the propertyId to find out). Read-only. Use to find a property id to compute or read, and to avoid creating duplicates.",
     "input_schema": {
       "type": "object",
       "properties": {},
@@ -902,7 +902,7 @@
   },
   {
     "name": "get_property_values",
-    "description": "Read computed property values as summary statistics (count, mean, std, min, max, median, p25, p75) per property value path \u2014 not a per-annotation dump. Optionally restrict to one propertyId and/or filter the annotations with a query (same shape as list_annotations). Statistics cover every matching annotation in the dataset at any size; count is how many of them have a numeric value on that path, so a count below get_annotation_summary's total means the rest have no value there (not computed, or not applicable), and a path that is absent has no values at all. On very large datasets the values are fetched from the server and can take a few seconds. Read-only. Use to answer questions like 'what's the mean intensity of my nuclei?'.",
+    "description": "Read computed property values as summary statistics (count, mean, std, min, max, median, p25, p75) per property value path \u2014 not a per-annotation dump. Optionally restrict to one propertyId and/or filter the annotations with a query (same shape as list_annotations). Statistics cover every matching annotation in the dataset at any size; count is how many of them have a numeric value on that path, so a count below get_annotation_summary's total means the rest have no value there (not computed, or not applicable), and a path that is absent has no values at all. On very large datasets the values are fetched from the server and can take tens of seconds; pass propertyId to read one property faster. Read-only. Use to answer questions like 'what's the mean intensity of my nuclei?'.",
     "input_schema": {
       "type": "object",
       "properties": {

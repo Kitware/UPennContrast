@@ -352,3 +352,77 @@ loft surfaces, line-scan tool, Solidity/Rectangularity, registration "None",
 deconvolution single-Z caveat). Only `interacting-with-objects.md` needed no
 change. Verified live end-to-end after a girder rebuild (folder-upload and
 CSV-export questions now answered correctly).
+
+---
+
+# PR #1405 — stub-only mode (Codex round 1, 2026-10-14)
+
+Verified against the current code after merging master (a535b5af). Both are
+real and current.
+
+## [S1-1] Stub-mode property paths came from a 512-document sample (P1)
+**Location:** `src/agent/executors.ts` `get_property_values` (and its sibling
+`list_properties`), `src/store/properties.ts` `computedPropertyPaths`
+**Status:** fixed — stub-mode `get_property_values` projects property roots
+(plus virtual paths) and takes leaf paths from the returned values;
+`list_properties` reports `computed: null` when the sample can't tell. Tests:
+"get_property_values finds a property the path sample missed", "…summarizes
+every property's paths", "…includes virtual paths", "list_properties does not
+report a sampled-out property as uncomputed". The Annotation Browser's column
+list has the same sample limit; out of scope here.
+
+In stub-only mode `computedPropertyPaths` is `discoveredPropertyPaths`, the leaf
+paths of the first 512 value documents by `_id`. A property computed only for a
+subset of annotations (one shape or tag) can be absent from that sample.
+`get_property_values` then skipped it and reported no statistic, even with
+`propertyId` named. Sibling: `list_properties` reported such a property as
+`computed: false`.
+
+## [S1-2] Analysis/list snapshots not revalidated after the new awaits (P2)
+**Location:** `src/agent/executors.ts` `loadAnalysisValues`, `list_annotations`
+**Status:** fixed — `withStableAnnotations` re-resolves and reloads when
+`contentRevision` moves across the await, and errors after a second change.
+Used by all six analysis tools (`loadAnalysisInputs`) and `list_annotations`.
+Replaces the delete-only filter. The analysis tools keep a result when the
+re-resolved query matches the same ids (an unrelated edit), since values belong
+to ids. Tests: "re-resolves the query when an annotation is deleted / matching
+annotations are added / an annotation is retagged during the fetch", "gives up
+with an error when the matching annotations keep changing", "keeps the result
+when a change leaves the query's matches unchanged", list_annotations' "gives
+up with an error when annotations keep changing", "re-reads the page when
+annotations change during the name fetch".
+
+Self-review of these fixes (code-review, high) raised five points: one live-id
+Set rebuilt per path (fixed: resolved once per call), the global revision
+forcing refetches/failures on unrelated edits (fixed: id comparison above), an
+inaccurate ordering comment and a NUL-joined `localeCompare` (fixed: plain
+comparison), missing attempt-count assertions (fixed). Skipped: leaf-path
+discovery walks every fetched value document — same order of cost as the stats
+pass it precedes, and a sample is exactly what S1-1 removed.
+
+The query is resolved before the batch value fetch (or the name hydrate), and
+only deletions were re-checked afterwards. Annotations added, or retagged,
+during the await (for example by a finishing worker) left the result describing
+a population that no longer matches the query.
+
+**Live verification (2026-10-14)** on the local 465,543-annotation Xenium
+Kidney (protein) dataset in stub-only mode, running the fixed and the pre-fix
+(`d3b8674b`) executors side by side in the same page:
+
+- S1-1: a temporary property with values on only the last 2,000 annotations
+  (0 of its paths in the 512-document sample). Fixed: 2 paths, n=2000,
+  mean 1000.5 (exact). Pre-fix: no stats. `list_properties`: `null` vs `false`.
+- S1-2: 10 annotations matched a local-only tag, and 5 more joined during the
+  value fetch. Fixed: histogram totalCount 15 after 2 fetches. Pre-fix: 10.
+  An unrelated retag during the fetch: fixed kept n=10 with 1 fetch.
+  `list_annotations`: 15 rows after 2 hydrates.
+- Also checked: list totals match the stub count (465,543) and a tag's count;
+  select by query and fit-to-selection work; scatter (downsampled) and box
+  plots build.
+- Cost, measured: one property 5 s; every property (24 paths) 28 s; scatter
+  10 s. Docs and the tool description now say so.
+- Fixture fully removed: property, values, collection entry, and the 9 value
+  documents the insert created (value docs back to 465,534).
+- The local Girder image predates master's `annotation_property/batch` and the
+  summary `shapes` field, so property definitions were loaded through a
+  page-only shim and `get_annotation_summary` was not exercised.

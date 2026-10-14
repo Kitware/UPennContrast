@@ -349,10 +349,29 @@ read through that split, so they report the same population as
   paths being analyzed, for the query's ids (or every live id). It never sends
   an empty path list, because to that endpoint an empty list means every
   value. The live-id intersection that drops orphaned values still applies.
-  This means a dataset-wide `get_property_values` on a 700K dataset uploads
-  every id and parses every projected value: a few seconds, once per call.
-  That is acceptable for an explicit request, but it is the cost to move
-  server-side first.
+  This means a dataset-wide `get_property_values` uploads every id and parses
+  every projected value. Measured on a 465K-annotation dataset (local,
+  2026-10-14): one property 5 s; every property (24 paths) 28 s; a
+  tag-colored scatter of two paths 10 s. That is tolerable for an explicit
+  request, but it is the cost to move server-side first (the summary endpoint
+  already aggregates count/mean/std/min/max over list filters).
+- **Paths are discovered from the fetch, not the sample.** In stub-only mode
+  `computedPropertyPaths` is the leaf paths of a bounded sample of value
+  documents (512, by `_id`), which can miss a property computed only on some
+  annotations. `get_property_values` therefore projects each property's root
+  (plus the virtual paths) and reports the leaf paths found in what comes back.
+  `list_properties` reports `computed: null` (unknown) for a property absent
+  from the sample, instead of a false `false`.
+- **One consistent snapshot.** A tool resolves its query before the await (the
+  value fetch, or `list_annotations`' name hydrate). `withStableAnnotations`
+  compares `annotationStore.contentRevision` across the await; if annotations
+  were added, edited or deleted meanwhile, it resolves and loads again, and
+  after a second change it reports an error instead of a stale answer. The
+  revision is global, so the analysis tools first re-resolve the query: values
+  belong to ids, so a change that leaves the matching ids the same keeps the
+  result without a refetch.
+  Hydration does not bump the revision, so panning during a fetch does not
+  cause a retry.
 - **Tags and `fit` resolve per id.** Tag-grouped plots and sample rows look up
   each id with `getAnnotationOrStubFromId`. `set_camera`'s `fit` bounds a stub
   by its centroid widened by `estimatedRadius`.
@@ -874,8 +893,22 @@ Analysis reads the dataset, not the viewport:
 - The fetch is identity-checked, and a failed fetch is an error rather than
   zero values — *"aborts if the dataset changes during the value fetch"*,
   *"reports a failed value fetch as an error, not as zero values"*.
-- An annotation deleted during the fetch is not counted (the query resolves
-  before the await) — *"drops an annotation deleted while its values were loading"*.
+- A content change during the fetch re-resolves the query, and a population
+  that keeps changing is an error, not a stale answer —
+  *"re-resolves the query when an annotation is deleted during the fetch"*,
+  *"re-resolves the query when matching annotations are added during the fetch"*,
+  *"re-resolves the query when an annotation is retagged during the fetch"*,
+  *"gives up with an error when the matching annotations keep changing"*.
+  An unrelated change (the revision is global) neither refetches nor fails —
+  *"keeps the result when a change leaves the query's matches unchanged"*.
+  `list_annotations` does the same around its name fetch —
+  *"re-reads the page when annotations change during the name fetch"*.
+- Property paths come from the fetched values, not the 512-document sample, so
+  a property computed on a subset is still summarized —
+  *"get_property_values finds a property the path sample missed"*,
+  *"get_property_values includes virtual paths"*; and `list_properties` says
+  "unknown" rather than "not computed" for it —
+  *"list_properties does not report a sampled-out property as uncomputed"*.
 - A path is never projected alongside its own ancestor (MongoDB rejects the
   collision) — *"never projects a path together with its own ancestor"*.
 - Input is validated before the whole-population fetch —
