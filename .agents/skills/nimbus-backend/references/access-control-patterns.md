@@ -72,23 +72,52 @@ Resources affected by sharing:
 ### Share Endpoint Pattern
 
 ```python
-@access.user
+@access.user(scope=TokenScope.DATA_WRITE)
 @autoDescribeRoute(
     Description("Share dataset views with a user")
     .jsonParam("body", "Share request", paramType="body",
                schema={
                    "datasetViewIds": ["id1", "id2"],
                    "userMailOrUsername": "user@example.com",
-                   "accessType": 0  # 0=READ, 1=WRITE, -1=remove (-> None)
+                   "accessType": 0  # 0=READ, 1=WRITE, 2=ADMIN, -1=remove (-> None)
                })
 )
 def share(self, body):
     # 1. Resolve user by email or username
-    # 2. For each DatasetView:
-    #    - Set access on the DatasetView
-    #    - Set access on the parent Dataset folder
-    #    - Set access on associated Configurations
+    # 2. Load the dataset, views and configurations at WRITE
+    # 3. requireCanSetUserAccess(model, doc, caller, target, level) on every
+    #    document before writing any (403: above the caller's own level)
+    # 4. setUserAccess with parseShareAccessType's level (None removes)
 ```
+
+`AccessType().validate()` accepts 2, so a share endpoint that only checks
+WRITE lets a collaborator grant **themselves** ADMIN (their own login as
+the target). Any code that writes an ACL for someone else -- an endpoint,
+or a propagation like project sharing -- applies the same rule: WRITE is
+enough to share, never above the caller's own level. Explicit requests
+refuse (`requireCanSetUserAccess`, 403, checked on every document before
+any write); copying a whole ACL onto an added resource (a project's onto
+a dataset) caps each entry instead (`helpers/aclLimits.cappedCopyLevel`),
+since the caller's own ADMIN entry would otherwise ride along. Pass the
+acting user down to the model rather than letting the model write
+unconditionally; reach only what the caller could share directly
+(`limitToShareable`).
+
+Check every path that hands data *out* on a container's authority, not
+only the ones that write ACLs: a Zenodo upload of a project exported every
+dataset in it on project ADMIN alone, including datasets the caller could
+not read. Publishing or exporting a container needs ADMIN on each thing in
+it (`requireProjectContentsAccess`) -- including what the export finds
+indirectly: the Zenodo job publishes the property definitions of the
+configurations a project dataset's views use. Derive the checked set from
+what the export reads, not from the container's own list, and hand the
+export that set instead of letting it re-query.
+
+But do not *refuse* because of something anyone can attach: dataset views
+reference a dataset without any access check, so a stranger's view (public,
+hence "readable") would block the owner's upload. Skip what the caller
+does not own instead, and drop the data that depended on it (property
+values without their definitions).
 
 ### Public Access Pattern
 

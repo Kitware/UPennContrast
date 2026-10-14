@@ -207,6 +207,17 @@ ADMIN or remove the owner. *"testWriteUserCanShareUpToWrite"*,
   Tests: *"testShareEndpointRemoveDropsAclEntries"*, *"testAccessListHidesLegacyNegativeEntries"*,
   *"test_remove_drops_entries_everywhere"* (project), *"test_legacy_negative_entry_not_propagated"*.
 
+**Limits (`server/helpers/aclLimits.py`):** sharing never hands out more than the
+caller holds. WRITE is enough to share, but an explicit request (this endpoint,
+`project/:id/share`) is refused if it would exceed the caller's level on any touched
+document or change a user above it (its owner). Copying a project's ACL onto a resource
+newly added to it caps each entry at the caller's level instead (`cappedCopyLevel`), so
+adding a dataset never fails over someone else's grant. Project propagation reaches only
+what the caller could share here (`limitToShareable`: datasets, their views and
+collections the caller can edit). Before this, a WRITE collaborator could grant
+themselves ADMIN (`accessType: 2` on their own login). Tests:
+`test/test_share_escalation.py`; invariants are in `PROJECTS.md` "Regression checklist".
+
 #### `POST /dataset_view/set_public`
 
 Makes a dataset and all associated resources public or private.
