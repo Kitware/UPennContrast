@@ -424,6 +424,8 @@ Run `pnpm test src/components/ZenodoPublish.test.ts src/store/ZenodoAPI.test.ts 
 - [ ] **`uploading` with no visible job is re-read, and the status poll covers it** (a stale cached project, or a co-owner's upload), and the poll stops on a status change or unmount, including mid-lookup; a failed lookup falls back to the poll. — *"re-reads the project when the reported upload has no job"*, *"keeps re-reading while the upload's job is invisible"*, *"keeps checking when the job lookup fails"*, *"stops polling when unmounted"*, *"schedules nothing if unmounted while looking up the job"*
 - [ ] **Project status is written before the job's terminal status** on failure as on success, because the card re-reads the project on that event. — *"test_fail_writes_project_status_before_job_status"*
 
+- [ ] **An older project refresh can't overwrite a newer one.** The card triggers overlapping refreshes (409, job end, status poll); `projects.fetchProject` commits only its latest request per project, so a stale `draft` can't release an upload that followed it. — *"keeps the newest snapshot when refreshes resolve out of order"*
+
 ### Project switch
 
 - [ ] **Each project gets its own card instance**, so errors, progress and the job subscription never carry over. — *"gives each project its own ZenodoPublish instance"*

@@ -11,6 +11,13 @@ import sync from "./sync";
 import { IProject, TProjectStatus } from "./model";
 import { logError } from "@/utils/log";
 
+// Latest fetchProject request per project. Overlapping refreshes of one
+// project (the Zenodo card asks on a 409, on a job's end and from its status
+// poll) can resolve out of order; only the newest may commit, or an older
+// snapshot replaces a newer one.
+const latestProjectFetch = new Map<string, number>();
+let projectFetchSeq = 0;
+
 @Module({ dynamic: true, store, name: "projects" })
 export class Projects extends VuexModule {
   // State
@@ -106,10 +113,12 @@ export class Projects extends VuexModule {
   async fetchProject(projectId: string): Promise<IProject | null> {
     // Note: removed isLoggedIn check to allow page refresh to work properly
     // The API call will fail if not authenticated anyway
+    const seq = ++projectFetchSeq;
+    latestProjectFetch.set(projectId, seq);
     sync.setSaving(true);
     try {
       const project = await main.projectsAPI.getProject(projectId);
-      if (project) {
+      if (project && latestProjectFetch.get(projectId) === seq) {
         this.addProjectImpl(project);
       }
       sync.setSaving(false);
