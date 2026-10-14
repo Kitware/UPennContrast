@@ -158,7 +158,7 @@ def _rollbackImport(annotationDocs, connectionDocs, annotationIds):
     """Best-effort cleanup of a partially completed import.
 
     Deletes explicitly rather than relying on the annotation-removal
-    cascade (the "model.upenn_annotation.removeStringIds" event that
+    cascade (the ANNOTATIONS_REMOVED_EVENT event that
     normally cleans up connections/property values), so cleanup here
     is not dependent on that event graph doing the right thing for a
     failure that can happen at any step of the import.

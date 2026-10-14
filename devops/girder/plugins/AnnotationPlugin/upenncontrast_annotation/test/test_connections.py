@@ -8,7 +8,16 @@ from upenncontrast_annotation.server.models.annotation import Annotation
 from upenncontrast_annotation.server.models.connections import (
     AnnotationConnection,
 )
+from upenncontrast_annotation.server.models.propertyValues import (
+    AnnotationPropertyValues,
+)
+from upenncontrast_annotation.server.helpers.constants import (
+    ANNOTATIONS_REMOVED_EVENT,
+)
 from upenncontrast_annotation.server.models import connections
+from upenncontrast_annotation.server.models import (
+    annotation as annotationModule,
+)
 from upenncontrast_annotation.server.helpers.connections import (
     annotationToAnnotationDistance,
     isAPoint,
@@ -20,6 +29,7 @@ from upenncontrast_annotation.server.helpers.connections import (
 from . import girder_utilities as utilities
 from . import upenn_testing_utilities as upenn_utilities
 
+from girder import events
 from girder.exceptions import ValidationException
 from girder.models.folder import Folder
 
@@ -636,6 +646,228 @@ class TestConnectionEndpoints:
         )
         assertStatusOk(resp)
         assert len(resp.json) == 3
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestDeleteCleansUpConnections:
+    """Deleting annotations must remove the connections that reference them.
+
+    Regression for issue #1243: bulk delete used to emit string ids into the
+    annotation-removal cleanup event, but childId/parentId are stored as
+    ObjectIds, so the cleanup's string $in matched nothing and bulk-deleted
+    annotations left their connections orphaned. (Single delete passed an
+    ObjectId and worked.) The emitter now converts to ObjectIds.
+    """
+
+    def _chain(self, admin, count=3, name="cleanup-ds"):
+        """`count` annotations in a fresh dataset, linked parent -> child in
+        a chain."""
+        dataset = utilities.createFolder(
+            admin, name, upenn_utilities.datasetMetadata
+        )
+        annotations = [
+            Annotation().create(
+                upenn_utilities.getSampleAnnotation(dataset["_id"])
+            )
+            for _ in range(count)
+        ]
+        for parent, child in zip(annotations, annotations[1:]):
+            AnnotationConnection().create(
+                upenn_utilities.getSampleConnection(
+                    parent["_id"], child["_id"], dataset["_id"]
+                )
+            )
+        return dataset, [a["_id"] for a in annotations]
+
+    def _connectionCount(self, dataset):
+        return len(list(AnnotationConnection().find(
+            {"datasetId": dataset["_id"]}
+        )))
+
+    def testBulkDeleteRemovesConnections(self, admin):
+        dataset, annotationIds = self._chain(admin)
+        assert self._connectionCount(dataset) == 2
+
+        # The string-id path the REST endpoint uses.
+        Annotation().deleteMultiple([str(i) for i in annotationIds])
+
+        assert self._connectionCount(dataset) == 0
+
+    def testBulkDeleteKeepsUnrelatedConnections(self, admin):
+        """Only connections touching a deleted annotation go, here or in any
+        other dataset."""
+        dataset, annotationIds = self._chain(admin, count=4)
+        other, otherIds = self._chain(admin, name="other-ds")
+
+        # Delete the last annotation: only the connection 2 -> 3 references
+        # it; 0 -> 1 and 1 -> 2 must survive.
+        Annotation().deleteMultiple([str(annotationIds[3])])
+
+        remaining = list(AnnotationConnection().find(
+            {"datasetId": dataset["_id"]}
+        ))
+        assert sorted(
+            (c["parentId"], c["childId"]) for c in remaining
+        ) == sorted([
+            (annotationIds[0], annotationIds[1]),
+            (annotationIds[1], annotationIds[2]),
+        ])
+        assert self._connectionCount(other) == 2
+
+    def testDeleteRemovesConnectionsStoredInAnotherDataset(self, admin):
+        """Cleanup matches by annotation id, not by dataset: a connection
+        stored under dataset B that points at an annotation in dataset A goes
+        when that annotation is deleted. (Master's pipeline only looked in the
+        deleted annotation's own dataset.)"""
+        datasetA, idsA = self._chain(admin, count=1, name="ds-a")
+        datasetB, idsB = self._chain(admin, count=2, name="ds-b")
+        AnnotationConnection().create(
+            upenn_utilities.getSampleConnection(
+                idsA[0], idsB[0], datasetB["_id"]
+            )
+        )
+        assert self._connectionCount(datasetB) == 2
+
+        Annotation().delete(Annotation().load(idsA[0], force=True))
+
+        remaining = list(AnnotationConnection().find(
+            {"datasetId": datasetB["_id"]}
+        ))
+        assert [(c["parentId"], c["childId"]) for c in remaining] == [
+            (idsB[0], idsB[1])
+        ]
+
+    def testSingleDeleteRemovesConnections(self, admin):
+        dataset, annotationIds = self._chain(admin, count=2)
+        Annotation().delete(Annotation().load(annotationIds[1], force=True))
+        assert self._connectionCount(dataset) == 0
+
+    def testBulkDeleteRemovesPropertyValues(self, admin):
+        """The property-value half of #1243 (fixed earlier); kept here so the
+        two cleanups of the same event are held together."""
+        dataset, annotationIds = self._chain(admin)
+        for annotationId in annotationIds:
+            AnnotationPropertyValues().appendValues(
+                {"propA": 1.0}, annotationId, dataset["_id"]
+            )
+
+        Annotation().deleteMultiple([str(i) for i in annotationIds])
+
+        assert list(AnnotationPropertyValues().find(
+            {"annotationId": {"$in": annotationIds}}
+        )) == []
+
+    def testUndoBulkDeleteRestoresConnections(self, admin, server):
+        """The cleanup runs inside the recorded request, so undoing the bulk
+        delete brings the connections back with the annotations."""
+        dataset, annotationIds = self._chain(admin)
+
+        resp = server.request(
+            path="/upenn_annotation/multiple",
+            method="DELETE",
+            user=admin,
+            body=json.dumps([str(i) for i in annotationIds]),
+            type="application/json",
+        )
+        assertStatusOk(resp)
+        assert self._connectionCount(dataset) == 0
+
+        resp = server.request(
+            path="/history/undo",
+            method="PUT",
+            user=admin,
+            params={"datasetId": str(dataset["_id"])},
+        )
+        assertStatusOk(resp)
+        assert self._connectionCount(dataset) == 2
+        assert len(list(Annotation().find(
+            {"datasetId": dataset["_id"]}
+        ))) == 3
+
+    def _orphan(self, annotationId):
+        """Remove the annotation document without firing the cleanup event,
+        leaving its connections and property values behind: the state that
+        bulk deletes before #1243's fix left in existing datasets."""
+        Annotation().removeWithQuery({"_id": annotationId})
+
+    def testBulkDeleteOfNonexistentIdsLeavesOtherDatasetsAlone(
+        self, admin, user, server
+    ):
+        """An id that matches no annotation gets no access check (there is
+        no dataset to check), so it must not reach the cleanup either:
+        otherwise any user could delete another dataset's orphaned
+        connections and property values by naming their dangling ids."""
+        dataset, annotationIds = self._chain(admin, count=2)
+        AnnotationPropertyValues().appendValues(
+            {"propA": 1.0}, annotationIds[1], dataset["_id"]
+        )
+        self._orphan(annotationIds[1])
+
+        resp = server.request(
+            path="/upenn_annotation/multiple",
+            method="DELETE",
+            user=user,
+            body=json.dumps([str(annotationIds[1])]),
+            type="application/json",
+        )
+        assertStatusOk(resp)
+        assert self._connectionCount(dataset) == 1
+        assert AnnotationPropertyValues().findOne(
+            {"annotationId": annotationIds[1]}
+        ) is not None
+
+    def testBulkDeleteWithMixedIdsCleansOnlyExistingOnes(
+        self, admin, server
+    ):
+        """One request naming a live annotation and a dangling id from
+        another dataset: the live one's connections go, the dangling id's
+        orphaned connection stays."""
+        own, ownIds = self._chain(admin, count=2, name="own-ds")
+        other, otherIds = self._chain(admin, count=2, name="other-ds")
+        self._orphan(otherIds[1])
+
+        resp = server.request(
+            path="/upenn_annotation/multiple",
+            method="DELETE",
+            user=admin,
+            body=json.dumps([str(ownIds[1]), str(otherIds[1])]),
+            type="application/json",
+        )
+        assertStatusOk(resp)
+        assert self._connectionCount(own) == 0
+        assert self._connectionCount(other) == 1
+
+    def testBulkDeleteCleanupIsChunked(self, admin, monkeypatch):
+        """The cleanup event carries at most MAX_IDS_PER_QUERY ids, so the
+        subscribers' $in queries stay under MongoDB's 16 MiB command limit
+        for very large deletes (the connection query sends the list twice).
+        """
+        monkeypatch.setattr(annotationModule, "MAX_IDS_PER_QUERY", 2)
+        dataset, annotationIds = self._chain(admin, count=5)
+        for annotationId in annotationIds:
+            AnnotationPropertyValues().appendValues(
+                {"propA": 1.0}, annotationId, dataset["_id"]
+            )
+        payloadSizes = []
+        events.bind(
+            ANNOTATIONS_REMOVED_EVENT,
+            "test.recordPayloadSizes",
+            lambda event: payloadSizes.append(len(event.info)),
+        )
+        try:
+            Annotation().deleteMultiple([str(i) for i in annotationIds])
+        finally:
+            events.unbind(
+                ANNOTATIONS_REMOVED_EVENT,
+                "test.recordPayloadSizes",
+            )
+
+        assert payloadSizes == [2, 2, 1]
+        assert self._connectionCount(dataset) == 0
+        assert AnnotationPropertyValues().findOne(
+            {"annotationId": {"$in": annotationIds}}
+        ) is None
 
 
 @pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
