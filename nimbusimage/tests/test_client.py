@@ -364,6 +364,34 @@ class TestJobLookup:
             mock_gc.get.assert_called_with("job/job1")
             assert job.id == "job1"
 
+    def test_job_by_id_401_names_the_missing_permission(self):
+        # client.job(id) fetches before a Job exists; a key without
+        # 'List and read jobs' must get the same hint as refresh(), not
+        # Girder's raw scope error.
+        import json
+
+        from girder_client import HttpError
+
+        with patch("nimbusimage._girder.girder_client.GirderClient") as MockGC:
+            mock_gc = MagicMock()
+            MockGC.return_value = mock_gc
+            mock_gc.get.return_value = {"_id": "user123", "login": "admin"}
+            client = NimbusClient(
+                api_url="http://localhost:8080/api/v1", token="tok",
+            )
+            mock_gc.get.side_effect = HttpError(
+                status=401,
+                text=json.dumps({
+                    "message": "Invalid token scope.\nRequired: "
+                    "jobs.job_job1.\nAllowed: core.data.read",
+                    "type": "access",
+                }),
+                url="job/job1",
+                method="GET",
+            )
+            with pytest.raises(PermissionError, match="List and read jobs"):
+                client.job("job1")
+
 
 class TestCountAnnotations:
     def _client(self, mock_gc):

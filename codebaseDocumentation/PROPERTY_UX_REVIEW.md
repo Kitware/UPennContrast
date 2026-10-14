@@ -14,14 +14,20 @@ inspection on the large local dataset.
 - Summary: the local-dataset “Compute all” action loops through properties and
   submits one HTTP request/job at a time from the client. Large property sets
   amplify request overhead and permit partial client-side submission.
-- Status: partially fixed here; completed by a follow-up backend PR. This
-  commit consolidates Compute-all into one store action
-  (`propertyStore.computeProperties`) with full lifecycle guarantees, but the
-  submissions still go one request per property through the existing
-  endpoint so this branch stays frontend-only and deployable without a
-  Girder rebuild. The follow-up PR ("Property compute: batch submission
-  endpoint", stacked on this branch) adds `POST /annotation_property/compute`
-  and switches the client to a single request.
+- Status: fixed. #1327 consolidated Compute-all into one store action
+  (`propertyStore.computeProperties`) with full lifecycle guarantees while
+  still submitting per property, so it deployed without a Girder rebuild.
+  #1334 added `POST /annotation_property/compute` and switched the client to
+  a single request. The endpoint validates all input, requires dataset WRITE,
+  loads the properties with one `$in` query, and checks them all before
+  scheduling any job. If scheduling a later property fails (a broker error),
+  it cancels the jobs already queued and re-raises, so the batch is
+  all-or-nothing and a retry cannot run those jobs twice. It shares that path
+  with the single-property endpoint.
+  A property is computable by a caller who can read it through its own ACL,
+  which names only the creator, or through a configuration that references
+  it. That is the rule `GET /annotation_property/:id` applies, so dataset
+  collaborators can compute the properties they can see.
 
 ### F2 — Property-value menus and bulk visibility are unbounded
 
@@ -93,13 +99,25 @@ test that holds the invariant.
 
 - [x] Compute all goes through one store action with a bounded per-run set —
       _"computeUncomputedProperties submits the group through one store action"_
-      and _"submits at most 100 properties per compute-all run"_.
-- [ ] Compute all uses one client request and the batch endpoint permission-
-      checks properties without looped loads — held by the follow-up backend
-      PR ("Property compute: batch submission endpoint"), whose tests cover
-      single-request submission, preflight validation, and dataset WRITE
-      enforcement. Test names are cited there once the endpoint lands; this
-      branch deliberately submits per property.
+      and _"submits at most 100 properties so the client matches the server
+      limit"_.
+- [x] Compute all uses one client request and the batch endpoint permission-
+      checks properties without looped loads —
+      _"submits every property in one request"_,
+      _"testComputeMultipleSubmitsAllPropertiesInOneRequest"_,
+      _"testComputeMultipleValidatesEveryPropertyBeforeSubmitting"_,
+      _"testComputeRequiresDatasetWriteAccess"_, and
+      _"testComputeMultipleRequiresDatasetWriteAccess"_.
+- [x] The client batch cap equals the server's `MAX_COMPUTE_PROPERTIES` —
+      _"matches the server's MAX_COMPUTE_PROPERTIES"_.
+- [x] Collaborators can compute properties they read through a shared
+      configuration, and a deleted property is a 404 rather than an access
+      error — _"testCollaboratorComputesPropertyReadableThroughConfiguration"_
+      and _"testComputeMultipleReportsMissingPropertyAs404"_.
+- [x] A scheduling failure partway through a batch cancels the jobs already
+      queued, so the client's "all failed" is true and a retry does not
+      duplicate them —
+      _"testComputeMultipleCancelsQueuedJobsWhenSchedulingFails"_.
 - [x] Submission, missing-job, worker-failure, and refresh-failure paths always
       clear running/progress state and surface an error —
       _"cleans up and surfaces an API submission failure"_,
@@ -107,7 +125,7 @@ test that holds the invariant.
       _"cleans up and surfaces job tracking failures"_,
       _"cleans up and surfaces post-job refresh failures"_,
       _"surfaces worker failure when job completes unsuccessfully"_,
-      _"cleans up batch state when every submission rejects"_,
+      _"cleans up batch state when the batch API rejects"_,
       _"cleans up batch state when the server omits a job"_, and
       _"returns the store promise so callers can observe completion"_.
 - [x] Every non-batch UI entry point goes through the shared compute helper —

@@ -661,3 +661,120 @@ class TestFindDefaultSort:
 
         returnedIds = [doc["_id"] for doc in resp.json]
         assert returnedIds == [str(i) for i in idsAscending]
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestCreateMultipleValidation:
+    """POST /upenn_annotation/multiple must reject malformed input with 400.
+
+    Regression for issue #1242: the bulk-create endpoint validated its body
+    far less than the bulk-update endpoint, so a non-list body, a non-dict
+    entry, or a malformed id raised a 500 instead of a clean 400.
+    """
+
+    def _post(self, server, user, body):
+        return server.request(
+            path="/upenn_annotation/multiple",
+            method="POST",
+            user=user,
+            body=json.dumps(body),
+            type="application/json",
+        )
+
+    def testNonListBodyReturns400(self, admin, server):
+        resp = self._post(server, admin, {"not": "a list"})
+        assertStatus(resp, 400)
+
+    def testNonDictEntryReturns400(self, admin, server):
+        resp = self._post(server, admin, [123])
+        assertStatus(resp, 400)
+
+    def testMalformedDatasetIdReturns400(self, admin, server):
+        sample = upenn_utilities.getSampleAnnotation("not-a-valid-object-id")
+        resp = self._post(server, admin, [sample])
+        assertStatus(resp, 400)
+
+    def testNumericDatasetIdReturns400(self, admin, server):
+        """A non-string id raises TypeError (not InvalidId) in ObjectId()."""
+        sample = upenn_utilities.getSampleAnnotation(123)
+        resp = self._post(server, admin, [sample])
+        assertStatus(resp, 400)
+
+    def testNumericIdWithoutDatasetIdReturns400(self, admin, server):
+        """With no datasetId, the @recordable finder looks the dataset up
+        from the entry's id before the handler runs; a numeric id must not
+        500 there. (The 400 itself comes from schema validation: an entry
+        without a datasetId is never valid. The finder's own path is pinned
+        by TestUpdateMultipleNumericIds.)"""
+        resp = self._post(server, admin, [{"_id": 123}])
+        assertStatus(resp, 400)
+
+    def testValidBodyStillCreates(self, admin, server):
+        dataset = utilities.createFolder(
+            admin, "create-multiple-ds", upenn_utilities.datasetMetadata
+        )
+        samples = [
+            upenn_utilities.getSampleAnnotation(str(dataset["_id"]))
+            for _ in range(2)
+        ]
+        resp = self._post(server, admin, samples)
+        assertStatusOk(resp)
+        assert len(resp.json) == 2
+
+    def testValidBodyIsRecordedForUndo(self, admin, server):
+        """The finder still returns the datasetId for a valid body, so the
+        create is recorded and undo removes it."""
+        dataset = utilities.createFolder(
+            admin, "create-multiple-undo-ds", upenn_utilities.datasetMetadata
+        )
+        samples = [
+            upenn_utilities.getSampleAnnotation(str(dataset["_id"]))
+            for _ in range(2)
+        ]
+        assertStatusOk(self._post(server, admin, samples))
+        assert len(list(Annotation().find({"datasetId": dataset["_id"]}))) == 2
+
+        assertStatusOk(server.request(
+            path="/history/undo",
+            method="PUT",
+            user=admin,
+            params={"datasetId": str(dataset["_id"])},
+        ))
+        assert len(list(Annotation().find({"datasetId": dataset["_id"]}))) == 0
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
+class TestUpdateMultipleNumericIds:
+    """PUT /upenn_annotation/multiple with a numeric id or datasetId is a
+    400: ObjectId() raises TypeError for a non-string, not InvalidId."""
+
+    def _put(self, server, user, body):
+        return server.request(
+            path="/upenn_annotation/multiple",
+            method="PUT",
+            user=user,
+            body=json.dumps(body),
+            type="application/json",
+        )
+
+    def testNumericIdReturns400(self, admin, server):
+        """The finder skips a numeric id (no load(), no TypeError) and the
+        handler's own id check rejects it."""
+        resp = self._put(server, admin, [{"id": 123}])
+        assertStatus(resp, 400)
+        assert resp.json["message"] == "annotation id is not a valid id"
+
+    def testNumericDatasetIdReturns400(self, admin, server):
+        dataset = utilities.createFolder(
+            admin, "update-multiple-ds", upenn_utilities.datasetMetadata
+        )
+        annotation = Annotation().create(
+            upenn_utilities.getSampleAnnotation(dataset["_id"])
+        )
+        resp = self._put(
+            server, admin, [{"id": str(annotation["_id"]), "datasetId": 123}]
+        )
+        assertStatus(resp, 400)
+        assert resp.json["message"] == "datasetId is not a valid id"

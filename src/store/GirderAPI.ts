@@ -91,6 +91,17 @@ function itemsToResourceObject(items: IGirderSelectAble[]) {
   return resourceObj;
 }
 
+// POST dataset_view/set_public. Views and collections owned by other users
+// are left unchanged and counted as skipped.
+export interface ISetDatasetPublicResult {
+  dataset: string;
+  public: boolean;
+  datasetViewsUpdated: number;
+  configurationsUpdated: number;
+  datasetViewsSkipped: number;
+  configurationsSkipped: number;
+}
+
 export default class GirderAPI {
   client: RestClientInstance;
 
@@ -702,7 +713,10 @@ export default class GirderAPI {
     return response.data;
   }
 
-  async setDatasetPublic(datasetId: string, isPublic: boolean) {
+  async setDatasetPublic(
+    datasetId: string,
+    isPublic: boolean,
+  ): Promise<ISetDatasetPublicResult> {
     const response = await this.client.post("dataset_view/set_public", null, {
       params: {
         datasetId,
