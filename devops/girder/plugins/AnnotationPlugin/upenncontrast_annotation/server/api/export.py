@@ -319,28 +319,24 @@ class Export(Resource):
                 for pid in config['meta']['propertyIds']:
                     propertyIds.add(ObjectId(pid))
         else:
-            datasetViews = list(
-                self._datasetViewModel.collection.find({
-                    'datasetId': datasetId
-                })
-            )
             configIds = {
-                dv['configurationId'] for dv in datasetViews
-            }
-
-            for configId in configIds:
-                config = self._collectionModel.load(
-                    configId, user=user, level=AccessType.READ
+                dv['configurationId']
+                for dv in self._datasetViewModel.find(
+                    {'datasetId': datasetId}, fields=['configurationId']
                 )
-                if (config and 'meta' in config
-                        and 'propertyIds' in config['meta']):
-                    for pid in config['meta']['propertyIds']:
-                        propertyIds.add(ObjectId(pid))
+            }
+            # Only configurations the caller can read: other users may have
+            # opened the dataset with a private configuration of their own,
+            # and loading that one used to fail the whole export.
+            for config in self._collectionModel.findWithPermissions(
+                {'_id': {'$in': list(configIds)}},
+                user=user, level=AccessType.READ,
+            ):
+                for pid in config.get('meta', {}).get('propertyIds', []):
+                    propertyIds.add(ObjectId(pid))
 
         if propertyIds:
-            return list(self._propertyModel.find(
-                {"_id": {"$in": list(propertyIds)}}
-            ))
+            return self._propertyModel.findClientFields(propertyIds)
         return []
 
     def _getPropertyValues(self, datasetId):

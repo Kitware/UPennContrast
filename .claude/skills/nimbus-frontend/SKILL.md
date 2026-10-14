@@ -682,6 +682,34 @@ moved out of their `v-menu` so the palette could open them:
   app bar. A dialog that is always opened from outside should have no
   activator at all; delete it rather than overriding it with nothing.
 
+### Reused dialogs that write to the server: two lifetimes
+
+A dialog instance is reused across close/reopen and across a changing
+`dataset` prop (and several instances can exist — one per list row). Its
+async handlers mix two things with **different lifetimes**, and every race
+found in `ShareDataset.vue` (PR #1403 took ~10 Codex rounds) was one treated
+as the other:
+
+1. **What the dialog shows** — loaded lists, notices/errors, typed inputs,
+   pending confirmations. Scoped to one *session* (open period × dataset).
+   Capture a session claim before each `await` and write back only while it
+   holds; bump the session on **every** reset (close *and* dataset switch —
+   the dataset id alone recurs, A → B → A). Keep every such field in one
+   reset function used by both paths. Loads are latest-wins counters.
+2. **Server operations** (create/change/remove/publish/revoke) — they keep
+   running after the dialog closes or unmounts. Their in-progress guards
+   must live in a **module-level registry keyed by what they change**
+   (`utils/pendingMutations.ts`, `utils/pendingPublishes.ts`), shared by all
+   instances, with UI flags computed from it — never component refs a reset
+   clears. When one settles, every open dialog showing that resource
+   **refreshes from the server** (quietly: keep selection and notices), or a
+   dialog that loaded mid-change keeps stale rows.
+
+Test it with a never-resolving-until-told promise, `resetState()`/`setProps`
+in between, then resolve. Module-level registries leak between tests via
+still-mounted wrappers: use `enableAutoUnmount(afterEach)`, or a "refreshes"
+assertion can pass because a previous test's open dialog did the refresh.
+
 ## API Calls
 
 Use the API classes from store — never put `girderRest.get(...)` in components:
@@ -690,6 +718,12 @@ Use the API classes from store — never put `girderRest.get(...)` in components
 import store from "@/store";
 const result = await store.api.someMethod();
 ```
+
+### Your own rights come from the server's effective level, never an ACL row
+
+Don't decide what the current user may do by finding `store.girderUser._id` in an access list's `users`. That list holds only **direct** entries. Someone with access through a Girder group, or a site admin, has no row there, so the UI hides controls the server would allow. Codex caught this on the Share dialog (PR #1406). The access endpoints return `currentUserLevel` (Girder `getAccessLevel`) for this. For a Girder document already in hand, its `_accessLevel` is the same value. Two follow-ons:
+- **It's derived state.** After changing the caller's own entry, re-read it from the server: a group may still grant access. Removing your last access turns the access list itself into a 403, so fail closed (`-1`) instead of keeping the old level.
+- **Re-read narrowly.** Reloading the whole dialog after a self-change reset the user's collection selection.
 
 ### Replacing `girderRest` must reach the API classes too
 

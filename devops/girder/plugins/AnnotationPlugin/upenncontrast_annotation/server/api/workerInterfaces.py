@@ -5,7 +5,7 @@ from docker.errors import DockerException
 
 from girder.api import access
 from girder.api.describe import Description, describeRoute
-from girder.api.rest import Resource
+from girder.api.rest import Resource, filtermodel
 from girder.constants import TokenScope
 from girder.exceptions import RestException
 
@@ -46,6 +46,7 @@ class WorkerInterfaces(Resource):
         )
     )
     @access.user
+    @filtermodel(model=InterfaceModel)
     def update(self, params):
         if "image" not in params:
             raise RestException(code=400, message="Missing 'image' parameter")

@@ -71,7 +71,9 @@ Semantics:
   overflow) is null, since JSON cannot carry it — a JSON body's `1e999` parses to Infinity
   and is stored, and returning it made the summary a 500.
 - Without any filter the statistics run over every value document of the dataset, so a
-  value document orphaned by a deleted annotation counts until the removal hook cleans it.
+  value document orphaned by a deleted annotation counts. Deletes now clean up their values
+  (the removal hook, fixed for bulk deletes by #1243), but orphans written before that fix
+  stay until purged: the hook acts only on annotations that still exist when they are deleted.
   Excluding them would cost a second full scan per request (measured +2.6 s for an id set
   difference, +7.4 s for a `$lookup`, against a 1.5 s query), so this is accepted.
 - An empty match is `total: 0`, `tags: []`, `shapes: []`, `channels: []`, zeroed property entries — not an error. The
