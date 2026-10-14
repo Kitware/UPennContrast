@@ -61,6 +61,21 @@ def _log_text(job_data: dict) -> str:
     return _SECRET.sub("[redacted]", log)
 
 
+def _fetch_job(gc: girder_client.GirderClient, job_id: str) -> dict:
+    """GET job/{id}, turning a 401 into a PermissionError that names the
+    likely cause instead of Girder's raw scope message."""
+    try:
+        return gc.get(f"job/{job_id}")
+    except girder_client.HttpError as exc:
+        if getattr(exc, "status", None) == 401:
+            hint = (
+                _JOB_TOKEN_HINT if _token_was_rejected(exc)
+                else _JOB_SCOPE_HINT
+            )
+            raise PermissionError(hint) from exc
+        raise
+
+
 # Girder job status codes
 STATUS_INACTIVE = 0
 STATUS_QUEUED = 1
@@ -93,6 +108,12 @@ class Job:
         self._id = job_data["_id"]
         self._data = job_data
         self._log = _log_text(job_data)
+
+    @classmethod
+    def fetch(cls, gc: girder_client.GirderClient, job_id: str) -> Job:
+        """Load a job by id. Raises PermissionError on a 401, like
+        :meth:`refresh`."""
+        return cls(gc, _fetch_job(gc, job_id))
 
     @property
     def id(self) -> str:
@@ -137,16 +158,7 @@ class Job:
                 (expired, or its key revoked). The job itself is
                 unaffected.
         """
-        try:
-            self._data = self._gc.get(f"job/{self._id}")
-        except girder_client.HttpError as exc:
-            if getattr(exc, "status", None) == 401:
-                hint = (
-                    _JOB_TOKEN_HINT if _token_was_rejected(exc)
-                    else _JOB_SCOPE_HINT
-                )
-                raise PermissionError(hint) from exc
-            raise
+        self._data = _fetch_job(self._gc, self._id)
         self._log = _log_text(self._data)
 
     def wait(
@@ -167,9 +179,7 @@ class Job:
 
         Raises:
             TimeoutError: If timeout is reached before the job finishes.
-            PermissionError: If polling returns 401, usually because the
-                API key lacks the 'List and read jobs' scope (NIM-005).
-                Raised via :meth:`refresh`.
+            PermissionError: If polling returns 401; see :meth:`refresh`.
         """
         start = time.monotonic()
         last_log_len = 0
