@@ -4,7 +4,7 @@ from bson import ObjectId
 
 from girder.api import access
 from girder.api.describe import autoDescribeRoute, Description, describeRoute
-from girder.api.rest import Resource, loadmodel
+from girder.api.rest import Resource, filtermodel, loadmodel
 from girder.constants import AccessType, TokenScope
 from girder.exceptions import AccessException
 from girder.exceptions import RestException
@@ -49,6 +49,7 @@ class DatasetView(Resource):
         self.route("POST", ("map",), self.map)
 
     @access.public(scope=TokenScope.DATA_READ)
+    @filtermodel(model=DatasetViewModel)
     @describeRoute(
         Description("Get a dataset view by its id.").param(
             "id", "The dataset view's id", paramType="path"
@@ -60,13 +61,11 @@ class DatasetView(Resource):
         level=AccessType.READ,
     )
     def get(self, dataset_view, params):
-        user = self.getCurrentUser()
-        dataset_view['_accessLevel'] = \
-            self._datasetViewModel.getAccessLevel(
-                dataset_view, user)
+        # @filtermodel adds the caller's _accessLevel.
         return dataset_view
 
     @access.user(scope=TokenScope.DATA_WRITE)
+    @filtermodel(model=DatasetViewModel)
     @describeRoute(
         Description("Create a new dataset view.").param(
             "body", "Dataset View Object", paramType="body"
@@ -150,6 +149,7 @@ class DatasetView(Resource):
             dataset_view, new_dataset_view)
 
     @access.public(scope=TokenScope.DATA_READ)
+    @filtermodel(model=DatasetViewModel)
     @describeRoute(
         Description("Search for dataset views.")
         .responseClass("dataset_view")
@@ -204,6 +204,7 @@ class DatasetView(Resource):
         )
 
     @access.public(scope=TokenScope.DATA_READ)
+    @filtermodel(model=DatasetViewModel)
     @autoDescribeRoute(
         Description("""
         Bulk search for dataset views (READ OPERATION).
@@ -471,13 +472,17 @@ class DatasetView(Resource):
             dv['configurationId']
             for dv in datasetViews
         }
-        configs = list(CollectionModel().find({
-            '_id': {'$in': list(configIds)}
-        }))
+        # Only configurations the caller can read: the list names them and
+        # says whether they are public.
+        collectionModel = CollectionModel()
+        configs = list(collectionModel.findWithPermissions(
+            {'_id': {'$in': list(configIds)}},
+            user=user,
+            level=AccessType.READ,
+        ))
         # The share endpoint needs WRITE on every view and configuration it
         # touches, so tell the client which ones the caller can include
         # (from the documents already loaded, no extra queries).
-        collectionModel = CollectionModel()
         result['configurations'] = [
             {
                 'id': str(config['_id']),
@@ -549,9 +554,13 @@ class DatasetView(Resource):
         # Bulk load all datasets at once
         datasets = []
         if datasetIds:
-            folders = list(Folder().find({
-                '_id': {'$in': list(datasetIds)}
-            }))
+            # Only datasets the caller can read: other users may have
+            # opened their own private datasets with this configuration.
+            folders = list(Folder().findWithPermissions(
+                {'_id': {'$in': list(datasetIds)}},
+                user=self.getCurrentUser(),
+                level=AccessType.READ,
+            ))
             datasets = [
                 {
                     'id': str(f['_id']),

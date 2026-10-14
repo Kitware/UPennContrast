@@ -78,6 +78,12 @@ class DatasetView(ProxiedModel):
     def initialize(self):
         self.name = "dataset_view"
         self.schema = DatasetViewSchema.datasetViewSchema
+        # filter() exposes only these. Views are shared with collaborators
+        # and share-link users, and the `access` ACL names all of them.
+        self.exposeFields(AccessType.READ, (
+            "_id", "datasetId", "configurationId", "layerContrasts",
+            "lastLocation", "scales", "lastViewed", "public",
+        ))
 
     def validate(self, document):
         try:

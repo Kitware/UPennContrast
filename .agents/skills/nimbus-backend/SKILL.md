@@ -52,6 +52,8 @@ When modifying sharing/access code: read `codebaseDocumentation/SHARING.md`
 - For exports, which bypass `filter()`, use a `fields=` projection (`AnnotationProperty.findClientFields`).
 - Treat the write side as the twin: a create or update that stores the raw body lets the caller set `access` or `public`. Allow-list the body with `filterUpdateFields(requireObjectBody(...))`.
 - `filter()` adds `_accessLevel`, computed from the doc's own ACL. If that ACL is not what grants reads (properties are read through configurations; worker docs by anyone), the value is wrong, so mix in `UngatedAclFilterMixin` (`helpers/customModel.py`).
+- A response that **names** related resources leaks too: an access list or summary built with plain `find()` (e.g. `configuration_access` listing every dataset opened with a configuration) must use `findWithPermissions` for the caller.
+- A caller-supplied Mongo query probes hidden fields through *which* documents match, even when the response is filtered (`{"access.users.id": X}` on `folder/query` was an ACL-membership oracle). Validate it with `requireQueryOnFields(query, exposedFields)` from `helpers/validation.py`.
 - Test with a READ-only caller and an anonymous one, and assert both that `access` is absent and that every field the consumers read survives.
 
 ### `rest.*.before` listeners need their own access level
