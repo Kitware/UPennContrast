@@ -214,6 +214,29 @@ describe("ZenodoPublish", () => {
     expect(jobsMock.addJob).toHaveBeenCalledTimes(2);
   });
 
+  it("re-reads the project when the reported upload has no job", async () => {
+    // A cached project can still say "uploading" after its job ended (the
+    // store doesn't refetch a cached project on navigation).
+    mocks.findActiveUploadJob.mockResolvedValue(null);
+    const w = await mountComponent("uploading");
+
+    expect(jobsMock.addJob).not.toHaveBeenCalled();
+    expect(w.emitted("updated")).toHaveLength(1);
+  });
+
+  it("can't discard while an upload is starting", async () => {
+    mocks.uploadProject.mockReturnValue(new Promise(() => {}));
+    const w = await mountComponent("error");
+
+    await clickButton(w, "Upload to Zenodo");
+
+    // Discard would overwrite the 'uploading' status the upload just set.
+    const discard = w
+      .findAll("button")
+      .find((b) => b.text().includes("Discard Draft"))!;
+    expect(discard.attributes("disabled")).toBeDefined();
+  });
+
   it("follows an upload already running when it mounts", async () => {
     await mountComponent("uploading");
     expect(mocks.findActiveUploadJob).toHaveBeenCalledTimes(1);

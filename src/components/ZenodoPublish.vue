@@ -139,7 +139,7 @@
         color="error"
         size="small"
         :loading="discarding"
-        :disabled="publishing"
+        :disabled="publishing || !!localProgress"
         @click="discardDraft"
       >
         <v-icon start>mdi-delete</v-icon>
@@ -514,17 +514,24 @@ async function recoverActiveJob() {
       props.project.id,
     );
     // startUpload may have subscribed while this was in flight.
-    if (activeJob && !trackedJobId.value) {
-      trackJob(activeJob._id);
-      // Seed progress from project meta until the next SSE event arrives.
-      const progress = zenodoMeta.value?.progress;
-      if (progress) {
-        localProgress.value = {
-          current: progress.current,
-          total: progress.total,
-          message: progress.message,
-        };
-      }
+    if (trackedJobId.value) return;
+    if (!activeJob) {
+      // The project says "uploading" but no upload is running: the
+      // project is stale (a cached copy, or a refresh that landed out of
+      // order). Re-read it. This can't loop: the watcher only fires when
+      // the status changes.
+      emit("updated");
+      return;
+    }
+    trackJob(activeJob._id);
+    // Seed progress from project meta until the next SSE event arrives.
+    const progress = zenodoMeta.value?.progress;
+    if (progress) {
+      localProgress.value = {
+        current: progress.current,
+        total: progress.total,
+        message: progress.message,
+      };
     }
   } catch {
     // Not critical — status will still show from project meta

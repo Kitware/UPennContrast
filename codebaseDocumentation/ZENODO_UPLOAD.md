@@ -90,7 +90,7 @@ Progress flows through two channels:
 - **SSE (primary)**: Job log lines contain JSON like `{"progress": 0.5, "current": 3, "total": 7, "message": "Uploading file.tiff..."}`. The frontend parses these in the `eventCallback` passed to `jobs.addJob()`.
 - **Project metadata (persistent)**: `project.meta.zenodo.progress` is updated every 5 files (and always on the first/last file) to reduce MongoDB write load, serving as a recovery source if the user navigates away and returns.
 
-On page mount, if `zenodoStatus === 'uploading'`, the component queries for active `zenodo_upload` jobs matching this project's ID and re-subscribes via `jobs.addJob()`.
+Whenever `zenodoStatus` becomes `'uploading'` (including on mount) and the card isn't already following a job, it queries for an active (inactive, queued or running) `zenodo_upload` job matching this project's ID and subscribes via `jobs.addJob()`. If none is found, the project copy is stale (the store doesn't refetch a cached project on navigation), so the card asks `ProjectInfo` to re-read it. Girder lists jobs, and sends their SSE events, only to the job's owner, so a project co-owner can't follow an upload someone else started; their card shows the status from project metadata.
 
 **Note on app-wide progress UI:** The `ZenodoPublish` component manages its own progress display locally rather than using the shared `ProgressType.ZENODO_UPLOAD` / progress store used by other long-running jobs (histogram caching, max-merge, etc.). This was an intentional design choice because the Zenodo progress UI is self-contained within the ProjectInfo page. A future update should integrate Zenodo upload progress into the app-wide progress manager so uploads remain visible when navigating away from ProjectInfo. See GitHub issue for tracking.
 
@@ -319,8 +319,8 @@ In the UI, `ZenodoPublish.vue` shows the server's `response.data.message` for ev
 refused request, one error per request so a request never hides or relabels another's:
 upload and discard errors in alerts on the card, and publish errors inside the publish
 confirmation dialog, which stays open. The dialog can't be dismissed while publishing,
-and Publish is disabled while a discard is in flight, so neither result lands in the
-other's place. A 403 naming a folder or collection on upload/publish also says that
+Publish is disabled while a discard is in flight, and Discard is disabled while an
+upload is starting (it would overwrite the `uploading` status the upload just set). A 403 naming a folder or collection on upload/publish also says that
 publishing needs owner access to every dataset and collection in the project; a
 project-level 403, and any discard error, is shown as the server sent it. A 409 also
 refreshes the project. Saving a token or retrying clears the alert.
@@ -388,4 +388,4 @@ The following scenarios have been verified end-to-end against `sandbox.zenodo.or
 | New version after publish (7 files, ~118MB) | `69ae998ca50fdb5e668f0fc5` | Deposition 468742 created as draft, original DOI preserved |
 | Job progress tracking | all | JSON log lines parsed correctly (0% → 25% → 50% → 100%) |
 | SSE-based frontend tracking | all | `jobs.addJob()` receives progress events in real time |
-| Recovery on page reload | all | `recoverActiveJob()` re-subscribes to active job on mount |
+| Recovery on page reload | all | `recoverActiveJob()` re-subscribes to the active job when the status is `uploading` (on mount, or after a refresh) |

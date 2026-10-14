@@ -527,7 +527,7 @@ export default class ZenodoAPI {
   }
 
   /**
-   * Find an in-flight (queued or running) `zenodo_upload` job for the
+   * Find an in-flight (inactive, queued or running) `zenodo_upload` job for the
    * given project. Used by the frontend to re-subscribe to job progress
    * after a page reload mid-upload. Returns null if none is found.
    *
@@ -540,7 +540,13 @@ export default class ZenodoAPI {
     const response = await this.client.get("job", {
       params: {
         types: JSON.stringify(["zenodo_upload"]),
-        statuses: JSON.stringify([jobStates.queued, jobStates.running]),
+        // A local job stays INACTIVE until its daemon thread marks it
+        // RUNNING, so a just-started upload is INACTIVE for a moment.
+        statuses: JSON.stringify([
+          jobStates.inactive,
+          jobStates.queued,
+          jobStates.running,
+        ]),
         limit: 5,
         sort: "created",
         sortdir: -1,
