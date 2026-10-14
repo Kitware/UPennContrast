@@ -90,6 +90,19 @@ class TestJobRefresh:
         # Hex digests and ObjectIds are not secrets
         assert digest in job.log and "6accce3ebabab1576b6bdaf8" in job.log
 
+    def test_init_reads_log_from_job_data(self):
+        # client.job(id) builds the Job from a full GET job/{id} document;
+        # its log must be readable without a second request.
+        token = "aB" * 32
+        gc = MagicMock()
+        job = Job(gc, {
+            "_id": "j1",
+            "status": STATUS_SUCCESS,
+            "log": [f"--token {token}\n", "done\n"],
+        })
+        assert job.log == "--token [redacted]\ndone\n"
+        gc.get.assert_not_called()
+
     def test_refresh_without_log_field(self):
         gc = MagicMock()
         gc.get.return_value = {"_id": "j1", "status": STATUS_RUNNING}
@@ -137,6 +150,43 @@ class TestJobScopeError:
 
         with pytest.raises(PermissionError, match="Allow all actions"):
             job.wait(verbose=False)
+
+    def _girder_401(self, allowed):
+        import json
+        from girder_client import HttpError
+
+        return HttpError(
+            status=401,
+            text=json.dumps({
+                "message": "Invalid token scope.\nRequired: "
+                f"jobs.job_j1.\nAllowed: {allowed}",
+                "type": "access",
+            }),
+            url="job/j1",
+            method="GET",
+        )
+
+    def test_refresh_401_with_scopes_names_list_and_read_jobs(self):
+        gc = MagicMock()
+        gc.get.side_effect = self._girder_401(
+            "core.data.read core.data.write"
+        )
+        job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
+
+        with pytest.raises(PermissionError, match="List and read jobs"):
+            job.refresh()
+
+    def test_refresh_401_without_scopes_blames_token_not_scope(self):
+        # Expired, revoked or missing tokens also get a 401, but Girder
+        # lists no allowed scopes; naming a permission there misleads.
+        gc = MagicMock()
+        gc.get.side_effect = self._girder_401("")
+        job = Job(gc, {"_id": "j1", "status": STATUS_RUNNING})
+
+        with pytest.raises(PermissionError) as info:
+            job.refresh()
+        assert "did not accept this session's token" in str(info.value)
+        assert "List and read jobs" not in str(info.value)
 
     def test_refresh_non_401_propagates_unchanged(self):
         from girder_client import HttpError

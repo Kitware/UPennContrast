@@ -213,7 +213,7 @@ Status codes: 0=inactive, 1=queued, 2=running, **3=success**, 4=error, 5=cancell
 
 ### When you can't see what a job is doing
 
-A `PermissionError` from `refresh()` / `wait()` means the API key lacks **"List and read jobs"**. The job still runs; the key just can't watch it. Ask the user to add that permission to the key (or use a full-access key), and meanwhile confirm the job ran by checking its outputs. See "Can't see a job's status ≠ the job didn't run" in `references/gotchas.md`.
+A `PermissionError` from `refresh()` / `wait()` means the API key lacks **"List and read jobs"**. The job still runs; the key just can't watch it. The user should add that permission to the key if they can edit it, or ask the server's admin (support, for nimbusimage.com) to; a full-access key also works. Meanwhile, confirm the job ran by checking its outputs. See "Can't see a job's status ≠ the job didn't run" in `references/gotchas.md`.
 
 ## Rate limits (HTTP 429)
 

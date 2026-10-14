@@ -108,7 +108,9 @@ Girder job status codes: 0=inactive, 1=queued, 2=running, **3=success**, 4=error
 
 ## Can't see a job's status ≠ the job didn't run
 
-A `PermissionError` from `job.refresh()` / `job.wait()` means the API key lacks **"List and read jobs"** (`jobs.rest.list_job`). The job was still submitted and still runs; the key just can't read its status or logs. The fix is to add "List and read jobs" to the key, or use a full-access key ("Allow all actions on behalf of my user"). Tell the user exactly that, naming the missing permission; don't say the key "can't run jobs".
+A `PermissionError` from `job.refresh()` / `job.wait()` means the API key lacks **"List and read jobs"** (`jobs.rest.list_job`). The job was still submitted and still runs; the key just can't read its status or logs. The fix is to add "List and read jobs" to the key: the user can do that themselves if they can edit their API keys; otherwise they ask the server's admin (support, for nimbusimage.com) to add it. A full-access key ("Allow all actions on behalf of my user") also works. Tell the user exactly that, naming the missing permission; don't say the key "can't run jobs".
+
+If the `PermissionError` instead says the server did not accept the token, the problem isn't a permission: the token expired or the key was revoked or deactivated. Reconnect, and check the key is still active.
 
 To confirm a job ran without polling it, check its outputs: `ds.annotations.count(tags=[...])` before and after, or `ds.properties.get_values()` for property workers. Give it a few minutes first; jobs queue and may pull a large Docker image before they start.
 

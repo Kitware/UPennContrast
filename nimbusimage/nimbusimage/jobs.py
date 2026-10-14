@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 import time
@@ -24,10 +25,41 @@ _JOB_SCOPE_HINT = (
     "Could not read job status (HTTP 401). Your API key is most likely "
     "missing the 'List and read jobs' permission, so it can submit jobs but "
     "cannot poll their status or logs. The job itself is not affected and "
-    "may still be running. Add 'List and read jobs' to the key, or use a "
-    "full-access key ('Allow all actions on behalf of my user'). See the "
-    "nimbusimage README (Authentication)."
+    "may still be running. Add 'List and read jobs' to the key if you can "
+    "edit it, or ask the server's admin (support, for nimbusimage.com) to "
+    "add it. A full-access key ('Allow all actions on behalf of my user') "
+    "also works. See the nimbusimage README (Authentication)."
 )
+
+# The same 401 comes back when no valid token reached the server at all
+# (expired, or its API key was revoked or deactivated). Girder's message
+# then lists no allowed scopes ("Allowed: " is empty), unlike a valid
+# custom-scoped token, which lists the scopes it has.
+_JOB_TOKEN_HINT = (
+    "Could not read job status (HTTP 401). The server did not accept this "
+    "session's token: it may have expired, or the API key may have been "
+    "revoked or deactivated. The job itself is not affected. Reconnect, and "
+    "check that the API key is still active."
+)
+
+
+def _token_was_rejected(exc: girder_client.HttpError) -> bool:
+    """True when a 401's Girder message lists no allowed scopes."""
+    try:
+        message = json.loads(exc.responseText)["message"]
+    except (TypeError, ValueError, KeyError):
+        return False
+    return re.search(r"Allowed:\s*$", message) is not None
+
+
+def _log_text(job_data: dict) -> str:
+    """A job document's log as one string, with Girder tokens redacted.
+    girder_jobs returns the log inside GET job/{id}; there is no separate
+    job/{id}/log route."""
+    log = job_data.get("log") or []
+    log = "".join(log) if isinstance(log, list) else str(log)
+    return _SECRET.sub("[redacted]", log)
+
 
 # Girder job status codes
 STATUS_INACTIVE = 0
@@ -60,7 +92,7 @@ class Job:
         self._gc = gc
         self._id = job_data["_id"]
         self._data = job_data
-        self._log: str = ""
+        self._log = _log_text(job_data)
 
     @property
     def id(self) -> str:
@@ -99,22 +131,23 @@ class Job:
         """Fetch the latest job status and log from the server.
 
         Raises:
-            PermissionError: If the job-status request returns 401, which
-                almost always means a custom-scoped API key without the
-                'List and read jobs' scope (NIM-005). The job itself is
+            PermissionError: If the job-status request returns 401. The
+                message says whether the API key lacks the 'List and read
+                jobs' scope (NIM-005) or the token itself was not accepted
+                (expired, or its key revoked). The job itself is
                 unaffected.
         """
         try:
             self._data = self._gc.get(f"job/{self._id}")
         except girder_client.HttpError as exc:
             if getattr(exc, "status", None) == 401:
-                raise PermissionError(_JOB_SCOPE_HINT) from exc
+                hint = (
+                    _JOB_TOKEN_HINT if _token_was_rejected(exc)
+                    else _JOB_SCOPE_HINT
+                )
+                raise PermissionError(hint) from exc
             raise
-        # The log comes back inside the job document; girder_jobs has no
-        # separate job/{id}/log route.
-        log = self._data.get("log") or []
-        log = "".join(log) if isinstance(log, list) else str(log)
-        self._log = _SECRET.sub("[redacted]", log)
+        self._log = _log_text(self._data)
 
     def wait(
         self,
