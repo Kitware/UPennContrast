@@ -78,18 +78,19 @@
         </div>
       </div>
 
-      <!-- Request refused by the server. Carries upload and discard errors,
-           and a publish error once its confirm dialog is closed. -->
+      <!-- Requests refused by the server, one alert per request. Publish
+           errors show in the publish dialog instead. -->
       <v-alert
-        v-if="!confirmPublish"
-        v-model="showError"
+        v-for="request in cardErrorRequests"
+        :key="request"
         type="error"
         density="compact"
         closable
         class="mb-3"
         data-testid="zenodo-request-error"
+        @click:close="requestErrors[request] = null"
       >
-        {{ errorString }}
+        {{ requestErrors[request] }}
       </v-alert>
 
       <!-- Error display -->
@@ -138,6 +139,7 @@
         color="error"
         size="small"
         :loading="discarding"
+        :disabled="publishing"
         @click="discardDraft"
       >
         <v-icon start>mdi-delete</v-icon>
@@ -151,6 +153,7 @@
         color="success"
         size="small"
         :loading="publishing"
+        :disabled="discarding"
         @click="openPublishConfirm"
       >
         <v-icon start>mdi-earth</v-icon>
@@ -192,19 +195,26 @@
     <zenodo-token-dialog v-model="tokenDialog" @saved="onTokenSaved" />
 
     <!-- Publish confirmation dialog -->
-    <v-dialog v-model="confirmPublish" max-width="33vw">
+    <!-- Can't be dismissed while publishing, so the result (and any error)
+         always lands in this dialog. -->
+    <v-dialog
+      v-model="confirmPublish"
+      max-width="33vw"
+      :persistent="publishing"
+    >
       <v-card>
         <v-card-title>Publish to Zenodo?</v-card-title>
         <v-card-text>
           <v-alert
-            v-model="showError"
+            v-if="requestErrors.publish"
             type="error"
             density="compact"
             closable
             class="mb-3"
             data-testid="zenodo-publish-error"
+            @click:close="requestErrors.publish = null"
           >
-            {{ errorString }}
+            {{ requestErrors.publish }}
           </v-alert>
           <v-alert type="warning" density="compact" class="mb-3">
             This action is <strong>irreversible</strong>.
@@ -216,7 +226,11 @@
           </p>
         </v-card-text>
         <v-card-actions class="d-flex justify-end gap-2">
-          <v-btn variant="text" size="small" @click="confirmPublish = false"
+          <v-btn
+            variant="text"
+            size="small"
+            :disabled="publishing"
+            @click="confirmPublish = false"
             >Cancel</v-btn
           >
           <v-btn
@@ -235,7 +249,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import store from "@/store";
 import jobs from "@/store/jobs";
 import { logError } from "@/utils/log";
@@ -262,8 +276,21 @@ const hasToken = ref(false);
 const isSandbox = ref(false);
 const publishing = ref(false);
 const discarding = ref(false);
-const showError = ref(false);
-const errorString = ref("");
+// The server's refusal message for each request, or null. Kept per request
+// so one request starting or failing never hides or relabels another's.
+type TZenodoRequest = "upload" | "discard" | "publish";
+const requestErrors = ref<Record<TZenodoRequest, string | null>>({
+  upload: null,
+  discard: null,
+  publish: null,
+});
+const cardErrorRequests = computed(() =>
+  (["upload", "discard"] as const).filter((r) => requestErrors.value[r]),
+);
+
+// The upload job this card is subscribed to, so it subscribes once per job.
+const trackedJobId = ref<string | null>(null);
+const recoveringJob = ref(false);
 
 // Local progress state, updated from job SSE events
 const localProgress = ref<{
@@ -335,18 +362,17 @@ const CONTENTS_ACCESS_HINT =
 // gets the hint; a project-level refusal is explained by its own message.
 const CONTENTS_ACCESS_DENIED = /access denied for (folder|collection)\b/i;
 
-function showRequestError(error: unknown, { checksContents = false } = {}) {
+function showRequestError(request: TZenodoRequest, error: unknown) {
   const message = extractErrorMessage(error);
   // Upload and publish (not discard) require ADMIN on every dataset and
   // collection in the project, not just on the project.
-  errorString.value =
-    checksContents &&
+  requestErrors.value[request] =
+    request !== "discard" &&
     isAxiosError(error) &&
     error.response?.status === 403 &&
     CONTENTS_ACCESS_DENIED.test(message)
       ? `${message.replace(/\.$/, "")}. ${CONTENTS_ACCESS_HINT}`
       : message;
-  showError.value = true;
 }
 
 async function checkToken() {
@@ -361,11 +387,16 @@ async function checkToken() {
 
 function onTokenSaved() {
   // A missing/invalid-token refusal no longer applies.
-  showError.value = false;
+  requestErrors.value.upload = null;
+  requestErrors.value.publish = null;
   checkToken();
 }
 
 function trackJob(jobId: string) {
+  // addJob appends a listener per call; a second one would double every
+  // progress update and terminal refresh.
+  if (trackedJobId.value === jobId) return;
+  trackedJobId.value = jobId;
   jobs.addJob({
     jobId,
     datasetId: null,
@@ -399,6 +430,7 @@ function trackJob(jobId: string) {
         )
       ) {
         localProgress.value = null;
+        trackedJobId.value = null;
         emit("updated");
       }
     },
@@ -416,7 +448,7 @@ async function startUpload() {
     total: 0,
     message: "Starting upload…",
   };
-  showError.value = false;
+  requestErrors.value.upload = null;
   try {
     const response = await store.zenodoAPI.uploadProject(props.project.id);
     localProgress.value = {
@@ -430,7 +462,7 @@ async function startUpload() {
   } catch (error) {
     localProgress.value = null;
     logError("Failed to start Zenodo upload", error);
-    showRequestError(error, { checksContents: true });
+    showRequestError("upload", error);
     // 409: another tab or session is already uploading. Refresh so the
     // card shows that upload instead of offering this one again.
     if (isAxiosError(error) && error.response?.status === 409) {
@@ -440,20 +472,20 @@ async function startUpload() {
 }
 
 function openPublishConfirm() {
-  showError.value = false;
+  requestErrors.value.publish = null;
   confirmPublish.value = true;
 }
 
 async function doPublish() {
   publishing.value = true;
-  showError.value = false;
+  requestErrors.value.publish = null;
   try {
     await store.zenodoAPI.publishProject(props.project.id);
     confirmPublish.value = false;
     emit("updated");
   } catch (error) {
     logError("Failed to publish to Zenodo", error);
-    showRequestError(error, { checksContents: true });
+    showRequestError("publish", error);
   } finally {
     publishing.value = false;
   }
@@ -461,26 +493,28 @@ async function doPublish() {
 
 async function discardDraft() {
   discarding.value = true;
-  showError.value = false;
+  requestErrors.value.discard = null;
   try {
     await store.zenodoAPI.discardDraft(props.project.id);
     emit("updated");
   } catch (error) {
     logError("Failed to discard Zenodo draft", error);
-    showRequestError(error);
+    showRequestError("discard", error);
   } finally {
     discarding.value = false;
   }
 }
 
 async function recoverActiveJob() {
-  // If we load the page while an upload is in progress, find the
-  // active job and re-subscribe to its SSE stream.
+  // An upload this card didn't start (page load mid-upload, or another tab
+  // per a 409): find its job and subscribe to its SSE stream.
+  recoveringJob.value = true;
   try {
     const activeJob = await store.zenodoAPI.findActiveUploadJob(
       props.project.id,
     );
-    if (activeJob) {
+    // startUpload may have subscribed while this was in flight.
+    if (activeJob && !trackedJobId.value) {
       trackJob(activeJob._id);
       // Seed progress from project meta until the next SSE event arrives.
       const progress = zenodoMeta.value?.progress;
@@ -494,13 +528,24 @@ async function recoverActiveJob() {
     }
   } catch {
     // Not critical — status will still show from project meta
+  } finally {
+    recoveringJob.value = false;
   }
 }
 
-onMounted(async () => {
+// Whenever the project reports an upload this card isn't following, follow
+// it, so the card leaves "uploading" when the job ends.
+watch(
+  zenodoStatus,
+  (status) => {
+    if (status === "uploading" && !trackedJobId.value && !recoveringJob.value) {
+      recoverActiveJob();
+    }
+  },
+  { immediate: true },
+);
+
+onMounted(() => {
   checkToken();
-  if (zenodoStatus.value === "uploading") {
-    await recoverActiveJob();
-  }
 });
 </script>

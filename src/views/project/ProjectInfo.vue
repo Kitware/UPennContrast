@@ -365,8 +365,14 @@
       </v-card-actions>
     </v-card>
 
-    <!-- Zenodo Publication Card -->
-    <zenodo-publish :project="project" @updated="refreshProject" />
+    <!-- Zenodo Publication Card. Keyed by project: the route reuses this
+         view across projects, and the card's errors, upload progress and
+         job subscription belong to one project. -->
+    <zenodo-publish
+      :key="project.id"
+      :project="project"
+      @updated="refreshProject"
+    />
 
     <!-- Publication Metadata Card -->
     <v-card class="mb-4">

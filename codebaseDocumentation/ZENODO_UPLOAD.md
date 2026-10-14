@@ -316,13 +316,26 @@ curl -s -H "Girder-Token: $TOKEN" http://localhost:8080/api/v1/zenodo/status/PRO
   `requireProjectContentsAccess`)
 
 In the UI, `ZenodoPublish.vue` shows the server's `response.data.message` for every
-refused request: upload and discard errors in an alert on the card, and publish errors
-inside the publish confirmation dialog, which stays open. A 403 naming a folder or
-collection on upload/publish also says that publishing needs owner access to every
-dataset and collection in the project; a project-level 403, and any discard error, is
-shown as the server sent it. A 409 also refreshes the project, so the card shows the
-upload that is already running. Saving a token or retrying clears the alert.
-Tests: `src/components/ZenodoPublish.test.ts`.
+refused request, one error per request so a request never hides or relabels another's:
+upload and discard errors in alerts on the card, and publish errors inside the publish
+confirmation dialog, which stays open. The dialog can't be dismissed while publishing,
+and Publish is disabled while a discard is in flight, so neither result lands in the
+other's place. A 403 naming a folder or collection on upload/publish also says that
+publishing needs owner access to every dataset and collection in the project; a
+project-level 403, and any discard error, is shown as the server sent it. A 409 also
+refreshes the project. Saving a token or retrying clears the alert.
+
+The card subscribes to an upload's job whenever the project reports `uploading` and it
+is not already following one: on load, after a 409, or when another tab starts an
+upload. It subscribes once per job (`jobs.addJob` adds a listener per call). On failure
+the job helper writes `status: error` to the project before marking the job ERROR (as
+the success path writes `draft` before SUCCESS), because the card re-reads the project
+when the terminal status arrives. `ProjectInfo.vue` keys the card by project id: the
+route reuses the view across projects, and errors, progress and the job subscription
+belong to one project.
+Tests: `src/components/ZenodoPublish.test.ts`, `ProjectInfo.test.ts` ("gives each
+project its own ZenodoPublish instance"), `test_zenodo.py`
+(`test_fail_writes_project_status_before_job_status`).
 
 ### curl Quick Reference
 

@@ -14,9 +14,8 @@ vi.mock("@/store", () => ({
   default: { zenodoAPI: mocks },
 }));
 
-vi.mock("@/store/jobs", () => ({
-  default: { addJob: vi.fn() },
-}));
+const jobsMock = vi.hoisted(() => ({ addJob: vi.fn() }));
+vi.mock("@/store/jobs", () => ({ default: jobsMock }));
 
 vi.mock("@/utils/log", () => ({ logError: vi.fn() }));
 
@@ -78,6 +77,7 @@ function requestError(w: VueWrapper) {
 describe("ZenodoPublish", () => {
   beforeEach(() => {
     mocks.getCredentials.mockResolvedValue({ hasToken: true, sandbox: false });
+    mocks.findActiveUploadJob.mockResolvedValue({ _id: "job-1" });
   });
 
   afterEach(() => {
@@ -147,21 +147,25 @@ describe("ZenodoPublish", () => {
   });
 
   it("clears the error on retry and after saving a token", async () => {
-    mocks.uploadProject.mockRejectedValueOnce(
-      serverError(400, "No Zenodo token configured."),
-    );
-    mocks.uploadProject.mockReturnValueOnce(new Promise(() => {}));
+    mocks.uploadProject
+      .mockRejectedValueOnce(serverError(400, "No Zenodo token configured."))
+      .mockRejectedValueOnce(
+        serverError(400, "Zenodo token validation failed."),
+      )
+      .mockReturnValueOnce(new Promise(() => {}));
     const w = await mountComponent();
 
     await clickButton(w, "Upload to Zenodo");
-    expect(requestError(w).exists()).toBe(true);
+    expect(requestError(w).text()).toContain("No Zenodo token configured.");
 
     w.findComponent({ name: "ZenodoTokenDialog" }).vm.$emit("saved");
     await flushPromises();
     expect(requestError(w).exists()).toBe(false);
 
-    (w.vm as any).showError = true;
-    await flushPromises();
+    await clickButton(w, "Upload to Zenodo");
+    expect(requestError(w).text()).toContain("Zenodo token validation failed.");
+
+    // A retry that is still in flight shows no old error.
     await clickButton(w, "Upload to Zenodo");
     expect(requestError(w).exists()).toBe(false);
   });
@@ -178,6 +182,93 @@ describe("ZenodoPublish", () => {
       "An upload is already in progress for this project.",
     );
     expect(w.emitted("updated")).toHaveLength(1);
+
+    // The refreshed project reports the other upload: follow its job, so
+    // the card leaves "uploading" when that job ends.
+    await w.setProps({ project: project("uploading") });
+    await flushPromises();
+    expect(mocks.findActiveUploadJob).toHaveBeenCalledWith("p1");
+    expect(jobsMock.addJob).toHaveBeenCalledTimes(1);
+    expect(jobsMock.addJob.mock.calls[0][0].jobId).toBe("job-1");
+  });
+
+  it("tracks an upload once, and again after it ends", async () => {
+    mocks.uploadProject.mockResolvedValue({ jobId: "job-1", totalFiles: 3 });
+    const w = await mountComponent();
+
+    await clickButton(w, "Upload to Zenodo");
+    expect(jobsMock.addJob).toHaveBeenCalledTimes(1);
+
+    // The refresh this upload triggers must not subscribe a second time.
+    await w.setProps({ project: project("uploading") });
+    await flushPromises();
+    expect(mocks.findActiveUploadJob).not.toHaveBeenCalled();
+    expect(jobsMock.addJob).toHaveBeenCalledTimes(1);
+
+    // The job ends; a later upload (from another tab) is followed again.
+    jobsMock.addJob.mock.calls[0][0].eventCallback({ status: 3 });
+    await w.setProps({ project: project("draft") });
+    await w.setProps({ project: project("uploading") });
+    await flushPromises();
+    expect(mocks.findActiveUploadJob).toHaveBeenCalledTimes(1);
+    expect(jobsMock.addJob).toHaveBeenCalledTimes(2);
+  });
+
+  it("follows an upload already running when it mounts", async () => {
+    await mountComponent("uploading");
+    expect(mocks.findActiveUploadJob).toHaveBeenCalledTimes(1);
+    expect(jobsMock.addJob).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps each request's error in its own place", async () => {
+    mocks.uploadProject.mockRejectedValue(
+      serverError(400, "No Zenodo token configured."),
+    );
+    let rejectDiscard!: (e: unknown) => void;
+    mocks.discardDraft.mockReturnValue(
+      new Promise((_, reject) => (rejectDiscard = reject)),
+    );
+    const w = await mountComponent("error");
+
+    await clickButton(w, "Upload to Zenodo");
+    await clickButton(w, "Discard Draft");
+    rejectDiscard(serverError(500, "Discard failed."));
+    await flushPromises();
+
+    // Starting the discard did not hide the upload's error.
+    const texts = w
+      .findAll('[data-testid="zenodo-request-error"]')
+      .map((a) => a.text());
+    expect(texts).toEqual([
+      expect.stringContaining("No Zenodo token configured."),
+      expect.stringContaining("Discard failed."),
+    ]);
+  });
+
+  it("does not let publish and discard overlap", async () => {
+    mocks.discardDraft.mockReturnValue(new Promise(() => {}));
+    mocks.publishProject.mockReturnValue(new Promise(() => {}));
+    const w = await mountComponent("draft");
+    const mintButton = () =>
+      w.findAll("button").find((b) => b.text().includes("Publish (Mint DOI)"))!;
+
+    await clickButton(w, "Discard Draft");
+    // A discard in flight would make the publish dialog's error belong to
+    // discard, and could publish a draft that is being deleted.
+    expect(mintButton().attributes("disabled")).toBeDefined();
+
+    w.unmount();
+    const w2 = await mountComponent("draft");
+    await clickButton(w2, "Publish (Mint DOI)");
+    Array.from(document.body.querySelectorAll("button"))
+      .find((b) => b.textContent?.trim() === "Publish")!
+      .click();
+    await flushPromises();
+    // Cancelling a pending publish would orphan its error.
+    const cancel = Array.from(document.body.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "Cancel",
+    )!;
+    expect(cancel.disabled).toBe(true);
   });
 
   it("shows the server's message in the publish dialog", async () => {

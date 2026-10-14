@@ -153,6 +153,33 @@ class TestUpdateZenodoMeta:
         assert zenodo['depositionId'] == 12345
         assert zenodo['doi'] == '10.5072/test'
 
+    def test_fail_writes_project_status_before_job_status(self, admin):
+        """A failed upload is 'error' in project meta before the job
+        reports ERROR: the frontend re-reads the project when the job's
+        terminal status arrives, and would otherwise see 'uploading'."""
+        from upenncontrast_annotation.server.helpers import zenodo_job
+
+        pm = ProjectModel()
+        proj = pm.createProject(
+            name="Zenodo Fail Order Test", creator=admin
+        )
+        update_zenodo_meta(proj['_id'], {'status': 'uploading'})
+
+        statusAtJobUpdate = []
+        job_model = MagicMock()
+        job_model.updateJob.side_effect = (
+            lambda *args, **kwargs: statusAtJobUpdate.append(
+                pm.load(proj['_id'], force=True)
+                ['meta']['zenodo']['status']
+            )
+        )
+
+        zenodo_job._fail(
+            {}, job_model, proj['_id'], pm, "boom",
+        )
+
+        assert statusAtJobUpdate == ['error']
+
     def test_nonexistent_project_no_error(self, admin):
         """Does not raise for a missing project ID."""
         # Should not raise

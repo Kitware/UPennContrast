@@ -109,7 +109,17 @@ def run(job):
 
 def _fail(job, job_model, project_id, project_model,
           error_msg):
-    """Mark both the job and project as failed."""
+    """Mark both the job and project as failed.
+
+    The project is updated first, as on success: the ERROR status reaches
+    the frontend over SSE, which then re-reads the project and must not
+    find it still 'uploading'.
+    """
+    update_zenodo_meta(project_id, {
+        'status': 'error',
+        'error': error_msg,
+        'progress': None,
+    }, project_model=project_model)
     job_model.updateJob(
         job,
         status=JobStatus.ERROR,
@@ -118,11 +128,6 @@ def _fail(job, job_model, project_id, project_model,
             'title': 'Zenodo Upload Error',
         }) + '\n',
     )
-    update_zenodo_meta(project_id, {
-        'status': 'error',
-        'error': error_msg,
-        'progress': None,
-    }, project_model=project_model)
 
 
 # How often to persist progress to MongoDB (every N files)
