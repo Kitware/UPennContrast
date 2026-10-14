@@ -12,7 +12,11 @@ import { describe, it, expect, vi } from "vitest";
 const h = vi.hoisted(() => ({
   main: {
     isLoggedIn: true,
-    projectsAPI: { getProject: vi.fn() },
+    projectsAPI: {
+      getProject: vi.fn(),
+      updateProjectMetadata: vi.fn(),
+      deleteProject: vi.fn(),
+    },
   },
 }));
 
@@ -72,5 +76,51 @@ describe("fetchProject", () => {
     await projects.fetchProject("p1");
 
     expect(projects.projects.find((p) => p.id === "p1")).toBe(before);
+  });
+
+  it("doesn't let a re-read that started before a save replace it", async () => {
+    // Selecting a cached project re-reads it in the background; the user
+    // can save metadata before that read returns. The older read must not
+    // replace the saved project (the form would reset to the old values,
+    // and saving again would write them back).
+    h.main.projectsAPI.getProject.mockResolvedValueOnce(snapshot("draft"));
+    await projects.fetchProject("p1");
+    let resolveRead!: (p: unknown) => void;
+    h.main.projectsAPI.getProject.mockReturnValueOnce(
+      new Promise((r) => (resolveRead = r)),
+    );
+    const read = projects.fetchProject("p1");
+
+    const saved = {
+      ...snapshot("draft"),
+      meta: { zenodo: { status: "draft" }, metadata: { title: "New title" } },
+    };
+    h.main.projectsAPI.updateProjectMetadata.mockResolvedValueOnce(saved);
+    await projects.updateProjectMetadata({
+      projectId: "p1",
+      metadata: { title: "New title" },
+    });
+    resolveRead(snapshot("draft"));
+    await read;
+
+    const stored = projects.projects.find((p) => p.id === "p1") as any;
+    expect(stored.meta.metadata?.title).toBe("New title");
+  });
+
+  it("doesn't bring back a project deleted while a re-read was out", async () => {
+    h.main.projectsAPI.getProject.mockResolvedValueOnce(snapshot("draft"));
+    await projects.fetchProject("p1");
+    let resolveRead!: (p: unknown) => void;
+    h.main.projectsAPI.getProject.mockReturnValueOnce(
+      new Promise((r) => (resolveRead = r)),
+    );
+    const read = projects.fetchProject("p1");
+
+    h.main.projectsAPI.deleteProject.mockResolvedValueOnce(undefined);
+    await projects.deleteProject("p1");
+    resolveRead(snapshot("draft"));
+    await read;
+
+    expect(projects.projects.find((p) => p.id === "p1")).toBeUndefined();
   });
 });

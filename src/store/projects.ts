@@ -11,12 +11,21 @@ import sync from "./sync";
 import { IProject, TProjectStatus } from "./model";
 import { logError } from "@/utils/log";
 
-// Latest fetchProject request per project. Overlapping refreshes of one
-// project (the Zenodo card asks on a 409, on a job's end and from its status
-// poll) can resolve out of order; only the newest may commit, or an older
-// snapshot replaces a newer one.
-const latestProjectFetch = new Map<string, number>();
-let projectFetchSeq = 0;
+// Per project, the stamp of the last change to its stored copy or of the
+// newest fetchProject in flight. A fetch commits only if neither has happened
+// since it began: overlapping refreshes (the Zenodo card asks on a 409, on a
+// job's end and from its status poll) can resolve out of order, and a read
+// that started before a save must not replace the saved project. Every
+// mutation that writes a project stamps it, so every save action is covered
+// without opting in.
+const projectStamps = new Map<string, number>();
+let projectStampSeq = 0;
+
+function stampProject(projectId: string): number {
+  projectStampSeq += 1;
+  projectStamps.set(projectId, projectStampSeq);
+  return projectStampSeq;
+}
 
 @Module({ dynamic: true, store, name: "projects" })
 export class Projects extends VuexModule {
@@ -53,6 +62,7 @@ export class Projects extends VuexModule {
   // Mutations
   @Mutation
   setProjects(projects: IProject[]) {
+    projects.forEach((p) => stampProject(p.id));
     this.projects = projects;
   }
 
@@ -63,6 +73,7 @@ export class Projects extends VuexModule {
 
   @Mutation
   addProjectImpl(project: IProject) {
+    stampProject(project.id);
     // Check if project already exists
     const existingIndex = this.projects.findIndex((p) => p.id === project.id);
     if (existingIndex >= 0) {
@@ -75,6 +86,7 @@ export class Projects extends VuexModule {
 
   @Mutation
   updateProjectImpl(updatedProject: IProject) {
+    stampProject(updatedProject.id);
     const index = this.projects.findIndex((p) => p.id === updatedProject.id);
     if (index !== -1) {
       this.projects.splice(index, 1, updatedProject);
@@ -83,6 +95,7 @@ export class Projects extends VuexModule {
 
   @Mutation
   removeProjectImpl(projectId: string) {
+    stampProject(projectId);
     this.projects = this.projects.filter((p) => p.id !== projectId);
     if (this.currentProjectId === projectId) {
       this.currentProjectId = null;
@@ -113,14 +126,13 @@ export class Projects extends VuexModule {
   async fetchProject(projectId: string): Promise<IProject | null> {
     // Note: removed isLoggedIn check to allow page refresh to work properly
     // The API call will fail if not authenticated anyway
-    const seq = ++projectFetchSeq;
-    latestProjectFetch.set(projectId, seq);
+    const stamp = stampProject(projectId);
     sync.setSaving(true);
     try {
       const project = await main.projectsAPI.getProject(projectId);
       if (
         project &&
-        latestProjectFetch.get(projectId) === seq &&
+        projectStamps.get(projectId) === stamp &&
         // Views re-initialise when the project object is replaced; an
         // unchanged re-read keeps the cached object.
         JSON.stringify(project) !==
