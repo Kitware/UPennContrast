@@ -122,6 +122,57 @@ def buildExportData(export, datasetId, configurationId=None,
 
 @pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
 @pytest.mark.plugin("upenncontrast_annotation")
+class TestExportSkipsUnreadableConfigurations:
+    def testReaderExportsAroundAnotherUsersPrivateConfiguration(
+        self, admin, user, server
+    ):
+        """Without configurationId, properties come from the dataset's
+        configurations the caller can read; another user's private one is
+        skipped instead of failing the whole export."""
+        from girder.constants import AccessType
+        from girder.models.folder import Folder
+
+        dataset = utilities.createPrivateFolder(
+            admin, "export_ds", upenn_utilities.datasetMetadata
+        )
+        Folder().setUserAccess(dataset, user, AccessType.READ, save=True)
+        visible = AnnotationProperty().save({
+            "name": "Visible", "image": "img", "shape": "point",
+            "tags": {"tags": [], "exclusive": False}, "workerInterface": {},
+        })
+        hidden = AnnotationProperty().save({
+            "name": "Hidden", "image": "img", "shape": "point",
+            "tags": {"tags": [], "exclusive": False}, "workerInterface": {},
+        })
+        shared = createConfiguration(admin, dataset, [visible["_id"]])
+        Collection().setUserAccess(shared, user, AccessType.READ, save=True)
+        private = createConfiguration(admin, dataset, [hidden["_id"]])
+        for config in (shared, private):
+            DatasetViewModel().create(admin, {
+                "datasetId": dataset["_id"],
+                "configurationId": config["_id"],
+                "lastLocation": {"xy": 0, "z": 0, "time": 0},
+                "layerContrasts": {},
+            })
+
+        resp = server.request(
+            path="/export/json", method="GET", user=user,
+            params={"datasetId": str(dataset["_id"]),
+                    "includeAnnotations": "false",
+                    "includeConnections": "false",
+                    "includePropertyValues": "false"},
+            isJson=False,
+        )
+
+        assertStatusOk(resp)
+        exported = json.loads(b"".join(resp.body))
+        assert [p["name"] for p in exported["annotationProperties"]] == [
+            "Visible"
+        ]
+
+
+@pytest.mark.usefixtures("unbindLargeImage", "unbindAnnotation")
+@pytest.mark.plugin("upenncontrast_annotation")
 class TestExport:
     def testExportJsonBasic(self, admin):
         """Test basic export with all data types."""

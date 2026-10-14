@@ -1467,10 +1467,10 @@ export class Annotations extends VuexModule {
       await this.annotationsAPI.deleteMultipleAnnotations(ids);
       this.bumpMutationCounter();
 
+      const idsSet = new Set(ids);
       if (this.stubOnlyMode) {
         this.removeAnnotationStubs(ids);
       } else {
-        const idsSet = new Set(ids);
         this.setAnnotations(
           this.annotations.filter(
             (annotation: IAnnotation) => !idsSet.has(annotation.id),
@@ -1487,6 +1487,20 @@ export class Annotations extends VuexModule {
         ids.includes(this.hoveredAnnotationId)
       ) {
         this.setHoveredAnnotationId(null);
+      }
+      // The server removes every connection whose parent or child was
+      // deleted; drop them here too so the connection list and overlay
+      // don't keep edges to annotations that no longer exist. Skip the
+      // mutation when none match: it replaces the array, which would
+      // re-run every connection watcher for nothing.
+      const orphanedConnectionIds = this.annotationConnections
+        .filter(
+          (connection) =>
+            idsSet.has(connection.parentId) || idsSet.has(connection.childId),
+        )
+        .map((connection) => connection.id);
+      if (orphanedConnectionIds.length > 0) {
+        this.deleteMultipleConnections(orphanedConnectionIds);
       }
     } finally {
       // Always set the state back to false, even if there's an error

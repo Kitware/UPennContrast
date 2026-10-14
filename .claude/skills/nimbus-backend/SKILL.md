@@ -18,7 +18,7 @@ description: "Use when writing or modifying Python code in the Girder backend pl
 
 **Important:** `AccessType.ADMIN` means **owner of that document**, not a site-wide admin. The creator of a project/dataset gets ADMIN on it and can share it with others.
 
-Use `-1` (not `null`) to remove a user's access.
+**Removing access:** the share endpoints take `-1` on the wire, but Girder's `setUserAccess(doc, user, level)` deletes the entry **only when `level is None`**. Pass `-1` and Girder stores an inert `{id, level: -1}` entry: the user can't read anything, yet still shows up in access lists. Convert at the API boundary with `parseShareAccessType()` (`server/helpers/access_helpers.py`). A test that checks only "user can no longer read" passes with the bug present, so assert the user has **no entry** in `doc['access']['users']`.
 
 ### Access Decorators (Endpoint-Level)
 
@@ -44,6 +44,10 @@ doc = Model().load(id, force=True)  # Admin bypass
 For detailed access patterns including sharing: read `references/access-control-patterns.md`
 When modifying sharing/access code: read `codebaseDocumentation/SHARING.md`
 
+### Ids that match nothing get no access check
+
+Bulk endpoints usually check access on the datasets of the documents an id list resolves to (`distinctDatasetIds` → `requireDatasetsAccess`). An id that matches no document resolves to no dataset, so nothing about it is checked. That is harmless only if nothing downstream acts on the raw id. The bulk-delete cleanup cascade did: it removed connections and property values pointing at the id in **any** dataset. Leftover orphans in other users' datasets could therefore be deleted by naming their dangling ids. Anything that fans out from caller-supplied ids (cascades, events, follow-up queries keyed on the id rather than the loaded document) must run only for ids that resolved to a document the caller was checked against. `Annotation.multipleAnnotationsRemovedEvent` filters to existing annotations before triggering cleanup (#1418, Codex P2).
+
 ### Never return a document that carries `access` raw
 
 `findWithPermissions` and `@loadmodel` decide which **documents** a caller sees. Neither decides which **fields** they see. Any plugin model built on `AccessControlledModel` (every `ProxiedModel`) stores an `access` ACL that lists every collaborator's user id, and `GET user/{id}` turns those ids into names. When a model defines no `exposeFields`, returning its raw doc hands that list to every reader, anonymous viewers of public datasets included. This has happened with dataset views, properties, worker interfaces and previews, and with the JSON export and Zenodo archive, which embed docs without going through any endpoint.
@@ -52,7 +56,13 @@ When modifying sharing/access code: read `codebaseDocumentation/SHARING.md`
 - For exports, which bypass `filter()`, use a `fields=` projection (`AnnotationProperty.findClientFields`).
 - Treat the write side as the twin: a create or update that stores the raw body lets the caller set `access` or `public`. Allow-list the body with `filterUpdateFields(requireObjectBody(...))`.
 - `filter()` adds `_accessLevel`, computed from the doc's own ACL. If that ACL is not what grants reads (properties are read through configurations; worker docs by anyone), the value is wrong, so mix in `UngatedAclFilterMixin` (`helpers/customModel.py`).
+- A response that **names** related resources leaks too: an access list or summary built with plain `find()` (e.g. `configuration_access` listing every dataset opened with a configuration) must use `findWithPermissions` for the caller.
+- A caller-supplied Mongo query probes hidden fields through *which* documents match, even when the response is filtered (`{"access.users.id": X}` on `folder/query` was an ACL-membership oracle). Validate it with `requireQueryOnFields(query, exposedFields)` from `helpers/validation.py`.
 - Test with a READ-only caller and an anonymous one, and assert both that `access` is absent and that every field the consumers read survives.
+
+### Gate on the ACL that actually grants access
+
+The fields rule above has a twin on the access side. A property's own ACL names only its creator and is never shared, so `@loadmodel(level=READ)` or `findWithPermissions` on properties refuses every collaborator, even though they read the property through a shared configuration. Property compute shipped this way: a WRITE collaborator's "Compute all" returned 403 for every property they could see. Before gating an endpoint on a model's ACL, check whether that ACL is what grants reads (the `UngatedAclFilterMixin` models). For properties, use `_readableThroughConfigurations` in `api/property.py`: one `$in` query returns the requested ids that some READ-able configuration's `meta.propertyIds` references. `getBatch` and the compute endpoints (`_loadComputableProperties`, which also accepts the property's own ACL) both use it. Test it with a collaborator who is not on the document's ACL.
 
 ### `rest.*.before` listeners need their own access level
 
@@ -209,6 +219,12 @@ call `Model()` at the point of use instead.
   stage computes and why (e.g. "$ifNull maps missing → null so one
   $ne-null test catches absent and null").
 
+### Constants read by more than one module live in `server/helpers/constants.py`
+
+A constant used by one module stays in that module. Once a second module needs it, move it to `server/helpers/constants.py` and import it from there in **every** user, including the module that first defined it. Don't import it from the module that happened to define it first. `MAX_IDS_PER_QUERY` lived in `models/propertyValues.py` while `access_helpers` and the bulk-delete cleanup imported it from there. Tuning it for property values would then have silently changed annotation deletes too (pchoisel, PR #1418).
+
+Event names count as constants too. An event is a string nothing type-checks, so a renamed emitter with a stale subscriber fails silently: the handler simply never runs again. Define a custom event's name once in `constants.py` (e.g. `ANNOTATIONS_REMOVED_EVENT`) and have every `events.trigger` and `events.bind`, tests included, import it. Name an event for what it carries now. The old `removeStringIds` carried ObjectIds after the #1243 fix and was renamed.
+
 ## ObjectId Handling
 
 ```python
@@ -219,6 +235,10 @@ query = {'_id': {'$in': [ObjectId(id) for id in string_ids]}}
 ```
 
 Note: `Model().load()` handles ObjectId conversion internally.
+
+### A string `$in` silently matches nothing on an ObjectId field
+
+`{"childId": {"$in": ["61a4..."]}}` returns no documents when `childId` is stored as an ObjectId. No error, just an empty match. This bites events with more than one emitter. The annotation-removal cleanup event (then `model.upenn_annotation.removeStringIds`, now `ANNOTATIONS_REMOVED_EVENT`) used to get ObjectIds from single delete but strings from bulk delete. Its subscribers (property-value and connection cleanup) therefore worked for single delete and silently orphaned documents on bulk delete. The first fix normalized inside one subscriber, so the other stayed broken for months (#1243). Normalize **where the event is triggered**, so every current and future subscriber gets one type. Both emitters in `models/annotation.py` now send ObjectIds. The bulk emitter also chunks the list at `MAX_IDS_PER_QUERY`, because a subscriber that puts the list in a query twice (`$or` of two `$in`s) passes the 16 MiB command limit long before the annotation removal's single `$in` does.
 
 ## API vs Model Layer Separation
 
@@ -235,6 +255,44 @@ The API and model layers have strict responsibilities. Never mix them.
 - Raises `ValueError` or `ValidationException` — **never `RestException`**
 - Must be abstract from HTTP/API concerns
 - Should not know about request parameters or HTTP status codes
+
+### Helpers report; the endpoint decides the HTTP error
+
+A shared helper in `server/helpers/` must not raise an HTTP-flavoured error
+for a condition it detects -- `RestException`, or an `AccessException`
+standing in for one ("these no longer exist; discard and re-upload"). It
+returns what it found (the ids that exist, the entries that failed) or
+raises a domain error, and the endpoint that called it raises
+`RestException` with the status and message that fit *that* endpoint
+(pchoisel, PR #1410: *"A helper should not raise this kind of API-related
+exceptions. The API that uses this helper should receive an error from this
+helper then should raise this kind of exception"*).
+
+Why it matters, beyond layering: the same helper often has callers that need
+the opposite answer. `requireResourcesAccess` grew a `requireAll=True` flag
+that raised for missing resources, needed by Zenodo *publish* (a deleted
+resource's files are still in the draft: refuse) while the upload *job*
+calls the same helper and must just drop what vanished. A flag that switches
+the helper into "raise for the API" mode is the tell; return the found set
+and let each caller compare.
+
+- **Look for it:** `raise RestException` / `raise AccessException(...)`
+  with a hand-written message in `server/helpers/*.py`, and boolean
+  parameters (`requireAll`, `strict`, `raiseIfMissing`) whose only effect is
+  to raise.
+- **Fix:** return the result (`existingIds, docsById` or a list of bad
+  entries); in the endpoint, compute what is missing/invalid and raise
+  `RestException(message, code=...)` there. Pick the status in the endpoint
+  (a missing resource in a stored draft is a 409 conflict, not a 403).
+- **Test both halves:** the endpoint test asserts the status *and* message;
+  a helper test asserts it returns the partial result instead of raising.
+- **Still fine in a helper:** Girder's own `model.requireAccess(doc, user,
+  level)` (the model's access check, not a message the helper invented),
+  and the request validators in `helpers/validation.py`, which exist to map
+  malformed request fields to a 400 and are only called from API code.
+- Older helpers that raise `RestException` themselves
+  (`requireAnnotationsInDatasets`) predate this rule; convert them when you
+  next change them rather than copying the pattern.
 
 ### Validating caller input is an API job — even when the model "could" do it
 
@@ -259,9 +317,10 @@ data and passing it to the model for the DB modification"*).
   that dataset) and forces tests to bypass the model (`collection.insert_one`)
   to set up legitimate fixtures — both are tells the check is misplaced.
 - When several endpoints need the same check, write it once in
-  `server/helpers/` (e.g. `requireAnnotationsInDatasets` in
-  `helpers/access_helpers.py`, beside `requireDatasetsAccess`), batch-load with
-  `$in`, raise `RestException(code=400)`, and call it from each endpoint.
+  `server/helpers/` (beside `requireDatasetsAccess` in
+  `helpers/access_helpers.py`), batch-load with `$in`, and call it from each
+  endpoint -- but have the helper **report** the problem and let each
+  endpoint raise the HTTP error (next section).
 - Document the precondition in the model method's docstring ("callers must
   ensure each annotation belongs to its datasetId") so internal callers know
   the model trusts them.
