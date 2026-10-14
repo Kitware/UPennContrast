@@ -45,4 +45,32 @@ describe("fetchProject", () => {
     const stored = projects.projects.find((p) => p.id === "p1");
     expect(stored?.meta.zenodo?.status).toBe("uploading");
   });
+
+  it("re-reads a cached project when it is selected again", async () => {
+    // Navigating away mid-operation drops the card's refresh; coming back
+    // must not show the cached pre-operation state.
+    h.main.projectsAPI.getProject.mockResolvedValueOnce(snapshot("draft"));
+    await projects.fetchProject("p1");
+    h.main.projectsAPI.getProject.mockResolvedValueOnce(snapshot("published"));
+
+    await projects.setSelectedProject("p1");
+    await vi.waitFor(() =>
+      expect(
+        projects.projects.find((p) => p.id === "p1")?.meta.zenodo?.status,
+      ).toBe("published"),
+    );
+  });
+
+  it("keeps the cached object when a re-read finds no change", async () => {
+    // Views watch the project object and re-initialise (forms, dataset and
+    // access fetches) when it is replaced; an unchanged re-read must not.
+    h.main.projectsAPI.getProject.mockResolvedValueOnce(snapshot("draft"));
+    await projects.fetchProject("p1");
+    const before = projects.projects.find((p) => p.id === "p1");
+    h.main.projectsAPI.getProject.mockResolvedValueOnce(snapshot("draft"));
+
+    await projects.fetchProject("p1");
+
+    expect(projects.projects.find((p) => p.id === "p1")).toBe(before);
+  });
 });

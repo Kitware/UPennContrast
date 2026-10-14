@@ -118,7 +118,14 @@ export class Projects extends VuexModule {
     sync.setSaving(true);
     try {
       const project = await main.projectsAPI.getProject(projectId);
-      if (project && latestProjectFetch.get(projectId) === seq) {
+      if (
+        project &&
+        latestProjectFetch.get(projectId) === seq &&
+        // Views re-initialise when the project object is replaced; an
+        // unchanged re-read keeps the cached object.
+        JSON.stringify(project) !==
+          JSON.stringify(this.getProjectById(projectId))
+      ) {
         this.addProjectImpl(project);
       }
       sync.setSaving(false);
@@ -367,9 +374,16 @@ export class Projects extends VuexModule {
   @Action
   async setSelectedProject(projectId: string | null): Promise<void> {
     this.setCurrentProjectId(projectId);
-    if (projectId && !this.getProjectById(projectId)) {
+    if (!projectId) return;
+    if (!this.getProjectById(projectId)) {
       await this.fetchProject(projectId);
+      return;
     }
+    // Show the cached copy now, but re-read it: it can be stale (e.g. an
+    // operation finished after the user navigated away, so the view that
+    // started it never refreshed it). fetchProject handles its own errors,
+    // and its sequence guard keeps an older read from landing last.
+    this.fetchProject(projectId);
   }
 
   @Action

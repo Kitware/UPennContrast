@@ -425,6 +425,7 @@ Run `pnpm test src/components/ZenodoPublish.test.ts src/store/ZenodoAPI.test.ts 
 - [ ] **Project status is written before the job's terminal status** on failure as on success, because the card re-reads the project on that event. — *"test_fail_writes_project_status_before_job_status"*
 
 - [ ] **An older project refresh can't overwrite a newer one.** The card triggers overlapping refreshes (409, job end, status poll); `projects.fetchProject` commits only its latest request per project, so a stale `draft` can't release an upload that followed it. — *"keeps the newest snapshot when refreshes resolve out of order"*
+- [ ] **Returning to a project re-reads it.** The card is keyed by project, so leaving mid-operation drops its refresh; `setSelectedProject` shows the cached copy and refetches it, instead of skipping cached projects. — *"re-reads a cached project when it is selected again"*
 
 ### Project switch
 
