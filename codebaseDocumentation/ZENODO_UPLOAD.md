@@ -69,7 +69,7 @@ Tokens are encrypted at rest using Fernet symmetric encryption. The encryption k
 | `POST` | `/api/v1/zenodo/upload` | Start uploading a project to Zenodo | ADMIN |
 | `GET` | `/api/v1/zenodo/status/:projectId` | Get upload progress (fallback for diagnostics) | READ |
 | `POST` | `/api/v1/zenodo/publish/:projectId` | Publish draft, mint DOI | ADMIN |
-| `POST` | `/api/v1/zenodo/discard/:projectId` | Discard unpublished draft (409 while the project's upload job is live) | ADMIN |
+| `POST` | `/api/v1/zenodo/discard/:projectId` | Discard unpublished draft (409 while the project's upload job is live; `force=true` overrides for a job orphaned by a restart) | ADMIN |
 
 The upload endpoint returns a `jobId` that the frontend uses for SSE-based progress tracking.
 
@@ -312,7 +312,7 @@ curl -s -H "Girder-Token: $TOKEN" http://localhost:8080/api/v1/zenodo/status/PRO
 - **Missing dataset folder**: Job fails, status → `error` with message in `zenodo.error`
 - **Over 50GB / 100 files**: Upload returns 400 with size/count limit message
 - **Publish without draft**: Returns 400 "No draft deposition to publish"
-- **Discard during a live upload**: Returns 409 "An upload is in progress for this project." Discard still accepts `uploading` so a project whose job died can be reset, but not while `meta.zenodo.jobId` names a live job: a stale card in another tab could otherwise delete the deposition the job is using.
+- **Discard during a live upload**: Returns 409 "An upload is in progress for this project." Discard still accepts `uploading` so a project whose job died can be reset, but not while `meta.zenodo.jobId` names a live job: a stale card in another tab could otherwise delete the deposition the job is using. A job whose thread died stays live-looking only if it never reached ERROR, which is what a Girder restart mid-upload leaves (Girder never sweeps local jobs: the job stays RUNNING, or INACTIVE if the restart came before its thread started). For that, `POST zenodo/discard/:projectId?force=true` resets the project anyway.
 - **Not the owner of a dataset or collection in the project**: Upload and publish return
   403 "Admin access denied for folder|collection ..." (the ownership check added by PR #1410,
   `requireProjectContentsAccess`)
@@ -416,9 +416,9 @@ Run `pnpm test src/components/ZenodoPublish.test.ts src/store/ZenodoAPI.test.ts 
 ### Upload tracking
 
 - [ ] **Tracking follows the reported status, not the mount**: on load, after a 409, and after another tab starts an upload; once per job. — *"follows an upload already running when it mounts"*, *"refreshes the project when an upload is already in progress"*, *"tracks an upload once, and again after it ends"*
-- [ ] **The upload's job is found by the id the project records**, not by job kwargs (serialized, and admin-only). A just-started INACTIVE job counts; a job this user can't read (a co-owner's) is treated as invisible. — *"test_upload_records_job_id"*, *"returns the job while it is %s"*, *"returns null for a job this user can't read"*, *"returns null once the job has ended"*
+- [ ] **The upload's job is found by the id the project records**, not by job kwargs (serialized, and admin-only). A just-started INACTIVE job counts; a job this user can't read (a co-owner's) is treated as invisible. — *"test_upload_records_job_id"*, *"returns the job while it is %s"*, *"returns null for a job this user can't read"*, *"returns null for a job that no longer exists"*, *"returns null once the job has ended"*
 - [ ] **After a 409 the card follows the running job before releasing the in-flight flag**, so a stale `error` card can't discard the other tab's upload in the window before the refresh lands. — *"keeps the actions locked after a 409 until the refresh lands"*
-- [ ] **The server refuses a discard while the upload job is live**, and still resets a project whose job died. — *"test_discard_refused_while_upload_job_live"*, *"test_discard_resets_stuck_upload"*
+- [ ] **The server refuses a discard while the upload job is live**, still resets a project whose job ended in error, and `force=true` resets one whose job a restart orphaned at RUNNING. — *"test_discard_refused_while_upload_job_live"*, *"test_discard_resets_stuck_upload"*, *"test_discard_force_resets_orphaned_job"*
 - [ ] **`uploading` with no visible job is re-read, then polled** (a stale cached project, or a co-owner's upload), and the poll stops on a status change or unmount, including mid-lookup; a failed lookup falls back to the poll. — *"re-reads the project when the reported upload has no job"*, *"keeps re-reading while the upload's job is invisible"*, *"keeps checking when the job lookup fails"*, *"stops polling when unmounted"*, *"schedules nothing if unmounted while looking up the job"*
 - [ ] **Project status is written before the job's terminal status** on failure as on success, because the card re-reads the project on that event. — *"test_fail_writes_project_status_before_job_status"*
 

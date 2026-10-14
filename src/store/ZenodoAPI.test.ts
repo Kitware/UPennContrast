@@ -56,6 +56,14 @@ describe("ZenodoAPI.getLiveUploadJobId", () => {
     expect(await api.getLiveUploadJobId("job-1")).toBeNull();
   });
 
+  it("returns null for a job that no longer exists", async () => {
+    // Girder answers a missing job id with 400 ("Invalid job id").
+    const get = vi.fn().mockRejectedValue(httpError(400));
+    const api = new ZenodoAPI({ get } as any);
+
+    expect(await api.getLiveUploadJobId("job-1")).toBeNull();
+  });
+
   it("rethrows other failures", async () => {
     const get = vi.fn().mockRejectedValue(httpError(500));
     const api = new ZenodoAPI({ get } as any);

@@ -399,11 +399,17 @@ class Zenodo(Resource):
             'projectId', 'The project ID',
             paramType='path',
         )
+        .param(
+            'force',
+            'Reset a project stuck in uploading even though its upload job '
+            'still looks live (a Girder restart leaves a dead job RUNNING).',
+            dataType='boolean', default=False, required=False,
+        )
         .errorResponse('Project not found.', 404)
         .errorResponse('No draft to discard.', 400)
         .errorResponse('An upload is in progress.', 409)
     )
-    def discard(self, projectId):
+    def discard(self, projectId, force):
         user = self.getCurrentUser()
         project = self._projectModel.load(
             projectId, user=user,
@@ -421,8 +427,10 @@ class Zenodo(Resource):
 
         # 'uploading' is accepted so a project whose upload job died can be
         # reset, but not while the job is alive: it is using the deposition,
-        # and a stale card in another tab can still ask.
-        if (zenodo.get('status') == 'uploading'
+        # and a stale card in another tab can still ask. Girder never sweeps
+        # local jobs, so a job whose thread died in a restart stays RUNNING
+        # forever; `force` is the way out for that.
+        if (zenodo.get('status') == 'uploading' and not force
                 and has_live_upload_job(zenodo)):
             raise RestException(
                 "An upload is in progress for this project.",

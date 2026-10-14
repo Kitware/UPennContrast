@@ -489,6 +489,29 @@ class TestDiscardFromUploading:
         reloaded = pm.load(proj['_id'], force=True)
         assert reloaded['meta']['zenodo']['status'] == 'none'
 
+    def test_discard_force_resets_orphaned_job(self, server, admin):
+        """A Girder restart kills the job thread but leaves the job RUNNING
+        forever (Girder never sweeps local jobs). force=true is the way
+        out: it resets the project although the job still looks live."""
+        from girder_jobs.constants import JobStatus
+
+        pm, proj = self._uploadingProject(admin, "Orphaned Job Test")
+        self._uploadJob(admin, proj, JobStatus.RUNNING)
+
+        refused = server.request(
+            path=f"/zenodo/discard/{proj['_id']}",
+            method="POST", user=admin,
+        )
+        assertStatus(refused, 409)
+        resp = server.request(
+            path=f"/zenodo/discard/{proj['_id']}",
+            method="POST", user=admin, params={'force': 'true'},
+        )
+
+        assertStatusOk(resp)
+        reloaded = pm.load(proj['_id'], force=True)
+        assert reloaded['meta']['zenodo']['status'] == 'none'
+
     def test_upload_records_job_id(self, server, admin, monkeypatch):
         """The project carries its upload's job id, so the card (which can't
         see job kwargs) and discard can find the job."""

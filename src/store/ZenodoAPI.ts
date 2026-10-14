@@ -43,10 +43,6 @@ export interface IZenodoPublishResponse {
 }
 
 /**
- * Minimal shape of a `zenodo_upload` Girder job, as returned by the
- * /job listing endpoint. Only the fields the frontend reads are typed.
- */
-/**
  * Interface for Zenodo file metadata
  */
 export interface IZenodoFile {
@@ -530,8 +526,9 @@ export default class ZenodoAPI {
    * subscribe to an upload this card didn't start.
    *
    * Looked up by id because a job's kwargs (its projectId) are visible only
-   * to site admins. Returns null when this user can't read the job: Girder
-   * lets only the job's owner do so, so a co-owner's upload is invisible.
+   * to site admins. Returns null when this user can't read the job (403:
+   * Girder lets only the job's owner do so, so a co-owner's upload is
+   * invisible) or it no longer exists (Girder answers 400 "Invalid job id").
    */
   async getLiveUploadJobId(jobId: string): Promise<string | null> {
     try {
@@ -545,7 +542,7 @@ export default class ZenodoAPI {
     } catch (error) {
       if (
         isAxiosError(error) &&
-        (error.response?.status === 403 || error.response?.status === 404)
+        (error.response?.status === 400 || error.response?.status === 403)
       ) {
         return null;
       }
