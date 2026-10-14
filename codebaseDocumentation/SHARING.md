@@ -134,6 +134,7 @@ collection had every share refused. *"testAccessListReportsWhatTheCallerCanShare
 - Uses `Folder().getFullAccessList()` for user list (doesn't include emails)
 - Requires separate bulk query to fetch user emails
 - Bulk loads configurations to avoid N+1 queries
+- Lists only configurations the caller can READ (`findWithPermissions`): another user may have opened the dataset with a private configuration of theirs
 
 #### `GET /dataset_view/configuration_access/:configurationId`
 
@@ -170,6 +171,7 @@ Returns the current access list for a configuration and its associated datasets.
 - Uses `Collection().getFullAccessList()` for user list (doesn't include emails)
 - Requires separate bulk query to fetch user emails
 - Bulk loads datasets to avoid N+1 queries
+- Lists only datasets the caller can READ (`findWithPermissions`): other users may have opened their own private datasets with this configuration
 
 #### `POST /dataset_view/share`
 
