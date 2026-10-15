@@ -117,6 +117,17 @@ describe("OAuthConsent", () => {
     expect(s.mcpOAuthAPI.getRequest).toHaveBeenCalledWith("req1");
   });
 
+  it("goes ahead for a logged-in user even before authRestored", async () => {
+    // e.g. logged in from the menu in a tab that started on a share link,
+    // where initialize() never ran.
+    s.isLoggedIn = true;
+    s.girderUser = { login: "alice" };
+    mountPage();
+    await flush();
+    expect(s.mcpOAuthAPI.getRequest).toHaveBeenCalledWith("req1");
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
   it("sends a logged-out user to login and saves the way back", async () => {
     mountPage();
     s.authRestored = true;

@@ -113,7 +113,9 @@ const login = computed(() => store.girderUser?.login ?? "");
 watch(
   [() => store.authRestored, () => store.isLoggedIn, requestId],
   async ([restored, loggedIn, id]) => {
-    if (framed || !restored) return;
+    // authRestored only matters for deciding the user is logged OUT; a
+    // logged-in user (however they got there) can go ahead.
+    if (framed || (!restored && !loggedIn)) return;
     if (!id) {
       error.value = "The link is missing its request. Start again from Claude.";
       return;
