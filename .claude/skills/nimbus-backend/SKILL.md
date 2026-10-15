@@ -571,6 +571,12 @@ tripping the revocation (review round 4). Test each malformed-request
 case with a **corrected retry that succeeds**; a test that only checks the
 error response cannot see a spent token.
 
+Apply the split to **every** credential of the kind, not the one that was
+reported: the refresh path got its resource peek and the authorization-code
+exchange, its twin, did not until a later round. And the read after the
+claim can come back empty (a TTL index deleted the expired record in
+between), so treat `None` there as the same `invalid_grant`, not a crash.
+
 ## Index changes on existing collections: not at startup
 
 Any `create_index` / `drop_index` / `ensureIndices` you add to a model

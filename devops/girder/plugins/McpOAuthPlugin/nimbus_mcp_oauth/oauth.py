@@ -221,9 +221,20 @@ def _checkResource(params, expected):
 
 
 def _exchangeCode(params):
+    # Before claiming the code: a malformed request must not spend it.
+    if not params.get('client_id'):
+        raise OAuthError('invalid_request', 'client_id is required.')
     code = params.get('code') or ''
     codeId = _hash(code)
     grantId = ObjectId()
+    # A resource that does not match the authorization is a request error,
+    # so (as for refresh) it is checked on a peek before the code is spent,
+    # and only for the right client: a wrong client falls through to the
+    # claim.
+    if params.get('resource') is not None:
+        peek = AuthorizationCode().findOne({'_id': codeId, 'used': False})
+        if peek and peek['clientId'] == params.get('client_id'):
+            _checkResource(params, peek['resource'])
     # Atomic single use: only one exchange flips used, and it records the
     # grant it will create, so a replay can always find what to revoke.
     result = AuthorizationCode().update(
@@ -238,7 +249,8 @@ def _exchangeCode(params):
                 {'_id': codeId}, {'$set': {'replayed': True}}, multi=False)
             revokeGrant(doc['grantId'])
         raise OAuthError('invalid_grant', 'Invalid authorization code.')
-    if expired(doc):
+    # Gone between the claim and the read: the TTL monitor removed it.
+    if doc is None or expired(doc):
         raise OAuthError('invalid_grant', 'The authorization code expired.')
     if params.get('client_id') != doc['clientId']:
         raise OAuthError('invalid_grant', 'Code was issued to another client.')

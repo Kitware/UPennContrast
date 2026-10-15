@@ -225,6 +225,53 @@ def testResourceMismatchAtTokenIsInvalidTarget(enabled, user):
     assert resp.json['error'] == 'invalid_target'
 
 
+def testCodeWithWrongResourceIsNotSpent(enabled, user):
+    verifier, code, params = approveFlow(enabled, user)
+    resp = exchange(enabled, code, verifier, params,
+                    resource='https://other.example/mcp')
+    assert resp.json['error'] == 'invalid_target'
+    # A corrected retry still works.
+    resp = exchange(enabled, code, verifier, params)
+    assert resp.json['access_token'].startswith('nio_')
+
+
+def testCodeWithoutClientIdIsNotSpent(enabled, user):
+    verifier, code, params = approveFlow(enabled, user)
+    resp = exchange(enabled, code, verifier, params, client_id=None)
+    assert resp.json['error'] == 'invalid_request'
+    resp = exchange(enabled, code, verifier, params)
+    assert resp.json['access_token'].startswith('nio_')
+
+
+def testWrongClientWithWrongResourceStillSpendsTheCode(enabled, user):
+    # The peek is only for the right client; anyone else is a bad grant.
+    verifier, code, params = approveFlow(enabled, user)
+    resp = exchange(enabled, code, verifier, params,
+                    client_id='https://claude.ai/other',
+                    resource='https://other.example/mcp')
+    assert resp.json['error'] == 'invalid_grant'
+    assert exchange(enabled, code, verifier, params).json[
+        'error'] == 'invalid_grant'
+
+
+def testCodeRemovedAfterTheClaimIsInvalidGrant(enabled, user, monkeypatch):
+    # The TTL monitor can delete an expired code between the claim and the
+    # read that follows it.
+    from nimbus_mcp_oauth.models import AuthorizationCode
+    verifier, code, params = approveFlow(enabled, user)
+    update = AuthorizationCode.update
+
+    def updateThenDelete(self, query, *args, **kwargs):
+        result = update(self, query, *args, **kwargs)
+        AuthorizationCode().removeWithQuery({'_id': query['_id']})
+        return result
+
+    monkeypatch.setattr(AuthorizationCode, 'update', updateThenDelete)
+    resp = exchange(enabled, code, verifier, params, resource=None)
+    assert _status(resp) == 400
+    assert resp.json['error'] == 'invalid_grant'
+
+
 def testCodeWorksOnceAndReplayRevokesItsTokens(enabled, user):
     verifier, code, params = approveFlow(enabled, user)
     first = exchange(enabled, code, verifier, params).json
@@ -556,6 +603,17 @@ def testMalformedUrlSettingsAreRefused(server, key, value):
     from girder.exceptions import ValidationException
     with pytest.raises(ValidationException, match='http'):
         Setting().set(key, value)
+
+
+@pytest.mark.parametrize('issuer', [
+    'https://nimbus.example/oauth', 'https://nimbus.example/girder/'])
+def testIssuerMustBeABareOrigin(server, issuer):
+    # The metadata is served only at the root's /.well-known path.
+    from girder.exceptions import ValidationException
+    with pytest.raises(ValidationException, match='bare origin'):
+        Setting().set(settings.ISSUER, issuer)
+    Setting().set(settings.ISSUER, 'https://nimbus.example/')
+    assert Setting().get(settings.ISSUER) == 'https://nimbus.example'
 
 
 def testEquivalentResourceSpellingsAreAccepted(server):

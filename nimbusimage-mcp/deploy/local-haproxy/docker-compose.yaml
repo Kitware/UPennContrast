@@ -2,21 +2,25 @@
 # tunnel test. Joins the main stack's network, so start that first (with the
 # mcp profile) from the repo root of the main checkout, then:
 #   docker compose -f nimbusimage-mcp/deploy/local-haproxy/docker-compose.yaml up -d
-# HAProxy listens on localhost:8090; point a tunnel at it. It finds mcp and
-# girder through Docker's DNS, so recreating either needs no HAProxy restart.
+# HAProxy listens on localhost:8090, the public side: point a tunnel at it,
+# never at 8091, which stands in for the private network (Girder answers
+# everything there). It finds mcp and girder through Docker's DNS, so
+# recreating either needs no HAProxy restart. Check the routing with
+# check_routing.sh.
 name: nimbus-mcp-haproxy
 
 services:
   haproxy:
-    image: haproxy:3.2-alpine
+    image: haproxy:3.2.4-alpine
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     ports:
-      - "127.0.0.1:${HAPROXY_PORT-8090}:80"
+      - "127.0.0.1:${HAPROXY_PORT:-8090}:80"
+      - "127.0.0.1:${HAPROXY_INTERNAL_PORT:-8091}:81"
     depends_on:
       - static
   static:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     volumes:
       - ./static:/usr/share/nginx/html:ro
       - ./nginx.conf:/etc/nginx/nginx.conf:ro

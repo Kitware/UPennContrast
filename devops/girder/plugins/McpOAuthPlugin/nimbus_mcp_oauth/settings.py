@@ -3,6 +3,8 @@
 Set them as a site admin with ``PUT /system/setting``. While ``enabled`` is
 false every endpoint of this plugin answers 404.
 """
+from urllib.parse import urlsplit
+
 from girder.exceptions import ValidationException
 from girder.models.setting import Setting
 from girder.utility import setting_utilities
@@ -73,6 +75,12 @@ def _validateUrl(doc):
             'value')
     doc['value'] = value.rstrip('/')
     if doc['key'] == ISSUER:
+        # A bare origin: the metadata is served (and proxied) only at
+        # /.well-known/oauth-authorization-server, where a client looks for
+        # an issuer with no path (RFC 8414 section 3).
+        if urlsplit(doc['value']).path:
+            raise ValidationException(
+                'Must be a bare origin, with no path.', 'value')
         _refuseClearingWhileEnabled(doc)
 
 

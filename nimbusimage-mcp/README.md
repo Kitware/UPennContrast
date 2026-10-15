@@ -96,9 +96,11 @@ access on the next request.
 
 claude.ai connectors call from Anthropic's servers, so they need an HTTPS URL.
 `deploy/local-haproxy/` runs HAProxy with the proposed production routing in
-front of the `mcp` service. Tunnel traffic reaches Girder only for OAuth
-authorize, token and revoke; the deny keys on Cloudflare's
-`Cf-Connecting-Ip`, so use cloudflared, not another tunnel. HAProxy finds
+front of the `mcp` service. Port 8090 is the public side: point the tunnel
+there, and Girder answers it only for the OAuth discovery documents and
+authorize, token and revoke.
+Port 8091 (localhost only) stands in for the private network; never tunnel
+it. `deploy/local-haproxy/check_routing.sh` checks the routing. HAProxy finds
 `mcp` through Docker's DNS, so the order below works and `mcp` can be recreated
 while it runs. From the repo root of the main checkout:
 

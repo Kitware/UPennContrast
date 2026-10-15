@@ -11,9 +11,10 @@ a local HAProxy with the proposed production rules; see
 plugin ([6.3](#63-girder-oauth-plugin)), the MCP server's token check
 ([6.1](#61-token-verifier-in-the-mcp-server)) and the consent page work end to end with
 Claude Code locally and with a Team org's claude.ai connector through a tunnel, and the
-branch review's findings are fixed. Phases 4 onward are proposals. The order was changed on 2026-10-12 so a header-key connector test through a
-tunnel (Phase 2) comes before OAuth (Phase 3), because most users will be on Team/Enterprise
-plans and OAuth must follow soon, built on a verified connector path.
+branch review's findings are fixed. Phases 4 onward are proposals. The order was changed
+on 2026-10-12 so a header-key connector test through a tunnel (Phase 2) comes before OAuth
+(Phase 3), because most users will be on Team/Enterprise plans and OAuth must follow soon,
+built on a verified connector path.
 **Last reviewed:** 2026-10-13 (Phase 2 routing and §7 Phase 4 rules against the
 AWSDeploy HAProxy template, including its static server); otherwise 2026-10-11, against
 NimbusImage `82a746f`, the AWSDeploy HAProxy template and deploy playbook, and the current Claude and MCP documentation listed in
@@ -190,7 +191,7 @@ Key properties:
 | Token verifier | Accepts a Girder API key or an OAuth access token, resolves it to a Girder session token and user. | Inside the MCP server |
 | Girder OAuth plugin | Authorization server: metadata, authorize, consent (request, approve, deny), token, revoke, the user's connections, and an introspection endpoint for the MCP service. Off by default behind a setting. | `devops/girder/plugins/McpOAuthPlugin/` (built, Phase 3) |
 | Consent page | Frontend route that shows who is asking and approves the request with the user's own Girder token. | NimbusImage frontend (`src/views/`, router) |
-| HAProxy rules | Exact-path routes for `/mcp` and the two OAuth discovery documents; a static backend for the MCP service. | AWSDeploy `templates/startup_haproxy.tftpl` (the IP manager script should need no change; confirm with a test) |
+| HAProxy rules | Exact-path routes for `/mcp` and the OAuth discovery documents; a 308 from `/mcp/`; introspection refused from outside the VPC (on the decoded path); the ACME exemption narrowed; a static backend for the MCP service. Checked by `nimbusimage-mcp/deploy/local-haproxy/check_routing.sh`. | AWSDeploy `templates/startup_haproxy.tftpl` (the IP manager script should need no change; confirm with a test) |
 
 ### 4.3 API-key request path
 
@@ -617,7 +618,8 @@ latency is acceptable, the proposed HAProxy rules behave).
 **Safety:**
 
 - The local stack uses the default `admin`/`password` and is shared, so Girder must not be
-  reachable through the tunnel at all (the local HAProxy refuses it), and the connector
+  reachable through the tunnel (the local HAProxy refuses it; since Phase 3, except the
+  OAuth discovery documents and sign-in endpoints), and the connector
   uses a dedicated non-admin test user's key over test data only. (The original plan, a
   changed admin password and a throwaway database, was replaced by this on 2026-10-12
   because the local database is shared with other work.)
@@ -642,7 +644,10 @@ main stack's network. A Cloudflare quick tunnel (`cloudflared tunnel --url
 http://localhost:8090`) exposed only that HAProxy. Local differences: TLS ends at the
 tunnel (`X-Forwarded-Proto` stands in for `ssl_fc`), Girder is refused (403) to anything
 arriving through the tunnel because the shared local stack keeps the default admin
-password, and the worker rate limit is left out. Instead of a separate database, the test
+password, and the worker rate limit is left out. (Since Phase 3 the public side is port
+8090 for any tunnel, with Girder answering only the OAuth discovery documents and sign-in
+endpoints; port 8091,
+localhost only, stands in for the private network.) Instead of a separate database, the test
 ran as a dedicated non-admin user with a random password and a full-access key, owning one
 copy of a 4-channel, 7-z HCR dataset; the user, key, dataset, annotations and jobs were
 deleted afterwards. The compose `mcp` service now takes `NI_MCP_PUBLIC_URL`,
@@ -852,15 +857,35 @@ with NimbusImage's Girder image like the other plugins.
     `/.well-known/openid-configuration` (clients probe it next; without a rule the static
     server would answer with `index.html`). No `path_beg /.well-known/`
     rule. Rehearsed in `nimbusimage-mcp/deploy/local-haproxy/haproxy.cfg` (Phase 2).
+  - Redirect `/mcp/` to `/mcp` with a **308** and a relative location: a pasted URL with
+    a trailing slash otherwise gets `index.html`. Not the MCP server's own redirect,
+    which names `http://` because TLS ends at HAProxy, and not a 302, which turns a POST
+    into a GET.
   - Narrow the existing HTTPS-redirect exemption (`acl acme_challenge path_beg
     /.well-known/`) to `/.well-known/acme-challenge/`, so OAuth metadata is never served
     over plain HTTP.
   - Send `Content-Security-Policy: frame-ancestors 'none'` (or `X-Frame-Options: DENY`)
     for the frontend from the static server, so the OAuth consent page cannot be framed
     even without JavaScript; the page's own frame check is the only defence today.
-  - Deny `/girder/api/v1/mcp_oauth/introspect` (and the `//girder` and `/girder/` path
-    variants) from outside the VPC, so only the MCP service reaches it; it already
-    answers 404 without the shared secret.
+  - Deny introspection from outside the VPC, so only the MCP service reaches it (it
+    already answers 404 without the shared secret; this is the layer for a leaked
+    secret). A literal path match is **not** enough: HAProxy matches the raw path, and
+    in the local rehearsal `introspect/`, `%69ntrospect`, `mcp_oauth%2Fintrospect` and
+    `api//v1/...` all reached Girder's introspect handler past one. Put the rule in `backend nimbus-girders`
+    **after** the `set-path` rewrites, on the decoded path with slashes collapsed again,
+    as a prefix and case-blind:
+    `http-request deny if { path,url_dec,regsub('/+','/','g') -m beg -i
+    /api/v1/mcp_oauth/introspect } !{ src ${VPC_CIDR} }`. Rehearsed locally with port
+    81 standing in for the VPC.
+  - MCP and OAuth live on `app.<domain>` only. The existing apex rule (`redirect code 301
+    location https://app.<domain> if { hdr(host) -i <domain> } !acme_challenge`) drops the
+    path, so apex `/mcp` lands on the app root; and its `!acme_challenge` term follows the
+    narrowed ACL above. Neither rule is in the local rehearsal, nor the VPC exemption
+    from the HTTPS redirect.
+  - Run `nimbusimage-mcp/deploy/local-haproxy/check_routing.sh` after every change to
+    these rules, locally and (Phase 5) against the test environment with `HTTPS_BASE`,
+    `HTTP_BASE` and an empty `INTERNAL_BASE`, from outside the VPC (the VPC skips the
+    HTTPS redirect).
   - A new **static** backend for the MCP service (its fixed private address), not part
     of the dynamic Girder backend. `/mcp` and `/.well-known/oauth-protected-resource/mcp`
     route to it; `/.well-known/oauth-authorization-server` and
@@ -1158,6 +1183,12 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
       *"testRefreshFromAnotherClientRevokes"*, *"testAnotherClientCannotProbeWithAWrongResource"*,
       *"testRefreshWithoutClientIdKeepsTheConnection"*,
       *"testRefreshWithWrongResourceKeepsTheToken"*
+- [x] Its twin, the code exchange: no `client_id`, or a wrong `resource` from the right
+      client, does not spend the code (a wrong client still does), and a code the TTL
+      monitor removes right after the claim is `invalid_grant`, not a 500.
+      *"testCodeWithoutClientIdIsNotSpent"*, *"testCodeWithWrongResourceIsNotSpent"*,
+      *"testWrongClientWithWrongResourceStillSpendsTheCode"*,
+      *"testCodeRemovedAfterTheClaimIsInvalidGrant"*
 - [x] `resource` is required, compared in canonical form, and bound to the tokens.
       *"testBadRequestsRedirectBackWithError"*, *"testResourceIsComparedInCanonicalForm"*, *"testResourceMismatchAtTokenIsInvalidTarget"*,
       *"testIntrospectionReturnsAWorkingGirderSession"*
@@ -1184,6 +1215,8 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
       fragment (or, for issuer/API/frontend, a query or credentials) is refused, while
       equivalent resource spellings (case, default port, trailing slash) are accepted.
       *"testMalformedUrlSettingsAreRefused"*, *"testEquivalentResourceSpellingsAreAccepted"*
+- [x] The issuer is a bare origin (no path), since the metadata is served only at the
+      root's `/.well-known/`. *"testIssuerMustBeABareOrigin"*
 
 ### Consent page
 
@@ -1211,9 +1244,11 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
 
 Deploy (Phases 4 and 5): no HAProxy rule matches `/.well-known/acme-challenge/*` except
 the static server; the IP manager's reconciliation leaves the static MCP backend alone
-(AWSDeploy `tests/test_load_balancer_ip_manager.py`). In Phase 2 the routing was checked by
-hand with curl against `nimbusimage-mcp/deploy/local-haproxy/` (plain and HTTPS, with and
-without the tunnel header); a scripted version is still to be written.
+(AWSDeploy `tests/test_load_balancer_ip_manager.py`). The proxy routing is checked by
+`nimbusimage-mcp/deploy/local-haproxy/check_routing.sh` (backend per path, the HTTPS
+redirect, ACME, the `/mcp/` redirect, and the Girder and introspection denies with
+encoded, `//`, case and trailing-slash variants). It needs a running proxy, so it is not
+in CI; run it after any rule change. Phase 5 runs it against the test environment.
 
 Process rules carried over from `CLAUDE.md`: verify from a fresh start against data that
 actually has the property under test, and use `git stash` to confirm a test fails without
