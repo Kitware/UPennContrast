@@ -123,7 +123,8 @@ watch(
 watch(
   () => store.isLoggedIn,
   (loggedIn) => {
-    if (!loggedIn) return;
+    // A share link's hidden user is not the login a page asked for.
+    if (!loggedIn || store.girderUser?.shareLink) return;
     const path = takeReturnTo();
     if (path) Promise.resolve(router.replace(path)).finally(finishReturn);
   },

@@ -811,6 +811,9 @@ with NimbusImage's Girder image like the other plugins.
   - Narrow the existing HTTPS-redirect exemption (`acl acme_challenge path_beg
     /.well-known/`) to `/.well-known/acme-challenge/`, so OAuth metadata is never served
     over plain HTTP.
+  - Send `Content-Security-Policy: frame-ancestors 'none'` (or `X-Frame-Options: DENY`)
+    for the frontend from the static server, so the OAuth consent page cannot be framed
+    even without JavaScript; the page's own frame check is the only defence today.
   - Deny `/girder/api/v1/mcp_oauth/introspect` (and the `//girder` and `/girder/` path
     variants) from outside the VPC, so only the MCP service reaches it; it already
     answers 404 without the shared secret.

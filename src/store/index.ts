@@ -1998,6 +1998,9 @@ export class Main extends VuexModule {
       }
     }
     await this.loggedIn(previous);
+    // A tab that started on a shared URL never ran initialize(); its login
+    // is settled now (a page waiting on authRestored would spin forever).
+    this.setAuthRestored();
   }
 
   @Action

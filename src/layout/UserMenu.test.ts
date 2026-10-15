@@ -93,6 +93,16 @@ describe("UserMenu", () => {
       expect(wrapper.vm.userMenu).toBe(false);
     });
 
+    it("does not spend the way back on a share link's session", async () => {
+      await mountComponent("shared");
+      saveReturnTo("/oauth/consent?request=abc");
+      (store as any).girderUser = { shareLink: { datasetId: "d" } };
+      (store as any).isLoggedIn = true;
+      await nextTick();
+      expect(replace).not.toHaveBeenCalled();
+      (store as any).girderUser = null;
+    });
+
     it("goes back to the saved page once after login", async () => {
       await mountComponent("root");
       saveReturnTo("/oauth/consent?request=abc");

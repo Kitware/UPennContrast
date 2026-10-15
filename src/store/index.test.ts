@@ -170,10 +170,13 @@ describe("share-link bootstrap identity", () => {
     vi.spyOn(ShareLinkAPI.prototype, "me").mockResolvedValue({
       datasetViewId: "v",
     } as any);
+    (rootStore.state as any).main.authRestored = false;
     await main.openShareLink({ token: "link-a" });
     await main.leaveShareLink();
     expect(main.girderRest).toBe(client);
     expect(main.girderUser?._id).toBe("owner-token");
+    // initialize() never ran in this tab; leaving settles the login.
+    expect(main.authRestored).toBe(true);
   });
 
   it("does not commit a share bootstrap after its route is cancelled", async () => {
