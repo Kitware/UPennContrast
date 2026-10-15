@@ -25,6 +25,7 @@ import { v4 as uuidv4 } from "uuid";
 import AnnotationsAPI from "./AnnotationsAPI";
 import SpatialAPI from "./SpatialAPI";
 import ShareLinkAPI from "./ShareLinkAPI";
+import McpOAuthAPI from "./McpOAuthAPI";
 import PropertiesAPI from "./PropertiesAPI";
 import ToolSuggestionsAPI from "./ToolSuggestionsAPI";
 import AgentAPI from "./AgentAPI";
@@ -619,6 +620,7 @@ export class Main extends VuexModule {
   annotationsAPI = new AnnotationsAPI(this.girderRestProxy);
   spatialAPI = new SpatialAPI(this.girderRestProxy);
   shareLinkAPI = new ShareLinkAPI(this.girderRestProxy);
+  mcpOAuthAPI = new McpOAuthAPI(this.girderRestProxy);
   propertiesAPI = new PropertiesAPI(this.girderRestProxy);
   toolSuggestionsAPI = new ToolSuggestionsAPI(this.girderRestProxy);
   agentAPI = new AgentAPI(this.girderRestProxy);
@@ -632,6 +634,10 @@ export class Main extends VuexModule {
   folderLocation: IGirderLocation = this.girderUser || { type: "users" };
   assetstores: IGirderAssetstore[] = [];
   hasUserLoggedOut: boolean = false;
+  // True once startup has finished restoring the stored login (or found
+  // none). Until then isLoggedIn is false even for a logged-in user, so a
+  // page that sends logged-out users to login must wait for this.
+  authRestored: boolean = false;
   userStorageInfo: IUserStorageQuota | null = null;
 
   history: IHistoryEntry[] = [];
@@ -1520,6 +1526,11 @@ export class Main extends VuexModule {
   }
 
   @Mutation
+  protected setAuthRestored() {
+    this.authRestored = true;
+  }
+
+  @Mutation
   protected loggedOut() {
     this.girderUser = null;
     this.userStorageInfo = null;
@@ -1992,6 +2003,7 @@ export class Main extends VuexModule {
   @Action
   async initialize() {
     if (!this.girderRest.token) {
+      this.setAuthRestored();
       return;
     }
     try {
@@ -2000,9 +2012,12 @@ export class Main extends VuexModule {
       if (user) {
         await this.loggedIn(this.girderRest);
       }
+      // The login is settled here; dataset loading below can take long.
+      this.setAuthRestored();
       await this.initFromUrl();
       sync.setLoading(false);
     } catch (error) {
+      this.setAuthRestored();
       sync.setLoading(error as Error);
     }
   }

@@ -1031,3 +1031,36 @@ describe("scales getters normalize an unknown pixel size", () => {
     expect(main.scales.pixelSize).toEqual({ value: 0.3, unit: "µm" });
   });
 });
+
+describe("initialize: authRestored", () => {
+  it("is set when there is no stored login", async () => {
+    const client = main.girderRest;
+    const token = client.token;
+    Object.assign(client, { token: "" });
+    (rootStore.state as any).main.authRestored = false;
+    try {
+      await main.initialize();
+      expect(main.authRestored).toBe(true);
+    } finally {
+      Object.assign(client, { token });
+    }
+  });
+
+  it("is set even when restoring the login fails", async () => {
+    const client = main.girderRest;
+    const token = client.token;
+    Object.assign(client, { token: "stale" });
+    (rootStore.state as any).main.authRestored = false;
+    vi.spyOn(RestClient.prototype, "fetchUser").mockRejectedValue(
+      new Error("401"),
+    );
+    try {
+      await main.initialize();
+      expect(main.authRestored).toBe(true);
+      expect(main.isLoggedIn).toBe(false);
+    } finally {
+      Object.assign(client, { token });
+      vi.restoreAllMocks();
+    }
+  });
+});
