@@ -7,9 +7,11 @@ auth and 17 tools, run locally or as the compose `mcp` profile (see
 Placement decided (2026-10-12): a small separate service, see §11. Phase 2 done
 (2026-10-13): the header-key connector works from claude.ai and through `mcp-remote` behind
 a local HAProxy with the proposed production rules; see
-[Phase 2 results](#phase-2-results-2026-10-13). Phase 3 in progress (2026-10-13): the OAuth
-plugin is built and reviewed ([6.3](#63-girder-oauth-plugin)); the verifier, consent page
-and end-to-end tests are next. Phases 4 onward are proposals. The order was changed on 2026-10-12 so a header-key connector test through a
+[Phase 2 results](#phase-2-results-2026-10-13). Phase 3 built and verified (2026-10-15): the OAuth
+plugin ([6.3](#63-girder-oauth-plugin)), the MCP server's token check
+([6.1](#61-token-verifier-in-the-mcp-server)) and the consent page work end to end with
+Claude Code locally and with a Team org's claude.ai connector through a tunnel; only the
+human read of the plugin remains. Phases 4 onward are proposals. The order was changed on 2026-10-12 so a header-key connector test through a
 tunnel (Phase 2) comes before OAuth (Phase 3), because most users will be on Team/Enterprise
 plans and OAuth must follow soon, built on a verified connector path.
 **Last reviewed:** 2026-10-13 (Phase 2 routing and §7 Phase 4 rules against the
@@ -755,6 +757,24 @@ the exchange created a grant for `http://localhost:8001/mcp`; Claude Code then l
 owner's 96 datasets. Add the server with `--scope user` (or start `claude` in the folder it
 was added from): a local-scope server only appears there.
 
+**Team org through the tunnel (2026-10-15).** The Phase 2 setup (local HAProxy, Cloudflare
+quick tunnel) with OAuth on: the issuer and resource set to the tunnel origin, the
+plugin's authorize, token and revoke endpoints let through to Girder (introspection and the
+rest of Girder still refused to tunnel traffic), and the consent page on the members'
+machine (`mcp_oauth.frontend_url` = `http://localhost:5173`). The Team org's Owner added
+the custom connector with the default "Use Claude's published identity"; two members
+connected as different NimbusImage users (`arjunraj`, `arjunregular`) and each saw their
+own data. Observed:
+
+- claude.ai's client id is **`https://claude.ai/oauth/mcp-oauth-client-metadata`**
+  (name "Claude", one redirect URI, `https://claude.ai/api/mcp/auth_callback`). Claude's
+  documentation does not publish it; the plugin's host allowlist and redirect restriction
+  accept it as designed.
+- The browser follows authorize (Chrome); claude.ai's backend (`python-httpx`) exchanges the
+  code and sends `resource`, which the plugin requires; tool calls arrive as
+  `Claude-User`, protocol `2026-07-28`, and are introspected per request.
+- One grant per member, named after the client, bound to the tunnel's `/mcp`.
+
 **Tests:**
 
 - Plugin tests with pytest via tox: one or more per security requirement in
@@ -779,8 +799,8 @@ connector with OAuth, and two members use it.
 - [x] With the setting off, every OAuth endpoint returns 404 and API-key auth still works.
 - [ ] Security review of the plugin (use the repo's `/security-review` skill plus a human
       read). Four independent agent reviews done; the human read is outstanding.
-- [ ] OAuth connector works through the tunnel, and two members of the same org see
-      different data.
+- [x] OAuth connector works through the tunnel, and two members of the same org see
+      different data (2026-10-15, below).
 
 
 ### Phase 4: Deploy preparation
@@ -1183,9 +1203,10 @@ its fix.
 - The production Girder stack is defined in `CytoPixel/OutsetaLogin`, which was not read
   for this plan. With the separate MCP service it needs no MCP change, but how the service
   reaches Girder over the private network (`NI_API_URL`) is still to be decided.
-- Claude's OAuth callback URL (`https://claude.ai/api/mcp/auth_callback`) is from Claude's
-  connector documentation; it has not yet been observed in a real flow (Phase 3 tunnel
-  test).
+- Claude's OAuth callback URL (`https://claude.ai/api/mcp/auth_callback`) was observed in
+  the Phase 3 Team test (2026-10-15), in claude.ai's client document
+  `https://claude.ai/oauth/mcp-oauth-client-metadata`. The `claude.com` callback is still
+  accepted as a hedge but has not been seen.
 - MCP Python SDK names (`MCPServer`, `TokenVerifier`, `AuthSettings`,
   `validate_token_resource`, `stateless_http`) were confirmed against the pinned
   `mcp==2.3.0` in Phases 0 and 1. The request's verified token reaches sync tools (run in a
