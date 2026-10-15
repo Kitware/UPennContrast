@@ -83,7 +83,7 @@ function mountPage() {
 function loggedIn() {
   s.authRestored = true;
   s.isLoggedIn = true;
-  s.girderUser = { login: "alice" };
+  s.girderUser = { _id: "u1", login: "alice" };
 }
 
 describe("OAuthConsent", () => {
@@ -121,11 +121,39 @@ describe("OAuthConsent", () => {
     // e.g. logged in from the menu in a tab that started on a share link,
     // where initialize() never ran.
     s.isLoggedIn = true;
-    s.girderUser = { login: "alice" };
+    s.girderUser = { _id: "u1", login: "alice" };
     mountPage();
     await flush();
     expect(s.mcpOAuthAPI.getRequest).toHaveBeenCalledWith("req1");
     expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("waits while a share link's user is still the session", async () => {
+    // Leaving a share link restores the real login asynchronously.
+    s.isLoggedIn = true;
+    s.girderUser = {
+      _id: "link",
+      login: "link",
+      shareLink: { datasetId: "d" },
+    };
+    mountPage();
+    await flush();
+    expect(s.mcpOAuthAPI.getRequest).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+    s.girderUser = { _id: "u1", login: "alice" };
+    s.authRestored = true;
+    await flush();
+    expect(s.mcpOAuthAPI.getRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("reloads the request when the login changes", async () => {
+    loggedIn();
+    s.girderUser = { _id: "u1", login: "alice" };
+    mountPage();
+    await flush();
+    s.girderUser = { _id: "u2", login: "bob" };
+    await flush();
+    expect(s.mcpOAuthAPI.getRequest).toHaveBeenCalledTimes(2);
   });
 
   it("sends a logged-out user to login and saves the way back", async () => {

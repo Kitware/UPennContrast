@@ -102,38 +102,47 @@ const framed = window.top !== window.self;
 const request = ref<IMcpOAuthRequest | null>(null);
 const error = ref<string | null>(null);
 const busy = ref(false);
-let loadedId: string | null = null;
+let loadedKey: string | null = null;
 
 const requestId = computed(() => {
   const value = route.query.request;
   return typeof value === "string" ? value : "";
 });
 const login = computed(() => store.girderUser?.login ?? "");
+// A share link's hidden user is not a login that can approve (its token
+// lacks the user scope); treat it as not logged in yet.
+const userId = computed(() =>
+  store.isLoggedIn && !store.girderUser?.shareLink
+    ? String(store.girderUser?._id ?? "")
+    : null,
+);
 
 watch(
-  [() => store.authRestored, () => store.isLoggedIn, requestId],
-  async ([restored, loggedIn, id]) => {
+  [() => store.authRestored, userId, requestId],
+  async ([restored, user, id]) => {
     // authRestored only matters for deciding the user is logged OUT; a
     // logged-in user (however they got there) can go ahead.
-    if (framed || (!restored && !loggedIn)) return;
+    if (framed || (!restored && user === null)) return;
     if (!id) {
       error.value = "The link is missing its request. Start again from Claude.";
       return;
     }
-    if (!loggedIn) {
+    if (user === null) {
       saveReturnTo(route.fullPath);
       router.replace({ name: "root" });
       return;
     }
-    if (loadedId === id) return;
-    loadedId = id;
+    // Load once per request and user: a change of login reloads it.
+    const key = `${user}:${id}`;
+    if (loadedKey === key) return;
+    loadedKey = key;
     request.value = null;
     error.value = null;
     try {
       const loaded = await store.mcpOAuthAPI.getRequest(id);
-      if (loadedId === id) request.value = loaded;
+      if (loadedKey === key) request.value = loaded;
     } catch (caught) {
-      if (loadedId !== id) return;
+      if (loadedKey !== key) return;
       logError("Failed to load the sign-in request:", caught);
       error.value = extractErrorMessage(caught);
     }
