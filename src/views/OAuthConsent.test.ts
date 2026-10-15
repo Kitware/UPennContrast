@@ -146,6 +146,25 @@ describe("OAuthConsent", () => {
     expect(s.mcpOAuthAPI.getRequest).toHaveBeenCalledTimes(1);
   });
 
+  it("waits for a share session to end even after authRestored", async () => {
+    s.authRestored = true;
+    s.isLoggedIn = true;
+    s.girderUser = {
+      _id: "link",
+      login: "link",
+      shareLink: { datasetId: "d" },
+    };
+    mountPage();
+    await flush();
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(s.mcpOAuthAPI.getRequest).not.toHaveBeenCalled();
+    // The leave found no real login: now go to login.
+    s.girderUser = null;
+    s.isLoggedIn = false;
+    await flush();
+    expect(mocks.replace).toHaveBeenCalledWith({ name: "root" });
+  });
+
   it("reloads the request when the login changes", async () => {
     loggedIn();
     s.girderUser = { _id: "u1", login: "alice" };

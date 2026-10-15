@@ -117,12 +117,17 @@ const userId = computed(() =>
     : null,
 );
 
+// Arriving here from a share link ends that session (SharedView unmounts
+// and restores the real login, or none): wait for it, whatever
+// authRestored says.
+const inShareSession = computed(() => !!store.girderUser?.shareLink);
+
 watch(
-  [() => store.authRestored, userId, requestId],
-  async ([restored, user, id]) => {
+  [() => store.authRestored, userId, requestId, inShareSession],
+  async ([restored, user, id, sharing]) => {
     // authRestored only matters for deciding the user is logged OUT; a
     // logged-in user (however they got there) can go ahead.
-    if (framed || (!restored && user === null)) return;
+    if (framed || sharing || (!restored && user === null)) return;
     if (!id) {
       error.value = "The link is missing its request. Start again from Claude.";
       return;
