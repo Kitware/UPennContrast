@@ -78,7 +78,11 @@ import store, { girderUrlFromApiRoot } from "@/store";
 import { storageSeverityColor } from "@/utils/storage";
 import UserProfileSettings from "@/layout/UserProfileSettings.vue";
 import UserMenuLoginForm from "@/layout/UserMenuLoginForm.vue";
-import { hasReturnTo, takeReturnTo } from "@/utils/returnAfterLogin";
+import {
+  finishReturn,
+  hasReturnTo,
+  takeReturnTo,
+} from "@/utils/returnAfterLogin";
 
 const router = useRouter();
 router.isReady().then(() => {
@@ -121,7 +125,7 @@ watch(
   (loggedIn) => {
     if (!loggedIn) return;
     const path = takeReturnTo();
-    if (path) router.replace(path);
+    if (path) Promise.resolve(router.replace(path)).finally(finishReturn);
   },
 );
 

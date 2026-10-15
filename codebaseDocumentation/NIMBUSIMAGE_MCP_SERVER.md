@@ -707,8 +707,44 @@ Phase 2 tunnel with a Team or Enterprise org.
 - The built-in public client `nimbusimage-claude` (done).
 
 **Progress:** the plugin is built and reviewed (four independent review rounds; see
-[6.3](#63-girder-oauth-plugin)), and the MCP server accepts its tokens
-([6.1](#61-token-verifier-in-the-mcp-server)). Next: the consent page, then end to end.
+[6.3](#63-girder-oauth-plugin)), the MCP server accepts its tokens
+([6.1](#61-token-verifier-in-the-mcp-server)), and the consent page is built; the whole flow
+works locally (results below). Next: a real Claude Code sign-in, then the tunnel test with a
+Team or Enterprise org.
+
+**Consent page (built 2026-10-14):** `src/views/OAuthConsent.vue` at
+`#/oauth/consent?request=<id>`, calls in `src/store/McpOAuthAPI.ts`. It shows the client,
+the signed-in account, that access is full, where the browser goes back to, and a warning
+when that is a program on this computer; Allow and Cancel answer through the plugin and the
+browser leaves for the client's callback (http(s) only). It refuses to run inside another
+site's frame. A logged-out user is sent to the root page's login (password or Outseta) with
+the route saved by `src/utils/returnAfterLogin.ts` (sessionStorage, in-app paths only, 15
+minutes, used once), and `UserMenu` brings them back after login. Two traps it handles:
+startup restores a stored login asynchronously, so the page waits for the store's
+`authRestored` flag before deciding the user is logged out; and the first-run welcome tour
+(started by the root page on a browser's first login) navigates back to the root page, so
+it holds back while a return is pending or in progress (`isReturningAfterLogin`) and runs on
+the next visit instead.
+
+#### Phase 3 local results (2026-10-14)
+
+Against the local stack (Girder image rebuilt with the plugin, settings for
+`http://localhost:8080`, the MCP container with the shared secret), with a stand-in public
+client playing Claude Code (built-in client id, PKCE, loopback callback on a random port):
+
+| Step | Result |
+|---|---|
+| Metadata | 404 with the setting off; served at Girder's root once on |
+| Authorize, logged in | Redirect to the consent page, which showed the client, account, full access, `localhost:<port>` and the local-program warning |
+| Authorize, logged out (fresh browser) | Return path saved, login dialog opened; after login, back on the consent page with the tour held back; the tour ran on the next visit home |
+| Allow | Callback with `code`, matching `state`, `iss` |
+| Token exchange | `nio_` token, 8 h, scope `nimbusimage` |
+| MCP calls | 17 tools; `ni_datasets_list` returned 96 datasets for the owner and 1 for a new test user (each token acts as its own user) |
+| Refresh, then reuse of the old refresh token | New tokens work; reuse answers `invalid_grant` and the newest access token is refused at once (401) |
+| Afterwards | No grants, tokens or Girder sessions left |
+
+The first logged-out run found the welcome-tour bug above: the user ended on the home page
+instead of the consent page.
 
 **Tests:**
 
@@ -728,10 +764,12 @@ connector with OAuth, and two members use it.
 **Exit criteria:**
 
 - [ ] Claude Code completes OAuth against the local stack and calls tools as the right user.
-- [ ] Refresh works, and refresh-token reuse revokes the grant.
-- [ ] With the setting off, every OAuth endpoint returns 404 and API-key auth still works.
+      (A stand-in client did, both logged in and logged out; a real Claude Code `/mcp`
+      sign-in is still to run.)
+- [x] Refresh works, and refresh-token reuse revokes the grant (live, 2026-10-14).
+- [x] With the setting off, every OAuth endpoint returns 404 and API-key auth still works.
 - [ ] Security review of the plugin (use the repo's `/security-review` skill plus a human
-      read).
+      read). Four independent agent reviews done; the human read is outstanding.
 - [ ] OAuth connector works through the tunnel, and two members of the same org see
       different data.
 
@@ -1081,11 +1119,27 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
 - [x] Users see and disconnect only their own connections.
       *"testUsersSeeAndRevokeOnlyTheirOwnConnections"*
 
-### Planned (no test yet)
+### Consent page
 
-Consent page (Phase 3): shows the client name and redirect host; return-after-login accepts
-only in-app routes; waits for login to be restored on load before treating the user as
-logged out. Planned location: `src/views/oauth/OAuthConsent.test.ts`.
+- [x] It waits for startup to restore a stored login before treating the user as logged out,
+      and sends a logged-out user to login with the way back saved.
+      *"waits for the stored login before treating the user as logged out"*,
+      *"sends a logged-out user to login and saves the way back"*,
+      *"is set even when restoring the login fails"*
+- [x] It shows the client, the account, full access and the callback host, and warns about
+      a local redirect. *"shows the client, the account and where it goes back to"*,
+      *"warns when the code goes to a program on this computer"*
+- [x] Allow answers once and leaves only for an http(s) callback; it refuses to run framed.
+      *"allow approves once and leaves for the client's callback"*,
+      *"never leaves for a non-web address"*, *"refuses to run inside another site's frame"*
+- [x] The return target is an in-app path, recent, and used once; login opens for it and
+      goes back after. *"accepts only in-app router paths"*, *"ignores planted or stale values"*,
+      *"opens the login when a page sends the user to root"*,
+      *"goes back to the saved page once after login"*
+- [x] The first-run welcome tour does not pull a returning login back to the home page.
+      *"holds back while a login returns to another page"*
+
+### Planned (no test yet)
 
 Deploy (Phases 4 and 5): no HAProxy rule matches `/.well-known/acme-challenge/*` except
 the static server; the IP manager's reconciliation leaves the static MCP backend alone

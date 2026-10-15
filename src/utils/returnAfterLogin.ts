@@ -7,12 +7,17 @@
  * the root in the same tab, so the target lives in sessionStorage. After
  * login, UserMenu takes it and navigates there.
  *
+ * Between taking the target and arriving there, isReturningAfterLogin()
+ * is true, so the root page holds back what it would do for a fresh login
+ * (the first-run welcome tour, which navigates back to the root page).
+ *
  * Only in-app router paths are accepted ("/oauth/consent?request=..."),
  * never a URL: anything else, or anything older than MAX_AGE_MS, is dropped
  * so a stale or planted value cannot redirect a later login.
  */
 
 const STORAGE_KEY = "nimbus.returnTo";
+let returning = false;
 export const MAX_AGE_MS = 15 * 60 * 1000;
 
 export function isInAppPath(path: unknown): path is string {
@@ -56,7 +61,8 @@ export function hasReturnTo(): boolean {
   return read() !== null;
 }
 
-/** The waiting return target, removed so it is used once. */
+/** The waiting return target, removed so it is used once. Call
+ * finishReturn() once the navigation to it has settled. */
 export function takeReturnTo(): string | null {
   const path = read();
   try {
@@ -64,5 +70,15 @@ export function takeReturnTo(): string | null {
   } catch {
     // nothing to clean up
   }
+  returning = path !== null;
   return path;
+}
+
+export function finishReturn(): void {
+  returning = false;
+}
+
+/** A login is about to go somewhere else: waiting, or on its way. */
+export function isReturningAfterLogin(): boolean {
+  return returning || hasReturnTo();
 }
