@@ -115,4 +115,7 @@ def get(key):
 
 
 def enabled():
-    return get(ENABLED) is True
+    # Also off when half-configured: PUT system/setting with a null value
+    # (unset) and GIRDER_SETTING_* environment variables skip validators.
+    return get(ENABLED) is True and bool(get(ISSUER)) and \
+        bool(get(RESOURCES))

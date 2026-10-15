@@ -380,7 +380,7 @@ refused returns `None`, which the SDK turns into a 401.
 **Built (Phase 3, 2026-10-13):** `devops/girder/plugins/McpOAuthPlugin/`, package
 `nimbus_mcp_oauth`, installed in `devops/girder/Dockerfile`; backend CI runs its tox. Code is
 split as the backend rules ask: `oauth.py` and `clients.py` hold the logic and raise
-`OAuthError`, `rest.py` maps that to HTTP. 74 tests, one or more per rule below; the PKCE,
+`OAuthError`, `rest.py` maps that to HTTP. 75 tests, one or more per rule below; the PKCE,
 refresh-reuse, resource and `redirect_uri` checks were each confirmed to fail their test
 when disabled.
 
@@ -402,7 +402,9 @@ REST root, e.g. `https://app.nimbusimage.com/girder/api/v1`), `mcp_oauth.fronten
 `mcp_oauth.resources` (the MCP URLs a token may be for), `mcp_oauth.introspection_secret`
 (32+ characters; empty disables introspection), `mcp_oauth.cimd_hosts`. `enabled` cannot be
 set to true until `issuer` and `resources` are set, and those cannot be cleared while it is
-true: set them first, enable last.
+true: set them first, enable last. Because a null `PUT system/setting` (unset) and
+`GIRDER_SETTING_*` environment variables skip validators, the plugin also acts as disabled at
+runtime whenever the issuer or resources are missing.
 
 **Endpoints** (REST under `/api/v1/mcp_oauth`):
 
@@ -419,9 +421,11 @@ true: set them first, enable last.
 
 `token`, `revoke` and `introspect` are kept out of Girder's audit log, which records every
 parameter, and refuse parameters in the query string (`invalid_request`), which the access
-log records whatever the audit setting. A new connection replaces the same user's earlier
-connections from the same client to the same server (a reconnect or a re-added connector),
-so dropped connections do not linger with live Girder sessions.
+log records whatever the audit setting. A new connection does **not** replace earlier ones
+from the same client: the client id is shared by every device (Claude Code on two machines)
+and every claude.ai org, so it cannot tell a reconnect from a second device (replacing was
+tried in review and reverted). An abandoned connection's Girder sessions expire with its
+last access token (8 h); its unheld refresh token after 30 days without use.
 
 **Collections** (all with TTL indexes on `expiresAt`): pending requests, codes, grants (one
 per connection, expiry slides on refresh), access tokens, refresh tokens, and a one-hour
@@ -787,7 +791,7 @@ own data. Observed:
 **Tests:**
 
 - Plugin tests with pytest via tox: one or more per security requirement in
-  [6.3](#63-girder-oauth-plugin), plus the disabled-setting 404s (done: 74 tests in
+  [6.3](#63-girder-oauth-plugin), plus the disabled-setting 404s (done: 75 tests in
   `nimbus_mcp_oauth/test/`).
 - Vitest for the consent page and the return-target validation.
 - End to end with Claude Code:
@@ -807,7 +811,9 @@ connector with OAuth, and two members use it.
 - [x] Refresh works, and refresh-token reuse revokes the grant (live, 2026-10-14).
 - [x] With the setting off, every OAuth endpoint returns 404 and API-key auth still works.
 - [x] Security review of the plugin: four independent agent reviews, then a full branch
-      review (2026-10-15) whose three low findings and an administrator warning were fixed.
+      review (2026-10-15): query-string credentials refused, the enable guard, and an
+      administrator warning fixed; replacing connections on reconnect was tried and reverted
+      (it cut off a user's other devices).
 - [x] OAuth connector works through the tunnel, and two members of the same org see
       different data (2026-10-15, below).
 
@@ -1163,11 +1169,12 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
       *"testUsersSeeAndRevokeOnlyTheirOwnConnections"*
 - [x] Codes, verifiers and tokens are refused in the query string (the access log keeps
       it), without spending them. *"testCredentialsInTheQueryStringAreRefused"*
-- [x] A reconnect replaces the user's earlier connection from that client to that server;
-      other users and other clients keep theirs. *"testReconnectReplacesTheEarlierConnection"*,
+- [x] A second device's sign-in (same client id) does not end the first device's
+      connection, nor another client's. *"testSecondDeviceDoesNotEndTheFirst"*,
       *"testAnotherClientKeepsItsOwnConnection"*
 - [x] The plugin cannot be enabled without an issuer and resources, nor have them cleared
-      while enabled. *"testCannotEnableHalfConfigured"*
+      while enabled, and acts as disabled if they go missing anyway (unset, environment).
+      *"testCannotEnableHalfConfigured"*, *"testHalfConfiguredActsDisabled"*
 
 ### Consent page
 

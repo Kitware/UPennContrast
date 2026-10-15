@@ -499,17 +499,16 @@ def testCredentialsInTheQueryStringAreRefused(enabled, user):
         assert resp.json['error'] == 'invalid_request', path
 
 
-def testReconnectReplacesTheEarlierConnection(enabled, user, admin):
+def testSecondDeviceDoesNotEndTheFirst(enabled, user):
+    # Claude Code on two machines shares one client id; so do claude.ai
+    # orgs. A new sign-in must not cut off the other.
     first = connect(enabled, user)
-    theirs = connect(enabled, admin)
     second = connect(enabled, user)
-    assert introspect(enabled, first['access_token']).json == {
-        'active': False}
-    assert refresh(enabled, first['refresh_token']).json['error'] == \
-        'invalid_grant'
+    assert introspect(enabled, first['access_token']).json['active']
     assert introspect(enabled, second['access_token']).json['active']
-    assert introspect(enabled, theirs['access_token']).json['active']
-    assert len(enabled.request('/mcp_oauth/grant', user=user).json) == 1
+    assert refresh(enabled, first['refresh_token']).json[
+        'access_token'].startswith('nio_')
+    assert len(enabled.request('/mcp_oauth/grant', user=user).json) == 2
 
 
 def testAnotherClientKeepsItsOwnConnection(enabled, user, monkeypatch):
@@ -538,3 +537,17 @@ def testCannotEnableHalfConfigured(server):
             Setting().set(key, empty)
     Setting().set(settings.ENABLED, False)
     Setting().set(settings.RESOURCES, [])
+
+
+def testHalfConfiguredActsDisabled(enabled):
+    # A null PUT (unset) skips the validators; the plugin must not serve
+    # broken metadata then.
+    Setting().unset(settings.ISSUER)
+    resp = enabled.request('/oauth-authorization-server',
+                           prefix='/.well-known', appPrefix='/.well-known',
+                           isJson=False)
+    assert _status(resp) == 404
+    _, challenge = pkcePair()
+    resp = enabled.request('/mcp_oauth/authorize',
+                           params=authorizeParams(challenge))
+    assert _status(resp) == 404

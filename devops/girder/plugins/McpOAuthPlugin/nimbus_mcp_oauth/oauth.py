@@ -281,15 +281,12 @@ def _exchangeCode(params):
         'lastUsed': now(),
         'expiresAt': now() + REFRESH_IDLE_LIFETIME,
     })
-    tokens = _issueIfStillGranted(grant, user, codeId=codeId)
-    # A new connection replaces this client's earlier ones to the same
-    # server (a reconnect or re-add): the client has dropped their tokens,
-    # so they would only linger with live Girder sessions.
-    revokeGrants([g['_id'] for g in Grant().find({
-        'userId': user['_id'], 'clientId': grant['clientId'],
-        'resource': grant['resource'], '_id': {'$ne': grant['_id']},
-    }, fields=['_id'])])
-    return tokens
+    # Earlier connections of this user and client are left alone: the
+    # client id is shared by every device (Claude Code on two machines) and
+    # every claude.ai org, so it cannot tell a reconnect from a second
+    # device. An abandoned connection's Girder sessions expire with its
+    # last access token (8 h); its unheld refresh token after 30 idle days.
+    return _issueIfStillGranted(grant, user, codeId=codeId)
 
 
 def _refresh(params):
