@@ -10,8 +10,8 @@ a local HAProxy with the proposed production rules; see
 [Phase 2 results](#phase-2-results-2026-10-13). Phase 3 built and verified (2026-10-15): the OAuth
 plugin ([6.3](#63-girder-oauth-plugin)), the MCP server's token check
 ([6.1](#61-token-verifier-in-the-mcp-server)) and the consent page work end to end with
-Claude Code locally and with a Team org's claude.ai connector through a tunnel; only the
-human read of the plugin remains. Phases 4 onward are proposals. The order was changed on 2026-10-12 so a header-key connector test through a
+Claude Code locally and with a Team org's claude.ai connector through a tunnel, and the
+branch review's findings are fixed. Phases 4 onward are proposals. The order was changed on 2026-10-12 so a header-key connector test through a
 tunnel (Phase 2) comes before OAuth (Phase 3), because most users will be on Team/Enterprise
 plans and OAuth must follow soon, built on a verified connector path.
 **Last reviewed:** 2026-10-13 (Phase 2 routing and §7 Phase 4 rules against the
@@ -380,7 +380,7 @@ refused returns `None`, which the SDK turns into a 401.
 **Built (Phase 3, 2026-10-13):** `devops/girder/plugins/McpOAuthPlugin/`, package
 `nimbus_mcp_oauth`, installed in `devops/girder/Dockerfile`; backend CI runs its tox. Code is
 split as the backend rules ask: `oauth.py` and `clients.py` hold the logic and raise
-`OAuthError`, `rest.py` maps that to HTTP. 70 tests, one or more per rule below; the PKCE,
+`OAuthError`, `rest.py` maps that to HTTP. 74 tests, one or more per rule below; the PKCE,
 refresh-reuse, resource and `redirect_uri` checks were each confirmed to fail their test
 when disabled.
 
@@ -400,7 +400,9 @@ deploys to production on the next autoscaling churn (see
 origin, equal to the MCP server's `NI_MCP_ISSUER_URL`), `mcp_oauth.api_url` (public Girder
 REST root, e.g. `https://app.nimbusimage.com/girder/api/v1`), `mcp_oauth.frontend_url`,
 `mcp_oauth.resources` (the MCP URLs a token may be for), `mcp_oauth.introspection_secret`
-(32+ characters; empty disables introspection), `mcp_oauth.cimd_hosts`.
+(32+ characters; empty disables introspection), `mcp_oauth.cimd_hosts`. `enabled` cannot be
+set to true until `issuer` and `resources` are set, and those cannot be cleared while it is
+true: set them first, enable last.
 
 **Endpoints** (REST under `/api/v1/mcp_oauth`):
 
@@ -416,7 +418,10 @@ REST root, e.g. `https://app.nimbusimage.com/girder/api/v1`), `mcp_oauth.fronten
 | `GET grant`, `DELETE grant/:id` | User | Your connected clients; disconnect (UI later) |
 
 `token`, `revoke` and `introspect` are kept out of Girder's audit log, which records every
-parameter.
+parameter, and refuse parameters in the query string (`invalid_request`), which the access
+log records whatever the audit setting. A new connection replaces the same user's earlier
+connections from the same client to the same server (a reconnect or a re-added connector),
+so dropped connections do not linger with live Girder sessions.
 
 **Collections** (all with TTL indexes on `expiresAt`): pending requests, codes, grants (one
 per connection, expiry slides on refresh), access tokens, refresh tokens, and a one-hour
@@ -467,7 +472,11 @@ another host.
   link is stopped by the client's own `state` check. The consent page should refuse to be
   framed and tell users to approve only a request they just started.
 - The session behind an access token has full access, so it could mint an API key that
-  outlives the connection; the MCP tools never do this.
+  outlives the connection; the MCP tools never do this, but nothing enforces that beyond the
+  tool code. The `nio_` token itself only works through the MCP server's tools; the Girder
+  session behind it exists only in the MCP server's memory, Girder's database and the
+  private network between them. For a site administrator that session has administrator
+  powers, so the consent page warns administrators (2026-10-15 review).
 - The rate limits are per process. Authorize, token and revoke are keyed on the last
   `X-Forwarded-For` hop (correct only behind HAProxy, which is how production runs);
   consent is keyed per user.
@@ -778,7 +787,7 @@ own data. Observed:
 **Tests:**
 
 - Plugin tests with pytest via tox: one or more per security requirement in
-  [6.3](#63-girder-oauth-plugin), plus the disabled-setting 404s (done: 70 tests in
+  [6.3](#63-girder-oauth-plugin), plus the disabled-setting 404s (done: 74 tests in
   `nimbus_mcp_oauth/test/`).
 - Vitest for the consent page and the return-target validation.
 - End to end with Claude Code:
@@ -797,8 +806,8 @@ connector with OAuth, and two members use it.
       `/mcp` → Authenticate, consent, then a dataset list of the owner's 96 datasets).
 - [x] Refresh works, and refresh-token reuse revokes the grant (live, 2026-10-14).
 - [x] With the setting off, every OAuth endpoint returns 404 and API-key auth still works.
-- [ ] Security review of the plugin (use the repo's `/security-review` skill plus a human
-      read). Four independent agent reviews done; the human read is outstanding.
+- [x] Security review of the plugin: four independent agent reviews, then a full branch
+      review (2026-10-15) whose three low findings and an administrator warning were fixed.
 - [x] OAuth connector works through the tunnel, and two members of the same org see
       different data (2026-10-15, below).
 
@@ -913,8 +922,10 @@ Order matters, because Girder changes deploy themselves and HAProxy changes do n
    playbook. If OAuth routes went live before every Girder instance had the plugin,
    round-robin would produce intermittent 404s.
 3. **Announce API-key access** for Claude Code and Pro/Max connectors.
-4. **Turn the OAuth setting on** after the security review. Team and Enterprise connectors
-   start working.
+4. **Turn the OAuth setting on** after the security review: set `mcp_oauth.issuer`,
+   `mcp_oauth.api_url`, `mcp_oauth.frontend_url`, `mcp_oauth.resources` and
+   `mcp_oauth.introspection_secret` first, then `mcp_oauth.enabled` (it refuses to turn on
+   without an issuer and resources). Team and Enterprise connectors start working.
 
 Getting API-key MCP live before the OAuth plugin and consent page exist would cost a second
 HAProxy replace, the riskiest operation in this plan.
@@ -1150,6 +1161,13 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
       *"testSecretsAreStoredHashed"*, *"testSecretsStayOutOfTheAuditLog"*
 - [x] Users see and disconnect only their own connections.
       *"testUsersSeeAndRevokeOnlyTheirOwnConnections"*
+- [x] Codes, verifiers and tokens are refused in the query string (the access log keeps
+      it), without spending them. *"testCredentialsInTheQueryStringAreRefused"*
+- [x] A reconnect replaces the user's earlier connection from that client to that server;
+      other users and other clients keep theirs. *"testReconnectReplacesTheEarlierConnection"*,
+      *"testAnotherClientKeepsItsOwnConnection"*
+- [x] The plugin cannot be enabled without an issuer and resources, nor have them cleared
+      while enabled. *"testCannotEnableHalfConfigured"*
 
 ### Consent page
 
@@ -1170,6 +1188,8 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
       *"goes back to the saved page once after login"*
 - [x] The first-run welcome tour does not pull a returning login back to the home page.
       *"holds back while a login returns to another page"*
+- [x] A site administrator is warned that the connection carries administrator powers.
+      *"warns a site administrator"*
 
 ### Planned (no test yet)
 

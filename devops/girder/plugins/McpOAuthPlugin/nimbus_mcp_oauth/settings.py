@@ -37,6 +37,21 @@ def _defaultEnabled():
 def _validateEnabled(doc):
     if not isinstance(doc['value'], bool):
         raise ValidationException('Must be true or false.', 'value')
+    # On with no issuer or resource would serve broken metadata and refuse
+    # every sign-in; say so now instead. Set them first.
+    if doc['value']:
+        missing = [key for key in (ISSUER, RESOURCES) if not get(key)]
+        if missing:
+            raise ValidationException(
+                'Set %s before enabling MCP OAuth.' % ' and '.join(missing),
+                'value')
+
+
+def _refuseClearingWhileEnabled(doc):
+    if not doc['value'] and enabled():
+        raise ValidationException(
+            'Disable MCP OAuth (mcp_oauth.enabled) before clearing this.',
+            'value')
 
 
 @setting_utilities.default({ISSUER, API_URL, FRONTEND_URL,
@@ -53,6 +68,8 @@ def _validateUrl(doc):
     if value and not value.startswith(('https://', 'http://')):
         raise ValidationException('Must be an http(s) URL.', 'value')
     doc['value'] = value.rstrip('/')
+    if doc['key'] == ISSUER:
+        _refuseClearingWhileEnabled(doc)
 
 
 @setting_utilities.validator(INTROSPECTION_SECRET)
@@ -76,6 +93,7 @@ def _validateResources(doc):
             for v in value):
         raise ValidationException(
             'Must be a list of http(s) URLs.', 'value')
+    _refuseClearingWhileEnabled(doc)
 
 
 @setting_utilities.default(CIMD_HOSTS)

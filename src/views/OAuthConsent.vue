@@ -33,6 +33,17 @@
               >.
             </p>
             <v-alert
+              v-if="isAdmin"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-3 admin-warning"
+            >
+              You are a site administrator. This connection could do anything
+              your administrator account can, including administrative changes.
+              Consider connecting with an account that is not an administrator.
+            </v-alert>
+            <v-alert
               v-if="request.localRedirect"
               type="warning"
               variant="tonal"
@@ -109,6 +120,8 @@ const requestId = computed(() => {
   return typeof value === "string" ? value : "";
 });
 const login = computed(() => store.girderUser?.login ?? "");
+// The connection carries the account's full powers (§6.3 of the MCP plan).
+const isAdmin = computed(() => store.girderUser?.admin === true);
 // A share link's hidden user is not a login that can approve (its token
 // lacks the user scope); treat it as not logged in yet.
 const userId = computed(() =>

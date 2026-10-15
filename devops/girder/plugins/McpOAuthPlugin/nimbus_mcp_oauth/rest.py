@@ -54,6 +54,14 @@ def _oauthErrorBody(err):
     return {'error': err.error, 'error_description': err.description}
 
 
+def _refuseQueryCredentials():
+    """Codes, verifiers and tokens belong in the POST body: a query string
+    is written to the access log, which @disableAuditLog does not cover."""
+    if cherrypy.request.query_string:
+        raise OAuthError(
+            'invalid_request', 'Send the parameters in the request body.')
+
+
 def _noStore():
     setResponseHeader('Cache-Control', 'no-store')
     setResponseHeader('Pragma', 'no-cache')
@@ -162,6 +170,7 @@ class McpOAuthResource(Resource):
                 'temporarily_unavailable', 'Too many requests; retry '
                 'shortly.', status=429))
         try:
+            _refuseQueryCredentials()
             return oauth.token(params)
         except OAuthError as err:
             return _oauthErrorBody(err)
@@ -175,6 +184,10 @@ class McpOAuthResource(Resource):
     def revoke(self, params):
         _requireEnabled()
         _limit(_tokenLimit, _clientAddress())
+        try:
+            _refuseQueryCredentials()
+        except OAuthError as err:
+            return _oauthErrorBody(err)
         oauth.revokeToken(params.get('token'))
         return {}
 
@@ -191,6 +204,10 @@ class McpOAuthResource(Resource):
                 given.encode(), expected.encode()):
             raise RestException('Not found.', code=404)
         _noStore()
+        try:
+            _refuseQueryCredentials()
+        except OAuthError as err:
+            return _oauthErrorBody(err)
         return oauth.introspect(params.get('token'))
 
     @access.user

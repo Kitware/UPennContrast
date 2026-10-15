@@ -470,3 +470,71 @@ def testAuthorizeIsRateLimited(enabled, monkeypatch):
                                 isJson=False))
         for _ in range(3)]
     assert statuses == [302, 302, 429]
+
+
+# --- review round: query credentials, reconnects, settings -----------------
+
+def _postWithQuery(server, path, query, headers=()):
+    # pytest-girder puts params in the query string only when a body is
+    # also sent.
+    return server.request(path, method='POST', params=query, body='x=1',
+                          type='application/x-www-form-urlencoded',
+                          additionalHeaders=list(headers))
+
+
+def testCredentialsInTheQueryStringAreRefused(enabled, user):
+    tokens = connect(enabled, user)
+    resp = _postWithQuery(enabled, '/mcp_oauth/token', {
+        'grant_type': 'refresh_token', 'client_id': 'nimbusimage-claude',
+        'refresh_token': tokens['refresh_token']})
+    assert _status(resp) == 400
+    assert resp.json['error'] == 'invalid_request'
+    # Not spent: the same token still works from the body.
+    assert refresh(enabled, tokens['refresh_token']).json[
+        'access_token'].startswith('nio_')
+    for path in ('/mcp_oauth/revoke', '/mcp_oauth/introspect'):
+        resp = _postWithQuery(
+            enabled, path, {'token': tokens['access_token']},
+            [('X-Mcp-Introspection-Secret', 's' * 40)])
+        assert resp.json['error'] == 'invalid_request', path
+
+
+def testReconnectReplacesTheEarlierConnection(enabled, user, admin):
+    first = connect(enabled, user)
+    theirs = connect(enabled, admin)
+    second = connect(enabled, user)
+    assert introspect(enabled, first['access_token']).json == {
+        'active': False}
+    assert refresh(enabled, first['refresh_token']).json['error'] == \
+        'invalid_grant'
+    assert introspect(enabled, second['access_token']).json['active']
+    assert introspect(enabled, theirs['access_token']).json['active']
+    assert len(enabled.request('/mcp_oauth/grant', user=user).json) == 1
+
+
+def testAnotherClientKeepsItsOwnConnection(enabled, user, monkeypatch):
+    from nimbus_mcp_oauth import clients
+    other = {'client_id': 'other-test-client', 'client_name': 'Other',
+             'redirect_uris': ['https://claude.ai/api/mcp/auth_callback']}
+    monkeypatch.setitem(clients.BUILTIN_CLIENTS, 'other-test-client', other)
+    builtin = connect(enabled, user)
+    connect(enabled, user, client_id='other-test-client')
+    assert introspect(enabled, builtin['access_token']).json['active']
+    assert len(enabled.request('/mcp_oauth/grant', user=user).json) == 2
+
+
+def testCannotEnableHalfConfigured(server):
+    from girder.exceptions import ValidationException
+    with pytest.raises(ValidationException, match='mcp_oauth.issuer'):
+        Setting().set(settings.ENABLED, True)
+    Setting().set(settings.ISSUER, ISSUER)
+    with pytest.raises(ValidationException, match='mcp_oauth.resources'):
+        Setting().set(settings.ENABLED, True)
+    Setting().set(settings.RESOURCES, [RESOURCE])
+    Setting().set(settings.ENABLED, True)
+    # Its twin: not cleared while on.
+    for key, empty in ((settings.ISSUER, ''), (settings.RESOURCES, [])):
+        with pytest.raises(ValidationException, match='Disable MCP OAuth'):
+            Setting().set(key, empty)
+    Setting().set(settings.ENABLED, False)
+    Setting().set(settings.RESOURCES, [])

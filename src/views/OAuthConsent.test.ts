@@ -69,7 +69,10 @@ function mountPage() {
         VCardTitle: { template: "<div><slot /></div>" },
         VCardText: { template: "<div><slot /></div>" },
         VCardActions: { template: "<div><slot /></div>" },
-        VAlert: { template: "<div class='alert'><slot /></div>" },
+        VAlert: {
+          props: ["type"],
+          template: "<div class='alert' :data-type='type'><slot /></div>",
+        },
         VIcon: true,
         VProgressCircular: { template: "<div class='spinner' />" },
         VBtn: {
@@ -194,6 +197,18 @@ describe("OAuthConsent", () => {
     expect(text).toContain("full access");
     expect(text).toContain("claude.ai");
     expect(wrapper.find(".alert").exists()).toBe(false);
+  });
+
+  it("warns a site administrator", async () => {
+    loggedIn();
+    const wrapper = mountPage();
+    await flush();
+    expect(wrapper.find(".admin-warning").exists()).toBe(false);
+    s.girderUser = { _id: "u1", login: "alice", admin: true };
+    await flush();
+    expect(wrapper.find(".admin-warning").text()).toContain(
+      "site administrator",
+    );
   });
 
   it("warns when the code goes to a program on this computer", async () => {

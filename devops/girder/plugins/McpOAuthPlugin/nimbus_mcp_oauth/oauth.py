@@ -281,7 +281,15 @@ def _exchangeCode(params):
         'lastUsed': now(),
         'expiresAt': now() + REFRESH_IDLE_LIFETIME,
     })
-    return _issueIfStillGranted(grant, user, codeId=codeId)
+    tokens = _issueIfStillGranted(grant, user, codeId=codeId)
+    # A new connection replaces this client's earlier ones to the same
+    # server (a reconnect or re-add): the client has dropped their tokens,
+    # so they would only linger with live Girder sessions.
+    revokeGrants([g['_id'] for g in Grant().find({
+        'userId': user['_id'], 'clientId': grant['clientId'],
+        'resource': grant['resource'], '_id': {'$ne': grant['_id']},
+    }, fields=['_id'])])
+    return tokens
 
 
 def _refresh(params):
@@ -416,16 +424,23 @@ def _aware(moment):
     return moment
 
 
-def revokeGrant(grantId):
-    """End a connection: its refresh tokens, access tokens and the Girder
-    sessions behind them."""
+def revokeGrants(grantIds):
+    """End connections: their refresh tokens, access tokens and the
+    Girder sessions behind them, in one query per collection."""
+    if not grantIds:
+        return
+    byGrant = {'grantId': {'$in': list(grantIds)}}
     tokenIds = [a['girderTokenId'] for a in AccessToken().find(
-        {'grantId': grantId}, fields=['girderTokenId'])]
+        byGrant, fields=['girderTokenId'])]
     if tokenIds:
         Token().removeWithQuery({'_id': {'$in': tokenIds}})
-    AccessToken().removeWithQuery({'grantId': grantId})
-    RefreshToken().removeWithQuery({'grantId': grantId})
-    Grant().removeWithQuery({'_id': grantId})
+    AccessToken().removeWithQuery(byGrant)
+    RefreshToken().removeWithQuery(byGrant)
+    Grant().removeWithQuery({'_id': {'$in': list(grantIds)}})
+
+
+def revokeGrant(grantId):
+    revokeGrants([grantId])
 
 
 def revokeToken(tokenValue):
