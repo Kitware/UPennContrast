@@ -1013,6 +1013,11 @@ the local stack. Add an item whenever a review finds something this list missed.
       *"test_expired_oauth_token_is_refused"*, *"test_malformed_oauth_tokens_never_reach_girder"*,
       *"test_oauth_refused_without_secret_or_with_a_wrong_one"*,
       *"test_settings_introspection_secret"*
+- [x] `NI_MCP_PUBLIC_URL` spelled with a trailing slash or upper-case scheme still accepts
+      tokens the plugin issued for the canonical resource, and a trailing slash is dropped
+      so the metadata path keeps matching the proxy's exact-path rules.
+      *"test_equivalent_public_url_spellings_accept_the_token"*,
+      *"test_public_url_trailing_slash_is_dropped"*
 - [x] The server refuses to start with a service credential in its environment.
       *"test_settings_refuse_a_service_credential"*
 - [x] Credentials are never logged; the log names the user id. The server log carries
@@ -1175,6 +1180,10 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
 - [x] The plugin cannot be enabled without an issuer and resources, nor have them cleared
       while enabled, and acts as disabled if they go missing anyway (unset, environment).
       *"testCannotEnableHalfConfigured"*, *"testHalfConfiguredActsDisabled"*
+- [x] URL settings are parsed, not prefix-checked: a value with no host, a bad port, a
+      fragment (or, for issuer/API/frontend, a query or credentials) is refused, while
+      equivalent resource spellings (case, default port, trailing slash) are accepted.
+      *"testMalformedUrlSettingsAreRefused"*, *"testEquivalentResourceSpellingsAreAccepted"*
 
 ### Consent page
 

@@ -54,3 +54,10 @@ def test_settings_refuse_a_service_credential():
             Settings.from_env({name: "x"})
     settings = Settings.from_env({"NI_MCP_PORT": "9001"})
     assert settings.public_url == "http://localhost:9001/mcp"
+
+
+def test_public_url_trailing_slash_is_dropped():
+    # The metadata path follows public_url, and the proxy matches it
+    # exactly.
+    settings = Settings.from_env({"NI_MCP_PUBLIC_URL": "https://h/mcp/"})
+    assert settings.public_url == "https://h/mcp"

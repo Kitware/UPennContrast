@@ -7,6 +7,8 @@ from girder.exceptions import ValidationException
 from girder.models.setting import Setting
 from girder.utility import setting_utilities
 
+from .urls import canonicalResource, isPlainHttpUrl
+
 ENABLED = 'mcp_oauth.enabled'
 # The public origin that issues tokens, e.g. https://app.nimbusimage.com.
 # Must equal the MCP server's NI_MCP_ISSUER_URL exactly: clients compare it
@@ -65,8 +67,10 @@ def _validateUrl(doc):
     value = doc['value']
     if not isinstance(value, str):
         raise ValidationException('Must be a URL.', 'value')
-    if value and not value.startswith(('https://', 'http://')):
-        raise ValidationException('Must be an http(s) URL.', 'value')
+    if value and not isPlainHttpUrl(value):
+        raise ValidationException(
+            'Must be an http(s) URL with a host and no query or fragment.',
+            'value')
     doc['value'] = value.rstrip('/')
     if doc['key'] == ISSUER:
         _refuseClearingWhileEnabled(doc)
@@ -89,10 +93,10 @@ def _defaultResources():
 def _validateResources(doc):
     value = doc['value']
     if not isinstance(value, list) or not all(
-            isinstance(v, str) and v.startswith(('https://', 'http://'))
-            for v in value):
+            isinstance(v, str) and canonicalResource(v) for v in value):
         raise ValidationException(
-            'Must be a list of http(s) URLs.', 'value')
+            'Must be a list of http(s) URLs with a host and no fragment.',
+            'value')
     _refuseClearingWhileEnabled(doc)
 
 

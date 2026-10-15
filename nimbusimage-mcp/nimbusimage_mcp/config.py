@@ -58,9 +58,11 @@ class Settings:
             api_url=environ.get(
                 "NI_API_URL", "http://localhost:8080/api/v1"
             ),
+            # No trailing slash: the protected-resource metadata path and
+            # the proxy's exact-path rules follow this URL.
             public_url=environ.get(
                 "NI_MCP_PUBLIC_URL", f"http://localhost:{port}/mcp"
-            ),
+            ).rstrip("/"),
             issuer_url=environ.get(
                 "NI_MCP_ISSUER_URL", "http://localhost:8080"
             ),

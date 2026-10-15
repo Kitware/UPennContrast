@@ -539,6 +539,31 @@ def testCannotEnableHalfConfigured(server):
     Setting().set(settings.RESOURCES, [])
 
 
+@pytest.mark.parametrize('key,value', [
+    (settings.ISSUER, 'https://'),
+    (settings.ISSUER, 'https://nimbus.example#frag'),
+    (settings.ISSUER, 'https://nimbus.example?x=1'),
+    (settings.API_URL, 'https://nimbus.example:notaport/girder/api/v1'),
+    (settings.FRONTEND_URL, 'https://user:pw@nimbus.example'),
+    (settings.FRONTEND_URL, 'ftp://nimbus.example'),
+    (settings.RESOURCES, ['https://']),
+    (settings.RESOURCES, ['https://nimbus.example/mcp#frag']),
+    (settings.RESOURCES, [RESOURCE, 'nimbus.example/mcp']),
+])
+def testMalformedUrlSettingsAreRefused(server, key, value):
+    # Accepting these would let the plugin be enabled and then refuse
+    # every sign-in (invalid_target) or serve unusable metadata.
+    from girder.exceptions import ValidationException
+    with pytest.raises(ValidationException, match='http'):
+        Setting().set(key, value)
+
+
+def testEquivalentResourceSpellingsAreAccepted(server):
+    Setting().set(settings.RESOURCES, ['https://NIMBUS.example:443/mcp/'])
+    from nimbus_mcp_oauth import oauth
+    assert oauth.allowedResources() == {RESOURCE}
+
+
 def testHalfConfiguredActsDisabled(enabled):
     # A null PUT (unset) skips the validators; the plugin must not serve
     # broken metadata then.

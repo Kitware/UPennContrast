@@ -100,6 +100,24 @@ def test_token_for_another_mcp_server_is_refused(server, girder):
     assert rpc(server, "tools/list", {}, key=OAUTH).status_code == 401
 
 
+@pytest.mark.parametrize("public_url", [
+    "http://127.0.0.1:8000/mcp/", "HTTP://127.0.0.1:8000/mcp",
+])
+def test_equivalent_public_url_spellings_accept_the_token(girder,
+                                                         public_url):
+    # The plugin stores the canonical resource (no trailing slash, lower
+    # case); NI_MCP_PUBLIC_URL may be spelled otherwise, as the README
+    # allows. The SDK compares as URLs, a trailing slash aside.
+    girder.add_oauth(OAUTH, "carol", resource="http://127.0.0.1:8000/mcp")
+    app = build_app(make_settings(public_url=public_url), NimbusVerifier(
+        GirderApiKeyVerifier(API, public_url, http=girder.http()),
+        GirderOAuthVerifier(API, girder.introspection_secret,
+                            http=girder.http()),
+    ))
+    with serve(app) as url:
+        assert rpc(url, "tools/list", {}, key=OAUTH).status_code == 200
+
+
 def test_expired_oauth_token_is_refused(server, girder):
     girder.add_oauth(OAUTH, "carol")
     girder.oauth[OAUTH]["exp"] = 1

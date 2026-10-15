@@ -96,7 +96,9 @@ access on the next request.
 
 claude.ai connectors call from Anthropic's servers, so they need an HTTPS URL.
 `deploy/local-haproxy/` runs HAProxy with the proposed production routing in
-front of the `mcp` service (Girder is refused to tunnel traffic). HAProxy finds
+front of the `mcp` service. Tunnel traffic reaches Girder only for OAuth
+authorize, token and revoke; the deny keys on Cloudflare's
+`Cf-Connecting-Ip`, so use cloudflared, not another tunnel. HAProxy finds
 `mcp` through Docker's DNS, so the order below works and `mcp` can be recreated
 while it runs. From the repo root of the main checkout:
 
@@ -128,7 +130,9 @@ Two kinds of bearer credential:
   its next call; the token must have been issued for this server's URL
   (`NI_MCP_PUBLIC_URL`), or it is refused. That URL must appear in the
   plugin's `mcp_oauth.resources` setting exactly, path case included
-  (host case, default port and a trailing slash do not matter).
+  (host case, default port and a trailing slash do not matter; the server
+  drops a trailing slash from `NI_MCP_PUBLIC_URL` so its metadata path
+  stays `/.well-known/oauth-protected-resource/mcp`).
 
 For API keys:
 

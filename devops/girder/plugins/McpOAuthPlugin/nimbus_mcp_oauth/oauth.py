@@ -29,6 +29,7 @@ from .errors import OAuthError, RedirectableError
 from .models import (
     AccessToken, AuthorizationCode, AuthorizationRequest, Grant,
     RefreshToken, expired, now)
+from .urls import canonicalResource
 
 SCOPE = 'nimbusimage'
 # Accepted in a request and ignored: Claude adds offline_access when the
@@ -54,26 +55,6 @@ def _hash(secret):
 
 def _newSecret(prefix):
     return prefix + secrets.token_urlsafe(32)
-
-
-def canonicalResource(url):
-    """RFC 8707 resource in canonical form: lower-case scheme and host, no
-    default port, no trailing slash, no fragment."""
-    try:
-        parts = urlsplit(url)
-        port = parts.port
-    except (ValueError, AttributeError):
-        return None
-    if parts.scheme not in ('http', 'https') or not parts.hostname \
-            or parts.fragment:
-        return None
-    host = parts.hostname
-    if ':' in host:
-        host = f'[{host}]'
-    if port and port != {'http': 80, 'https': 443}[parts.scheme]:
-        host = f'{host}:{port}'
-    return urlunsplit(
-        (parts.scheme, host, parts.path.rstrip('/'), parts.query, ''))
 
 
 def allowedResources():
