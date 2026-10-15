@@ -746,6 +746,15 @@ client playing Claude Code (built-in client id, PKCE, loopback callback on a ran
 The first logged-out run found the welcome-tour bug above: the user ended on the home page
 instead of the consent page.
 
+**Real Claude Code (2026-10-15).** Claude Code 2.x (`User-Agent: Bun/1.4.3`) fetched the
+metadata at Girder's root, then authorized with its published identity,
+`client_id=https://claude.ai/oauth/claude-code-client-metadata`. The plugin fetched and
+validated that document live (name "Claude Code", redirect URIs `http://localhost/callback`
+and `http://127.0.0.1/callback`, public client), the user approved on the consent page, and
+the exchange created a grant for `http://localhost:8001/mcp`; Claude Code then listed the
+owner's 96 datasets. Add the server with `--scope user` (or start `claude` in the folder it
+was added from): a local-scope server only appears there.
+
 **Tests:**
 
 - Plugin tests with pytest via tox: one or more per security requirement in
@@ -763,9 +772,9 @@ connector with OAuth, and two members use it.
 
 **Exit criteria:**
 
-- [ ] Claude Code completes OAuth against the local stack and calls tools as the right user.
-      (A stand-in client did, both logged in and logged out; a real Claude Code `/mcp`
-      sign-in is still to run.)
+- [x] Claude Code completes OAuth against the local stack and calls tools as the right user
+      (2026-10-15: `claude mcp add --transport http nimbus-oauth http://localhost:8001/mcp`,
+      `/mcp` → Authenticate, consent, then a dataset list of the owner's 96 datasets).
 - [x] Refresh works, and refresh-token reuse revokes the grant (live, 2026-10-14).
 - [x] With the setting off, every OAuth endpoint returns 404 and API-key auth still works.
 - [ ] Security review of the plugin (use the repo's `/security-review` skill plus a human
