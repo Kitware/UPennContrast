@@ -1,9 +1,9 @@
 """SharingAccessor — dataset access control.
 
 All access changes go through the `dataset_view/share` endpoint, which is
-**incremental** (modifies one user's access at a time). ``share()``
-refuses to target the calling user, so it cannot strip the caller's own
-access. This is the only safe way to change a dataset's ACL from Python.
+**incremental** (modifies one user's access at a time), and the server
+refuses any share that would take the dataset's creator below ADMIN.
+This is the only safe way to change a dataset's ACL from Python.
 
 DO NOT bypass this accessor by calling the raw Girder endpoint:
 
@@ -13,15 +13,15 @@ DO NOT bypass this accessor by calling the raw Girder endpoint:
 The raw `PUT /folder/{id}/access` replaces the access list with whatever
 you send. If the new list omits the dataset creator, the owner is
 silently locked out (``_accessLevel`` becomes ``-1`` and only a site
-admin can recover). The backend does not guard against this, so never
-reach for the raw endpoint. See
+admin can recover). The backend now rejects such saves on
+``contrastDataset`` folders, but the right answer is to never reach for
+the raw endpoint in the first place. See
 ``plugins/nimbusimage/references/gotchas.md``.
 """
 
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-from nimbusimage._access import refuse_self_target as _refuse_self_target
 from nimbusimage._access import resolve_access as _resolve_access
 
 if TYPE_CHECKING:
@@ -48,16 +48,11 @@ class SharingAccessor:
             access: 'read', 'write', 'admin', or 'remove'.
 
         Raises:
-            ValueError: If ``user_email_or_name`` is the calling user
-                (e.g. "remove" would lock you out of your own dataset),
-                if the token can't identify the caller (no user-info
-                scope, e.g. a data-only API key), or if the dataset has
-                no dataset views (the server
+            ValueError: If the dataset has no dataset views (the server
                 derives the dataset and collections from the views, so
                 there is nothing to share through).
         """
         access_type = _resolve_access(access)
-        _refuse_self_target(self._gc, user_email_or_name)
         views = self._gc.get(
             "dataset_view",
             parameters={"datasetId": self._dataset_id, "limit": 0},

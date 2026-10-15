@@ -79,9 +79,6 @@ class TestProjectUpdate:
         mock_gc.delete.assert_called_with("project/proj_001")
 
 
-ME = {"_id": "me_1", "login": "owner", "email": "owner@lab.org"}
-
-
 class TestProjectSharing:
     """Assert exact requests: these endpoints read query params, and a
     JSON body (what the old code sent) is a 400 on the live server."""
@@ -91,7 +88,6 @@ class TestProjectSharing:
         [("read", 0), ("write", 1), ("admin", 2), ("remove", -1)],
     )
     def test_share_sends_query_params(self, mock_gc, access, access_type):
-        mock_gc.get.return_value = ME
         _make_project(mock_gc).share("user@test.com", access=access)
         mock_gc.post.assert_called_once_with(
             "project/proj_001/share",
@@ -101,18 +97,15 @@ class TestProjectSharing:
             },
         )
 
-    @pytest.mark.parametrize("target", ["owner", "Owner@Lab.org"])
-    def test_share_refuses_to_target_caller(self, mock_gc, target):
-        mock_gc.get.return_value = ME
-        with pytest.raises(ValueError, match="your own access"):
-            _make_project(mock_gc).share(target, access="remove")
-        mock_gc.post.assert_not_called()
-
-    def test_share_refuses_when_caller_is_unknown(self, mock_gc):
-        mock_gc.get.return_value = None
-        with pytest.raises(ValueError, match="USER_INFO_READ"):
-            _make_project(mock_gc).share("owner", access="remove")
-        mock_gc.post.assert_not_called()
+    def test_share_leaves_self_targeting_to_the_server(self, mock_gc):
+        """One POST, no user/me lookup: the server decides whether the
+        change is allowed, so a data-only API key can share too."""
+        _make_project(mock_gc).share("owner", access="remove")
+        mock_gc.get.assert_not_called()
+        mock_gc.post.assert_called_once_with(
+            "project/proj_001/share",
+            parameters={"userMailOrUsername": "owner", "accessType": -1},
+        )
 
     @pytest.mark.parametrize(
         "public, flag", [(True, "true"), (False, "false")]

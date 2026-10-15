@@ -3,7 +3,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-from nimbusimage._access import refuse_self_target as _refuse_self_target
 from nimbusimage._access import resolve_access as _resolve_access
 from nimbusimage.urls import DEFAULT_FRONTEND_URL, project_url, open_url
 
@@ -113,13 +112,8 @@ class Project:
         Args:
             user_email_or_name: User's email or username.
             access: 'read', 'write', 'admin', or 'remove'.
-
-        Raises:
-            ValueError: If ``user_email_or_name`` is the calling user, or
-                the token can't identify the caller (no user-info scope).
         """
         access_type = _resolve_access(access)
-        _refuse_self_target(self._gc, user_email_or_name)
         self._gc.post(
             f"project/{self.id}/share",
             parameters={

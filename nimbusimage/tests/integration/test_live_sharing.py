@@ -120,12 +120,11 @@ class TestLiveSharing:
         assert ds.sharing.get_access()["public"] is False
         assert not _can_read(other, ds.id)
 
-    def test_share_refuses_without_user_info_scope(
+    def test_share_with_data_only_api_key(
         self, private_test_dataset, second_user, client, api_url
     ):
-        """A data-only key gets null from user/me (200, not 403), so the
-        caller can't be identified; share() fails closed instead of
-        risking a self-removal the server wouldn't stop."""
+        """share() needs no user/me lookup, so a key scoped to data only
+        (for which user/me returns null) can share."""
         ds = private_test_dataset
         login, other = second_user
         key = client.girder.post(
@@ -139,24 +138,72 @@ class TestLiveSharing:
             scoped = ni.connect(api_url, api_key=key["key"])
             assert scoped.girder.get("user/me") is None
 
-            with pytest.raises(ValueError, match="USER_INFO_READ"):
-                scoped.dataset(ds.id).sharing.share(login, access="read")
+            scoped.dataset(ds.id).sharing.share(login, access="read")
         finally:
             client.girder.delete(f"api_key/{key['_id']}")
 
-        assert login not in _user_levels(ds)
-        assert not _can_read(other, ds.id)
+        assert _user_levels(ds)[login] == 0
+        assert _can_read(other, ds.id)
 
-    def test_share_refuses_to_target_caller(
-        self, private_test_dataset, client
-    ):
-        ds = private_test_dataset
-        me = client.girder.get("user/me")
+    @pytest.mark.xfail(
+        strict=True,
+        reason="The server guard that keeps a dataset's creator at ADMIN "
+        "lands in PR #1165; remove this marker once it is deployed.",
+    )
+    def test_creator_cannot_remove_themselves(self, client, second_user):
+        """Owner lockout is refused by the server, not the client:
+        share() sends a self-removal like any other, and
+        dataset_view/share answers 400 without changing anything."""
+        login, owner = second_user
+        gc = owner.girder
+        me = gc.get("user/me")
+        private = gc.get(
+            "folder",
+            parameters={
+                "parentType": "user", "parentId": me["_id"],
+                "name": "Private",
+            },
+        )[0]
+        folder = gc.post(
+            "folder",
+            parameters={
+                "parentType": "folder", "parentId": private["_id"],
+                "name": f"ni-share-test-{secrets.token_hex(4)}",
+                "metadata": json.dumps({"subtype": "contrastDataset"}),
+            },
+        )
+        view = None
+        # Cleanup runs as admin: without the guard the owner is locked out.
+        try:
+            collection = gc.post(
+                "upenn_collection",
+                parameters={"folderId": folder["_id"], "name": "cfg"},
+                data={"metadata": json.dumps({
+                    "subtype": "contrastConfiguration", "compatibility": {},
+                    "layers": [], "tools": [], "propertyIds": [],
+                    "snapshots": [], "scales": {},
+                })},
+            )
+            view = gc.post(
+                "dataset_view",
+                json={
+                    "datasetId": folder["_id"],
+                    "configurationId": collection["_id"],
+                    "layerContrasts": {},
+                    "lastLocation": {"xy": 0, "z": 0, "time": 0},
+                },
+            )
 
-        with pytest.raises(ValueError, match="your own access"):
-            ds.sharing.share(me["login"], access="remove")
-
-        assert _user_levels(ds)[me["login"]] == 2
+            with pytest.raises(girder_client.HttpError) as refused:
+                owner.dataset(folder["_id"]).sharing.share(
+                    login, access="remove"
+                )
+            assert refused.value.status == 400
+            assert gc.get(f"folder/{folder['_id']}")["_accessLevel"] == 2
+        finally:
+            if view is not None:
+                client.girder.delete(f"dataset_view/{view['_id']}")
+            client.girder.delete(f"folder/{folder['_id']}")
 
 
 @pytest.fixture
@@ -200,10 +247,3 @@ class TestLiveProjectSharing:
 
         assert project.set_public(False)["public"] is False
         assert not _can_read(other, ds.id)
-
-    def test_share_refuses_to_target_caller(self, private_project, client):
-        project, _ = private_project
-        me = client.girder.get("user/me")
-
-        with pytest.raises(ValueError, match="your own access"):
-            project.share(me["email"], access="remove")
