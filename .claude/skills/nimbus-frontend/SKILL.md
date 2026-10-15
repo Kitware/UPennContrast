@@ -128,6 +128,31 @@ store.dispatch('sendUserMessage', 'Find the nuclei in this image.'); // fire, do
 
 Agent tool executors live in `src/agent/executors.ts` (`executeAgentTool(name, input, ctx)`), importable in the Vite dev page for isolated testing: `await import('/src/agent/executors.ts?t=' + Date.now())` (the query-bust avoids a stale module cache). Worker tools save parameters under `tool.values.workerInterfaceValues`; `channelCheckboxes` values are `{channelIndex: true}` maps (a `true` value selects — key-presence alone does not).
 
+### Whole-population reads must handle stub-only mode
+
+Above `stubThreshold` (100K) `annotationStore.annotations` is **empty**. The
+population is in `annotationStubs`, and `propertyStore.propertyValues` holds
+only the rendered annotations' values for the displayed columns. Code that
+reads either one as "the dataset" returns zero there, or worse, a viewport-sized
+subset presented as the whole. Nothing errors, and every small-fixture test
+passes. This shipped in the AI panel: list/select/color/tag, every analysis
+tool and `fit` saw nothing on exactly the datasets where the server summary
+reported 700K (AI_PANEL_SPEC.md §4.1).
+
+- Count with `annotationCount`. Get ids with `allAnnotationIds`. Look up one id
+  with `getAnnotationOrStubFromId` (O(1); capture the getter once before a
+  loop). To iterate, use `annotationStubs.values()` in stub-only mode, or
+  `annotationsForIteration`, which copies the map into a new array on every
+  access. Stubs have tags/shape/channel/location/color/centroid, but no
+  `name` or `coordinates`; narrow with `isHydratedAnnotation`.
+- Property values for an arbitrary population: below the threshold, read the
+  store. Above it, use the server: aggregates via `fetchAnnotationSummary` or the
+  analysis endpoints, or values via `getPropertyValuesForIds(ds, ids, paths)`
+  with a **non-empty** `paths` (an empty list means every value).
+- Test it by putting the store mock in stub-only mode (`stubOnlyMode: true`,
+  `annotations: []`, stubs populated), and confirm the test fails with the fix
+  reverted. `executors.test.ts` `describe("stub-only mode")` is the pattern.
+
 ### Never assign a big per-annotation map to state without `markRaw`
 
 `annotationStubs`, `hydratedAnnotations`, and `annotationCentroids` hold one
