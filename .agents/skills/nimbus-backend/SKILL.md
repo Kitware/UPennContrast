@@ -545,6 +545,26 @@ sibling's values.
   documents and several rounds (`test/test_save_many.py`). It fails reliably
   without the fix; a single-threaded test cannot see the race.
 
+## Girder setting validators can be skipped: check the value in effect
+
+`@setting_utilities.validator` runs only on `Setting().set`. A null
+`PUT system/setting` (unset) and a `GIRDER_SETTING_<KEY>` environment
+override (JSON-decoded, else the raw string) reach `Setting().get` without
+it. A feature gated on its settings must not trust them at runtime. On
+PR #1421 Codex found this one setting per round (the issuer, then the
+API URL and secret), and a bare-string host list from the environment
+turned an `in` check into a substring match.
+
+Fix it once for every setting: give each one a **normalizer** that returns
+the value as it should be stored or raises `ValidationException`. Register
+one validator that stores the normalizer's result, and have the runtime
+gate run the same table over `get(key)`. A value is usable when normalizing
+leaves it unchanged. Add a test that asserts the bad-value table covers
+every key, so a new setting cannot be added unchecked
+(`McpOAuthPlugin/nimbus_mcp_oauth/settings.py` `NORMALIZE`). Drive tests
+through the real path: `monkeypatch.setenv('GIRDER_SETTING_...')`, then
+`Setting()._get.invalidate(Setting(), key)` (`get` is cached).
+
 ## Single-use credentials: claim atomically, and only after the request is well-formed
 
 One-time codes, refresh tokens, invite links, consent requests: claim them

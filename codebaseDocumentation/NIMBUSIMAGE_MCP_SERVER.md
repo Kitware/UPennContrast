@@ -405,7 +405,9 @@ REST root, e.g. `https://app.nimbusimage.com/girder/api/v1`), `mcp_oauth.fronten
 set to true until `issuer` and `resources` are set, and those cannot be cleared while it is
 true: set them first, enable last. Because a null `PUT system/setting` (unset) and
 `GIRDER_SETTING_*` environment variables skip validators, the plugin also acts as disabled at
-runtime whenever the issuer or resources are missing.
+runtime whenever the issuer or resources are missing, or any setting's value in effect is not
+one its validator would store unchanged (`settings.NORMALIZE`; for example a trailing slash
+or mixed-case hosts in an environment override).
 
 **Endpoints** (REST under `/api/v1/mcp_oauth`):
 
@@ -956,7 +958,7 @@ Order matters, because Girder changes deploy themselves and HAProxy changes do n
 4. **Turn the OAuth setting on** after the security review: set `mcp_oauth.issuer`,
    `mcp_oauth.api_url`, `mcp_oauth.frontend_url`, `mcp_oauth.resources` and
    `mcp_oauth.introspection_secret` first, then `mcp_oauth.enabled` (it refuses to turn on
-   without an issuer and resources). Team and Enterprise connectors start working.
+   without an issuer and resources, or with any setting invalid). Team and Enterprise connectors start working.
 
 Getting API-key MCP live before the OAuth plugin and consent page exist would cost a second
 HAProxy replace, the riskiest operation in this plan.
@@ -1210,11 +1212,12 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
       *"testAnotherClientKeepsItsOwnConnection"*
 - [x] The plugin cannot be enabled without an issuer and resources, nor have them cleared
       while enabled, and acts as disabled if they go missing anyway (unset, environment).
-      *"testCannotEnableHalfConfigured"*, *"testHalfConfiguredActsDisabled"*. Values that
-      skipped the validators (`GIRDER_SETTING_*` overrides) are checked again at runtime:
-      an issuer with a path or an unusable resource list turns it off, and a non-list
-      `cimd_hosts` trusts no host rather than matching by substring.
-      *"testUnvalidatedBadSettingsActDisabled"*, *"testEnvironmentCimdHostsNeverMatchASubstring"*
+      *"testCannotEnableHalfConfigured"*, *"testHalfConfiguredActsDisabled"*. Every setting's
+      value in effect, including one that skipped its validator (`GIRDER_SETTING_*`
+      overrides), goes through the same normalizer table (`settings.NORMALIZE`); one that
+      it would change turns the plugin off, and a non-list `cimd_hosts` trusts no host
+      rather than matching by substring. *"testUnvalidatedBadSettingsActDisabled"*,
+      *"testEveryEffectiveSettingIsChecked"*, *"testEnvironmentCimdHostsNeverMatchASubstring"*
 - [x] URL settings are parsed, not prefix-checked: a value with no host, a bad port, a
       fragment (or, for issuer/API/frontend, a query or credentials) is refused, while
       equivalent resource spellings (case, default port, trailing slash) are accepted.

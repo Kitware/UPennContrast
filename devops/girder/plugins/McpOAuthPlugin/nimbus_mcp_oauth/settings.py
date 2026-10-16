@@ -19,7 +19,7 @@ ISSUER = 'mcp_oauth.issuer'
 # Public URL of Girder's REST root as browsers and clients reach it, e.g.
 # https://app.nimbusimage.com/girder/api/v1 (HAProxy adds /girder).
 API_URL = 'mcp_oauth.api_url'
-# Where the consent page lives, e.g. https://app.nimbusimage.com/
+# Where the consent page lives, e.g. https://app.nimbusimage.com
 FRONTEND_URL = 'mcp_oauth.frontend_url'
 # The MCP server URLs a token may be issued for (RFC 8707 resource).
 RESOURCES = 'mcp_oauth.resources'
@@ -37,59 +37,10 @@ def _defaultEnabled():
     return False
 
 
-@setting_utilities.validator(ENABLED)
-def _validateEnabled(doc):
-    if not isinstance(doc['value'], bool):
-        raise ValidationException('Must be true or false.', 'value')
-    # On with no issuer or resource would serve broken metadata and refuse
-    # every sign-in; say so now instead. Set them first.
-    if doc['value']:
-        missing = [key for key, usable in ((ISSUER, _usableIssuer),
-                                           (RESOURCES, _usableResources))
-                   if not usable(get(key))]
-        if missing:
-            raise ValidationException(
-                'Set a valid %s before enabling MCP OAuth.'
-                % ' and '.join(missing),
-                'value')
-
-
-def _refuseClearingWhileEnabled(doc):
-    if not doc['value'] and enabled():
-        raise ValidationException(
-            'Disable MCP OAuth (mcp_oauth.enabled) before clearing this.',
-            'value')
-
-
 @setting_utilities.default({ISSUER, API_URL, FRONTEND_URL,
                             INTROSPECTION_SECRET})
 def _defaultEmpty():
     return ''
-
-
-@setting_utilities.validator({ISSUER, API_URL, FRONTEND_URL})
-def _validateUrl(doc):
-    value = doc['value']
-    if not isinstance(value, str):
-        raise ValidationException('Must be a URL.', 'value')
-    if value and not isPlainHttpUrl(value):
-        raise ValidationException(
-            'Must be an http(s) URL with a host and no query or fragment.',
-            'value')
-    doc['value'] = value.rstrip('/')
-    if doc['key'] == ISSUER:
-        if doc['value'] and not _usableIssuer(doc['value']):
-            raise ValidationException(
-                'Must be a bare origin, with no path.', 'value')
-        _refuseClearingWhileEnabled(doc)
-
-
-@setting_utilities.validator(INTROSPECTION_SECRET)
-def _validateSecret(doc):
-    value = doc['value']
-    if not isinstance(value, str) or (value and len(value) < 32):
-        raise ValidationException(
-            'Must be empty or at least 32 characters.', 'value')
 
 
 @setting_utilities.default(RESOURCES)
@@ -97,61 +48,120 @@ def _defaultResources():
     return []
 
 
-@setting_utilities.validator(RESOURCES)
-def _validateResources(doc):
-    value = doc['value']
-    if not isinstance(value, list) or (value and not _usableResources(value)):
-        raise ValidationException(
-            'Must be a list of http(s) URLs with a host and no fragment.',
-            'value')
-    _refuseClearingWhileEnabled(doc)
-
-
 @setting_utilities.default(CIMD_HOSTS)
 def _defaultCimdHosts():
     return list(DEFAULT_CIMD_HOSTS)
 
 
-@setting_utilities.validator(CIMD_HOSTS)
-def _validateCimdHosts(doc):
-    value = doc['value']
+# One normalizer per setting: the value as it should be stored, or a
+# ValidationException. The validators store what it returns, and
+# enabled() runs it again on the values in effect, which may have skipped
+# the validators (an unset, or a GIRDER_SETTING_* environment override).
+# A value is usable when normalizing leaves it unchanged.
+
+def _url(value):
+    if not isinstance(value, str) or (value and not isPlainHttpUrl(value)):
+        raise ValidationException(
+            'Must be an http(s) URL with a host and no query or fragment.',
+            'value')
+    return value.rstrip('/')
+
+
+def _issuer(value):
+    value = _url(value)
+    # A bare origin: the metadata is served (and proxied) only at
+    # /.well-known/oauth-authorization-server, where a client looks for an
+    # issuer with no path (RFC 8414 section 3).
+    if urlsplit(value).path:
+        raise ValidationException(
+            'Must be a bare origin, with no path.', 'value')
+    return value
+
+
+def _resources(value):
+    if not isinstance(value, list) or not all(
+            isinstance(v, str) and canonicalResource(v) for v in value):
+        raise ValidationException(
+            'Must be a list of http(s) URLs with a host and no fragment.',
+            'value')
+    return value
+
+
+def _secret(value):
+    if not isinstance(value, str) or (value and len(value) < 32):
+        raise ValidationException(
+            'Must be empty or at least 32 characters.', 'value')
+    return value
+
+
+def _cimdHosts(value):
     if not isinstance(value, list) or not all(
             isinstance(v, str) and v and '/' not in v for v in value):
         raise ValidationException('Must be a list of host names.', 'value')
-    doc['value'] = [v.lower() for v in value]
+    return [v.lower() for v in value]
+
+
+NORMALIZE = {
+    ISSUER: _issuer,
+    API_URL: _url,
+    FRONTEND_URL: _url,
+    RESOURCES: _resources,
+    INTROSPECTION_SECRET: _secret,
+    CIMD_HOSTS: _cimdHosts,
+}
+# Without these the plugin would serve broken metadata and refuse every
+# sign-in.
+REQUIRED = (ISSUER, RESOURCES)
+
+
+@setting_utilities.validator(set(NORMALIZE))
+def _validate(doc):
+    doc['value'] = NORMALIZE[doc['key']](doc['value'])
+    if doc['key'] in REQUIRED and not doc['value'] and enabled():
+        raise ValidationException(
+            'Disable MCP OAuth (mcp_oauth.enabled) before clearing this.',
+            'value')
+
+
+@setting_utilities.validator(ENABLED)
+def _validateEnabled(doc):
+    if not isinstance(doc['value'], bool):
+        raise ValidationException('Must be true or false.', 'value')
+    # Say so now rather than act disabled later. Set them first.
+    problems = _problems()
+    if doc['value'] and problems:
+        raise ValidationException(
+            'Set a valid %s before enabling MCP OAuth (a GIRDER_SETTING_* '
+            'environment override takes precedence).'
+            % ' and '.join(problems), 'value')
 
 
 def get(key):
     return Setting().get(key)
 
 
-def cimdHosts():
-    # A set, whatever an environment override holds: a bare string there
-    # would turn the host check into a substring test.
-    value = get(CIMD_HOSTS)
-    if not isinstance(value, list):
-        return set()
-    return {v.lower() for v in value if isinstance(v, str)}
-
-
-def _usableIssuer(value):
-    # A bare origin: the metadata is served (and proxied) only at
-    # /.well-known/oauth-authorization-server, where a client looks for an
-    # issuer with no path (RFC 8414 section 3).
-    # No trailing slash either (the validator strips one; an environment
-    # override does not): clients compare the issuer exactly.
-    return isinstance(value, str) and isPlainHttpUrl(value) and \
-        not urlsplit(value).path
-
-
-def _usableResources(value):
-    return isinstance(value, list) and bool(value) and all(
-        isinstance(v, str) and canonicalResource(v) for v in value)
+def _problems():
+    """The settings whose values in effect are unusable or missing."""
+    problems = []
+    for key, normalize in NORMALIZE.items():
+        value = get(key)
+        try:
+            usable = normalize(value) == value
+        except ValidationException:
+            usable = False
+        if not usable or (key in REQUIRED and not value):
+            problems.append(key)
+    return problems
 
 
 def enabled():
-    # Also off when misconfigured: PUT system/setting with a null value
-    # (unset) and GIRDER_SETTING_* environment variables skip the
-    # validators, so the values in effect are checked here too.
-    return get(ENABLED) is True and _usableIssuer(get(ISSUER)) and \
-        _usableResources(get(RESOURCES))
+    return get(ENABLED) is True and not _problems()
+
+
+def cimdHosts():
+    # A set, whatever the setting holds: a bare string from an environment
+    # override would turn the host check into a substring test.
+    value = get(CIMD_HOSTS)
+    if not isinstance(value, list):
+        return set()
+    return {v for v in value if isinstance(v, str)}

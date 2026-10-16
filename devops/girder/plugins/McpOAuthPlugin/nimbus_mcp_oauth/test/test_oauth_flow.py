@@ -616,15 +616,36 @@ def testIssuerMustBeABareOrigin(server, issuer):
     assert Setting().get(settings.ISSUER) == 'https://nimbus.example'
 
 
-@pytest.mark.parametrize('key,value', [
+# Unusable values in effect (skipping the validators), at least one per
+# setting; testEveryEffectiveSettingIsChecked keeps the table complete when
+# a setting is added.
+UNVALIDATED_BAD = [
     (settings.ISSUER, 'https://nimbus.example/oauth'),
     (settings.ISSUER, 'https://nimbus.example/'),
     (settings.ISSUER, 'https://'),
     (settings.ISSUER, 42),
+    (settings.ISSUER, ''),
     (settings.RESOURCES, ['https://']),
     (settings.RESOURCES, 'https://nimbus.example/mcp'),
     (settings.RESOURCES, [42]),
-])
+    (settings.RESOURCES, []),
+    (settings.API_URL, 42),
+    (settings.API_URL, 'https://nimbus.example/girder/api/v1/'),
+    (settings.API_URL, 'nimbus.example/api/v1'),
+    (settings.FRONTEND_URL, ['https://nimbus.example']),
+    (settings.FRONTEND_URL, 'https://nimbus.example/#/'),
+    (settings.INTROSPECTION_SECRET, 12345678901234567890123456789012345),
+    (settings.INTROSPECTION_SECRET, 'short'),
+    (settings.CIMD_HOSTS, 'claude.ai'),
+    (settings.CIMD_HOSTS, ['Claude.ai']),
+]
+
+
+def testEveryEffectiveSettingIsChecked():
+    assert {key for key, _ in UNVALIDATED_BAD} == set(settings.NORMALIZE)
+
+
+@pytest.mark.parametrize('key,value', UNVALIDATED_BAD)
 def testUnvalidatedBadSettingsActDisabled(
         enabled, key, value, monkeypatch):
     # GIRDER_SETTING_* environment overrides skip the validators, so the
