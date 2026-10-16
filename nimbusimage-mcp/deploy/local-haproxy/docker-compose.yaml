@@ -12,6 +12,9 @@ name: nimbus-mcp-haproxy
 services:
   haproxy:
     image: haproxy:3.2.4-alpine
+    # Its watchdog can abort the process when Docker's VM starves it of
+    # CPU; come back rather than leave a tunnel pointing at nothing.
+    restart: unless-stopped
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     ports:
