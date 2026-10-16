@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import math
 import os
+import re
 from dataclasses import dataclass, field
+
+# Printable ASCII without spaces, 32 or more: safe as a header value.
+SECRET_RE = re.compile(r"[!-~]{32,}")
 
 
 @dataclass(frozen=True)
@@ -50,9 +54,12 @@ class Settings:
             raise ValueError("NI_MCP_MAX_JOB_WAIT must be at least 1 second.")
         host = environ.get("NI_MCP_HOST", "127.0.0.1")
         secret = environ.get("NI_MCP_INTROSPECTION_SECRET") or None
-        if secret is not None and len(secret) < 32:
+        # Sent as a header: printable ASCII, no spaces (the Girder plugin's
+        # mcp_oauth.introspection_secret has the same rule).
+        if secret is not None and not SECRET_RE.fullmatch(secret):
             raise ValueError(
-                "NI_MCP_INTROSPECTION_SECRET must be at least 32 characters."
+                "NI_MCP_INTROSPECTION_SECRET must be at least 32 printable "
+                "ASCII characters, without spaces."
             )
         return cls(
             api_url=environ.get(
@@ -63,9 +70,11 @@ class Settings:
             public_url=environ.get(
                 "NI_MCP_PUBLIC_URL", f"http://localhost:{port}/mcp"
             ).rstrip("/"),
+            # Stripped as the Girder plugin strips mcp_oauth.issuer: clients
+            # compare the two exactly, and the SDK keeps a trailing slash.
             issuer_url=environ.get(
                 "NI_MCP_ISSUER_URL", "http://localhost:8080"
-            ),
+            ).rstrip("/"),
             host=host,
             port=port,
             call_log=environ.get("NI_MCP_CALL_LOG") or None,

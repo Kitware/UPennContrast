@@ -56,6 +56,13 @@ def test_settings_refuse_a_service_credential():
     assert settings.public_url == "http://localhost:9001/mcp"
 
 
+def test_issuer_trailing_slash_is_dropped():
+    # The plugin strips mcp_oauth.issuer the same way; clients compare the
+    # protected-resource metadata's issuer with the AS metadata exactly.
+    settings = Settings.from_env({"NI_MCP_ISSUER_URL": "https://h/"})
+    assert settings.issuer_url == "https://h"
+
+
 def test_public_url_trailing_slash_is_dropped():
     # The metadata path follows public_url, and the proxy matches it
     # exactly.

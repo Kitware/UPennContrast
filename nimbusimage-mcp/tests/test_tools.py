@@ -195,8 +195,11 @@ def test_settings_refuse_a_nonpositive_job_wait():
 def test_settings_introspection_secret():
     from nimbusimage_mcp.config import Settings
     from nimbusimage_mcp.server import build_verifier
-    with pytest.raises(ValueError, match="at least 32"):
-        Settings.from_env({"NI_MCP_INTROSPECTION_SECRET": "short"})
+    # Too short, or not header-safe (the plugin's setting has the same
+    # rule: testSecretMustBeHeaderSafe).
+    for bad in ("short", "é" * 40, "a" * 31 + " " + "a", "a" * 40 + "\n"):
+        with pytest.raises(ValueError, match="at least 32 printable"):
+            Settings.from_env({"NI_MCP_INTROSPECTION_SECRET": bad})
     secret = "s" * 40
     settings = Settings.from_env({"NI_MCP_INTROSPECTION_SECRET": secret})
     assert settings.introspection_secret == secret

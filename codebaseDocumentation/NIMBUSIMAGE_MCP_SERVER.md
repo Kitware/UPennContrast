@@ -401,7 +401,8 @@ deploys to production on the next autoscaling churn (see
 origin, equal to the MCP server's `NI_MCP_ISSUER_URL`), `mcp_oauth.api_url` (public Girder
 REST root, e.g. `https://app.nimbusimage.com/girder/api/v1`), `mcp_oauth.frontend_url`,
 `mcp_oauth.resources` (the MCP URLs a token may be for), `mcp_oauth.introspection_secret`
-(32+ characters; empty disables introspection), `mcp_oauth.cimd_hosts`. `enabled` cannot be
+(32+ printable ASCII characters without spaces, the same rule as `NI_MCP_INTROSPECTION_SECRET`;
+empty disables introspection), `mcp_oauth.cimd_hosts`. `enabled` cannot be
 set to true until `issuer` and `resources` are set, and those cannot be cleared while it is
 true: set them first, enable last. Because a null `PUT system/setting` (unset) and
 `GIRDER_SETTING_*` environment variables skip validators, the plugin also acts as disabled at
@@ -957,7 +958,11 @@ Order matters, because Girder changes deploy themselves and HAProxy changes do n
 3. **Announce API-key access** for Claude Code and Pro/Max connectors.
 4. **Turn the OAuth setting on** after the security review: set `mcp_oauth.issuer`,
    `mcp_oauth.api_url`, `mcp_oauth.frontend_url`, `mcp_oauth.resources` and
-   `mcp_oauth.introspection_secret` first, then `mcp_oauth.enabled` (it refuses to turn on
+   `mcp_oauth.introspection_secret` (the same value as the MCP service's
+   `NI_MCP_INTROSPECTION_SECRET`; generate it with
+   `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'`, which avoids the
+   line breaks of a long `openssl rand -base64` and the `$` compose would interpolate)
+   first, then `mcp_oauth.enabled` (it refuses to turn on
    without an issuer and resources, or with any setting invalid). Team and Enterprise connectors start working.
 
 Getting API-key MCP live before the OAuth plugin and consent page exist would cost a second
@@ -1218,6 +1223,11 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
       it would change turns the plugin off, and a non-list `cimd_hosts` trusts no host
       rather than matching by substring. *"testUnvalidatedBadSettingsActDisabled"*,
       *"testEveryEffectiveSettingIsChecked"*, *"testEnvironmentCimdHostsNeverMatchASubstring"*
+- [x] Settings shared with the MCP service follow the same rule on both sides: the issuer's
+      trailing slash is dropped by both, and the introspection secret is printable ASCII
+      without spaces (a header value) on both. *"testSecretMustBeHeaderSafe"*,
+      *"test_settings_introspection_secret"*, *"test_issuer_trailing_slash_is_dropped"*,
+      *"test_metadata_names_the_issuer_without_a_trailing_slash"*
 - [x] URL settings are parsed, not prefix-checked: a value with no host, a bad port, a
       fragment (or, for issuer/API/frontend, a query or credentials) is refused, while
       equivalent resource spellings (case, default port, trailing slash) are accepted.

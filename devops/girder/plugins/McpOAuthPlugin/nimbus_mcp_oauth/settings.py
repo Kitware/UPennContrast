@@ -3,6 +3,7 @@
 Set them as a site admin with ``PUT /system/setting``. While ``enabled`` is
 false every endpoint of this plugin answers 404.
 """
+import re
 from urllib.parse import urlsplit
 
 from girder.exceptions import ValidationException
@@ -87,10 +88,17 @@ def _resources(value):
     return value
 
 
+# Printable ASCII without spaces: the MCP service sends it as a header
+# (NI_MCP_INTROSPECTION_SECRET has the same rule).
+SECRET_RE = re.compile(r'[!-~]{32,}')
+
+
 def _secret(value):
-    if not isinstance(value, str) or (value and len(value) < 32):
+    if not isinstance(value, str) or (
+            value and not SECRET_RE.fullmatch(value)):
         raise ValidationException(
-            'Must be empty or at least 32 characters.', 'value')
+            'Must be empty or at least 32 printable ASCII characters, '
+            'without spaces.', 'value')
     return value
 
 

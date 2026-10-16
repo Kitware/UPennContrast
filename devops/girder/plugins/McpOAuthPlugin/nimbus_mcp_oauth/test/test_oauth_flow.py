@@ -636,9 +636,21 @@ UNVALIDATED_BAD = [
     (settings.FRONTEND_URL, 'https://nimbus.example/#/'),
     (settings.INTROSPECTION_SECRET, 12345678901234567890123456789012345),
     (settings.INTROSPECTION_SECRET, 'short'),
+    (settings.INTROSPECTION_SECRET, '\u00e9' * 40),
     (settings.CIMD_HOSTS, 'claude.ai'),
     (settings.CIMD_HOSTS, ['Claude.ai']),
 ]
+
+
+@pytest.mark.parametrize('secret', [
+    'short', '\u00e9' * 40, 'a' * 31 + ' ' + 'a', 'a' * 40 + '\n'])
+def testSecretMustBeHeaderSafe(server, secret):
+    # The MCP service sends it as a header; NI_MCP_INTROSPECTION_SECRET has
+    # the same rule (test_settings_introspection_secret).
+    from girder.exceptions import ValidationException
+    with pytest.raises(ValidationException, match='printable ASCII'):
+        Setting().set(settings.INTROSPECTION_SECRET, secret)
+    Setting().set(settings.INTROSPECTION_SECRET, '!~' * 16)
 
 
 def testEveryEffectiveSettingIsChecked():

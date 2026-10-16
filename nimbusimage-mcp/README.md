@@ -69,8 +69,8 @@ NI_API_URL=http://localhost:8080/api/v1 nimbusimage-mcp/.venv/bin/nimbusimage-mc
 | `NI_API_URL` | `http://localhost:8080/api/v1` | Girder REST root the server calls |
 | `NI_MCP_HOST` / `NI_MCP_PORT` | `127.0.0.1` / `8000` | Where it listens (the image uses `0.0.0.0`) |
 | `NI_MCP_PUBLIC_URL` | `http://localhost:<port>/mcp` | This server's public URL (the OAuth resource id) |
-| `NI_MCP_ISSUER_URL` | `http://localhost:8080` | Advertised authorization server: the `nimbus_mcp_oauth` plugin's `mcp_oauth.issuer` (the site's bare origin) |
-| `NI_MCP_INTROSPECTION_SECRET` | unset | Shared with the plugin's `mcp_oauth.introspection_secret` (32+ characters). Unset: OAuth tokens are refused and only API keys work. Reach Girder over the private network or https (`NI_API_URL`), since the secret travels with every OAuth request |
+| `NI_MCP_ISSUER_URL` | `http://localhost:8080` | Advertised authorization server: the `nimbus_mcp_oauth` plugin's `mcp_oauth.issuer` (the site's bare origin; a trailing slash is dropped, as the plugin drops it) |
+| `NI_MCP_INTROSPECTION_SECRET` | unset | Shared with the plugin's `mcp_oauth.introspection_secret` (32+ printable ASCII characters, no spaces). Unset: OAuth tokens are refused and only API keys work. Reach Girder over the private network or https (`NI_API_URL`), since the secret travels with every OAuth request |
 | `NI_MCP_CALL_LOG` | unset | JSON-lines call log (tool, user id, arguments, seconds, bytes, error), for evals. The server log has the same records without arguments or error messages (only the kind of error) |
 | `NI_MCP_MAX_JOB_WAIT` | `240` | Longest `ni_job_wait` (and cap on a worker-interface fetch, at most 60 s), in seconds, at least 1; keep it under every HTTP timeout in front of the server. Each request to Girder separately times out after 330 s (behind a proxy with a shorter timeout, such as HAProxy, the client sees the proxy's timeout first) |
 

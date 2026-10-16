@@ -118,6 +118,22 @@ def test_equivalent_public_url_spellings_accept_the_token(
         assert rpc(url, "tools/list", {}, key=OAUTH).status_code == 200
 
 
+def test_metadata_names_the_issuer_without_a_trailing_slash(girder):
+    # What clients compare with the plugin's AS metadata (which strips the
+    # slash from mcp_oauth.issuer).
+    import httpx
+    from nimbusimage_mcp.config import Settings
+    settings = Settings.from_env({"NI_MCP_ISSUER_URL": "https://h/",
+                                  "NI_API_URL": API})
+    with serve(build_app(settings, NimbusVerifier(
+            GirderApiKeyVerifier(API, settings.public_url,
+                                 http=girder.http()), None))) as url:
+        base = url.rsplit("/mcp", 1)[0]
+        meta = httpx.get(
+            base + "/.well-known/oauth-protected-resource/mcp").json()
+    assert meta["authorization_servers"] == ["https://h"]
+
+
 def test_expired_oauth_token_is_refused(server, girder):
     girder.add_oauth(OAUTH, "carol")
     girder.oauth[OAUTH]["exp"] = 1
