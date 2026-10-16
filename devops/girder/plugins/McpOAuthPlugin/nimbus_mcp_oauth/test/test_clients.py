@@ -134,3 +134,22 @@ def testDocumentMayNameClaudeCallbacks(enabled, fetches):
     client = clients.resolve(CLIENT_URL)
     assert clients.redirectAllowed(
         client, 'https://claude.ai/api/mcp/auth_callback')
+
+
+@pytest.mark.parametrize('envValue', ['claude.ai', '"claude.ai"', '42'])
+def testEnvironmentCimdHostsNeverMatchASubstring(server, monkeypatch,
+                                                 envValue):
+    # An environment override skips the validator, and a bare string would
+    # make "e.ai" or "ai" match by substring; it trusts no host instead.
+    from girder.models.setting import Setting
+    from nimbus_mcp_oauth import settings
+    monkeypatch.setenv('GIRDER_SETTING_MCP_OAUTH_CIMD_HOSTS', envValue)
+    Setting()._get.invalidate(Setting(), settings.CIMD_HOSTS)
+    try:
+        assert not clients._isAllowedDocumentUrl('https://e.ai/client.json')
+        assert not clients._isAllowedDocumentUrl('https://ai/client.json')
+    finally:
+        monkeypatch.undo()
+        Setting()._get.invalidate(Setting(), settings.CIMD_HOSTS)
+    assert clients._isAllowedDocumentUrl(
+        'https://claude.ai/oauth/mcp-oauth-client-metadata')

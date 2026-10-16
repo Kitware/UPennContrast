@@ -73,7 +73,7 @@ def _isAllowedDocumentUrl(url):
         return False
     return (
         parts.scheme == 'https'
-        and parts.hostname in settings.get(settings.CIMD_HOSTS)
+        and parts.hostname in settings.cimdHosts()
         and port in (None, 443)
         and parts.username is None and parts.password is None
         and parts.path not in ('', '/')

@@ -44,10 +44,13 @@ def _validateEnabled(doc):
     # On with no issuer or resource would serve broken metadata and refuse
     # every sign-in; say so now instead. Set them first.
     if doc['value']:
-        missing = [key for key in (ISSUER, RESOURCES) if not get(key)]
+        missing = [key for key, usable in ((ISSUER, _usableIssuer),
+                                           (RESOURCES, _usableResources))
+                   if not usable(get(key))]
         if missing:
             raise ValidationException(
-                'Set %s before enabling MCP OAuth.' % ' and '.join(missing),
+                'Set a valid %s before enabling MCP OAuth.'
+                % ' and '.join(missing),
                 'value')
 
 
@@ -75,10 +78,7 @@ def _validateUrl(doc):
             'value')
     doc['value'] = value.rstrip('/')
     if doc['key'] == ISSUER:
-        # A bare origin: the metadata is served (and proxied) only at
-        # /.well-known/oauth-authorization-server, where a client looks for
-        # an issuer with no path (RFC 8414 section 3).
-        if urlsplit(doc['value']).path:
+        if doc['value'] and not _usableIssuer(doc['value']):
             raise ValidationException(
                 'Must be a bare origin, with no path.', 'value')
         _refuseClearingWhileEnabled(doc)
@@ -100,8 +100,7 @@ def _defaultResources():
 @setting_utilities.validator(RESOURCES)
 def _validateResources(doc):
     value = doc['value']
-    if not isinstance(value, list) or not all(
-            isinstance(v, str) and canonicalResource(v) for v in value):
+    if not isinstance(value, list) or (value and not _usableResources(value)):
         raise ValidationException(
             'Must be a list of http(s) URLs with a host and no fragment.',
             'value')
@@ -126,8 +125,33 @@ def get(key):
     return Setting().get(key)
 
 
+def cimdHosts():
+    # A set, whatever an environment override holds: a bare string there
+    # would turn the host check into a substring test.
+    value = get(CIMD_HOSTS)
+    if not isinstance(value, list):
+        return set()
+    return {v.lower() for v in value if isinstance(v, str)}
+
+
+def _usableIssuer(value):
+    # A bare origin: the metadata is served (and proxied) only at
+    # /.well-known/oauth-authorization-server, where a client looks for an
+    # issuer with no path (RFC 8414 section 3).
+    # No trailing slash either (the validator strips one; an environment
+    # override does not): clients compare the issuer exactly.
+    return isinstance(value, str) and isPlainHttpUrl(value) and \
+        not urlsplit(value).path
+
+
+def _usableResources(value):
+    return isinstance(value, list) and bool(value) and all(
+        isinstance(v, str) and canonicalResource(v) for v in value)
+
+
 def enabled():
-    # Also off when half-configured: PUT system/setting with a null value
-    # (unset) and GIRDER_SETTING_* environment variables skip validators.
-    return get(ENABLED) is True and bool(get(ISSUER)) and \
-        bool(get(RESOURCES))
+    # Also off when misconfigured: PUT system/setting with a null value
+    # (unset) and GIRDER_SETTING_* environment variables skip the
+    # validators, so the values in effect are checked here too.
+    return get(ENABLED) is True and _usableIssuer(get(ISSUER)) and \
+        _usableResources(get(RESOURCES))

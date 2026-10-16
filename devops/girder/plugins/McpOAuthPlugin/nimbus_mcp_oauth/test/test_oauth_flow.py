@@ -616,6 +616,36 @@ def testIssuerMustBeABareOrigin(server, issuer):
     assert Setting().get(settings.ISSUER) == 'https://nimbus.example'
 
 
+@pytest.mark.parametrize('key,value', [
+    (settings.ISSUER, 'https://nimbus.example/oauth'),
+    (settings.ISSUER, 'https://nimbus.example/'),
+    (settings.ISSUER, 'https://'),
+    (settings.ISSUER, 42),
+    (settings.RESOURCES, ['https://']),
+    (settings.RESOURCES, 'https://nimbus.example/mcp'),
+    (settings.RESOURCES, [42]),
+])
+def testUnvalidatedBadSettingsActDisabled(
+        enabled, key, value, monkeypatch):
+    # GIRDER_SETTING_* environment overrides skip the validators, so the
+    # values in effect are checked again, and a bad one turns the plugin
+    # off instead of serving broken metadata or failing every sign-in.
+    import json
+    envKey = 'GIRDER_SETTING_' + key.replace('.', '_').upper()
+    monkeypatch.setenv(envKey, json.dumps(value))
+    Setting()._get.invalidate(Setting(), key)
+    try:
+        assert settings.get(key) == value
+        assert settings.enabled() is False
+        resp = enabled.request(
+            '/oauth-authorization-server', prefix='/.well-known',
+            appPrefix='/.well-known', isJson=False)
+        assert _status(resp) == 404
+    finally:
+        monkeypatch.undo()
+        Setting()._get.invalidate(Setting(), key)
+
+
 def testEquivalentResourceSpellingsAreAccepted(server):
     Setting().set(settings.RESOURCES, ['https://NIMBUS.example:443/mcp/'])
     from nimbus_mcp_oauth import oauth

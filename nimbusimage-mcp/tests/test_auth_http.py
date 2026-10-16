@@ -103,8 +103,8 @@ def test_token_for_another_mcp_server_is_refused(server, girder):
 @pytest.mark.parametrize("public_url", [
     "http://127.0.0.1:8000/mcp/", "HTTP://127.0.0.1:8000/mcp",
 ])
-def test_equivalent_public_url_spellings_accept_the_token(girder,
-                                                         public_url):
+def test_equivalent_public_url_spellings_accept_the_token(
+        girder, public_url):
     # The plugin stores the canonical resource (no trailing slash, lower
     # case); NI_MCP_PUBLIC_URL may be spelled otherwise, as the README
     # allows. The SDK compares as URLs, a trailing slash aside.

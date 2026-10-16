@@ -1210,7 +1210,11 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
       *"testAnotherClientKeepsItsOwnConnection"*
 - [x] The plugin cannot be enabled without an issuer and resources, nor have them cleared
       while enabled, and acts as disabled if they go missing anyway (unset, environment).
-      *"testCannotEnableHalfConfigured"*, *"testHalfConfiguredActsDisabled"*
+      *"testCannotEnableHalfConfigured"*, *"testHalfConfiguredActsDisabled"*. Values that
+      skipped the validators (`GIRDER_SETTING_*` overrides) are checked again at runtime:
+      an issuer with a path or an unusable resource list turns it off, and a non-list
+      `cimd_hosts` trusts no host rather than matching by substring.
+      *"testUnvalidatedBadSettingsActDisabled"*, *"testEnvironmentCimdHostsNeverMatchASubstring"*
 - [x] URL settings are parsed, not prefix-checked: a value with no host, a bad port, a
       fragment (or, for issuer/API/frontend, a query or credentials) is refused, while
       equivalent resource spellings (case, default port, trailing slash) are accepted.
