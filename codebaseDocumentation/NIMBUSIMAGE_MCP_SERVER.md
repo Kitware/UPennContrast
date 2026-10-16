@@ -840,9 +840,10 @@ connector with OAuth, and two members use it.
 - It is outside the Girder autoscaling group, so it needs no warm-pool cycle to deploy,
   does not touch the Girder launch hook's 900-second budget, and an outage affects MCP
   only. Stateless, so a second instance can be added behind the same backend later.
-- `NI_API_URL`: how it reaches Girder over the private network, e.g. HAProxy's private
-  address for the Girder backend (round-robin across instances is fine, the server is
-  stateless). Decide and document. `NI_MCP_PUBLIC_URL` and `NI_MCP_ISSUER_URL` are the
+- `NI_API_URL=http://<haproxy-private-ip>/girder/api/v1` (decided, see §11): through
+  HAProxy over the private network, round-robin across Girder instances. HAProxy needs a
+  stable private IP (or Terraform passes it in), and the MCP instance's security group
+  must reach HAProxy on port 80. `NI_MCP_MAX_JOB_WAIT=120` (§11). `NI_MCP_PUBLIC_URL` and `NI_MCP_ISSUER_URL` are the
   public `/mcp` URL and the Girder issuer. A health check (`/mcp` answering 401 without a
   key is enough).
 - Security group: inbound only from HAProxy; Girder's OAuth introspection endpoint
@@ -936,6 +937,8 @@ that is not production.
    cloud-init takes 8 minutes or more, `dist` is non-empty, the served bundle hash matches,
    `/girder/api/v1/system/version` answers, and the ACME path still reaches nginx.
 4. Run the full client matrix from [3](#3-client-compatibility) against the test domain.
+   Include one `ni_job_wait` that runs the full 120 s from claude.ai, to confirm it is not
+   cut off; if it is, lower `NI_MCP_MAX_JOB_WAIT` to 85.
 5. Turn the OAuth setting on and repeat the OAuth tests.
 
 **Exit criteria:**
@@ -1278,6 +1281,8 @@ its fix.
 | Decision | Options | Leaning |
 |---|---|---|
 | Placement | **Decided 2026-10-12: a small separate service** (own instance, e.g. t4g.small, behind a static HAProxy backend). Rejected: a **sidecar** on each Girder host (needs a second dynamic HAProxy backend and IP manager changes, the plan's site-wide-503 risk; every MCP change needs a warm-pool cycle; adds to the 900 s launch budget) and **mounting inside Girder's ASGI app** (cheapest on infrastructure, but shares Girder's process, threads and memory with image work, couples every MCP change to a Girder deploy, and the MCP SDK's pinned dependencies must coexist with Girder 5's, unverified). Stickiness is irrelevant: the server is stateless, and connectors calling from Anthropic's cloud do not keep HAProxy's cookie. Per-process state (the key-exchange cache, the registration single-flight) becomes effectively global with one instance. | Separate service |
+| How the MCP service reaches Girder | **Decided 2026-10-16: through HAProxy's private address**, `NI_API_URL=http://<haproxy-private-ip>/girder/api/v1`. HAProxy's IP manager already tracks the Girder instances, round-robin is fine for a stateless server, VPC sources are already exempt from the HTTPS redirect, and the introspection deny allows them. Rejected: **a direct Girder address** (would have to follow autoscaling itself) and **the public `https://app.nimbusimage.com`** (TLS and a trip out of the VPC on every call). Cost: one more hop through HAProxy, which the site depends on anyway. | HAProxy |
+| `ni_job_wait` cap in production | **Decided 2026-10-16: `NI_MCP_MAX_JOB_WAIT=120`.** Under HAProxy's 300 s server timeout; claude.ai is known to tolerate 85 s (the tunnel's limit), not yet longer, so Phase 5 checks 120 s against claude.ai and falls back to 85 if it is cut off. Longer jobs report `finished: false` and Claude waits again. | 120 s |
 | Where the code lives | New top-level `nimbusimage-mcp/` package, or an optional extra in `nimbusimage` | Separate package |
 | Token lifetimes | **Decided 2026-10-13:** access 8 h, refresh 30 days idle (see [6.3](#63-girder-oauth-plugin)) | |
 | Client registration | **Decided 2026-10-13:** Claude's published identity (client documents from claude.ai/claude.com) plus one built-in client; no dynamic registration | |
@@ -1289,8 +1294,8 @@ its fix.
 ## 12. Assumptions and things not yet verified
 
 - The production Girder stack is defined in `CytoPixel/OutsetaLogin`, which was not read
-  for this plan. With the separate MCP service it needs no MCP change, but how the service
-  reaches Girder over the private network (`NI_API_URL`) is still to be decided.
+  for this plan. With the separate MCP service it needs no MCP change; the service reaches
+  Girder through HAProxy's private address (decided 2026-10-16, §11).
 - Claude's OAuth callback URL (`https://claude.ai/api/mcp/auth_callback`) was observed in
   the Phase 3 Team test (2026-10-15), in claude.ai's client document
   `https://claude.ai/oauth/mcp-oauth-client-metadata`. The `claude.com` callback is still
