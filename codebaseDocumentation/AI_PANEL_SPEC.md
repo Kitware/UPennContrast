@@ -319,7 +319,7 @@ never enters the model's context**, even for datasets with millions of objects:
 - **Reads return aggregates.** `get_annotation_summary` returns counts by
   tag/shape/channel, aggregated on the server over the whole dataset;
   `get_property_values` returns per-property
-  `{count, mean, min, max}`, not raw values; `get_interface_state` returns
+  `{count, mean, std, min, max, median, p25, p75}`, not raw values; `get_interface_state` returns
   counts plus the tag list.
 - **`list_annotations` is the only raw-row path, and it is hard-capped** at
   `MAX_LIST_ANNOTATIONS` (200) rows per call regardless of the requested `limit`
@@ -327,18 +327,65 @@ never enters the model's context**, even for datasets with millions of objects:
   `get_annotation_summary` above that. So no single call can blow the context
   window.
 
-**The real ceiling is not the agent** — it is that `queryAnnotations` filters
-`annotationStore.annotations`, the full annotations the frontend holds in
-browser memory. Above the stub threshold (`stubThreshold`, 100K by default) the
-store loads stubs only and `annotations` is empty, so the query-based tools
-see nothing there. `get_annotation_summary` already avoids this by asking the
-server. The query/mutation tools, the analysis tools (`get_property_values`,
-histograms, plots and sample values, which intersect with the loaded ids), and
-`set_location`'s `fit` do not yet, so in stub-only mode they can report zero
-while the summary reports the whole dataset.
+**Stub-only mode.** Above the stub threshold (`stubThreshold`, 100K by
+default) the store loads stubs only: `annotationStore.annotations` is empty, the
+population lives in `annotationStubs` (id, centroid, location, shape, channel,
+tags, color), and `propertyStore.propertyValues` holds only the rendered
+annotations' values for the Annotation Browser's displayed columns. The tools
+read through that split, so they report the same population as
+`get_annotation_summary` (which asks the server) at any dataset size:
 
-**Future (defer until there is real demand):** when datasets genuinely outgrow
-the in-memory set, query/mutation resolution must move **server-side** — a
+- **Queries iterate stubs.** `queryAnnotations` walks `liveAnnotations()` —
+  the stub map in stub-only mode, `annotations` otherwise. Stubs carry every
+  field a query filters on, so `list_annotations`, `select_annotations`,
+  `color_annotations` and `tag_annotations` resolve the same ids in both modes.
+  The resulting writes still go through the batch endpoints.
+- **`list_annotations` hydrates only its page for names.** Stubs have a
+  centroid but no name, so the page's stub rows (at most 200) are hydrated in
+  one `upenn_annotation/hydrate` call. Tags, color and location come from the
+  stub, which holds the client's current state.
+- **Analysis fetches the values it reads.** `loadAnalysisValues` sends one
+  `annotation_property_values/batch` call per tool call, projected to the
+  paths being analyzed, for the query's ids (or every live id). It never sends
+  an empty path list, because to that endpoint an empty list means every
+  value. The live-id intersection that drops orphaned values still applies.
+  This means a dataset-wide `get_property_values` uploads every id and parses
+  every projected value. Measured on a 465K-annotation dataset (local,
+  2026-10-14): one property 5 s; every property (24 paths) 28 s; a
+  tag-colored scatter of two paths 10 s. That is tolerable for an explicit
+  request, but it is the cost to move server-side first (the summary endpoint
+  already aggregates count/mean/std/min/max over list filters).
+- **Paths are discovered from the fetch, not the sample.** In stub-only mode
+  `computedPropertyPaths` is the leaf paths of a bounded sample of value
+  documents (512, by `_id`), which can miss a property computed only on some
+  annotations. `get_property_values` therefore projects each property's root
+  (plus the virtual paths) and reports the leaf paths found in what comes back.
+  `list_properties` reports `computed: null` (unknown) for a property absent
+  from the sample, instead of a false `false`.
+- **One consistent snapshot.** A tool resolves its query before the await (the
+  value fetch, or `list_annotations`' name hydrate). `withStableAnnotations`
+  compares `annotationStore.contentRevision` across the await; if annotations
+  were added, edited or deleted meanwhile, it resolves and loads again, and
+  after a second change it reports an error instead of a stale answer. The
+  revision is global, so the analysis tools first re-resolve the query: values
+  belong to ids, so a change that leaves the matching ids the same keeps the
+  result without a refetch.
+  Hydration does not bump the revision, so panning during a fetch does not
+  cause a retry.
+- **Tags and `fit` resolve per id.** Tag-grouped plots and sample rows look up
+  each id with `getAnnotationOrStubFromId`. `set_camera`'s `fit` bounds a stub
+  by its centroid widened by `estimatedRadius`.
+
+**Why not resolve queries server-side** (via the `upenn_annotation/list/ids`
+endpoint with list filters)? The stub map is already resident and is updated
+by every local mutation, and the mutation actions take ids anyway. A server
+round trip would add latency and could disagree with an edit the client has
+made but not yet persisted. Iterating 700K stubs takes milliseconds. The cost
+that does scale is the analysis value fetch above.
+
+**Future (defer until there is real demand):** when datasets outgrow even
+the stub set, or the analysis value fetch gets too slow, query/mutation
+resolution must move **server-side** — a
 backend endpoint that resolves a query to matching ids or applies the mutation
 directly, so the browser never materializes the whole set. That same server-side
 foundation is what a **managed-agent / code-execution** capability (Option B,
@@ -809,3 +856,79 @@ Process rules:
 - The plugin logs drops at INFO, but the Girder container doesn't print this
   plugin's INFO output. To check drops, call `_stream_agent_response` in the
   container with the `girder_claude_chat` logger set to INFO.
+
+## 14. Regression checklist — stub-only mode
+
+Invariants for datasets above `stubThreshold`, where `annotations` is empty
+(§4.1 "Stub-only mode"). Each names the test that holds it in
+`executors.test.ts` `describe("stub-only mode")`. Re-check these when touching
+`queryAnnotations`, `liveAnnotations`, `loadAnalysisValues`, the tag resolvers
+or `annotationsBoundingBox`, and whenever a new executor reads annotation or
+property data.
+
+Queries see the stub population:
+
+- Query fields filter stubs as they filter full annotations —
+  *"filters stubs by shape, channel and current frame"*.
+- Selection and edits by query reach stubs, and edits go out as one batch
+  call — *"select_annotations selects matching stubs"*,
+  *"color_annotations and tag_annotations resolve a query over stubs into one batch call"*.
+- `list_annotations` names stub rows with one hydrate of just the page —
+  *"list_annotations lists stubs, with names from one batch hydrate"*,
+  *"list_annotations hydrates only the requested page"*. That await is
+  identity-checked, and a failed fetch is an error, not a null name —
+  *"list_annotations aborts if the dataset changes during the name fetch"*,
+  *"list_annotations reports a failed name fetch as an error"*.
+
+Analysis reads the dataset, not the viewport:
+
+- Stats cover every stub from one projected fetch, never the store's visible
+  subset — *"get_property_values computes stats over the whole stub population"*.
+- A query narrows the ids sent, and values for ids that are not live are
+  dropped — *"sends only the query's matches, and drops values for ids that are not live"*.
+- Several value documents for one annotation merge —
+  *"merges several value documents for one annotation"*.
+- An empty path list is never sent (to the endpoint it means "every value") —
+  *"never fetches unprojected values when there is nothing to summarize"*.
+- The fetch is identity-checked, and a failed fetch is an error rather than
+  zero values — *"aborts if the dataset changes during the value fetch"*,
+  *"reports a failed value fetch as an error, not as zero values"*.
+- A content change during the fetch re-resolves the query, and a population
+  that keeps changing is an error, not a stale answer —
+  *"re-resolves the query when an annotation is deleted during the fetch"*,
+  *"re-resolves the query when matching annotations are added during the fetch"*,
+  *"re-resolves the query when an annotation is retagged during the fetch"*,
+  *"gives up with an error when the matching annotations keep changing"*.
+  An unrelated change (the revision is global) neither refetches nor fails —
+  *"keeps the result when a change leaves the query's matches unchanged"*.
+  `list_annotations` does the same around its name fetch —
+  *"re-reads the page when annotations change during the name fetch"*. Rows are
+  serialized from the store after that await, so a recolor (which does not move
+  the revision) is not lost — *"reports a color changed during the name fetch"*.
+- Property paths come from the fetched values, not the 512-document sample, so
+  a property computed on a subset is still summarized —
+  *"get_property_values finds a property the path sample missed"*,
+  *"get_property_values includes virtual paths"*; and `list_properties` says
+  "unknown" rather than "not computed" for it —
+  *"list_properties does not report a sampled-out property as uncomputed"*.
+- A path is never projected alongside its own ancestor (MongoDB rejects the
+  collision) — *"never projects a path together with its own ancestor"*.
+- Input is validated before the whole-population fetch —
+  *"rejects groupByTag with several paths before fetching values"*.
+- Fully loaded, values come from the store and nothing is fetched —
+  *"get_property_values reads the store, not the server, when fully loaded"*.
+- Each analysis tool takes the same path —
+  *"get_property_histogram and create_histogram_plot count every stub"*,
+  *"get_sample_values reads values from the fetch and tags from the stubs"*,
+  *"create_scatter_plot groups stubs by their first tag"*,
+  *"create_box_plot groups stubs by their first tag"*.
+
+Camera:
+
+- `fit` frames stubs by centroid and radius, and skips selected ids that no
+  longer resolve — *"fits every stub by centroid and estimated radius"*,
+  *"fits the selected stubs, skipping ids that no longer resolve"*.
+
+Process rule: a new test here must fail with the store mock in stub-only mode
+and the fix reverted. 18 of the first 19 failed against the pre-fix executors. The
+empty-path test passes there trivially, because it guards the fix's own fetch.
