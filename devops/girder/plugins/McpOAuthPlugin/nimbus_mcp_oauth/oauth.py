@@ -92,7 +92,8 @@ def startAuthorization(params):
             'redirect_uri is not registered for this client.')
     state = params.get('state')
     if state is not None and len(state) > MAX_STATE:
-        raise RedirectableError('invalid_request', 'state is too long.')
+        raise RedirectableError('invalid_request', 'state is too long.',
+                                echoState=False)
     if params.get('response_type') != 'code':
         raise RedirectableError(
             'unsupported_response_type', 'Only response_type=code.')
@@ -450,6 +451,9 @@ def revokeToken(tokenValue):
 
 
 def listGrants(user):
+    # Not yet reaped by the TTL monitor is not the same as still connected.
+    live = Grant().find({'userId': user['_id'], 'expiresAt': {'$gt': now()}},
+                        sort=[('created', 1)])
     return [{
         'id': str(g['_id']),
         'clientName': g['clientName'],
@@ -457,7 +461,7 @@ def listGrants(user):
         'redirectHost': g['redirectHost'],
         'created': g['created'],
         'lastUsed': g['lastUsed'],
-    } for g in Grant().find({'userId': user['_id']}, sort=[('created', 1)])]
+    } for g in live]
 
 
 def revokeUserGrant(user, grantId):

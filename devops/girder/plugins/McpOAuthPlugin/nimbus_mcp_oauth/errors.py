@@ -14,4 +14,10 @@ class OAuthError(Exception):
 
 class RedirectableError(OAuthError):
     """An authorize error that is reported to the client by redirecting to
-    its (already validated) redirect URI."""
+    its (already validated) redirect URI. ``echoState`` False leaves the
+    client's state out of that redirect (when the state itself is the
+    error)."""
+
+    def __init__(self, error, description, status=400, echoState=True):
+        super().__init__(error, description, status)
+        self.echoState = echoState

@@ -10,7 +10,8 @@
 # server with a fresh call log (NI_MCP_CALL_LOG=<new file>) so the eval's
 # sizes and latencies are not mixed with earlier calls. The tasks only read.
 #
-# Only the nimbus MCP tools are allowed, and user/project settings are not
+# Only the read-only nimbus MCP tools (and ni_worker_interface) are
+# allowed, and user/project settings are not
 # loaded, so Claude cannot fall back to the nimbusimage skills or Bash.
 set -euo pipefail
 EVAL="$(cd "$(dirname "$0")" && pwd)"
@@ -28,6 +29,11 @@ print(json.dumps({"mcpServers": {"nimbus": {
 mkdir -p "$EVAL/runs"
 rm -f "$EVAL"/runs/*.jsonl
 
+# The read-only tools, plus ni_worker_interface (it registers a worker's
+# interface, not the user's data). Not "mcp__nimbus", which would allow
+# ni_worker_run, ni_property_compute and ni_annotations_tag unprompted.
+READ_TOOLS="mcp__nimbus__ni_datasets_list mcp__nimbus__ni_dataset_info mcp__nimbus__ni_annotations_count mcp__nimbus__ni_annotations_summary mcp__nimbus__ni_annotations_list mcp__nimbus__ni_image_get_composite mcp__nimbus__ni_image_get_channel mcp__nimbus__ni_properties_list mcp__nimbus__ni_property_values_summary mcp__nimbus__ni_property_histogram mcp__nimbus__ni_workers_list mcp__nimbus__ni_job_wait mcp__nimbus__ni_help_topic mcp__nimbus__ni_worker_interface"
+
 i=0
 pids=()
 while IFS= read -r task; do
@@ -37,7 +43,7 @@ while IFS= read -r task; do
   (cd "$WORK" && claude -p "$task" \
       --mcp-config "$WORK/mcp.json" --strict-mcp-config \
       --setting-sources "" \
-      --allowedTools "mcp__nimbus" \
+      --allowedTools "$READ_TOOLS" \
       --disallowedTools "Bash Read Write Edit Glob Grep WebFetch WebSearch Agent NotebookEdit Skill" \
       --output-format stream-json --verbose --max-turns 15 \
       < /dev/null > "$EVAL/runs/task$(printf %02d "$i").jsonl" 2>&1) &

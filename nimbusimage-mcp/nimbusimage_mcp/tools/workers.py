@@ -462,7 +462,7 @@ async def ni_worker_run(
 async def ni_job_wait(job_id: str, timeout_seconds: float = 60) -> dict:
     """Wait for a job started by ni_worker_run or ni_property_compute to
     finish, then report its status and the end of its log. Waits at most
-    timeout_seconds (default 60, capped by the server, about 4 minutes);
+    timeout_seconds (default 60, capped by the server's own limit);
     if the job is still going, the result says finished=false and you can
     call this again with the same job_id. If NimbusImage itself does not
     answer in time, status is "unknown". Do not poll with other tools.

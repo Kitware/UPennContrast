@@ -277,6 +277,8 @@ class NimbusClient:
         """
         if isinstance(tags, str):
             raise TypeError("tags must be a list of tag names, not a string")
+        if isinstance(dataset_ids, str):
+            raise TypeError("dataset_ids must be a list of ids, not a string")
         ids = list(dict.fromkeys(str(i) for i in dataset_ids))
         rows: list[dict] = []
         for start in range(0, len(ids), _COUNT_BATCH):

@@ -23,6 +23,7 @@ from mcp_types import ToolAnnotations
 
 import nimbusimage as ni
 
+from nimbusimage_mcp import auth
 from nimbusimage_mcp.config import Settings
 
 log = logging.getLogger("nimbusimage_mcp.calls")
@@ -156,6 +157,14 @@ def girder_message(e: girder_client.HttpError) -> str:
 
 def tool_error(e: girder_client.HttpError) -> ToolError:
     if e.status == 401:
+        access = get_access_token()
+        if access is not None and access.client_id != auth.CLIENT_ID:
+            # An OAuth session is full-access, so no scope is missing: the
+            # connection was ended (or its session expired) mid-call.
+            return ToolError(
+                "NimbusImage refused this call (HTTP 401): your sign-in has "
+                "ended. Reconnect NimbusImage in your client and try again."
+            )
         # The verifier checked this session at the start of the request,
         # so the likeliest cause is a scoped API key lacking the scope
         # this call needs (e.g. help topics and job status need

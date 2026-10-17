@@ -33,8 +33,9 @@ INSTRUCTIONS = (
     "platform, acting as the signed-in user. Datasets are multidimensional "
     "images (channels, z-slices, time points, XY positions) with "
     "annotations (points for spots, polygons for cells/nuclei, lines, "
-    "rectangles) and measurements (properties) computed on them. Every "
-    "tool takes a dataset_id; use ni_datasets_list to find it. Prefer "
+    "rectangles) and measurements (properties) computed on them. Dataset "
+    "tools take a dataset_id (ni_annotations_count takes a list); use "
+    "ni_datasets_list to find it. Prefer "
     "counts and summaries over listing rows. Tools marked destructive "
     "change the user's data: confirm with the user first."
 )

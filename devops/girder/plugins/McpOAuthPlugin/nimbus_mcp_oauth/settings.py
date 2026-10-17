@@ -24,8 +24,8 @@ API_URL = 'mcp_oauth.api_url'
 FRONTEND_URL = 'mcp_oauth.frontend_url'
 # The MCP server URLs a token may be issued for (RFC 8707 resource).
 RESOURCES = 'mcp_oauth.resources'
-# Shared secret the MCP service sends to the introspection endpoint. Empty
-# disables introspection.
+# Shared secret the MCP service sends to the introspection endpoint.
+# Required to enable the plugin (without it every MCP call would fail).
 INTROSPECTION_SECRET = 'mcp_oauth.introspection_secret'
 # Hosts whose Client ID Metadata Documents are fetched.
 CIMD_HOSTS = 'mcp_oauth.cimd_hosts'
@@ -118,8 +118,9 @@ NORMALIZE = {
     CIMD_HOSTS: _cimdHosts,
 }
 # Without these the plugin would serve broken metadata and refuse every
-# sign-in.
-REQUIRED = (ISSUER, RESOURCES)
+# sign-in, or (no introspection secret) complete every sign-in and then have
+# the MCP service refuse every call.
+REQUIRED = (ISSUER, RESOURCES, INTROSPECTION_SECRET)
 
 
 @setting_utilities.validator(set(NORMALIZE))

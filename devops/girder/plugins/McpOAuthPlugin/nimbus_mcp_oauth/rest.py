@@ -102,7 +102,7 @@ class McpOAuthResource(Resource):
         except RedirectableError as err:
             raise cherrypy.HTTPRedirect(oauth.errorRedirect(
                 params['redirect_uri'], err.error, err.description,
-                params.get('state')), 302)
+                params.get('state') if err.echoState else None), 302)
         except OAuthError as err:
             # The client or redirect URI is not trusted: never redirect.
             raise RestException(err.description, code=400)

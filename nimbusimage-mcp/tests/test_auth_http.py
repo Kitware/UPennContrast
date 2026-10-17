@@ -134,6 +134,23 @@ def test_metadata_names_the_issuer_without_a_trailing_slash(girder):
     assert meta["authorization_servers"] == ["https://h"]
 
 
+@pytest.mark.parametrize("public_url", [
+    "https://h.example:443/mcp", "HTTPS://H.example/mcp",
+])
+def test_default_port_and_host_case_accept_the_canonical_token(
+        girder, public_url):
+    # The plugin stores https://h.example/mcp (no default port, lower-case
+    # host); the SDK compares as URLs, so these spellings still match.
+    girder.add_oauth(OAUTH, "carol", resource="https://h.example/mcp")
+    app = build_app(make_settings(public_url=public_url), NimbusVerifier(
+        GirderApiKeyVerifier(API, public_url, http=girder.http()),
+        GirderOAuthVerifier(API, girder.introspection_secret,
+                            http=girder.http()),
+    ))
+    with serve(app) as url:
+        assert rpc(url, "tools/list", {}, key=OAUTH).status_code == 200
+
+
 def test_expired_oauth_token_is_refused(server, girder):
     girder.add_oauth(OAUTH, "carol")
     girder.oauth[OAUTH]["exp"] = 1

@@ -88,6 +88,18 @@ def test_girder_errors_become_tool_errors(nc, status, fragment):
         datasets.ni_dataset_info(dataset_id="x")
 
 
+def test_a_401_for_an_oauth_caller_says_reconnect(nc, monkeypatch):
+    # An OAuth session is full-access: a 401 means the connection ended,
+    # not a missing API-key scope.
+    from mcp.server.auth.provider import AccessToken
+    monkeypatch.setattr(_common, "get_access_token", lambda: AccessToken(
+        token="t", client_id="nimbusimage-claude", scopes=["nimbusimage"]))
+    nc.dataset.side_effect = http_error(401)
+    with pytest.raises(ToolError, match="sign-in has ended") as raised:
+        datasets.ni_dataset_info(dataset_id="x")
+    assert "API key" not in str(raised.value)
+
+
 def test_unwritable_call_log_does_not_fail_the_call(nc, tmp_path, caplog):
     _common.configure(make_settings(call_log=str(tmp_path)))  # a directory
     nc.list_datasets.return_value = [{"_id": "d1", "name": "x"}]

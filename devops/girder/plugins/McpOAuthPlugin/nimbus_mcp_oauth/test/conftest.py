@@ -41,7 +41,7 @@ def enabled(server):
     Setting().set(settings.FRONTEND_URL, ISSUER)
     Setting().set(settings.RESOURCES, [RESOURCE])
     Setting().set(settings.INTROSPECTION_SECRET, SECRET)
-    # Last: enabling requires the issuer and resources
+    # Last: enabling requires the issuer, resources and secret
     Setting().set(settings.ENABLED, True)
     return server
 

@@ -392,6 +392,13 @@ class TestAnnotationRaster:
         limiter.check(("10.0.0.9", "d"))
         with pytest.raises(RasterBuildRateLimited):
             limiter.check(("10.0.0.9", "d"))
+        # Live clients over the threshold: the next sweep waits a window
+        # rather than rebuilding the table on every call.
+        for client in range(10, 15):
+            limiter.check((f"10.0.0.{client}", "d"))
+        table = limiter._attempts
+        limiter.check(("10.0.0.20", "d"))
+        assert limiter._attempts is table
 
     @pytest.mark.parametrize(
         "error,status",

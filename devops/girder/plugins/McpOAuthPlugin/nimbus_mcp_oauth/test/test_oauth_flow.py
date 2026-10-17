@@ -414,6 +414,43 @@ def testUnverifiedEmailCannotUseTokens(enabled, user):
         'active': False}
 
 
+@pytest.mark.parametrize('block', ['disabled', 'unverified', 'unapproved'])
+def testAccountBlockedAfterApprovalCannotExchange(enabled, user, block):
+    # Between consent and the token exchange: no grant, no tokens.
+    from nimbus_mcp_oauth.models import Grant
+    verifier, code, params = approveFlow(enabled, user)
+    if block == 'disabled':
+        user['status'] = 'disabled'
+    elif block == 'unverified':
+        Setting().set('core.email_verification', 'required')
+        user['emailVerified'] = False
+    else:
+        Setting().set('core.registration_policy', 'approve')
+        user['status'] = 'pending'
+    User().save(user)
+    resp = exchange(enabled, code, verifier, params)
+    assert resp.json['error'] == 'invalid_grant'
+    assert Grant().find({'userId': user['_id']}).count() == 0
+
+
+def testExpiredGrantsAreNotListed(enabled, user):
+    from nimbus_mcp_oauth.models import Grant
+    connect(enabled, user)
+    assert len(enabled.request('/mcp_oauth/grant', user=user).json) == 1
+    Grant().update({'userId': user['_id']}, {'$set': {
+        'expiresAt': oauth.now() - datetime.timedelta(seconds=1)}})
+    assert enabled.request('/mcp_oauth/grant', user=user).json == []
+
+
+def testOverlongStateIsNotEchoed(enabled):
+    _, challenge = pkcePair()
+    params = authorizeParams(challenge, state='s' * (oauth.MAX_STATE + 1))
+    resp = enabled.request('/mcp_oauth/authorize', params=params,
+                           isJson=False)
+    back = query(location(resp))
+    assert back['error'] == 'invalid_request' and 'state' not in back
+
+
 def testDisabledUserCannotRefresh(enabled, user):
     first = connect(enabled, user)
     user['status'] = 'disabled'
@@ -611,9 +648,15 @@ def testCannotEnableHalfConfigured(server):
     with pytest.raises(ValidationException, match='mcp_oauth.resources'):
         Setting().set(settings.ENABLED, True)
     Setting().set(settings.RESOURCES, [RESOURCE])
+    # Without the secret every sign-in would succeed and every MCP call fail
+    with pytest.raises(ValidationException,
+                       match='mcp_oauth.introspection_secret'):
+        Setting().set(settings.ENABLED, True)
+    Setting().set(settings.INTROSPECTION_SECRET, 'k' * 40)
     Setting().set(settings.ENABLED, True)
     # Its twin: not cleared while on.
-    for key, empty in ((settings.ISSUER, ''), (settings.RESOURCES, [])):
+    for key, empty in ((settings.ISSUER, ''), (settings.RESOURCES, []),
+                       (settings.INTROSPECTION_SECRET, '')):
         with pytest.raises(ValidationException, match='Disable MCP OAuth'):
             Setting().set(key, empty)
     Setting().set(settings.ENABLED, False)
@@ -670,6 +713,7 @@ UNVALIDATED_BAD = [
     (settings.FRONTEND_URL, 'https://nimbus.example/#/'),
     (settings.INTROSPECTION_SECRET, 12345678901234567890123456789012345),
     (settings.INTROSPECTION_SECRET, 'short'),
+    (settings.INTROSPECTION_SECRET, ''),
     (settings.INTROSPECTION_SECRET, '\u00e9' * 40),
     (settings.CIMD_HOSTS, 'claude.ai'),
     (settings.CIMD_HOSTS, ['Claude.ai']),

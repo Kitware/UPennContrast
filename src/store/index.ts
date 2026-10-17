@@ -1979,7 +1979,17 @@ export class Main extends VuexModule {
   async leaveShareLink() {
     const session = shareLinkSession;
     shareLinkSession = null;
-    if (!session || toRaw(this.girderRest) !== session.linkClient) {
+    if (!session) {
+      // No link took over (it was invalid or cancelled), so this client is
+      // the saved login. A tab that started on a shared URL skipped
+      // initialize(): settle that login now, or a page waiting on
+      // authRestored (the consent page) spins forever.
+      if (!this.authRestored) {
+        await this.restoreSavedLogin();
+      }
+      return;
+    }
+    if (toRaw(this.girderRest) !== session.linkClient) {
       return;
     }
     // A shared URL opened directly skips initialize(), so the saved login's
@@ -1997,10 +2007,33 @@ export class Main extends VuexModule {
         return;
       }
     }
-    await this.loggedIn(previous);
-    // A tab that started on a shared URL never ran initialize(); its login
-    // is settled now (a page waiting on authRestored would spin forever).
-    this.setAuthRestored();
+    try {
+      await this.loggedIn(previous);
+    } finally {
+      // A tab that started on a shared URL never ran initialize(); its
+      // login is settled now (a page waiting on authRestored would spin
+      // forever), even if restoring it failed.
+      this.setAuthRestored();
+    }
+  }
+
+  // The login half of initialize(), for a tab that skipped it.
+  @Action
+  async restoreSavedLogin() {
+    const client = toRaw(this.girderRest);
+    try {
+      if (client.token && !client.user) {
+        // A login or another link may take over during the fetch; leave
+        // it alone then (as leaveShareLink's session path does).
+        if ((await client.fetchUser()) && toRaw(this.girderRest) === client) {
+          await this.loggedIn(client);
+        }
+      }
+    } catch (error) {
+      logError("Could not restore the saved login:", error);
+    } finally {
+      this.setAuthRestored();
+    }
   }
 
   @Action

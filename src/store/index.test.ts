@@ -1,3 +1,4 @@
+import { toRaw } from "vue";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Regression tests for addMultiSourceMetadata's error propagation.
@@ -176,6 +177,81 @@ describe("share-link bootstrap identity", () => {
     expect(main.girderRest).toBe(client);
     expect(main.girderUser?._id).toBe("owner-token");
     // initialize() never ran in this tab; leaving settles the login.
+    expect(main.authRestored).toBe(true);
+  });
+
+  it("settles the saved login when a shared URL opened directly fails", async () => {
+    // initialize() never ran in this tab and no link session took over:
+    // leaving must restore the owner and settle authRestored, or the
+    // consent page waits forever.
+    const client = main.girderRest;
+    Object.assign(client, { user: null, token: "owner-token" });
+    vi.spyOn(RestClient.prototype, "fetchUser").mockImplementation(
+      async function (this: any) {
+        this.user = { _id: this.token };
+        return this.user;
+      },
+    );
+    vi.spyOn(ShareLinkAPI.prototype, "me").mockRejectedValue(
+      new Error("not a link"),
+    );
+    (rootStore.state as any).main.authRestored = false;
+    await messageOf(main.openShareLink({ token: "bad-link" }));
+    await main.leaveShareLink();
+    expect(main.girderRest).toBe(client);
+    expect(main.girderUser?._id).toBe("owner-token");
+    expect(main.authRestored).toBe(true);
+  });
+
+  it("leaves a link that took over during the restore alone", async () => {
+    const client = main.girderRest;
+    Object.assign(client, { user: null, token: "owner-token" });
+    let finishOwner!: () => void;
+    vi.spyOn(RestClient.prototype, "fetchUser").mockImplementation(
+      async function (this: any) {
+        if (toRaw(this) === toRaw(client)) {
+          await new Promise<void>((resolve) => {
+            finishOwner = resolve;
+          });
+        }
+        this.user = { _id: this.token };
+        return this.user;
+      },
+    );
+    vi.spyOn(ShareLinkAPI.prototype, "me").mockRejectedValueOnce(
+      new Error("not a link"),
+    );
+    (rootStore.state as any).main.authRestored = false;
+    await messageOf(main.openShareLink({ token: "bad-link" }));
+    const leaving = main.leaveShareLink();
+    await vi.waitFor(() => expect(finishOwner).toBeTypeOf("function"));
+    // Another link takes over while the owner's user is being fetched.
+    const linkClient = { token: "other" };
+    (rootStore.state as any).main.girderRest = linkClient;
+    const loggedIn = vi.spyOn(main as any, "loggedIn");
+    finishOwner();
+    await leaving;
+    expect(loggedIn).not.toHaveBeenCalled();
+    expect(toRaw(main.girderRest)).toBe(linkClient);
+    expect(main.authRestored).toBe(true);
+  });
+
+  it("settles authRestored even if restoring the login throws", async () => {
+    const client = main.girderRest;
+    Object.assign(client, { user: null, token: "owner-token" });
+    vi.spyOn(RestClient.prototype, "fetchUser").mockImplementation(
+      async function (this: any) {
+        this.user = { _id: this.token };
+        return this.user;
+      },
+    );
+    vi.spyOn(ShareLinkAPI.prototype, "me").mockResolvedValue({
+      datasetViewId: "v",
+    } as any);
+    (rootStore.state as any).main.authRestored = false;
+    await main.openShareLink({ token: "link-a" });
+    vi.spyOn(main as any, "loggedIn").mockRejectedValue(new Error("boom"));
+    await main.leaveShareLink().catch(() => undefined);
     expect(main.authRestored).toBe(true);
   });
 

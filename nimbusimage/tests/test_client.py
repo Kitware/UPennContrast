@@ -427,3 +427,16 @@ class TestCountAnnotations:
     def test_tags_must_be_a_list(self, mock_gc):
         with pytest.raises(TypeError):
             self._client(mock_gc).count_annotations(["a"], tags="spot")
+
+
+def test_count_annotations_refuses_a_bare_dataset_id():
+    from unittest.mock import MagicMock
+
+    import pytest
+
+    from nimbusimage.client import NimbusClient
+    client = NimbusClient.__new__(NimbusClient)
+    client._gc = MagicMock()
+    with pytest.raises(TypeError, match="dataset_ids"):
+        client.count_annotations("6512abcdef0123456789abcd")
+    client._gc.post.assert_not_called()

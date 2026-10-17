@@ -58,3 +58,29 @@ def test_no_credentials_in_logs(tmp_path, caplog, monkeypatch):
     assert records[0]["bytes"] > 0 and records[0]["error"] is None
     assert records[1]["error"] == "No large image in patient-1234"
     assert '"error": "bad input"' in caplog.text
+
+
+def test_no_oauth_credentials_in_logs(caplog, monkeypatch):
+    # The OAuth twin: neither the access token, the Girder session the
+    # introspection hands back, nor the shared secret is logged.
+    from nimbusimage_mcp.auth import GirderOAuthVerifier, NimbusVerifier
+    girder = FakeGirder()
+    oauth_token = "nio_" + "Z" * 43
+    girder.add_oauth(oauth_token, "carol")
+    session = girder.oauth[oauth_token]["girder_token"]
+    fake = MagicMock()
+    fake.list_datasets.return_value = []
+    monkeypatch.setattr(_common.ni, "connect", lambda api_url, token: fake)
+    caplog.set_level(logging.DEBUG)
+    settings = make_settings()
+    app = build_app(settings, NimbusVerifier(
+        GirderApiKeyVerifier(API, settings.public_url, http=girder.http()),
+        GirderOAuthVerifier(API, girder.introspection_secret,
+                            http=girder.http()),
+    ))
+    with serve(app) as url:
+        call_tool(url, oauth_token, "ni_datasets_list", {})
+        rpc(url, "tools/list", {}, key="nio_" + "Y" * 43)  # unknown token
+    for secret in [oauth_token, "nio_" + "Y" * 43, session,
+                   girder.introspection_secret]:
+        assert secret not in caplog.text

@@ -139,7 +139,9 @@ done
 # --- Public side: the OAuth endpoints clients call reach Girder.
 for path in authorize token revoke; do
   https GET "/girder/api/v1/mcp_oauth/$path"
-  if [[ $status != 403 && $ctype != text/html* ]]; then pass
+  # An answer from Girder that is not a deny: no answer at all fails too
+  if [[ -n $status && $status != 403 && $ctype != text/html* &&
+        ( -z $backend || $backend == nimbus-girders ) ]]; then pass
   else fail "mcp_oauth/$path reachable"; fi
 done
 
