@@ -84,7 +84,9 @@ class _NoReadTimeoutRetry(Retry):
 # deadline-bounded wait (ni_job_wait) returns at its cap, but its
 # abandoned thread would never end. The read timeout is above the
 # server's own aggregation cap (AGGREGATION_MAX_TIME_MS, 300 s), so a
-# legitimate slow request is never cut off first.
+# legitimate slow request is never cut off first. Behind HAProxy
+# (production reaches Girder through it) its own 300 s server timeout
+# answers 504 first; see _bound_requests.
 HTTP_TIMEOUT = (10, 330)
 
 
@@ -97,14 +99,18 @@ def _bound_requests(session) -> None:
     retry adapter retries GET/PUT/DELETE on read errors up to 5 times,
     which would turn one timeout into six requests (each re-running a
     slow server aggregation) and a stuck thread into half an hour.
-    Every other retry stays: connect errors, 502/503/504, and a
-    connection dropped before the response (a recycled keep-alive).
+    A 504 is the same event seen through a proxy (HAProxy answers 504
+    only when its server timeout runs out, never on a failed connect),
+    so it is not retried either. Every other retry stays: connect
+    errors, 502/503, and a connection dropped before the response (a
+    recycled keep-alive).
     """
     for adapter in session.adapters.values():
         retries = getattr(adapter, "max_retries", None)
         if isinstance(retries, Retry):
-            # Same settings, one changed rule; new() keeps the class.
-            adapter.max_retries = retries.new()
+            # Same settings, two changed rules; new() keeps the class.
+            adapter.max_retries = retries.new(status_forcelist=frozenset(
+                retries.status_forcelist or ()) - {504})
             adapter.max_retries.__class__ = _NoReadTimeoutRetry
     request = session.request
 
@@ -170,6 +176,9 @@ def tool_error(e: girder_client.HttpError) -> ToolError:
         return ToolError(f"Invalid request: {girder_message(e)}")
     if e.status == 404:
         return ToolError(f"Not found. {girder_message(e)}".strip())
+    if e.status == 504:
+        # A proxy's timeout: the same advice as a read timeout.
+        return ToolError(TOO_SLOW)
     return ToolError(f"NimbusImage server error ({e.status}).")
 
 

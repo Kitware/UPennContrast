@@ -868,9 +868,12 @@ with NimbusImage's Girder image like the other plugins.
   - Narrow the existing HTTPS-redirect exemption (`acl acme_challenge path_beg
     /.well-known/`) to `/.well-known/acme-challenge/`, so OAuth metadata is never served
     over plain HTTP.
-  - Send `Content-Security-Policy: frame-ancestors 'none'` (or `X-Frame-Options: DENY`)
-    for the frontend from the static server, so the OAuth consent page cannot be framed
-    even without JavaScript; the page's own frame check is the only defence today.
+  - ~~Send `Content-Security-Policy: frame-ancestors 'none'` for the frontend.~~
+    **Dropped (2026-10-16):** share links have an `#/embed/<token>` form meant to be
+    framed by other sites, and with hash routing the static server cannot tell that page
+    from the consent page, so a site-wide header would break embedding. The consent
+    page's own frame check stays the defence. Revisit if the consent page moves to its
+    own path.
   - Deny introspection from outside the VPC, so only the MCP service reaches it (it
     already answers 404 without the shared secret; this is the layer for a leaked
     secret). A literal path match is **not** enough: HAProxy matches the raw path, and
@@ -911,6 +914,32 @@ with NimbusImage's Girder image like the other plugins.
 
 - [ ] All Phase 4 changes on branches, reviewed, unit tests green.
 - [ ] `terraform plan` reviewed for the test workspace.
+
+#### Phase 4 progress (2026-10-16)
+
+On AWSDeploy branch `feature/mcp-server`; its `doc/MCP_Server.md` has the rollout,
+update and rollback steps.
+
+- `MCP_server.tf` + `templates/startup_mcp.tftpl`:
+  - a **t3.small** (x86, so it shares the Ubuntu 24 AMI; the image is multi-arch) at
+    fixed private IP `.6`, with an EIP for the boot-time ECR pull (the VPC has no NAT);
+  - 1 GB container limit; SG port 8000 from HAProxy's `/32` only; ECR pull IAM scoped
+    to `nimbus/mcp`;
+  - the secret goes in a root-only env file;
+  - gated on `MCP_SERVER_ENABLED` (default off), instance and EIP only.
+- **HAProxy template:** the rules above, ported from the local rehearsal. The rendered
+  production config was run in HAProxy 3.2.4 in front of the local stack:
+  - `check_routing.sh` passed 32/32 from outside the "VPC";
+  - from inside it, plain HTTP reached Girder and introspection reached Girder's handler;
+  - an MCP container configured like the AWS box listed datasets through it.
+
+  `user_data_base64` grew by 436 bytes, to 15,020 of EC2's 16,384 with prod-length values.
+- `scripts/push_mcp_to_ecr.sh`: a multi-arch build to `nimbus/mcp:<commit>`.
+- **Tests:**
+  - `tests/mcp_server.tftest.hcl`: off by default, names and IPs per environment, boot
+    settings, validation, and the user_data size limit;
+  - `tests/test_load_balancer_ip_manager.py`: the IP manager's first tests, proving the
+    static `nimbus-mcp` backend survives renders and never counts as drift.
 
 ### Phase 5: AWS test-environment rehearsal
 
@@ -1097,9 +1126,12 @@ the local stack. Add an item whenever a review finds something this list missed.
       aggregation cap) and is not retried after a read timeout, so one slow request is
       never re-sent and a thread abandoned at a deadline ends. A read timeout, before or
       during the body, is a clear tool error that does not name the internal host.
-      Other retries stay, including a connection dropped before the response.
+      A 504 is treated the same way: in production the server reaches Girder through
+      HAProxy, whose 300 s server timeout answers 504 before the read timeout. 502/503
+      and a connection dropped before the response are still retried.
       *"test_tool_requests_time_out_once_without_retrying"*,
-      *"test_a_body_that_stalls_is_a_timeout"*, *"test_dropped_connections_are_still_retried"*
+      *"test_a_body_that_stalls_is_a_timeout"*, *"test_dropped_connections_are_still_retried"*,
+      *"test_a_proxy_timeout_is_not_retried"*
 - [x] A wait's result is one complete job snapshot, never a mix of states.
       *"test_job_wait_never_reports_a_torn_state"*
 - [x] Failing to write the optional call log never fails a tool call.

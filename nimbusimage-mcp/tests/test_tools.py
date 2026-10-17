@@ -80,7 +80,7 @@ def test_every_tool_is_registered_with_its_annotations():
 
 @pytest.mark.parametrize("status, fragment", [
     (401, "scope"), (403, "denied"), (400, "No such folder"),
-    (404, "Not found"), (500, "server error"),
+    (404, "Not found"), (500, "server error"), (504, "took too long"),
 ])
 def test_girder_errors_become_tool_errors(nc, status, fragment):
     nc.dataset.side_effect = http_error(status, "No such folder")
@@ -183,6 +183,50 @@ def test_dropped_connections_are_still_retried():
         assert response.status_code == 200 and len(connections) == 2
     finally:
         _close_listener(listener)
+
+
+@pytest.mark.parametrize("first, requests_made", [(504, 1), (503, 2)])
+def test_a_proxy_timeout_is_not_retried(first, requests_made):
+    """A 504 is a proxy's timeout (the request already waited it out):
+    one request, not six. A 503 is still retried."""
+    import socket
+    import threading
+
+    import nimbusimage._girder as girder_module
+
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(16)
+    connections = []
+
+    def serve():
+        while True:
+            try:
+                conn, _ = listener.accept()
+            except OSError:
+                return
+            connections.append(conn)
+            conn.recv(65536)
+            status = first if len(connections) == 1 else 200
+            conn.sendall(f"HTTP/1.1 {status} X\r\nContent-Length: 2\r\n"
+                         "Connection: close\r\n\r\n{}".encode())
+            conn.close()
+
+    threading.Thread(target=serve, daemon=True).start()
+    session = girder_module._build_retry_session()
+    _common._bound_requests(session)
+    try:
+        port = listener.getsockname()[1]
+        from unittest import mock
+        with mock.patch("time.sleep"):
+            response = session.get(f"http://127.0.0.1:{port}/x")
+        assert len(connections) == requests_made
+        assert response.status_code == (504 if first == 504 else 200)
+    finally:
+        _close_listener(listener)
+    # The nimbusimage package itself still retries 504 (NIM-006).
+    assert 504 in girder_module._build_retry_session().adapters[
+        "http://"].max_retries.status_forcelist
 
 
 def test_settings_refuse_a_nonpositive_job_wait():
