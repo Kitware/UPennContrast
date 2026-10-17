@@ -591,6 +591,13 @@ tripping the revocation (review round 4). Test each malformed-request
 case with a **corrected retry that succeeds**; a test that only checks the
 error response cannot see a spent token.
 
+Sort by *who could cause it*, not by which parameter it is: a field the
+legitimate client sends and could mistype (`client_id`, `redirect_uri`,
+`resource`) is malformed; a failed proof of possession (a PKCE verifier) is
+a security event even though it is "just a parameter". Codex found the
+`redirect_uri` case a round after `resource`, because the first fix moved
+the one parameter it was shown.
+
 Apply the split to **every** credential of the kind, not the one that was
 reported: the refresh path got its resource peek and the authorization-code
 exchange, its twin, did not until a later round. And the read after the

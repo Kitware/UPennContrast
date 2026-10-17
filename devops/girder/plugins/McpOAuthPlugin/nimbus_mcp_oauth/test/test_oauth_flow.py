@@ -243,6 +243,26 @@ def testCodeWithoutClientIdIsNotSpent(enabled, user):
     assert resp.json['access_token'].startswith('nio_')
 
 
+@pytest.mark.parametrize('redirect', [None, 'http://localhost:9/callback'])
+def testCodeWithWrongRedirectIsNotSpent(enabled, user, redirect):
+    verifier, code, params = approveFlow(enabled, user)
+    resp = exchange(enabled, code, verifier, params, redirect_uri=redirect)
+    assert resp.json['error'] == 'invalid_grant'
+    # A corrected retry still works.
+    resp = exchange(enabled, code, verifier, params)
+    assert resp.json['access_token'].startswith('nio_')
+
+
+def testWrongVerifierStillSpendsTheCode(enabled, user):
+    # PKCE is the proof of possession, so a failure is not a typo to
+    # forgive: the code is gone.
+    verifier, code, params = approveFlow(enabled, user)
+    assert exchange(enabled, code, verifier, params,
+                    code_verifier='x' * 50).json['error'] == 'invalid_grant'
+    assert exchange(enabled, code, verifier, params).json[
+        'error'] == 'invalid_grant'
+
+
 def testWrongClientWithWrongResourceStillSpendsTheCode(enabled, user):
     # The peek is only for the right client; anyone else is a bad grant.
     verifier, code, params = approveFlow(enabled, user)

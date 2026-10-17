@@ -68,3 +68,24 @@ def test_public_url_trailing_slash_is_dropped():
     # exactly.
     settings = Settings.from_env({"NI_MCP_PUBLIC_URL": "https://h/mcp/"})
     assert settings.public_url == "https://h/mcp"
+
+
+@pytest.mark.parametrize("name, value", [
+    ("NI_MCP_ISSUER_URL", "https://h/oauth"),
+    ("NI_MCP_ISSUER_URL", "https://h?x=1"),
+    ("NI_MCP_ISSUER_URL", "h.example"),
+    ("NI_MCP_ISSUER_URL", "https://"),
+    ("NI_MCP_ISSUER_URL", "https://h#/"),
+    ("NI_MCP_ISSUER_URL", "https://h?/"),
+    ("NI_MCP_PUBLIC_URL", "https://h/mcp#/"),
+    ("NI_MCP_PUBLIC_URL", "https://h/mcp#frag"),
+    ("NI_MCP_PUBLIC_URL", "ftp://h/mcp"),
+    ("NI_MCP_PUBLIC_URL", "https://h:notaport/mcp"),
+    ("NI_MCP_PUBLIC_URL", "https://user:pw@h/mcp"),
+])
+def test_shared_urls_follow_the_plugins_rules(name, value):
+    # The plugin refuses these for mcp_oauth.issuer / resources (credentials
+    # in the public URL are refused here only); the MCP side starting with
+    # one would advertise what the plugin cannot match.
+    with pytest.raises(ValueError, match=name):
+        Settings.from_env({name: value})

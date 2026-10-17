@@ -1225,10 +1225,12 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
       *"testRefreshFromAnotherClientRevokes"*, *"testAnotherClientCannotProbeWithAWrongResource"*,
       *"testRefreshWithoutClientIdKeepsTheConnection"*,
       *"testRefreshWithWrongResourceKeepsTheToken"*
-- [x] Its twin, the code exchange: no `client_id`, or a wrong `resource` from the right
-      client, does not spend the code (a wrong client still does), and a code the TTL
-      monitor removes right after the claim is `invalid_grant`, not a 500.
-      *"testCodeWithoutClientIdIsNotSpent"*, *"testCodeWithWrongResourceIsNotSpent"*,
+- [x] Its twin, the code exchange: no `client_id`, or a wrong `redirect_uri` or `resource`
+      from the right client, does not spend the code (a wrong client or a wrong PKCE
+      verifier still does), and a code the TTL monitor removes right after the claim is
+      `invalid_grant`, not a 500. *"testCodeWithoutClientIdIsNotSpent"*,
+      *"testCodeWithWrongResourceIsNotSpent"*, *"testCodeWithWrongRedirectIsNotSpent"*,
+      *"testWrongVerifierStillSpendsTheCode"*,
       *"testWrongClientWithWrongResourceStillSpendsTheCode"*,
       *"testCodeRemovedAfterTheClaimIsInvalidGrant"*
 - [x] `resource` is required, compared in canonical form, and bound to the tokens.
@@ -1260,7 +1262,9 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
       *"testEveryEffectiveSettingIsChecked"*, *"testEnvironmentCimdHostsNeverMatchASubstring"*
 - [x] Settings shared with the MCP service follow the same rule on both sides: the issuer's
       trailing slash is dropped by both, and the introspection secret is printable ASCII
-      without spaces (a header value) on both. *"testSecretMustBeHeaderSafe"*,
+      without spaces (a header value) on both, and the MCP service refuses at startup an
+      issuer with a path or a public URL the plugin would refuse as a resource.
+      *"testSecretMustBeHeaderSafe"*, *"test_shared_urls_follow_the_plugins_rules"*,
       *"test_settings_introspection_secret"*, *"test_issuer_trailing_slash_is_dropped"*,
       *"test_metadata_names_the_issuer_without_a_trailing_slash"*
 - [x] URL settings are parsed, not prefix-checked: a value with no host, a bad port, a

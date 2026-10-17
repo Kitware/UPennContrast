@@ -12,9 +12,32 @@ import math
 import os
 import re
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 # Printable ASCII without spaces, 32 or more: safe as a header value.
 SECRET_RE = re.compile(r"[!-~]{32,}")
+
+
+def _http_url(name: str, value: str, bare_origin: bool = False) -> str:
+    """The rules the Girder plugin applies to the same values
+    (mcp_oauth.issuer and mcp_oauth.resources): an http(s) URL with a
+    host and no fragment, and for the issuer no credentials, path or
+    query. Stricter than the plugin in one way: no credentials in the
+    public URL either. Parsed as given, as the plugin does, then returned
+    without a trailing slash, as the plugin stores it."""
+    try:
+        parts = urlsplit(value)
+        parts.port  # raises ValueError for a bad port
+    except ValueError:
+        parts = None
+    if (parts is None or parts.scheme not in ("http", "https")
+            or not parts.hostname or parts.fragment
+            or parts.username or parts.password
+            or (bare_origin and (parts.path.rstrip("/") or parts.query))):
+        shape = "a bare origin (no path)" if bare_origin else "an http(s) URL"
+        # The value is not echoed: it may hold credentials.
+        raise ValueError(f"{name} must be {shape}.")
+    return value.rstrip("/")
 
 
 @dataclass(frozen=True)
@@ -67,14 +90,14 @@ class Settings:
             ),
             # No trailing slash: the protected-resource metadata path and
             # the proxy's exact-path rules follow this URL.
-            public_url=environ.get(
+            public_url=_http_url("NI_MCP_PUBLIC_URL", environ.get(
                 "NI_MCP_PUBLIC_URL", f"http://localhost:{port}/mcp"
-            ).rstrip("/"),
+            )),
             # Stripped as the Girder plugin strips mcp_oauth.issuer: clients
             # compare the two exactly, and the SDK keeps a trailing slash.
-            issuer_url=environ.get(
+            issuer_url=_http_url("NI_MCP_ISSUER_URL", environ.get(
                 "NI_MCP_ISSUER_URL", "http://localhost:8080"
-            ).rstrip("/"),
+            ), bare_origin=True),
             host=host,
             port=port,
             call_log=environ.get("NI_MCP_CALL_LOG") or None,
