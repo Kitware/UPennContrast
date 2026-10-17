@@ -485,9 +485,11 @@ another host.
   session behind it exists only in the MCP server's memory, Girder's database and the
   private network between them. For a site administrator that session has administrator
   powers, so the consent page warns administrators (2026-10-15 review).
-- The rate limits are per process. Authorize, token and revoke are keyed on the last
-  `X-Forwarded-For` hop (correct only behind HAProxy, which is how production runs);
-  consent is keyed per user.
+- The rate limits are per process (so about 30/min per Girder worker process, times
+  workers and instances). Authorize, token and revoke are keyed on `remote.ip`, which
+  Girder's CherryPy proxy tool takes from the first `X-Forwarded-For` entry; HAProxy
+  overwrites that header with the real client address (CytoPixel/AWSDeploy#128).
+  Consent is keyed per user.
 
 ---
 
@@ -933,7 +935,10 @@ update and rollback steps.
   - from inside it, plain HTTP reached Girder and introspection reached Girder's handler;
   - an MCP container configured like the AWS box listed datasets through it.
 
-  `user_data_base64` grew by 436 bytes, to 15,020 of EC2's 16,384 with prod-length values.
+  `user_data_base64` grew by 504 bytes, to 15,088 of EC2's 16,384 with prod-length values.
+  HAProxy also sets `X-Forwarded-For` to the real client address, replacing any the client
+  sent: Girder's CherryPy proxy tool makes its first entry `remote.ip`, which the plugin's
+  rate limits (and the anonymous raster limiter) key on.
 - `scripts/push_mcp_to_ecr.sh`: a multi-arch build to `nimbus/mcp:<commit>`.
 - **Tests:**
   - `tests/mcp_server.tftest.hcl`: off by default, names and IPs per environment, boot
@@ -1252,6 +1257,15 @@ Tests are in `devops/girder/plugins/McpOAuthPlugin/nimbus_mcp_oauth/test/`.
 - [x] A second device's sign-in (same client id) does not end the first device's
       connection, nor another client's. *"testSecondDeviceDoesNotEndTheFirst"*,
       *"testAnotherClientKeepsItsOwnConnection"*
+- [x] Consent claims a request only while it is live, so an approval racing the
+      deadline issues no code. *"testRequestExpiringDuringApprovalIssuesNoCode"*
+- [x] Rate limits key on `remote.ip`, which Girder's proxy tool takes from the first
+      `X-Forwarded-For` entry; HAProxy overwrites that header with the real address, so
+      a client cannot rotate it to dodge the limits (verified live: 30 redirects then
+      429s with a forged header per request). A repeated parameter is refused by Girder
+      (400), never a 500, and spends no code. *"testRateLimitKeyIsTheAddressTheProxyGives"*,
+      *"testRepeatedTokenFieldsAreRefusedWithoutSpendingTheCode"*,
+      *"testRepeatedRevokeAndIntrospectFieldsAreRefused"*
 - [x] The plugin cannot be enabled without an issuer and resources, nor have them cleared
       while enabled, and acts as disabled if they go missing anyway (unset, environment).
       *"testCannotEnableHalfConfigured"*, *"testHalfConfiguredActsDisabled"*. Every setting's

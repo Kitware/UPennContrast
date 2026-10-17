@@ -376,6 +376,23 @@ class TestAnnotationRaster:
 
         assert builtKeys == keys[:2]
 
+    def testAnonymousLimiterForgetsIdleClients(self, monkeypatch):
+        # One identity per client address and dataset: without a sweep the
+        # table would keep every client ever seen.
+        clock = [0.0]
+        limiter = annotationRaster._AnonymousBuildRateLimiter(
+            2, 60, lambda: clock[0])
+        monkeypatch.setattr(limiter, "SWEEP_ABOVE", 3)
+        for client in range(4):
+            limiter.check((f"10.0.0.{client}", "d"))
+        clock[0] = 61.0
+        limiter.check(("10.0.0.9", "d"))
+        assert list(limiter._attempts) == [("10.0.0.9", "d")]
+        # A client inside its window keeps its count through a sweep.
+        limiter.check(("10.0.0.9", "d"))
+        with pytest.raises(RasterBuildRateLimited):
+            limiter.check(("10.0.0.9", "d"))
+
     @pytest.mark.parametrize(
         "error,status",
         [

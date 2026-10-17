@@ -178,6 +178,20 @@ def testExpiredRequestIsRefused(enabled, user):
     assert _status(resp) == 404
 
 
+def testRequestExpiringDuringApprovalIssuesNoCode(
+        enabled, user, monkeypatch):
+    # The read said live; by the claim it had expired. The claim itself
+    # must refuse it.
+    _, requestId, _ = startFlow(enabled)
+    AuthorizationRequest().update({'_id': requestId}, {'$set': {
+        'expiresAt': oauth.now() - datetime.timedelta(seconds=1)}})
+    monkeypatch.setattr(oauth, 'expired', lambda doc: False)
+    resp = enabled.request(f'/mcp_oauth/request/{requestId}/approve',
+                           method='POST', user=user)
+    assert _status(resp) == 404
+    assert AuthorizationCode().find({}).count() == 0
+
+
 def testDenyRedirectsWithAccessDenied(enabled, user):
     _, requestId, _ = startFlow(enabled)
     resp = enabled.request(f'/mcp_oauth/request/{requestId}/deny',
@@ -717,3 +731,75 @@ def testHalfConfiguredActsDisabled(enabled):
     resp = enabled.request('/mcp_oauth/authorize',
                            params=authorizeParams(challenge))
     assert _status(resp) == 404
+
+
+def _repeated(params, key):
+    """The query string or form body a client sends with key twice."""
+    from urllib.parse import urlencode
+    pairs = [(k, v) for k, v in params.items()] + [(key, params[key])]
+    return urlencode(pairs)
+
+
+def _refusedAsRepeated(resp):
+    # Girder's own _preventRepeatedParams answers before the endpoint runs:
+    # a 400, never the endpoint seeing a list (which would be a 500).
+    return _status(resp) == 400 and 'multiple times' in resp.json['message']
+
+
+def testRepeatedTokenFieldsAreRefusedWithoutSpendingTheCode(enabled, user):
+    verifier, code, params = approveFlow(enabled, user)
+    form = {'grant_type': 'authorization_code', 'code': code,
+            'code_verifier': verifier, 'client_id': params['client_id'],
+            'redirect_uri': params['redirect_uri'],
+            'resource': params['resource']}
+    for key in ('code', 'grant_type'):
+        assert _refusedAsRepeated(enabled.request(
+            '/mcp_oauth/token', method='POST', body=_repeated(form, key),
+            type='application/x-www-form-urlencoded'))
+    assert exchange(enabled, code, verifier, params).json[
+        'access_token'].startswith('nio_')
+
+
+def testRepeatedRevokeAndIntrospectFieldsAreRefused(enabled, user):
+    from .conftest import SECRET
+    token = connect(enabled, user)['access_token']
+    body = _repeated({'token': token}, 'token')
+    assert _refusedAsRepeated(enabled.request(
+        '/mcp_oauth/revoke', method='POST', body=body,
+        type='application/x-www-form-urlencoded'))
+    assert _refusedAsRepeated(enabled.request(
+        '/mcp_oauth/introspect', method='POST', body=body,
+        type='application/x-www-form-urlencoded',
+        additionalHeaders=[('X-Mcp-Introspection-Secret', SECRET)]))
+    assert introspect(enabled, token).json['active']
+
+
+def testRepeatedAuthorizeFieldsNeverRedirect(enabled):
+    _, challenge = pkcePair()
+    resp = enabled.request(
+        '/mcp_oauth/authorize?' + _repeated(authorizeParams(challenge),
+                                            'redirect_uri'),
+        isJson=False)
+    assert _status(resp) == 400
+
+
+def testRateLimitKeyIsTheAddressTheProxyGives(enabled, monkeypatch):
+    # Through the real request stack: Girder's proxy tool makes the FIRST
+    # X-Forwarded-For entry the client (HAProxy owns the header: it
+    # overwrites it), and without the header the socket peer counts.
+    from nimbus_mcp_oauth import rest
+    keys = []
+
+    class Recorder:
+        def check(self, key):
+            keys.append(key)
+            return True
+
+    monkeypatch.setattr(rest, '_authorizeLimit', Recorder())
+    _, challenge = pkcePair()
+    params = authorizeParams(challenge)
+    enabled.request('/mcp_oauth/authorize', params=params, isJson=False,
+                    additionalHeaders=[('X-Forwarded-For',
+                                        '203.0.113.7, 198.51.100.9')])
+    enabled.request('/mcp_oauth/authorize', params=params, isJson=False)
+    assert keys == ['203.0.113.7', '127.0.0.1']

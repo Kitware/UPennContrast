@@ -153,9 +153,10 @@ def describeRequest(requestId):
 
 def _consume(requestId):
     request = pendingRequest(requestId)
-    # Atomic: of two concurrent approvals only one flips consumed.
+    # Atomic: of two concurrent approvals only one flips consumed, and only
+    # while the request is still live (it may expire after the read above).
     result = AuthorizationRequest().update(
-        {'_id': requestId, 'consumed': False},
+        {'_id': requestId, 'consumed': False, 'expiresAt': {'$gt': now()}},
         {'$set': {'consumed': True}}, multi=False)
     if result.modified_count != 1:
         raise _requestGone()

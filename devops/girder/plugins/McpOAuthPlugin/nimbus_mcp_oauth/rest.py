@@ -35,11 +35,10 @@ def _requireEnabled():
 
 
 def _clientAddress():
-    # Behind HAProxy the last X-Forwarded-For hop is the one HAProxy saw;
-    # earlier hops are whatever the client sent.
-    forwarded = cherrypy.request.headers.get('X-Forwarded-For')
-    if forwarded:
-        return forwarded.split(',')[-1].strip()
+    """The address to rate-limit. Girder turns on CherryPy's proxy tool,
+    which has already replaced remote.ip with the first X-Forwarded-For
+    entry; HAProxy sets that header to the client's real address,
+    replacing anything the client sent, so this is the client."""
     return cherrypy.request.remote.ip
 
 

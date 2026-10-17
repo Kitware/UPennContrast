@@ -243,6 +243,11 @@ class _CacheEntry:
 
 
 class _AnonymousBuildRateLimiter:
+    # Identities (client address, dataset) whose window has emptied are
+    # dropped once the table passes this size, so it is bounded by the
+    # clients active in one window, not by every client ever seen.
+    SWEEP_ABOVE = 10000
+
     def __init__(self, limit, windowSeconds, timeFn):
         self._limit = limit
         self._windowSeconds = windowSeconds
@@ -253,8 +258,12 @@ class _AnonymousBuildRateLimiter:
         if self._limit <= 0:
             raise RasterBuildRateLimited()
         now = self._timeFn()
-        attempts = self._attempts.setdefault(identity, deque())
         cutoff = now - self._windowSeconds
+        if len(self._attempts) > self.SWEEP_ABOVE:
+            self._attempts = {
+                key: times for key, times in self._attempts.items()
+                if times and times[-1] > cutoff}
+        attempts = self._attempts.setdefault(identity, deque())
         while attempts and attempts[0] <= cutoff:
             attempts.popleft()
         if len(attempts) >= self._limit:

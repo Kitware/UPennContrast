@@ -565,6 +565,33 @@ every key, so a new setting cannot be added unchecked
 through the real path: `monkeypatch.setenv('GIRDER_SETTING_...')`, then
 `Setting()._get.invalidate(Setting(), key)` (`get` is cached).
 
+## Keying a rate limit on the client address
+
+Girder turns on CherryPy's proxy tool (`tools.proxy.on`), so before any handler
+runs `cherrypy.request.remote.ip` is **already the first `X-Forwarded-For`
+entry**, not the socket peer. Two consequences:
+
+- The header must be one the proxy owns. Production HAProxy did not set it (no
+  `option forwardfor`), so a client could put anything there and rotate it to
+  dodge a limit (Codex on PR #1421). It now does
+  `http-request set-header X-Forwarded-For %[src]`, which replaces whatever the
+  client sent.
+- Code cannot check "did this come from our proxy" with `remote.ip`: it is the
+  header's value. A first fix that trusted the header only from a private
+  `remote.ip` did nothing, and its unit test passed by monkeypatching a
+  `remote.ip` the real stack never presents. Key on `remote.ip` and test
+  through `server.request(..., additionalHeaders=[('X-Forwarded-For', ...)])`
+  (`McpOAuthPlugin/.../rest.py` `_clientAddress`,
+  `testRateLimitKeyIsTheAddressTheProxyGives`).
+
+Anything else keyed on `remote.ip` changes meaning when the proxy starts setting
+the header: the anonymous raster limiter went from one bucket per dataset to one
+per client, so its table needed a sweep.
+
+Girder already refuses a repeated parameter (`code=a&code=b`) with a 400 in
+`girder.api.rest._preventRepeatedParams`, query and form body alike, before the
+endpoint runs, so endpoint code never sees a list. Don't add a second check.
+
 ## Single-use credentials: claim atomically, and only after the request is well-formed
 
 One-time codes, refresh tokens, invite links, consent requests: claim them
