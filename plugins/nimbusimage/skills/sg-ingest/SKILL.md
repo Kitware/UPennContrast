@@ -133,8 +133,10 @@ A gene appears in the app's pickers only once it has been added, which keeps a
 property list" have not added it yet.
 
 **In the app:**
-1. Open the object list (list icon) and go to the **Measurements** tab.
-2. Click **Genes from spatial table**, pick genes, and choose a mode:
+1. Click the ruler icon (**Measure objects**) and use the **Gene expression** card's
+   **Add genes…** button. Alternatively, open the object list (list icon), go to the
+   **Measurements** tab and click **Add genes**.
+2. Pick genes and choose a mode:
    - **Add as live columns** (default): no copy is made, and the genes are listed under
      **Spatial table**.
    - **Copy into a measurement**: materializes ordinary property values.
