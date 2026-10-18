@@ -966,7 +966,7 @@ Every invariant names the test that holds it (format enforced by
 - The refusal banner names a PARTIAL failure. Resolution is per plot, so a
   failed batch leaves already-resolved gates filtering; saying "the viewer
   shows everything the other filters allow" described the pre-per-plot
-  behaviour and misstated what was on screen. Asserted on rendered text,
+  behavior and misstated what was on screen. Asserted on rendered text,
   since a sentence is what was wrong and nothing typechecks one —
   *"describes a gate refusal as partial, not as everything being
   unfiltered"*
@@ -1049,7 +1049,7 @@ Every invariant names the test that holds it (format enforced by
   meaningless.** `addAnalysisPlot` was a bare `vi.fn()` that never appended,
   so nine passing tests could not observe whether the executor's plot had
   landed — exactly the state the cap race produces. Mocks mirror the real
-  action, including its refusal behaviour.
+  action, including its refusal behavior.
 - Verify from a fresh page load on a dataset that actually exceeds the cap
   (the 708,983-object Xenium dataset).
 - The parity fixture regenerates only from the TS reference implementation;

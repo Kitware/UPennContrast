@@ -19,7 +19,7 @@ GeoJS's annotation layer has several asymmetric, mutating APIs. Each trap below 
 | Connection lines mostly missing on a big (stub-only) dataset; more appear as you zoom in | Draw/retention gated on `getAnnotationFromId`, which returns `undefined` for unhydrated non-point annotations | Gate on what you actually draw from (the centroid map), never on hydration — see "Hydration-coupled draw paths" |
 | A specially styled feature reverts to the default style after a pan/zoom | The retained-feature restyle loop in `drawNewAnnotations` treats every `girderId`-bearing feature as an object annotation | `continue` on `isConnection` (or your own marker) in that loop |
 | A drawn feature can't be selected even though its record exists | One feature drawn per *pair/group* while several records map to it; the feature carries only the first record's id | Choose the selected record as the drawn representative |
-| Feature is in `layer.annotations()`, on-screen, right colour — and paints nothing | `options("style", {...})` **replaces** the style, dropping GeoJS's default `stroke: true` / `fill: true` | Include `stroke: true` explicitly, and merge: `options("style", {...a.options("style"), ...next})` |
+| Feature is in `layer.annotations()`, on-screen, right color — and paints nothing | `options("style", {...})` **replaces** the style, dropping GeoJS's default `stroke: true` / `fill: true` | Include `stroke: true` explicitly, and merge: `options("style", {...a.options("style"), ...next})` |
 | Clicking a list row shows no connection at high zoom | A connection draws only when BOTH endpoints are displayed; recentering on one leaves the other outside the viewport | Frame both endpoints (`frameCameraInfo`) instead of recentering on one |
 | With an axis unrolled, the camera/hit-test lands exactly one tile-width (or a multiple) away from the object | The draw path offsets each annotation by its grid cell; the other path used the raw frame-local centroid | Put both through `@/utils/unroll` — see "Unrolled coordinates are a third space" |
 | Hover/selection highlight works on one layer and does nothing on another | The second layer decides its styling during a rebuild pass, so only the state wired to that pass is ever reflected | Give the features a base-style option and restyle them in place — see "Layers that bake style at draw time" |
@@ -228,10 +228,10 @@ pan.
 omits them silently turns rendering off for that feature. This shipped: adding
 construction-time styling with `{strokeColor, strokeWidth, strokeOpacity}` made every
 connection line invisible at every zoom — present in `layer.annotations()`, correctly
-positioned, correct colour in `options().style`, and never painted. The tell is
+positioned, correct color in `options().style`, and never painted. The tell is
 `annotation.style().stroke === undefined` where a working feature reads `true`.
 
-Always spread the existing style, and assert renderability in tests, not just colour:
+Always spread the existing style, and assert renderability in tests, not just color:
 
 ```ts
 line.options("style", { ...line.options("style"), ...getConnectionStyle(sel, hov) });

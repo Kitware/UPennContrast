@@ -72,12 +72,12 @@ applied the reachable ones, each with a regression test that fails without it.
 
 | Area | Fixed |
 |---|---|
-| AnnotationPlugin | CSV export fills live gene (virtual) columns instead of a 400; histograms/dots honour gene filters (were an empty population); `batch` unknown gene is a 400; summary maps non-finite statistics to null (Infinity stays a value, as decided); summary validates paths before resolving filters; an omitted `upstreamGates` is `[]`, not a 500 |
+| AnnotationPlugin | CSV export fills live gene (virtual) columns instead of a 400; histograms/dots honor gene filters (were an empty population); `batch` unknown gene is a 400; summary maps non-finite statistics to null (Infinity stays a value, as decided); summary validates paths before resolving filters; an omitted `upstreamGates` is `[]`, not a 500 |
 | SpatialPlugin | dirty recompute also compares the transcript registration (file, pixel size, transform); materialize/score retire stale sub-keys on cells absent from the table; neighborhood types retired per property; materialize refuses `.`/`$` symbols; registration catches IndexError/TypeError; structural length checks at open; duplicate grid keys refused; non-finite X refused at registration; `log2FoldChange` null for non-positive means; jobs check file affiliation |
 | Frontend | values refresh after Materialize/Score/Neighborhood; a job keeps polling after its dialog closes and still refreshes (a dataset change stops it); differential result cleared when inputs change; selection summary warns when region/hidden-layer filters are not applied server-side; revoking another link keeps a just-created URL |
 
 Declined: a registered file's contents replaced in place (Girder `PUT file/contents`),
-and the CSV preview labelling gene columns "Spatial table / X" while the file writes
+and the CSV preview labeling gene columns "Spatial table / X" while the file writes
 "spatial / X" (cosmetic; needs a provider display name).
 
 Suites: AnnotationPlugin 866 (full, including test_dataset_multi_source.py), SpatialPlugin
@@ -166,7 +166,7 @@ Suites: AnnotationPlugin 866 (full, including test_dataset_multi_source.py), Spa
 
 | Finding | Status |
 |---|---|
-| P2 Wilcoxon statistic labelled `t` | fixed — header and CSV say `z` for Wilcoxon results (`t` for Welch); regression fails without the fix |
+| P2 Wilcoxon statistic labeled `t` | fixed — header and CSV say `z` for Wilcoxon results (`t` for Welch); regression fails without the fix |
 | P2 Region inputs editable while a summary runs | fixed — source and tag lock while loading (the genes were already captured per request); regression fails without the fix |
 | P2 Falsy non-object `filters` in the shared list prologue | declined — same reasoning as the aggregate endpoint: `{}` is a valid request with the same cost |
 | P2 Unfiltered aggregate reads the table, not live annotations | declined then; **fixed later at the source (ba37f908): the live mask is cached, 2.2 s cold / 0.01 s warm at 709K** |
@@ -186,7 +186,7 @@ Suites: AnnotationPlugin 866 (full, including test_dataset_multi_source.py), Spa
 | Finding | Status |
 |---|---|
 | P2 Quality threshold is not exact in every render mode | fixed — the panel says so: coarser point levels only split at Q20 (exact at 0 and 20), and the heat map counts every quality; per-level quality data was not added |
-| P2 Share-session restore can race the link's initialization | deferred — needs leaving the route inside the sub-second `loggedIn`; the worst case is a stale folder location or colour list until reload, not a wrong credential (the restored client is set synchronously) |
+| P2 Share-session restore can race the link's initialization | deferred — needs leaving the route inside the sub-second `loggedIn`; the worst case is a stale folder location or color list until reload, not a wrong credential (the restored client is set synchronously) |
 | P2 Region summaries survive dataset switches | fixed — results and the tag clear on a dataset change and an in-flight answer for another dataset is dropped; regression fails without the fix |
 | P2 Falsy non-object `filters` default to `{}` on the aggregate endpoint | declined — `{}` is itself a valid request with the same cost, so a malformed falsy value grants nothing a caller could not already ask for |
 
@@ -197,7 +197,7 @@ Suites: AnnotationPlugin 866 (full, including test_dataset_multi_source.py), Spa
 | P1 Anonymous region-summary computation | deferred — same class as the anonymous differential-expression jobs the user asked to leave unchanged (2026-09-06); the centroid pass is cached per raster version |
 | P2 Malformed `regionTag` beside `regionIds` → 500 | fixed — `regionTag` validated whenever present (400); regression in `testRegionSummaryValidation` fails without the fix |
 | P2 Region polygons counted as cells in neighborhoods | deferred — a handful of region polygons among ~700K cells barely moves counts or enrichment, and every candidate cell predicate (the `cell` tag, table membership) would exclude real cells on non-Xenium datasets; revisit if regions become numerous |
-| P2 Region results labelled with edited genes | fixed — columns use the genes the request was sent with (the button is disabled while loading, so no guard is needed); regression fails without the fix |
+| P2 Region results labeled with edited genes | fixed — columns use the genes the request was sent with (the button is disabled while loading, so no guard is needed); regression fails without the fix |
 | P2 Session not restored after leaving a shared view | fixed — `leaveShareLink` restores the replaced client on route unmount (raw-client comparison: Vuex hands back reactive proxies), including after link-to-link hops |
 
 ## Final local review (2026-09-06)
