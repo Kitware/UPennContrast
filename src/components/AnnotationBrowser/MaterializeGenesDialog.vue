@@ -1,6 +1,6 @@
 <template>
   <v-dialog v-model="dialog" max-width="600px">
-    <template v-slot:activator="activatorBinding">
+    <template v-if="showActivator" v-slot:activator="activatorBinding">
       <slot name="activator" v-bind="activatorBinding">
         <v-btn
           variant="outlined"
@@ -144,7 +144,13 @@ const DEFAULT_SCORE_PROPERTY_NAME = "Gene set scores";
 const SCORE_METHODS = ["mean", "sum"] as const;
 const JOB_POLL_MS = 2000;
 
-const dialog = ref(false);
+// Uncontrolled by default (its own activator). App.vue binds v-model:open
+// to host the app's single instance (see utils/genesDialog.ts).
+const dialog = defineModel<boolean>("open", { default: false });
+
+withDefaults(defineProps<{ showActivator?: boolean }>(), {
+  showActivator: true,
+});
 const symbols = ref<string[]>([]);
 const mode = ref<TMode>("live");
 const propertyName = ref(DEFAULT_PROPERTY_NAME);

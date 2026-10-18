@@ -71,6 +71,21 @@ async function openDialog(mode: "live" | "copy" | "score" = "copy") {
   return wrapper;
 }
 
+describe("MaterializeGenesDialog as the app-level instance", () => {
+  it("follows v-model:open and shows no activator of its own", async () => {
+    const wrapper = shallowMount(MaterializeGenesDialog, {
+      props: { open: false, showActivator: false },
+    });
+    expect((wrapper.vm as any).dialog).toBe(false);
+    await wrapper.setProps({ open: true });
+    expect((wrapper.vm as any).dialog).toBe(true);
+    (wrapper.vm as any).dialog = false;
+    await nextTick();
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+    expect(wrapper.text()).not.toContain("Genes from spatial table");
+  });
+});
+
 describe("MaterializeGenesDialog", () => {
   beforeEach(() => {
     vi.useFakeTimers();

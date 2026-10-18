@@ -522,7 +522,7 @@
       :width="RIGHT_PALETTE_WIDTHS.analyze"
       :mobile="false"
     >
-      <analyze-annotations />
+      <analyze-annotations :visible="analyzePanel" />
     </v-navigation-drawer>
 
     <floating-palette
@@ -633,6 +633,13 @@
     </template>
 
     <analyze-dialog v-model="analyzeDialogOpen" @show-in-list="onShowInList" />
+    <!-- The app's one genes dialog, opened by every "Add genes" button
+         (utils/genesDialog.ts); mounted here so a job keeps polling after
+         the dialog or tab that opened it closes. -->
+    <materialize-genes-dialog
+      v-model:open="genesDialogOpen"
+      :show-activator="false"
+    />
     <pipeline-dialog v-model="pipelineDialogOpen" />
     <color-by-property-dialog v-model:show="colorByPropertyDialogOpen" />
   </v-app>
@@ -663,6 +670,8 @@ import AnalysisPanel from "@/components/AnalysisPanel.vue";
 import TranscriptsPanel from "@/components/TranscriptsPanel.vue";
 import transcriptsStore from "@/store/transcripts";
 import AnalyzeDialog from "@/components/AnalyzeDialog.vue";
+import MaterializeGenesDialog from "@/components/AnnotationBrowser/MaterializeGenesDialog.vue";
+import { genesDialogOpen } from "@/utils/genesDialog";
 import PipelineDialog from "@/components/PipelineDialog.vue";
 import ColorByPropertyDialog from "@/components/AnnotationBrowser/ColorByPropertyDialog.vue";
 import UndoRedoButtons from "@/components/UndoRedoButtons.vue";

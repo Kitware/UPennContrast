@@ -77,6 +77,8 @@ vi.mock("@/utils/v-mousetrap", () => ({
 }));
 
 import { routeProvider, routerProvider } from "@/test/helpers";
+import MaterializeGenesDialog from "@/components/AnnotationBrowser/MaterializeGenesDialog.vue";
+import { genesDialogOpen } from "@/utils/genesDialog";
 import App from "./App.vue";
 import store from "@/store";
 import propertyStore from "@/store/properties";
@@ -700,5 +702,28 @@ describe("App", () => {
     // datasetChanged() calls closeAllPalettes when the route is not datasetview.
     vm.closeAllPalettes();
     expect(vm.annotationPanel).toBe(false);
+  });
+});
+
+describe("App genes dialog", () => {
+  it("hosts the one genes dialog, bound to the shared open flag", async () => {
+    // Every "Add genes" button opens this instance, so a running copy or
+    // score job keeps polling after the dialog or tab that opened it closes.
+    genesDialogOpen.value = false;
+    // Render <v-app>'s children (shallowMount's stub would drop them).
+    const wrapper = mountComponent(
+      {},
+      {
+        VApp: { template: "<div><slot /></div>" },
+      },
+    );
+    const dialogs = wrapper.findAllComponents(MaterializeGenesDialog);
+    expect(dialogs).toHaveLength(1);
+    expect(dialogs[0].props("showActivator")).toBe(false);
+    expect(dialogs[0].props("open")).toBe(false);
+    genesDialogOpen.value = true;
+    await nextTick();
+    expect(dialogs[0].props("open")).toBe(true);
+    genesDialogOpen.value = false;
   });
 });
