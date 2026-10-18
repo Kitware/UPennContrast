@@ -56,14 +56,14 @@ Verified in the live app at `#/datasetView/6a1978ad247013c97128321f/view`
 - **Finding 1's fix confirmed**: with the left palette column open the legend
   computes `transform: matrix(1,0,0,1,430,0)` — it joins the bottom-left
   cluster's shift instead of hiding under the palettes — at `z-index: 999`,
-  and `elementFromPoint` at the panel's centre returns the legend itself.
+  and `elementFromPoint` at the panel's center returns the legend itself.
 - **Apply → persist → refetch end to end** (via the store action the dialog
-  calls): continuous on `cell Blob metrics / Area` returned 708,983 coloured /
+  calls): continuous on `cell Blob metrics / Area` returned 708,983 colored /
   0 uncoloured, persisted the new-shape legend (ramp 150.01–1959.97, extent
   19.50–12792.47, clipped both ends), and the refetched stubs carried
-  per-annotation colours (217 distinct in a 5,000 sample).
+  per-annotation colors (217 distinct in a 5,000 sample).
 - **Categorical** on `Clustering / graphclust`: 36 categories, **36 distinct
-  colours**, cluster 1 `#4e79a7` vs cluster 21 `#2b435c` — the palette
+  colors**, cluster 1 `#4e79a7` vs cluster 21 `#2b435c` — the palette
   extension working on real data. Legend showed 30 rows + "+6 more",
   scrollable at 240px.
 - **Collapse/reopen via real clicks**: persisted `showLegend` false/true, and
@@ -89,15 +89,15 @@ the DOM and enabled, and clicks register (`v-overlay--active`, z-index 2000),
 but overlay content never becomes hittable. Environmental, not a defect; needs
 a foreground window to confirm.
 
-**Dataset left clean**: all 708,983 colours `null` and no legend in the
+**Dataset left clean**: all 708,983 colors `null` and no legend in the
 configuration, so a fresh apply from the UI starts from nothing.
 
 ## Post-apply refetch removed (`returnAssignment`)
 
-Follow-up after measuring the whole user-visible operation: writing colours was
+Follow-up after measuring the whole user-visible operation: writing colors was
 never the dominant cost — the `GET /stubs` refetch that followed it was (12.8s,
 178 MB, recomputing every centroid from full polygon coordinates for a change
-that touched only a colour string). The endpoint already holds the id→colour
+that touched only a color string). The endpoint already holds the id→color
 grouping it just wrote, so it now returns it on request and the client patches
 in place. **Whole apply on 708K annotations: ~22s → ~11s.** See
 `COLOR_BY_PROPERTY.md` § "The post-apply refetch" for the numbers and the
@@ -108,11 +108,11 @@ Two defects found while building it, both by measuring rather than reasoning:
 | # | Problem | How it surfaced | Fix |
 |---|---------|-----------------|-----|
 | L4 | The new mutation assigned `annotationStubs` **without `markRaw`** — the only one of ten assignments to that map that didn't — so Vue walked and proxied all 708,983 entries | The clear path measured **16.9s** when the backend clear is ~5s and the patch ~0.5s; the gap didn't add up | `markRaw(newStubs)`, plus `src/store/__tests__/rawStateMaps.test.ts` asserting the invariant for every mutation replacing one of these maps. Verified by removing only the `markRaw` call: exactly one test fails. Patch is now **~0.5s** |
-| L5 | Hydration issued before a recolor could land after it and reinstate pre-recolor colours (the race raised in review) | Reasoned from the write window, then reproduced live by committing a stale-coloured hydration | `mergeHydratedAnnotations` takes `color` from the local stub when one exists; geometry still comes from the fetch. Verified live: `#STALE0` overridden, coordinates preserved |
+| L5 | Hydration issued before a recolor could land after it and reinstate pre-recolor colors (the race raised in review) | Reasoned from the write window, then reproduced live by committing a stale-colored hydration | `mergeHydratedAnnotations` takes `color` from the local stub when one exists; geometry still comes from the fetch. Verified live: `#STALE0` overridden, coordinates preserved |
 
 Verified live on the 708K dataset: **zero** stub refetches on both apply and
-clear, **zero** mismatches across all 708,983 stub colours against the returned
-assignment, and a direct 5/5 spot-check of client colours against MongoDB.
+clear, **zero** mismatches across all 708,983 stub colors against the returned
+assignment, and a direct 5/5 spot-check of client colors against MongoDB.
 
 ## Merge-round findings (Codex on merge commit `34053a4`, plus carried-over P2s)
 

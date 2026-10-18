@@ -97,7 +97,7 @@ Anything added here later needs the same treatment.
       2×2 one. — *"wraps onto the next grid row past the last column"*
 - [ ] **Cell 0 and the un-unrolled case are untouched.** The raw centroid *is* the
       drawn position there, and this must not regress the pre-existing Objects-tab
-      behaviour. — *"leaves the centroid alone for a frame on the first cell"*,
+      behavior. — *"leaves the centroid alone for a frame on the first cell"*,
       *"does not offset when unrolling is off"*
 - [ ] **The offset is computed after the frame is set**, so the grid is the one
       being navigated to rather than the one being left.

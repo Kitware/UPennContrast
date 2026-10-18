@@ -489,7 +489,7 @@ class, so `dense` still works and the only symptom is
 `[Vuetify UPGRADE] 'dense' is deprecated` in the console. Don't trust
 Vuetify's own JSDoc here: `makeVRowProps` says `@deprecated use
 density="compact"` while the runtime warning and the class mapping both say
-`comfortable`. `comfortable` is the behaviour-preserving one.
+`comfortable`. `comfortable` is the behavior-preserving one.
 
 **The warning is one-shot per mounted row, not per render.** `deprecate()` is
 called from `VRow.setup()`, so re-rendering or updating an existing row never
@@ -987,7 +987,7 @@ produced (the store refuses at its cap by no-oping, and the executor went on
 to configure and report a plot that did not exist).
 
 The rule: **a mocked action must reproduce the state change its caller depends
-on, including its refusal behaviour.** If the real action appends, the mock
+on, including its refusal behavior.** If the real action appends, the mock
 appends; if the real one silently no-ops past a cap, the mock does too. When a
 test needs extra side effects on top, factor the default into a helper and
 call it, rather than replacing the implementation and silently dropping the

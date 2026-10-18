@@ -1629,6 +1629,11 @@ function _syncAnnotationOverviewLayer(
     params.layer.crossDomain = "use-credentials";
     params.layer.autoshareRenderer = false;
     params.layer.nearestPixel = params.layer.maxLevel;
+    // Overview tiles are transparent outside the shapes. With GeoJS's
+    // default keepLower, every coarser level stays drawn beneath the
+    // current one and shows through the gaps as blocky halos around cells
+    // (coarse levels splat small objects as single pixels, magnified 8-64x).
+    params.layer.keepLower = false;
     params.layer.url = blankUrl;
     params.layer.visible = false;
     mapentry.annotationOverviewLayer = markRaw(

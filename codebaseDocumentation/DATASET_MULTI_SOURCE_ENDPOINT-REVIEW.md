@@ -25,7 +25,7 @@ below are *gaps in coverage*, not drift in the ported arithmetic.
 |---|---|---|---|---|
 | R1 | medium | `nimbusimage/client.py:110` | Datasets created through the API never appeared in `list_datasets()`, which enumerates dataset views | fixed — the endpoint now creates a collection + view (`createView`, default on) |
 | R2 | low | `server/helpers/multi_source.py:125` | `_js_number_or_zero` returned `-0.0` where JS `\|\| 0` gives `+0`, rendering "-0 nm" | fixed |
-| R3 | low | `nimbusimage/models.py:175` | `isRGBFile` / `rgbBandCount` / `transcodeDefault` came back only on dry runs and were dropped by the model | fixed — returned by both paths, modelled on both |
+| R3 | low | `nimbusimage/models.py:175` | `isRGBFile` / `rgbBandCount` / `transcodeDefault` came back only on dry runs and were dropped by the model | fixed — returned by both paths, modeled on both |
 | R4 | low | `test_dataset_multi_source.py` | Malformed-body dry-run test asserted only the status, and two routes reached 400 | fixed — pins the reason |
 | R5 | low | `test_multi_source_parity.py:112` | Validation fixtures check message parity across ends that deliberately behave differently | fixed — documented at the assertion |
 | R6-R9 | nit | package + tests | `import os` in a method; `(source, guess)` used as a variable identity; `"multi-source2.json"` literal ×10; `upload()` silently dropping subdirectories | fixed |
@@ -33,7 +33,7 @@ below are *gaps in coverage*, not drift in the ported arithmetic.
 R1's fix is the largest: a fourth port (`helpers/default_configuration.py`,
 covering `defaultConfigurationBase` / `newLayer` / `getDatasetCompatibility` /
 `getDatasetScales` / `inferZStepFromDimensionLabelsUm`) so the collection gets
-the same default layers, colours and scales the UI would create. Two
+the same default layers, colors and scales the UI would create. Two
 divergences were caught while writing its tests, both of which would have made
 API-created datasets subtly different from UI-created ones:
 
@@ -43,10 +43,10 @@ API-created datasets subtly different from UI-created ones:
   (`nanometers`, `micrometer`, …) and normalizes GREEK SMALL LETTER MU to MICRO
   SIGN before matching.
 
-The colour tables are the drift risk, so `TestColourTableParity` re-parses
+The color tables are the drift risk, so `TestColourTableParity` re-parses
 `src/store/model.ts` and compares — a palette edit on the frontend fails the
 backend suite instead of silently giving API-created datasets different layer
-colours. It self-skips where the frontend tree is unreachable (the Linux
+colors. It self-skips where the frontend tree is unreachable (the Linux
 container), so run that file under `tox` too, where 43 tests pass rather than
 40 + 3 skipped.
 
@@ -64,7 +64,7 @@ own variable as it is created.
 |---|---|---|---|---|
 | X1 | P2 | `server/api/dataset.py` | Clearing the source items ran before the transcode and view creation, so a later failure destroyed `largeImage` state this request did not create and cannot restore — and deletes the derived file for a worker-converted source | fixed — the destructive clear is now the last step |
 | X2 | P2 | `server/api/dataset.py` | Compositing forces every `xySet` to 0, so the image has one XY position, but the collection recorded the assignment size and `areCompatibles()` would call it incompatible with its own dataset | fixed — `compute_configuration` reports `compositing`, and the compatibility block uses `xy_count=1` when it is set |
-| X3 | P2 | `server/helpers/default_configuration.py` | The creator's saved channel-colour overrides were ignored, so API-created collections silently differed from UI-created ones | fixed — `resolve_channel_colors` merges them, loaded via `UserColors().getUserColors(user)` |
+| X3 | P2 | `server/helpers/default_configuration.py` | The creator's saved channel-color overrides were ignored, so API-created collections silently differed from UI-created ones | fixed — `resolve_channel_colors` merges them, loaded via `UserColors().getUserColors(user)` |
 
 All three were verified against the frontend before fixing: `areCompatibles`
 does compare `xyDimensions` exactly, and `createConfigurationFromDataset` does
@@ -413,7 +413,7 @@ mongodb://mongodb:27017"` and
   so.** Otherwise `areCompatibles()` rejects the collection for its own
   dataset. — *"test_compositing_reported_and_xy_collapsed"*,
   *"test_not_compositing_when_not_requested"*
-- [ ] **The creator's channel-colour overrides are honoured.** —
+- [ ] **The creator's channel-color overrides are honored.** —
   *"testUserChannelColoursAreHonoured"*, *"testUserOverrideWinsOverTheDefaultTable"*,
   *"testMergeDoesNotMutateTheSharedTable"*
 - [ ] **Every `logger.exception` sits inside an exception handler.** Outside
@@ -490,12 +490,12 @@ mongodb://mongodb:27017"` and
   built both in a helper returning a tuple, so a failure lost the caller's
   handle on the collection and leaked it. —
   *"testViewFailureRollsBackTheWholeRequest"*
-- [ ] **The ported colour tables equal the frontend's.** Re-parsed from
+- [ ] **The ported color tables equal the frontend's.** Re-parsed from
   `src/store/model.ts`, with a guard that the parse found something. —
   *"testPaletteMatches"*, *"testChannelColoursMatch"*,
   *"testParsingFoundSomething"*
 - [ ] **Layer defaults match `newLayer`.** Known channel names keep their
-  colour, a duplicate colour falls back to the palette, duplicate names get
+  color, a duplicate color falls back to the palette, duplicate names get
   positional ones, and an empty name becomes "Channel N" (not "Layer N" --
   that branch is dead in the frontend too). —
   *"testKnownChannelNamesGetTheirColour"*,
