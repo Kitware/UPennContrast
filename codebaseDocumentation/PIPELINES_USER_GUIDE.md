@@ -132,9 +132,11 @@ where its settings come from. Only its name and Enabled toggle can be changed
 in the pipeline. **Unlink** (in the step's editor) turns it into an independent
 step that keeps the current values and can be edited on its own; unlinking a
 property step means the pipeline will create its own property on the next run,
-leaving the original untouched. If the source tool or property is deleted, the
-step shows "source deleted" and keeps running with the last saved copy of its
-settings. A tool that still exists but no longer has a worker image shows "tool
+leaving the original untouched. If the source tool is deleted, the step shows
+"source deleted" and keeps running with the last saved copy of its settings. A
+linked property that can't be found shows "source unavailable": the next run
+reloads the properties, and if it really was deleted, computes a new property
+from the last saved copy of its settings. A tool that still exists but no longer has a worker image shows "tool
 has no worker" and is treated the same way.
 
 ### Configuring a step

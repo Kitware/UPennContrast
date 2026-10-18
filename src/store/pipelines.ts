@@ -417,12 +417,11 @@ export class Pipelines extends VuexModule {
     // then auto-wiring is re-applied so a property step reads the tags its
     // upstream step produces now (a linked tool's output tags may have changed
     // since the pipeline was saved). materializedPropertyId is written to the
-    // run step and copied back to the stored steps after the loop.
+    // run step and copied to the stored step as soon as it changes.
     const runSteps = computeAutoWiredSteps(
       pipeline.steps.map((step) =>
         resolveLinkedStep(step, main.tools, properties.properties),
       ),
-      { wireUnflagged: false },
     );
 
     for (const stepIndex of enabledIndices) {
@@ -515,6 +514,12 @@ export class Pipelines extends VuexModule {
               runStep.materializedPropertyId !== previousMaterializedPropertyId
             ) {
               materializedPropertyChanged = true;
+              // Onto the stored step now (runStep is a copy wherever resolving
+              // or wiring changed it), so later steps' reference checks see it.
+              mergeMaterializedPropertyIds(pipeline, {
+                ...pipeline,
+                steps: [runStep],
+              });
             }
             if (property) {
               submitted = await properties.submitPropertyJob({
@@ -577,9 +582,6 @@ export class Pipelines extends VuexModule {
         break;
       }
     }
-
-    // runSteps are copies wherever resolving or wiring changed a step.
-    mergeMaterializedPropertyIds(pipeline, { ...pipeline, steps: runSteps });
 
     try {
       // Persist newly-materialized property ids captured during the run, but

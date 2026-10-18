@@ -421,4 +421,48 @@ describe("PipelineEditor linked steps", () => {
       expect.objectContaining({ id: "pipe" }),
     );
   });
+
+  it("keeps a wired property step's tags when its upstream step is removed before saving", async () => {
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [
+        {
+          ...linkedAnnotationStep("a", "none"),
+          sourceToolId: undefined,
+          annotation: annotationSetup(["upstream"]),
+        },
+        propertyStep("p", { inputTags: { tags: [], exclusive: false } }),
+      ],
+    });
+    const vm = wrapper.vm as any;
+    expect(vm.displayedPipeline.steps[1].inputTags.tags).toEqual(["upstream"]);
+
+    vm.askRemoveStep(0);
+    await vm.save();
+
+    const [saved] = h.pipelinesStore.savePipeline.mock.calls[0];
+    expect(saved.steps[0].inputTags.tags).toEqual(["upstream"]);
+  });
+
+  it("does not auto-wire a property step without the autoWired flag", () => {
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [
+        {
+          ...linkedAnnotationStep("a", "none"),
+          sourceToolId: undefined,
+          annotation: annotationSetup(["upstream"]),
+        },
+        propertyStep("p", {
+          autoWired: undefined,
+          inputTags: { tags: ["manual"], exclusive: false },
+        }),
+      ],
+    });
+    const vm = wrapper.vm as any;
+
+    expect(vm.displayedPipeline.steps[1].inputTags.tags).toEqual(["manual"]);
+  });
 });

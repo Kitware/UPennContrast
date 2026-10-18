@@ -460,7 +460,7 @@
 
 <script setup lang="ts">
 import { computed, inject, onMounted, ref, watch } from "vue";
-import { cloneDeep, omit, pick } from "lodash";
+import { cloneDeep, omit } from "lodash";
 import store from "@/store";
 import pipelinesStore, {
   mergeMaterializedPropertyIds,
@@ -519,7 +519,7 @@ const controller = inject<PipelineRunController>(PipelineRunControllerKey)!;
 // Linked steps are read-only apart from their name and enabled flag: they are
 // shown, run and saved with their source's live values (edited in the Tools
 // panel, not here). See "Linked steps" in WORKER_PIPELINES.md.
-const localPipeline = ref<IPipeline>(cloneDeep(props.pipeline));
+const localPipeline = ref<IPipeline>(clonePipelineForEditing(props.pipeline));
 
 // A pipeline's steps as shown and as saved: linked steps take their live
 // source's values (their saved copy stays the fallback if the source goes),
@@ -531,6 +531,21 @@ function displayedSteps(steps: TPipelineStep[]): TPipelineStep[] {
       resolveLinkedStep(step, store.tools, propertiesStore.properties),
     ),
   );
+}
+
+// Auto-wired property steps keep their wired tags on the working copy (as
+// shown), so a step keeps them if its upstream step is later removed or
+// disabled, rather than falling back to the tags it had before wiring.
+function withWiredTags(steps: TPipelineStep[]): TPipelineStep[] {
+  const wired = displayedSteps(steps);
+  return steps.map((step, index) =>
+    step.kind === "property" && !step.sourcePropertyId ? wired[index] : step,
+  );
+}
+
+function clonePipelineForEditing(pipeline: IPipeline): IPipeline {
+  const clone = cloneDeep(pipeline);
+  return { ...clone, steps: withWiredTags(clone.steps) };
 }
 
 const displayedPipeline = computed<IPipeline>(() => ({
@@ -547,7 +562,7 @@ function loadMissingLinkedProperties() {
 watch(
   () => props.pipeline.id,
   () => {
-    localPipeline.value = cloneDeep(props.pipeline);
+    localPipeline.value = clonePipelineForEditing(props.pipeline);
     loadMissingLinkedProperties();
     materializedPropertyIdsToRemove.value = [];
     showRemoveStepDialog.value = false;
@@ -663,7 +678,7 @@ const stepCaptions = computed<(string | null)[]>(() => {
       }
       return null;
     }
-    if (step.autoWired === false || step.sourcePropertyId) {
+    if (step.autoWired !== true || step.sourcePropertyId) {
       return null;
     }
     if (!lastAnnotation) {
@@ -674,7 +689,7 @@ const stepCaptions = computed<(string | null)[]>(() => {
 });
 
 function updateSteps(steps: TPipelineStep[]) {
-  localPipeline.value.steps = steps;
+  localPipeline.value.steps = withWiredTags(steps);
 }
 
 const linkStates = computed<TStepLinkState[]>(() =>
@@ -685,9 +700,15 @@ const linkStates = computed<TStepLinkState[]>(() =>
 
 function unusableSourceLabel(index: number): string {
   const linkState = linkStates.value[index];
-  return linkState?.state === "missing" && linkState.sourceName
-    ? "tool has no worker"
-    : "source deleted";
+  if (linkState?.state !== "missing") {
+    return "";
+  }
+  if (linkState.reason === "noWorker") {
+    return "tool has no worker";
+  }
+  return linkState.sourceKind === "tool"
+    ? "source deleted"
+    : "source unavailable";
 }
 
 function linkedSourceName(index: number): string {
@@ -695,32 +716,16 @@ function linkedSourceName(index: number): string {
   return linkState?.state === "linked" ? linkState.sourceName : "";
 }
 
-function isLinkedStep(step: TPipelineStep): boolean {
-  return step.kind === "annotation"
-    ? !!step.sourceToolId
-    : !!step.sourcePropertyId;
-}
-
-// `newStep` is the displayed step with the user's change. A linked step keeps
-// only a new name or enabled flag: its other settings are its source's (its
-// editors are locked, but they still re-emit). Anything else — including
-// Unlink, which drops the link and keeps the shown values — replaces the step.
+// `newStep` is the displayed step with the user's change (for a linked step,
+// only its name, enabled flag or Unlink: its editor emits nothing else).
 // Child editors re-emit whenever their value's identity changes, so an emit
 // that changes nothing must change no state.
 function handleStepUpdate(index: number, newStep: TPipelineStep) {
-  const shown = displayedPipeline.value.steps[index];
-  const ownFields = (step: TPipelineStep) => pick(step, "name", "enabled");
-  if (
-    samePersistedValue(newStep, shown) ||
-    (isLinkedStep(newStep) &&
-      samePersistedValue(ownFields(newStep), ownFields(shown)))
-  ) {
+  if (samePersistedValue(newStep, displayedPipeline.value.steps[index])) {
     return;
   }
   const steps = localPipeline.value.steps.slice();
-  steps[index] = isLinkedStep(newStep)
-    ? { ...steps[index], ...ownFields(newStep) }
-    : newStep;
+  steps[index] = newStep;
   updateSteps(steps);
 }
 

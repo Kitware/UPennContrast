@@ -415,8 +415,8 @@ behave exactly as before. Pure helpers live in `src/utils/pipelineLinks.ts`
 | What runs | The tool's current image, parameters, annotation setup, `connectTo`, `jobDateTag` (transient tool built from `resolveLinkedStep`) | The property itself (`submitPropertyJob` on its id); no materialization | The step's saved copy (a property step materializes from it as before). Before treating a linked property as deleted, the runner reloads the configuration's properties once (`loadMissingLinkedProperties`, after taking the run lock — it never rejects, so it cannot leave the lock held; once per batch; the editor does the same on open), so one that simply had not loaded yet is computed, not duplicated. If that reload fails, the step fails rather than materializing a possible duplicate. A step already running its fallback is not rechecked and keeps running it |
 | Editor: worker image | Locked | Locked | Locked |
 | Editor: parameters / tags | Locked: "edit them in the Tools panel, or Unlink to customize this step" | Locked: "Unlink to customize this step" (properties are immutable in the UI) | Locked |
-| Header chip | link icon + tool name | link icon + property name | "source deleted" (warning), or "tool has no worker" for a tool that still exists without a worker image (also unusable, so the saved copy runs) |
-| Auto-wiring (§5) | Its output tags feed downstream steps as usual — **also at run time**: the runner re-applies auto-wiring (`computeAutoWiredSteps`, `src/utils/pipelineWiring.ts`) to the resolved steps, so a tool whose output tags changed since the last save still feeds the property steps after it. The runner rewires only steps flagged `autoWired: true`, never an unflagged one (saved before the flag existed; its tags may be manual) | Skipped: computes on the property's own tags/shape | Same as when live |
+| Header chip | link icon + tool name | link icon + property name | "source deleted" for a tool, "source unavailable" for a property (it may only not be loaded yet; the runner reloads before deciding), or "tool has no worker" for a tool that still exists without a worker image (also unusable, so the saved copy runs) |
+| Auto-wiring (§5) | Its output tags feed downstream steps as usual — **also at run time**: the runner re-applies auto-wiring (`computeAutoWiredSteps`, `src/utils/pipelineWiring.ts`) to the resolved steps, so a tool whose output tags changed since the last save still feeds the property steps after it. Only steps flagged `autoWired: true` are rewired. If the tool's output tags change, a wired step's pipeline-created property no longer matches, so the next run replaces it (`ensureMaterializedProperty` drift, as when tags are edited in the pipeline) | Skipped: computes on the property's own tags/shape | Same as when live |
 
 **Editor behaviour** (`PipelineEditor.vue`, `PipelineStepEditor.vue`):
 
@@ -424,9 +424,9 @@ behave exactly as before. Pure helpers live in `src/utils/pipelineLinks.ts`
   unlinked value. What is shown (`displayedPipeline`) is each linked step
   resolved against its **live** source, then auto-wired, so a tool edited
   elsewhere shows through at once. A linked step's settings are locked
-  (`v-defaults-provider` with a global `disabled` default plus `inert`); only
-  its name and enabled flag can change, and `handleStepUpdate` keeps only those
-  from a linked step's emit (its locked editors still re-emit).
+  (`v-defaults-provider` with a global `disabled` default plus `inert`), and
+  `PipelineStepEditor` emits nothing for it but a new name, enabled flag or
+  Unlink (its locked child editors still re-emit).
 - **Viewing writes nothing.** A linked step's unset parameters *show* the
   worker's defaults (as the tool's own menu does) without writing them; an
   unlinked step is still seeded on mount. An emit that changes nothing changes
@@ -445,7 +445,10 @@ behave exactly as before. Pure helpers live in `src/utils/pipelineLinks.ts`
   save stays unsaved.
 - **Unlink** removes `sourceToolId` / `sourcePropertyId` and keeps the shown
   values (including displayed defaults and any saved parameter the worker no
-  longer declares) as an independent, editable step. An unlinked property step gets
+  longer declares) as an independent, editable step. Unlinking a step from a
+  live property means the pipeline computes its own copy of that property
+  from then on (the banner says so): reusing the user's property would let a
+  later settings change replace and delete it. An unlinked property step gets
   `autoWired: false` (it keeps the property's tags). It never takes the user's
   property as its `materializedPropertyId`, so its next run materializes a new
   property and the user's property is never touched; a property the fallback
@@ -628,10 +631,13 @@ make this correct-by-default so users don't have to reason about it:
   (`src/utils/pipelineWiring.ts`) — in the editor whenever it shows the
   pipeline, and by the runner on the steps as they run (so a linked tool's
   changed output tags reach the property steps after it even when the
-  pipeline is run from the list without being reopened). The runner rewires
-  only steps flagged `autoWired: true`; an unflagged step (saved before the
-  flag existed) is wired when the editor shows it, and saved wired. A manual
-  tag or shape edit sets `autoWired: false`.
+  pipeline is run from the list without being reopened). Only steps flagged
+  `autoWired: true` are wired, in the editor and the runner alike: the editor
+  sets the flag on every property step it adds (the flag shipped with
+  pipelines), so an unflagged step was made elsewhere and its tags may be
+  deliberate. A manual tag or shape edit sets `autoWired: false`. The editor
+  keeps wired tags on its working copy, so a step keeps them if its upstream
+  step is later removed or disabled.
 - **Validation (warn, don't block):** before running, flag property steps whose
   `inputTags` match no upstream output tags and no pre-existing annotations —
   they'll compute on nothing. Show as a non-blocking warning in the editor.
@@ -967,8 +973,13 @@ Linked steps (§3.4):
   *"runs a step already on its fallback when another step's reload fails"*.
 - Drift replacement never deletes a property another step links to —
   *"does not delete a drifted-away property that another step links to"*.
-- Deleting a pipeline never deletes a linked property —
-  *"never deletes a linked property when its pipeline is deleted"*.
+- Deleting a pipeline never deletes a linked property, nor a property it
+  materialized that another pipeline links to —
+  *"never deletes a linked property when its pipeline is deleted"*,
+  *"keeps a materialized property another pipeline links to when its own pipeline is deleted"*.
+- A new materialized id reaches the stored step at once, so a property every
+  step drifted away from in one run is deleted, not orphaned —
+  *"deletes a property both of whose steps drifted away from it in one run"*.
 - The runner re-wires property steps to what a linked tool produces now, but
   never an unflagged step —
   *"re-wires a property step to the output tags its linked tool produces now"*,
@@ -981,6 +992,7 @@ Linked steps (§3.4):
 - A linked step is read-only: its settings are locked with a pointer to the
   Tools panel, and only its name and enabled flag change —
   *"locks a linked step's settings and says where to edit them"*,
+  *"emits only name and enabled changes for a linked step"*,
   *"leaves an unlinked step's settings editable"*,
   *"keeps only the name and enabled flag from an edit to a linked step"*.
 - Viewing writes nothing, and re-emits change nothing —
@@ -995,5 +1007,8 @@ Linked steps (§3.4):
   declares —
   *"keeps the shown values when a linked step is unlinked"*,
   *"keeps saved parameters the worker no longer declares on unlink"*.
-- Auto-wiring leaves property-linked steps alone —
-  *"does not auto-wire a step linked to an existing property"*.
+- Auto-wiring leaves property-linked and unflagged steps alone, and wired tags
+  survive removing the upstream step —
+  *"does not auto-wire a step linked to an existing property"*,
+  *"does not auto-wire a property step without the autoWired flag"*,
+  *"keeps a wired property step's tags when its upstream step is removed before saving"*.

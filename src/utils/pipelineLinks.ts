@@ -58,10 +58,10 @@ export type TPropertyLinkedFields = Pick<
 >;
 
 // A worker tool's values as annotation-step fields (the inverse of the
-// pipeline runner's buildTransientTool). Null when the tool has no worker
-// image. `annotation` falls back to `fallbackAnnotation` for a tool saved
-// without one.
-export function toolLinkedFields(
+// pipeline runner's buildTransientTool), sharing the tool's objects. Null when
+// the tool has no worker image. `annotation` falls back to
+// `fallbackAnnotation` for a tool saved without one.
+function toolFields(
   tool: IToolConfiguration,
   fallbackAnnotation: IAnnotationSetup,
 ): TToolLinkedFields | null {
@@ -71,29 +71,35 @@ export function toolLinkedFields(
   }
   return {
     image,
-    workerInterfaceValues: cloneDeep(tool.values.workerInterfaceValues ?? {}),
-    annotation: tool.values.annotation
-      ? cloneDeep(tool.values.annotation)
-      : cloneDeep(fallbackAnnotation),
-    connectTo: tool.values.connectTo
-      ? cloneDeep(tool.values.connectTo)
-      : undefined,
+    workerInterfaceValues: tool.values.workerInterfaceValues ?? {},
+    annotation: tool.values.annotation ?? fallbackAnnotation,
+    connectTo: tool.values.connectTo || undefined,
     jobDateTag: tool.values.jobDateTag ?? undefined,
   };
+}
+
+// A property's settings as property-step fields, sharing its objects.
+function propertyFields(property: IAnnotationProperty): TPropertyLinkedFields {
+  return {
+    image: property.image,
+    workerInterfaceValues: property.workerInterface ?? {},
+    shape: property.shape,
+    inputTags: property.tags,
+  };
+}
+
+// Copies of a tool's or property's settings as step fields, for a new step.
+export function toolLinkedFields(
+  tool: IToolConfiguration,
+  fallbackAnnotation: IAnnotationSetup,
+): TToolLinkedFields | null {
+  return cloneDeep(toolFields(tool, fallbackAnnotation));
 }
 
 export function propertyLinkedFields(
   property: IAnnotationProperty,
 ): TPropertyLinkedFields {
-  return {
-    image: property.image,
-    workerInterfaceValues: cloneDeep(property.workerInterface ?? {}),
-    shape: property.shape,
-    inputTags: {
-      tags: [...property.tags.tags],
-      exclusive: property.tags.exclusive,
-    },
-  };
+  return cloneDeep(propertyFields(property));
 }
 
 // The step's link fields, for comparing a step against its source or an
@@ -144,15 +150,19 @@ export function findSourceProperty(
 
 // How a step relates to a source: not linked, linked to a live source (with
 // its name), or linked to a source it can no longer use, in which case the
-// runner uses the step's saved copy. An unusable source is either gone or, for
-// a tool, still there but without a worker image (`sourceName` is set then).
+// runner uses the step's saved copy. An unusable source is either not in the
+// loaded list (`notFound`: a deleted one, or a property not loaded yet, which
+// the runner reloads before deciding) or a tool still there but without a
+// worker image (`noWorker`).
 export type TStepLinkState =
   | { state: "unlinked" }
   | { state: "linked"; sourceKind: "tool" | "property"; sourceName: string }
+  | { state: "missing"; sourceKind: "tool" | "property"; reason: "notFound" }
   | {
       state: "missing";
-      sourceKind: "tool" | "property";
-      sourceName?: string;
+      sourceKind: "tool";
+      reason: "noWorker";
+      sourceName: string;
     };
 
 export function stepLinkState(
@@ -166,11 +176,16 @@ export function stepLinkState(
     }
     const tool = tools.find((t) => t.id === step.sourceToolId);
     if (!tool) {
-      return { state: "missing", sourceKind: "tool" };
+      return { state: "missing", sourceKind: "tool", reason: "notFound" };
     }
     return findSourceTool(step, tools)
       ? { state: "linked", sourceKind: "tool", sourceName: tool.name }
-      : { state: "missing", sourceKind: "tool", sourceName: tool.name };
+      : {
+          state: "missing",
+          sourceKind: "tool",
+          reason: "noWorker",
+          sourceName: tool.name,
+        };
   }
   if (!step.sourcePropertyId) {
     return { state: "unlinked" };
@@ -178,12 +193,13 @@ export function stepLinkState(
   const property = findSourceProperty(step, propertyList);
   return property
     ? { state: "linked", sourceKind: "property", sourceName: property.name }
-    : { state: "missing", sourceKind: "property" };
+    : { state: "missing", sourceKind: "property", reason: "notFound" };
 }
 
-// The step with its saved copy replaced by its live source's values. Returns
-// the step itself (same object) when it is unlinked, its source is gone, or
-// the copy already matches, so callers can tell whether anything changed.
+// The step with its saved copy replaced by (a copy of) its live source's
+// values. Returns the step itself (same object) when it is unlinked, its
+// source is gone, or the copy already matches, so callers can tell whether
+// anything changed; the source is only cloned when it differs.
 export function resolveLinkedStep<T extends TPipelineStep>(
   step: T,
   tools: IToolConfiguration[],
@@ -196,18 +212,18 @@ export function resolveLinkedStep(
 ): TPipelineStep {
   if (step.kind === "annotation") {
     const tool = findSourceTool(step, tools);
-    const fields = tool && toolLinkedFields(tool, step.annotation);
+    const fields = tool && toolFields(tool, step.annotation);
     if (!fields || samePersistedValue(fields, stepToolLinkedFields(step))) {
       return step;
     }
-    return { ...step, ...fields };
+    return { ...step, ...cloneDeep(fields) };
   }
   const property = findSourceProperty(step, propertyList);
   if (!property) {
     return step;
   }
-  const fields = propertyLinkedFields(property);
+  const fields = propertyFields(property);
   return samePersistedValue(fields, stepPropertyLinkedFields(step))
     ? step
-    : { ...step, ...fields };
+    : { ...step, ...cloneDeep(fields) };
 }

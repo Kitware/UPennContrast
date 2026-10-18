@@ -924,6 +924,56 @@ describe("linked steps", () => {
     expect(h.properties.deleteProperty).not.toHaveBeenCalled();
   });
 
+  it("keeps a materialized property another pipeline links to when its own pipeline is deleted", async () => {
+    const owner = { ...propertyStep("owner"), materializedPropertyId: "P" };
+    const linker = { ...propertyStep("linker"), sourcePropertyId: "P" };
+    h.main.configuration.pipelines = [
+      pipeline([owner]),
+      { id: "pipe2", name: "Other", steps: [linker] },
+    ];
+
+    await pipelinesStore.deletePipeline({ pipelineId: "pipe1" });
+
+    expect(h.properties.deleteProperties).not.toHaveBeenCalled();
+  });
+
+  it("deletes a property both of whose steps drifted away from it in one run", async () => {
+    h.properties.properties = [
+      {
+        id: "X",
+        image: "img/prop",
+        shape: AnnotationShape.Polygon,
+        tags: { tags: ["old"], exclusive: false },
+        workerInterface: {},
+      },
+    ];
+    let created = 0;
+    h.properties.createProperty.mockImplementation(async (property: any) => ({
+      ...property,
+      id: `new-${++created}`,
+    }));
+    h.annotations.submitAnnotationWorkerJob.mockResolvedValue(
+      submitResult("j-a", true),
+    );
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+    // Both share X and are rewired at run time (so they run as copies).
+    const wired = (id: string) => ({
+      ...propertyStep(id, ["old"]),
+      autoWired: true,
+      materializedPropertyId: "X",
+    });
+    const pipe = pipeline([
+      annotationStep("a", ["new"]),
+      wired("s1"),
+      wired("s2"),
+    ]);
+    h.main.configuration.pipelines = [pipe];
+
+    await pipelinesStore.runPipeline({ pipeline: pipe });
+
+    expect(h.properties.deleteProperty).toHaveBeenCalledWith("X");
+  });
+
   it("never deletes a linked property when its pipeline is deleted", async () => {
     const linkedStep = {
       ...propertyStep("linked"),
@@ -974,7 +1024,7 @@ describe("linked steps", () => {
     ).toEqual({ state: "linked", sourceKind: "tool", sourceName: "Tool t1" });
     expect(
       stepLinkState({ ...propertyStep("p"), sourcePropertyId: "x" }, [], props),
-    ).toEqual({ state: "missing", sourceKind: "property" });
+    ).toEqual({ state: "missing", sourceKind: "property", reason: "notFound" });
     expect(stepLinkState(annotationStep("a"), tools, props)).toEqual({
       state: "unlinked",
     });
@@ -986,7 +1036,12 @@ describe("linked steps", () => {
         [workerTool("t2", { image: { image: "" } })],
         [],
       ),
-    ).toEqual({ state: "missing", sourceKind: "tool", sourceName: "Tool t2" });
+    ).toEqual({
+      state: "missing",
+      sourceKind: "tool",
+      reason: "noWorker",
+      sourceName: "Tool t2",
+    });
   });
 
   it("re-wires a property step to the output tags its linked tool produces now", async () => {

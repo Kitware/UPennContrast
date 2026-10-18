@@ -120,4 +120,23 @@ describe("PipelineStepEditor linked steps", () => {
       retired: 7,
     });
   });
+
+  it("emits only name and enabled changes for a linked step", async () => {
+    const wrapper = mountStepEditor(
+      annotationStep({ threshold: 1 }, { sourceToolId: "t1" }),
+      linked,
+    );
+    await nextTick();
+    const vm = wrapper.vm as any;
+
+    // What a locked child editor re-emitting would do.
+    vm.image = "img/other";
+    await nextTick();
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+
+    vm.name = "Renamed";
+    const emitted = wrapper.emitted("update:modelValue") as any[];
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0][0].name).toBe("Renamed");
+  });
 });

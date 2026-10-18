@@ -176,7 +176,20 @@ const propertyStepValue = computed<IPropertyPipelineStep | null>(() =>
 // keeps the patch from re-widening the discriminant when spread.
 type TStepPatch = Partial<Omit<IPipelineStepBase, "kind">>;
 
+// A linked step's settings are its source's: only its own name and enabled
+// flag may change, so its locked sections (whose child editors still re-emit,
+// e.g. AnnotationConfiguration on mount) emit nothing.
+function isLockedPatch(patch: object): boolean {
+  return (
+    isLinked.value &&
+    Object.keys(patch).some((key) => key !== "name" && key !== "enabled")
+  );
+}
+
 function patchStep(patch: TStepPatch) {
+  if (isLockedPatch(patch)) {
+    return;
+  }
   // Branch so each spread is over a concrete member of the discriminated
   // union (a spread over the union widens `kind` and breaks assignability).
   if (step.value.kind === "annotation") {
@@ -187,14 +200,14 @@ function patchStep(patch: TStepPatch) {
 }
 
 function patchAnnotationStep(patch: Partial<IAnnotationPipelineStep>) {
-  if (step.value.kind !== "annotation") {
+  if (step.value.kind !== "annotation" || isLockedPatch(patch)) {
     return;
   }
   emit("update:modelValue", { ...step.value, ...patch });
 }
 
 function patchPropertyStep(patch: Partial<IPropertyPipelineStep>) {
-  if (step.value.kind !== "property") {
+  if (step.value.kind !== "property" || isLockedPatch(patch)) {
     return;
   }
   emit("update:modelValue", { ...step.value, ...patch });
@@ -212,16 +225,16 @@ const linkMessage = computed<string | null>(() => {
     return null;
   }
   if (linkState.state === "missing") {
-    if (linkState.sourceKind === "property") {
-      return "The property this step was linked to was deleted. It runs a new property from the last saved copy of its settings. Unlink to edit them.";
+    if (linkState.reason === "noWorker") {
+      return `The tool "${linkState.sourceName}" this step is linked to no longer has a worker image. It runs with the last saved copy of the tool's settings. Unlink to edit them.`;
     }
-    return linkState.sourceName
-      ? `The tool "${linkState.sourceName}" this step is linked to no longer has a worker image. It runs with the last saved copy of the tool's settings. Unlink to edit them.`
-      : "The tool this step was linked to was deleted. It runs with the last saved copy of the tool's settings. Unlink to edit them.";
+    return linkState.sourceKind === "tool"
+      ? "The tool this step was linked to was deleted. It runs with the last saved copy of the tool's settings. Unlink to edit them."
+      : "The property this step is linked to is not available (deleted, or not loaded yet). A run checks again: if it was deleted, the step computes a new property from the last saved copy of its settings.";
   }
   return linkState.sourceKind === "tool"
     ? `Linked to tool "${linkState.sourceName}": runs with the tool's current settings. Edit them in the Tools panel, or Unlink to customize this step.`
-    : `Linked to property "${linkState.sourceName}": computes that property as it is defined. Unlink to customize this step.`;
+    : `Linked to property "${linkState.sourceName}": computes that property as it is defined. Unlink to customize this step (the pipeline then computes its own copy of the property).`;
 });
 
 // Locked sections render every Vuetify control disabled (a global default, so
