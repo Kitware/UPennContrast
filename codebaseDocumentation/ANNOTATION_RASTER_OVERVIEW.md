@@ -611,6 +611,15 @@ let shared fixtures return fixed values that defeat assertions.
 
 ## Regression checklist
 
+- **Only the current level is drawn**: overview tiles are transparent outside
+  the shapes, so the layer is created with `keepLower: false`. With GeoJS's
+  default, every coarser level stays drawn beneath the current one and shows
+  through the gaps as blocky coloured halos around cells: coarse levels splat
+  small objects as single pixels, and those are magnified 8–64×. Found with
+  cells coloured by cluster on a Spatial Genomics ROI —
+  _"lazily creates the layer and refreshes its URL on mutations"_. The
+  transcript heat map has the same constraint —
+  _"creates heat-map layers that keep only the current level"_.
 - **Small objects paint over large ones**: shapes draw largest bbox first and
   sub-pixel splats last, so a region or tissue outline created after its cells
   (a later `_id`) cannot cover them at any level —
