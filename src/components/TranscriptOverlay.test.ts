@@ -149,11 +149,13 @@ function makeMap(bounds = { left: 0, top: 0, right: 600, bottom: 300 }) {
       held.splice(held.indexOf(layer), 1);
     }),
     node: () => [document.createElement("div")],
-    createLayer: vi.fn((kind: string) => {
-      const layer = kind === "osm" ? makeOsm() : featureLayer;
-      held.push(layer);
-      return layer;
-    }),
+    createLayer: vi.fn<(kind: string, params: Record<string, any>) => any>(
+      (kind) => {
+        const layer = kind === "osm" ? makeOsm() : featureLayer;
+        held.push(layer);
+        return layer;
+      },
+    ),
     held,
   };
   return {
@@ -355,7 +357,7 @@ describe("TranscriptOverlay", () => {
     mount(parts);
     await vi.advanceTimersByTimeAsync(250);
     const osmCalls = parts.map.createLayer.mock.calls.filter(
-      ([kind]: [string]) => kind === "osm",
+      ([kind]) => kind === "osm",
     );
     expect(osmCalls.length).toBeGreaterThan(0);
     for (const [, params] of osmCalls) {
