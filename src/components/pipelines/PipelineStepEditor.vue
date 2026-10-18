@@ -246,7 +246,9 @@ function lockedDefaults(locked: boolean) {
 }
 
 // Turn a linked step into an independent copy of its current settings. An
-// unlinked property step keeps its tags rather than auto-wiring over them.
+// unlinked property step keeps its tags rather than auto-wiring over them, and
+// is renamed: the pipeline now computes its own copy of the property, named
+// after the step, which would otherwise share the original's name.
 function unlink() {
   const current = step.value;
   // Keep the values the step was showing (including displayed defaults).
@@ -259,6 +261,7 @@ function unlink() {
   } else {
     emit("update:modelValue", {
       ...omit(current, "sourcePropertyId"),
+      name: `${current.name} (pipeline copy)`,
       workerInterfaceValues,
       autoWired: false,
     });
@@ -319,8 +322,8 @@ function onAnnotationSetupChange(value: IAnnotationSetup) {
 const propertyShape = computed({
   get: () => propertyStepValue.value?.shape ?? AnnotationShape.Polygon,
   // Like a manual tag edit, a manual shape edit detaches auto-wiring —
-  // otherwise PipelineEditor's computeAutoWiredSteps would immediately
-  // overwrite the shape from the upstream annotation step again.
+  // otherwise auto-wiring (computeAutoWiredSteps, in the editor and the
+  // runner) would overwrite the shape from the upstream annotation step again.
   set: (value: AnnotationShape) =>
     patchPropertyStep({ shape: value, autoWired: false }),
 });

@@ -635,6 +635,42 @@ describe("runPipelineBatch", () => {
     expect(h.annotations.fetchAnnotations).toHaveBeenCalledTimes(1);
   });
 
+  it("runs every dataset with the linked settings resolved when the batch started", async () => {
+    const tool = (threshold: number) => ({
+      id: "t1",
+      name: "Tool",
+      hotkey: null,
+      type: "segmentation",
+      template: { name: "t", type: "segmentation", interface: [] },
+      values: {
+        image: { image: "img/tool" },
+        workerInterfaceValues: { threshold },
+      },
+    });
+    h.main.tools = [tool(7)];
+    h.main.api.findDatasetViews.mockResolvedValue([
+      { datasetId: "d1" },
+      { datasetId: "d2" },
+    ]);
+    const thresholds: number[] = [];
+    h.annotations.submitAnnotationWorkerJob.mockImplementation(
+      async ({ tool: submitted }: any) => {
+        thresholds.push(submitted.values.workerInterfaceValues.threshold);
+        // The tool is edited while the batch runs.
+        h.main.tools = [tool(99)];
+        return submitResult("j", true);
+      },
+    );
+    const step = { ...annotationStep("a"), sourceToolId: "t1" };
+
+    await pipelinesStore.runPipelineBatch({
+      pipeline: pipeline([step]),
+      configurationId: "cfg1",
+    });
+
+    expect(thresholds).toEqual([7, 7]);
+  });
+
   it("counts a dataset with a failed step as failed", async () => {
     h.main.api.findDatasetViews.mockResolvedValue([
       { datasetId: "d1" },
@@ -1214,6 +1250,64 @@ describe("linked steps", () => {
         property: expect.objectContaining({ id: "fallback" }),
       }),
     );
+  });
+
+  it("does not recheck a linked property a reload confirmed missing", async () => {
+    h.properties.properties = [];
+    h.properties.createProperty.mockResolvedValue({
+      id: "fresh",
+      image: "img/prop",
+      shape: AnnotationShape.Polygon,
+      tags: { tags: [], exclusive: false },
+      workerInterface: {},
+    });
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+    const step = () => ({
+      ...propertyStep("p"),
+      sourcePropertyId: "confirmed-missing",
+    });
+
+    await pipelinesStore.loadMissingLinkedProperties(pipeline([step()]));
+    await pipelinesStore.loadMissingLinkedProperties(pipeline([step()]));
+
+    expect(h.properties.fetchProperties).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails the run without holding the lock when its steps can't be prepared", async () => {
+    // Malformed stored data: an auto-wired property step without inputTags.
+    const malformed = { ...propertyStep("p"), autoWired: true } as any;
+    delete malformed.inputTags;
+    const onComplete = vi.fn();
+
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipeline([annotationStep("a", ["t"]), malformed]),
+      onComplete,
+    });
+
+    expect(result.failed).toBe(2);
+    expect(onComplete).toHaveBeenCalledWith(result);
+    expect(pipelinesStore.runningPipelineId).toBeNull();
+    expect(h.annotations.submitAnnotationWorkerJob).not.toHaveBeenCalled();
+  });
+
+  it("records a new materialized id on the store's current copy of the pipeline", async () => {
+    h.properties.createProperty.mockResolvedValue({
+      id: "fresh",
+      image: "img/prop",
+      shape: AnnotationShape.Polygon,
+      tags: { tags: [], exclusive: false },
+      workerInterface: {},
+    });
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+    const storeCopy = pipeline([propertyStep("p")]);
+    h.main.configuration.pipelines = [storeCopy];
+
+    // Run with a stale copy (as a batch does after its first config write).
+    await pipelinesStore.runPipeline({
+      pipeline: JSON.parse(JSON.stringify(storeCopy)),
+    });
+
+    expect((storeCopy.steps[0] as any).materializedPropertyId).toBe("fresh");
   });
 
   it("does not reload properties when every linked property is loaded", async () => {

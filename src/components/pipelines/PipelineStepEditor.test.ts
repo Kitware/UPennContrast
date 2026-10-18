@@ -139,4 +139,36 @@ describe("PipelineStepEditor linked steps", () => {
     expect(emitted).toHaveLength(1);
     expect(emitted[0][0].name).toBe("Renamed");
   });
+
+  it("renames a property step on unlink so its own property is told apart", async () => {
+    const wrapper = mountStepEditor(
+      {
+        id: "p",
+        kind: "property",
+        name: "Nucleus Area",
+        image: "img/tool",
+        workerInterfaceValues: {},
+        enabled: true,
+        shape: AnnotationShape.Polygon,
+        inputTags: { tags: ["n"], exclusive: false },
+        autoWired: false,
+        sourcePropertyId: "user",
+      },
+      {
+        state: "linked",
+        sourceKind: "property",
+        sourceName: "Nucleus Area",
+      },
+    );
+    await nextTick();
+
+    (wrapper.vm as any).unlink();
+
+    const emitted = wrapper.emitted("update:modelValue") as any[];
+    expect(emitted.at(-1)[0]).toMatchObject({
+      name: "Nucleus Area (pipeline copy)",
+      autoWired: false,
+    });
+    expect(emitted.at(-1)[0]).not.toHaveProperty("sourcePropertyId");
+  });
 });

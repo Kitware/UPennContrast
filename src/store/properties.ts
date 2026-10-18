@@ -1310,7 +1310,8 @@ export class Properties extends VuexModule {
   // This action should be called when changing configuration
   async fetchProperties() {
     if (main.configuration) {
-      const propertyIds = main.configuration.propertyIds;
+      const configuration = main.configuration;
+      const propertyIds = configuration.propertyIds;
       // The server omits ids it cannot resolve. A deleted property should
       // drop out, but one being created is in the local configuration before
       // its propertyIds save lands, so the server omits it too. Keep the
@@ -1322,6 +1323,12 @@ export class Properties extends VuexModule {
           (property) => [property.id, property],
         ),
       );
+      // A response for a configuration that has since been replaced (e.g.
+      // a dataset switch while a fetch was in flight) must not overwrite
+      // the new configuration's properties.
+      if (main.configuration?.id !== configuration.id) {
+        return;
+      }
       const loaded = new Map(
         this.properties.map((property) => [property.id, property]),
       );

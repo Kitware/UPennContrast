@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
     configuration: { propertyIds: [] as string[] },
   },
   pipelinesStore: {
+    pipelines: [] as any[],
     getPipelineById: vi.fn(),
     savePipeline: vi.fn(),
     createStepId: vi.fn(),
@@ -154,6 +155,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.store.tools = [];
   h.properties.properties = [];
+  h.pipelinesStore.pipelines = [];
   h.pipelinesStore.createStepId.mockReturnValue("new-step");
 });
 
@@ -464,5 +466,68 @@ describe("PipelineEditor linked steps", () => {
     const vm = wrapper.vm as any;
 
     expect(vm.displayedPipeline.steps[1].inputTags.tags).toEqual(["manual"]);
+  });
+
+  it("keeps a linked step's saved copy when a settings edit comes in", () => {
+    h.store.tools = [workerTool("t1", 5, [])];
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1", 1)],
+    });
+    const vm = wrapper.vm as any;
+
+    vm.handleStepUpdate(0, {
+      ...vm.displayedPipeline.steps[0],
+      name: "Renamed",
+      workerInterfaceValues: { threshold: 9 },
+    });
+    // With the tool gone, the saved copy (the fallback) shows: unchanged.
+    h.store.tools = [];
+
+    expect(vm.displayedPipeline.steps[0]).toMatchObject({
+      name: "Renamed",
+      workerInterfaceValues: { threshold: 1 },
+    });
+  });
+
+  it("offers to remove the property the runner materialized on the stored pipeline", () => {
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [propertyStep("p")],
+    });
+    const vm = wrapper.vm as any;
+    // The runner recorded the id on the stored pipeline after the editor
+    // cloned it.
+    h.pipelinesStore.getPipelineById.mockReturnValue({
+      id: "pipe",
+      name: "P",
+      steps: [propertyStep("p", { materializedPropertyId: "M" })],
+    });
+
+    vm.askRemoveStep(0);
+    vm.confirmRemoveStep();
+
+    expect(vm.materializedPropertyIdsToRemove).toEqual(["M"]);
+  });
+
+  it("does not offer a pipeline-materialized property to link to", () => {
+    h.properties.properties = [
+      { id: "own", name: "Own" },
+      { id: "materialized", name: "Materialized" },
+    ];
+    h.pipelinesStore.pipelines = [
+      {
+        id: "other",
+        name: "Other",
+        steps: [propertyStep("x", { materializedPropertyId: "materialized" })],
+      },
+    ];
+    const wrapper = mountEditor({ id: "pipe", name: "P", steps: [] });
+
+    expect(
+      (wrapper.vm as any).linkableProperties.map((p: any) => p.id),
+    ).toEqual(["own"]);
   });
 });

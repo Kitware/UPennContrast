@@ -350,7 +350,7 @@
               value="existingProperty"
               variant="outlined"
               size="small"
-              :disabled="propertiesStore.properties.length === 0"
+              :disabled="linkableProperties.length === 0"
             >
               Existing property
             </v-btn>
@@ -370,7 +370,7 @@
             v-else-if="newStepSource === 'existingProperty'"
             v-model="newStepPropertyId"
             label="Property"
-            :items="propertiesStore.properties"
+            :items="linkableProperties"
             item-title="name"
             item-value="id"
             density="compact"
@@ -523,8 +523,8 @@ const localPipeline = ref<IPipeline>(clonePipelineForEditing(props.pipeline));
 
 // A pipeline's steps as shown and as saved: linked steps take their live
 // source's values (their saved copy stays the fallback if the source goes),
-// then auto-wiring is applied (so pipelines arriving with unwired property
-// steps are wired on open).
+// then auto-wiring is applied (so `autoWired` property steps arriving
+// unwired are wired on open).
 function displayedSteps(steps: TPipelineStep[]): TPipelineStep[] {
   return computeAutoWiredSteps(
     steps.map((step) =>
@@ -548,9 +548,14 @@ function clonePipelineForEditing(pipeline: IPipeline): IPipeline {
   return { ...clone, steps: withWiredTags(clone.steps) };
 }
 
+// Steps on their own computed, so typing a pipeline name or description does
+// not re-resolve every step (and hand step editors new values to re-emit).
+const displayedStepList = computed(() =>
+  displayedSteps(localPipeline.value.steps),
+);
 const displayedPipeline = computed<IPipeline>(() => ({
   ...localPipeline.value,
-  steps: displayedSteps(localPipeline.value.steps),
+  steps: displayedStepList.value,
 }));
 
 // A linked property that has not loaded yet would read as deleted; reload the
@@ -716,16 +721,26 @@ function linkedSourceName(index: number): string {
   return linkState?.state === "linked" ? linkState.sourceName : "";
 }
 
-// `newStep` is the displayed step with the user's change (for a linked step,
-// only its name, enabled flag or Unlink: its editor emits nothing else).
-// Child editors re-emit whenever their value's identity changes, so an emit
-// that changes nothing must change no state.
+function isLinkedStep(step: TPipelineStep): boolean {
+  return step.kind === "annotation"
+    ? !!step.sourceToolId
+    : !!step.sourcePropertyId;
+}
+
+// `newStep` is the displayed step with the user's change. A still-linked step
+// keeps only its own name and enabled flag (its settings are its source's,
+// and its saved copy, the fallback if the source goes, must stay the
+// source's); anything else, including Unlink, replaces the step. Child
+// editors re-emit whenever their value's identity changes, so an emit that
+// changes nothing must change no state.
 function handleStepUpdate(index: number, newStep: TPipelineStep) {
   if (samePersistedValue(newStep, displayedPipeline.value.steps[index])) {
     return;
   }
   const steps = localPipeline.value.steps.slice();
-  steps[index] = newStep;
+  steps[index] = isLinkedStep(newStep)
+    ? { ...steps[index], name: newStep.name, enabled: newStep.enabled }
+    : newStep;
   updateSteps(steps);
 }
 
@@ -756,9 +771,24 @@ const stepToRemove = computed(() =>
     : localPipeline.value.steps[stepToRemoveIndex.value] ?? null,
 );
 
+// The step's materialized property: the runner records it on the stored
+// pipeline, which this working copy may not have picked up yet.
+function materializedPropertyIdOf(step: TPipelineStep): string | undefined {
+  if (step.kind !== "property") {
+    return undefined;
+  }
+  const stored = pipelinesStore
+    .getPipelineById(localPipeline.value.id)
+    ?.steps.find((s) => s.id === step.id);
+  return (
+    step.materializedPropertyId ??
+    (stored?.kind === "property" ? stored.materializedPropertyId : undefined)
+  );
+}
+
 function askRemoveStep(index: number) {
   const step = localPipeline.value.steps[index];
-  if (step?.kind !== "property" || !step.materializedPropertyId) {
+  if (!step || !materializedPropertyIdOf(step)) {
     removeStep(index);
     return;
   }
@@ -773,13 +803,13 @@ function confirmRemoveStep() {
   if (index === null || !step) {
     return;
   }
+  const materializedPropertyId = materializedPropertyIdOf(step);
   if (
     removeMaterializedProperty.value &&
-    step.kind === "property" &&
-    step.materializedPropertyId &&
-    !materializedPropertyIdsToRemove.value.includes(step.materializedPropertyId)
+    materializedPropertyId &&
+    !materializedPropertyIdsToRemove.value.includes(materializedPropertyId)
   ) {
-    materializedPropertyIdsToRemove.value.push(step.materializedPropertyId);
+    materializedPropertyIdsToRemove.value.push(materializedPropertyId);
   }
   removeStep(index);
   showRemoveStepDialog.value = false;
@@ -798,6 +828,21 @@ const newStepPropertyId = ref<string | null>(null);
 const workerTools = computed(() =>
   store.tools.filter((tool) => tool.type === "segmentation"),
 );
+
+// Properties a step can link to: the configuration's own, not those a
+// pipeline materialized (the pipeline that owns one may replace or delete it).
+const linkableProperties = computed(() => {
+  const materializedIds = new Set(
+    pipelinesStore.pipelines.flatMap((pipeline) =>
+      pipeline.steps.flatMap((step) =>
+        step.kind === "property" && step.materializedPropertyId
+          ? [step.materializedPropertyId]
+          : [],
+      ),
+    ),
+  );
+  return propertiesStore.properties.filter((p) => !materializedIds.has(p.id));
+});
 
 const canConfirmAddStep = computed(() => {
   switch (newStepSource.value) {
@@ -857,7 +902,7 @@ function stepFromTool(toolId: string): IAnnotationPipelineStep | null {
 // A property step linked to an existing property. Not auto-wired: it computes
 // on the property's own tags and shape.
 function stepFromProperty(propertyId: string): IPropertyPipelineStep | null {
-  const property = propertiesStore.properties.find((p) => p.id === propertyId);
+  const property = linkableProperties.value.find((p) => p.id === propertyId);
   if (!property) {
     return null;
   }
@@ -939,14 +984,14 @@ async function persist(): Promise<IPipeline | null> {
     ...editing,
     steps: displayedSteps(editing.steps),
   };
+  // Preserve any materializedPropertyId the runner wrote to the store copy
+  // after a run, so saving edits doesn't drop it and orphan the property.
+  mergeMaterializedPropertyIds(
+    toSave,
+    pipelinesStore.getPipelineById(toSave.id),
+  );
   const saved = cloneDeep(toSave);
   try {
-    // Preserve any materializedPropertyId the runner wrote to the store copy
-    // after a run, so saving edits doesn't drop it and orphan the property.
-    mergeMaterializedPropertyIds(
-      toSave,
-      pipelinesStore.getPipelineById(toSave.id),
-    );
     await pipelinesStore.savePipeline(toSave);
     if (materializedPropertyIdsToRemove.value.length > 0) {
       await pipelinesStore.deleteUnreferencedMaterializedProperties(
@@ -1015,6 +1060,7 @@ defineExpose({
   newStepPropertyId,
   confirmAddStep,
   displayedPipeline,
+  linkableProperties,
 });
 </script>
 

@@ -46,13 +46,13 @@ export function samePersistedValue(a: unknown, b: unknown): boolean {
 }
 
 // The fields a linked annotation step takes from its tool.
-export type TToolLinkedFields = Pick<
+type TToolLinkedFields = Pick<
   IAnnotationPipelineStep,
   "image" | "workerInterfaceValues" | "annotation" | "connectTo" | "jobDateTag"
 >;
 
 // The fields a linked property step takes from its property.
-export type TPropertyLinkedFields = Pick<
+type TPropertyLinkedFields = Pick<
   IPropertyPipelineStep,
   "image" | "workerInterfaceValues" | "shape" | "inputTags"
 >;
@@ -102,9 +102,8 @@ export function propertyLinkedFields(
   return cloneDeep(propertyFields(property));
 }
 
-// The step's link fields, for comparing a step against its source or an
-// earlier version of itself.
-export function stepToolLinkedFields(
+// The step's link fields, for comparing a step against its source.
+function stepToolLinkedFields(
   step: IAnnotationPipelineStep,
 ): TToolLinkedFields {
   return {
@@ -116,7 +115,7 @@ export function stepToolLinkedFields(
   };
 }
 
-export function stepPropertyLinkedFields(
+function stepPropertyLinkedFields(
   step: IPropertyPipelineStep,
 ): TPropertyLinkedFields {
   return {
@@ -127,7 +126,7 @@ export function stepPropertyLinkedFields(
   };
 }
 
-export function findSourceTool(
+function findSourceTool(
   step: TPipelineStep,
   tools: IToolConfiguration[],
 ): IToolConfiguration | null {

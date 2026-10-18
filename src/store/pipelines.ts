@@ -81,6 +81,11 @@ export function mergeMaterializedPropertyIds(
   }
 }
 
+// Linked property ids a reload found missing (see
+// loadMissingLinkedProperties). Property ids are never reused, so a deleted
+// one stays deleted.
+const confirmedMissingPropertyIds = new Set<string>();
+
 function buildTransientTool(step: IAnnotationPipelineStep): IToolConfiguration {
   return {
     id: step.id,
@@ -321,6 +326,7 @@ export class Pipelines extends VuexModule {
     skipRefresh = false,
     skipRunningState = false,
     linkedPropertiesChecked,
+    resolvedSteps,
   }: {
     pipeline: IPipeline;
     datasetId?: string;
@@ -342,6 +348,9 @@ export class Pipelines extends VuexModule {
     // Set by runPipelineBatch, which checks linked properties once for all
     // datasets (see loadMissingLinkedProperties).
     linkedPropertiesChecked?: boolean;
+    // Set by runPipelineBatch, which resolves the steps once, so every
+    // dataset runs the same settings even if a linked tool changes mid-batch.
+    resolvedSteps?: TPipelineStep[];
   }): Promise<IPipelineRunResult> {
     const emptyResult: IPipelineRunResult = {
       succeeded: 0,
@@ -392,6 +401,25 @@ export class Pipelines extends VuexModule {
       linkedPropertiesChecked ??
       (await this.loadMissingLinkedProperties(pipeline));
 
+    // The steps as they run (see stepsAsRun). A batch resolves them once for
+    // all its datasets. Stored data this can't make sense of fails the run
+    // here rather than leaving the lock held.
+    let runSteps: TPipelineStep[];
+    try {
+      runSteps = resolvedSteps ?? this.stepsAsRun(pipeline);
+    } catch (error) {
+      logError(`Pipeline "${pipeline.name}" could not be prepared:`, error);
+      if (!skipRunningState) {
+        this.setRunningPipelineId(null);
+      }
+      const failedResult = {
+        ...emptyResult,
+        failed: enabledIndices.length,
+      };
+      onComplete?.(failedResult);
+      return failedResult;
+    }
+
     const topProgressId = await progress.create({
       type: ProgressType.PIPELINE_COMPUTE,
       title: `Pipeline: ${pipeline.name}`,
@@ -412,17 +440,6 @@ export class Pipelines extends VuexModule {
     // the config back - a run with no property steps (or only reused,
     // already-matching properties) shouldn't write the config at all.
     let materializedPropertyChanged = false;
-
-    // The steps as they run: linked steps take their source's current values,
-    // then auto-wiring is re-applied so a property step reads the tags its
-    // upstream step produces now (a linked tool's output tags may have changed
-    // since the pipeline was saved). materializedPropertyId is written to the
-    // run step and copied to the stored step as soon as it changes.
-    const runSteps = computeAutoWiredSteps(
-      pipeline.steps.map((step) =>
-        resolveLinkedStep(step, main.tools, properties.properties),
-      ),
-    );
 
     for (const stepIndex of enabledIndices) {
       const step = pipeline.steps[stepIndex];
@@ -516,10 +533,12 @@ export class Pipelines extends VuexModule {
               materializedPropertyChanged = true;
               // Onto the stored step now (runStep is a copy wherever resolving
               // or wiring changed it), so later steps' reference checks see it.
-              mergeMaterializedPropertyIds(pipeline, {
-                ...pipeline,
-                steps: [runStep],
-              });
+              // The store's current copy: a config write (e.g. by an earlier
+              // dataset of a batch) replaces the object the caller passed.
+              mergeMaterializedPropertyIds(
+                this.getPipelineById(pipeline.id) ?? pipeline,
+                { ...pipeline, steps: [runStep] },
+              );
             }
             if (property) {
               submitted = await properties.submitPropertyJob({
@@ -617,14 +636,30 @@ export class Pipelines extends VuexModule {
     return result;
   }
 
+  // The steps as they run: linked steps take their source's current values,
+  // then auto-wiring is re-applied so a property step reads the tags its
+  // upstream step produces now (a linked tool's output tags may have changed
+  // since the pipeline was saved). The runner writes materializedPropertyId to
+  // these and copies it to the stored step as soon as it changes.
+  get stepsAsRun() {
+    return (pipeline: IPipeline): TPipelineStep[] =>
+      computeAutoWiredSteps(
+        pipeline.steps.map((step) =>
+          resolveLinkedStep(step, main.tools, properties.properties),
+        ),
+      );
+  }
+
   // Reload the configuration's properties when an enabled step is linked to a
   // property that is not in the loaded list, so one that simply had not loaded
   // yet is not treated as deleted (whose fallback would materialize a
   // duplicate of it). A step already running its fallback (it has a
   // materialized property) was found gone before and is not rechecked, so a
   // deleted source does not cost a fetch on every run. Returns false when the
-  // reload failed: whether the missing ones exist is then unknown. Never
-  // rejects (the editor calls it without awaiting).
+  // reload failed: whether the missing ones exist is then unknown. A property
+  // a reload confirmed missing is not rechecked (opening the editor or running
+  // would otherwise refetch every property each time). Never rejects (the
+  // editor calls it without awaiting).
   @Action
   async loadMissingLinkedProperties(pipeline: IPipeline): Promise<boolean> {
     const needsCheck = (step: TPipelineStep) =>
@@ -632,12 +667,18 @@ export class Pipelines extends VuexModule {
       step.kind === "property" &&
       !!step.sourcePropertyId &&
       !step.materializedPropertyId &&
+      !confirmedMissingPropertyIds.has(step.sourcePropertyId) &&
       !findSourceProperty(step, properties.properties);
     if (!pipeline.steps.some(needsCheck)) {
       return true;
     }
     try {
       await properties.fetchProperties();
+      for (const step of pipeline.steps.filter(needsCheck)) {
+        if (step.kind === "property" && step.sourcePropertyId) {
+          confirmedMissingPropertyIds.add(step.sourcePropertyId);
+        }
+      }
       return true;
     } catch (error) {
       logError("Failed to reload properties for linked pipeline steps:", error);
@@ -769,6 +810,10 @@ export class Pipelines extends VuexModule {
     let cancelled = 0;
 
     try {
+      // Resolved once, so every dataset runs the same settings even if a
+      // linked tool changes mid-batch (and auto-wired property steps don't
+      // drift from their materialized property part-way through).
+      const resolvedSteps = this.stepsAsRun(pipeline);
       for (const datasetId of datasetIds) {
         if (isCancelled) {
           cancelled++;
@@ -797,6 +842,7 @@ export class Pipelines extends VuexModule {
           skipRunningState: true,
           skipRefresh: true,
           linkedPropertiesChecked,
+          resolvedSteps,
           onCancel: (c) => {
             innerCancel = c;
           },

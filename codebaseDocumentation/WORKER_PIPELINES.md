@@ -412,7 +412,7 @@ behave exactly as before. Pure helpers live in `src/utils/pipelineLinks.ts`
 
 | | Linked to a live tool | Linked to a live property | Source deleted |
 |---|---|---|---|
-| What runs | The tool's current image, parameters, annotation setup, `connectTo`, `jobDateTag` (transient tool built from `resolveLinkedStep`) | The property itself (`submitPropertyJob` on its id); no materialization | The step's saved copy (a property step materializes from it as before). Before treating a linked property as deleted, the runner reloads the configuration's properties once (`loadMissingLinkedProperties`, after taking the run lock — it never rejects, so it cannot leave the lock held; once per batch; the editor does the same on open), so one that simply had not loaded yet is computed, not duplicated. If that reload fails, the step fails rather than materializing a possible duplicate. A step already running its fallback is not rechecked and keeps running it |
+| What runs | The tool's current image, parameters, annotation setup, `connectTo`, `jobDateTag` (transient tool built from `resolveLinkedStep`) | The property itself (`submitPropertyJob` on its id); no materialization | The step's saved copy (a property step materializes from it as before). Before treating a linked property as deleted, the runner reloads the configuration's properties once (`loadMissingLinkedProperties`, after taking the run lock — it never rejects, so it cannot leave the lock held; once per batch; the editor does the same on open), so one that simply had not loaded yet is computed, not duplicated. If that reload fails, the step fails rather than materializing a possible duplicate. A step already running its fallback, or whose property a reload already confirmed missing, is not rechecked. A batch resolves linked steps once, so every dataset runs the settings in effect when it started |
 | Editor: worker image | Locked | Locked | Locked |
 | Editor: parameters / tags | Locked: "edit them in the Tools panel, or Unlink to customize this step" | Locked: "Unlink to customize this step" (properties are immutable in the UI) | Locked |
 | Header chip | link icon + tool name | link icon + property name | "source deleted" for a tool, "source unavailable" for a property (it may only not be loaded yet; the runner reloads before deciding), or "tool has no worker" for a tool that still exists without a worker image (also unusable, so the saved copy runs) |
@@ -448,7 +448,8 @@ behave exactly as before. Pure helpers live in `src/utils/pipelineLinks.ts`
   longer declares) as an independent, editable step. Unlinking a step from a
   live property means the pipeline computes its own copy of that property
   from then on (the banner says so): reusing the user's property would let a
-  later settings change replace and delete it. An unlinked property step gets
+  later settings change replace and delete it. The step is renamed
+  "<name> (pipeline copy)" so that property is told apart from the original. An unlinked property step gets
   `autoWired: false` (it keeps the property's tags). It never takes the user's
   property as its `materializedPropertyId`, so its next run materializes a new
   property and the user's property is never touched; a property the fallback
@@ -456,7 +457,8 @@ behave exactly as before. Pure helpers live in `src/utils/pipelineLinks.ts`
   pipeline's own and is reused.
 - "Add step" offers **Existing tool** (links via `sourceToolId`) and **Existing
   property** (links via `sourcePropertyId`, listing the configuration's
-  properties).
+  properties except those a pipeline materialized: the pipeline that owns one
+  may replace or delete it).
 
 **Never delete a user's property.** A linked property is never assigned to
 `materializedPropertyId`, so drift replacement in `ensureMaterializedProperty`,
@@ -626,7 +628,7 @@ make this correct-by-default so users don't have to reason about it:
 - If the user edits an upstream step's output tags, prompt to update downstream
   input filters that were auto-wired (track an `autoWired` flag per property step
   to know which to offer updating; don't clobber manual edits).
-- **As implemented:** auto-wired steps (`autoWired !== false`) are re-wired
+- **As implemented:** auto-wired steps (`autoWired: true`) are re-wired
   automatically rather than prompted, by `computeAutoWiredSteps`
   (`src/utils/pipelineWiring.ts`) — in the editor whenever it shows the
   pipeline, and by the runner on the steps as they run (so a linked tool's
@@ -977,9 +979,17 @@ Linked steps (§3.4):
   materialized that another pipeline links to —
   *"never deletes a linked property when its pipeline is deleted"*,
   *"keeps a materialized property another pipeline links to when its own pipeline is deleted"*.
-- A new materialized id reaches the stored step at once, so a property every
-  step drifted away from in one run is deleted, not orphaned —
-  *"deletes a property both of whose steps drifted away from it in one run"*.
+- A new materialized id reaches the stored step at once (the store's current
+  copy), so a property every step drifted away from in one run is deleted, not
+  orphaned —
+  *"deletes a property both of whose steps drifted away from it in one run"*,
+  *"records a new materialized id on the store's current copy of the pipeline"*.
+- A batch runs every dataset with the linked settings resolved at its start,
+  and a run whose steps can't be prepared fails without holding the lock —
+  *"runs every dataset with the linked settings resolved when the batch started"*,
+  *"fails the run without holding the lock when its steps can't be prepared"*.
+- A property confirmed missing is not refetched on every open or run —
+  *"does not recheck a linked property a reload confirmed missing"*.
 - The runner re-wires property steps to what a linked tool produces now, but
   never an unflagged step —
   *"re-wires a property step to the output tags its linked tool produces now"*,
@@ -993,6 +1003,7 @@ Linked steps (§3.4):
   Tools panel, and only its name and enabled flag change —
   *"locks a linked step's settings and says where to edit them"*,
   *"emits only name and enabled changes for a linked step"*,
+  *"keeps a linked step's saved copy when a settings edit comes in"*,
   *"leaves an unlinked step's settings editable"*,
   *"keeps only the name and enabled flag from an edit to a linked step"*.
 - Viewing writes nothing, and re-emits change nothing —
@@ -1004,9 +1015,15 @@ Linked steps (§3.4):
   *"refreshes a linked step's stored copy to its tool's settings on save"*,
   *"stays unsaved for edits made during a save"*.
 - Unlink keeps the shown values, including parameters the worker no longer
-  declares —
+  declares, and renames a property step —
   *"keeps the shown values when a linked step is unlinked"*,
-  *"keeps saved parameters the worker no longer declares on unlink"*.
+  *"keeps saved parameters the worker no longer declares on unlink"*,
+  *"renames a property step on unlink so its own property is told apart"*.
+- Removing a step offers to remove the property the runner materialized even
+  if the editor's copy predates it; pipeline-materialized properties are not
+  offered for linking —
+  *"offers to remove the property the runner materialized on the stored pipeline"*,
+  *"does not offer a pipeline-materialized property to link to"*.
 - Auto-wiring leaves property-linked and unflagged steps alone, and wired tags
   survive removing the upstream step —
   *"does not auto-wire a step linked to an existing property"*,
