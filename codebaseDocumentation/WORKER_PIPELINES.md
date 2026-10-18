@@ -28,10 +28,10 @@ they aren't re-litigated.)
   steps to the nearest upstream annotation step.
 - **Linked steps** (§3.4): a step added from an existing tool or an existing
   property is *linked* to it, so the pipeline runs with the same parameters as
-  the individual tool or property instead of a diverging copy. Edits made to a
-  tool-linked step in the pipeline editor are written back to the tool; a
-  property-linked step computes the user's own property and never replaces or
-  deletes it. Each linked step keeps a saved copy used only when its source is
+  the individual tool or property instead of a diverging copy. A linked step's
+  settings are read-only in the pipeline editor (edit the tool in the Tools
+  panel); a property-linked step computes the user's own property and never
+  replaces or deletes it. Each linked step keeps a saved copy used only when its source is
   deleted, and **Unlink** turns it into an independent step.
 
 ### Removed / superseded
@@ -389,7 +389,18 @@ parameters. Options considered:
 - **Reference only** (a step holds just `toolId` / `propertyId`). Matches user
   expectation exactly, but breaks the portability and no-dangling-reference
   properties of §2: deleting a tool would break the pipeline.
-- **(chosen) Linked, with a saved copy as fallback.** Described below.
+- **(chosen) Linked, with a saved copy as fallback, read-only in the
+  pipeline.** Described below.
+
+An earlier iteration of the chosen option also let the user edit a
+tool-linked step's settings in the pipeline editor and wrote them back to the
+tool on Save. It was removed: nearly every review finding on this feature came
+from that write-back (pending edits going stale while the tool changed
+elsewhere, merging onto the tool's current values, save ordering and partial
+failure, rollback, a race with the tool menu's own debounced save, child
+editors that change their props in place). The user asked for the pipeline
+and the tool to use the same values, which linking alone delivers; the tool is
+edited where it lives.
 
 **Model.** `IAnnotationPipelineStep.sourceToolId` and
 `IPropertyPipelineStep.sourcePropertyId` mark a linked step. The step's ordinary
@@ -397,70 +408,44 @@ fields (image, parameters, annotation setup / tags, shape) are kept as a
 *saved copy* of the source. Steps built from a raw worker image are unlinked and
 behave exactly as before. Pure helpers live in `src/utils/pipelineLinks.ts`
 (`resolveLinkedStep`, `stepLinkState`, `toolLinkedFields`,
-`propertyLinkedFields`, `toolEditsBetween`, `applyToolEdits`,
-`remainingToolEdits`, `toolWithEdits`, `samePersistedValue`).
+`propertyLinkedFields`, `samePersistedValue`).
 
 | | Linked to a live tool | Linked to a live property | Source deleted |
 |---|---|---|---|
-| What runs | The tool's current image, parameters, annotation setup, `connectTo`, `jobDateTag` (transient tool built from `resolveLinkedStep`) | The property itself (`submitPropertyJob` on its id); no materialization | The step's saved copy (a property step materializes from it as before). Before treating a linked property as deleted, the runner reloads the configuration's properties once (`loadMissingLinkedProperties`, before taking the run lock; once per batch; the editor does the same on open), so one that simply had not loaded yet is computed, not duplicated. If that reload fails, the step fails rather than materializing a possible duplicate. A step already running its fallback is not rechecked |
+| What runs | The tool's current image, parameters, annotation setup, `connectTo`, `jobDateTag` (transient tool built from `resolveLinkedStep`) | The property itself (`submitPropertyJob` on its id); no materialization | The step's saved copy (a property step materializes from it as before). Before treating a linked property as deleted, the runner reloads the configuration's properties once (`loadMissingLinkedProperties`, after taking the run lock — it never rejects, so it cannot leave the lock held; once per batch; the editor does the same on open), so one that simply had not loaded yet is computed, not duplicated. If that reload fails, the step fails rather than materializing a possible duplicate. A step already running its fallback is not rechecked and keeps running it |
 | Editor: worker image | Locked | Locked | Locked |
-| Editor: parameters / tags | Editable; **written back to the tool on Save** | Locked (properties are immutable in the UI) | Locked |
+| Editor: parameters / tags | Locked: "edit them in the Tools panel, or Unlink to customize this step" | Locked: "Unlink to customize this step" (properties are immutable in the UI) | Locked |
 | Header chip | link icon + tool name | link icon + property name | "source deleted" (warning), or "tool has no worker" for a tool that still exists without a worker image (also unusable, so the saved copy runs) |
 | Auto-wiring (§5) | Its output tags feed downstream steps as usual — **also at run time**: the runner re-applies auto-wiring (`computeAutoWiredSteps`, `src/utils/pipelineWiring.ts`) to the resolved steps, so a tool whose output tags changed since the last save still feeds the property steps after it. The runner rewires only steps flagged `autoWired: true`, never an unflagged one (saved before the flag existed; its tags may be manual) | Skipped: computes on the property's own tags/shape | Same as when live |
 
-**Editor behaviour** (`PipelineEditor.vue`, `PipelineStepEditor.vue`). The
-editor never edits a copy of a linked tool's values — an earlier design did,
-and every bug its reviews found came from that copy going stale while the tool
-changed elsewhere. Instead:
+**Editor behaviour** (`PipelineEditor.vue`, `PipelineStepEditor.vue`):
 
-- **Shown live.** `localPipeline` holds the step list and every unlinked value.
-  `pendingToolEdits` holds, per tool, only what the user edited (whole fields,
-  except parameters, recorded one by one; `toolEditsBetween`, pruned by
-  `remainingToolEdits` of anything equal to the tool's value). What is shown
-  (`displayedPipeline`) is each linked step resolved against the **live** tool,
-  with that tool's pending edits on top, then auto-wired. So a tool edited
-  elsewhere shows through at once, all steps linked to one tool always show the
-  same values (the edits are keyed by tool, not by step), and a step added from
-  an already-linked tool shows the pending edits too.
-- **Only the step's own name and enabled flag are stored on the step.** An
-  edit to a tool-linked step's values becomes a pending tool edit. An emit
-  that changes nothing changes no state (`handleStepUpdate`): child editors
-  re-emit whenever their value's identity changes, and a linked step's shown
-  values are rebuilt on every recompute, so anything else would loop.
-- **Pending edits follow the links.** When no step links a tool any more (its
-  steps were unlinked — taking the shown values with them — or removed), its
-  pending edits are discarded, so a step later added from that tool does not
-  bring them back. Save writes edits only for tools a step can still use; a
-  tool that lost its worker image shows no edits and gets none.
+- **Shown live, read-only.** `localPipeline` holds the step list and every
+  unlinked value. What is shown (`displayedPipeline`) is each linked step
+  resolved against its **live** source, then auto-wired, so a tool edited
+  elsewhere shows through at once. A linked step's settings are locked
+  (`v-defaults-provider` with a global `disabled` default plus `inert`); only
+  its name and enabled flag can change, and `handleStepUpdate` keeps only those
+  from a linked step's emit (its locked editors still re-emit).
 - **Viewing writes nothing.** A linked step's unset parameters *show* the
-  worker's defaults (as the tool's own menu does). `PipelineStepEditor` hands
-  `WorkerInterfaceValues` a local copy (that widget edits its v-model object in
-  place without emitting) and emits only the parameters the user changed, so a
-  displayed default is never written. (An unlinked step is still seeded on
-  mount.)
+  worker's defaults (as the tool's own menu does) without writing them; an
+  unlinked step is still seeded on mount. An emit that changes nothing changes
+  no state: child editors re-emit whenever their value's identity changes, and
+  a linked step's shown values are rebuilt when its copy differs from its
+  source.
 - **Unsaved changes** are computed, not snapshotted: the displayed pipeline is
-  compared with the stored pipeline shown the same way (same live tools and
-  properties, ignoring the runner's `materializedPropertyId` write-backs), so a
-  source changed elsewhere is not an unsaved change. Equality ignores
-  `undefined` keys (`samePersistedValue`): child editors re-emit untouched
-  values with explicit `undefined` keys on mount (`AnnotationConfiguration`
-  always emits `color`), while values loaded from Girder JSON have none.
-- **Save** writes each linked tool's pending edits onto its current values
-  (`toolWithEdits`), so a change made elsewhere survives unless the user
-  edited the same field or parameter, in one `editToolsInConfiguration` call
-  (one `tools` write; on failure it reverts only the tools it replaced that
-  still hold its edit, and rethrows). Edits to a tool no step links any more
-  (all its steps were unlinked) are not written. The pipeline is saved with
-  each linked step's copy resolved against the tools as they are after the
-  save, so the deleted-tool fallback runs the tool's last settings.
-  `persist()` captures everything it writes before its first await. The tools
-  write happens **before** the pipeline write: if it fails, nothing is saved;
-  if it lands and the pipeline write fails, the tools keep the edits (which is
-  what the linked steps run) and any other change stays unsaved. After the
-  tools write, a pending edit is dropped only if it is still the value written,
-  so an edit made during the save stays pending.
-- **Unlink** removes `sourceToolId` / `sourcePropertyId` and keeps the current
-  values as an independent step. An unlinked property step gets
+  compared with the stored pipeline shown the same way (same live sources,
+  ignoring the runner's `materializedPropertyId` write-backs), so a source
+  changed elsewhere is not an unsaved change. Equality ignores `undefined` keys
+  (`samePersistedValue`): `AnnotationConfiguration` always emits `color`, while
+  values loaded from Girder JSON have no such key.
+- **Save** stores each linked step with its source's current values, so the
+  deleted-source fallback runs its last settings as of the last save. It
+  captures what it saves before its first await, so an edit made during the
+  save stays unsaved.
+- **Unlink** removes `sourceToolId` / `sourcePropertyId` and keeps the shown
+  values (including displayed defaults and any saved parameter the worker no
+  longer declares) as an independent, editable step. An unlinked property step gets
   `autoWired: false` (it keeps the property's tags). It never takes the user's
   property as its `materializedPropertyId`, so its next run materializes a new
   property and the user's property is never touched; a property the fallback
@@ -479,12 +464,8 @@ pipeline-materialized property that another step links to is not deleted when
 its own pipeline replaces or drops it.
 
 **Not linked (by design).** The step *name* and *enabled* flag stay per-step.
-Changing a linked step's worker image requires unlinking (a different worker is
-a different tool). A locked section disables every control in it, so parameter
-help tooltips are unavailable on locked steps. `AnnotationConfiguration` clamps
-Z/Time assignments that exceed the current dataset when it mounts; for a
-tool-linked step that clamp is an edit like any other and is saved to the tool,
-as it would be from the tool's own menu.
+A locked section disables every control in it, so parameter help tooltips are
+unavailable on linked steps.
 
 ---
 
@@ -981,7 +962,9 @@ Linked steps (§3.4):
   *"does not reload properties when every linked property is loaded"*,
   *"reloads properties on open when a linked property is missing"*,
   *"fails a missing linked property step when the reload fails, without materializing or holding the run lock"*,
-  *"does not reload a linked property already running its fallback"*.
+  *"holds the run lock while it reloads linked properties"*,
+  *"does not reload a linked property already running its fallback"*,
+  *"runs a step already on its fallback when another step's reload fails"*.
 - Drift replacement never deletes a property another step links to —
   *"does not delete a drifted-away property that another step links to"*.
 - Deleting a pipeline never deletes a linked property —
@@ -995,42 +978,22 @@ Linked steps (§3.4):
 - The editor shows linked steps live, never reads that as unsaved —
   *"shows a linked step with its tool's live values on open, without marking it dirty"*,
   *"shows a tool change made elsewhere while the editor is open"*.
-- Edits are recorded per tool, so every step linked to it agrees, including a
-  step added later —
-  *"applies an edit of one linked step to the other steps linked to the same tool"*,
-  *"gives a step added from an already-linked tool that step's unsaved edits"*.
-- Save writes back exactly the user's edits, onto the tool's current values —
-  *"writes an edited linked step back to its tool on save"*,
-  *"keeps a tool change made elsewhere in a field the step did not edit"*,
-  *"does not write an unedited linked step back over a tool changed elsewhere"*,
-  *"does not write back a step added this session when only its tool changed elsewhere"*,
-  *"differingToolEdits records changed parameters one by one and whole fields"*,
-  *"toolWithEdits writes only the pending edits onto the tool's current values"*,
-  *"differingToolEdits drops edits that match the given values"*.
-- A child re-emitting with `undefined` keys is not an edit (no write, not
-  unsaved) —
+- A linked step is read-only: its settings are locked with a pointer to the
+  Tools panel, and only its name and enabled flag change —
+  *"locks a linked step's settings and says where to edit them"*,
+  *"leaves an unlinked step's settings editable"*,
+  *"keeps only the name and enabled flag from an edit to a linked step"*.
+- Viewing writes nothing, and re-emits change nothing —
+  *"shows a linked step's defaults without writing them on mount"*,
   *"does not treat a child re-emitting a linked step with undefined keys as an edit"*,
-  *"differingToolEdits treats values differing only in undefined keys as unedited"*.
-- Parameter edits made in place reach the parent, and only touched parameters
-  are written — viewing writes nothing —
-  *"emits a parameter edited in place by the parameter widget"*,
-  *"emits only the parameter edited on a linked step, not the displayed defaults"*,
-  *"shows a linked step's defaults without writing them on mount"*.
-- Edits made during a save stay unsaved / pending —
-  *"saves what was on screen when Save started and stays unsaved for edits made during it"*,
-  *"keeps an edit made during the tool write pending"*.
-- A failed tool write saves nothing —
-  *"does not save the pipeline when writing a linked tool back fails"*.
-- Unlinked steps take their values with them; their old tool's pending edits
-  are discarded, and a tool without a worker gets no edits —
-  *"does not write a tool back once no step is linked to it"*,
-  *"does not write edits for a tool that lost its worker image"*.
-- Save refreshes linked steps' stored copies —
-  *"refreshes a linked step's stored copy to its tool's settings on save"*.
+  *"changes no editor state on an unchanged re-emit"*.
+- Save refreshes linked steps' stored copies, and edits made during a save stay
+  unsaved —
+  *"refreshes a linked step's stored copy to its tool's settings on save"*,
+  *"stays unsaved for edits made during a save"*.
+- Unlink keeps the shown values, including parameters the worker no longer
+  declares —
+  *"keeps the shown values when a linked step is unlinked"*,
+  *"keeps saved parameters the worker no longer declares on unlink"*.
 - Auto-wiring leaves property-linked steps alone —
   *"does not auto-wire a step linked to an existing property"*.
-- The multi-tool write is one `tools` write, keeps pins and selection, and rolls
-  back with the original message without discarding changes made during it —
-  *"edits several tools with one write, keeping pins and the selection"*,
-  *"rolls back a multi-tool edit whose write fails, with the original message"*,
-  *"a failed multi-tool write keeps changes made while it was in flight"*.

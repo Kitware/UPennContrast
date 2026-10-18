@@ -64,32 +64,7 @@ beforeEach(() => {
   h.properties.getWorkerInterface.mockReturnValue(workerInterface);
 });
 
-describe("PipelineStepEditor parameters", () => {
-  it("emits a parameter edited in place by the parameter widget", async () => {
-    const step = annotationStep(
-      { threshold: 1, radius: 2 },
-      {
-        sourceToolId: "t1",
-      },
-    );
-    const wrapper = mountStepEditor(step, linked);
-    await nextTick();
-    const values = wrapper
-      .findComponent(WorkerInterfaceValues)
-      .props("modelValue") as any;
-
-    // What WorkerInterfaceValues' `v-model="interfaceValues[id]"` does.
-    values.threshold = 9;
-    await nextTick();
-
-    const emitted = wrapper.emitted("update:modelValue") as any[];
-    expect(emitted.at(-1)[0].workerInterfaceValues).toEqual({
-      threshold: 9,
-      radius: 2,
-    });
-    expect(step.workerInterfaceValues.threshold).toBe(1);
-  });
-
+describe("PipelineStepEditor linked steps", () => {
   it("shows a linked step's defaults without writing them on mount", async () => {
     const wrapper = mountStepEditor(
       annotationStep({}, { sourceToolId: "t1" }),
@@ -104,20 +79,45 @@ describe("PipelineStepEditor parameters", () => {
     expect(wrapper.emitted("update:modelValue")).toBeUndefined();
   });
 
-  it("emits only the parameter edited on a linked step, not the displayed defaults", async () => {
+  it("locks a linked step's settings and says where to edit them", async () => {
     const wrapper = mountStepEditor(
-      annotationStep({}, { sourceToolId: "t1" }),
+      annotationStep({ threshold: 1 }, { sourceToolId: "t1" }),
       linked,
     );
     await nextTick();
-    const values = wrapper
-      .findComponent(WorkerInterfaceValues)
-      .props("modelValue") as any;
 
-    values.threshold = 9;
+    const locked = wrapper.findAll("[inert]");
+    expect(locked.length).toBe(2);
+    expect(
+      locked.some((section) =>
+        section.findComponent(WorkerInterfaceValues).exists(),
+      ),
+    ).toBe(true);
+    expect(wrapper.text()).toContain("Edit them in the Tools panel");
+  });
+
+  it("leaves an unlinked step's settings editable", async () => {
+    const wrapper = mountStepEditor(annotationStep({ threshold: 1 }));
     await nextTick();
 
+    expect(wrapper.findAll("[inert]").length).toBe(0);
+  });
+
+  it("keeps saved parameters the worker no longer declares on unlink", async () => {
+    const wrapper = mountStepEditor(
+      annotationStep({ threshold: 1, retired: 7 }, { sourceToolId: "t1" }),
+      linked,
+    );
+    await nextTick();
+
+    (wrapper.vm as any).unlink();
+
     const emitted = wrapper.emitted("update:modelValue") as any[];
-    expect(emitted.at(-1)[0].workerInterfaceValues).toEqual({ threshold: 9 });
+    expect(emitted.at(-1)[0]).not.toHaveProperty("sourceToolId");
+    expect(emitted.at(-1)[0].workerInterfaceValues).toEqual({
+      threshold: 1,
+      radius: 2,
+      retired: 7,
+    });
   });
 });

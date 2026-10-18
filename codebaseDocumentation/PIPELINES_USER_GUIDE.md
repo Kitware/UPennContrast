@@ -116,9 +116,10 @@ The **Add step** dialog offers four sources:
    configuration (the tools a user set up in the Tools panel). The new
    annotation step is **linked** to that tool: it runs with the tool's current
    worker, parameter values, annotation setup (tags, shape, coordinate
-   assignment) and connection settings. Changing the tool changes the pipeline,
-   and changing the step's parameters in the pipeline (then saving) changes the
-   tool. This option is disabled if the configuration has no worker-backed tools.
+   assignment) and connection settings. The step's settings are read-only in
+   the pipeline: to change them, edit the tool in the Tools panel, and the
+   pipeline follows. This option is disabled if the configuration has no
+   worker-backed tools.
 4. **Existing property** — pick a property already defined in the
    configuration. The new property step is **linked** to it: the pipeline
    computes that same property (same values in the Annotation Browser column)
@@ -126,12 +127,15 @@ The **Add step** dialog offers four sources:
    pipeline, because properties can't be edited after they are created. This
    option is disabled if the configuration has no properties.
 
-A linked step shows a link chip with its source's name. **Unlink** (in the
-step's editor) turns it into an independent step that keeps the current values
-and can be edited on its own; unlinking a property step means the pipeline will
-create its own property on the next run, leaving the original untouched. If the
-source tool or property is deleted, the step shows "source deleted" and keeps
-running with the last saved copy of its settings.
+A linked step shows a link chip with its source's name, and its editor says
+where its settings come from. Only its name and Enabled toggle can be changed
+in the pipeline. **Unlink** (in the step's editor) turns it into an independent
+step that keeps the current values and can be edited on its own; unlinking a
+property step means the pipeline will create its own property on the next run,
+leaving the original untouched. If the source tool or property is deleted, the
+step shows "source deleted" and keeps running with the last saved copy of its
+settings. A tool that still exists but no longer has a worker image shows "tool
+has no worker" and is treated the same way.
 
 ### Configuring a step
 
@@ -257,7 +261,7 @@ shared by every dataset in the collection.
 | **Auto-wiring** | The editor copying an upstream annotation step's tags/shape into a downstream property step automatically. |
 | **Materializable shapes** | The shapes a property can be computed on: point, line, polygon. |
 | **Materialized property** | The persisted property definition a property step creates on first run and reuses. |
-| **Linked step** | A step added from an existing tool or property; it runs with that source's current settings (edits to a tool-linked step are saved to the tool). |
+| **Linked step** | A step added from an existing tool or property; it runs with that source's current settings, which are read-only in the pipeline. |
 | **Origin** | Where a pipeline came from: `user` or `preset`. |
 | **Batch run** | Running one pipeline across every dataset in the collection (≤ 50). |
 
@@ -289,9 +293,9 @@ non-materializable shapes to polygon automatically).
 
 **"Can I reuse a tool I already set up?"** Yes — in Add step, choose "Existing
 tool". The step is linked to the tool, so the pipeline and the tool always use
-the same parameters; edit either one and the other follows. Choose "Existing
-property" to reuse a property the same way. Use **Unlink** on the step if you
-want the pipeline to use different settings from the tool.
+the same parameters: edit the tool in the Tools panel and the pipeline follows.
+Choose "Existing property" to reuse a property the same way. Use **Unlink** on
+the step if you want the pipeline to use different settings from the tool.
 
 **"Why don't my pipeline's parameters match my tool?"** The step was probably
 added from a raw worker image, or was unlinked, so it has its own settings.

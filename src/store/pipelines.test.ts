@@ -91,13 +91,7 @@ vi.mock("./filters", () => ({
 }));
 
 import pipelinesStore, { mergeMaterializedPropertyIds } from "./pipelines";
-import {
-  differingToolEdits,
-  resolveLinkedStep,
-  stepLinkState,
-  stepToolLinkedFields,
-  toolWithEdits,
-} from "@/utils/pipelineLinks";
+import { resolveLinkedStep, stepLinkState } from "@/utils/pipelineLinks";
 import { AnnotationShape, IPipeline } from "./model";
 
 function annotationStep(id: string, tags: string[] = []): any {
@@ -995,76 +989,6 @@ describe("linked steps", () => {
     ).toEqual({ state: "missing", sourceKind: "tool", sourceName: "Tool t2" });
   });
 
-  it("differingToolEdits records changed parameters one by one and whole fields", () => {
-    const before = stepToolLinkedFields({
-      ...annotationStep("a", ["t"]),
-      workerInterfaceValues: { threshold: 7, radius: 2 },
-    });
-    const after = {
-      ...before,
-      workerInterfaceValues: { threshold: 9, radius: 2 },
-      annotation: { ...before.annotation, tags: ["edited"] },
-    };
-
-    expect(differingToolEdits(after, before)).toEqual({
-      workerInterfaceValues: { threshold: 9 },
-      annotation: after.annotation,
-    });
-  });
-
-  it("differingToolEdits treats values differing only in undefined keys as unedited", () => {
-    const before = stepToolLinkedFields(annotationStep("a", ["t"]));
-    delete (before.annotation as any).color;
-    // What AnnotationConfiguration re-emits on mount: an explicit color key.
-    const after = {
-      ...before,
-      annotation: { ...before.annotation, color: undefined },
-    };
-
-    expect(differingToolEdits(after, before)).toEqual({});
-  });
-
-  it("toolWithEdits writes only the pending edits onto the tool's current values", () => {
-    // The tool gained a parameter and new output tags elsewhere; the pending
-    // edit is only `threshold`.
-    const tool = workerTool("t1", {
-      workerInterfaceValues: { threshold: 7, radius: 4 },
-    });
-    tool.values.annotation.tags = ["changed-elsewhere"];
-
-    const edited = toolWithEdits(tool, {
-      workerInterfaceValues: { threshold: 9 },
-    });
-
-    expect(edited.values.image.image).toBe("img/tool");
-    expect(edited.values.workerInterfaceValues).toEqual({
-      threshold: 9,
-      radius: 4,
-    });
-    expect(edited.values.annotation.tags).toEqual(["changed-elsewhere"]);
-    expect(tool.values.workerInterfaceValues).toEqual({
-      threshold: 7,
-      radius: 4,
-    });
-  });
-
-  it("differingToolEdits drops edits that match the given values", () => {
-    const live = stepToolLinkedFields({
-      ...annotationStep("a", ["t"]),
-      workerInterfaceValues: { threshold: 7 },
-    });
-
-    expect(
-      differingToolEdits(
-        {
-          workerInterfaceValues: { threshold: 7, radius: 3 },
-          jobDateTag: true,
-        },
-        live,
-      ),
-    ).toEqual({ workerInterfaceValues: { radius: 3 }, jobDateTag: true });
-  });
-
   it("re-wires a property step to the output tags its linked tool produces now", async () => {
     // Saved while the tool produced "stale-tag"; the tool now produces
     // "from-tool".
@@ -1186,6 +1110,54 @@ describe("linked steps", () => {
 
     expect(h.properties.createProperty).toHaveBeenCalledWith(
       expect.objectContaining({ tags: { tags: ["cells"], exclusive: false } }),
+    );
+  });
+
+  it("holds the run lock while it reloads linked properties", async () => {
+    h.properties.properties = [];
+    let lockDuringReload: string | null = null;
+    h.properties.fetchProperties.mockImplementation(async () => {
+      lockDuringReload = pipelinesStore.runningPipelineId;
+      h.properties.properties = [existingProperty("user")];
+    });
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+
+    await pipelinesStore.runPipeline({
+      pipeline: pipeline([{ ...propertyStep("p"), sourcePropertyId: "user" }]),
+    });
+
+    expect(lockDuringReload).toBe("pipe1");
+  });
+
+  it("runs a step already on its fallback when another step's reload fails", async () => {
+    h.properties.properties = [
+      {
+        id: "fallback",
+        image: "img/prop",
+        shape: AnnotationShape.Polygon,
+        tags: { tags: [], exclusive: false },
+        workerInterface: {},
+      },
+    ];
+    h.properties.fetchProperties.mockRejectedValue(new Error("offline"));
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+    const onFallback = {
+      ...propertyStep("a"),
+      sourcePropertyId: "gone",
+      materializedPropertyId: "fallback",
+    };
+    const unchecked = { ...propertyStep("b"), sourcePropertyId: "not-loaded" };
+
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipeline([onFallback, unchecked]),
+      continueOnError: true,
+    });
+
+    expect(result).toMatchObject({ succeeded: 1, failed: 1 });
+    expect(h.properties.submitPropertyJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        property: expect.objectContaining({ id: "fallback" }),
+      }),
     );
   });
 

@@ -53,11 +53,9 @@
       </v-col>
     </v-row>
 
-    <!-- Parameters are editable on a step linked to a live tool (edits are
-         written back to the tool on Save), but not on a step linked to a
-         property (properties are immutable) or to a deleted source. -->
-    <v-defaults-provider :defaults="lockedDefaults(parametersLocked)">
-      <div :inert="parametersLocked || undefined">
+    <!-- A linked step's settings are its source's: read-only here. -->
+    <v-defaults-provider :defaults="lockedDefaults(isLinked)">
+      <div :inert="isLinked || undefined">
         <template v-if="isAnnotation">
           <v-row class="my-0">
             <v-col class="py-1">
@@ -116,8 +114,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { cloneDeep, omit, pickBy } from "lodash";
+import { computed, onMounted, ref } from "vue";
+import { cloneDeep, omit } from "lodash";
 import propertiesStore from "@/store/properties";
 import DockerImageSelect from "@/components/DockerImageSelect.vue";
 import WorkerInterfaceValues from "@/components/WorkerInterfaceValues.vue";
@@ -125,7 +123,7 @@ import TagPicker from "@/components/TagPicker.vue";
 import AnnotationConfiguration from "@/tools/creation/templates/AnnotationConfiguration.vue";
 import { getDefault } from "@/utils/workerInterface";
 import { logError } from "@/utils/log";
-import { samePersistedValue, TStepLinkState } from "@/utils/pipelineLinks";
+import { TStepLinkState } from "@/utils/pipelineLinks";
 import {
   AnnotationNames,
   AnnotationShape,
@@ -208,14 +206,6 @@ const isLinked = computed(
   () => !!props.linkState && props.linkState.state !== "unlinked",
 );
 
-const parametersLocked = computed(() => {
-  const linkState = props.linkState;
-  if (!linkState || linkState.state === "unlinked") {
-    return false;
-  }
-  return linkState.state === "missing" || linkState.sourceKind === "property";
-});
-
 const linkMessage = computed<string | null>(() => {
   const linkState = props.linkState;
   if (!linkState || linkState.state === "unlinked") {
@@ -230,8 +220,8 @@ const linkMessage = computed<string | null>(() => {
       : "The tool this step was linked to was deleted. It runs with the last saved copy of the tool's settings. Unlink to edit them.";
   }
   return linkState.sourceKind === "tool"
-    ? `Linked to tool "${linkState.sourceName}": runs with the tool's current settings. Changes made here are saved to the tool too.`
-    : `Linked to property "${linkState.sourceName}": computes that property as it is defined. Unlink to change its settings in this pipeline only.`;
+    ? `Linked to tool "${linkState.sourceName}": runs with the tool's current settings. Edit them in the Tools panel, or Unlink to customize this step.`
+    : `Linked to property "${linkState.sourceName}": computes that property as it is defined. Unlink to customize this step.`;
 });
 
 // Locked sections render every Vuetify control disabled (a global default, so
@@ -283,56 +273,27 @@ const workerInterface = computed<IWorkerInterface | null>(() => {
 });
 
 // The parameter values shown. A linked step's unset parameters show the
-// worker's defaults, as the tool's own menu does, without writing them: merely
-// viewing a step must not change its tool. (An unlinked step is seeded on
-// mount instead; see onMounted.)
+// worker's defaults, as the tool's own menu does, without writing them (its
+// settings are read-only here). (An unlinked step is seeded on mount instead;
+// see onMounted.) Saved values the interface no longer declares are kept, so
+// Unlink does not drop them.
 const displayedWorkerInterfaceValues = computed<IWorkerInterfaceValues>(() =>
   isLinked.value && workerInterface.value
-    ? seedWorkerInterfaceValues(
-        step.value.image,
-        step.value.workerInterfaceValues,
-      )
+    ? {
+        ...seedWorkerInterfaceValues(
+          step.value.image,
+          step.value.workerInterfaceValues,
+        ),
+        ...step.value.workerInterfaceValues,
+      }
     : step.value.workerInterfaceValues,
 );
 
-// WorkerInterfaceValues edits its v-model object in place (`v-model` on
-// `interfaceValues[id]`) without emitting. Hand it a local copy and emit each
-// real change, so the parent sees every parameter edit (it keeps steps linked
-// to the same tool in sync) and the step is never mutated behind its back.
-const workerInterfaceValuesModel = ref<IWorkerInterfaceValues>(
-  cloneDeep(displayedWorkerInterfaceValues.value),
-);
-watch(
-  displayedWorkerInterfaceValues,
-  (values) => {
-    if (!samePersistedValue(values, workerInterfaceValuesModel.value)) {
-      workerInterfaceValuesModel.value = cloneDeep(values);
-    }
-  },
-  { deep: true },
-);
-// Emit only the parameters the user changed, onto the step's own values: a
-// displayed default that was not touched is never written.
-watch(
-  workerInterfaceValuesModel,
-  (values) => {
-    const displayed = displayedWorkerInterfaceValues.value;
-    const changed = pickBy(
-      values,
-      (value, parameterId) =>
-        !samePersistedValue(value, displayed[parameterId]),
-    );
-    if (Object.keys(changed).length > 0) {
-      patchStep({
-        workerInterfaceValues: {
-          ...step.value.workerInterfaceValues,
-          ...cloneDeep(changed),
-        },
-      });
-    }
-  },
-  { deep: true },
-);
+const workerInterfaceValuesModel = computed({
+  get: () => displayedWorkerInterfaceValues.value,
+  set: (value: IWorkerInterfaceValues) =>
+    patchStep({ workerInterfaceValues: value }),
+});
 
 const annotationSetup = computed<IAnnotationSetup | undefined>(
   () => annotationStepValue.value?.annotation,
@@ -485,7 +446,6 @@ onMounted(async () => {
 defineExpose({
   step,
   isLinked,
-  parametersLocked,
   unlink,
   isAnnotation,
   workerInterface,

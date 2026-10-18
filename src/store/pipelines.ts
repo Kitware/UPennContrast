@@ -367,13 +367,8 @@ export class Pipelines extends VuexModule {
       return emptyResult;
     }
 
-    // A linked property missing from the loaded list may be gone, or may not
-    // have loaded yet (properties load with the configuration). Check before
-    // taking the run lock, so a failed check can't leave it held.
-    const linkedPropertiesKnown =
-      linkedPropertiesChecked ??
-      (await this.loadMissingLinkedProperties(pipeline));
-
+    // Take the run lock before any await, so a second run can't start in the
+    // meantime.
     if (!skipRunningState) {
       this.setRunningPipelineId(pipeline.id);
     }
@@ -389,6 +384,13 @@ export class Pipelines extends VuexModule {
     // Hand the cancel handle to the caller immediately (before the loop), so the
     // cancel button is wired up without waiting for the run to finish.
     onCancel?.(cancel);
+
+    // A linked property missing from the loaded list may be gone, or may not
+    // have loaded yet (properties load with the configuration). This check
+    // never rejects, so it cannot leave the lock held.
+    const linkedPropertiesKnown =
+      linkedPropertiesChecked ??
+      (await this.loadMissingLinkedProperties(pipeline));
 
     const topProgressId = await progress.create({
       type: ProgressType.PIPELINE_COMPUTE,
@@ -494,9 +496,14 @@ export class Pipelines extends VuexModule {
               eventCallback,
               errorCallback,
             });
-          } else if (runStep.sourcePropertyId && !linkedPropertiesKnown) {
+          } else if (
+            runStep.sourcePropertyId &&
+            !runStep.materializedPropertyId &&
+            !linkedPropertiesKnown
+          ) {
             // Unknown whether the linked property still exists: don't
-            // materialize what may be a duplicate of it.
+            // materialize what may be a duplicate of it. (A step already on
+            // its fallback was not part of the check and runs it.)
             throw new Error(
               "Could not check whether the linked property still exists; try again.",
             );
@@ -745,9 +752,10 @@ export class Pipelines extends VuexModule {
       datasetNames[id] = datasetInfo.folder?.[id]?.name || "Unknown dataset";
     }
 
+    this.setRunningPipelineId(pipeline.id);
+    // Never rejects, so it cannot leave the lock held.
     const linkedPropertiesChecked =
       await this.loadMissingLinkedProperties(pipeline);
-    this.setRunningPipelineId(pipeline.id);
     const batchProgressId = await progress.create({
       type: ProgressType.BATCH_PIPELINE_COMPUTE,
       title: `Batch pipeline: ${pipeline.name}`,

@@ -363,7 +363,7 @@
             item-title="name"
             item-value="id"
             density="compact"
-            hint="Links the step to the tool: it runs with the tool's current parameters and output tags, and changes to them here are saved to the tool too"
+            hint="Links the step to the tool: it runs with the tool's current parameters and output tags. Edit them in the Tools panel, or unlink the step to customize it"
             persistent-hint
           />
           <v-select
@@ -466,18 +466,11 @@ import pipelinesStore, {
   mergeMaterializedPropertyIds,
 } from "@/store/pipelines";
 import {
-  applyToolEdits,
-  differingToolEdits,
-  findSourceTool,
-  hasToolEdits,
-  IToolEdits,
   propertyLinkedFields,
   resolveLinkedStep,
   samePersistedValue,
   stepLinkState,
-  stepToolLinkedFields,
   toolLinkedFields,
-  toolWithEdits,
   TStepLinkState,
 } from "@/utils/pipelineLinks";
 import { computeAutoWiredSteps } from "@/utils/pipelineWiring";
@@ -500,7 +493,6 @@ import {
   IAnnotationSetup,
   IPipeline,
   IPropertyPipelineStep,
-  IToolConfiguration,
   IWorkerLabels,
   MessageType,
   TPipelineStep,
@@ -521,50 +513,29 @@ const emit = defineEmits<{
 
 const controller = inject<PipelineRunController>(PipelineRunControllerKey)!;
 
-// The user's working copy: the step list and every unlinked value, edited as
-// a deep clone so nothing is persisted until Save/Run. Re-cloned only when
-// pointed at a *different* pipeline (id change).
+// The working copy, edited as a deep clone so nothing is persisted until
+// Save/Run. Re-cloned only when pointed at a *different* pipeline (id change).
 //
-// A tool-linked step's values are NOT edited here. The editor shows the live
-// tool with `pendingToolEdits` on top (only what the user edited, by tool), so
-// a tool changed elsewhere while the editor is open shows through, steps
-// linked to one tool always agree, and Save writes back exactly the user's
-// edits. See "Linked steps" in WORKER_PIPELINES.md.
+// Linked steps are read-only apart from their name and enabled flag: they are
+// shown, run and saved with their source's live values (edited in the Tools
+// panel, not here). See "Linked steps" in WORKER_PIPELINES.md.
 const localPipeline = ref<IPipeline>(cloneDeep(props.pipeline));
-const pendingToolEdits = ref<Record<string, IToolEdits>>({});
 
 // A pipeline's steps as shown and as saved: linked steps take their live
-// source's values (plus pending edits, if given), then auto-wiring is applied
-// (so pipelines arriving with unwired property steps are wired on open).
-function displayedSteps(
-  steps: TPipelineStep[],
-  toolEdits: Record<string, IToolEdits> = {},
-  tools: IToolConfiguration[] = store.tools,
-): TPipelineStep[] {
+// source's values (their saved copy stays the fallback if the source goes),
+// then auto-wiring is applied (so pipelines arriving with unwired property
+// steps are wired on open).
+function displayedSteps(steps: TPipelineStep[]): TPipelineStep[] {
   return computeAutoWiredSteps(
-    steps.map((step) => {
-      const resolved = resolveLinkedStep(
-        step,
-        tools,
-        propertiesStore.properties,
-      );
-      if (resolved.kind !== "annotation" || !resolved.sourceToolId) {
-        return resolved;
-      }
-      const edits = toolEdits[resolved.sourceToolId];
-      return hasToolEdits(edits) && findSourceTool(resolved, tools)
-        ? {
-            ...resolved,
-            ...applyToolEdits(stepToolLinkedFields(resolved), edits),
-          }
-        : resolved;
-    }),
+    steps.map((step) =>
+      resolveLinkedStep(step, store.tools, propertiesStore.properties),
+    ),
   );
 }
 
 const displayedPipeline = computed<IPipeline>(() => ({
   ...localPipeline.value,
-  steps: displayedSteps(localPipeline.value.steps, pendingToolEdits.value),
+  steps: displayedSteps(localPipeline.value.steps),
 }));
 
 // A linked property that has not loaded yet would read as deleted; reload the
@@ -577,7 +548,6 @@ watch(
   () => props.pipeline.id,
   () => {
     localPipeline.value = cloneDeep(props.pipeline);
-    pendingToolEdits.value = {};
     loadMissingLinkedProperties();
     materializedPropertyIdsToRemove.value = [];
     showRemoveStepDialog.value = false;
@@ -703,25 +673,8 @@ const stepCaptions = computed<(string | null)[]>(() => {
   });
 });
 
-function linkedToolIds(steps: TPipelineStep[]): Set<string> {
-  return new Set(
-    steps.flatMap((step) =>
-      step.kind === "annotation" && step.sourceToolId
-        ? [step.sourceToolId]
-        : [],
-    ),
-  );
-}
-
-// Pending edits of a tool that no step links any more (its steps were unlinked
-// — taking the shown values with them — or removed) are discarded, so a step
-// later added from that tool does not bring them back.
 function updateSteps(steps: TPipelineStep[]) {
   localPipeline.value.steps = steps;
-  const linked = linkedToolIds(steps);
-  if (Object.keys(pendingToolEdits.value).some((id) => !linked.has(id))) {
-    pendingToolEdits.value = pick(pendingToolEdits.value, [...linked]);
-  }
 }
 
 const linkStates = computed<TStepLinkState[]>(() =>
@@ -742,71 +695,32 @@ function linkedSourceName(index: number): string {
   return linkState?.state === "linked" ? linkState.sourceName : "";
 }
 
-// Record edits to a linked tool, keeping only what still differs from its
-// live values (`live`: a step linked to it, shown without pending edits).
-function recordToolEdits(
-  toolId: string,
-  edits: IToolEdits,
-  live: IAnnotationPipelineStep,
-) {
-  const remaining = differingToolEdits(
-    applyToolEdits(pendingToolEdits.value[toolId] ?? {}, edits),
-    stepToolLinkedFields(live),
-  );
-  if (samePersistedValue(remaining, pendingToolEdits.value[toolId] ?? {})) {
-    return;
-  }
-  pendingToolEdits.value = hasToolEdits(remaining)
-    ? { ...pendingToolEdits.value, [toolId]: remaining }
-    : omit(pendingToolEdits.value, toolId);
+function isLinkedStep(step: TPipelineStep): boolean {
+  return step.kind === "annotation"
+    ? !!step.sourceToolId
+    : !!step.sourcePropertyId;
 }
 
-// `newStep` is the displayed step with the user's change. For a step linked to
-// a live tool, a change to the tool's values becomes a pending tool edit (shown
-// on every step linked to that tool); only the step's own name and enabled
-// flag are kept on the step. Anything else (including Unlink, which drops the
-// link and keeps the shown values) replaces the step.
+// `newStep` is the displayed step with the user's change. A linked step keeps
+// only a new name or enabled flag: its other settings are its source's (its
+// editors are locked, but they still re-emit). Anything else — including
+// Unlink, which drops the link and keeps the shown values — replaces the step.
+// Child editors re-emit whenever their value's identity changes, so an emit
+// that changes nothing must change no state.
 function handleStepUpdate(index: number, newStep: TPipelineStep) {
   const shown = displayedPipeline.value.steps[index];
-  // Child editors re-emit whenever their value's identity changes (and a
-  // linked step's shown values are rebuilt on every recompute), so an
-  // unchanged emit must change no state, or it would loop.
-  if (samePersistedValue(newStep, shown)) {
+  const ownFields = (step: TPipelineStep) => pick(step, "name", "enabled");
+  if (
+    samePersistedValue(newStep, shown) ||
+    (isLinkedStep(newStep) &&
+      samePersistedValue(ownFields(newStep), ownFields(shown)))
+  ) {
     return;
   }
   const steps = localPipeline.value.steps.slice();
-  const live = resolveLinkedStep(
-    steps[index],
-    store.tools,
-    propertiesStore.properties,
-  );
-  if (
-    newStep.kind === "annotation" &&
-    shown?.kind === "annotation" &&
-    live.kind === "annotation" &&
-    newStep.sourceToolId &&
-    findSourceTool(newStep, store.tools)
-  ) {
-    recordToolEdits(
-      newStep.sourceToolId,
-      differingToolEdits(
-        stepToolLinkedFields(newStep),
-        stepToolLinkedFields(shown),
-      ),
-      live,
-    );
-    if (
-      samePersistedValue(
-        pick(newStep, "name", "enabled"),
-        pick(shown, "name", "enabled"),
-      )
-    ) {
-      return;
-    }
-    steps[index] = { ...steps[index], ...pick(newStep, "name", "enabled") };
-  } else {
-    steps[index] = newStep;
-  }
+  steps[index] = isLinkedStep(newStep)
+    ? { ...steps[index], ...ownFields(newStep) }
+    : newStep;
   updateSteps(steps);
 }
 
@@ -918,8 +832,7 @@ function defaultAnnotationSetup(
 
 // An annotation step linked to an existing worker tool. Its fields start as a
 // copy of the tool's (the inverse of the runner's buildTransientTool
-// mapping); the editor shows it with the tool's live values and any pending
-// edits to that tool, like every other step linked to it.
+// mapping); the editor shows it, read-only, with the tool's live values.
 function stepFromTool(toolId: string): IAnnotationPipelineStep | null {
   const tool = workerTools.value.find((t) => t.id === toolId);
   const fields = tool && toolLinkedFields(tool, defaultAnnotationSetup());
@@ -1013,57 +926,16 @@ function confirmAddStep() {
 async function persist(): Promise<IPipeline | null> {
   saving.value = true;
   saveError.value = null;
-  // Everything this save writes is captured before the first await, so an
-  // edit made while it is in flight is neither half-saved nor marked saved.
+  // Captured before the first await, so an edit made while the save is in
+  // flight is not marked saved. Linked steps are saved with their source's
+  // current values, so the deleted-source fallback runs its last settings.
   const editing = cloneDeep(localPipeline.value);
-  // Pending edits are written onto each tool's current values, for tools a
-  // step can still use (the editor shows no edits on a step whose tool lost
-  // its worker image, so none are written for it).
-  const usableToolIds = new Set(
-    editing.steps.flatMap((step) => {
-      const tool = findSourceTool(step, store.tools);
-      return tool ? [tool.id] : [];
-    }),
-  );
-  const toolEdits = Object.entries(cloneDeep(pendingToolEdits.value)).filter(
-    ([toolId]) => usableToolIds.has(toolId),
-  );
-  const editedTools = toolEdits.flatMap(([toolId, edits]) => {
-    const tool = store.tools.find((t) => t.id === toolId);
-    return tool ? [toolWithEdits(tool, edits)] : [];
-  });
-  // The saved copy of each linked step is its source as it will be after this
-  // save, so the deleted-source fallback runs the tool's last settings.
-  const editedToolsById = new Map(editedTools.map((tool) => [tool.id, tool]));
   const toSave: IPipeline = {
     ...editing,
-    steps: displayedSteps(
-      editing.steps,
-      {},
-      store.tools.map((tool) => editedToolsById.get(tool.id) ?? tool),
-    ),
+    steps: displayedSteps(editing.steps),
   };
   const saved = cloneDeep(toSave);
   try {
-    // Linked steps' edits go to their tools first. If that write fails,
-    // nothing is saved. If it lands and the pipeline write then fails, the
-    // tools keep the edits (which is what the linked steps run) and any other
-    // change stays unsaved, so Save can be retried.
-    if (editedTools.length > 0) {
-      await store.editToolsInConfiguration(editedTools);
-      // The tools hold these edits now: drop each pending edit that is still
-      // the one written (one made during the write stays pending).
-      const remaining = { ...pendingToolEdits.value };
-      for (const [toolId, written] of toolEdits) {
-        const left = differingToolEdits(remaining[toolId] ?? {}, written);
-        if (hasToolEdits(left)) {
-          remaining[toolId] = left;
-        } else {
-          delete remaining[toolId];
-        }
-      }
-      pendingToolEdits.value = remaining;
-    }
     // Preserve any materializedPropertyId the runner wrote to the store copy
     // after a run, so saving edits doesn't drop it and orphan the property.
     mergeMaterializedPropertyIds(
@@ -1138,7 +1010,6 @@ defineExpose({
   newStepPropertyId,
   confirmAddStep,
   displayedPipeline,
-  pendingToolEdits,
 });
 </script>
 

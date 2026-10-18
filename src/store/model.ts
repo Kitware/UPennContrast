@@ -2429,11 +2429,10 @@ export interface IAnnotationPipelineStep extends IPipelineStepBase {
   jobDateTag?: boolean;
   // Set when the step was added from an existing worker tool. The step is then
   // LINKED: the runner uses the tool's current image, parameters, annotation
-  // setup, connectTo and jobDateTag, and edits made in the pipeline editor
-  // are written back to the tool. The fields above are a saved copy, refreshed
-  // from the tool on every save of the pipeline (and shown refreshed in the
-  // editor), and used as a fallback when the tool no longer exists. Cleared by
-  // "Unlink".
+  // setup, connectTo and jobDateTag, and the pipeline editor shows them
+  // read-only (the tool is edited in the Tools panel). The fields above are a
+  // saved copy, refreshed from the tool on every save of the pipeline, and
+  // used as a fallback when the tool no longer exists. Cleared by "Unlink".
   // See "Linked steps" in WORKER_PIPELINES.md.
   sourceToolId?: string;
 }

@@ -950,65 +950,6 @@ describe("tool pinning and ordering", () => {
 
     expect(updateKey).not.toHaveBeenCalled();
   });
-
-  it("edits several tools with one write, keeping pins and the selection", async () => {
-    setTools([tool("a", true), tool("b"), tool("c")]);
-    main.setSelectedToolId("b");
-
-    await main.editToolsInConfiguration([
-      { ...tool("a"), name: "A2" },
-      { ...tool("b"), name: "B2" },
-      { ...tool("missing"), name: "ignored" },
-    ]);
-
-    expect(main.tools.map((t) => [t.id, t.name, !!t.pinned])).toEqual([
-      ["a", "A2", true],
-      ["b", "B2", false],
-      ["c", "c", false],
-    ]);
-    expect(main.selectedTool?.configuration.name).toBe("B2");
-    expect(updateKey).toHaveBeenCalledTimes(1);
-    expect(updateKey.mock.calls[0][1]).toBe("tools");
-  });
-
-  it("a failed multi-tool write keeps changes made while it was in flight", async () => {
-    setTools([tool("a"), tool("b")]);
-    main.setSelectedToolId("a");
-    let failWrite: (error: Error) => void = () => {};
-    updateKey.mockImplementationOnce(
-      () => new Promise((_resolve, reject) => (failWrite = reject)),
-    );
-
-    const pending = main
-      .editToolsInConfiguration([
-        { ...tool("a"), name: "A2" },
-        { ...tool("b"), name: "B2" },
-      ])
-      .catch((e: Error) => e);
-    // During the write: tool a is edited again and tool b is selected.
-    main.editToolInConfiguration({ ...tool("a"), name: "A3" });
-    main.setSelectedToolId("b");
-    failWrite(new Error("tools write refused"));
-    await pending;
-
-    expect(main.tools.map((t) => t.name)).toEqual(["A3", "b"]);
-    expect(main.selectedTool?.configuration.id).toBe("b");
-    expect(main.selectedTool?.configuration.name).toBe("b");
-  });
-
-  it("rolls back a multi-tool edit whose write fails, with the original message", async () => {
-    setTools([tool("a"), tool("b")]);
-    main.setSelectedToolId("a");
-    updateKey.mockRejectedValue(new Error("tools write refused"));
-
-    const error = await main
-      .editToolsInConfiguration([{ ...tool("a"), name: "A2" }])
-      .catch((e: Error) => e);
-
-    expect((error as Error).message).toBe("tools write refused");
-    expect(main.tools.map((t) => t.name)).toEqual(["a", "b"]);
-    expect(main.selectedTool?.configuration.name).toBe("a");
-  });
 });
 
 describe("tool job outcome scoping", () => {

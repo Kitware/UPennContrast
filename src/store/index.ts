@@ -583,34 +583,6 @@ async function followJobToEnd(
   }
 }
 
-// Replace tools by id, keeping each stored tool's pin: the pin is owned by
-// setToolPinned, and editors can hand in a copy taken before a pin toggle
-// (AnnotationWorkerMenu debounces its save of props.tool). Returns the new
-// list, the tools as applied (raw objects: state reads return reactive
-// proxies, so identity checks compare toRaw of what is read back) and the
-// tools they replaced. Unknown ids are ignored.
-function withEditedTools(
-  current: IToolConfiguration[],
-  edited: IToolConfiguration[],
-) {
-  const editedById = new Map(edited.map((tool) => [tool.id, tool]));
-  const appliedById = new Map<string, IToolConfiguration>();
-  const replacedById = new Map<string, IToolConfiguration>();
-  const next = current.map((tool) => {
-    const edit = editedById.get(tool.id);
-    if (!edit) {
-      return tool;
-    }
-    const applied = toRaw(
-      edit.pinned === tool.pinned ? edit : { ...edit, pinned: tool.pinned },
-    );
-    appliedById.set(tool.id, applied);
-    replacedById.set(tool.id, tool);
-    return applied;
-  });
-  return { next, appliedById, replacedById };
-}
-
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
   girderRest = createGirderRestClient({
@@ -1407,59 +1379,20 @@ export class Main extends VuexModule {
     if (!configurationTools) {
       return;
     }
-    const { next, appliedById } = withEditedTools(configurationTools, [tool]);
-    const editedTool = appliedById.get(tool.id);
-    if (!editedTool) {
+    const toolIdx = configurationTools.findIndex(({ id }) => id === tool.id);
+    if (toolIdx < 0) {
       return;
     }
-    this.setConfigurationTools(next);
+    // The pin is owned by setToolPinned. Editors can hand in a copy taken
+    // before a pin toggle (AnnotationWorkerMenu debounces its save of
+    // props.tool), so keep the stored pin rather than let a late edit undo it.
+    const { pinned } = configurationTools[toolIdx];
+    const editedTool = tool.pinned === pinned ? tool : { ...tool, pinned };
+    configurationTools.splice(toolIdx, 1, editedTool);
     if (this.selectedTool?.configuration.id === tool.id) {
       this.setSelectedToolImpl(editedTool);
     }
     this.syncConfiguration("tools");
-  }
-
-  // Replace several tools with one write of the tools key, rethrowing on
-  // failure (rawError keeps the message). Used by the pipeline editor to write
-  // linked steps' edits back to their tools. Unknown ids are ignored; like
-  // editToolInConfiguration, the stored pin is kept.
-  @Action({ rawError: true })
-  async editToolsInConfiguration(tools: IToolConfiguration[]) {
-    const configuration = this.configuration;
-    if (!configuration || tools.length === 0) {
-      return;
-    }
-    const { next, appliedById, replacedById } = withEditedTools(
-      configuration.tools,
-      tools,
-    );
-    this.setConfigurationTools(next);
-    const selectedId = this.selectedTool?.configuration.id;
-    const selectedEdit = selectedId ? appliedById.get(selectedId) : undefined;
-    if (selectedEdit) {
-      this.setSelectedToolImpl(selectedEdit);
-    }
-    try {
-      await this.syncConfiguration({ key: "tools", throwOnError: true });
-    } catch (error) {
-      // Revert only the tools this call replaced, and only those still
-      // holding its edit: a tool edited, pinned or removed during the write
-      // keeps that newer state.
-      if (this.configuration === configuration) {
-        this.setConfigurationTools(
-          configuration.tools.map((tool) =>
-            appliedById.get(tool.id) === toRaw(tool)
-              ? replacedById.get(tool.id)!
-              : tool,
-          ),
-        );
-      }
-      const selected = this.selectedTool?.configuration;
-      if (selected && appliedById.get(selected.id) === toRaw(selected)) {
-        this.setSelectedToolImpl(replacedById.get(selected.id)!);
-      }
-      throw error;
-    }
   }
 
   // Pinning only changes where the Tools palette lists a tool: one write of

@@ -1,4 +1,4 @@
-import { cloneDeep, isEqual, isPlainObject, pickBy } from "lodash";
+import { cloneDeep, isEqual, isPlainObject } from "lodash";
 
 import {
   IAnnotationPipelineStep,
@@ -6,7 +6,6 @@ import {
   IAnnotationSetup,
   IPropertyPipelineStep,
   IToolConfiguration,
-  IWorkerInterfaceValues,
   TPipelineStep,
 } from "@/store/model";
 
@@ -211,96 +210,4 @@ export function resolveLinkedStep(
   return samePersistedValue(fields, stepPropertyLinkedFields(step))
     ? step
     : { ...step, ...fields };
-}
-
-// ---- Pending edits to a linked tool -------------------------------------
-// The pipeline editor never edits a copy of a linked tool's values. It shows
-// the live tool with the user's pending edits on top, and records only what
-// was actually edited: whole fields, except parameters, which are recorded one
-// by one. Save writes exactly these onto the tool's current values, so a
-// change made to the tool elsewhere is kept unless the user edited the same
-// field or parameter here.
-export interface IToolEdits {
-  workerInterfaceValues?: IWorkerInterfaceValues;
-  annotation?: IAnnotationSetup;
-  connectTo?: IAnnotationPipelineStep["connectTo"];
-  jobDateTag?: boolean;
-}
-
-const WHOLE_TOOL_FIELDS = ["annotation", "connectTo", "jobDateTag"] as const;
-
-// The parts of `candidate` that differ from `reference`: its parameters one by
-// one, and each whole field it has. (A parameter missing from `candidate` is
-// not an edit: the editor never removes parameters.)
-export function differingToolEdits(
-  candidate: TToolLinkedFields | IToolEdits,
-  reference: TToolLinkedFields | IToolEdits,
-): IToolEdits {
-  const edits: IToolEdits = {};
-  const parameters = pickBy(
-    candidate.workerInterfaceValues ?? {},
-    (value, parameterId) =>
-      !samePersistedValue(
-        value,
-        reference.workerInterfaceValues?.[parameterId],
-      ),
-  );
-  if (Object.keys(parameters).length > 0) {
-    edits.workerInterfaceValues = cloneDeep(parameters);
-  }
-  for (const field of WHOLE_TOOL_FIELDS) {
-    if (
-      field in candidate &&
-      !samePersistedValue(candidate[field], reference[field])
-    ) {
-      Object.assign(edits, { [field]: cloneDeep(candidate[field]) });
-    }
-  }
-  return edits;
-}
-
-export function hasToolEdits(edits: IToolEdits | undefined): boolean {
-  return !!edits && Object.keys(edits).length > 0;
-}
-
-// `fields` with `edits` applied (later edits win; parameters merge by id).
-export function applyToolEdits<T extends TToolLinkedFields | IToolEdits>(
-  fields: T,
-  edits: IToolEdits | undefined,
-): T {
-  if (!edits || !hasToolEdits(edits)) {
-    return fields;
-  }
-  const { workerInterfaceValues, ...wholeFields } = cloneDeep(edits);
-  return {
-    ...fields,
-    ...wholeFields,
-    ...(workerInterfaceValues
-      ? {
-          workerInterfaceValues: {
-            ...fields.workerInterfaceValues,
-            ...workerInterfaceValues,
-          },
-        }
-      : {}),
-  };
-}
-
-// The tool with pending edits written onto its current values. The worker
-// image is never edited: the editor locks it on linked steps (a different
-// worker means a different tool, so it requires unlinking).
-export function toolWithEdits(
-  tool: IToolConfiguration,
-  edits: IToolEdits,
-): IToolConfiguration {
-  return {
-    ...tool,
-    values: {
-      ...tool.values,
-      ...applyToolEdits(
-        { workerInterfaceValues: tool.values.workerInterfaceValues ?? {} },
-        edits,
-      ),
-    },
-  };
 }
