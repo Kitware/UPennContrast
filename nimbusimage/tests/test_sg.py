@@ -322,6 +322,16 @@ class TestSpatialTable:
         with pytest.raises(SGError, match="built for dataset"):
             upload_spatial_table(server.dataset("ds_other"), path)
 
+    def test_a_mapped_cell_without_a_matrix_row_is_refused(
+        self, server, roi, tmp_path
+    ):
+        _, cells = _uploaded(server, roi)
+        table = pd.read_csv(roi.counts_path, index_col=0)
+        table.drop(index=2).to_csv(roi.counts_path)
+        with pytest.raises(SGError, match="no CellxGene row"):
+            build_spatial_table(roi, cells, tmp_path / "t.zarr.zip")
+        assert not (tmp_path / "t.zarr.zip").exists()
+
 
 class TestTranscriptStore:
     def test_layout_levels_and_density(self, roi, tmp_path):
@@ -499,6 +509,44 @@ class TestCli:
         assert cli_main(["transcripts", *roi_args, "--cells",
                          str(cells_path), "--out", str(missing)]) == 1
         assert len(server.writes) == writes and not built
+
+    def test_verify_fails_when_the_table_or_transcripts_are_missing(
+        self, export, roi, server, tmp_path, monkeypatch, capsys
+    ):
+        ds, cells = _uploaded(server, roi)
+        cells_path = cells.save(tmp_path / "cells.npz")
+        monkeypatch.setattr(
+            "nimbusimage.sg.cli._connect",
+            lambda: types.SimpleNamespace(dataset=server.dataset),
+        )
+        args = ["verify", "--export-dir", str(export), "--roi", "roi_1",
+                "--dataset", ds.id, "--cells", str(cells_path)]
+        table = {"nObs": 3, "liveAnnotations": 3}
+        transcripts = {"totalPoints": 400, "genes": 3}
+        for info, tx, code in [
+            (table, transcripts, 0),
+            (None, transcripts, 1),
+            (table, None, 1),
+            ({"nObs": 2, "liveAnnotations": 2}, transcripts, 1),
+        ]:
+            ds.spatial.info = lambda verify=False, info=info: info
+            ds.spatial.transcripts = lambda tx=tx: tx
+            assert cli_main(args) == code, (info, tx)
+        capsys.readouterr()
+
+    def test_ingest_checks_its_work_dir_before_uploading(
+        self, export, tmp_path, monkeypatch
+    ):
+        connected = []
+        monkeypatch.setattr(
+            "nimbusimage.sg.cli._connect", lambda: connected.append(1)
+        )
+        work = tmp_path / "work"
+        work.mkdir()
+        (work / "roi_1_cells.npz").mkdir()  # an output path that is a dir
+        assert cli_main(["ingest", "--export-dir", str(export), "--roi",
+                         "roi_1", "--work-dir", str(work)]) == 1
+        assert not connected
 
     def test_missing_credentials_is_an_error_not_a_trace(
         self, export, tmp_path, monkeypatch, capsys

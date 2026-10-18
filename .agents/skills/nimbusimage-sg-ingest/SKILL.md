@@ -153,8 +153,10 @@ Spp1 returns 189,484 molecules, the same as the export's HDF5.
 ## 5. Verification checklist
 
 - [ ] `check --recount`: frame 300/300, `entriesEqual` ≥ 0.99, correlation ≈ 1.
-- [ ] `verify`: the map's sampled first vertices match, and the table's
-      `liveAnnotations` equals `nObs`.
+- [ ] `verify` exits 0. It checks:
+  - the map's sampled first vertices match;
+  - a table is registered with one row per mapped cell, all live;
+  - transcripts are registered.
 - [ ] In the browser:
   - outlines sit on the DAPI nuclei;
   - for 4–5 marker genes, the top cell (`CellxGene.csv` idxmax) is full of that

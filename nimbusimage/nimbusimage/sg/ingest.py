@@ -287,9 +287,15 @@ def build_spatial_table(
     out = Path(out)
     labels, symbols, names, counts = roi.counts()
     id_of = cells.id_of
+    unmatched = sorted(set(id_of) - set(labels.tolist()))
+    if unmatched:
+        # Every uploaded cell needs its row; a short table would register
+        # and verify as complete while some cells silently have no data.
+        raise SGError(
+            f"{len(unmatched)} mapped cells have no CellxGene row "
+            f"(e.g. labels {unmatched[:5]})"
+        )
     keep = np.array([int(label) in id_of for label in labels])
-    if not keep.any():
-        raise SGError("no CellxGene row joins the cell map")
     if (~keep).any():
         logger.info("  dropping %d matrix rows without a polygon",
                     int((~keep).sum()))

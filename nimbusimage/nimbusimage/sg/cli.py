@@ -207,18 +207,45 @@ def cmd_verify(args) -> None:
             "nObs": info.get("nObs"),
             "liveAnnotations": info.get("liveAnnotations"),
         }
-    report["transcripts"] = bool(ds.spatial.transcripts())
+    transcripts = ds.spatial.transcripts()
+    if transcripts:
+        report["transcripts"] = {
+            "totalPoints": transcripts.get("totalPoints"),
+            "genes": transcripts.get("genes"),
+        }
     _print_json(report)
     table = report.get("table")
-    if table and table["liveAnnotations"] != table["nObs"]:
+    if table is None:
+        raise SGError("no spatial table is registered on the dataset")
+    if table["nObs"] != len(cells):
+        raise SGError(
+            f"the table has {table['nObs']} rows, the cell map "
+            f"{len(cells)} cells"
+        )
+    if table["liveAnnotations"] != table["nObs"]:
         raise SGError("some table rows no longer join a live annotation")
+    if not transcripts:
+        raise SGError("no transcripts are registered on the dataset")
 
 
 def cmd_ingest(args) -> None:
     """Every step for one ROI, state in --work-dir."""
     roi = _roi(args)
     work = Path(args.work_dir)
-    work.mkdir(parents=True, exist_ok=True)
+    try:
+        work.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise SGError(f"cannot create the work directory {work}: {exc}")
+    outputs = {
+        "dataset": work / f"{roi.name}_dataset.txt",
+        "cells": work / f"{roi.name}_cells.npz",
+        "table": work / f"{roi.name}_spatial.zarr.zip",
+        "transcripts": work / f"{roi.name}_transcripts.zarr.zip",
+    }
+    # Before anything is uploaded: a dataset whose id and cell map were
+    # never saved is the one failure the work dir exists to prevent.
+    for what, path in outputs.items():
+        _require_writable(path, what)
     frame = verify.check_frame(roi)
     logger.info("frame check: %d/%d centroids on their label",
                 frame["matched"], frame["checked"])
@@ -229,18 +256,14 @@ def cmd_ingest(args) -> None:
         client, roi, args.name or f"{roi.project} {roi.name}",
         parent_folder_id=args.parent,
     )
-    (work / f"{roi.name}_dataset.txt").write_text(ds.id)
+    outputs["dataset"].write_text(ds.id)
     logger.info("dataset %s", ds.id)
     cells = ingest.upload_polygons(ds, roi)
-    cells.save(work / f"{roi.name}_cells.npz")
+    cells.save(outputs["cells"])
     ingest.upload_cell_data(ds, roi, cells)
-    table = ingest.build_spatial_table(
-        roi, cells, work / f"{roi.name}_spatial.zarr.zip"
-    )
+    table = ingest.build_spatial_table(roi, cells, outputs["table"])
     ingest.upload_spatial_table(ds, table)
-    store = ingest.build_transcript_store(
-        roi, work / f"{roi.name}_transcripts.zarr.zip"
-    )
+    store = ingest.build_transcript_store(roi, outputs["transcripts"])
     ingest.register_transcripts(ds, cells, store)
     logger.info("verified %d cells against the server",
                 sg_cells.verify_cells(ds, roi, cells))
