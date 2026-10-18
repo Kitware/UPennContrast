@@ -17,6 +17,7 @@ import progress from "./progress";
 import { BATCH_DATASET_LIMIT } from "./constants";
 import { logError } from "@/utils/log";
 import { findSourceProperty, resolveLinkedStep } from "@/utils/pipelineLinks";
+import { computeAutoWiredSteps } from "@/utils/pipelineWiring";
 
 import {
   AnnotationShape,
@@ -399,8 +400,20 @@ export class Pipelines extends VuexModule {
     // already-matching properties) shouldn't write the config at all.
     let materializedPropertyChanged = false;
 
+    // The steps as they run: linked steps take their source's current values,
+    // then auto-wiring is re-applied so a property step reads the tags its
+    // upstream step produces now (a linked tool's output tags may have changed
+    // since the pipeline was saved). Write-backs (materializedPropertyId) go
+    // to the stored step.
+    const runSteps = computeAutoWiredSteps(
+      pipeline.steps.map((step) =>
+        resolveLinkedStep(step, main.tools, properties.properties),
+      ),
+    );
+
     for (const stepIndex of enabledIndices) {
       const step = pipeline.steps[stepIndex];
+      const runStep = runSteps[stepIndex];
 
       if (isCancelled) {
         cancelled++;
@@ -448,43 +461,57 @@ export class Pipelines extends VuexModule {
           completionPromise: Promise<boolean>;
         } | null = null;
 
-        // A linked step runs its source's current values; with the source
-        // gone, it runs its saved copy (the step itself).
-        const linkedProperty = findSourceProperty(step, properties.properties);
-        if (step.kind === "annotation") {
-          const runStep = resolveLinkedStep(
-            step,
-            main.tools,
-            properties.properties,
-          ) as IAnnotationPipelineStep;
+        if (runStep.kind === "annotation") {
           submitted = await annotations.submitAnnotationWorkerJob({
             tool: buildTransientTool(runStep),
             datasetId: targetDatasetId,
             eventCallback,
             errorCallback,
           });
-        } else if (linkedProperty) {
-          // Compute the user's own property directly: no materialized copy,
-          // and nothing here may replace or delete it.
-          submitted = await properties.submitPropertyJob({
-            property: linkedProperty,
-            datasetId: targetDatasetId,
-            eventCallback,
-            errorCallback,
-          });
         } else {
-          const previousMaterializedPropertyId = step.materializedPropertyId;
-          const property = await this.ensureMaterializedProperty(step);
-          if (step.materializedPropertyId !== previousMaterializedPropertyId) {
-            materializedPropertyChanged = true;
-          }
-          if (property) {
+          const linkedProperty = findSourceProperty(
+            runStep,
+            properties.properties,
+          );
+          if (linkedProperty) {
+            // Compute the user's own property directly: no materialized
+            // copy, and nothing here may replace or delete it.
             submitted = await properties.submitPropertyJob({
-              property,
+              property: linkedProperty,
               datasetId: targetDatasetId,
               eventCallback,
               errorCallback,
             });
+          } else if (
+            runStep.sourcePropertyId &&
+            main.configuration?.propertyIds.includes(runStep.sourcePropertyId)
+          ) {
+            // Still in the configuration but not loaded (a properties fetch
+            // in flight): not deleted, so don't materialize a duplicate.
+            throw new Error(
+              "The linked property is not loaded yet; try again shortly.",
+            );
+          } else {
+            const previousMaterializedPropertyId =
+              runStep.materializedPropertyId;
+            const property = await this.ensureMaterializedProperty(runStep);
+            if (
+              runStep.materializedPropertyId !== previousMaterializedPropertyId
+            ) {
+              materializedPropertyChanged = true;
+            }
+            // runStep is a copy when resolving or wiring changed the step.
+            if (step.kind === "property") {
+              step.materializedPropertyId = runStep.materializedPropertyId;
+            }
+            if (property) {
+              submitted = await properties.submitPropertyJob({
+                property,
+                datasetId: targetDatasetId,
+                eventCallback,
+                errorCallback,
+              });
+            }
           }
         }
 

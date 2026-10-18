@@ -2429,10 +2429,11 @@ export interface IAnnotationPipelineStep extends IPipelineStepBase {
   jobDateTag?: boolean;
   // Set when the step was added from an existing worker tool. The step is then
   // LINKED: the runner uses the tool's current image, parameters, annotation
-  // setup, connectTo and jobDateTag, and parameter edits made in the pipeline
-  // editor are written back to the tool. The fields above are a saved copy,
-  // refreshed from the tool whenever the editor opens, and used as a fallback
-  // when the tool no longer exists. Cleared by "Unlink".
+  // setup, connectTo and jobDateTag, and edits made in the pipeline editor
+  // are written back to the tool. The fields above are a saved copy, refreshed
+  // from the tool on every save of the pipeline (and shown refreshed in the
+  // editor), and used as a fallback when the tool no longer exists. Cleared by
+  // "Unlink".
   // See "Linked steps" in WORKER_PIPELINES.md.
   sourceToolId?: string;
 }
@@ -2449,8 +2450,9 @@ export interface IPropertyPipelineStep extends IPipelineStepBase {
   autoWired?: boolean;
   // Set lazily by the runner on first successful run: the id of the persisted
   // IAnnotationProperty this step created. Reused on later runs. Cleared if the
-  // referenced property no longer exists (runner re-creates). Never set while
-  // the step is linked to an existing property (sourcePropertyId).
+  // referenced property no longer exists (runner re-creates). On a step linked
+  // to an existing property (sourcePropertyId), set only by the fallback run
+  // after that property was deleted; never set to the linked property's id.
   materializedPropertyId?: string;
   // Set when the step was added from an existing property. The step is then
   // LINKED: the runner computes that property itself (its image, shape, tags

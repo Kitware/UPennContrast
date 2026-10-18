@@ -116,8 +116,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { omit } from "lodash";
+import { computed, onMounted, ref, watch } from "vue";
+import { cloneDeep, omit } from "lodash";
 import propertiesStore from "@/store/properties";
 import DockerImageSelect from "@/components/DockerImageSelect.vue";
 import WorkerInterfaceValues from "@/components/WorkerInterfaceValues.vue";
@@ -125,7 +125,7 @@ import TagPicker from "@/components/TagPicker.vue";
 import AnnotationConfiguration from "@/tools/creation/templates/AnnotationConfiguration.vue";
 import { getDefault } from "@/utils/workerInterface";
 import { logError } from "@/utils/log";
-import { TStepLinkState } from "@/utils/pipelineLinks";
+import { samePersistedValue, TStepLinkState } from "@/utils/pipelineLinks";
 import {
   AnnotationNames,
   AnnotationShape,
@@ -233,7 +233,8 @@ const linkMessage = computed<string | null>(() => {
 
 // Locked sections render every Vuetify control disabled (a global default, so
 // it reaches the inputs inside child components and their own v-forms); the
-// wrapper's `inert` also blocks focus and clicks on anything else.
+// wrapper's `inert` also blocks focus and clicks on anything else. Parameter
+// help tooltips are therefore unavailable on a locked step.
 function lockedDefaults(locked: boolean) {
   return locked ? { global: { disabled: true } } : {};
 }
@@ -242,11 +243,17 @@ function lockedDefaults(locked: boolean) {
 // unlinked property step keeps its tags rather than auto-wiring over them.
 function unlink() {
   const current = step.value;
+  // Keep the values the step was showing (including displayed defaults).
+  const workerInterfaceValues = cloneDeep(displayedWorkerInterfaceValues.value);
   if (current.kind === "annotation") {
-    emit("update:modelValue", omit(current, "sourceToolId"));
+    emit("update:modelValue", {
+      ...omit(current, "sourceToolId"),
+      workerInterfaceValues,
+    });
   } else {
     emit("update:modelValue", {
       ...omit(current, "sourcePropertyId"),
+      workerInterfaceValues,
       autoWired: false,
     });
   }
@@ -272,11 +279,44 @@ const workerInterface = computed<IWorkerInterface | null>(() => {
   return propertiesStore.getWorkerInterface(step.value.image) ?? null;
 });
 
-const workerInterfaceValuesModel = computed({
-  get: () => step.value.workerInterfaceValues,
-  set: (value: IWorkerInterfaceValues) =>
-    patchStep({ workerInterfaceValues: value }),
-});
+// The parameter values shown. A linked step's unset parameters show the
+// worker's defaults, as the tool's own menu does, without writing them: merely
+// viewing a step must not change its tool. (An unlinked step is seeded on
+// mount instead; see onMounted.)
+const displayedWorkerInterfaceValues = computed<IWorkerInterfaceValues>(() =>
+  isLinked.value && workerInterface.value
+    ? seedWorkerInterfaceValues(
+        step.value.image,
+        step.value.workerInterfaceValues,
+      )
+    : step.value.workerInterfaceValues,
+);
+
+// WorkerInterfaceValues edits its v-model object in place (`v-model` on
+// `interfaceValues[id]`) without emitting. Hand it a local copy and emit each
+// real change, so the parent sees every parameter edit (it keeps steps linked
+// to the same tool in sync) and the step is never mutated behind its back.
+const workerInterfaceValuesModel = ref<IWorkerInterfaceValues>(
+  cloneDeep(displayedWorkerInterfaceValues.value),
+);
+watch(
+  displayedWorkerInterfaceValues,
+  (values) => {
+    if (!samePersistedValue(values, workerInterfaceValuesModel.value)) {
+      workerInterfaceValuesModel.value = cloneDeep(values);
+    }
+  },
+  { deep: true },
+);
+watch(
+  workerInterfaceValuesModel,
+  (values) => {
+    if (!samePersistedValue(values, displayedWorkerInterfaceValues.value)) {
+      patchStep({ workerInterfaceValues: cloneDeep(values) });
+    }
+  },
+  { deep: true },
+);
 
 const annotationSetup = computed<IAnnotationSetup | undefined>(
   () => annotationStepValue.value?.annotation,
@@ -410,8 +450,10 @@ onMounted(async () => {
     return;
   }
   await ensureWorkerInterface(current.image);
+  // Linked steps show defaults without writing them
+  // (displayedWorkerInterfaceValues).
   if (
-    !parametersLocked.value &&
+    !isLinked.value &&
     Object.keys(current.workerInterfaceValues).length === 0
   ) {
     const workerInterfaceValues = seedWorkerInterfaceValues(

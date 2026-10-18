@@ -1,4 +1,4 @@
-import { cloneDeep, isEqual } from "lodash";
+import { cloneDeep, isEqual, isPlainObject } from "lodash";
 
 import {
   IAnnotationPipelineStep,
@@ -14,6 +14,37 @@ import {
 // The step's own fields are a saved copy, used only when the source is gone.
 // See "Linked steps" in WORKER_PIPELINES.md.
 
+// Equality as persisted: configurations travel as JSON, which drops
+// `undefined` keys, so `{ color: undefined }` and `{}` are the same saved
+// value. Child editors re-emit with explicit `undefined` keys on mount
+// (AnnotationConfiguration always emits `color`), so a plain isEqual would read
+// an untouched step as edited.
+// Walks the values directly rather than serializing them: the editor's dirty
+// check runs this over the whole pipeline on every edit.
+export function samePersistedValue(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    // JSON writes an undefined array element as null.
+    return (
+      a.length === b.length &&
+      a.every((value, index) =>
+        samePersistedValue(value ?? null, b[index] ?? null),
+      )
+    );
+  }
+  if (isPlainObject(a) && isPlainObject(b)) {
+    const definedKeys = (value: Record<string, unknown>) =>
+      Object.keys(value).filter((key) => value[key] !== undefined);
+    const objectA = a as Record<string, unknown>;
+    const objectB = b as Record<string, unknown>;
+    const keysA = definedKeys(objectA);
+    return (
+      keysA.length === definedKeys(objectB).length &&
+      keysA.every((key) => samePersistedValue(objectA[key], objectB[key]))
+    );
+  }
+  return isEqual(a, b);
+}
+
 // The fields a linked annotation step takes from its tool.
 export type TToolLinkedFields = Pick<
   IAnnotationPipelineStep,
@@ -26,9 +57,10 @@ export type TPropertyLinkedFields = Pick<
   "image" | "workerInterfaceValues" | "shape" | "inputTags"
 >;
 
-// A worker tool's values as annotation-step fields (the inverse of
-// the pipeline runner's buildTransientTool). Null when the tool has no worker image. `annotation`
-// falls back to `fallbackAnnotation` for a tool saved without one.
+// A worker tool's values as annotation-step fields (the inverse of the
+// pipeline runner's buildTransientTool). Null when the tool has no worker
+// image. `annotation` falls back to `fallbackAnnotation` for a tool saved
+// without one.
 export function toolLinkedFields(
   tool: IToolConfiguration,
   fallbackAnnotation: IAnnotationSetup,
@@ -78,6 +110,17 @@ export function stepToolLinkedFields(
   };
 }
 
+export function stepPropertyLinkedFields(
+  step: IPropertyPipelineStep,
+): TPropertyLinkedFields {
+  return {
+    image: step.image,
+    workerInterfaceValues: step.workerInterfaceValues,
+    shape: step.shape,
+    inputTags: step.inputTags,
+  };
+}
+
 export function findSourceTool(
   step: TPipelineStep,
   tools: IToolConfiguration[],
@@ -101,7 +144,9 @@ export function findSourceProperty(
 
 // How a step relates to a source: not linked, linked to a live source (with
 // its name), or linked to a source that no longer exists (the runner then uses
-// the step's saved copy).
+// the step's saved copy). A property still in `configuredPropertyIds` but not
+// loaded yet counts as linked, not deleted, matching the runner (which fails
+// such a step rather than materializing a duplicate).
 export type TStepLinkState =
   | { state: "unlinked" }
   | { state: "linked"; sourceKind: "tool" | "property"; sourceName: string }
@@ -111,6 +156,7 @@ export function stepLinkState(
   step: TPipelineStep,
   tools: IToolConfiguration[],
   propertyList: IAnnotationProperty[],
+  configuredPropertyIds: string[] = [],
 ): TStepLinkState {
   if (step.kind === "annotation") {
     if (!step.sourceToolId) {
@@ -125,14 +171,26 @@ export function stepLinkState(
     return { state: "unlinked" };
   }
   const property = findSourceProperty(step, propertyList);
-  return property
-    ? { state: "linked", sourceKind: "property", sourceName: property.name }
+  if (property) {
+    return {
+      state: "linked",
+      sourceKind: "property",
+      sourceName: property.name,
+    };
+  }
+  return configuredPropertyIds.includes(step.sourcePropertyId)
+    ? { state: "linked", sourceKind: "property", sourceName: step.name }
     : { state: "missing", sourceKind: "property" };
 }
 
 // The step with its saved copy replaced by its live source's values. Returns
 // the step itself (same object) when it is unlinked, its source is gone, or
 // the copy already matches, so callers can tell whether anything changed.
+export function resolveLinkedStep<T extends TPipelineStep>(
+  step: T,
+  tools: IToolConfiguration[],
+  propertyList: IAnnotationProperty[],
+): T;
 export function resolveLinkedStep(
   step: TPipelineStep,
   tools: IToolConfiguration[],
@@ -141,7 +199,7 @@ export function resolveLinkedStep(
   if (step.kind === "annotation") {
     const tool = findSourceTool(step, tools);
     const fields = tool && toolLinkedFields(tool, step.annotation);
-    if (!fields || isEqual(fields, stepToolLinkedFields(step))) {
+    if (!fields || samePersistedValue(fields, stepToolLinkedFields(step))) {
       return step;
     }
     return { ...step, ...fields };
@@ -151,30 +209,53 @@ export function resolveLinkedStep(
     return step;
   }
   const fields = propertyLinkedFields(property);
-  const current: TPropertyLinkedFields = {
-    image: step.image,
-    workerInterfaceValues: step.workerInterfaceValues,
-    shape: step.shape,
-    inputTags: step.inputTags,
-  };
-  return isEqual(fields, current) ? step : { ...step, ...fields };
+  return samePersistedValue(fields, stepPropertyLinkedFields(step))
+    ? step
+    : { ...step, ...fields };
 }
 
-// The tool with a linked step's edits written into it. The worker image is
-// not written: the editor locks it on linked steps (changing the worker means
-// a different tool, so it requires unlinking).
+// The tool with the edits a linked step made since `baseline` written in, or
+// null when it made none. Only changed fields are written, and parameters are
+// written one by one, so a change made to the tool elsewhere in a field (or a
+// parameter) the step did not touch is kept. The worker image is never
+// written: the editor locks it on linked steps (a different worker means a
+// different tool, so it requires unlinking).
 export function toolWithStepEdits(
   tool: IToolConfiguration,
   step: IAnnotationPipelineStep,
-): IToolConfiguration {
-  return {
-    ...tool,
-    values: {
-      ...tool.values,
-      workerInterfaceValues: cloneDeep(step.workerInterfaceValues),
-      annotation: cloneDeep(step.annotation),
-      connectTo: step.connectTo ? cloneDeep(step.connectTo) : undefined,
-      jobDateTag: step.jobDateTag,
-    },
-  };
+  baseline: TToolLinkedFields,
+): IToolConfiguration | null {
+  const values = { ...tool.values };
+  let changed = false;
+
+  const parameters = { ...(values.workerInterfaceValues ?? {}) };
+  const parameterIds = new Set([
+    ...Object.keys(step.workerInterfaceValues),
+    ...Object.keys(baseline.workerInterfaceValues),
+  ]);
+  for (const parameterId of parameterIds) {
+    const edited = step.workerInterfaceValues[parameterId];
+    if (
+      samePersistedValue(edited, baseline.workerInterfaceValues[parameterId])
+    ) {
+      continue;
+    }
+    if (edited === undefined) {
+      delete parameters[parameterId];
+    } else {
+      parameters[parameterId] = cloneDeep(edited);
+    }
+    changed = true;
+  }
+  if (changed) {
+    values.workerInterfaceValues = parameters;
+  }
+
+  for (const field of ["annotation", "connectTo", "jobDateTag"] as const) {
+    if (!samePersistedValue(step[field], baseline[field])) {
+      values[field] = cloneDeep(step[field]);
+      changed = true;
+    }
+  }
+  return changed ? { ...tool, values } : null;
 }

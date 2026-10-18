@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   store: {
     tools: [] as any[],
+    configuration: { propertyIds: [] as string[] },
     editToolsInConfiguration: vi.fn(),
   },
   pipelinesStore: {
@@ -326,5 +327,136 @@ describe("PipelineEditor linked steps", () => {
       sourceToolId: "t1",
       workerInterfaceValues: { threshold: 5 },
     });
+  });
+
+  it("does not treat a child re-emitting a linked step with undefined keys as an edit", async () => {
+    // As loaded from Girder: JSON has no `color` key.
+    const tool = JSON.parse(JSON.stringify(workerTool("t1", 5, ["t"])));
+    h.store.tools = [tool];
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [JSON.parse(JSON.stringify(linkedAnnotationStep("a", "t1", 5)))],
+    });
+    const vm = wrapper.vm as any;
+    const step = vm.localPipeline.steps[0];
+    // What AnnotationConfiguration emits on mount.
+    vm.handleStepUpdate(0, {
+      ...step,
+      annotation: { ...step.annotation, color: undefined },
+    });
+
+    expect(vm.isDirty).toBe(false);
+    vm.localPipeline.name = "Renamed";
+    await vm.save();
+
+    expect(h.store.editToolsInConfiguration).not.toHaveBeenCalled();
+  });
+
+  it("keeps a tool change made elsewhere in a field the step did not edit", async () => {
+    h.store.tools = [workerTool("t1", 5, ["original"])];
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1")],
+    });
+    const vm = wrapper.vm as any;
+    // The tool's output tags change elsewhere; the step changes a parameter.
+    h.store.tools = [workerTool("t1", 5, ["changed-elsewhere"])];
+    vm.handleStepUpdate(0, {
+      ...vm.localPipeline.steps[0],
+      workerInterfaceValues: { threshold: 9 },
+    });
+
+    await vm.save();
+
+    const [[written]] = h.store.editToolsInConfiguration.mock.calls[0];
+    expect(written.values.workerInterfaceValues).toEqual({ threshold: 9 });
+    expect(written.values.annotation.tags).toEqual(["changed-elsewhere"]);
+  });
+
+  it("saves what was on screen when Save started and stays unsaved for edits made during it", async () => {
+    h.store.tools = [workerTool("t1", 5, [])];
+    let finishToolWrite: () => void = () => {};
+    h.store.editToolsInConfiguration.mockImplementation(
+      () => new Promise<void>((resolve) => (finishToolWrite = resolve)),
+    );
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1")],
+    });
+    const vm = wrapper.vm as any;
+    vm.handleStepUpdate(0, {
+      ...vm.localPipeline.steps[0],
+      workerInterfaceValues: { threshold: 9 },
+    });
+
+    const saving = vm.save();
+    vm.localPipeline.name = "Edited during save";
+    finishToolWrite();
+    await saving;
+
+    expect(h.pipelinesStore.savePipeline.mock.calls[0][0].name).toBe("P");
+    expect(vm.isDirty).toBe(true);
+  });
+
+  it("gives a step added from an already-linked tool that step's unsaved edits", () => {
+    h.store.tools = [workerTool("t1", 1, [])];
+    h.pipelinesStore.createStepId.mockReturnValue("b");
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1")],
+    });
+    const vm = wrapper.vm as any;
+    vm.handleStepUpdate(0, {
+      ...vm.localPipeline.steps[0],
+      workerInterfaceValues: { threshold: 5 },
+    });
+
+    vm.newStepSource = "tool";
+    vm.newStepToolId = "t1";
+    vm.confirmAddStep();
+
+    expect(vm.localPipeline.steps[1].workerInterfaceValues).toEqual({
+      threshold: 5,
+    });
+  });
+
+  it("compares a step added this session with its tool as it was when added", async () => {
+    h.store.tools = [workerTool("t1", 1, ["original"])];
+    const wrapper = mountEditor({ id: "pipe", name: "P", steps: [] });
+    const vm = wrapper.vm as any;
+    vm.newStepSource = "tool";
+    vm.newStepToolId = "t1";
+    vm.confirmAddStep();
+    // The tool changes elsewhere; the new step is not edited.
+    h.store.tools = [workerTool("t1", 2, ["changed-elsewhere"])];
+
+    await vm.save();
+
+    expect(h.store.editToolsInConfiguration).not.toHaveBeenCalled();
+  });
+
+  it("refreshes a linked step's stored copy to its tool's settings on save", async () => {
+    h.store.tools = [workerTool("t1", 5, [])];
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1")],
+    });
+    const vm = wrapper.vm as any;
+    h.store.tools = [workerTool("t1", 42, [])];
+    vm.localPipeline.name = "Renamed";
+
+    await vm.save();
+
+    const [saved] = h.pipelinesStore.savePipeline.mock.calls[0];
+    expect(saved.steps[0].workerInterfaceValues).toEqual({ threshold: 42 });
+    expect(vm.localPipeline.steps[0].workerInterfaceValues).toEqual({
+      threshold: 42,
+    });
+    expect(vm.isDirty).toBe(false);
   });
 });

@@ -93,6 +93,7 @@ import pipelinesStore, { mergeMaterializedPropertyIds } from "./pipelines";
 import {
   resolveLinkedStep,
   stepLinkState,
+  stepToolLinkedFields,
   toolWithStepEdits,
 } from "@/utils/pipelineLinks";
 import { AnnotationShape, IPipeline } from "./model";
@@ -155,6 +156,7 @@ beforeEach(() => {
   h.main.isLoggedIn = true;
   h.main.configuration = {
     pipelines: [],
+    propertyIds: [],
     compatibility: { channels: {} },
   };
   h.main.tools = [];
@@ -979,10 +981,23 @@ describe("linked steps", () => {
     expect(stepLinkState(annotationStep("a"), tools, props)).toEqual({
       state: "unlinked",
     });
+    // Configured but not loaded yet: linked, not deleted.
+    expect(
+      stepLinkState(
+        { ...propertyStep("p"), sourcePropertyId: "x" },
+        [],
+        [],
+        ["x"],
+      ),
+    ).toEqual({ state: "linked", sourceKind: "property", sourceName: "p" });
   });
 
   it("toolWithStepEdits writes a step's edits into the tool but keeps its image", () => {
     const tool = workerTool("t1");
+    const baseline = stepToolLinkedFields({
+      ...annotationStep("a", ["from-tool"]),
+      workerInterfaceValues: { threshold: 7 },
+    });
     const step = {
       ...annotationStep("a", ["edited"]),
       image: "img/other",
@@ -990,11 +1005,109 @@ describe("linked steps", () => {
       sourceToolId: "t1",
     };
 
-    const edited = toolWithStepEdits(tool, step);
+    const edited = toolWithStepEdits(tool, step, baseline)!;
 
     expect(edited.values.image.image).toBe("img/tool");
     expect(edited.values.workerInterfaceValues).toEqual({ threshold: 9 });
     expect(edited.values.annotation.tags).toEqual(["edited"]);
     expect(tool.values.workerInterfaceValues).toEqual({ threshold: 7 });
+  });
+
+  it("toolWithStepEdits writes only the fields and parameters the step changed", () => {
+    // The tool gained a parameter and new output tags elsewhere since the
+    // baseline; the step changed only `threshold`.
+    const tool = workerTool("t1", {
+      workerInterfaceValues: { threshold: 7, radius: 4 },
+    });
+    tool.values.annotation.tags = ["changed-elsewhere"];
+    const baselineStep = {
+      ...annotationStep("a", ["from-tool"]),
+      workerInterfaceValues: { threshold: 7 },
+    };
+    const step = {
+      ...baselineStep,
+      workerInterfaceValues: { threshold: 9 },
+      sourceToolId: "t1",
+    };
+
+    const edited = toolWithStepEdits(
+      tool,
+      step,
+      stepToolLinkedFields(baselineStep),
+    )!;
+
+    expect(edited.values.workerInterfaceValues).toEqual({
+      threshold: 9,
+      radius: 4,
+    });
+    expect(edited.values.annotation.tags).toEqual(["changed-elsewhere"]);
+  });
+
+  it("toolWithStepEdits treats values differing only in undefined keys as unedited", () => {
+    const tool = workerTool("t1");
+    const baselineStep = annotationStep("a", ["from-tool"]);
+    delete baselineStep.annotation.color;
+    // What AnnotationConfiguration re-emits on mount: an explicit color key.
+    const step = {
+      ...baselineStep,
+      annotation: { ...baselineStep.annotation, color: undefined },
+      sourceToolId: "t1",
+    };
+
+    expect(
+      toolWithStepEdits(tool, step, stepToolLinkedFields(baselineStep)),
+    ).toBeNull();
+  });
+
+  it("re-wires a property step to the output tags its linked tool produces now", async () => {
+    // Saved while the tool produced "stale-tag"; the tool now produces
+    // "from-tool".
+    h.main.tools = [workerTool("t1")];
+    h.annotations.submitAnnotationWorkerJob.mockResolvedValue(
+      submitResult("j-a", true),
+    );
+    h.properties.createProperty.mockResolvedValue({
+      id: "fresh",
+      image: "img/prop",
+      shape: AnnotationShape.Polygon,
+      tags: { tags: ["from-tool"], exclusive: false },
+      workerInterface: {},
+    });
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+    const linkedStep = {
+      ...annotationStep("a", ["stale-tag"]),
+      sourceToolId: "t1",
+    };
+    const wiredStep = { ...propertyStep("p", ["stale-tag"]), autoWired: true };
+    const pipe = pipeline([linkedStep, wiredStep]);
+    h.main.configuration.pipelines = [pipe];
+
+    await pipelinesStore.runPipeline({ pipeline: pipe });
+
+    expect(h.properties.createProperty).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tags: { tags: ["from-tool"], exclusive: false },
+      }),
+    );
+    // The materialized id lands on the stored step, and is persisted.
+    expect(wiredStep.materializedPropertyId).toBe("fresh");
+    expect(h.main.updateConfigurationPipelines).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails a linked property step whose property is configured but not loaded, without materializing", async () => {
+    h.main.configuration.propertyIds = ["user"];
+    h.properties.properties = [];
+    const errors: any[] = [];
+    const step = { ...propertyStep("p"), sourcePropertyId: "user" };
+
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipeline([step]),
+      onStepError: (_index, info) => errors.push(...info.errors),
+    });
+
+    expect(result.failed).toBe(1);
+    expect(h.properties.createProperty).not.toHaveBeenCalled();
+    expect(h.properties.submitPropertyJob).not.toHaveBeenCalled();
+    expect(errors[0].error).toContain("not loaded yet");
   });
 });

@@ -1395,10 +1395,10 @@ export class Main extends VuexModule {
     this.syncConfiguration("tools");
   }
 
-  // Replace several tools with one write of the tools key, rolling back and
-  // rethrowing on failure (rawError keeps the message). Used by the pipeline
-  // editor to write linked steps' edits back to their tools. Unknown ids are
-  // ignored; like editToolInConfiguration, the stored pin is kept.
+  // Replace several tools with one write of the tools key, rethrowing on
+  // failure (rawError keeps the message). Used by the pipeline editor to write
+  // linked steps' edits back to their tools. Unknown ids are ignored; like
+  // editToolInConfiguration, the stored pin is kept.
   @Action({ rawError: true })
   async editToolsInConfiguration(tools: IToolConfiguration[]) {
     const configuration = this.configuration;
@@ -1406,26 +1406,47 @@ export class Main extends VuexModule {
       return;
     }
     const editedById = new Map(tools.map((tool) => [tool.id, tool]));
-    const previous = configuration.tools;
-    const next = previous.map((current) => {
+    // The tool each edit replaces, so a failed write can put it back.
+    const replacedById = new Map<string, IToolConfiguration>();
+    const next = configuration.tools.map((current) => {
       const edited = editedById.get(current.id);
-      return edited ? { ...edited, pinned: current.pinned } : current;
+      if (!edited) {
+        return current;
+      }
+      replacedById.set(current.id, current);
+      return { ...edited, pinned: current.pinned };
     });
     this.setConfigurationTools(next);
-    const selectedId = this.selectedTool?.configuration.id;
-    const selectedEdit = next.find(
-      (tool) => tool.id === selectedId && editedById.has(tool.id),
+    // Raw objects: state reads return reactive proxies, so identity checks
+    // compare toRaw of what is read back.
+    const appliedById = new Map(
+      next
+        .filter((tool) => replacedById.has(tool.id))
+        .map((tool) => [tool.id, toRaw(tool)]),
     );
+    const selectedId = this.selectedTool?.configuration.id;
+    const selectedEdit = selectedId ? appliedById.get(selectedId) : undefined;
     if (selectedEdit) {
       this.setSelectedToolImpl(selectedEdit);
     }
     try {
       await this.syncConfiguration({ key: "tools", throwOnError: true });
     } catch (error) {
-      this.setConfigurationTools(previous);
-      const previousSelected = previous.find((tool) => tool.id === selectedId);
-      if (selectedEdit && previousSelected) {
-        this.setSelectedToolImpl(previousSelected);
+      // Revert only the tools this call replaced, and only those still
+      // holding its edit: a tool edited, pinned or removed during the write
+      // keeps that newer state.
+      if (this.configuration === configuration) {
+        this.setConfigurationTools(
+          configuration.tools.map((tool) =>
+            appliedById.get(tool.id) === toRaw(tool)
+              ? replacedById.get(tool.id)!
+              : tool,
+          ),
+        );
+      }
+      const selected = this.selectedTool?.configuration;
+      if (selected && appliedById.get(selected.id) === toRaw(selected)) {
+        this.setSelectedToolImpl(replacedById.get(selected.id)!);
       }
       throw error;
     }
