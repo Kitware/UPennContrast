@@ -104,7 +104,7 @@ Following numpy convention: `ds.shape` returns `(rows, cols)` = `(height, width)
 
 ## Job status 3 is SUCCESS
 
-Girder job status codes: 0=inactive, 1=queued, 2=running, **3=success**, 4=error, 5=cancelled. Status 3 means the job completed successfully — don't confuse it with "still running."
+Girder job status codes: 0=inactive, 1=queued, 2=running, **3=success**, 4=error, 5=canceled. Status 3 means the job completed successfully — don't confuse it with "still running."
 
 ## Can't see a job's status ≠ the job didn't run
 

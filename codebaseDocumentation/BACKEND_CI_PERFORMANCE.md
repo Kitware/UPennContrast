@@ -30,7 +30,7 @@ CI suffers far more than a laptop. Mongo runs as a service container, so
 each of the ~2,100 round trips per test mid-run cost a few milliseconds:
 the same trivial test took 0.7 s in the first file of a run and 16–18 s in
 the late files. Mongo itself was not the bottleneck: its log for a 96-minute
-run showed 35K index builds totalling about one minute.
+run showed 35K index builds totaling about one minute.
 
 Ruled out: the test bodies (~0.01 s each), the Mongo version (9.0.2 vs 8.2.9
 locally: 8.0 s vs 6.7 s), network timeouts (a socket logger saw only the

@@ -305,7 +305,7 @@ Run `pnpm test src/commands src/components/CommandPalette.test.ts src/components
 ### Running commands
 
 - [ ] **A command runs only after the dialog has left**, so a dialog it opens doesn't fight the closing one for focus or the scrim. The test's dialog stub emits after-leave only when the test says so; an automatic one can't tell "after leave" from "a tick later". — _"does not run the command until the dialog has left"_
-- [ ] **Reopening mid-close still runs the chosen command** (after-leave never comes once the leave is cancelled). — _"still runs the chosen command if reopened before it finished closing"_
+- [ ] **Reopening mid-close still runs the chosen command** (after-leave never comes once the leave is canceled). — _"still runs the chosen command if reopened before it finished closing"_
 - [ ] **The highlight follows the command, not the row number**, so a list that re-derives under the user (the worker list landing) can't make Enter run something else, and a vanished command falls back to the first row. — _"keeps the highlighted command when the list re-derives under it"_, _"falls back to the first row when the highlighted command disappears"_
 - [ ] **⌘K / Ctrl+K typed in the search field closes the palette.** v-mousetrap ignores keys in inputs, so the field handles it (and claims Ctrl+K from the browser). — _"closes on its own toggle key typed in the search field"_
 - [ ] **⌘K / Ctrl+K opens the palette from inside any text field**, and only that binding fires there. — *"fires an allowInInputs hotkey from inside a text field, and only that one"*
@@ -323,7 +323,7 @@ Run `pnpm test src/commands src/components/CommandPalette.test.ts src/components
 - [ ] **Empty query shows recents first, not duplicated below.** — _"shows recent commands first on an empty query"_
 - [ ] **"Add tool" opens creation pre-selected, never builds a tool silently**, and the selection matches what clicking the card produces. — _"asks for tool creation pre-selected instead of building a tool"_, _"opens tool creation pre-selected for an Add-tool request, then clears it"_
 - [ ] **Selecting a shape card doesn't write into the shared template list.** — _"selecting a shape card does not write into the shared template"_
-- [ ] **Requests are cleared once honoured, and a logged-out request is dropped.** — _"drops the request without opening when logged out"_, _"loads a snapshot requested from the command palette, then clears it"_, _"selects it when the dialog is already open"_
+- [ ] **Requests are cleared once honored, and a logged-out request is dropped.** — _"drops the request without opening when logged out"_, _"loads a snapshot requested from the command palette, then clears it"_, _"selects it when the dialog is already open"_
 - [ ] **Panel commands go through the owner's toggle**, so the companion rules apply. — _"flips Open/Close with the palette's state and toggles through the owner"_
 
 ### Cost

@@ -272,7 +272,7 @@ docker logs girder -f 2>&1 | grep "upenn_annotation"
 docker exec nimbusimage-mongodb-1 mongosh girder --eval "db.job.find({}, {title: 1, status: 1, updated: 1}).sort({updated: -1}).limit(5).toArray()" --quiet
 ```
 
-Job status codes: 0=inactive, 1=queued, 2=running, 3=success, 4=error, 5=cancelled
+Job status codes: 0=inactive, 1=queued, 2=running, 3=success, 4=error, 5=canceled
 
 ### Notifications / Progress (Girder 5 WebSocket + Redis pub/sub)
 

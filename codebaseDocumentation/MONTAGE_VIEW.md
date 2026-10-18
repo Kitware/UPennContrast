@@ -127,7 +127,7 @@ montage is a main use, so its actions must stay reachable.
 
 ## Not done (yet)
 
-- Neighbouring objects are not drawn in a panel, only the panel's own object.
+- Neighboring objects are not drawn in a panel, only the panel's own object.
 - A server-side montage endpoint (one sprite per page instead of one request
   per crop) was deliberately deferred until it is shown to be needed.
 

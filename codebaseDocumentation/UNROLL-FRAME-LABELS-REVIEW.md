@@ -45,9 +45,9 @@ apart is a bigger, riskier change than this fix needs. `sortedAxisValues` in
 ## Finding 2 — verified real
 
 The widget element was a `div` with an `onclick`, so keyboard users could not
-reach it and screen readers saw no control. GeoJS's `domWidget` honours
+reach it and screen readers saw no control. GeoJS's `domWidget` honors
 `arg.el`, so the element is now a real `<button type="button">` with an
-`aria-label`, and the mousedown-stopPropagation behaviour that keeps clicks away
+`aria-label`, and the mousedown-stopPropagation behavior that keeps clicks away
 from the drawing tools is unchanged (it is bound on the widget canvas whatever
 the tag is).
 
