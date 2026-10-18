@@ -5,6 +5,7 @@ export type TCommandGroup =
   | "Tools"
   | "Add tool"
   | "Panels"
+  | "Navigate"
   | "Layers"
   | "Snapshots"
   | "Properties"
@@ -17,6 +18,7 @@ export const COMMAND_GROUP_ORDER: readonly TCommandGroup[] = [
   "Tools",
   "Add tool",
   "Panels",
+  "Navigate",
   "Layers",
   "Snapshots",
   "Properties",
@@ -43,6 +45,10 @@ export interface ICommand {
   // requires the dataset view).
   enabled?: () => boolean;
   run: () => void | Promise<void>;
+  // Instantiated per keystroke from the query (src/actions/parse.ts) rather
+  // than derived from state: its id never resolves in the registry, so the
+  // palette must not record it as recently used.
+  generated?: boolean;
 }
 
 // A provider derives commands from live state. Providers are read inside a

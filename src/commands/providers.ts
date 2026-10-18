@@ -1,4 +1,5 @@
 import store from "@/store";
+import { selectTool } from "@/actions/operations";
 import propertyStore from "@/store/properties";
 import { ITourMetadata } from "@/store/model";
 import { boundHotkey } from "./hotkeys";
@@ -39,7 +40,7 @@ export function toolCommands(ctx: IProviderContext): TCommandProvider {
         enabled: () => ctx.inViewer() && store.isLoggedIn,
         run: () => {
           store.requestPaletteOpen(["toolsPanel"]);
-          store.setSelectedToolId(tool.id);
+          selectTool(tool.id);
         },
       }),
     );

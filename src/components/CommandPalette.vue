@@ -85,6 +85,7 @@ import {
 import { COMMAND_GROUP_ORDER, ICommand } from "@/commands/types";
 import { formatHotkey, isPaletteToggleKey } from "@/commands/hotkeys";
 import { useViewerContext } from "@/commands/context";
+import { paramCommandsForQuery } from "@/actions/parse";
 
 // Results are capped so a broad query stays a short, scannable list.
 const MAX_ROWS = 50;
@@ -121,9 +122,20 @@ useCommandProvider(propertyCommands(providerContext));
 // their position among commands only, which is what the arrow keys move over.
 const rows = computed((): TRow[] => {
   const commands = enabledCommands.value;
-  const sections: { label: string; commands: ICommand[] }[] = [];
+  const sections: { key: string; label: string; commands: ICommand[] }[] = [];
 
   if (query.value.trim()) {
+    // "z 12" / "show only dapi": commands instantiated from the query come
+    // first, in sections of their own, so Enter runs what was typed.
+    const generatedByGroup = new Map<string, ICommand[]>();
+    for (const command of paramCommandsForQuery(query.value, providerContext)) {
+      const group = generatedByGroup.get(command.group) ?? [];
+      group.push(command);
+      generatedByGroup.set(command.group, group);
+    }
+    for (const [label, groupCommands] of generatedByGroup) {
+      sections.push({ key: `typed:${label}`, label, commands: groupCommands });
+    }
     // Groups ordered by their best match, so the top row is the top result.
     const byGroup = new Map<string, ICommand[]>();
     for (const command of rankCommands(commands, query.value, MAX_ROWS)) {
@@ -132,7 +144,7 @@ const rows = computed((): TRow[] => {
       byGroup.set(command.group, group);
     }
     for (const [label, groupCommands] of byGroup) {
-      sections.push({ label, commands: groupCommands });
+      sections.push({ key: label, label, commands: groupCommands });
     }
   } else {
     const byId = new Map(commands.map((command) => [command.id, command]));
@@ -140,7 +152,7 @@ const rows = computed((): TRow[] => {
       .map((id) => byId.get(id))
       .filter((command): command is ICommand => !!command);
     if (recent.length) {
-      sections.push({ label: "Recent", commands: recent });
+      sections.push({ key: "Recent", label: "Recent", commands: recent });
     }
     const recentIds = new Set(recent.map((command) => command.id));
     for (const group of COMMAND_GROUP_ORDER) {
@@ -150,7 +162,7 @@ const rows = computed((): TRow[] => {
         )
         .slice(0, OVERVIEW_PER_GROUP);
       if (groupCommands.length) {
-        sections.push({ label: group, commands: groupCommands });
+        sections.push({ key: group, label: group, commands: groupCommands });
       }
     }
   }
@@ -163,13 +175,13 @@ const rows = computed((): TRow[] => {
     }
     result.push({
       kind: "header",
-      key: `header:${section.label}`,
+      key: `header:${section.key}`,
       label: section.label,
     });
     for (const command of section.commands.slice(0, MAX_ROWS - index)) {
       result.push({
         kind: "command",
-        key: `${section.label}:${command.id}`,
+        key: `${section.key}:${command.id}`,
         command,
         index: index++,
       });
@@ -310,7 +322,11 @@ async function runPendingCommand() {
   if (!command) {
     return;
   }
-  recordRecentCommand(command.id);
+  // Commands generated from the query have ids that never resolve in the
+  // registry; recording them would only waste recent slots.
+  if (!command.generated) {
+    recordRecentCommand(command.id);
+  }
   try {
     await command.run();
   } catch (error) {

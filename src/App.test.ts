@@ -386,6 +386,28 @@ describe("App", () => {
     expect(vm.commandPaletteOpen).toBe(false);
   });
 
+  it("shows a search-field pill that opens the command palette", async () => {
+    // Render v-btn slots (shallowMount drops them) so the label and hint show.
+    (store as any).dataset = { id: "ds1", name: "Dataset" };
+    const wrapper = mountComponent(
+      { name: "datasetview" },
+      {
+        ...renderAppBarStubs,
+        VBtn: { template: "<button><slot /></button>" },
+      },
+    );
+    const pill = wrapper.get('[data-tour="command-palette-button"]');
+    expect(pill.attributes("aria-label")).toBe("Search commands");
+    expect(pill.text()).toContain("Search commands…");
+    expect(pill.get("kbd").text()).toBe(
+      (wrapper.vm as any).commandPaletteHotkey,
+    );
+    expect((wrapper.vm as any).commandPaletteOpen).toBe(false);
+    await pill.trigger("click");
+    expect((wrapper.vm as any).commandPaletteOpen).toBe(true);
+    wrapper.unmount();
+  });
+
   // -- Computed: hasUncomputedProperties --
   it("hasUncomputedProperties returns false when no uncomputed entries", () => {
     (propertyStore as any).uncomputedCountByProperty = {};

@@ -7,7 +7,18 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("@/store", () => ({
-  default: { isLoggedIn: true, dataset: { id: "ds" } },
+  default: {
+    isLoggedIn: true,
+    dataset: { id: "ds", xy: [0], z: Array.from({ length: 10 }), time: [0] },
+    layers: [],
+  },
+}));
+
+const goToLocation = vi.hoisted(() => vi.fn());
+vi.mock("@/actions/operations", () => ({
+  goToLocation,
+  setVisibleLayers: vi.fn(),
+  selectTool: vi.fn(),
 }));
 
 vi.mock("@/store/properties", () => ({
@@ -334,5 +345,44 @@ describe("CommandPalette", () => {
     // pointer) does not take it back.
     await rows[0].trigger("mousemove", { clientX: 10, clientY: 10 });
     expect(rowTitles()[wrapper.vm.activeIndex]).toBe(chosen);
+  });
+
+  it("puts a typed parameterized command first and runs it after the dialog leaves", async () => {
+    goToLocation.mockClear();
+    unregister();
+    unregister = registerCommandProvider(() => [
+      command("panel.zoom", "Open Z stack zoom", "Panels"),
+    ]);
+    mountPalette();
+    await type("z 3");
+    expect(rowTitles()[0]).toContain("Go to Z 3");
+    await press("Enter");
+    expect(goToLocation).not.toHaveBeenCalled();
+    await leave();
+    // The typed 3 is the 3rd slice: index 2.
+    expect(goToLocation).toHaveBeenCalledWith({ z: 2 });
+  });
+
+  it("does not record a generated command as recent", async () => {
+    mountPalette();
+    await type("z 3");
+    await press("Enter");
+    await leave();
+    expect(goToLocation).toHaveBeenCalled();
+    expect(recentCommandIds.value).toEqual([]);
+    await wrapper.setProps({ modelValue: true });
+    await type("open filters");
+    await press("Enter");
+    await leave();
+    expect(recentCommandIds.value).toEqual(["panel.filters"]);
+  });
+
+  it("keeps highlighting a generated command by id", async () => {
+    mountPalette();
+    await type("z 3");
+    expect(wrapper.vm.activeCommandId).toBe(null);
+    expect(wrapper.vm.commandRows[wrapper.vm.activeIndex].command.id).toBe(
+      "navigate.z:2",
+    );
   });
 });

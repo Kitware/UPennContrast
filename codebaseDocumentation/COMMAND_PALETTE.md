@@ -282,12 +282,42 @@ Not exercised live: "Go to snapshot" (the test collection has no snapshots,
 and creating one would write to a shared configuration). It is covered by
 *"loads a snapshot requested from the command palette, then clears it"*.
 
+## Parameterized commands and shared operations
+
+Some actions take an argument typed in the query. `src/actions/catalog.ts`
+lists them declaratively (id, group, icon, trigger `phrases`, a `param`, the
+`agentTool` that performs the same operation, `enabled`, `run`), and
+`paramCommandsForQuery` in `src/actions/parse.ts` instantiates ready-to-run
+`ICommand`s per keystroke: `z 12`, `t40`, `xy 3` ("Go to Z 12" in the
+Navigate group) and `show only dapi` ("Show only layer: DAPI"; the bare phrase
+lists up to 8 layers, matched with the ordinary scorer, synonyms and channel
+names included).
+
+- **1-based rule.** The Navigator sliders show 1-based numbers
+  (`NavigatorPanel.vue` uses `:offset="1"`), so the typed N is index N - 1.
+  Only 1 <= N <= length is offered, and only for a dimension with more than one
+  entry. The title shows the typed number; the description shows "of 20".
+- **Generated commands** carry `generated: true`. Their ids never resolve in
+  `enabledCommands`, so the palette doesn't record them as recent. They are
+  listed first, in their own sections, so Enter runs what was typed.
+- **One implementation, two dispatchers.** The store-mutating cores live in
+  `src/actions/operations.ts` (`goToLocation`, `setVisibleLayers`,
+  `selectTool`); the agent executors (`set_location`, `set_layer_visibility`,
+  `select_tool`) and the palette both call them. `setVisibleLayers` does not
+  persist: the executor persists with a throwing sync, the palette with
+  `syncConfiguration("layers")` only when logged in. Validation, errors and
+  result payloads stay in `executors.ts`.
+- **`agentTool` link.** Every catalog action names the agent tool doing the
+  same thing; `catalog.test.ts` checks it against `AGENT_TOOL_NAMES`. Adding
+  an action both sides can do means a catalog entry plus a shared operation,
+  not a second implementation.
+
 ## Regression checklist
 
 Each line names an invariant and the test that holds it, so a change here means
 re-checking the list rather than rediscovering it.
 
-Run `pnpm test src/commands src/components/CommandPalette.test.ts src/components/DataIOMenu.test.ts src/utils/v-mousetrap.test.ts src/App.commands.test.ts src/App.test.ts src/utils/panelRegistry.test.ts src/tools/creation/toolTypeCatalog.test.ts src/tools/toolsets/Toolset.test.ts src/components/Snapshots.test.ts src/components/AnnotationBrowser/ColorByPropertyDialog.test.ts`.
+Run `pnpm test src/commands src/actions src/components/CommandPalette.test.ts src/components/DataIOMenu.test.ts src/utils/v-mousetrap.test.ts src/App.commands.test.ts src/App.test.ts src/utils/panelRegistry.test.ts src/tools/creation/toolTypeCatalog.test.ts src/tools/toolsets/Toolset.test.ts src/components/Snapshots.test.ts src/components/AnnotationBrowser/ColorByPropertyDialog.test.ts`.
 
 ### Self-updating
 
@@ -325,6 +355,16 @@ Run `pnpm test src/commands src/components/CommandPalette.test.ts src/components
 - [ ] **Selecting a shape card doesn't write into the shared template list.** — _"selecting a shape card does not write into the shared template"_
 - [ ] **Requests are cleared once honored, and a logged-out request is dropped.** — _"drops the request without opening when logged out"_, _"loads a snapshot requested from the command palette, then clears it"_, _"selects it when the dialog is already open"_
 - [ ] **Panel commands go through the owner's toggle**, so the companion rules apply. — _"flips Open/Close with the palette's state and toggles through the owner"_
+
+### Parameterized commands
+
+- [ ] **The typed number is 1-based; the index run is N - 1.** — _"converts the typed 1-based number to a 0-based index"_
+- [ ] **Out-of-range, 0, non-integer, single-entry dimensions and non-viewer routes offer nothing.** — _"offers nothing for 0 or a number past the dimension's length"_, _"offers nothing for a dimension with a single entry"_, _"offers nothing outside the viewer"_
+- [ ] **Every phrase form parses**, glued included. — _"reads every phrase form, the glued one included"_, _"lists every layer for the bare phrase"_, _"ranks the best layer first for a partial name"_
+- [ ] **Show-only persists only when logged in, through the shared operation.** — _"runs the show-only command through the shared operation, then persists"_, _"does not persist show-only when logged out"_
+- [ ] **Shared operations clamp, touch only differing layers, and don't sync.** — _"clamps each index into the dataset's range"_, _"changes only layers whose visibility differs, without syncing"_
+- [ ] **Every catalog action names an existing agent tool.** — _"names an agent tool that exists for every action"_
+- [ ] **Typed commands come first, run after the dialog leaves, and are never recorded as recent.** — _"puts a typed parameterized command first and runs it after the dialog leaves"_, _"does not record a generated command as recent"_, _"keeps highlighting a generated command by id"_
 
 ### Cost
 

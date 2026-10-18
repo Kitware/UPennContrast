@@ -389,21 +389,21 @@
         <data-io-menu class="ml-1" />
       </template>
       <div class="mx-4 d-flex align-center">
-        <v-tooltip :text="`Search commands (${commandPaletteHotkey})`">
-          <template v-slot:activator="{ props: activatorProps }">
-            <v-btn
-              v-bind="activatorProps"
-              :data-tour="TOUR_ANCHORS.commandPaletteButton"
-              variant="text"
-              icon
-              size="small"
-              aria-label="Search commands"
-              @click="commandPaletteOpen = true"
-            >
-              <v-icon>mdi-magnify</v-icon>
-            </v-btn>
-          </template>
-        </v-tooltip>
+        <!-- A button, not an input: it only opens the palette (typing happens
+             there). It is drawn as a search field so the palette is
+             discoverable; below the `sm` breakpoint it collapses to the icon. -->
+        <v-btn
+          :data-tour="TOUR_ANCHORS.commandPaletteButton"
+          class="palette-search"
+          variant="text"
+          size="small"
+          aria-label="Search commands"
+          @click="commandPaletteOpen = true"
+        >
+          <v-icon>mdi-magnify</v-icon>
+          <span class="palette-search-label">Search commands…</span>
+          <kbd class="palette-search-kbd">{{ commandPaletteHotkey }}</kbd>
+        </v-btn>
         <v-menu>
           <template v-slot:activator="{ props: activatorProps }">
             <v-btn
@@ -1653,6 +1653,75 @@ $palette-cluster-tone: #0f1217;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--nimbus-border, rgba(255, 255, 255, 0.08));
+}
+
+/* Field-looking button that opens the command palette. Wide: a pill with
+   the magnifier, placeholder text and the hotkey hint. Narrow: only the icon
+   (the label and hint are hidden, the button shrinks to a 36px circle). */
+.palette-search.v-btn {
+  width: 264px;
+  min-width: 0;
+  padding: 0 8px 0 10px;
+  border-radius: 100px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  background: rgba(var(--v-theme-on-surface), 0.06);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+
+  &:hover {
+    background: rgba(var(--v-theme-on-surface), 0.1);
+    color: rgba(var(--v-theme-on-surface), 0.8);
+  }
+}
+
+.palette-search.v-btn :deep(.v-btn__content) {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.palette-search-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-search-kbd {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.2);
+  background: rgba(var(--v-theme-on-surface), 0.05);
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-family: inherit;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 959px) {
+  .palette-search.v-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
+    border-color: transparent;
+    background: transparent;
+
+    :deep(.v-btn__content) {
+      justify-content: center;
+    }
+  }
+
+  .palette-search-label,
+  .palette-search-kbd {
+    display: none;
+  }
 }
 
 .palette-ibtn {
