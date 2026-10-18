@@ -103,4 +103,21 @@ describe("PipelineStepEditor parameters", () => {
     ).toEqual({ threshold: 3, radius: 2 });
     expect(wrapper.emitted("update:modelValue")).toBeUndefined();
   });
+
+  it("emits only the parameter edited on a linked step, not the displayed defaults", async () => {
+    const wrapper = mountStepEditor(
+      annotationStep({}, { sourceToolId: "t1" }),
+      linked,
+    );
+    await nextTick();
+    const values = wrapper
+      .findComponent(WorkerInterfaceValues)
+      .props("modelValue") as any;
+
+    values.threshold = 9;
+    await nextTick();
+
+    const emitted = wrapper.emitted("update:modelValue") as any[];
+    expect(emitted.at(-1)[0].workerInterfaceValues).toEqual({ threshold: 9 });
+  });
 });

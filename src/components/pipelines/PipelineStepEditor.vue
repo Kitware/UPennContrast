@@ -117,7 +117,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { cloneDeep, omit } from "lodash";
+import { cloneDeep, omit, pickBy } from "lodash";
 import propertiesStore from "@/store/properties";
 import DockerImageSelect from "@/components/DockerImageSelect.vue";
 import WorkerInterfaceValues from "@/components/WorkerInterfaceValues.vue";
@@ -222,9 +222,12 @@ const linkMessage = computed<string | null>(() => {
     return null;
   }
   if (linkState.state === "missing") {
-    return linkState.sourceKind === "tool"
-      ? "The tool this step was linked to was deleted. It runs with the last saved copy of the tool's settings. Unlink to edit them."
-      : "The property this step was linked to was deleted. It runs a new property from the last saved copy of its settings. Unlink to edit them.";
+    if (linkState.sourceKind === "property") {
+      return "The property this step was linked to was deleted. It runs a new property from the last saved copy of its settings. Unlink to edit them.";
+    }
+    return linkState.sourceName
+      ? `The tool "${linkState.sourceName}" this step is linked to no longer has a worker image. It runs with the last saved copy of the tool's settings. Unlink to edit them.`
+      : "The tool this step was linked to was deleted. It runs with the last saved copy of the tool's settings. Unlink to edit them.";
   }
   return linkState.sourceKind === "tool"
     ? `Linked to tool "${linkState.sourceName}": runs with the tool's current settings. Changes made here are saved to the tool too.`
@@ -308,11 +311,24 @@ watch(
   },
   { deep: true },
 );
+// Emit only the parameters the user changed, onto the step's own values: a
+// displayed default that was not touched is never written.
 watch(
   workerInterfaceValuesModel,
   (values) => {
-    if (!samePersistedValue(values, displayedWorkerInterfaceValues.value)) {
-      patchStep({ workerInterfaceValues: cloneDeep(values) });
+    const displayed = displayedWorkerInterfaceValues.value;
+    const changed = pickBy(
+      values,
+      (value, parameterId) =>
+        !samePersistedValue(value, displayed[parameterId]),
+    );
+    if (Object.keys(changed).length > 0) {
+      patchStep({
+        workerInterfaceValues: {
+          ...step.value.workerInterfaceValues,
+          ...cloneDeep(changed),
+        },
+      });
     }
   },
   { deep: true },

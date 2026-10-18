@@ -47,6 +47,7 @@ const h = vi.hoisted(() => ({
     deleteProperties: vi.fn().mockResolvedValue(undefined),
     properties: [] as any[],
     fetchPropertyValues: vi.fn().mockResolvedValue(undefined),
+    fetchProperties: vi.fn().mockResolvedValue(undefined),
     getWorkerInterface: vi.fn().mockReturnValue(null),
     fetchWorkerInterface: vi.fn().mockResolvedValue(undefined),
     fetchWorkerImageList: vi.fn().mockResolvedValue(undefined),
@@ -91,10 +92,12 @@ vi.mock("./filters", () => ({
 
 import pipelinesStore, { mergeMaterializedPropertyIds } from "./pipelines";
 import {
+  remainingToolEdits,
   resolveLinkedStep,
   stepLinkState,
   stepToolLinkedFields,
-  toolWithStepEdits,
+  toolEditsBetween,
+  toolWithEdits,
 } from "@/utils/pipelineLinks";
 import { AnnotationShape, IPipeline } from "./model";
 
@@ -148,6 +151,7 @@ beforeEach(() => {
   h.main.updateConfigurationPipelines.mockResolvedValue(undefined);
   h.annotations.fetchAnnotations.mockResolvedValue(undefined);
   h.properties.fetchPropertyValues.mockResolvedValue(undefined);
+  h.properties.fetchProperties.mockResolvedValue(undefined);
   h.properties.deleteProperty.mockResolvedValue(undefined);
   h.properties.deleteProperties.mockResolvedValue(undefined);
   h.progress.create.mockResolvedValue("prog");
@@ -981,82 +985,85 @@ describe("linked steps", () => {
     expect(stepLinkState(annotationStep("a"), tools, props)).toEqual({
       state: "unlinked",
     });
-    // Configured but not loaded yet: linked, not deleted.
+    // A tool that still exists but has no worker image is unusable, not
+    // deleted.
     expect(
       stepLinkState(
-        { ...propertyStep("p"), sourcePropertyId: "x" },
+        { ...annotationStep("a"), sourceToolId: "t2" },
+        [workerTool("t2", { image: { image: "" } })],
         [],
-        [],
-        ["x"],
       ),
-    ).toEqual({ state: "linked", sourceKind: "property", sourceName: "p" });
+    ).toEqual({ state: "missing", sourceKind: "tool", sourceName: "Tool t2" });
   });
 
-  it("toolWithStepEdits writes a step's edits into the tool but keeps its image", () => {
-    const tool = workerTool("t1");
-    const baseline = stepToolLinkedFields({
-      ...annotationStep("a", ["from-tool"]),
-      workerInterfaceValues: { threshold: 7 },
+  it("toolEditsBetween records changed parameters one by one and whole fields", () => {
+    const before = stepToolLinkedFields({
+      ...annotationStep("a", ["t"]),
+      workerInterfaceValues: { threshold: 7, radius: 2 },
     });
-    const step = {
-      ...annotationStep("a", ["edited"]),
-      image: "img/other",
-      workerInterfaceValues: { threshold: 9 },
-      sourceToolId: "t1",
+    const after = {
+      ...before,
+      workerInterfaceValues: { threshold: 9, radius: 2 },
+      annotation: { ...before.annotation, tags: ["edited"] },
     };
 
-    const edited = toolWithStepEdits(tool, step, baseline)!;
-
-    expect(edited.values.image.image).toBe("img/tool");
-    expect(edited.values.workerInterfaceValues).toEqual({ threshold: 9 });
-    expect(edited.values.annotation.tags).toEqual(["edited"]);
-    expect(tool.values.workerInterfaceValues).toEqual({ threshold: 7 });
+    expect(toolEditsBetween(before, after)).toEqual({
+      workerInterfaceValues: { threshold: 9 },
+      annotation: after.annotation,
+    });
   });
 
-  it("toolWithStepEdits writes only the fields and parameters the step changed", () => {
-    // The tool gained a parameter and new output tags elsewhere since the
-    // baseline; the step changed only `threshold`.
+  it("toolEditsBetween treats values differing only in undefined keys as unedited", () => {
+    const before = stepToolLinkedFields(annotationStep("a", ["t"]));
+    delete (before.annotation as any).color;
+    // What AnnotationConfiguration re-emits on mount: an explicit color key.
+    const after = {
+      ...before,
+      annotation: { ...before.annotation, color: undefined },
+    };
+
+    expect(toolEditsBetween(before, after)).toEqual({});
+  });
+
+  it("toolWithEdits writes only the pending edits onto the tool's current values", () => {
+    // The tool gained a parameter and new output tags elsewhere; the pending
+    // edit is only `threshold`.
     const tool = workerTool("t1", {
       workerInterfaceValues: { threshold: 7, radius: 4 },
     });
     tool.values.annotation.tags = ["changed-elsewhere"];
-    const baselineStep = {
-      ...annotationStep("a", ["from-tool"]),
-      workerInterfaceValues: { threshold: 7 },
-    };
-    const step = {
-      ...baselineStep,
+
+    const edited = toolWithEdits(tool, {
       workerInterfaceValues: { threshold: 9 },
-      sourceToolId: "t1",
-    };
+    });
 
-    const edited = toolWithStepEdits(
-      tool,
-      step,
-      stepToolLinkedFields(baselineStep),
-    )!;
-
+    expect(edited.values.image.image).toBe("img/tool");
     expect(edited.values.workerInterfaceValues).toEqual({
       threshold: 9,
       radius: 4,
     });
     expect(edited.values.annotation.tags).toEqual(["changed-elsewhere"]);
+    expect(tool.values.workerInterfaceValues).toEqual({
+      threshold: 7,
+      radius: 4,
+    });
   });
 
-  it("toolWithStepEdits treats values differing only in undefined keys as unedited", () => {
-    const tool = workerTool("t1");
-    const baselineStep = annotationStep("a", ["from-tool"]);
-    delete baselineStep.annotation.color;
-    // What AnnotationConfiguration re-emits on mount: an explicit color key.
-    const step = {
-      ...baselineStep,
-      annotation: { ...baselineStep.annotation, color: undefined },
-      sourceToolId: "t1",
-    };
+  it("remainingToolEdits drops edits that match the given values", () => {
+    const live = stepToolLinkedFields({
+      ...annotationStep("a", ["t"]),
+      workerInterfaceValues: { threshold: 7 },
+    });
 
     expect(
-      toolWithStepEdits(tool, step, stepToolLinkedFields(baselineStep)),
-    ).toBeNull();
+      remainingToolEdits(
+        {
+          workerInterfaceValues: { threshold: 7, radius: 3 },
+          jobDateTag: true,
+        },
+        live,
+      ),
+    ).toEqual({ workerInterfaceValues: { radius: 3 }, jobDateTag: true });
   });
 
   it("re-wires a property step to the output tags its linked tool produces now", async () => {
@@ -1094,20 +1101,37 @@ describe("linked steps", () => {
     expect(h.main.updateConfigurationPipelines).toHaveBeenCalledTimes(1);
   });
 
-  it("fails a linked property step whose property is configured but not loaded, without materializing", async () => {
-    h.main.configuration.propertyIds = ["user"];
+  it("reloads properties once before treating a linked property as deleted", async () => {
+    // Not loaded yet when the run starts; the reload finds it.
     h.properties.properties = [];
-    const errors: any[] = [];
+    h.properties.fetchProperties.mockImplementation(async () => {
+      h.properties.properties = [existingProperty("user")];
+    });
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
     const step = { ...propertyStep("p"), sourcePropertyId: "user" };
 
     const result = await pipelinesStore.runPipeline({
       pipeline: pipeline([step]),
-      onStepError: (_index, info) => errors.push(...info.errors),
     });
 
-    expect(result.failed).toBe(1);
+    expect(h.properties.fetchProperties).toHaveBeenCalledTimes(1);
     expect(h.properties.createProperty).not.toHaveBeenCalled();
-    expect(h.properties.submitPropertyJob).not.toHaveBeenCalled();
-    expect(errors[0].error).toContain("not loaded yet");
+    expect(h.properties.submitPropertyJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        property: expect.objectContaining({ id: "user" }),
+      }),
+    );
+    expect(result.succeeded).toBe(1);
+  });
+
+  it("does not reload properties when every linked property is loaded", async () => {
+    h.properties.properties = [existingProperty("user")];
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+
+    await pipelinesStore.runPipeline({
+      pipeline: pipeline([{ ...propertyStep("p"), sourcePropertyId: "user" }]),
+    });
+
+    expect(h.properties.fetchProperties).not.toHaveBeenCalled();
   });
 });

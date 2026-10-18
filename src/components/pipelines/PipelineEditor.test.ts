@@ -1,3 +1,4 @@
+import { omit } from "lodash";
 import { shallowMount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,7 +21,13 @@ const h = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/store", () => ({ default: h.store }));
+// Reactive, so a tool changed "elsewhere" (a test reassigning h.store.tools)
+// reaches the editor's computeds, as a real store change would.
+vi.mock("@/store", async () => {
+  const { reactive } = await import("vue");
+  h.store = reactive(h.store);
+  return { default: h.store };
+});
 vi.mock("@/store/pipelines", () => ({
   default: h.pipelinesStore,
   mergeMaterializedPropertyIds: vi.fn(),
@@ -126,10 +133,15 @@ const controller = {
 };
 
 function mountEditor(pipeline: IPipeline) {
-  // Persisted, so the editor's dirty baseline is the on-open clone.
+  // Persisted, like the real store: getPipelineById returns what was last
+  // saved (the editor's unsaved-changes baseline), and savePipeline replaces it.
+  let stored = pipeline;
   h.pipelinesStore.getPipelineById.mockImplementation((id: string) =>
-    id === pipeline.id ? pipeline : null,
+    id === stored.id ? stored : null,
   );
+  h.pipelinesStore.savePipeline.mockImplementation(async (saved: IPipeline) => {
+    stored = saved;
+  });
   return shallowMount(PipelineEditor, {
     props: { pipeline },
     global: {
@@ -143,12 +155,11 @@ beforeEach(() => {
   h.store.tools = [];
   h.properties.properties = [];
   h.store.editToolsInConfiguration.mockResolvedValue(undefined);
-  h.pipelinesStore.savePipeline.mockResolvedValue(undefined);
   h.pipelinesStore.createStepId.mockReturnValue("new-step");
 });
 
 describe("PipelineEditor linked steps", () => {
-  it("refreshes a linked step's saved copy from its tool on open, without marking it dirty", () => {
+  it("shows a linked step with its tool's live values on open, without marking it dirty", () => {
     h.store.tools = [workerTool("t1", 5, ["from-tool"])];
     const wrapper = mountEditor({
       id: "pipe",
@@ -157,10 +168,12 @@ describe("PipelineEditor linked steps", () => {
     });
     const vm = wrapper.vm as any;
 
-    expect(vm.localPipeline.steps[0].workerInterfaceValues).toEqual({
+    expect(vm.displayedPipeline.steps[0].workerInterfaceValues).toEqual({
       threshold: 5,
     });
-    expect(vm.localPipeline.steps[0].annotation.tags).toEqual(["from-tool"]);
+    expect(vm.displayedPipeline.steps[0].annotation.tags).toEqual([
+      "from-tool",
+    ]);
     expect(vm.isDirty).toBe(false);
     expect(vm.linkStates[0]).toEqual({
       state: "linked",
@@ -178,7 +191,7 @@ describe("PipelineEditor linked steps", () => {
     });
     const vm = wrapper.vm as any;
     vm.handleStepUpdate(0, {
-      ...vm.localPipeline.steps[0],
+      ...vm.displayedPipeline.steps[0],
       workerInterfaceValues: { threshold: 9 },
     });
 
@@ -221,7 +234,7 @@ describe("PipelineEditor linked steps", () => {
     });
     const vm = wrapper.vm as any;
     vm.handleStepUpdate(0, {
-      ...vm.localPipeline.steps[0],
+      ...vm.displayedPipeline.steps[0],
       workerInterfaceValues: { threshold: 9 },
     });
 
@@ -241,14 +254,14 @@ describe("PipelineEditor linked steps", () => {
     const vm = wrapper.vm as any;
 
     vm.handleStepUpdate(0, {
-      ...vm.localPipeline.steps[0],
+      ...vm.displayedPipeline.steps[0],
       workerInterfaceValues: { threshold: 9 },
     });
 
-    expect(vm.localPipeline.steps[1].workerInterfaceValues).toEqual({
+    expect(vm.displayedPipeline.steps[1].workerInterfaceValues).toEqual({
       threshold: 9,
     });
-    expect(vm.localPipeline.steps[1].name).toBe("b");
+    expect(vm.displayedPipeline.steps[1].name).toBe("b");
   });
 
   it("does not auto-wire a step linked to an existing property", () => {
@@ -274,8 +287,8 @@ describe("PipelineEditor linked steps", () => {
     });
     const vm = wrapper.vm as any;
 
-    expect(vm.localPipeline.steps[1].inputTags.tags).toEqual(["own"]);
-    expect(vm.localPipeline.steps[1].shape).toBe(AnnotationShape.Point);
+    expect(vm.displayedPipeline.steps[1].inputTags.tags).toEqual(["own"]);
+    expect(vm.displayedPipeline.steps[1].shape).toBe(AnnotationShape.Point);
   });
 
   it("adds an existing property as a linked, non-auto-wired step", () => {
@@ -296,7 +309,7 @@ describe("PipelineEditor linked steps", () => {
     vm.newStepPropertyId = "user";
     vm.confirmAddStep();
 
-    expect(vm.localPipeline.steps).toEqual([
+    expect(vm.displayedPipeline.steps).toEqual([
       expect.objectContaining({
         kind: "property",
         name: "User property",
@@ -308,7 +321,7 @@ describe("PipelineEditor linked steps", () => {
         sourcePropertyId: "user",
       }),
     ]);
-    expect(vm.localPipeline.steps[0]).not.toHaveProperty(
+    expect(vm.displayedPipeline.steps[0]).not.toHaveProperty(
       "materializedPropertyId",
     );
   });
@@ -322,7 +335,7 @@ describe("PipelineEditor linked steps", () => {
     vm.newStepToolId = "t1";
     vm.confirmAddStep();
 
-    expect(vm.localPipeline.steps[0]).toMatchObject({
+    expect(vm.displayedPipeline.steps[0]).toMatchObject({
       kind: "annotation",
       sourceToolId: "t1",
       workerInterfaceValues: { threshold: 5 },
@@ -339,7 +352,7 @@ describe("PipelineEditor linked steps", () => {
       steps: [JSON.parse(JSON.stringify(linkedAnnotationStep("a", "t1", 5)))],
     });
     const vm = wrapper.vm as any;
-    const step = vm.localPipeline.steps[0];
+    const step = vm.displayedPipeline.steps[0];
     // What AnnotationConfiguration emits on mount.
     vm.handleStepUpdate(0, {
       ...step,
@@ -364,7 +377,7 @@ describe("PipelineEditor linked steps", () => {
     // The tool's output tags change elsewhere; the step changes a parameter.
     h.store.tools = [workerTool("t1", 5, ["changed-elsewhere"])];
     vm.handleStepUpdate(0, {
-      ...vm.localPipeline.steps[0],
+      ...vm.displayedPipeline.steps[0],
       workerInterfaceValues: { threshold: 9 },
     });
 
@@ -388,7 +401,7 @@ describe("PipelineEditor linked steps", () => {
     });
     const vm = wrapper.vm as any;
     vm.handleStepUpdate(0, {
-      ...vm.localPipeline.steps[0],
+      ...vm.displayedPipeline.steps[0],
       workerInterfaceValues: { threshold: 9 },
     });
 
@@ -411,7 +424,7 @@ describe("PipelineEditor linked steps", () => {
     });
     const vm = wrapper.vm as any;
     vm.handleStepUpdate(0, {
-      ...vm.localPipeline.steps[0],
+      ...vm.displayedPipeline.steps[0],
       workerInterfaceValues: { threshold: 5 },
     });
 
@@ -419,12 +432,12 @@ describe("PipelineEditor linked steps", () => {
     vm.newStepToolId = "t1";
     vm.confirmAddStep();
 
-    expect(vm.localPipeline.steps[1].workerInterfaceValues).toEqual({
+    expect(vm.displayedPipeline.steps[1].workerInterfaceValues).toEqual({
       threshold: 5,
     });
   });
 
-  it("compares a step added this session with its tool as it was when added", async () => {
+  it("does not write back a step added this session when only its tool changed elsewhere", async () => {
     h.store.tools = [workerTool("t1", 1, ["original"])];
     const wrapper = mountEditor({ id: "pipe", name: "P", steps: [] });
     const vm = wrapper.vm as any;
@@ -454,9 +467,83 @@ describe("PipelineEditor linked steps", () => {
 
     const [saved] = h.pipelinesStore.savePipeline.mock.calls[0];
     expect(saved.steps[0].workerInterfaceValues).toEqual({ threshold: 42 });
-    expect(vm.localPipeline.steps[0].workerInterfaceValues).toEqual({
+    expect(vm.displayedPipeline.steps[0].workerInterfaceValues).toEqual({
       threshold: 42,
     });
     expect(vm.isDirty).toBe(false);
+  });
+
+  it("shows a tool change made elsewhere while the editor is open", () => {
+    h.store.tools = [workerTool("t1", 5, ["original"])];
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1")],
+    });
+    const vm = wrapper.vm as any;
+
+    h.store.tools = [workerTool("t1", 42, ["changed-elsewhere"])];
+
+    expect(vm.displayedPipeline.steps[0].workerInterfaceValues).toEqual({
+      threshold: 42,
+    });
+    expect(vm.displayedPipeline.steps[0].annotation.tags).toEqual([
+      "changed-elsewhere",
+    ]);
+    expect(vm.isDirty).toBe(false);
+  });
+
+  it("keeps an edit made during the tool write pending", async () => {
+    h.store.tools = [workerTool("t1", 5, [])];
+    let finishToolWrite: () => void = () => {};
+    h.store.editToolsInConfiguration.mockImplementation(
+      () => new Promise<void>((resolve) => (finishToolWrite = resolve)),
+    );
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1")],
+    });
+    const vm = wrapper.vm as any;
+    const edit = (threshold: number) =>
+      vm.handleStepUpdate(0, {
+        ...vm.displayedPipeline.steps[0],
+        workerInterfaceValues: { threshold },
+      });
+    edit(9);
+
+    const saving = vm.save();
+    edit(11);
+    finishToolWrite();
+    await saving;
+
+    const [[written]] = h.store.editToolsInConfiguration.mock.calls[0];
+    expect(written.values.workerInterfaceValues).toEqual({ threshold: 9 });
+    expect(vm.pendingToolEdits.t1).toEqual({
+      workerInterfaceValues: { threshold: 11 },
+    });
+  });
+
+  it("does not write a tool back once no step is linked to it", async () => {
+    h.store.tools = [workerTool("t1", 5, [])];
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1")],
+    });
+    const vm = wrapper.vm as any;
+    vm.handleStepUpdate(0, {
+      ...vm.displayedPipeline.steps[0],
+      workerInterfaceValues: { threshold: 9 },
+    });
+    // Unlink: the step keeps the values it shows, as an independent step.
+    vm.handleStepUpdate(0, omit(vm.displayedPipeline.steps[0], "sourceToolId"));
+
+    await vm.save();
+
+    expect(h.store.editToolsInConfiguration).not.toHaveBeenCalled();
+    const [saved] = h.pipelinesStore.savePipeline.mock.calls[0];
+    expect(saved.steps[0].workerInterfaceValues).toEqual({ threshold: 9 });
+    expect(saved.steps[0]).not.toHaveProperty("sourceToolId");
   });
 });

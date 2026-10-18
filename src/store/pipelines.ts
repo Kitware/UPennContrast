@@ -400,11 +400,20 @@ export class Pipelines extends VuexModule {
     // already-matching properties) shouldn't write the config at all.
     let materializedPropertyChanged = false;
 
+    // A linked property missing from the loaded list may be gone, or may not
+    // have loaded yet (properties load with the configuration). Reload once
+    // before treating it as gone, so the fallback never materializes a
+    // duplicate of a property that exists. Batch children skip this; the
+    // batch checks once for all datasets.
+    if (!skipRefresh) {
+      await this.loadMissingLinkedProperties(pipeline);
+    }
+
     // The steps as they run: linked steps take their source's current values,
     // then auto-wiring is re-applied so a property step reads the tags its
     // upstream step produces now (a linked tool's output tags may have changed
-    // since the pipeline was saved). Write-backs (materializedPropertyId) go
-    // to the stored step.
+    // since the pipeline was saved). materializedPropertyId is written to the
+    // run step and copied back to the stored steps after the loop.
     const runSteps = computeAutoWiredSteps(
       pipeline.steps.map((step) =>
         resolveLinkedStep(step, main.tools, properties.properties),
@@ -482,15 +491,6 @@ export class Pipelines extends VuexModule {
               eventCallback,
               errorCallback,
             });
-          } else if (
-            runStep.sourcePropertyId &&
-            main.configuration?.propertyIds.includes(runStep.sourcePropertyId)
-          ) {
-            // Still in the configuration but not loaded (a properties fetch
-            // in flight): not deleted, so don't materialize a duplicate.
-            throw new Error(
-              "The linked property is not loaded yet; try again shortly.",
-            );
           } else {
             const previousMaterializedPropertyId =
               runStep.materializedPropertyId;
@@ -499,10 +499,6 @@ export class Pipelines extends VuexModule {
               runStep.materializedPropertyId !== previousMaterializedPropertyId
             ) {
               materializedPropertyChanged = true;
-            }
-            // runStep is a copy when resolving or wiring changed the step.
-            if (step.kind === "property") {
-              step.materializedPropertyId = runStep.materializedPropertyId;
             }
             if (property) {
               submitted = await properties.submitPropertyJob({
@@ -566,6 +562,9 @@ export class Pipelines extends VuexModule {
       }
     }
 
+    // runSteps are copies wherever resolving or wiring changed a step.
+    mergeMaterializedPropertyIds(pipeline, { ...pipeline, steps: runSteps });
+
     try {
       // Persist newly-materialized property ids captured during the run, but
       // only when something actually changed - an annotation-only run (or one
@@ -598,6 +597,20 @@ export class Pipelines extends VuexModule {
     };
     onComplete?.(result);
     return result;
+  }
+
+  // Reload the configuration's properties when an enabled step is linked to a
+  // property that is not in the loaded list. At most one fetch per run.
+  @Action
+  async loadMissingLinkedProperties(pipeline: IPipeline) {
+    const isMissing = (step: TPipelineStep) =>
+      step.enabled &&
+      step.kind === "property" &&
+      !!step.sourcePropertyId &&
+      !findSourceProperty(step, properties.properties);
+    if (pipeline.steps.some(isMissing)) {
+      await properties.fetchProperties();
+    }
   }
 
   // Refresh derived state for the currently-viewed dataset. Shared by the
@@ -710,6 +723,7 @@ export class Pipelines extends VuexModule {
     }
 
     this.setRunningPipelineId(pipeline.id);
+    await this.loadMissingLinkedProperties(pipeline);
     const batchProgressId = await progress.create({
       type: ProgressType.BATCH_PIPELINE_COMPUTE,
       title: `Batch pipeline: ${pipeline.name}`,
