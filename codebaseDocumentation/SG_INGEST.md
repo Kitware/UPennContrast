@@ -85,7 +85,7 @@ Steps, for one ROI:
 What was reused unchanged: dataset creation and channel pinning, `create_many`,
 the property helpers, `update_many` tags, `ds.spatial.upload_and_register`,
 `upload_transcripts` / `register_transcripts`, and the whole server side
-(spatial plugin, raster, colour-by). **No server or frontend changes were
+(spatial plugin, raster, color-by). **No server or frontend changes were
 needed.**
 
 ## Verification on roi_3
@@ -107,10 +107,10 @@ needed.**
 - **Molecule click**: the readout shows gene, position and quality 40, and
   "Go to cell" jumps to the right annotation (label 5013).
 - **Heat map**: the zoomed-out density map renders.
-- **Overview raster + colour by `Clustering / leiden` (categorical)**: the
+- **Overview raster + color by `Clustering / leiden` (categorical)**: the
   legend counts equal the h5ad's Leiden counts exactly (8: 1000, 3: 727,
   0: 634, …); clusters form coherent regions, and the vectors take over in the
-  same colours when zoomed in.
+  same colors when zoomed in.
 - **Aggregate API**: mean / percent expressing per Leiden cluster returns
   sensible values.
 
@@ -122,8 +122,8 @@ needed.**
 3. The masks are zstd-tiled and need `imagecodecs` (in the `sg` extra).
    `labels_at` decodes only the tiles a lookup touches, so the checks never read a
    whole mask (~11 GB for roi_1).
-4. Colour-by needs a **numeric property**: Leiden as tags alone cannot drive the
-   raster colours, hence `Clustering / leiden`.
+4. Color-by needs a **numeric property**: Leiden as tags alone cannot drive the
+   raster colors, hence `Clustering / leiden`.
 5. The HDF5 points are in **pixels** while the CSVs are in **µm**.
 6. There is no quality field: don't describe the overlay's quality threshold as
    meaningful for SG data.

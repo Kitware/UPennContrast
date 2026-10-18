@@ -124,7 +124,7 @@ and density from it. That test only runs where zarr < 3, so CI (zarr 3) skips it
 store written with zarr 3 and read by the server's zarr 2 was checked by hand on roi_3:
 Spp1 returns 189,484 molecules, the same as the export's HDF5.
 
-## 4. Filtering and colouring by gene expression
+## 4. Filtering and coloring by gene expression
 
 Gene expression is **not** stored as property values. Every gene in the spatial table is
 readable as a virtual property path `["spatial", "<gene>"]`, served live from the table.
@@ -170,7 +170,7 @@ On roi_3, `KRT7 >= 100` matches 1,057 cells, exactly the count in `CellxGene.csv
    `UNUSED`, so extend it before ever ingesting HDF5 points, or the controls will be
    offered as genes.
 4. **HDF5 points are in pixels; the CSVs are in microns.**
-5. **Color by Property needs a number.** Leiden as tags cannot colour the overview
+5. **Color by Property needs a number.** Leiden as tags cannot color the overview
    raster; `Clustering / leiden` (Categorical mode) can. Its legend counts must equal
    the h5ad's `leiden.value_counts()`.
 6. **Each ROI is its own pixel grid**: one dataset per ROI.
@@ -205,4 +205,4 @@ On roi_3, `KRT7 >= 100` matches 1,057 cells, exactly the count in `CellxGene.csv
 - [ ] Settings → *Advanced settings for large numbers of annotations* → **Annotation
       overview raster** on, then Color by Property → `Clustering / leiden`,
       **Categorical**: the legend matches the h5ad, and vectors take over in the
-      same colours when zoomed in.
+      same colors when zoomed in.
