@@ -1238,7 +1238,7 @@ class TestDatasetMultiSourcePipeline:
                 "a failed run destroyed pre-existing largeImage state"
             )
 
-    def testUserChannelColorsAreHonoured(
+    def testUserChannelColorsAreHonored(
         self, admin, server, largeImageCapable
     ):
         """The UI passes the configuring user's saved palette into

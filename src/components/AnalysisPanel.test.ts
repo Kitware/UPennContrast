@@ -470,7 +470,7 @@ describe("AnalysisPanel", () => {
     expect(wrapper.vm.plotInputs[0]).toBe(before);
   });
 
-  it("drops memoised inputs for removed plots", async () => {
+  it("drops memoized inputs for removed plots", async () => {
     // Each retained entry pins a population of up to MAX_ANALYSIS_PLOT_POINTS.
     setPopulation(3);
     setPlots([makePlot("p1"), makePlot("p2")]);

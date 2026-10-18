@@ -436,7 +436,7 @@ const samLoadingMessages = computed(() => {
 // so the SAM watcher fires on swap, but skips deep-walking the GeoJS tree.
 const samMapEntry = shallowRef<IMapEntry | null>(null);
 const mouseState = ref<IMouseState | null>(null);
-let synchronisationEnabled = true;
+let synchronizationEnabled = true;
 
 const blankUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQIHWNgYAAAAAMAAU9ICq8AAAAASUVORK5CYII=";
@@ -1082,7 +1082,7 @@ function mouseUp(evt: MouseEvent) {
   mouseState.value = null;
 }
 
-function synchroniseCameraFromMap(map: IGeoJSMap) {
+function synchronizeCameraFromMap(map: IGeoJSMap) {
   const size = map.size();
   // Setting camera info will apply to all maps thanks to applyCameraInfo
   cameraInfo.value = {
@@ -1104,7 +1104,7 @@ function setCenter(center: IGeoJSPosition) {
     return;
   }
   map.center(center);
-  synchroniseCameraFromMap(map);
+  synchronizeCameraFromMap(map);
 }
 
 function resetRotation() {
@@ -1124,7 +1124,7 @@ function resetView() {
     return;
   }
   map.bounds(map.maxBounds(undefined, null), null);
-  synchroniseCameraFromMap(map);
+  synchronizeCameraFromMap(map);
 }
 
 function setCorners(evt: any) {
@@ -1149,13 +1149,13 @@ function setCorners(evt: any) {
   const zoom = map.zoom() - Math.log2(Math.max(scaling.x, scaling.y));
   map.zoom(zoom);
   map.center(center, null);
-  synchroniseCameraFromMap(map);
+  synchronizeCameraFromMap(map);
 }
 
 function applyCameraInfo() {
   maps.value.forEach((mapentry) => {
     const map = mapentry.map;
-    synchronisationEnabled = false;
+    synchronizationEnabled = false;
     try {
       map.zoom(cameraInfo.value.zoom, undefined, true, true);
       map.rotation(cameraInfo.value.rotate, undefined, true);
@@ -1163,7 +1163,7 @@ function applyCameraInfo() {
     } catch (err) {
       logWarning(err);
     } finally {
-      synchronisationEnabled = true;
+      synchronizationEnabled = true;
     }
   });
 }
@@ -1448,8 +1448,8 @@ function _setupMap(
   if (maps.value.length <= mllidx || needReset) {
     const map = markRaw(geojs.map(params.map));
     const synchronizationCallback = () => {
-      if (synchronisationEnabled) {
-        synchroniseCameraFromMap(map);
+      if (synchronizationEnabled) {
+        synchronizeCameraFromMap(map);
       }
     };
     map.geoOn(geojs.event.pan, synchronizationCallback);
@@ -2422,11 +2422,11 @@ defineExpose({
   samLoadingMessages,
   samMapEntry,
   mouseState,
-  get synchronisationEnabled() {
-    return synchronisationEnabled;
+  get synchronizationEnabled() {
+    return synchronizationEnabled;
   },
-  set synchronisationEnabled(v) {
-    synchronisationEnabled = v;
+  set synchronizationEnabled(v) {
+    synchronizationEnabled = v;
   },
   blankUrl,
   mouseDown,

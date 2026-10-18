@@ -43,7 +43,7 @@ API-created datasets subtly different from UI-created ones:
   (`nanometers`, `micrometer`, …) and normalizes GREEK SMALL LETTER MU to MICRO
   SIGN before matching.
 
-The color tables are the drift risk, so `TestColourTableParity` re-parses
+The color tables are the drift risk, so `TestColorTableParity` re-parses
 `src/store/model.ts` and compares — a palette edit on the frontend fails the
 backend suite instead of silently giving API-created datasets different layer
 colors. It self-skips where the frontend tree is unreachable (the Linux
@@ -414,7 +414,7 @@ mongodb://mongodb:27017"` and
   dataset. — *"test_compositing_reported_and_xy_collapsed"*,
   *"test_not_compositing_when_not_requested"*
 - [ ] **The creator's channel-color overrides are honored.** —
-  *"testUserChannelColorsAreHonoured"*, *"testUserOverrideWinsOverTheDefaultTable"*,
+  *"testUserChannelColorsAreHonored"*, *"testUserOverrideWinsOverTheDefaultTable"*,
   *"testMergeDoesNotMutateTheSharedTable"*
 - [ ] **Every `logger.exception` sits inside an exception handler.** Outside
   one it records `NoneType: None`, so a best-effort handler whose only output

@@ -518,7 +518,7 @@ describe("goToTrack", () => {
     const [, center, width, height] = h.frameCameraInfoToExtent.mock
       .calls[0] as any[];
     // Box over b and c only. Including "a" at (0,0) would give a 110x120 box
-    // centerd at (55, 60) — most of it empty image on a slice a isn't on.
+    // centered at (55, 60) — most of it empty image on a slice a isn't on.
     expect(width).toBe(10);
     expect(height).toBe(20);
     expect(center).toEqual({ x: 105, y: 110 });

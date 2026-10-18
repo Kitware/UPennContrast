@@ -170,7 +170,7 @@ export function getUnrollCells({
 // Everything below answers one question: given a point in a frame's own
 // coordinates, where does it end up on the unrolled grid? The rendering path
 // (`AnnotationViewer`) and the navigation path (`annotationNavigation`) BOTH
-// need that answer, and they used to disagree — navigation centerd the camera on
+// need that answer, and they used to disagree — navigation centered the camera on
 // the raw centroid while the viewer drew the annotation a tile-width away, so
 // clicking an Object Browser row for anything outside the first tile panned to
 // the wrong place. One implementation, used by both, is what keeps them honest.

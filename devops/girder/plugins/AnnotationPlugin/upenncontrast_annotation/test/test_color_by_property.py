@@ -231,7 +231,7 @@ class TestColorByProperty:
         assert legend["clippedLow"] is False
         assert legend["clippedHigh"] is False
 
-    def testCustomPercentilesAreHonoured(self, admin, server):
+    def testCustomPercentilesAreHonored(self, admin, server):
         folder, _ = self._makeDatasetWithValues(
             admin, [{"propA": v} for v in range(0, 101)]
         )

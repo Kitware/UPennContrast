@@ -972,7 +972,7 @@ effect the code under test is checking for:
 ```ts
 function appendAnalysisPlot(id: string) { /* what the real action does */ }
 beforeEach(() => { mock.addAnalysisPlot.mockImplementation(appendAnalysisPlot); });
-// A test layering extra behaviour composes rather than replaces:
+// A test layering extra behavior composes rather than replaces:
 mock.addAnalysisPlot.mockImplementation((id) => { appendAnalysisPlot(id); ...extra... });
 ```
 
