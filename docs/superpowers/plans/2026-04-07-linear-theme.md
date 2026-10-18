@@ -547,7 +547,7 @@ The card border and list-item padding rules are removed because they're now hand
 Open the app. Confirm:
 - App bar has no elevation shadow, just a subtle bottom border
 - Cards still have borders (now via global style.scss rule)
-- Grey text uses the new muted token color
+- Gray text uses the new muted token color
 - Type-indicator chips use ghost styling
 
 - [ ] **Step 4: Commit**

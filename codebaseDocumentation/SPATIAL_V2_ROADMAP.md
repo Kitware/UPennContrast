@@ -18,7 +18,7 @@ Treat the ranking as judgment, not a vote count.
 | # | Feature | Why | Effort |
 |---|---|---|---|
 | 1 | **SpatialData / AnnData import and export** | One adapter (via `spatialdata-io`) opens Visium HD, CosMx and MERSCOPE, not only Xenium, and sends tags/annotations back to scanpy/Seurat users. Answers the most common complaint: being stuck in one tool. | M |
-| 2 | **Multi-section / cohort analysis** | View several sections together with shared gene/colour settings; DE and composition across samples or conditions (responder vs non-responder). 10x's own KB says it has no built-in multi-sample workflow; the demand comes from the translational labs that buy Xenium. Reuses the existing DE and gating. Projects already group datasets. | L |
+| 2 | **Multi-section / cohort analysis** | View several sections together with shared gene/color settings; DE and composition across samples or conditions (responder vs non-responder). 10x's own KB says it has no built-in multi-sample workflow; the demand comes from the translational labs that buy Xenium. Reuses the existing DE and gating. Projects already group datasets. | L |
 | 3 | **Cell typing and niche calling as workers** | Label transfer from an scRNA reference; spatial domains (BANKSY, CellCharter). Results feed tags, gating and DE — closes the code-free loop, NimbusImage's clearest edge. | M |
 | 4 | **Figure export with legend and scale bar** | Asked for across viewers (TissUUmaps, QuPath; Xenium Explorer only added high-res export in 3.2). Cheap relative to the rest; snapshots exist, legends/overlays unconfirmed. | S–M |
 

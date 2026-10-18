@@ -67,7 +67,7 @@ Base: `master`
 - **Location:** `src/components/AnnotationActionPanel.vue`,
   `src/components/ConnectionActionPanel.vue`
 - **Summary:** Moving the selection panels clear of the Timelapse palette
-  (Finding 4's neighbour fix) keyed the new right-edge offset off a single
+  (Finding 4's neighbor fix) keyed the new right-edge offset off a single
   `object-browser-open` class. The Object Browser is not the only overlay that
   holds the right edge: `.ai-panel` is `z-index: 2001` against the panels' 1000
   and is mutually exclusive with neither timelapse mode nor the Browser. So the
@@ -89,15 +89,15 @@ Base: `master`
 
 - **Severity:** Low
 - **Location:** `src/components/AnnotationBrowser/ConnectionList.vue`
-- **Summary:** `showTrackSwatches` was gated on the colouring option but not on
+- **Summary:** `showTrackSwatches` was gated on the coloring option but not on
   the mode, while `trackColor` is reached only from the timelapse draw path. With
-  the mode off the swatch therefore named a colour nothing on the canvas used —
+  the mode off the swatch therefore named a color nothing on the canvas used —
   measured, 248 swatches in 248 distinct hues against zero drawn connection
   features (a timelapse link's endpoints sit on different timepoints, and normal
   mode never co-displays them). And they could not be switched off, because the
   only control that hides them lives in the Timelapse palette, which *is* the
   mode. This is the pair the branch had already written into
-  `CONNECTION_LIST.md` ("a track's colour in the viewer | its swatch in the
+  `CONNECTION_LIST.md` ("a track's color in the viewer | its swatch in the
   Connections tab") and then missed on the mode gate.
 - **Status:** fixed — gated on `timelapseStore.showMode` as well. Verified live:
   248 track rows throughout, swatches 248 → 0 → 248 across a mode toggle.
@@ -125,7 +125,7 @@ Base: `master`
 - **Summary:** Six timelapse fields and their seven mutations had accumulated in
   `src/store/index.ts`, against the guideline that a distinct feature area gets
   its own focused module rather than growing the 2000-line main one. Deferred
-  through two review rounds as a large behaviour-neutral edit to this feature's
+  through two review rounds as a large behavior-neutral edit to this feature's
   main safety net, then explicitly requested.
 - **Status:** fixed — extracted to `src/store/timelapse.ts` (`showMode`,
   `modeWindow`, `tags`, `showLabels`, `trackColoring`, `colorSeed`). Mechanical
@@ -137,10 +137,10 @@ Base: `master`
 - **Verification:** the risk here was the test harness, not the source. The new
   `@/store/timelapse` mock must be `reactive()` or every timelapse draw test
   passes against a layer that was never rebuilt. Confirmed by breaking it:
-  a plain-object mock fails 6 tests including both colouring-watch tests.
+  a plain-object mock fails 6 tests including both coloring-watch tests.
   Then live, driving the new module's mutations from a fresh page load —
-  mode off 0 points / 0 segments; on 1,966 / 1,714 in 119 colours; uniform the
-  same counts in **1** colour; shuffle 120 colours with the sampled hue changed;
+  mode off 0 points / 0 segments; on 1,966 / 1,714 in 119 colors; uniform the
+  same counts in **1** color; shuffle 120 colors with the sampled hue changed;
   window 30 → 2,728 / 2,488. `main` retains no timelapse field, and
   `timelapse-palette-open` still tracks the mode.
 
@@ -205,7 +205,7 @@ Base: `master`
 - **Location:** `src/utils/connections.ts`
 - **Summary:** The seed was folded into the hash accumulator, which for
   equal-length ids adds the same `31^n · seed` to every hash — a constant offset.
-  Every colour changed, so it looked like it worked, but every pairwise gap
+  Every color changed, so it looked like it worked, but every pairwise gap
   survived: an identical sorted gap multiset at every seed with the closest pair
   pinned at 2.927°. Separating a pair that collides is the only reason the button
   exists, and it was the one thing it could not do. The docstring claimed the
@@ -213,7 +213,7 @@ Base: `master`
 - **Three layers of verification had accepted it.** The unit test asserted "the
   per-id hue shift is not a single constant", which is true under rotation
   because `Math.abs` and int32 wrap perturb a few ids. The live browser check
-  observed "the sampled colour changed", also true under rotation. And the
+  observed "the sampled color changed", also true under rotation. And the
   docstring asserted the property as fact. None of them tested the gap structure.
 - **Status:** fixed — the seed now selects the hue STEP, which genuinely
   re-assigns (~97% of hues move, the closest pair changes both partners and
@@ -221,14 +221,14 @@ Base: `master`
   identity changes.
 - **A worse bug surfaced underneath it.** Choosing the step needed measurement,
   and measuring exposed that 1/φ — the value the code used and the docs praised —
-  scores **4.2°** minimum neighbour gap on the real dataset's 248 consecutive
+  scores **4.2°** minimum neighbor gap on the real dataset's 248 consecutive
   track keys, worse than every alternative. The 77.3° figure in the original docs
   came from a 40-id fixture starting at offset 0x0000, which never crosses the
   hex carry that triggers the resonance. The equidistribution theory behind 1/φ
   is about `frac(i·φ)` for consecutive integers; the input here is a polynomial
   hash whose delta jumps at every carry, so the theory does not transfer.
-- Two metrics must hold together, because optimising either alone picks a step
-  that fails the other: worst neighbour gap across id batches, and all-pairs gap
+- Two metrics must hold together, because optimizing either alone picks a step
+  that fails the other: worst neighbor gap across id batches, and all-pairs gap
   for a small nearby group. √2−1 scores 44.4°/19.4°; the three chosen steps score
   ≥65°/≥62°. A sweep found 852 qualifying steps, so this was never a tight
   constraint — just the wrong one metric.
@@ -237,19 +237,19 @@ Base: `master`
 
 # Codex round 3 (commit `4b827e66`)
 
-## Finding 13 — Time-jump links ignored the colouring control
+## Finding 13 — Time-jump links ignored the coloring control
 
 - **Severity:** P2 (Codex)
 - **Location:** `src/components/AnnotationViewer.vue` (`drawTimelapseTrack`)
-- **Summary:** A connection skipping a timepoint had its colour forced to
-  `#ff6b6b`, overriding both colouring modes. "Uniform" therefore left those
-  segments red among white ones — not uniform — and under per-track colouring a
+- **Summary:** A connection skipping a timepoint had its color forced to
+  `#ff6b6b`, overriding both coloring modes. "Uniform" therefore left those
+  segments red among white ones — not uniform — and under per-track coloring a
   track whose drawn segments are all jumps showed a hue swatch against red lines,
   contradicting the swatch's whole promise.
-- **Status:** fixed — the segment keeps its track colour. A jump is still
+- **Status:** fixed — the segment keeps its track color. A jump is still
   unmistakable: `lineDash: [5, 5]` and `strokeOpacity: 0.7` are two independent
-  cues no other segment carries, which is what made the colour the redundant one
-  to drop. This is a deliberate visible change to pre-existing behaviour; the
+  cues no other segment carries, which is what made the color the redundant one
+  to drop. This is a deliberate visible change to pre-existing behavior; the
   alternative was to keep the red and document the exception, which leaves the
   swatch lying under the default mode. `help/connections.md` updated — it
   advertised "skipped frame connections appear in red".
@@ -282,7 +282,7 @@ Base: `master`
   box is inflated by members that aren't drawn there.
 - **Status:** fixed — an anchor member is chosen first (nearest the current
   frame), XY/Z comes from it, and the bounds and times come from members on that
-  slice only. Identical behaviour for the common single-slice track.
+  slice only. Identical behavior for the common single-slice track.
 - **Lesson:** the comment asserting the invariant was the bug. It read like a
   justification and was never checked against the code that creates tracks.
 
@@ -343,7 +343,7 @@ Base: `master`
 - **Location:** `codebaseDocumentation/CONNECTION_LIST.md`
 - **Summary:** Round 4 replaced the track-framing Time rule but added the new
   invariant ABOVE the one it superseded instead of removing it. The checklist then
-  carried two contradictory rules for the same behaviour — the old row prescribing
+  carried two contradictory rules for the same behavior — the old row prescribing
   the range-based check that had just been shown to frame an empty view for sparse
   tracks — so no future change could satisfy both, and following the stale row
   would restore the bug. The old row also cited two tests that had been renamed

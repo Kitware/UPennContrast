@@ -258,7 +258,7 @@ The API and model layers have strict responsibilities. Never mix them.
 
 ### Helpers report; the endpoint decides the HTTP error
 
-A shared helper in `server/helpers/` must not raise an HTTP-flavoured error
+A shared helper in `server/helpers/` must not raise an HTTP-flavored error
 for a condition it detects -- `RestException`, or an `AccessException`
 standing in for one ("these no longer exist; discard and re-upload"). It
 returns what it found (the ids that exist, the entries that failed) or

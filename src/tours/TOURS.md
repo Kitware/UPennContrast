@@ -118,11 +118,11 @@ and trigger names. It exports:
 in `anchors.ts`. If you add a data-dependent anchor that YAML targets, add its
 runtime value to `DATA_DEPENDENT` in the test file.
 
-## TourManager Controller Behaviour
+## TourManager Controller Behavior
 
-Knowing these behaviours helps when authoring tour steps:
+Knowing these behaviors helps when authoring tour steps:
 
-| Behaviour | Detail |
+| Behavior | Detail |
 |-----------|--------|
 | **Auto-navigation** | If a step has a `route` that differs from the current route, the controller calls `router.push({ name: route })` and waits for `afterEach` before rendering. |
 | **Missing element recovery** | If `waitForElement` elapses before the target element appears, a "This step isn't available" recovery popover appears (Skip / End tour). Steps never silently vanish. |
@@ -243,7 +243,7 @@ filenames for the four welcome-tour variants.
 2. Set a generous `waitForElement` on steps that load after async data (e.g. `5000`).
 3. Pair `showNextButton: false` with `onTriggerEvent` so the user cannot bypass
    the required interaction.
-4. Steps without an `element` render the popover centred over `body` — useful
+4. Steps without an `element` render the popover centered over `body` — useful
    for purely instructional steps.
 5. Keep step text concise; the popover is small.
 6. Group related tours under the same `category` so they appear together in the
