@@ -106,6 +106,9 @@ def upload_polygons(
     tags = [CELL_TAG] if tags is None else list(tags)
     if batch < 1:
         raise SGError(f"batch must be >= 1, got {batch}")
+    if limit is not None and int(limit) < 1:
+        # labels[:-1] would upload nearly every cell
+        raise SGError(f"limit must be >= 1 (or None for all), got {limit}")
     pixel_size = roi.pixel_size
     labels, rings = roi.polygons()
     stop = len(labels) if limit is None else min(int(limit), len(labels))

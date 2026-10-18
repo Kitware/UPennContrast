@@ -137,3 +137,54 @@ needed.**
 - roi_1, roi_2, roi_4 (each ~10–15× roi_3).
 - Nuclei polygons (mask → polygon).
 - UNUSED-barcode controls in the transcript store (would let the FDR show).
+
+## Regression checklist
+
+Each item names the test (`nimbusimage/tests/test_sg.py`) that holds it.
+
+**Frame and counts**
+- µm → px is `floor(µm / res)`; centroids land on their own mask label, and a wrong
+  pixel size is caught — *"test_frame_check_passes_and_catches_a_wrong_pixel_size"*.
+- Mask lookups decode only the tiles they touch and match a whole-image read —
+  *"test_labels_at_reads_tiles_like_the_whole_image"*.
+- A mask recount reproduces `CellxGene.csv` — *"test_recount_reproduces_the_matrix"*.
+
+**Cell map**
+- Polygons go up in pixels with the closing vertex dropped, and the map
+  round-trips with its dataset, ROI and pixel size —
+  *"test_polygons_are_pixels_and_the_map_round_trips"*.
+- A non-positive `limit` uploads nothing (`labels[:-1]` would upload almost
+  everything) — *"test_polygon_limit_must_be_positive"*.
+- A map of another dataset or ROI is refused before any write —
+  *"test_a_map_of_another_dataset_or_roi_is_refused"*, and through the CLI —
+  *"test_steps_with_a_cell_map_of_another_dataset_write_nothing"*.
+- An unreadable map is an `SGError`, not a traceback —
+  *"test_an_unreadable_map_is_an_sg_error"*.
+
+**Per-cell data**
+- Custom polygon tags survive `cell-data` —
+  *"test_custom_polygon_tags_survive_cell_data"*.
+- Property values are replaced, not merged —
+  *"test_values_are_replaced_not_merged"*.
+
+**Spatial table**
+- A mapped cell without a `CellxGene.csv` row is refused (no short table) —
+  *"test_a_mapped_cell_without_a_matrix_row_is_refused"*.
+
+**Transcript store**
+- Every level holds every molecule, gene runs match `gene_identity`, and the
+  density CSR sums per gene —
+  *"test_layout_levels_and_density"*.
+- Merging across levels keeps exact count-weighted centroids —
+  *"test_merging_keeps_true_centroids"*.
+- The plugin's own `TranscriptStore` serves points and density from the store
+  (zarr 2 only) — *"test_the_server_reads_the_store"*.
+- Registration uses the map's pixel size and refuses another ROI's store —
+  *"test_register_uses_the_map_frame_and_refuses_another_roi"*.
+
+**CLI**
+- Unwritable outputs fail before any upload or build —
+  *"test_unwritable_outputs_fail_before_any_upload_or_build"*, and `ingest`
+  checks its work dir first — *"test_ingest_checks_its_work_dir_before_uploading"*.
+- `verify` fails when the table or transcripts are missing or the table is
+  short — *"test_verify_fails_when_the_table_or_transcripts_are_missing"*.

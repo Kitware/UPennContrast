@@ -235,6 +235,14 @@ class TestCells:
         with pytest.raises(SGError):
             SGCellMap.read(tmp_path / "objects.npz")
 
+    def test_polygon_limit_must_be_positive(self, server, roi):
+        ds = server.dataset("ds_sg")
+        for limit in (0, -1):
+            with pytest.raises(SGError, match="limit"):
+                upload_polygons(ds, roi, limit=limit)
+        assert server.writes == []
+        assert len(upload_polygons(ds, roi, limit=2)) == 2
+
     def test_a_map_of_another_dataset_or_roi_is_refused(
         self, server, roi, export
     ):
