@@ -124,7 +124,41 @@ and density from it. That test only runs where zarr < 3, so CI (zarr 3) skips it
 store written with zarr 3 and read by the server's zarr 2 was checked by hand on roi_3:
 Spp1 returns 189,484 molecules, the same as the export's HDF5.
 
-## 4. Traps
+## 4. Filtering and colouring by gene expression
+
+Gene expression is **not** stored as property values. Every gene in the spatial table is
+readable as a virtual property path `["spatial", "<gene>"]`, served live from the table.
+A gene appears in the app's pickers only once it has been added, which keeps a
+274-gene (or 5K) panel from flooding every menu. Users who "can't find expression in the
+property list" have not added it yet.
+
+**In the app:**
+1. Open the object list (list icon) and go to the **Measurements** tab.
+2. Click **Genes from spatial table**, pick genes, and choose a mode:
+   - **Add as live columns** (default): no copy is made, and the genes are listed under
+     **Spatial table**.
+   - **Copy into a measurement**: materializes ordinary property values.
+   - **Gene-set score**: combines several genes into one score.
+3. The genes are then offered wherever a measurement is: property **filters** (range),
+   analysis axes and gates, Color by Property, object-list columns, CSV export, and the
+   selection summary.
+
+You can't sort the object list by a gene column (a 400). Live columns persist across
+reloads through the displayed paths. Design notes: `codebaseDocumentation/SPATIAL_PLUGIN.md`,
+"Phase 2: any gene as a property path".
+
+**From Python** (`ds.spatial.virtual_path("KRT7")` gives `["spatial", "KRT7"]`):
+
+```python
+f = {"propertyFilters": [{"path": ["spatial", "KRT7"], "mode": "range", "min": 100}]}
+ds.annotations.summary(filters=f)            # counts server-side; nothing downloaded
+ds.spatial.aggregate(["KRT7", "Spp1"], {"tags": {"values": ["Leiden 0"], "exclusive": False}})
+ds.spatial.materialize(["KRT7", "Spp1"])    # copy into a property (dense sub-values)
+```
+
+On roi_3, `KRT7 >= 100` matches 1,057 cells, exactly the count in `CellxGene.csv`.
+
+## 5. Traps
 
 1. **`floor`, not `round`**, when converting µm to pixels for mask lookups. That is
    how `CellxGene.csv` was built: a floor recount matches it to within 2 of 7.4M
@@ -149,8 +183,11 @@ Spp1 returns 189,484 molecules, the same as the export's HDF5.
 9. `basic_results/*_DAPI.tiff` duplicates `images/dapi.tiff`; upload only one.
 10. Gene symbols with `.`/`$` become `_` in the table and the store (`safe_symbol`),
     the same as for Xenium mouse panels.
+11. **Genes are absent from the property pickers until added** (§4). Add them as live
+    columns rather than materializing the whole panel; `materialize` is for a few
+    genes you need as real values.
 
-## 5. Verification checklist
+## 6. Verification checklist
 
 - [ ] `check --recount`: frame 300/300, `entriesEqual` ≥ 0.99, correlation ≈ 1.
 - [ ] `verify` exits 0. It checks:
@@ -163,6 +200,8 @@ Spp1 returns 189,484 molecules, the same as the export's HDF5.
     gene's spots;
   - clicking a molecule shows its gene, and **Go to cell** jumps to that label;
   - the heat map appears when zoomed out.
+- [ ] Add one gene as a live column (§4). A range filter on it matches the
+      `CellxGene.csv` count of cells at or above the threshold.
 - [ ] Settings → *Advanced settings for large numbers of annotations* → **Annotation
       overview raster** on, then Color by Property → `Clustering / leiden`,
       **Categorical**: the legend matches the h5ad, and vectors take over in the
