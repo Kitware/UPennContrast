@@ -583,6 +583,34 @@ async function followJobToEnd(
   }
 }
 
+// Replace tools by id, keeping each stored tool's pin: the pin is owned by
+// setToolPinned, and editors can hand in a copy taken before a pin toggle
+// (AnnotationWorkerMenu debounces its save of props.tool). Returns the new
+// list, the tools as applied (raw objects: state reads return reactive
+// proxies, so identity checks compare toRaw of what is read back) and the
+// tools they replaced. Unknown ids are ignored.
+function withEditedTools(
+  current: IToolConfiguration[],
+  edited: IToolConfiguration[],
+) {
+  const editedById = new Map(edited.map((tool) => [tool.id, tool]));
+  const appliedById = new Map<string, IToolConfiguration>();
+  const replacedById = new Map<string, IToolConfiguration>();
+  const next = current.map((tool) => {
+    const edit = editedById.get(tool.id);
+    if (!edit) {
+      return tool;
+    }
+    const applied = toRaw(
+      edit.pinned === tool.pinned ? edit : { ...edit, pinned: tool.pinned },
+    );
+    appliedById.set(tool.id, applied);
+    replacedById.set(tool.id, tool);
+    return applied;
+  });
+  return { next, appliedById, replacedById };
+}
+
 @Module({ dynamic: true, store, name: "main" })
 export class Main extends VuexModule {
   girderRest = createGirderRestClient({
@@ -1379,16 +1407,12 @@ export class Main extends VuexModule {
     if (!configurationTools) {
       return;
     }
-    const toolIdx = configurationTools.findIndex(({ id }) => id === tool.id);
-    if (toolIdx < 0) {
+    const { next, appliedById } = withEditedTools(configurationTools, [tool]);
+    const editedTool = appliedById.get(tool.id);
+    if (!editedTool) {
       return;
     }
-    // The pin is owned by setToolPinned. Editors can hand in a copy taken
-    // before a pin toggle (AnnotationWorkerMenu debounces its save of
-    // props.tool), so keep the stored pin rather than let a late edit undo it.
-    const { pinned } = configurationTools[toolIdx];
-    const editedTool = tool.pinned === pinned ? tool : { ...tool, pinned };
-    configurationTools.splice(toolIdx, 1, editedTool);
+    this.setConfigurationTools(next);
     if (this.selectedTool?.configuration.id === tool.id) {
       this.setSelectedToolImpl(editedTool);
     }
@@ -1405,25 +1429,11 @@ export class Main extends VuexModule {
     if (!configuration || tools.length === 0) {
       return;
     }
-    const editedById = new Map(tools.map((tool) => [tool.id, tool]));
-    // The tool each edit replaces, so a failed write can put it back.
-    const replacedById = new Map<string, IToolConfiguration>();
-    const next = configuration.tools.map((current) => {
-      const edited = editedById.get(current.id);
-      if (!edited) {
-        return current;
-      }
-      replacedById.set(current.id, current);
-      return { ...edited, pinned: current.pinned };
-    });
-    this.setConfigurationTools(next);
-    // Raw objects: state reads return reactive proxies, so identity checks
-    // compare toRaw of what is read back.
-    const appliedById = new Map(
-      next
-        .filter((tool) => replacedById.has(tool.id))
-        .map((tool) => [tool.id, toRaw(tool)]),
+    const { next, appliedById, replacedById } = withEditedTools(
+      configuration.tools,
+      tools,
     );
+    this.setConfigurationTools(next);
     const selectedId = this.selectedTool?.configuration.id;
     const selectedEdit = selectedId ? appliedById.get(selectedId) : undefined;
     if (selectedEdit) {

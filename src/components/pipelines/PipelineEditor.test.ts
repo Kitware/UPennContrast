@@ -1,4 +1,4 @@
-import { omit } from "lodash";
+import { cloneDeep, omit } from "lodash";
 import { shallowMount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
     savePipeline: vi.fn(),
     createStepId: vi.fn(),
     deleteUnreferencedMaterializedProperties: vi.fn(),
+    loadMissingLinkedProperties: vi.fn(),
   },
   properties: {
     properties: [] as any[],
@@ -539,11 +540,79 @@ describe("PipelineEditor linked steps", () => {
     // Unlink: the step keeps the values it shows, as an independent step.
     vm.handleStepUpdate(0, omit(vm.displayedPipeline.steps[0], "sourceToolId"));
 
+    // Its pending edit is discarded, so re-adding the tool brings none back.
+    expect(vm.pendingToolEdits).toEqual({});
+    vm.newStepSource = "tool";
+    vm.newStepToolId = "t1";
+    vm.confirmAddStep();
+    expect(vm.displayedPipeline.steps[1].workerInterfaceValues).toEqual({
+      threshold: 5,
+    });
+
     await vm.save();
 
     expect(h.store.editToolsInConfiguration).not.toHaveBeenCalled();
     const [saved] = h.pipelinesStore.savePipeline.mock.calls[0];
     expect(saved.steps[0].workerInterfaceValues).toEqual({ threshold: 9 });
     expect(saved.steps[0]).not.toHaveProperty("sourceToolId");
+  });
+
+  it("changes no editor state on an unchanged re-emit", () => {
+    h.store.tools = [workerTool("t1", 5, ["t"])];
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1"), propertyStep("p")],
+    });
+    const vm = wrapper.vm as any;
+    vm.handleStepUpdate(0, {
+      ...vm.displayedPipeline.steps[0],
+      workerInterfaceValues: { threshold: 9 },
+    });
+    const steps = vm.localPipeline.steps;
+    const pending = vm.pendingToolEdits;
+
+    // What AnnotationConfiguration does whenever its value's identity
+    // changes: re-emit the same content as a new object (linked and unlinked
+    // steps alike).
+    vm.handleStepUpdate(0, cloneDeep(vm.displayedPipeline.steps[0]));
+    vm.handleStepUpdate(1, cloneDeep(vm.displayedPipeline.steps[1]));
+
+    expect(vm.localPipeline.steps).toBe(steps);
+    expect(vm.pendingToolEdits).toBe(pending);
+  });
+
+  it("does not write edits for a tool that lost its worker image", async () => {
+    h.store.tools = [workerTool("t1", 5, [])];
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1")],
+    });
+    const vm = wrapper.vm as any;
+    vm.handleStepUpdate(0, {
+      ...vm.displayedPipeline.steps[0],
+      workerInterfaceValues: { threshold: 9 },
+    });
+    const toolWithoutWorker = workerTool("t1", 5, []);
+    toolWithoutWorker.values.image = { image: "" };
+    h.store.tools = [toolWithoutWorker];
+    vm.localPipeline.name = "Renamed";
+
+    await vm.save();
+
+    expect(h.store.editToolsInConfiguration).not.toHaveBeenCalled();
+  });
+
+  it("reloads properties on open when a linked property is missing", () => {
+    mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [propertyStep("p", { sourcePropertyId: "not-loaded" })],
+    });
+
+    expect(h.pipelinesStore.loadMissingLinkedProperties).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "pipe" }),
+    );
   });
 });

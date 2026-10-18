@@ -1,4 +1,4 @@
-import { cloneDeep, isEqual, isPlainObject } from "lodash";
+import { cloneDeep, isEqual, isPlainObject, pickBy } from "lodash";
 
 import {
   IAnnotationPipelineStep,
@@ -229,25 +229,31 @@ export interface IToolEdits {
 
 const WHOLE_TOOL_FIELDS = ["annotation", "connectTo", "jobDateTag"] as const;
 
-// What changed between two versions of a linked step's fields.
-export function toolEditsBetween(
-  before: TToolLinkedFields,
-  after: TToolLinkedFields,
+// The parts of `candidate` that differ from `reference`: its parameters one by
+// one, and each whole field it has. (A parameter missing from `candidate` is
+// not an edit: the editor never removes parameters.)
+export function differingToolEdits(
+  candidate: TToolLinkedFields | IToolEdits,
+  reference: TToolLinkedFields | IToolEdits,
 ): IToolEdits {
   const edits: IToolEdits = {};
-  const parameters: IWorkerInterfaceValues = {};
-  for (const parameterId in after.workerInterfaceValues) {
-    const value = after.workerInterfaceValues[parameterId];
-    if (!samePersistedValue(value, before.workerInterfaceValues[parameterId])) {
-      parameters[parameterId] = cloneDeep(value);
-    }
-  }
+  const parameters = pickBy(
+    candidate.workerInterfaceValues ?? {},
+    (value, parameterId) =>
+      !samePersistedValue(
+        value,
+        reference.workerInterfaceValues?.[parameterId],
+      ),
+  );
   if (Object.keys(parameters).length > 0) {
-    edits.workerInterfaceValues = parameters;
+    edits.workerInterfaceValues = cloneDeep(parameters);
   }
   for (const field of WHOLE_TOOL_FIELDS) {
-    if (!samePersistedValue(after[field], before[field])) {
-      Object.assign(edits, { [field]: cloneDeep(after[field]) });
+    if (
+      field in candidate &&
+      !samePersistedValue(candidate[field], reference[field])
+    ) {
+      Object.assign(edits, { [field]: cloneDeep(candidate[field]) });
     }
   }
   return edits;
@@ -262,10 +268,10 @@ export function applyToolEdits<T extends TToolLinkedFields | IToolEdits>(
   fields: T,
   edits: IToolEdits | undefined,
 ): T {
-  if (!hasToolEdits(edits)) {
+  if (!edits || !hasToolEdits(edits)) {
     return fields;
   }
-  const { workerInterfaceValues, ...wholeFields } = cloneDeep(edits!);
+  const { workerInterfaceValues, ...wholeFields } = cloneDeep(edits);
   return {
     ...fields,
     ...wholeFields,
@@ -280,33 +286,6 @@ export function applyToolEdits<T extends TToolLinkedFields | IToolEdits>(
   };
 }
 
-// The edits that still differ from `current` (the live tool's fields, or the
-// values just written to it): an edit back to the tool's value is no edit.
-export function remainingToolEdits(
-  edits: IToolEdits,
-  current: TToolLinkedFields | IToolEdits,
-): IToolEdits {
-  const remaining: IToolEdits = {};
-  const parameters: IWorkerInterfaceValues = {};
-  for (const parameterId in edits.workerInterfaceValues ?? {}) {
-    const value = edits.workerInterfaceValues![parameterId];
-    if (
-      !samePersistedValue(value, current.workerInterfaceValues?.[parameterId])
-    ) {
-      parameters[parameterId] = value;
-    }
-  }
-  if (Object.keys(parameters).length > 0) {
-    remaining.workerInterfaceValues = parameters;
-  }
-  for (const field of WHOLE_TOOL_FIELDS) {
-    if (field in edits && !samePersistedValue(edits[field], current[field])) {
-      Object.assign(remaining, { [field]: edits[field] });
-    }
-  }
-  return remaining;
-}
-
 // The tool with pending edits written onto its current values. The worker
 // image is never edited: the editor locks it on linked steps (a different
 // worker means a different tool, so it requires unlinking).
@@ -314,20 +293,14 @@ export function toolWithEdits(
   tool: IToolConfiguration,
   edits: IToolEdits,
 ): IToolConfiguration {
-  const { workerInterfaceValues, ...wholeFields } = cloneDeep(edits);
   return {
     ...tool,
     values: {
       ...tool.values,
-      ...wholeFields,
-      ...(workerInterfaceValues
-        ? {
-            workerInterfaceValues: {
-              ...(tool.values.workerInterfaceValues ?? {}),
-              ...workerInterfaceValues,
-            },
-          }
-        : {}),
+      ...applyToolEdits(
+        { workerInterfaceValues: tool.values.workerInterfaceValues ?? {} },
+        edits,
+      ),
     },
   };
 }

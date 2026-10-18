@@ -402,11 +402,11 @@ behave exactly as before. Pure helpers live in `src/utils/pipelineLinks.ts`
 
 | | Linked to a live tool | Linked to a live property | Source deleted |
 |---|---|---|---|
-| What runs | The tool's current image, parameters, annotation setup, `connectTo`, `jobDateTag` (transient tool built from `resolveLinkedStep`) | The property itself (`submitPropertyJob` on its id); no materialization | The step's saved copy (a property step materializes from it as before). Before treating a linked property as deleted, the runner reloads the configuration's properties once (`loadMissingLinkedProperties`; once per batch), so one that simply had not loaded yet is computed, not duplicated |
+| What runs | The tool's current image, parameters, annotation setup, `connectTo`, `jobDateTag` (transient tool built from `resolveLinkedStep`) | The property itself (`submitPropertyJob` on its id); no materialization | The step's saved copy (a property step materializes from it as before). Before treating a linked property as deleted, the runner reloads the configuration's properties once (`loadMissingLinkedProperties`, before taking the run lock; once per batch; the editor does the same on open), so one that simply had not loaded yet is computed, not duplicated. If that reload fails, the step fails rather than materializing a possible duplicate. A step already running its fallback is not rechecked |
 | Editor: worker image | Locked | Locked | Locked |
 | Editor: parameters / tags | Editable; **written back to the tool on Save** | Locked (properties are immutable in the UI) | Locked |
 | Header chip | link icon + tool name | link icon + property name | "source deleted" (warning), or "tool has no worker" for a tool that still exists without a worker image (also unusable, so the saved copy runs) |
-| Auto-wiring (§5) | Its output tags feed downstream steps as usual — **also at run time**: the runner re-applies auto-wiring (`computeAutoWiredSteps`, `src/utils/pipelineWiring.ts`) to the resolved steps, so a tool whose output tags changed since the last save still feeds the property steps after it | Skipped: computes on the property's own tags/shape | Same as when live |
+| Auto-wiring (§5) | Its output tags feed downstream steps as usual — **also at run time**: the runner re-applies auto-wiring (`computeAutoWiredSteps`, `src/utils/pipelineWiring.ts`) to the resolved steps, so a tool whose output tags changed since the last save still feeds the property steps after it. The runner rewires only steps flagged `autoWired: true`, never an unflagged one (saved before the flag existed; its tags may be manual) | Skipped: computes on the property's own tags/shape | Same as when live |
 
 **Editor behaviour** (`PipelineEditor.vue`, `PipelineStepEditor.vue`). The
 editor never edits a copy of a linked tool's values — an earlier design did,
@@ -423,7 +423,15 @@ changed elsewhere. Instead:
   same values (the edits are keyed by tool, not by step), and a step added from
   an already-linked tool shows the pending edits too.
 - **Only the step's own name and enabled flag are stored on the step.** An
-  edit to a tool-linked step's values becomes a pending tool edit.
+  edit to a tool-linked step's values becomes a pending tool edit. An emit
+  that changes nothing changes no state (`handleStepUpdate`): child editors
+  re-emit whenever their value's identity changes, and a linked step's shown
+  values are rebuilt on every recompute, so anything else would loop.
+- **Pending edits follow the links.** When no step links a tool any more (its
+  steps were unlinked — taking the shown values with them — or removed), its
+  pending edits are discarded, so a step later added from that tool does not
+  bring them back. Save writes edits only for tools a step can still use; a
+  tool that lost its worker image shows no edits and gets none.
 - **Viewing writes nothing.** A linked step's unset parameters *show* the
   worker's defaults (as the tool's own menu does). `PipelineStepEditor` hands
   `WorkerInterfaceValues` a local copy (that widget edits its v-model object in
@@ -636,10 +644,13 @@ make this correct-by-default so users don't have to reason about it:
   to know which to offer updating; don't clobber manual edits).
 - **As implemented:** auto-wired steps (`autoWired !== false`) are re-wired
   automatically rather than prompted, by `computeAutoWiredSteps`
-  (`src/utils/pipelineWiring.ts`) — in the editor after every edit, and by the
-  runner on the steps as they run (so a linked tool's changed output tags reach
-  the property steps after it even when the pipeline is run from the list
-  without being reopened). A manual tag or shape edit sets `autoWired: false`.
+  (`src/utils/pipelineWiring.ts`) — in the editor whenever it shows the
+  pipeline, and by the runner on the steps as they run (so a linked tool's
+  changed output tags reach the property steps after it even when the
+  pipeline is run from the list without being reopened). The runner rewires
+  only steps flagged `autoWired: true`; an unflagged step (saved before the
+  flag existed) is wired when the editor shows it, and saved wired. A manual
+  tag or shape edit sets `autoWired: false`.
 - **Validation (warn, don't block):** before running, flag property steps whose
   `inputTags` match no upstream output tags and no pre-existing annotations —
   they'll compute on nothing. Show as a non-blocking warning in the editor.
@@ -964,15 +975,23 @@ Linked steps (§3.4):
 - With the property deleted, it materializes from its saved copy —
   *"materializes a linked property step from its saved copy when the property is gone"*;
   but a property that had not loaded yet is reloaded and computed, not
-  duplicated —
+  duplicated (also in the editor), a failed reload fails the step without
+  holding the run lock, and a step on its fallback is not rechecked —
   *"reloads properties once before treating a linked property as deleted"*,
-  *"does not reload properties when every linked property is loaded"*.
+  *"does not reload properties when every linked property is loaded"*,
+  *"reloads properties on open when a linked property is missing"*,
+  *"fails a missing linked property step when the reload fails, without materializing or holding the run lock"*,
+  *"does not reload a linked property already running its fallback"*.
 - Drift replacement never deletes a property another step links to —
   *"does not delete a drifted-away property that another step links to"*.
 - Deleting a pipeline never deletes a linked property —
   *"never deletes a linked property when its pipeline is deleted"*.
-- The runner re-wires property steps to what a linked tool produces now —
-  *"re-wires a property step to the output tags its linked tool produces now"*.
+- The runner re-wires property steps to what a linked tool produces now, but
+  never an unflagged step —
+  *"re-wires a property step to the output tags its linked tool produces now"*,
+  *"does not rewire a property step without an autoWired flag at run time"*.
+- An unchanged re-emit changes no editor state (no render loop) —
+  *"changes no editor state on an unchanged re-emit"*.
 - The editor shows linked steps live, never reads that as unsaved —
   *"shows a linked step with its tool's live values on open, without marking it dirty"*,
   *"shows a tool change made elsewhere while the editor is open"*.
@@ -985,13 +1004,13 @@ Linked steps (§3.4):
   *"keeps a tool change made elsewhere in a field the step did not edit"*,
   *"does not write an unedited linked step back over a tool changed elsewhere"*,
   *"does not write back a step added this session when only its tool changed elsewhere"*,
-  *"toolEditsBetween records changed parameters one by one and whole fields"*,
+  *"differingToolEdits records changed parameters one by one and whole fields"*,
   *"toolWithEdits writes only the pending edits onto the tool's current values"*,
-  *"remainingToolEdits drops edits that match the given values"*.
+  *"differingToolEdits drops edits that match the given values"*.
 - A child re-emitting with `undefined` keys is not an edit (no write, not
   unsaved) —
   *"does not treat a child re-emitting a linked step with undefined keys as an edit"*,
-  *"toolEditsBetween treats values differing only in undefined keys as unedited"*.
+  *"differingToolEdits treats values differing only in undefined keys as unedited"*.
 - Parameter edits made in place reach the parent, and only touched parameters
   are written — viewing writes nothing —
   *"emits a parameter edited in place by the parameter widget"*,
@@ -1002,8 +1021,10 @@ Linked steps (§3.4):
   *"keeps an edit made during the tool write pending"*.
 - A failed tool write saves nothing —
   *"does not save the pipeline when writing a linked tool back fails"*.
-- Unlinked steps take their values with them; their old tool is not written —
-  *"does not write a tool back once no step is linked to it"*.
+- Unlinked steps take their values with them; their old tool's pending edits
+  are discarded, and a tool without a worker gets no edits —
+  *"does not write a tool back once no step is linked to it"*,
+  *"does not write edits for a tool that lost its worker image"*.
 - Save refreshes linked steps' stored copies —
   *"refreshes a linked step's stored copy to its tool's settings on save"*.
 - Auto-wiring leaves property-linked steps alone —

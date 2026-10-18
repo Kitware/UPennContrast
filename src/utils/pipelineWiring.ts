@@ -13,7 +13,14 @@ import {
 // Pure function: for every property step that hasn't been manually detached
 // (autoWired !== false), pull tags/shape from the nearest preceding enabled
 // annotation step. Idempotent, so re-running after every edit is safe.
-export function computeAutoWiredSteps(steps: TPipelineStep[]): TPipelineStep[] {
+//
+// A step with no `autoWired` flag (saved before the flag existed) is wired too,
+// unless `wireUnflagged` is false: the runner passes that, so it never rewires
+// a step the user has not seen wired in the editor (its tags may be manual).
+export function computeAutoWiredSteps(
+  steps: TPipelineStep[],
+  { wireUnflagged = true }: { wireUnflagged?: boolean } = {},
+): TPipelineStep[] {
   let lastAnnotation: IAnnotationPipelineStep | null = null;
   return steps.map((step) => {
     if (step.kind === "annotation") {
@@ -24,7 +31,12 @@ export function computeAutoWiredSteps(steps: TPipelineStep[]): TPipelineStep[] {
     }
     // A step linked to an existing property computes on that property's
     // own tags and shape.
-    if (step.autoWired === false || step.sourcePropertyId || !lastAnnotation) {
+    if (
+      step.autoWired === false ||
+      (step.autoWired === undefined && !wireUnflagged) ||
+      step.sourcePropertyId ||
+      !lastAnnotation
+    ) {
       return step;
     }
     const wiredTags = lastAnnotation.annotation.tags;

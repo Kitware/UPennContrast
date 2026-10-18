@@ -467,16 +467,15 @@ import pipelinesStore, {
 } from "@/store/pipelines";
 import {
   applyToolEdits,
+  differingToolEdits,
   findSourceTool,
   hasToolEdits,
   IToolEdits,
   propertyLinkedFields,
-  remainingToolEdits,
   resolveLinkedStep,
   samePersistedValue,
   stepLinkState,
   stepToolLinkedFields,
-  toolEditsBetween,
   toolLinkedFields,
   toolWithEdits,
   TStepLinkState,
@@ -568,11 +567,18 @@ const displayedPipeline = computed<IPipeline>(() => ({
   steps: displayedSteps(localPipeline.value.steps, pendingToolEdits.value),
 }));
 
+// A linked property that has not loaded yet would read as deleted; reload the
+// configuration's properties once if one is missing, as the runner does.
+function loadMissingLinkedProperties() {
+  pipelinesStore.loadMissingLinkedProperties(localPipeline.value);
+}
+
 watch(
   () => props.pipeline.id,
   () => {
     localPipeline.value = cloneDeep(props.pipeline);
     pendingToolEdits.value = {};
+    loadMissingLinkedProperties();
     materializedPropertyIdsToRemove.value = [];
     showRemoveStepDialog.value = false;
     stepToRemoveIndex.value = null;
@@ -594,16 +600,20 @@ function comparable(pipeline: IPipeline, steps: TPipelineStep[]) {
 // elsewhere is not an unsaved change here), or the pipeline was never saved.
 // Compared as persisted (samePersistedValue): a child editor re-emitting an
 // untouched value with explicit `undefined` keys is not an edit.
-const isDirty = computed(() => {
+// The stored side is its own computed, so typing in the editor does not
+// re-resolve the stored pipeline on every keystroke.
+const storedPipelineForComparison = computed(() => {
   const stored = pipelinesStore.getPipelineById(localPipeline.value.id);
-  return (
-    !stored ||
+  return stored && comparable(stored, displayedSteps(stored.steps));
+});
+const isDirty = computed(
+  () =>
+    !storedPipelineForComparison.value ||
     !samePersistedValue(
       comparable(displayedPipeline.value, displayedPipeline.value.steps),
-      comparable(stored, displayedSteps(stored.steps)),
-    )
-  );
-});
+      storedPipelineForComparison.value,
+    ),
+);
 
 watch(isDirty, (dirty) => emit("update:dirty", dirty), { immediate: true });
 
@@ -693,8 +703,25 @@ const stepCaptions = computed<(string | null)[]>(() => {
   });
 });
 
+function linkedToolIds(steps: TPipelineStep[]): Set<string> {
+  return new Set(
+    steps.flatMap((step) =>
+      step.kind === "annotation" && step.sourceToolId
+        ? [step.sourceToolId]
+        : [],
+    ),
+  );
+}
+
+// Pending edits of a tool that no step links any more (its steps were unlinked
+// — taking the shown values with them — or removed) are discarded, so a step
+// later added from that tool does not bring them back.
 function updateSteps(steps: TPipelineStep[]) {
   localPipeline.value.steps = steps;
+  const linked = linkedToolIds(steps);
+  if (Object.keys(pendingToolEdits.value).some((id) => !linked.has(id))) {
+    pendingToolEdits.value = pick(pendingToolEdits.value, [...linked]);
+  }
 }
 
 const linkStates = computed<TStepLinkState[]>(() =>
@@ -722,10 +749,13 @@ function recordToolEdits(
   edits: IToolEdits,
   live: IAnnotationPipelineStep,
 ) {
-  const remaining = remainingToolEdits(
+  const remaining = differingToolEdits(
     applyToolEdits(pendingToolEdits.value[toolId] ?? {}, edits),
     stepToolLinkedFields(live),
   );
+  if (samePersistedValue(remaining, pendingToolEdits.value[toolId] ?? {})) {
+    return;
+  }
   pendingToolEdits.value = hasToolEdits(remaining)
     ? { ...pendingToolEdits.value, [toolId]: remaining }
     : omit(pendingToolEdits.value, toolId);
@@ -738,6 +768,12 @@ function recordToolEdits(
 // link and keeps the shown values) replaces the step.
 function handleStepUpdate(index: number, newStep: TPipelineStep) {
   const shown = displayedPipeline.value.steps[index];
+  // Child editors re-emit whenever their value's identity changes (and a
+  // linked step's shown values are rebuilt on every recompute), so an
+  // unchanged emit must change no state, or it would loop.
+  if (samePersistedValue(newStep, shown)) {
+    return;
+  }
   const steps = localPipeline.value.steps.slice();
   const live = resolveLinkedStep(
     steps[index],
@@ -753,12 +789,20 @@ function handleStepUpdate(index: number, newStep: TPipelineStep) {
   ) {
     recordToolEdits(
       newStep.sourceToolId,
-      toolEditsBetween(
-        stepToolLinkedFields(shown),
+      differingToolEdits(
         stepToolLinkedFields(newStep),
+        stepToolLinkedFields(shown),
       ),
       live,
     );
+    if (
+      samePersistedValue(
+        pick(newStep, "name", "enabled"),
+        pick(shown, "name", "enabled"),
+      )
+    ) {
+      return;
+    }
     steps[index] = { ...steps[index], ...pick(newStep, "name", "enabled") };
   } else {
     steps[index] = newStep;
@@ -972,17 +1016,17 @@ async function persist(): Promise<IPipeline | null> {
   // Everything this save writes is captured before the first await, so an
   // edit made while it is in flight is neither half-saved nor marked saved.
   const editing = cloneDeep(localPipeline.value);
-  const linkedToolIds = new Set(
-    editing.steps.flatMap((step) =>
-      step.kind === "annotation" && step.sourceToolId
-        ? [step.sourceToolId]
-        : [],
-    ),
+  // Pending edits are written onto each tool's current values, for tools a
+  // step can still use (the editor shows no edits on a step whose tool lost
+  // its worker image, so none are written for it).
+  const usableToolIds = new Set(
+    editing.steps.flatMap((step) => {
+      const tool = findSourceTool(step, store.tools);
+      return tool ? [tool.id] : [];
+    }),
   );
-  // Pending edits of tools still linked here (an unlinked step took its
-  // values with it), written onto each tool's current values.
   const toolEdits = Object.entries(cloneDeep(pendingToolEdits.value)).filter(
-    ([toolId]) => linkedToolIds.has(toolId),
+    ([toolId]) => usableToolIds.has(toolId),
   );
   const editedTools = toolEdits.flatMap(([toolId, edits]) => {
     const tool = store.tools.find((t) => t.id === toolId);
@@ -1011,7 +1055,7 @@ async function persist(): Promise<IPipeline | null> {
       // the one written (one made during the write stays pending).
       const remaining = { ...pendingToolEdits.value };
       for (const [toolId, written] of toolEdits) {
-        const left = remainingToolEdits(remaining[toolId] ?? {}, written);
+        const left = differingToolEdits(remaining[toolId] ?? {}, written);
         if (hasToolEdits(left)) {
           remaining[toolId] = left;
         } else {
@@ -1072,6 +1116,7 @@ onMounted(() => {
   if (Object.keys(propertiesStore.workerImageList).length === 0) {
     propertiesStore.fetchWorkerImageList();
   }
+  loadMissingLinkedProperties();
 });
 
 defineExpose({

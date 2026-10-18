@@ -92,11 +92,10 @@ vi.mock("./filters", () => ({
 
 import pipelinesStore, { mergeMaterializedPropertyIds } from "./pipelines";
 import {
-  remainingToolEdits,
+  differingToolEdits,
   resolveLinkedStep,
   stepLinkState,
   stepToolLinkedFields,
-  toolEditsBetween,
   toolWithEdits,
 } from "@/utils/pipelineLinks";
 import { AnnotationShape, IPipeline } from "./model";
@@ -996,7 +995,7 @@ describe("linked steps", () => {
     ).toEqual({ state: "missing", sourceKind: "tool", sourceName: "Tool t2" });
   });
 
-  it("toolEditsBetween records changed parameters one by one and whole fields", () => {
+  it("differingToolEdits records changed parameters one by one and whole fields", () => {
     const before = stepToolLinkedFields({
       ...annotationStep("a", ["t"]),
       workerInterfaceValues: { threshold: 7, radius: 2 },
@@ -1007,13 +1006,13 @@ describe("linked steps", () => {
       annotation: { ...before.annotation, tags: ["edited"] },
     };
 
-    expect(toolEditsBetween(before, after)).toEqual({
+    expect(differingToolEdits(after, before)).toEqual({
       workerInterfaceValues: { threshold: 9 },
       annotation: after.annotation,
     });
   });
 
-  it("toolEditsBetween treats values differing only in undefined keys as unedited", () => {
+  it("differingToolEdits treats values differing only in undefined keys as unedited", () => {
     const before = stepToolLinkedFields(annotationStep("a", ["t"]));
     delete (before.annotation as any).color;
     // What AnnotationConfiguration re-emits on mount: an explicit color key.
@@ -1022,7 +1021,7 @@ describe("linked steps", () => {
       annotation: { ...before.annotation, color: undefined },
     };
 
-    expect(toolEditsBetween(before, after)).toEqual({});
+    expect(differingToolEdits(after, before)).toEqual({});
   });
 
   it("toolWithEdits writes only the pending edits onto the tool's current values", () => {
@@ -1049,14 +1048,14 @@ describe("linked steps", () => {
     });
   });
 
-  it("remainingToolEdits drops edits that match the given values", () => {
+  it("differingToolEdits drops edits that match the given values", () => {
     const live = stepToolLinkedFields({
       ...annotationStep("a", ["t"]),
       workerInterfaceValues: { threshold: 7 },
     });
 
     expect(
-      remainingToolEdits(
+      differingToolEdits(
         {
           workerInterfaceValues: { threshold: 7, radius: 3 },
           jobDateTag: true,
@@ -1122,6 +1121,72 @@ describe("linked steps", () => {
       }),
     );
     expect(result.succeeded).toBe(1);
+  });
+
+  it("does not reload a linked property already running its fallback", async () => {
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+    h.properties.properties = [
+      {
+        id: "fallback",
+        image: "img/prop",
+        shape: AnnotationShape.Polygon,
+        tags: { tags: [], exclusive: false },
+        workerInterface: {},
+      },
+    ];
+    const step = {
+      ...propertyStep("p"),
+      sourcePropertyId: "gone",
+      materializedPropertyId: "fallback",
+    };
+
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipeline([step]),
+    });
+
+    expect(h.properties.fetchProperties).not.toHaveBeenCalled();
+    expect(h.properties.createProperty).not.toHaveBeenCalled();
+    expect(result.succeeded).toBe(1);
+  });
+
+  it("fails a missing linked property step when the reload fails, without materializing or holding the run lock", async () => {
+    h.properties.properties = [];
+    h.properties.fetchProperties.mockRejectedValue(new Error("offline"));
+    const errors: any[] = [];
+
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipeline([{ ...propertyStep("p"), sourcePropertyId: "user" }]),
+      onStepError: (_index, info) => errors.push(...info.errors),
+    });
+
+    expect(result.failed).toBe(1);
+    expect(h.properties.createProperty).not.toHaveBeenCalled();
+    expect(errors[0].error).toContain("Could not check");
+    expect(pipelinesStore.runningPipelineId).toBeNull();
+  });
+
+  it("does not rewire a property step without an autoWired flag at run time", async () => {
+    h.annotations.submitAnnotationWorkerJob.mockResolvedValue(
+      submitResult("j-a", true),
+    );
+    h.properties.createProperty.mockResolvedValue({
+      id: "fresh",
+      image: "img/prop",
+      shape: AnnotationShape.Polygon,
+      tags: { tags: ["cells"], exclusive: false },
+      workerInterface: {},
+    });
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+    // Saved before the flag existed, with manually chosen tags.
+    const manualStep = propertyStep("p", ["cells"]);
+
+    await pipelinesStore.runPipeline({
+      pipeline: pipeline([annotationStep("a", ["nuclei"]), manualStep]),
+    });
+
+    expect(h.properties.createProperty).toHaveBeenCalledWith(
+      expect.objectContaining({ tags: { tags: ["cells"], exclusive: false } }),
+    );
   });
 
   it("does not reload properties when every linked property is loaded", async () => {
