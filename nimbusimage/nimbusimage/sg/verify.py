@@ -77,6 +77,8 @@ def _pixels(microns: np.ndarray, pixel_size: float) -> np.ndarray:
 
 def check_frame(roi: SGRoi, sample: int = 300, seed: int = 0) -> dict:
     """Fraction of sampled cell centroids that land on their own label."""
+    if sample < 1:
+        raise SGError(f"sample must be >= 1, got {sample}")
     coords = roi.coordinates()
     picked = coords.sample(
         n=min(sample, len(coords)), random_state=seed

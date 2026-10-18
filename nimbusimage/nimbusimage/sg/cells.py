@@ -130,6 +130,8 @@ def verify_cells(
     """Read back a random sample of the map's annotations and compare each
     first vertex with the GeoJSON's (at ``cells.pixel_size``). Returns the
     number checked; raises on any mismatch or missing annotation."""
+    if sample < 1:
+        raise SGError(f"sample must be >= 1, got {sample}")
     cells.check(ds, roi)
     labels, rings = roi.polygons()
     ring_of = dict(zip(labels.tolist(), rings))

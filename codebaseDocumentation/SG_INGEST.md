@@ -154,7 +154,9 @@ Each item names the test (`nimbusimage/tests/test_sg.py`) that holds it.
   round-trips with its dataset, ROI and pixel size —
   *"test_polygons_are_pixels_and_the_map_round_trips"*.
 - A non-positive `limit` uploads nothing (`labels[:-1]` would upload almost
-  everything) — *"test_polygon_limit_must_be_positive"*.
+  everything) — *"test_polygon_limit_must_be_positive"*; `chunk < 1` or a
+  negative `verify_sample` on `upload_cell_data` is refused before any write —
+  *"test_invalid_controls_are_refused_before_any_write"*.
 - A map of another dataset or ROI is refused before any write —
   *"test_a_map_of_another_dataset_or_roi_is_refused"*, and through the CLI —
   *"test_steps_with_a_cell_map_of_another_dataset_write_nothing"*.

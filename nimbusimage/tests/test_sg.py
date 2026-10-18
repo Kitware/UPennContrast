@@ -198,6 +198,13 @@ class TestVerify:
         assert (found[inside] == mask[y[inside], x[inside]]).all()
         assert (found[~inside] == 0).all()
 
+    def test_sample_sizes_must_be_positive(self, server, roi):
+        with pytest.raises(SGError, match="sample"):
+            check_frame(roi, sample=0)
+        ds, cells = _uploaded(server, roi)
+        with pytest.raises(SGError, match="sample"):
+            verify_cells(ds, roi, cells, sample=0)
+
     def test_frame_check_passes_and_catches_a_wrong_pixel_size(self, roi):
         assert check_frame(roi)["fraction"] == 1.0
         roi.session["res"] = PIXEL_SIZE * 2
@@ -291,6 +298,18 @@ class TestCellData:
         assert server.annotations[cells.id_of[1]].tags == [
             "sg-cell", "Leiden 0"]
         assert server.annotations[cells.id_of[3]].tags == ["sg-cell"]
+
+    @pytest.mark.parametrize(
+        "controls", [{"chunk": 0}, {"chunk": -1}, {"verify_sample": -1}]
+    )
+    def test_invalid_controls_are_refused_before_any_write(
+        self, server, roi, controls
+    ):
+        ds, cells = _uploaded(server, roi)
+        writes = len(server.writes)
+        with pytest.raises(SGError):
+            upload_cell_data(ds, roi, cells, **controls)
+        assert len(server.writes) == writes
 
     def test_values_are_replaced_not_merged(self, server, roi):
         ds, cells = _uploaded(server, roi)
@@ -397,6 +416,14 @@ class TestTranscriptStore:
     def test_bad_input_is_refused(self, tmp_path, genes, xyz):
         with pytest.raises(SGError):
             write_transcript_store(["A"], genes, xyz, tmp_path / "x.zip")
+
+    def test_levels_must_be_positive(self, tmp_path):
+        with pytest.raises(SGError, match="levels"):
+            write_transcript_store(
+                ["A"], np.zeros(1, int), np.zeros((1, 3)),
+                tmp_path / "x.zarr.zip", levels=0,
+            )
+        assert not (tmp_path / "x.zarr.zip").exists()
 
     def test_register_uses_the_map_frame_and_refuses_another_roi(
         self, server, roi, tmp_path

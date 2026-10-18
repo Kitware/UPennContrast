@@ -182,6 +182,12 @@ def upload_cell_data(
     Property values are replaced, not merged (a re-run is exact). Returns
     cluster sizes.
     """
+    # Before any write: chunk < 1 would skip every tag update while the
+    # property writes still ran, and a negative sample fails only after them.
+    if chunk < 1:
+        raise SGError(f"chunk must be >= 1, got {chunk}")
+    if verify_sample < 0:
+        raise SGError(f"verify_sample must be >= 0, got {verify_sample}")
     cells.check(ds, roi)
     base_tags = list(cells.tags if base_tags is None else base_tags)
     id_of = cells.id_of

@@ -128,6 +128,8 @@ def write_transcript_store(
     genes = np.asarray(genes, dtype=np.int64)
     xyz = np.asarray(xyz, dtype=np.float32)
     n_genes = len(gene_names)
+    if levels < 1:
+        raise SGError(f"levels must be >= 1, got {levels}")
     if len(genes) == 0:
         raise SGError("no molecules to write")
     if len(set(gene_names)) != n_genes:
