@@ -349,6 +349,20 @@ describe("TranscriptOverlay", () => {
     expect(osmLayer.visible()).toBe(false);
   });
 
+  it("creates heat-map layers that keep only the current level", async () => {
+    const parts = makeMap({ left: 0, top: 0, right: 4000, bottom: 2000 });
+    (transcriptsStore as any).pointBudget = 100;
+    mount(parts);
+    await vi.advanceTimersByTimeAsync(250);
+    const osmCalls = parts.map.createLayer.mock.calls.filter(
+      ([kind]: [string]) => kind === "osm",
+    );
+    expect(osmCalls.length).toBeGreaterThan(0);
+    for (const [, params] of osmCalls) {
+      expect(params.keepLower).toBe(false);
+    }
+  });
+
   it("draws one heat map per gene in its own color and deletes removed ones", async () => {
     const parts = makeMap({ left: 0, top: 0, right: 4000, bottom: 2000 });
     (transcriptsStore as any).mode = "density";
