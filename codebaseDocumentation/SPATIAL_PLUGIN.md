@@ -610,7 +610,9 @@ Each line names the test that holds it.
   buttons only request it — *"hosts the one genes dialog, bound to the shared open flag"*,
   *"opens the app-level genes dialog instead of hosting its own"*,
   *"opens the app-level genes dialog instead of hosting one that tab switches unmount"*,
-  *"follows v-model:open and shows no activator of its own"*.
+  *"follows v-model:open and shows no activator of its own"*. Because it is never unmounted,
+  it resets its form when the dataset changes; otherwise another table's genes could be
+  posted — *"clears the form when the dataset changes, so no other table's genes are posted"*.
 - Materialize dialog: inline write reloads properties; job polling until success; failed
   job and rejected request reported; a job keeps polling after the dialog closes and still
   refreshes the values, and a dataset change stops it — *"writes inline results and reloads the property list"*, *"polls a scheduled job until it succeeds"*, *"reports a failed job and a rejected request"*, *"keeps polling after the dialog closes and still refreshes the values"*, *"stops polling when the dataset changes"*.

@@ -211,6 +211,27 @@ watch(mode, (next, previous) => {
   }
 });
 
+// The app's one instance (App.vue) outlives dataset switches, and its
+// closed dialog unmounts the picker that would otherwise drop genes picked
+// for the previous dataset's table. Start every dataset with a fresh form so
+// a copy or score can never post another table's genes. (useJobPolling
+// separately retires a running job's polling on the same change.)
+watch(
+  () => store.dataset?.id,
+  (datasetId, previousDatasetId) => {
+    if (datasetId === previousDatasetId) {
+      return;
+    }
+    symbols.value = [];
+    mode.value = "live";
+    propertyName.value = DEFAULT_PROPERTY_NAME;
+    scoreName.value = "";
+    scoreMethod.value = "mean";
+    done.value = "";
+    error.value = "";
+  },
+);
+
 const polling = useJobPolling(
   dialog,
   () => store.dataset?.id,
