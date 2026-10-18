@@ -317,7 +317,7 @@ the new one*, which nothing catches because the component unmounts fine and the
 trailing call usually lands harmlessly.
 
 Guard it with a test that records the throttles **at construction** — the
-version that listed them by name stayed green while two uncancelled ones
+version that listed them by name stayed green while two uncanceled ones
 shipped, and a version that scanned `wrapper.vm` only moved the hand-maintained
 list to `defineExpose` (an unexposed throttle stays invisible there):
 

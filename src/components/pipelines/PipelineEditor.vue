@@ -533,7 +533,7 @@ const statuses = computed(() => controller.statusesFor(localPipeline.value));
 
 function hasRunStatus(index: number): boolean {
   const status = statuses.value[index]?.status;
-  return status === "success" || status === "error" || status === "cancelled";
+  return status === "success" || status === "error" || status === "canceled";
 }
 
 // ---- Job logs ---------------------------------------------------------

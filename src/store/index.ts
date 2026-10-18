@@ -275,7 +275,7 @@ function liveGirderRest(instance: Main): RestClientInstance {
 const FINISHED_JOB_STATUSES: number[] = [
   jobStates.success,
   jobStates.error,
-  jobStates.cancelled,
+  jobStates.canceled,
 ];
 // How long the notification stream gets to deliver a job's end after the
 // request that ran it returned, before the job is read instead: a healthy
@@ -1813,7 +1813,7 @@ export class Main extends VuexModule {
 
   /**
    * Ask App.vue to open these palettes (see `paletteOpenRequests`). App.vue
-   * clears the request once it has honoured it, so asking for the same palette
+   * clears the request once it has honored it, so asking for the same palette
    * twice in a row still opens it the second time.
    */
   @Action
@@ -1939,7 +1939,7 @@ export class Main extends VuexModule {
     // The view owns this attempt. Leaving its route cancels the commit even
     // when no newer login or share-link request has changed the session.
     if (signal?.aborted) {
-      throw new Error("Share-link request was cancelled.");
+      throw new Error("Share-link request was canceled.");
     }
     if (
       sequence !== shareBootstrapSequence ||
@@ -3421,7 +3421,7 @@ export class Main extends VuexModule {
     layerId: string;
     contrast: IContrast;
     // Extra layer fields to write in the SAME configuration sync as the
-    // contrast. The AI panel's update_layer can change colour/name/visibility
+    // contrast. The AI panel's update_layer can change color/name/visibility
     // and a collection-scoped contrast in one call; sending them as two
     // changeLayer calls wrote the "layers" key twice and could leave the
     // collection partially updated when the second failed (Codex P2 on

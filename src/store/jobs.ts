@@ -342,9 +342,7 @@ export class Jobs extends VuexModule {
     const status = jobEvent.status;
     if (
       !status ||
-      ![jobStates.cancelled, jobStates.success, jobStates.error].includes(
-        status,
-      )
+      ![jobStates.canceled, jobStates.success, jobStates.error].includes(status)
     ) {
       return;
     }
@@ -353,7 +351,7 @@ export class Jobs extends VuexModule {
     if (!success) {
       logError(
         `Compute job with id ${jobId} ${
-          status === jobStates.cancelled ? "cancelled" : "failed"
+          status === jobStates.canceled ? "canceled" : "failed"
         }`,
       );
       if (status === jobStates.error) {

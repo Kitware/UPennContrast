@@ -864,7 +864,7 @@ const mapLayerList = computed<ILayerStackImage[][]>(() => {
 
 // One entry per map, index-aligned with mapLayerList (and so with maps): each
 // map draws its own layer group in the "unroll" layer mode, and a group can
-// cover different frames than its neighbour, so cells are derived per map from
+// cover different frames than its neighbor, so cells are derived per map from
 // the layer whose tiles that map shows.
 const unrollCellsByMap = computed<IUnrollCell[][]>(() => {
   if (!unrolling.value) {
@@ -1276,19 +1276,19 @@ const MAX_UNROLL_LABEL_CELLS = 400;
 
 interface IUnrollLabelState {
   widgets: IGeoJSDomWidget[];
-  // Identifies the labelled grid; a change means the widgets are rebuilt.
+  // Identifies the labeled grid; a change means the widgets are rebuilt.
   signature: string;
 }
 
 const unrollLabelStates = new WeakMap<IGeoJSMap, IUnrollLabelState>();
 
-// Cell count of the last grid that went unlabelled, so the warning is logged
+// Cell count of the last grid that went unlabeled, so the warning is logged
 // once per grid rather than on every draw.
 let warnedUnrollLabelCells = 0;
 
-// The cells of one map's grid that get a label: unlabelled ones (every unrolled
+// The cells of one map's grid that get a label: unlabeled ones (every unrolled
 // dimension has a single value) and grids too dense to label are dropped.
-function labelledUnrollCells(mapIndex: number): IUnrollCell[] {
+function labeledUnrollCells(mapIndex: number): IUnrollCell[] {
   const cells = (unrollCellsByMap.value[mapIndex] ?? []).filter(
     (cell) => cell.label,
   );
@@ -1383,7 +1383,7 @@ function updateUnrollLabels() {
     if (!uiLayer) {
       return;
     }
-    const cells = labelledUnrollCells(mapIndex);
+    const cells = labeledUnrollCells(mapIndex);
     const signature = JSON.stringify([
       cells.map((cell) => [cell.index, cell.label]),
       unrollW.value,

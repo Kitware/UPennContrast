@@ -690,7 +690,7 @@ describe("AnalysisPanel", () => {
     // Resolution is per plot, so a refused batch leaves already-resolved
     // gates filtering. The banner used to say "the viewer and the Objects tab
     // show everything the other filters allow", which described the
-    // all-or-nothing behaviour that preceded per-plot resolution and
+    // all-or-nothing behavior that preceded per-plot resolution and
     // misstated what is on screen. Asserted on rendered text because that is
     // the surface that was wrong — nothing typechecks a sentence.
     mocks.gateError = "gates resolve to more than the 2000000 ids";

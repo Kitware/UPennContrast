@@ -49,7 +49,7 @@ const SEGMENTATION_TEMPLATE: IToolTemplate = {
 // Runtime status for a single step during a run. Held by the UI (via run
 // callbacks); not persisted.
 export interface IPipelineStepRunStatus {
-  status: "pending" | "running" | "success" | "error" | "cancelled" | "skipped";
+  status: "pending" | "running" | "success" | "error" | "canceled" | "skipped";
   progress: IProgressInfo;
   errors: IErrorInfoList;
 }
@@ -336,7 +336,7 @@ export class Pipelines extends VuexModule {
     const emptyResult: IPipelineRunResult = {
       succeeded: 0,
       failed: 0,
-      cancelled: 0,
+      canceled: 0,
       failedStepIndex: null,
     };
 
@@ -361,10 +361,10 @@ export class Pipelines extends VuexModule {
       this.setRunningPipelineId(pipeline.id);
     }
 
-    let isCancelled = false;
+    let isCanceled = false;
     let currentJob: IAnnotationComputeJob | IPropertyComputeJob | null = null;
     const cancel = () => {
-      isCancelled = true;
+      isCanceled = true;
       if (currentJob) {
         main.api.cancelJob(currentJob.jobId);
       }
@@ -385,7 +385,7 @@ export class Pipelines extends VuexModule {
 
     let succeeded = 0;
     let failed = 0;
-    let cancelled = 0;
+    let canceled = 0;
     let failedStepIndex: number | null = null;
     let done = 0;
     // Set when ensureMaterializedProperty actually assigns/changes a step's
@@ -397,8 +397,8 @@ export class Pipelines extends VuexModule {
     for (const stepIndex of enabledIndices) {
       const step = pipeline.steps[stepIndex];
 
-      if (isCancelled) {
-        cancelled++;
+      if (isCanceled) {
+        canceled++;
         onStepComplete?.(stepIndex, false);
         done++;
         progress.update({
@@ -491,8 +491,8 @@ export class Pipelines extends VuexModule {
 
       progress.complete(stepProgressId);
 
-      if (isCancelled) {
-        cancelled++;
+      if (isCanceled) {
+        canceled++;
         onStepComplete?.(stepIndex, false);
       } else if (success) {
         succeeded++;
@@ -513,7 +513,7 @@ export class Pipelines extends VuexModule {
       });
 
       // Stop early on failure unless the caller opted into continuing.
-      if (!success && !isCancelled && !continueOnError) {
+      if (!success && !isCanceled && !continueOnError) {
         break;
       }
     }
@@ -545,7 +545,7 @@ export class Pipelines extends VuexModule {
     const result: IPipelineRunResult = {
       succeeded,
       failed,
-      cancelled,
+      canceled,
       failedStepIndex,
     };
     onComplete?.(result);
@@ -600,30 +600,30 @@ export class Pipelines extends VuexModule {
       total: number;
       completed: number;
       failed: number;
-      cancelled: number;
+      canceled: number;
       currentDatasetName: string;
     }) => void;
     onCancel?: (cancel: () => void) => void;
     onComplete?: (result: {
       succeeded: number;
       failed: number;
-      cancelled: number;
+      canceled: number;
     }) => void;
     // Called (with the authoritative dataset count) when the batch is refused
     // because the collection is over BATCH_DATASET_LIMIT, so callers can
     // explain the rejection rather than reporting a bare "N failed".
     onRejected?: (datasetCount: number) => void;
-  }): Promise<{ succeeded: number; failed: number; cancelled: number }> {
-    const emptyResult = { succeeded: 0, failed: 0, cancelled: 0 };
+  }): Promise<{ succeeded: number; failed: number; canceled: number }> {
+    const emptyResult = { succeeded: 0, failed: 0, canceled: 0 };
     if (!main.isLoggedIn) {
       onComplete?.(emptyResult);
       return emptyResult;
     }
 
-    let isCancelled = false;
+    let isCanceled = false;
     let innerCancel: (() => void) | null = null;
     const cancel = () => {
-      isCancelled = true;
+      isCanceled = true;
       innerCancel?.();
     };
     // Wire the cancel handle up immediately, before any await.
@@ -648,7 +648,7 @@ export class Pipelines extends VuexModule {
       const rejectedResult = {
         succeeded: 0,
         failed: total,
-        cancelled: 0,
+        canceled: 0,
       };
       onRejected?.(total);
       onComplete?.(rejectedResult);
@@ -670,17 +670,17 @@ export class Pipelines extends VuexModule {
 
     let completed = 0;
     let failed = 0;
-    let cancelled = 0;
+    let canceled = 0;
 
     try {
       for (const datasetId of datasetIds) {
-        if (isCancelled) {
-          cancelled++;
+        if (isCanceled) {
+          canceled++;
           onBatchProgress?.({
             total,
             completed,
             failed,
-            cancelled,
+            canceled,
             currentDatasetName: datasetNames[datasetId],
           });
           continue;
@@ -690,7 +690,7 @@ export class Pipelines extends VuexModule {
           total,
           completed,
           failed,
-          cancelled,
+          canceled,
           currentDatasetName: datasetNames[datasetId],
         });
 
@@ -705,12 +705,12 @@ export class Pipelines extends VuexModule {
           },
         });
 
-        if (isCancelled) {
-          cancelled++;
+        if (isCanceled) {
+          canceled++;
         } else if (
           result.succeeded > 0 &&
           result.failed === 0 &&
-          result.cancelled === 0
+          result.canceled === 0
         ) {
           // A child run that bailed out entirely (empty result, e.g. login
           // expired mid-batch) must not count as a completed dataset.
@@ -721,14 +721,14 @@ export class Pipelines extends VuexModule {
 
         progress.update({
           id: batchProgressId,
-          progress: completed + failed + cancelled,
+          progress: completed + failed + canceled,
           total,
         });
         onBatchProgress?.({
           total,
           completed,
           failed,
-          cancelled,
+          canceled,
           currentDatasetName: datasetNames[datasetId],
         });
       }
@@ -737,7 +737,7 @@ export class Pipelines extends VuexModule {
       // touched many others, but only the current one is on screen).
       await this.refreshAfterRun();
 
-      const summary = { succeeded: completed, failed, cancelled };
+      const summary = { succeeded: completed, failed, canceled };
       onComplete?.(summary);
       return summary;
     } finally {

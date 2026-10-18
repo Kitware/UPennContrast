@@ -67,7 +67,7 @@ function notifyDrainIfIdle() {
   }, DRAIN_DEBOUNCE_MS);
 }
 
-// Avoid "navigation cancelled" errors by doing calls to router.replace() one at a time
+// Avoid "navigation canceled" errors by doing calls to router.replace() one at a time
 const setUrlParamsOrQuery = awaitPreviousCallsDecorator(
   async (
     type: "query" | "params",
