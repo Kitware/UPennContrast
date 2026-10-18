@@ -20,6 +20,7 @@ const h = vi.hoisted(() => ({
       compatibility: { channels: {} as Record<number, string> },
     } as any,
     isLoggedIn: true,
+    tools: [] as any[],
     selectedConfigurationId: "cfg1",
     api: {
       cancelJob: vi.fn(),
@@ -61,7 +62,7 @@ const h = vi.hoisted(() => ({
 
 // `main` is wrapped in Vue's `reactive()` (instead of exported as a plain
 // object) because pipelines.ts's `pipelines` getter - and getters derived
-// from it, like `isMaterializedPropertyReferenced` - are real Vuex getters,
+// from it, like `isPropertyReferencedByPipelineStep` - are real Vuex getters,
 // which Vuex implements internally as `computed()`. A computed with no
 // reactive dependency computes once and caches its result forever. Exporting
 // a plain mock object here would mean the first test in this file to touch
@@ -89,6 +90,11 @@ vi.mock("./filters", () => ({
 }));
 
 import pipelinesStore, { mergeMaterializedPropertyIds } from "./pipelines";
+import {
+  resolveLinkedStep,
+  stepLinkState,
+  toolWithStepEdits,
+} from "@/utils/pipelineLinks";
 import { AnnotationShape, IPipeline } from "./model";
 
 function annotationStep(id: string, tags: string[] = []): any {
@@ -151,6 +157,7 @@ beforeEach(() => {
     pipelines: [],
     compatibility: { channels: {} },
   };
+  h.main.tools = [];
   h.properties.properties = [];
   h.properties.workerImageList = {};
   h.annotations.annotationTags = new Set();
@@ -760,5 +767,234 @@ describe("mergeMaterializedPropertyIds", () => {
     mergeMaterializedPropertyIds(target, source);
 
     expect((target.steps[0] as any).materializedPropertyId).toBeUndefined();
+  });
+});
+
+describe("linked steps", () => {
+  function workerTool(id: string, overrides: any = {}): any {
+    return {
+      id,
+      name: `Tool ${id}`,
+      hotkey: null,
+      type: "segmentation",
+      template: { name: "t", type: "segmentation", interface: [] },
+      values: {
+        image: { image: "img/tool" },
+        workerInterfaceValues: { threshold: 7 },
+        annotation: {
+          tags: ["from-tool"],
+          shape: AnnotationShape.Polygon,
+          color: undefined,
+          coordinateAssignments: {
+            layer: null,
+            Z: { type: "layer", value: 1, max: 1 },
+            Time: { type: "layer", value: 1, max: 1 },
+          },
+        },
+        ...overrides,
+      },
+    };
+  }
+
+  function existingProperty(id: string): any {
+    return {
+      id,
+      name: `Property ${id}`,
+      image: "img/user-prop",
+      shape: AnnotationShape.Point,
+      tags: { tags: ["user-tag"], exclusive: true },
+      workerInterface: { radius: 3 },
+    };
+  }
+
+  it("runs a linked annotation step with its tool's current values", async () => {
+    h.main.tools = [workerTool("t1")];
+    let submittedTool: any = null;
+    h.annotations.submitAnnotationWorkerJob.mockImplementation(
+      async ({ tool }: any) => {
+        submittedTool = tool;
+        return submitResult("j", true);
+      },
+    );
+    // The saved copy is stale: the tool was edited after the step was added.
+    const step = { ...annotationStep("a", ["stale-tag"]), sourceToolId: "t1" };
+
+    await pipelinesStore.runPipeline({ pipeline: pipeline([step]) });
+
+    expect(submittedTool.values.image.image).toBe("img/tool");
+    expect(submittedTool.values.workerInterfaceValues).toEqual({
+      threshold: 7,
+    });
+    expect(submittedTool.values.annotation.tags).toEqual(["from-tool"]);
+  });
+
+  it("runs a linked annotation step from its saved copy when the tool is gone", async () => {
+    h.main.tools = [];
+    let submittedTool: any = null;
+    h.annotations.submitAnnotationWorkerJob.mockImplementation(
+      async ({ tool }: any) => {
+        submittedTool = tool;
+        return submitResult("j", true);
+      },
+    );
+    const step = { ...annotationStep("a", ["saved"]), sourceToolId: "gone" };
+
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipeline([step]),
+    });
+
+    expect(result.succeeded).toBe(1);
+    expect(submittedTool.values.image.image).toBe("img/annotate");
+    expect(submittedTool.values.annotation.tags).toEqual(["saved"]);
+  });
+
+  it("computes a linked property step on the existing property without materializing", async () => {
+    h.properties.properties = [existingProperty("user")];
+    let submittedProperty: any = null;
+    h.properties.submitPropertyJob.mockImplementation(
+      async ({ property }: any) => {
+        submittedProperty = property;
+        return submitResult("j", true);
+      },
+    );
+    const step = { ...propertyStep("p", ["other"]), sourcePropertyId: "user" };
+    const pipe = pipeline([step]);
+    h.main.configuration.pipelines = [pipe];
+
+    const result = await pipelinesStore.runPipeline({ pipeline: pipe });
+
+    expect(result.succeeded).toBe(1);
+    expect(submittedProperty.id).toBe("user");
+    expect(h.properties.createProperty).not.toHaveBeenCalled();
+    expect(h.properties.deleteProperty).not.toHaveBeenCalled();
+    expect(h.main.updateConfigurationPipelines).not.toHaveBeenCalled();
+    expect(step).not.toHaveProperty("materializedPropertyId");
+  });
+
+  it("materializes a linked property step from its saved copy when the property is gone", async () => {
+    h.properties.createProperty.mockResolvedValue({
+      id: "fresh",
+      image: "img/prop",
+      shape: AnnotationShape.Polygon,
+      tags: { tags: ["nuclei"], exclusive: false },
+      workerInterface: {},
+    });
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+    const step = { ...propertyStep("p", ["nuclei"]), sourcePropertyId: "gone" };
+
+    await pipelinesStore.runPipeline({ pipeline: pipeline([step]) });
+
+    expect(h.properties.createProperty).toHaveBeenCalledWith(
+      expect.objectContaining({ image: "img/prop" }),
+    );
+    expect((step as any).materializedPropertyId).toBe("fresh");
+  });
+
+  it("does not delete a drifted-away property that another step links to", async () => {
+    h.properties.properties = [
+      {
+        id: "shared",
+        image: "img/prop",
+        shape: AnnotationShape.Polygon,
+        tags: { tags: ["old-tag"], exclusive: false },
+        workerInterface: {},
+      },
+    ];
+    h.properties.createProperty.mockResolvedValue({
+      id: "fresh",
+      image: "img/prop",
+      shape: AnnotationShape.Polygon,
+      tags: { tags: ["nuclei"], exclusive: false },
+      workerInterface: {},
+    });
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+    const step = propertyStep("p", ["nuclei"]);
+    step.materializedPropertyId = "shared";
+    const pipe = pipeline([step]);
+    const linkedStep = {
+      ...propertyStep("linked", ["old-tag"]),
+      sourcePropertyId: "shared",
+    };
+    h.main.configuration.pipelines = [
+      pipe,
+      { id: "pipe2", name: "Other", steps: [linkedStep] },
+    ];
+
+    await pipelinesStore.runPipeline({ pipeline: pipe });
+
+    expect(h.properties.deleteProperty).not.toHaveBeenCalled();
+  });
+
+  it("never deletes a linked property when its pipeline is deleted", async () => {
+    const linkedStep = {
+      ...propertyStep("linked"),
+      sourcePropertyId: "user",
+    };
+    h.main.configuration.pipelines = [pipeline([linkedStep])];
+
+    await pipelinesStore.deletePipeline({ pipelineId: "pipe1" });
+
+    expect(h.properties.deleteProperties).not.toHaveBeenCalled();
+  });
+
+  it("resolveLinkedStep returns the same step when unlinked, missing or in sync", () => {
+    const tool = workerTool("t1");
+    const unlinked = annotationStep("a");
+    const missing = { ...annotationStep("b"), sourceToolId: "gone" };
+    const inSync = resolveLinkedStep(
+      { ...annotationStep("c"), sourceToolId: "t1" },
+      [tool],
+      [],
+    );
+
+    expect(resolveLinkedStep(unlinked, [tool], [])).toBe(unlinked);
+    expect(resolveLinkedStep(missing, [tool], [])).toBe(missing);
+    expect(resolveLinkedStep(inSync, [tool], [])).toBe(inSync);
+  });
+
+  it("resolveLinkedStep takes a linked property step's fields from the property", () => {
+    const step = { ...propertyStep("p", ["x"]), sourcePropertyId: "user" };
+
+    const resolved = resolveLinkedStep(step, [], [existingProperty("user")]);
+
+    expect(resolved).toMatchObject({
+      image: "img/user-prop",
+      shape: AnnotationShape.Point,
+      inputTags: { tags: ["user-tag"], exclusive: true },
+      workerInterfaceValues: { radius: 3 },
+      sourcePropertyId: "user",
+    });
+  });
+
+  it("stepLinkState distinguishes linked, missing and unlinked steps", () => {
+    const tools = [workerTool("t1")];
+    const props = [existingProperty("user")];
+
+    expect(
+      stepLinkState({ ...annotationStep("a"), sourceToolId: "t1" }, tools, []),
+    ).toEqual({ state: "linked", sourceKind: "tool", sourceName: "Tool t1" });
+    expect(
+      stepLinkState({ ...propertyStep("p"), sourcePropertyId: "x" }, [], props),
+    ).toEqual({ state: "missing", sourceKind: "property" });
+    expect(stepLinkState(annotationStep("a"), tools, props)).toEqual({
+      state: "unlinked",
+    });
+  });
+
+  it("toolWithStepEdits writes a step's edits into the tool but keeps its image", () => {
+    const tool = workerTool("t1");
+    const step = {
+      ...annotationStep("a", ["edited"]),
+      image: "img/other",
+      workerInterfaceValues: { threshold: 9 },
+      sourceToolId: "t1",
+    };
+
+    const edited = toolWithStepEdits(tool, step);
+
+    expect(edited.values.image.image).toBe("img/tool");
+    expect(edited.values.workerInterfaceValues).toEqual({ threshold: 9 });
+    expect(edited.values.annotation.tags).toEqual(["edited"]);
+    expect(tool.values.workerInterfaceValues).toEqual({ threshold: 7 });
   });
 });

@@ -26,6 +26,13 @@ they aren't re-litigated.)
   progress widget. Steps can be built from an annotation worker, a property
   worker, or an **existing worker-backed tool**. Tag auto-wiring joins property
   steps to the nearest upstream annotation step.
+- **Linked steps** (§3.4): a step added from an existing tool or an existing
+  property is *linked* to it, so the pipeline runs with the same parameters as
+  the individual tool or property instead of a diverging copy. Edits made to a
+  tool-linked step in the pipeline editor are written back to the tool; a
+  property-linked step computes the user's own property and never replaces or
+  deletes it. Each linked step keeps a saved copy used only when its source is
+  deleted, and **Unlink** turns it into an independent step.
 
 ### Removed / superseded
 
@@ -206,8 +213,11 @@ it.
 ## 2. Design overview
 
 A **Pipeline** is a new, self-contained, ordered list of steps stored on the
-dataset configuration. It does **not** reference existing `tools[]` / `propertyIds[]`
-entries; each step embeds its own worker configuration. Rationale:
+dataset configuration. Each step embeds its own worker configuration rather than
+depending on existing `tools[]` / `propertyIds[]` entries. (A step added from an
+existing tool or property *also* records a link to it and runs with the source's
+current values — see §3.4. The embedded configuration remains as the fallback,
+so the properties below still hold.) Rationale:
 
 - **Portability.** A pipeline can be copied between configurations, shipped as a
   built-in preset, or generated wholesale by the LLM without first creating N
@@ -281,6 +291,9 @@ export interface IAnnotationPipelineStep extends IPipelineStepBase {
   };
   // Mirrors tool.values.jobDateTag.
   jobDateTag?: boolean;
+  // Linked to this configuration tool (§3.4). The fields above are then a
+  // saved copy of the tool's values.
+  sourceToolId?: string;
 }
 
 export interface IPropertyPipelineStep extends IPipelineStepBase {
@@ -294,6 +307,10 @@ export interface IPropertyPipelineStep extends IPipelineStepBase {
   // IAnnotationProperty this step created. Reused on subsequent runs. May be
   // cleared if the referenced property no longer exists (runner re-creates).
   materializedPropertyId?: string;
+  // Linked to this existing property (§3.4): the runner computes it directly
+  // instead of materializing one. Never set together with a live
+  // materializedPropertyId.
+  sourcePropertyId?: string;
 }
 
 export type TPipelineStep = IAnnotationPipelineStep | IPropertyPipelineStep;
@@ -356,6 +373,77 @@ real property document. Options:
 materialized property too (it will otherwise linger in the Annotation Browser).
 Reuse `deleteProperty` (`PropertiesAPI.ts:115`). Make this a confirm, not
 automatic — the user may want to keep the computed values.
+
+### 3.4 Linked steps
+
+**Why.** Users expected a pipeline step built from a tool they had already tuned
+to *be* that tool: change the tool's threshold and the pipeline should use it.
+The original design (§2) only copied the tool's values into the step once, at
+"Add step" time, and property steps always materialized a property of their own
+— so a dataset ended up with two "Blob metrics" properties with independent
+parameters. Options considered:
+
+- **Keep copies, flag drift** (record the source, show "out of sync", offer
+  update-from / push-to buttons). Cheapest, but values still diverge silently
+  until someone clicks.
+- **Reference only** (a step holds just `toolId` / `propertyId`). Matches user
+  expectation exactly, but breaks the portability and no-dangling-reference
+  properties of §2: deleting a tool would break the pipeline.
+- **(chosen) Linked, with a saved copy as fallback.** Described below.
+
+**Model.** `IAnnotationPipelineStep.sourceToolId` and
+`IPropertyPipelineStep.sourcePropertyId` mark a linked step. The step's ordinary
+fields (image, parameters, annotation setup / tags, shape) are kept as a
+*saved copy* of the source. Steps built from a raw worker image are unlinked and
+behave exactly as before. Pure helpers live in `src/utils/pipelineLinks.ts`
+(`resolveLinkedStep`, `stepLinkState`, `toolLinkedFields`,
+`propertyLinkedFields`, `toolWithStepEdits`).
+
+| | Linked to a live tool | Linked to a live property | Source deleted |
+|---|---|---|---|
+| What runs | The tool's current image, parameters, annotation setup, `connectTo`, `jobDateTag` (transient tool built from `resolveLinkedStep`) | The property itself (`submitPropertyJob` on its id); no materialization | The step's saved copy (a property step materializes from it as before) |
+| Editor: worker image | Locked | Locked | Locked |
+| Editor: parameters / tags | Editable; **written back to the tool on Save** | Locked (properties are immutable in the UI) | Locked |
+| Header chip | link icon + tool name | link icon + property name | "source deleted" (warning) |
+| Auto-wiring (§5) | Its output tags feed downstream steps as usual | Skipped: computes on the property's own tags/shape | Same as when live |
+
+**Editor behaviour** (`PipelineEditor.vue`, `PipelineStepEditor.vue`):
+
+- On open, each linked step's saved copy is refreshed from its source
+  (`resolveLinkedStep`) before auto-wiring, and that refreshed clone is the
+  dirty baseline, so opening never reads as an unsaved change. The saved copy
+  is persisted with the next Save.
+- **Write-back on Save.** `linkedToolEdits` compares each tool-linked step with
+  its *last-saved* version (or, for a step added this session, with the tool)
+  and writes only edited steps back, in one `editToolsInConfiguration` call (one
+  `tools` write, rolled back and rethrown on failure). Comparing with the tool
+  alone would revert a tool that was edited elsewhere while the editor was open.
+  The tools write happens **before** the pipeline write; if it fails, nothing is
+  saved and the editor stays dirty.
+- Several steps linked to the same tool are one tool: an edit to one is applied
+  to all of them in the editor, so Save never writes conflicting values.
+- **Unlink** removes `sourceToolId` / `sourcePropertyId` and keeps the current
+  values as an independent step. An unlinked property step gets
+  `autoWired: false` (it keeps the property's tags) and no
+  `materializedPropertyId`, so its next run materializes a new property and the
+  user's property is never touched.
+- "Add step" offers **Existing tool** (links via `sourceToolId`) and **Existing
+  property** (links via `sourcePropertyId`, listing the configuration's
+  properties).
+
+**Never delete a user's property.** A linked property is never assigned to
+`materializedPropertyId`, so drift replacement in `ensureMaterializedProperty`,
+pipeline deletion and property-step removal cannot reach it.
+`isPropertyReferencedByPipelineStep` (renamed from
+`isMaterializedPropertyReferenced`) also counts `sourcePropertyId`, so a
+pipeline-materialized property that another step links to is not deleted when
+its own pipeline replaces or drops it.
+
+**Not linked (by design).** The step *name* and *enabled* flag stay per-step.
+Changing a linked step's worker image requires unlinking (a different worker is
+a different tool). A tool edited elsewhere while the pipeline editor is open is
+not reflected in the open editor until it is reopened; the runner always reads
+the live tool, so runs are unaffected.
 
 ---
 
@@ -724,11 +812,12 @@ Delete) sit at the right. "New pipeline" at the top. No Edit-vs-Run fork.
 - Name/description, an ordered step list (up/down reorder), Add step,
   enable/disable, remove. Editing works on a local clone; auto-wiring (§5) runs
   on load and after every edit.
-- "Add step" → annotation worker / property worker (via `DockerImageSelect.vue`)
-  or **Existing tool**, which imports a worker-backed tool (`type:
-  "segmentation"`) from the configuration — copying its image,
-  `workerInterfaceValues`, annotation setup, `connectTo`, `jobDateTag` into a new
-  annotation step (the inverse of the runner's `buildTransientTool`).
+- "Add step" → annotation worker / property worker (via `DockerImageSelect.vue`),
+  **Existing tool**, which adds an annotation step *linked* to a worker-backed
+  tool (`type: "segmentation"`) — its image, `workerInterfaceValues`, annotation
+  setup, `connectTo`, `jobDateTag` start as a copy of the tool's (the inverse of
+  the runner's `buildTransientTool`) — or **Existing property**, which adds a
+  property step linked to a configuration property. See §3.4.
 - Per-step editor reuses `WorkerInterfaceValues.vue` and (for annotation steps)
   `AnnotationConfiguration.vue`. **Do not build new parameter widgets.**
 - **Run status is inline on the same step rows**: a spinner while running, then
@@ -819,3 +908,37 @@ Each of 1–3 is independently reviewable and testable before any UI exists.
    plumbing.)
 4. **Whether v1 ships batch-across-datasets** or defers to v2. (Recommend defer;
    the runner already takes `datasetId` so it's additive.)
+
+## Regression checklist
+
+Linked steps (§3.4):
+
+- A tool-linked step runs with the tool's current values, not its saved copy —
+  *"runs a linked annotation step with its tool's current values"*.
+- With the tool deleted, it runs its saved copy —
+  *"runs a linked annotation step from its saved copy when the tool is gone"*.
+- A property-linked step computes the user's property directly: no
+  materialization, no deletion, no configuration write —
+  *"computes a linked property step on the existing property without materializing"*.
+- With the property deleted, it materializes from its saved copy —
+  *"materializes a linked property step from its saved copy when the property is gone"*.
+- Drift replacement never deletes a property another step links to —
+  *"does not delete a drifted-away property that another step links to"*.
+- Deleting a pipeline never deletes a linked property —
+  *"never deletes a linked property when its pipeline is deleted"*.
+- Opening the editor refreshes linked copies without reading as dirty —
+  *"refreshes a linked step's saved copy from its tool on open, without marking it dirty"*.
+- Save writes an edited linked step back to its tool —
+  *"writes an edited linked step back to its tool on save"*; and an unedited
+  step never reverts a tool changed elsewhere —
+  *"does not write an unedited linked step back over a tool changed elsewhere"*.
+- A failed tool write saves nothing —
+  *"does not save the pipeline when writing a linked tool back fails"*.
+- Steps sharing a tool stay consistent —
+  *"applies an edit of one linked step to the other steps linked to the same tool"*.
+- Auto-wiring leaves property-linked steps alone —
+  *"does not auto-wire a step linked to an existing property"*.
+- The multi-tool write is one `tools` write, keeps pins and selection, and rolls
+  back with the original message —
+  *"edits several tools with one write, keeping pins and the selection"*,
+  *"rolls back a multi-tool edit whose write fails, with the original message"*.

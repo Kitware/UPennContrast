@@ -16,6 +16,7 @@ import { createProgressEventCallback, createErrorEventCallback } from "./jobs";
 import progress from "./progress";
 import { BATCH_DATASET_LIMIT } from "./constants";
 import { logError } from "@/utils/log";
+import { findSourceProperty, resolveLinkedStep } from "@/utils/pipelineLinks";
 
 import {
   AnnotationShape,
@@ -147,9 +148,10 @@ export class Pipelines extends VuexModule {
   }
 
   // True when some OTHER step (optionally excluding one pipeline / one step)
-  // still points its materializedPropertyId at `propertyId`. Used to avoid
+  // still uses `propertyId`, either as its materialized property or as the
+  // existing property it is linked to (sourcePropertyId). Used to avoid
   // deleting a property that another pipeline (or another step) relies on.
-  get isMaterializedPropertyReferenced() {
+  get isPropertyReferencedByPipelineStep() {
     return (
       propertyId: string,
       exclude: { pipelineId?: string; stepId?: string } = {},
@@ -160,7 +162,8 @@ export class Pipelines extends VuexModule {
           p.steps.some(
             (s) =>
               s.kind === "property" &&
-              s.materializedPropertyId === propertyId &&
+              (s.materializedPropertyId === propertyId ||
+                s.sourcePropertyId === propertyId) &&
               s.id !== exclude.stepId,
           ),
       );
@@ -197,7 +200,9 @@ export class Pipelines extends VuexModule {
       removableIds.push(
         ...[...materializedPropertyIds].filter(
           (propertyId) =>
-            !this.isMaterializedPropertyReferenced(propertyId, { pipelineId }),
+            !this.isPropertyReferencedByPipelineStep(propertyId, {
+              pipelineId,
+            }),
         ),
       );
     }
@@ -218,7 +223,7 @@ export class Pipelines extends VuexModule {
   @Action
   async deleteUnreferencedMaterializedProperties(propertyIds: string[]) {
     const removableIds = [...new Set(propertyIds)].filter(
-      (propertyId) => !this.isMaterializedPropertyReferenced(propertyId),
+      (propertyId) => !this.isPropertyReferencedByPipelineStep(propertyId),
     );
     if (removableIds.length > 0) {
       await properties.deleteProperties(removableIds);
@@ -290,7 +295,7 @@ export class Pipelines extends VuexModule {
       if (
         staleId &&
         staleId !== created.id &&
-        !this.isMaterializedPropertyReferenced(staleId, { stepId: step.id })
+        !this.isPropertyReferencedByPipelineStep(staleId, { stepId: step.id })
       ) {
         await properties.deleteProperty(staleId);
       }
@@ -443,10 +448,26 @@ export class Pipelines extends VuexModule {
           completionPromise: Promise<boolean>;
         } | null = null;
 
+        // A linked step runs its source's current values; with the source
+        // gone, it runs its saved copy (the step itself).
+        const linkedProperty = findSourceProperty(step, properties.properties);
         if (step.kind === "annotation") {
-          const tool = buildTransientTool(step);
+          const runStep = resolveLinkedStep(
+            step,
+            main.tools,
+            properties.properties,
+          ) as IAnnotationPipelineStep;
           submitted = await annotations.submitAnnotationWorkerJob({
-            tool,
+            tool: buildTransientTool(runStep),
+            datasetId: targetDatasetId,
+            eventCallback,
+            errorCallback,
+          });
+        } else if (linkedProperty) {
+          // Compute the user's own property directly: no materialized copy,
+          // and nothing here may replace or delete it.
+          submitted = await properties.submitPropertyJob({
+            property: linkedProperty,
             datasetId: targetDatasetId,
             eventCallback,
             errorCallback,

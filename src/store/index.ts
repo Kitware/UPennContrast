@@ -1395,6 +1395,42 @@ export class Main extends VuexModule {
     this.syncConfiguration("tools");
   }
 
+  // Replace several tools with one write of the tools key, rolling back and
+  // rethrowing on failure (rawError keeps the message). Used by the pipeline
+  // editor to write linked steps' edits back to their tools. Unknown ids are
+  // ignored; like editToolInConfiguration, the stored pin is kept.
+  @Action({ rawError: true })
+  async editToolsInConfiguration(tools: IToolConfiguration[]) {
+    const configuration = this.configuration;
+    if (!configuration || tools.length === 0) {
+      return;
+    }
+    const editedById = new Map(tools.map((tool) => [tool.id, tool]));
+    const previous = configuration.tools;
+    const next = previous.map((current) => {
+      const edited = editedById.get(current.id);
+      return edited ? { ...edited, pinned: current.pinned } : current;
+    });
+    this.setConfigurationTools(next);
+    const selectedId = this.selectedTool?.configuration.id;
+    const selectedEdit = next.find(
+      (tool) => tool.id === selectedId && editedById.has(tool.id),
+    );
+    if (selectedEdit) {
+      this.setSelectedToolImpl(selectedEdit);
+    }
+    try {
+      await this.syncConfiguration({ key: "tools", throwOnError: true });
+    } catch (error) {
+      this.setConfigurationTools(previous);
+      const previousSelected = previous.find((tool) => tool.id === selectedId);
+      if (selectedEdit && previousSelected) {
+        this.setSelectedToolImpl(previousSelected);
+      }
+      throw error;
+    }
+  }
+
   // Pinning only changes where the Tools palette lists a tool: one write of
   // the tools key, and a selected tool keeps its state (setSelectedToolImpl
   // only swaps the configuration for the same id).
