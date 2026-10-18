@@ -1104,6 +1104,9 @@ export interface IGeoJSLayerSpec {
   minLevel?: number;
   maxLevel?: number;
   nearestPixel?: boolean | number;
+  // Keep coarser levels' tiles drawn beneath the current one (GeoJS default
+  // true). Transparent overlays need false or the coarse tiles show through.
+  keepLower?: boolean;
   queue?: IGeoJSFetchQueue;
   tileHeight: number;
   tileOffset: () => IGeoJSPoint2D;
