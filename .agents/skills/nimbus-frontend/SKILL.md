@@ -327,7 +327,9 @@ the new configuration's `fetchProperties` without awaiting it, so for a while
 `properties.properties` is still the previous configuration's list, and
 `setProperties`/`deleteProperty` would save it as the new one's `propertyIds`
 (`setProperties` therefore refuses a list whose `propertiesConfigurationId`
-is not the loaded configuration, and `createProperty` registers nothing if a
+is not the loaded configuration, including `null`: a list no fetch has loaded
+is no configuration's, and treating "unknown" as safe let a stale list through
+after a failed first fetch; and `createProperty` registers nothing if a
 switch lands during its request). Keep a run-local record of what the action produced and merge it in
 just before the final write: a switch away and back reloads the configuration
 from the server, without anything merged into the old object.

@@ -60,6 +60,9 @@ describe("createProperty propagates the real failure reason", () => {
         propertyIds: [],
       } as any,
     });
+    // As if c1's properties fetch had landed: setProperties saves only a
+    // list a fetch loaded for the loaded configuration.
+    setListConfiguration("c1");
   });
 
   afterEach(() => {
@@ -168,8 +171,44 @@ describe("createProperty propagates the real failure reason", () => {
       .mockResolvedValue({} as any);
 
     expect(await messageOf(propertyStore.deleteProperty("from-c1"))).toContain(
-      "Another configuration was opened",
+      "have not loaded",
     );
+    expect(sync).not.toHaveBeenCalled();
+    expect(main.configuration!.propertyIds).toEqual(["from-c2"]);
+  });
+
+  it("refuses to save a property list no fetch has loaded", async () => {
+    // c1's fetch never landed (still loading, or it failed), then c2 opens
+    // before its own fetch lands: the loaded list belongs to neither.
+    setListConfiguration(null);
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([]);
+    (main as any).setConfigurationImpl({
+      id: "c2",
+      data: {
+        id: "c2",
+        name: "other",
+        layers: [],
+        tools: [],
+        scales: {},
+        propertyIds: ["from-c2"],
+      } as any,
+    });
+    vi.spyOn(propertyStore.propertiesAPI, "createProperty").mockResolvedValue({
+      id: "p1",
+      name: "area",
+    } as any);
+    const sync = vi
+      .spyOn(main.api, "updateConfigurationKey")
+      .mockResolvedValue({} as any);
+
+    expect(
+      await messageOf(propertyStore.createProperty({ name: "area" } as any)),
+    ).toContain("have not loaded");
+    // Saving would have replaced c2's properties with just the new one.
     expect(sync).not.toHaveBeenCalled();
     expect(main.configuration!.propertyIds).toEqual(["from-c2"]);
   });
@@ -183,7 +222,6 @@ describe("createProperty propagates the real failure reason", () => {
       { id: "p1", name: "Area" },
       { id: "p2", name: "Perimeter" },
     ]);
-    setListConfiguration("c1");
     const sync = vi
       .spyOn(main.api, "updateConfigurationKey")
       .mockResolvedValue({} as any);
@@ -200,7 +238,6 @@ describe("createProperty propagates the real failure reason", () => {
         setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
       }
     ).setPropertiesImpl([{ id: "p1", name: "Area" }]);
-    setListConfiguration("c1");
     vi.spyOn(main.api, "updateConfigurationKey").mockImplementation(
       async () => {
         (main as any).setConfigurationImpl({

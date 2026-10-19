@@ -236,7 +236,9 @@ export class Properties extends VuexModule {
   properties: IAnnotationProperty[] = [];
   // The configuration whose fetch filled `properties`. After a switch the
   // list is still the previous configuration's until the new fetch lands
-  // (setConfiguration does not await it). Null until the first fetch.
+  // (setConfiguration does not await it). Null until a fetch succeeds.
+  // setProperties saves only a list whose owner is the loaded
+  // configuration.
   propertiesConfigurationId: string | null = null;
 
   displayedPropertyPaths: string[][] = [];
@@ -1286,17 +1288,16 @@ export class Properties extends VuexModule {
   @Action({ rawError: true })
   protected async setProperties(properties: IAnnotationProperty[]) {
     // The list is saved as the loaded configuration's propertyIds, so it
-    // must be that configuration's list: a write made from the previous
-    // configuration's (an import rollback, a delete, a create right after a
-    // switch) would replace the new one's properties with the old ones.
+    // must be the list a fetch loaded for that configuration. One from the
+    // previous configuration (an import rollback, a delete, a create right
+    // after a switch) would replace the new one's properties with the old
+    // ones, and one no fetch has loaded yet (still loading, or the fetch
+    // failed) would replace them with whatever the write adds.
     const configurationId = main.configuration?.id;
-    if (
-      this.propertiesConfigurationId !== null &&
-      this.propertiesConfigurationId !== configurationId
-    ) {
+    if (this.propertiesConfigurationId !== configurationId) {
       throw new Error(
-        "Another configuration was opened, so the property list was not " +
-          "saved. Try again once it has loaded.",
+        "The properties of this configuration have not loaded, so the " +
+          "property list was not saved. Try again once they have loaded.",
       );
     }
     const previous = this.properties;

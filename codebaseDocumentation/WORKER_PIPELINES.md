@@ -583,9 +583,10 @@ Behavior (mirror `computeAnnotationsWithWorkerBatch`):
      configuration's `propertyIds` from the loaded property list, which may
      still be the previous configuration's until the new one's fetch lands.
      The properties store enforces this for every caller: `setProperties`
-     refuses to save a list that a fetch loaded for another configuration
-     (`propertiesConfigurationId`), and skips the plot and track-label
-     reconcile when a switch lands during its save.
+     saves only a list that a fetch loaded for the loaded configuration
+     (`propertiesConfigurationId`; it refuses one loaded for another
+     configuration, and one no fetch has loaded yet), and skips the plot and
+     track-label reconcile when a switch lands during its save.
    - `progress.complete(perStepProgressId)`; bump the top-level progress.
 5. After the loop (once, not per step): `annotationStore.fetchAnnotations()`,
    `propertiesStore.fetchPropertyValues()`, `filters.updateHistograms()`, and
@@ -1040,6 +1041,7 @@ Linked steps (§3.4):
   *"keeps ids materialized before a switch away and back"*,
   *"registers nothing when another configuration opens during the create request"*,
   *"refuses to save a property list loaded for another configuration"*,
+  *"refuses to save a property list no fetch has loaded"*,
   *"does not reconcile another configuration's plots after a switch during the save"*,
   *"does not reload linked properties for a batch whose configuration switched before the reload"*.
 - The runner re-wires property steps to what a linked tool produces now, but
