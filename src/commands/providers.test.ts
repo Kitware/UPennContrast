@@ -26,6 +26,7 @@ vi.mock("@/store", async () => {
       { text: "Blob", value: "polygon" },
     ],
     requestPaletteOpen: vi.fn(),
+    openAnnotationBrowserTab: vi.fn(),
     setSelectedToolId: vi.fn(),
     toggleLayerVisibility: vi.fn(),
     setIsColorByPropertyDialogOpen: vi.fn(),
@@ -276,9 +277,10 @@ describe("propertyListCommands", () => {
       "property.list.p1.Area",
     ]);
     commands[0].run();
-    expect(mocks.store.requestPaletteOpen).toHaveBeenCalledWith([
-      "annotationPanel",
-    ]);
+    // The Objects tab, not just the panel: the column must be in sight.
+    expect(mocks.store.openAnnotationBrowserTab).toHaveBeenCalledWith(
+      "objects",
+    );
     expect(mocks.properties.togglePropertyPathVisibility).toHaveBeenCalledWith([
       "p1",
       "Area",
@@ -288,9 +290,9 @@ describe("propertyListCommands", () => {
   it("does not reopen the Object Browser when hiding a column", () => {
     mocks.properties.computedPropertyPaths = [["p1", "Area"]];
     mocks.properties.displayedPropertyPaths = [["p1", "Area"]];
-    mocks.store.requestPaletteOpen.mockClear();
+    mocks.store.openAnnotationBrowserTab.mockClear();
     propertyListCommands(ctx)()[0].run();
-    expect(mocks.store.requestPaletteOpen).not.toHaveBeenCalled();
+    expect(mocks.store.openAnnotationBrowserTab).not.toHaveBeenCalled();
     expect(mocks.properties.togglePropertyPathVisibility).toHaveBeenCalledWith([
       "p1",
       "Area",

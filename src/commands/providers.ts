@@ -190,7 +190,9 @@ export function propertyListCommands(ctx: IProviderContext): TCommandProvider {
         enabled: () => ctx.inViewer() && (isShown || !isFull),
         run: () => {
           if (!isShown) {
-            store.requestPaletteOpen(["annotationPanel"]);
+            // The Objects tab, not just the panel: on the Measurements or
+            // Connections tab the new column would stay out of sight.
+            store.openAnnotationBrowserTab("objects");
           }
           propertyStore.togglePropertyPathVisibility(path);
         },

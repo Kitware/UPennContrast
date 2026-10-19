@@ -123,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import filterStore from "@/store/filters";
 import store from "@/store";
 import { ITagAnnotationFilter } from "@/store/model";
@@ -144,6 +144,18 @@ const props = withDefaults(
 
 const advancedOpen = ref(false);
 const propertyValuesOpen = ref(filterStore.filterPaths.length > 0);
+
+// Expand Property values when a filter is added from anywhere else (the
+// command palette's "Add filter: …", the AI agent): otherwise the new filter
+// sits inside a collapsed section. Closing it again stays the user's choice.
+watch(
+  () => filterStore.filterPaths.length,
+  (count, previous) => {
+    if (count > previous) {
+      propertyValuesOpen.value = true;
+    }
+  },
+);
 
 const selectionFilterEnabled = computed(
   () => filterStore.selectionFilter.enabled,
