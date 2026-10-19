@@ -1006,6 +1006,11 @@ Linked steps (§3.4):
   *"keeps a linked step's saved copy when a settings edit comes in"*,
   *"leaves an unlinked step's settings editable"*,
   *"keeps only the name and enabled flag from an edit to a linked step"*.
+- Every control in a locked section renders disabled, not just inert. A child
+  that forwards an explicit `disabled: false` overrides the provider's global
+  default (TagPicker did, leaving the Tags field looking editable), so pass
+  `undefined` when not disabled —
+  *"inherits a disabled default from a v-defaults-provider"*.
 - Viewing writes nothing, and re-emits change nothing —
   *"shows a linked step's defaults without writing them on mount"*,
   *"does not treat a child re-emitting a linked step with undefined keys as an edit"*,

@@ -566,6 +566,8 @@ defaults: {
 }
 ```
 
+**An explicit prop beats a `v-defaults-provider` default.** A wrapper that forwards `:disabled="disabled"` with a `false` default passes `false` explicitly, which overrides a surrounding `<v-defaults-provider :defaults="{ global: { disabled: true } }">`. A locked pipeline step's Tags field rendered editable-looking this way while every other field dimmed. Forward `:disabled="disabled || undefined"` so an unset prop falls through to the provider. Test it by mounting under `VDefaultsProvider` and asserting the `v-input--disabled` class: `findComponent().props("disabled")` reads the raw prop and returns `null` either way.
+
 ## @girder/components Compatibility
 
 `@girder/components@4.0.0` depends on `vuetify: ^3.10.1` — no Vuetify 4-compatible version exists yet. Key issues:
