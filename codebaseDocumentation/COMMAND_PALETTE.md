@@ -136,7 +136,10 @@ and login). Never send keystrokes to the network while the user types.
   buttons.
 - **Discoverability:**
   - a visible search button in the app bar with the tooltip "Search commands
-    (⌘K)";
+    (⌘K)": a compact pill (magnifier + hotkey hint) at `lg` and up, the bare
+    icon below. Keep it compact — the viewer's app bar is already full at
+    1024px, and a field-width trigger pushed the account and AI buttons off
+    screen;
   - a line in the Tab help overlay (`HelpPanel.vue`);
   - an anchor so a tour can point at it (`src/tours/anchors.ts`).
 - Bind ⌘K/Ctrl+K with `v-mousetrap` (not a raw `keydown` listener), with
@@ -312,12 +315,83 @@ names included).
   an action both sides can do means a catalog entry plus a shared operation,
   not a second implementation.
 
+## Viewer controls, aliases and property columns
+
+Every viewer control with a hotkey or a switch now has a command, registered
+with `useCommand` in the component that owns the control:
+
+| Component | Commands |
+| --- | --- |
+| `ImageViewer.vue` | Show/Hide objects (A), object tooltips (T), Lock/Unlock pan and zoom (L), Copy/Paste/Delete selected objects, Clear selection |
+| `DisplayLayers.vue` | Z max-merge all layers (Z), Show/Hide all layers (0) |
+| `DisplayLayer.vue` | Z max-merge layer: X (⇧N). Here rather than in a provider: turning it off restores the layer's previous slice, which only the component remembers |
+| `LayersPanel.vue` | Layer mode: Single / Multiple / Unroll, Add layer |
+| `NavigatorPanel.vue` | Next/Previous XY, Z, time point (w/r, d/e, s/f), Unroll XY/Z/T, time lapse mode. The Navigator's unroll watch is what refreshes the dataset, so the unroll commands go through it |
+| `LargeImageDropdown.vue` | Switch image: X |
+| `ViewerSettings.vue`, `AnnotationToggles.vue` | Scale bar, minimap, values on hover, point scaling, dimension labels, background color, connections, only show objects passing filters |
+
+Boolean settings use `toggleCommands` (`src/commands/toggles.ts`): the title
+names what running the command will do, so it flips with the setting.
+
+**Gate commands registered inside a right-hand palette.** The Settings,
+Object Browser and Snapshots palettes stay mounted on every route
+(FloatingPalette uses `v-show`), so "registered by a viewer component" does
+not mean "only in the viewer". Give such commands `useInViewer()` from
+`src/commands/context.ts` (`toggleCommands` takes it as `when`). Without it,
+"Hide scale bar" and nine other Settings commands appeared on the dataset
+list. Match each command's `enabled` to its control's `:disabled` too
+(connections, filtered draw and tooltips are off while objects are hidden).
+
+Hotkeys and their commands share one handler (`toggleDrawAnnotations`,
+`stepDimension`, `deleteSelectedObjects`), so a fix to one reaches the other.
+`deleteSelectedObjects` (`src/utils/`) is also the Object Browser's Delete:
+in server-list mode it deletes the selected ids and refreshes the page, which
+the mod+backspace hotkey previously skipped (it deleted nothing there).
+
+**Property columns and filters.** `propertyListCommands` and
+`propertyFilterCommands` (in `providers.ts`) offer "Show in object list: X" /
+"Hide from object list: X" and "Add filter: X" / "Remove filter: X" for every
+property value path, so "list area" finds the Area columns. Adding a column
+opens the Object Browser; adding a filter opens Filters.
+
+**Aliases.** `ICommand.aliases` are other names for the command itself. A
+query equal to an alias scores 950 (below only an exact title, above another
+command's title prefix, so "filter" finds the Filters panel before the
+"Add filter: …" rows) and a prefix of one (3+ characters) 800, above any
+per-word match. Panels take theirs from
+`IPanelDefinition.aliases`, so "objects" opens the Object Browser and
+"measurements" the Analysis panel before the many commands whose titles only
+mention the word. The scorer also tries a plural query word's singular
+("tools" → "Tool") at a small discount.
+
+**Ask Nimbus AI.** A robot button at the end of the search field, and
+⌘↵ / Ctrl+Enter, hand the query to the AI panel. Both are offered wherever
+the "Open Nimbus AI panel" command is enabled, and the empty state names the
+shortcut. (A first version put an "Ask Nimbus AI" row at the bottom of the
+results; it was out of sight below the scroll.) Running it sets
+`aiPromptRequest` (`src/commands/requests.ts`); App.vue opens the panel, and
+`AiPanel.vue` puts the text in its input and focuses it without sending, so
+the user can edit it first.
+
+**Example queries.** The search field's placeholder shows three example
+queries ("Try: z 3 · show only DAPI · list Area") and moves to the next three
+each time the palette opens and every 4 s while it is open. They come from
+`paletteExamples` (`src/commands/examples.ts`), which builds them from the
+open dataset (a slice that exists, the first layer, an Area-like property),
+so a first try succeeds: a first query that finds nothing loses the user.
+The timer runs only while the palette is open.
+
+**Still missing:** tag and color selected objects (need an input), dark mode
+(Vuetify's `useTheme` is component-local), select all matching objects
+(server-list mode logic lives in `AnnotationList.vue`), and switching the
+Object Browser's tabs (Objects / Measurements / Connections).
+
 ## Regression checklist
 
 Each line names an invariant and the test that holds it, so a change here means
 re-checking the list rather than rediscovering it.
 
-Run `pnpm test src/commands src/actions src/components/CommandPalette.test.ts src/components/DataIOMenu.test.ts src/utils/v-mousetrap.test.ts src/App.commands.test.ts src/App.test.ts src/utils/panelRegistry.test.ts src/tools/creation/toolTypeCatalog.test.ts src/tools/toolsets/Toolset.test.ts src/components/Snapshots.test.ts src/components/AnnotationBrowser/ColorByPropertyDialog.test.ts`.
+Run `pnpm test src/commands src/actions src/components/CommandPalette.test.ts src/components/AiPanel.test.ts src/components/ViewerSettings.test.ts src/utils/deleteSelectedObjects.test.ts src/components/DataIOMenu.test.ts src/utils/v-mousetrap.test.ts src/App.commands.test.ts src/App.test.ts src/utils/panelRegistry.test.ts src/tools/creation/toolTypeCatalog.test.ts src/tools/toolsets/Toolset.test.ts src/components/Snapshots.test.ts src/components/AnnotationBrowser/ColorByPropertyDialog.test.ts`.
 
 ### Self-updating
 
@@ -330,6 +404,9 @@ Run `pnpm test src/commands src/actions src/components/CommandPalette.test.ts sr
 
 - [ ] **Letters of any script stay searchable** ("α-tubulin", µ ↔ μ); an ASCII-only normalizer erased them. — _"keeps non-Latin letters searchable (α-tubulin, µ)"_
 - [ ] **Name, initials, description, synonym and diacritics matches.** — _"ranks the worker first for its name"_, _"matches a run of the title's word initials ('cs' → Cellpose-SAM)"_, _"matches a description word ('segment nuclei' finds Cellpose)"_, _"matches through a synonym (spots → puncta)"_, _"matches ignoring diacritics in either direction"_
+- [ ] **A query naming a panel finds the panel first** ("objects", "obj", "measurements"), through its aliases. — _"ranks a panel by its alias above titles that only mention the word"_
+- [ ] **An exact alias outranks another command's title prefix**, so "filter" finds the Filters panel above 50+ "Add filter: …" rows. — _"ranks an exact alias above another command's title prefix"_
+- [ ] **A plural query word matches a singular title word.** — _"matches a plural query word against a singular title word"_
 - [ ] **Every query word must match**, and results are capped. — _"requires every query word to match"_, _"returns nothing for an empty query and caps results"_
 
 ### Running commands
@@ -355,6 +432,20 @@ Run `pnpm test src/commands src/actions src/components/CommandPalette.test.ts sr
 - [ ] **Selecting a shape card doesn't write into the shared template list.** — _"selecting a shape card does not write into the shared template"_
 - [ ] **Requests are cleared once honored, and a logged-out request is dropped.** — _"drops the request without opening when logged out"_, _"loads a snapshot requested from the command palette, then clears it"_, _"selects it when the dialog is already open"_
 - [ ] **Panel commands go through the owner's toggle**, so the companion rules apply. — _"flips Open/Close with the palette's state and toggles through the owner"_
+
+### Viewer controls and property columns
+
+- [ ] **"list area" finds the Area column; adding opens the Object Browser, hiding doesn't.** — _"offers each property as an object-list column, found by 'list area'"_, _"does not reopen the Object Browser when hiding a column"_
+- [ ] **Commands registered in an always-mounted palette are viewer-only.** — _"offers its palette commands only on the viewer route"_
+- [ ] **"Show in object list" is withheld at the column cap; "Hide from" stays.** — _"withholds 'Show in' once the list is full, but still offers 'Hide from'"_
+- [ ] **Delete selected works in server-list mode from every entry point.** — _"deletes the selected ids, clears them and refreshes the page in server mode"_, _"uses the store action in local list mode"_
+- [ ] **A typed command shares its group's header with ranked matches.** — _"lists a typed command and ranked matches of its group under one header"_
+- [ ] **Property filters toggle through the Filters store.** — _"adds a property's filter, or removes one already there"_
+- [ ] **A setting's command is titled by what it will do, and flips it.** — _"titles each command by what running it will do, and flips the setting"_
+- [ ] **Ask Nimbus AI (field button and mod+Enter) works with no match, hands over the trimmed query, beats the highlighted row on mod+Enter, and only appears where the AI panel can open.** — _"asks Nimbus AI from the field's button or mod+Enter, even with no match"_, _"shows no Ask Nimbus AI button where the AI panel can't open"_, _"is mod+Enter with no other modifier, per platform"_, _"opens the AI panel for a palette prompt, only when it may open"_
+- [ ] **The AI panel fills, focuses and does not send a palette prompt**, whether it arrives before or after the panel mounts, and keeps an unsent draft. A prompt the gate refuses is dropped, not left pending. — _"fills its input from a palette request made before it mounted, without sending"_, _"takes a request that arrives while it is open"_, _"keeps an unsent draft, adding the prompt on a new line"_
+- [ ] **Placeholder examples come from the dataset, rotate while open, and stop when closed.** — _"builds viewer examples from the dataset: a real slice, layer and property"_, _"omits examples the dataset can't satisfy"_, _"rotates dataset-based example queries in the placeholder while open, and stops when closed"_
+- [ ] **The app-bar search trigger stays compact** (magnifier + hotkey hint, icon only below `lg`), so the viewer's account and AI buttons stay on screen. — _"shows a compact search pill that opens the command palette"_
 
 ### Parameterized commands
 

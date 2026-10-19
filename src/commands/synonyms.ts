@@ -13,6 +13,8 @@ const SYNONYM_GROUPS: readonly string[][] = [
   ["download", "export"],
   ["upload", "import"],
   ["plot", "plots", "graph", "chart", "analysis"],
+  ["merge", "merged", "projection", "mip"],
+  ["hide", "show", "toggle"],
 ];
 
 const SYNONYMS = new Map<string, string[]>();

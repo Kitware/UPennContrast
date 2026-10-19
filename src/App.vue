@@ -389,21 +389,26 @@
         <data-io-menu class="ml-1" />
       </template>
       <div class="mx-4 d-flex align-center">
-        <!-- A button, not an input: it only opens the palette (typing happens
-             there). It is drawn as a search field so the palette is
-             discoverable; below the `sm` breakpoint it collapses to the icon. -->
-        <v-btn
-          :data-tour="TOUR_ANCHORS.commandPaletteButton"
-          class="palette-search"
-          variant="text"
-          size="small"
-          aria-label="Search commands"
-          @click="commandPaletteOpen = true"
-        >
-          <v-icon>mdi-magnify</v-icon>
-          <span class="palette-search-label">Search commands…</span>
-          <kbd class="palette-search-kbd">{{ commandPaletteHotkey }}</kbd>
-        </v-btn>
+        <!-- A compact pill (magnifier + hotkey hint) so the palette is
+             discoverable without crowding the viewer's app bar; the palette
+             itself opens centered, so the trigger needn't look like a field.
+             Below the `lg` breakpoint it collapses to the icon. -->
+        <v-tooltip :text="`Search commands (${commandPaletteHotkey})`">
+          <template v-slot:activator="{ props: activatorProps }">
+            <v-btn
+              v-bind="activatorProps"
+              :data-tour="TOUR_ANCHORS.commandPaletteButton"
+              class="palette-search"
+              variant="text"
+              size="small"
+              aria-label="Search commands"
+              @click="commandPaletteOpen = true"
+            >
+              <v-icon>mdi-magnify</v-icon>
+              <kbd class="palette-search-kbd">{{ commandPaletteHotkey }}</kbd>
+            </v-btn>
+          </template>
+        </v-tooltip>
         <v-menu>
           <template v-slot:activator="{ props: activatorProps }">
             <v-btn
@@ -721,6 +726,7 @@ import {
 } from "@/utils/panelRegistry";
 import { useCommand, useCommandProvider } from "@/commands/registry";
 import { panelCommands, tourCommands } from "@/commands/providers";
+import { aiPromptRequest } from "@/commands/requests";
 import { isTourAvailableOnRoute, useViewerContext } from "@/commands/context";
 import { boundHotkey, formatHotkey } from "@/commands/hotkeys";
 
@@ -884,6 +890,20 @@ watch(
   (userId) => aiPanelStore.handleAuthenticatedUserChange(userId),
   { immediate: true },
 );
+
+// "Ask Nimbus AI: …" from the command palette: open the panel; AiPanel.vue
+// puts the text in its input and clears the request.
+watch(aiPromptRequest, (prompt) => {
+  if (prompt == null) {
+    return;
+  }
+  if (canUseAiPanel.value) {
+    aiPanelOpen.value = true;
+  } else {
+    // Drop it rather than leave it for the next time the panel mounts.
+    aiPromptRequest.value = null;
+  }
+});
 
 // Close the panel if the gate closes under it (e.g. the user logs out).
 watch(canUseAiPanel, (usable) => {
@@ -1424,6 +1444,7 @@ useCommand(() => [
     group: "Actions",
     description: "Configure and run property computations",
     keywords: ["compute", "property", "area", "intensity"],
+    aliases: ["measure", "measurements", "compute properties"],
     icon: "mdi-ruler-square",
     enabled: inViewer,
     run: () => {
@@ -1655,13 +1676,12 @@ $palette-cluster-tone: #0f1217;
   border: 1px solid var(--nimbus-border, rgba(255, 255, 255, 0.08));
 }
 
-/* Field-looking button that opens the command palette. Wide: a pill with
-   the magnifier, placeholder text and the hotkey hint. Narrow: only the icon
-   (the label and hint are hidden, the button shrinks to a 36px circle). */
+/* Compact pill that opens the command palette: the magnifier and the hotkey
+   hint. Below `lg` only the icon shows (a 36px circle), since the viewer's
+   app bar is already full at those widths. */
 .palette-search.v-btn {
-  width: 264px;
   min-width: 0;
-  padding: 0 8px 0 10px;
+  padding: 0 6px 0 8px;
   border-radius: 100px;
   text-transform: none;
   letter-spacing: normal;
@@ -1677,19 +1697,7 @@ $palette-cluster-tone: #0f1217;
 }
 
 .palette-search.v-btn :deep(.v-btn__content) {
-  flex: 1 1 auto;
-  min-width: 0;
-  justify-content: flex-start;
-  gap: 8px;
-}
-
-.palette-search-label {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  gap: 6px;
 }
 
 .palette-search-kbd {
@@ -1704,21 +1712,15 @@ $palette-cluster-tone: #0f1217;
   line-height: 1.4;
 }
 
-@media (max-width: 959px) {
+@media (max-width: 1279px) {
   .palette-search.v-btn {
     width: 36px;
     height: 36px;
     padding: 0;
-    justify-content: center;
     border-color: transparent;
     background: transparent;
-
-    :deep(.v-btn__content) {
-      justify-content: center;
-    }
   }
 
-  .palette-search-label,
   .palette-search-kbd {
     display: none;
   }

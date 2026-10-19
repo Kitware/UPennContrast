@@ -405,6 +405,32 @@ Vuetify 4 changed the default theme from `"light"` to `"system"`. Our config set
 }
 ```
 
+### The viewer's app bar is already full — measure before widening a control
+
+On the dataset view the app bar holds about 20 controls and already overflows
+by ~50px at 1024px wide. Anything wider than an icon pushes the right-hand
+buttons (help, account, Nimbus AI) off screen with no scrollbar and no error;
+a 264px search-field trigger hid all three anywhere from 960px to ~1300px.
+Before widening an app-bar control, measure on the **viewer** route (not the
+home page, which has half the controls) at 1024 and 1280px:
+
+```js
+const ai = document.querySelector('[aria-label="Nimbus AI panel"]');
+[innerWidth, Math.round(ai.getBoundingClientRect().right)]  // right must be <= innerWidth
+```
+
+Collapse to an icon below `lg` (1280px) rather than `md`.
+
+### Palette commands registered in a right-hand palette are global unless gated
+
+`useCommand` registers for the component's lifetime, and the right-hand
+FloatingPalettes (Settings, Object Browser, Snapshots) keep their content
+mounted on **every** route via `v-show`. So a command registered in, say,
+`ViewerSettings.vue` shows on the dataset list too. Gate it with
+`useInViewer()` from `src/commands/context.ts`, and set each command's
+`enabled` to match its control's `:disabled`. The left palettes (Navigator,
+Layers, Tools) and `ImageViewer.vue` mount only in the viewer.
+
 ### Select/Combobox Slot Items (No `.raw` Wrapper)
 
 Vuetify 4 removed the `.raw` wrapper from select slot items. Items are passed directly. This applies to ALL slot types: `#item`, `#chip`, and `#selection`.

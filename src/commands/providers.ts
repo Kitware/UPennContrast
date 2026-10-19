@@ -1,9 +1,11 @@
 import store from "@/store";
 import { selectTool } from "@/actions/operations";
 import propertyStore from "@/store/properties";
+import filterStore from "@/store/filters";
+import { MAX_DISPLAYED_PROPERTY_PATHS } from "@/store/constants";
 import { ITourMetadata } from "@/store/model";
 import { boundHotkey } from "./hotkeys";
-import { createPathStringFromPathArray } from "@/utils/paths";
+import { createPathStringFromPathArray, findIndexOfPath } from "@/utils/paths";
 import { snapshotKey } from "@/utils/snapshotKey";
 import { PANELS, PanelId } from "@/utils/panelRegistry";
 import {
@@ -134,9 +136,7 @@ export function propertyCommands(ctx: IProviderContext): TCommandProvider {
       const pathKey = createPathStringFromPathArray(path);
       return {
         id: `property.colorBy.${pathKey}`,
-        title: `Color by: ${
-          propertyStore.getFullNameFromPath(path) ?? path.join(" / ")
-        }`,
+        title: `Color by: ${propertyLabel(path)}`,
         group: "Properties",
         keywords: ["color", "colour", "colormap", "property"],
         icon: "mdi-palette",
@@ -150,6 +150,74 @@ export function propertyCommands(ctx: IProviderContext): TCommandProvider {
         },
       };
     });
+}
+
+function propertyLabel(path: string[]) {
+  return propertyStore.getFullNameFromPath(path) ?? path.join(" / ");
+}
+
+/**
+ * "Show in object list: …" / "Hide from object list: …" for every property
+ * value path, so "list area" finds the Area columns. Same toggle as the
+ * Object Browser's column picker; the save it schedules is skipped for
+ * anonymous viewers, so no login gate. "Show in" is withheld once the list
+ * holds MAX_DISPLAYED_PROPERTY_PATHS columns, where the toggle adds nothing.
+ */
+export function propertyListCommands(ctx: IProviderContext): TCommandProvider {
+  return () => {
+    const displayed = propertyStore.displayedPropertyPaths;
+    const isFull = displayed.length >= MAX_DISPLAYED_PROPERTY_PATHS;
+    return propertyStore.computedPropertyPaths.map((path): ICommand => {
+      const isShown = findIndexOfPath(path, displayed) >= 0;
+      return {
+        id: `property.list.${createPathStringFromPathArray(path)}`,
+        title: `${isShown ? "Hide from" : "Show in"} object list: ${propertyLabel(path)}`,
+        group: "Properties",
+        keywords: ["column", "table", "browser", "add", "remove", "property"],
+        icon: isShown
+          ? "mdi-table-column-remove"
+          : "mdi-table-column-plus-after",
+        enabled: () => ctx.inViewer() && (isShown || !isFull),
+        run: () => {
+          if (!isShown) {
+            store.requestPaletteOpen(["annotationPanel"]);
+          }
+          propertyStore.togglePropertyPathVisibility(path);
+        },
+      };
+    });
+  };
+}
+
+/**
+ * "Add filter: …" / "Remove filter: …" for every property value path: adds or
+ * removes that property's histogram filter, as the Filters panel's picker does.
+ */
+export function propertyFilterCommands(
+  ctx: IProviderContext,
+): TCommandProvider {
+  return () => {
+    const filtered = filterStore.filterPaths;
+    return propertyStore.computedPropertyPaths.map((path): ICommand => {
+      const isFiltered = findIndexOfPath(path, filtered) >= 0;
+      return {
+        id: `property.filter.${createPathStringFromPathArray(path)}`,
+        title: `${isFiltered ? "Remove" : "Add"} filter: ${propertyLabel(path)}`,
+        group: "Properties",
+        keywords: ["filter", "range", "histogram", "threshold", "property"],
+        icon: isFiltered
+          ? "mdi-filter-remove-outline"
+          : "mdi-filter-plus-outline",
+        enabled: ctx.inViewer,
+        run: () => {
+          if (!isFiltered) {
+            store.requestPaletteOpen(["filtersPanel"]);
+          }
+          filterStore.togglePropertyPathFiltering(path);
+        },
+      };
+    });
+  };
 }
 
 export interface IPanelController {
@@ -176,6 +244,7 @@ export function panelCommands(
         title: `${isOpen ? "Close" : "Open"} ${panel.title}`,
         group: "Panels",
         keywords: ["panel", "palette", "show", "hide"],
+        aliases: [panel.title, ...panel.aliases],
         icon: panel.icon,
         enabled: () =>
           ctx.inViewer() && (controller.isAvailable?.(panel.id) ?? true),

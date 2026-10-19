@@ -109,4 +109,41 @@ describe("command scorer", () => {
     );
     expect(rankCommands(many, "toggle", 50)).toHaveLength(50);
   });
+
+  it("ranks a panel by its alias above titles that only mention the word", () => {
+    const browser = command("panel.objects", "Open Object Browser", {
+      aliases: ["objects", "object list"],
+    });
+    const measure = command("measure", "Measure objects…");
+    const analysis = command("panel.analysis", "Open Analysis", {
+      aliases: ["measurements"],
+    });
+    const colorBy = command("color", "Color by: Intensity measurements / Max");
+    const all = [measure, colorBy, browser, analysis];
+    expect(rankCommands(all, "objects")[0].id).toBe("panel.objects");
+    // Alias prefix: a partly typed name still finds the panel.
+    expect(rankCommands(all, "obj")[0].id).toBe("panel.objects");
+    expect(rankCommands(all, "measurements")[0].id).toBe("panel.analysis");
+  });
+
+  it("ranks an exact alias above another command's title prefix", () => {
+    const filters = command("panel.filters", "Open Filters", {
+      aliases: ["Filters", "filter"],
+    });
+    const rows = Array.from({ length: 60 }, (_, i) =>
+      command(`f${i}`, `Filter rows ${i}`),
+    );
+    expect(rankCommands([...rows, filters], "filter", 50)[0].id).toBe(
+      "panel.filters",
+    );
+  });
+
+  it("matches a plural query word against a singular title word", () => {
+    // "tools" has no synonym, so only the singular fallback can match "Tool".
+    const blob = command("tool.blob", "Use tool: Blob");
+    const unrelated = command("x", "Toggle layer: DAPI");
+    expect(rankCommands([unrelated, blob], "tools")).toEqual([blob]);
+    // Not stripped from short words or double-s endings.
+    expect(scoreCommand(command("g", "Open Glas"), "glass")).toBe(0);
+  });
 });

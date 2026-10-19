@@ -9,6 +9,7 @@ import { computed } from "vue";
 const mocks = vi.hoisted(() => ({
   store: null as any,
   properties: null as any,
+  filters: null as any,
 }));
 
 vi.mock("@/store", async () => {
@@ -37,9 +38,20 @@ vi.mock("@/store/properties", async () => {
   mocks.properties = reactive({
     workerImageList: {} as Record<string, any>,
     computedPropertyPaths: [] as string[][],
+    displayedPropertyPaths: [] as string[][],
     getFullNameFromPath: (path: string[]) => `Name of ${path.join("/")}`,
+    togglePropertyPathVisibility: vi.fn(),
   });
   return { default: mocks.properties };
+});
+
+vi.mock("@/store/filters", async () => {
+  const { reactive } = await import("vue");
+  mocks.filters = reactive({
+    filterPaths: [] as string[][],
+    togglePropertyPathFiltering: vi.fn(),
+  });
+  return { default: mocks.filters };
 });
 
 vi.mock("@/utils/v-mousetrap", async () => {
@@ -58,10 +70,13 @@ import {
   layerCommands,
   panelCommands,
   propertyCommands,
+  propertyFilterCommands,
+  propertyListCommands,
   snapshotCommands,
   toolCommands,
   tourCommands,
 } from "./providers";
+import { rankCommands } from "./scorer";
 import {
   colorByPropertyRequest,
   snapshotLoadRequest,
@@ -235,6 +250,82 @@ describe("propertyCommands", () => {
     expect(mocks.store.setIsColorByPropertyDialogOpen).toHaveBeenCalledWith(
       true,
     );
+  });
+});
+
+describe("propertyListCommands", () => {
+  it("offers each property as an object-list column, found by 'list area'", () => {
+    mocks.properties.computedPropertyPaths = [
+      ["p1", "Area"],
+      ["p2", "Intensity"],
+    ];
+    mocks.properties.displayedPropertyPaths = [["p2", "Intensity"]];
+    const commands = propertyListCommands(ctx)();
+    expect(commands.map((c) => c.title)).toEqual([
+      "Show in object list: Name of p1/Area",
+      "Hide from object list: Name of p2/Intensity",
+    ]);
+    expect(ids(rankCommands(commands, "list area"))).toEqual([
+      "property.list.p1.Area",
+    ]);
+    commands[0].run();
+    expect(mocks.store.requestPaletteOpen).toHaveBeenCalledWith([
+      "annotationPanel",
+    ]);
+    expect(mocks.properties.togglePropertyPathVisibility).toHaveBeenCalledWith([
+      "p1",
+      "Area",
+    ]);
+  });
+
+  it("does not reopen the Object Browser when hiding a column", () => {
+    mocks.properties.computedPropertyPaths = [["p1", "Area"]];
+    mocks.properties.displayedPropertyPaths = [["p1", "Area"]];
+    mocks.store.requestPaletteOpen.mockClear();
+    propertyListCommands(ctx)()[0].run();
+    expect(mocks.store.requestPaletteOpen).not.toHaveBeenCalled();
+    expect(mocks.properties.togglePropertyPathVisibility).toHaveBeenCalledWith([
+      "p1",
+      "Area",
+    ]);
+  });
+});
+
+describe("propertyListCommands at the column cap", () => {
+  it("withholds 'Show in' once the list is full, but still offers 'Hide from'", () => {
+    const full = Array.from({ length: 100 }, (_, i) => [`p${i}`, "v"]);
+    mocks.properties.computedPropertyPaths = [
+      ["p0", "v"],
+      ["new", "Area"],
+    ];
+    mocks.properties.displayedPropertyPaths = full;
+    const [hide, show] = propertyListCommands(ctx)();
+    expect(hide.title).toBe("Hide from object list: Name of p0/v");
+    expect(hide.enabled!()).toBe(true);
+    expect(show.title).toBe("Show in object list: Name of new/Area");
+    expect(show.enabled!()).toBe(false);
+  });
+});
+
+describe("propertyFilterCommands", () => {
+  it("adds a property's filter, or removes one already there", () => {
+    mocks.properties.computedPropertyPaths = [
+      ["p1", "Area"],
+      ["p2", "Intensity"],
+    ];
+    mocks.filters.filterPaths = [["p2", "Intensity"]];
+    mocks.store.requestPaletteOpen.mockClear();
+    const [area, intensity] = propertyFilterCommands(ctx)();
+    expect(area.title).toBe("Add filter: Name of p1/Area");
+    expect(intensity.title).toBe("Remove filter: Name of p2/Intensity");
+    area.run();
+    expect(mocks.store.requestPaletteOpen).toHaveBeenCalledWith([
+      "filtersPanel",
+    ]);
+    expect(mocks.filters.togglePropertyPathFiltering).toHaveBeenCalledWith([
+      "p1",
+      "Area",
+    ]);
   });
 });
 

@@ -119,6 +119,8 @@ import draggable from "vuedraggable";
 import store from "@/store";
 import { TOUR_ANCHORS } from "@/tours/anchors";
 import { IHotkey } from "@/utils/v-mousetrap";
+import { useCommand } from "@/commands/registry";
+import { boundHotkey } from "@/commands/hotkeys";
 
 const singleLayerPrefix = "single-layer-group_";
 const spacerPrefix = "spacer_";
@@ -362,6 +364,37 @@ const mousetrapGlobalToggles: IHotkey[] = [
     },
   },
 ];
+
+useCommand(() => {
+  const layers = store.layers;
+  const allMerged =
+    layers.length > 0 && layers.every((layer) => layer.z.type === "max-merge");
+  const allVisible = layers.every((layer) => layer.visible);
+  return [
+    {
+      id: "layers.toggleZMaxMergeAll",
+      title: allMerged
+        ? "Turn off Z max-merge for all layers"
+        : "Z max-merge all layers",
+      group: "Layers",
+      keywords: ["projection", "mip", "maximum", "stack", "toggle"],
+      aliases: ["merge z", "z merge", "max merge", "max projection", "mip"],
+      icon: "mdi-layers-triple-outline",
+      hotkey: boundHotkey("z", "Toggle Z max-merge for all layers"),
+      enabled: () => !!hasMultipleZ.value,
+      run: store.toggleGlobalZMaxMerge,
+    },
+    {
+      id: "layers.toggleAll",
+      title: allVisible ? "Hide all layers" : "Show all layers",
+      group: "Layers",
+      keywords: ["channels", "visibility", "toggle"],
+      icon: allVisible ? "mdi-eye-off-outline" : "mdi-eye-outline",
+      hotkey: boundHotkey("0", "Show/hide all layers"),
+      run: store.toggleGlobalLayerVisibility,
+    },
+  ];
+});
 
 defineExpose({
   isDragging,

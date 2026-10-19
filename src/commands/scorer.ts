@@ -6,7 +6,10 @@ import { synonymsOf } from "./synonyms";
 // a title word-start ("seg" → "Segment"), a run of the title's word initials
 // ("cs" → "Add tool: Cellpose-SAM"), a title substring, a title subsequence,
 // a keyword, and the description last. Every query word must match somewhere;
-// a word may also match through a synonym at a discount.
+// a word may also match through its singular ("objects" → "Object") or a
+// synonym, at a discount. A whole query equal to one of a command's aliases
+// ranks just below an exact title, and a prefix of one just below a title
+// prefix.
 
 /**
  * Lowercase, strip diacritics, and turn punctuation (hyphens too) into spaces.
@@ -24,6 +27,7 @@ export function normalize(text: string): string {
 
 interface IPrepared {
   title: string;
+  aliases: string[];
   titleWords: string[];
   initials: string;
   compactTitle: string;
@@ -44,6 +48,7 @@ function prepare(command: ICommand): IPrepared {
     const description = normalize(command.description ?? "");
     prepared = {
       title,
+      aliases: (command.aliases ?? []).map(normalize).filter(Boolean),
       titleWords,
       initials: titleWords.map((word) => word[0]).join(""),
       compactTitle: titleWords.join(""),
@@ -98,9 +103,21 @@ function scoreWord(word: string, p: IPrepared): number {
 }
 
 const SYNONYM_DISCOUNT = 0.8;
+const SINGULAR_DISCOUNT = 0.95;
+
+/** "objects" → "object"; "cells" → "cell". Deliberately naive. */
+function singularOf(word: string): string | null {
+  return word.length > 3 && word.endsWith("s") && !word.endsWith("ss")
+    ? word.slice(0, -1)
+    : null;
+}
 
 function scoreWordWithSynonyms(word: string, p: IPrepared): number {
   let best = scoreWord(word, p);
+  const singular = singularOf(word);
+  if (singular) {
+    best = Math.max(best, scoreWord(singular, p) * SINGULAR_DISCOUNT);
+  }
   for (const synonym of synonymsOf(word)) {
     best = Math.max(best, scoreWord(synonym, p) * SYNONYM_DISCOUNT);
   }
@@ -118,8 +135,17 @@ function scoreNormalized(command: ICommand, q: string, words: string[]) {
   if (p.title === q) {
     return 1000;
   }
+  // An alias names the command as exactly as its title does, so it outranks
+  // another command whose title merely starts with the word ("filter" →
+  // Filters panel, not "Filter …" rows).
+  if (p.aliases.includes(q)) {
+    return 950;
+  }
   if (p.title.startsWith(q)) {
     return 900;
+  }
+  if (q.length >= 3 && p.aliases.some((alias) => alias.startsWith(q))) {
+    return 800;
   }
   let total = 0;
   for (const word of words) {

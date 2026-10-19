@@ -35,6 +35,11 @@ export interface ICommand {
   group: TCommandGroup;
   // Extra match terms (synonyms, tags, channel names).
   keywords?: string[];
+  // Other names for the command itself ("objects" for the Object Browser).
+  // A query equal to or prefixing one ranks it like a title match, so a query
+  // naming a panel finds the panel before the many commands whose titles
+  // merely mention the word.
+  aliases?: string[];
   // Secondary line; also matched, at a lower weight.
   description?: string;
   // mdi name, checked against @mdi/font 5.9.55 by mdiIconNames.test.ts.

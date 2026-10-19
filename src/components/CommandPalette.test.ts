@@ -22,7 +22,11 @@ vi.mock("@/actions/operations", () => ({
 }));
 
 vi.mock("@/store/properties", () => ({
-  default: { fetchWorkerImageList: vi.fn().mockResolvedValue(undefined) },
+  default: {
+    fetchWorkerImageList: vi.fn().mockResolvedValue(undefined),
+    computedPropertyPaths: [["p1", "Area"]],
+    getPropertyById: () => null,
+  },
 }));
 
 vi.mock("@/utils/log", () => ({
@@ -38,6 +42,8 @@ vi.mock("@/commands/providers", () => ({
   layerCommands: () => () => [],
   snapshotCommands: () => () => [],
   propertyCommands: () => () => [],
+  propertyListCommands: () => () => [],
+  propertyFilterCommands: () => () => [],
 }));
 
 import CommandPalette from "./CommandPalette.vue";
@@ -47,6 +53,7 @@ import { recentCommandIds } from "@/commands/recent";
 import { ICommand } from "@/commands/types";
 import { ref } from "vue";
 import { logError } from "@/utils/log";
+import { aiPromptRequest } from "@/commands/requests";
 
 // Stands in for v-dialog: renders while open. after-leave — which Vuetify's
 // real dialog emits only once its leave transition has finished — is emitted
@@ -363,6 +370,51 @@ describe("CommandPalette", () => {
     expect(goToLocation).toHaveBeenCalledWith({ z: 2 });
   });
 
+  it("lists a typed command and ranked matches of its group under one header", async () => {
+    unregister();
+    unregister = registerCommandProvider(() => [
+      command("bookmark.z3", "Bookmark z 3", "Navigate"),
+    ]);
+    mountPalette();
+    await type("z 3");
+    const headers = wrapper
+      .findAll(".v-list-subheader")
+      .map((header) => header.text());
+    expect(headers.filter((label) => label === "Navigate")).toHaveLength(1);
+    expect(rowTitles()[0]).toContain("Go to Z 3");
+    expect(rowTitles()[1]).toContain("Bookmark z 3");
+  });
+
+  it("rotates dataset-based example queries in the placeholder while open, and stops when closed", async () => {
+    vi.useFakeTimers();
+    try {
+      mountPalette();
+      const placeholder = () =>
+        wrapper.find("input").attributes("placeholder") ?? "";
+      const first = placeholder();
+      expect(first).toMatch(/^Try: /);
+      vi.advanceTimersByTime(4000);
+      await nextTick();
+      expect(placeholder()).not.toBe(first);
+      // Every example comes from this dataset: 10 slices, an Area property.
+      const all = new Set<string>();
+      for (let i = 0; i < 6; i++) {
+        placeholder()
+          .replace("Try: ", "")
+          .split(" · ")
+          .forEach((example) => all.add(example));
+        vi.advanceTimersByTime(4000);
+        await nextTick();
+      }
+      expect(all).toContain("z 3");
+      expect(all).toContain("list Area");
+      await wrapper.setProps({ modelValue: false });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not record a generated command as recent", async () => {
     mountPalette();
     await type("z 3");
@@ -384,5 +436,54 @@ describe("CommandPalette", () => {
     expect(wrapper.vm.commandRows[wrapper.vm.activeIndex].command.id).toBe(
       "navigate.z:2",
     );
+  });
+
+  it("asks Nimbus AI from the field's button or mod+Enter, even with no match", async () => {
+    const unregisterAi = registerCommandProvider(() => [
+      command("ai.togglePanel", "Open Nimbus AI panel"),
+    ]);
+    try {
+      mountPalette();
+      const button = () => wrapper.find("[data-ask-ai]");
+      // Not a list row: the list holds only matching commands.
+      await type("open");
+      expect(rowTitles().some((title) => title.includes("Ask Nimbus AI"))).toBe(
+        false,
+      );
+      await type("");
+      expect(button().attributes("disabled")).toBeDefined();
+      await type("  count the cells  ");
+      expect(rowTitles()).toEqual([]);
+      expect(wrapper.text()).toContain("to ask Nimbus AI");
+      await button().trigger("click");
+      await leave();
+      expect(aiPromptRequest.value).toBe("count the cells");
+      expect(recentCommandIds.value).toEqual([]);
+
+      aiPromptRequest.value = null;
+      await wrapper.setProps({ modelValue: true });
+      // "open" matches commands; mod+Enter still goes to the AI, not to the
+      // highlighted row.
+      await type("open");
+      const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+      await press("Enter", mac ? { metaKey: true } : { ctrlKey: true });
+      await leave();
+      expect(aiPromptRequest.value).toBe("open");
+      expect(runs).toEqual([]);
+    } finally {
+      aiPromptRequest.value = null;
+      unregisterAi();
+    }
+  });
+
+  it("shows no Ask Nimbus AI button where the AI panel can't open", async () => {
+    mountPalette();
+    await type("open");
+    expect(wrapper.find("[data-ask-ai]").exists()).toBe(false);
+    const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+    await press("Enter", mac ? { metaKey: true } : { ctrlKey: true });
+    await leave();
+    expect(aiPromptRequest.value).toBe(null);
+    expect(wrapper.text()).not.toContain("to ask Nimbus AI");
   });
 });
