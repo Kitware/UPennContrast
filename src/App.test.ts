@@ -386,6 +386,46 @@ describe("App", () => {
     expect(vm.commandPaletteOpen).toBe(false);
   });
 
+  it("opens the AI panel for a palette prompt, only when it may open", async () => {
+    const { aiPromptRequest } = await import("@/commands/requests");
+    (store as any).dataset = { id: "ds1", name: "Dataset" };
+    const wrapper = mountComponent({ name: "datasetview" });
+    const vm = wrapper.vm as any;
+    aiPromptRequest.value = "count cells";
+    await nextTick();
+    expect(vm.aiPanelOpen).toBe(false); // logged out: the gate is closed
+    expect(aiPromptRequest.value).toBe(null); // dropped, not left pending
+    (store as any).isLoggedIn = true;
+    (store as any).girderUser = { _id: "u1" };
+    await nextTick();
+    aiPromptRequest.value = "count cells";
+    await nextTick();
+    expect(vm.aiPanelOpen).toBe(true);
+    aiPromptRequest.value = null;
+    wrapper.unmount();
+  });
+
+  it("shows a compact search pill that opens the command palette", async () => {
+    // Render v-btn slots (shallowMount drops them) so the label and hint show.
+    (store as any).dataset = { id: "ds1", name: "Dataset" };
+    const wrapper = mountComponent(
+      { name: "datasetview" },
+      {
+        ...renderAppBarStubs,
+        VBtn: { template: "<button><slot /></button>" },
+      },
+    );
+    const pill = wrapper.get('[data-tour="command-palette-button"]');
+    expect(pill.attributes("aria-label")).toBe("Search commands");
+    expect(pill.get("kbd").text()).toBe(
+      (wrapper.vm as any).commandPaletteHotkey,
+    );
+    expect((wrapper.vm as any).commandPaletteOpen).toBe(false);
+    await pill.trigger("click");
+    expect((wrapper.vm as any).commandPaletteOpen).toBe(true);
+    wrapper.unmount();
+  });
+
   // -- Computed: hasUncomputedProperties --
   it("hasUncomputedProperties returns false when no uncomputed entries", () => {
     (propertyStore as any).uncomputedCountByProperty = {};
