@@ -630,7 +630,11 @@ already takes a `datasetId`, so the outer loop is thin.
 **As implemented:** the batch captures the loaded configuration's id when it
 starts and hands it to each dataset's run (`runPipeline`'s `configurationId`),
 so a run that starts after a switch fails on its first step. The datasets left
-after a switch are not run and count as failed.
+after a switch are not run and count as failed. The batch reloads linked
+properties (`loadMissingLinkedProperties`) only if its configuration is still
+loaded when the reload starts: it awaits the dataset list first, and a reload
+after a switch would check the other configuration's properties and record
+this pipeline's sources as missing for the rest of the session.
 
 ---
 
@@ -1020,7 +1024,8 @@ Linked steps (§3.4):
   *"does not run a batch's remaining datasets after a configuration switch"*,
   *"fails a batch child that starts after the configuration switched"*,
   *"saves a materialized property id to the run's configuration after a switch"*,
-  *"takes a property created during a switch out of the other configuration"*.
+  *"takes a property created during a switch out of the other configuration"*,
+  *"does not reload linked properties for a batch whose configuration switched before the reload"*.
 - The runner re-wires property steps to what a linked tool produces now, but
   never an unflagged step —
   *"re-wires a property step to the output tags its linked tool produces now"*,

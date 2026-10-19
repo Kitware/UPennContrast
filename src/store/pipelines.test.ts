@@ -1520,6 +1520,30 @@ describe("configuration switch during a run", () => {
     expect(pipelinesStore.runningPipelineId).toBeNull();
   });
 
+  it("does not reload linked properties for a batch whose configuration switched before the reload", async () => {
+    h.main.api.findDatasetViews.mockImplementation(async () => {
+      // The switch lands while the batch is still listing its datasets.
+      switchConfiguration();
+      return [{ datasetId: "d1" }];
+    });
+    const linked = pipeline([
+      { ...propertyStep("p"), sourcePropertyId: "not-loaded-yet" },
+    ]);
+
+    const summary = await pipelinesStore.runPipelineBatch({
+      pipeline: linked,
+      configurationId: "config-a",
+    });
+
+    expect(summary).toEqual({ succeeded: 0, failed: 1, cancelled: 0 });
+    // The other configuration's list says nothing about this source.
+    expect(h.properties.fetchProperties).not.toHaveBeenCalled();
+    // Not recorded as missing: back on its configuration, a run reloads.
+    h.main.configuration = { ...h.main.configuration, id: "config-a" };
+    await pipelinesStore.loadMissingLinkedProperties(linked);
+    expect(h.properties.fetchProperties).toHaveBeenCalledTimes(1);
+  });
+
   it("fails a batch child that starts after the configuration switched", async () => {
     // The child is handed the batch's configuration, so it fails on its own
     // even if it starts after the switch.

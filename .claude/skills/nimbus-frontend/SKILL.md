@@ -317,7 +317,8 @@ fallback creates properties there, and ids are recorded there, while the jobs
 still target the original dataset. Guarding one lookup (resolving it once at
 the start, or the reload guard in `loadMissingLinkedProperties`) leaves every
 other read exposed. Capture `main.configuration.id` before the first await,
-then check it before each unit of work and stop if it changed
+then check it before each unit of work, including any reload or cache write
+that reads "the loaded configuration" itself, and stop if it changed
 (`runPipeline`/`runPipelineBatch`, `CONFIGURATION_CHANGED_DURING_RUN`). Write
 anything the action already produced to the captured configuration object, not
 through `syncConfiguration`, which writes whichever configuration is loaded.

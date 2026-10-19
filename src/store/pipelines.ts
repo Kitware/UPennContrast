@@ -869,9 +869,14 @@ export class Pipelines extends VuexModule {
     }
 
     this.setRunningPipelineId(pipeline.id);
-    // Never rejects, so it cannot leave the lock held.
+    // Never rejects, so it cannot leave the lock held. Only on the batch's
+    // own configuration: after a switch during the awaits above, the reload
+    // would check the other configuration's properties and record this
+    // pipeline's sources as missing for the session. (The loop below then
+    // runs no dataset.)
     const linkedPropertiesChecked =
-      await this.loadMissingLinkedProperties(pipeline);
+      main.configuration?.id === batchConfigurationId &&
+      (await this.loadMissingLinkedProperties(pipeline));
     const batchProgressId = await progress.create({
       type: ProgressType.BATCH_PIPELINE_COMPUTE,
       title: `Batch pipeline: ${pipeline.name}`,
