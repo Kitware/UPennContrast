@@ -202,6 +202,12 @@ Run options (in the editor):
 Because the run state is shared across the dialog, closing and reopening mid-run
 returns straight to the running pipeline's editor.
 
+Opening a dataset that uses a different configuration while a pipeline runs
+stops the run: a worker job already running finishes, and the next step fails
+with a message asking you to rerun the pipeline from one of its own datasets.
+A collection run skips the datasets it had not reached yet and counts them as
+failed.
+
 ### Materialized properties
 
 The first time a **property step** runs, it creates a persisted property

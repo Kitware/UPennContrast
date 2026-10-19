@@ -307,6 +307,21 @@ URLs: the breadcrumb view switcher keeps the current query when it moves to
 another dataset. See `codebaseDocumentation/DATASET_LOCATION.md` and its
 regression checklist.
 
+### A long-running action must pin the configuration it started on
+
+`main.configuration`, `main.tools` and `properties.properties` are the LOADED
+configuration's, and opening a dataset of another configuration replaces all
+of them while an action that spans worker jobs (a pipeline run, a batch) keeps
+going. Each later read then sees the other configuration. Lookups fail, the
+fallback creates properties there, and ids are recorded there, while the jobs
+still target the original dataset. Guarding one lookup (resolving it once at
+the start, or the reload guard in `loadMissingLinkedProperties`) leaves every
+other read exposed. Capture `main.configuration.id` before the first await,
+then check it before each unit of work and stop if it changed
+(`runPipeline`/`runPipelineBatch`, `CONFIGURATION_CHANGED_DURING_RUN`). Write
+anything the action already produced to the captured configuration object, not
+through `syncConfiguration`, which writes whichever configuration is loaded.
+
 ### Every `throttle`/`debounce` needs a `cancel()` in `onBeforeUnmount`
 
 A trailing call that fires after teardown runs against a dead view — in

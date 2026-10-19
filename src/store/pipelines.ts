@@ -86,6 +86,10 @@ export function mergeMaterializedPropertyIds(
 // one stays deleted.
 const confirmedMissingPropertyIds = new Set<string>();
 
+export const CONFIGURATION_CHANGED_DURING_RUN =
+  "Another configuration was opened during the run. Open a dataset of this " +
+  "pipeline's configuration and run it again.";
+
 function buildTransientTool(step: IAnnotationPipelineStep): IToolConfiguration {
   return {
     id: step.id,
@@ -286,6 +290,7 @@ export class Pipelines extends VuexModule {
     // remove it below once the replacement is created. Only ever set for a
     // property that actually existed - never for a stale/dangling id.
     const staleId = existing?.id;
+    const configurationId = main.configuration?.id;
     const created = await properties.createProperty({
       name: step.name,
       image: step.image,
@@ -296,6 +301,16 @@ export class Pipelines extends VuexModule {
       shape: step.shape,
       workerInterface: step.workerInterfaceValues,
     });
+    if (created && main.configuration?.id !== configurationId) {
+      // createProperty registered it in the configuration loaded when the
+      // request returned, not this step's. Take it out of that one, record
+      // nothing, and leave the stale property alone (it is not in the loaded
+      // list): see CONFIGURATION_CHANGED_DURING_RUN.
+      if (properties.properties.some((p) => p.id === created.id)) {
+        await properties.deleteProperty(created.id);
+      }
+      throw new Error(CONFIGURATION_CHANGED_DURING_RUN);
+    }
     if (created) {
       step.materializedPropertyId = created.id;
       if (
@@ -327,6 +342,7 @@ export class Pipelines extends VuexModule {
     skipRunningState = false,
     linkedPropertiesChecked,
     resolvedSteps,
+    configurationId,
   }: {
     pipeline: IPipeline;
     datasetId?: string;
@@ -351,6 +367,9 @@ export class Pipelines extends VuexModule {
     // Set by runPipelineBatch, which resolves the steps once, so every
     // dataset runs the same settings even if a linked tool changes mid-batch.
     resolvedSteps?: TPipelineStep[];
+    // Set by runPipelineBatch: the configuration the batch started on, so a
+    // child that starts after a switch fails instead of running against it.
+    configurationId?: string;
   }): Promise<IPipelineRunResult> {
     const emptyResult: IPipelineRunResult = {
       succeeded: 0,
@@ -364,6 +383,23 @@ export class Pipelines extends VuexModule {
       return emptyResult;
     }
     const targetDatasetId = datasetId ?? main.dataset.id;
+    // The steps read the loaded configuration's tools and properties and
+    // write materialized property ids back to it. A switch mid-run (opening a
+    // dataset of another configuration) replaces all of that, so later steps
+    // would look up, create or record properties in the wrong configuration
+    // while their jobs target this run's dataset. Captured before any await.
+    const runConfigurationId = configurationId ?? main.configuration.id;
+    const configurationChanged = () =>
+      main.configuration?.id !== runConfigurationId;
+    // The run's configuration object: the loaded one while it is still the
+    // run's (a reload may replace the object), else the last one seen.
+    let runConfiguration = main.configuration;
+    const currentRunConfiguration = () => {
+      if (!configurationChanged()) {
+        runConfiguration = main.configuration!;
+      }
+      return runConfiguration;
+    };
 
     // Indices into pipeline.steps of the steps we will actually run.
     const enabledIndices = pipeline.steps
@@ -440,6 +476,10 @@ export class Pipelines extends VuexModule {
     // the config back - a run with no property steps (or only reused,
     // already-matching properties) shouldn't write the config at all.
     let materializedPropertyChanged = false;
+    // Set when a step fails because the configuration switched: the run
+    // stops, continueOnError or not, since every later step would fail the
+    // same way.
+    let configurationSwitched = false;
 
     for (const stepIndex of enabledIndices) {
       const step = pipeline.steps[stepIndex];
@@ -486,6 +526,9 @@ export class Pipelines extends VuexModule {
 
       let success = false;
       try {
+        if (configurationChanged()) {
+          throw new Error(CONFIGURATION_CHANGED_DURING_RUN);
+        }
         let submitted: {
           job: IAnnotationComputeJob | IPropertyComputeJob;
           completionPromise: Promise<boolean>;
@@ -533,10 +576,14 @@ export class Pipelines extends VuexModule {
               materializedPropertyChanged = true;
               // Onto the stored step now (runStep is a copy wherever resolving
               // or wiring changed it), so later steps' reference checks see it.
-              // The store's current copy: a config write (e.g. by an earlier
-              // dataset of a batch) replaces the object the caller passed.
+              // The run configuration's current copy: a config write (e.g. by
+              // an earlier dataset of a batch) replaces the object the caller
+              // passed. (A switch during the creation fails the step in
+              // ensureMaterializedProperty before this.)
               mergeMaterializedPropertyIds(
-                this.getPipelineById(pipeline.id) ?? pipeline,
+                currentRunConfiguration().pipelines?.find(
+                  (candidate) => candidate.id === pipeline.id,
+                ) ?? pipeline,
                 { ...pipeline, steps: [runStep] },
               );
             }
@@ -560,6 +607,8 @@ export class Pipelines extends VuexModule {
           success = false;
         }
       } catch (error) {
+        // Found here or while materializing the step's property.
+        configurationSwitched = configurationChanged();
         // The errorCallback only surfaces errors the worker prints to its job
         // log; a failed submission (HTTP error, property materialization
         // failure) never reaches it, so surface it here.
@@ -597,7 +646,10 @@ export class Pipelines extends VuexModule {
       });
 
       // Stop early on failure unless the caller opted into continuing.
-      if (!success && !isCancelled && !continueOnError) {
+      if (
+        configurationSwitched ||
+        (!success && !isCancelled && !continueOnError)
+      ) {
         break;
       }
     }
@@ -608,7 +660,17 @@ export class Pipelines extends VuexModule {
       // whose property steps all reused an already-matching property) has
       // nothing new to write back to the configuration.
       if (materializedPropertyChanged) {
-        await main.updateConfigurationPipelines(cloneDeep(this.pipelines));
+        if (!configurationChanged()) {
+          await main.updateConfigurationPipelines(cloneDeep(this.pipelines));
+        } else {
+          // To the run's own configuration, not the one now loaded: losing
+          // the ids would make its next run create the properties again.
+          await main.api.updateConfigurationKey(
+            currentRunConfiguration(),
+            "pipelines",
+          );
+          store.dispatch("ressourceChanged", runConfigurationId);
+        }
       }
 
       // Refresh derived state once for the whole run. Skipped for batch
@@ -770,6 +832,9 @@ export class Pipelines extends VuexModule {
     };
     // Wire the cancel handle up immediately, before any await.
     onCancel?.(cancel);
+    // The configuration whose tools and properties the steps resolve against
+    // (see runPipeline). Captured before any await.
+    const batchConfigurationId = main.configuration?.id;
 
     const datasetViews: IDatasetView[] = await main.api.findDatasetViews({
       configurationId,
@@ -816,6 +881,7 @@ export class Pipelines extends VuexModule {
     let completed = 0;
     let failed = 0;
     let cancelled = 0;
+    let configurationSwitched = false;
 
     try {
       // Resolved once, so every dataset runs the same settings even if a
@@ -825,6 +891,32 @@ export class Pipelines extends VuexModule {
       for (const datasetId of datasetIds) {
         if (isCancelled) {
           cancelled++;
+          onBatchProgress?.({
+            total,
+            completed,
+            failed,
+            cancelled,
+            currentDatasetName: datasetNames[datasetId],
+          });
+          continue;
+        }
+
+        // After a switch to another configuration, the remaining datasets
+        // are not run: each would fail on its first step anyway.
+        if (main.configuration?.id !== batchConfigurationId) {
+          if (!configurationSwitched) {
+            configurationSwitched = true;
+            logError(
+              `Batch pipeline "${pipeline.name}" stopped:`,
+              CONFIGURATION_CHANGED_DURING_RUN,
+            );
+          }
+          failed++;
+          progress.update({
+            id: batchProgressId,
+            progress: completed + failed + cancelled,
+            total,
+          });
           onBatchProgress?.({
             total,
             completed,
@@ -851,6 +943,7 @@ export class Pipelines extends VuexModule {
           skipRefresh: true,
           linkedPropertiesChecked,
           resolvedSteps,
+          configurationId: batchConfigurationId,
           onCancel: (c) => {
             innerCancel = c;
           },

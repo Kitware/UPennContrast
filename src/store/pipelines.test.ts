@@ -26,6 +26,7 @@ const h = vi.hoisted(() => ({
       cancelJob: vi.fn(),
       findDatasetViews: vi.fn().mockResolvedValue([]),
       batchResources: vi.fn().mockResolvedValue({ folder: {} }),
+      updateConfigurationKey: vi.fn().mockResolvedValue({}),
     },
     loadLargeImages: vi.fn().mockResolvedValue(false),
     scheduleTileFramesComputation: vi.fn(),
@@ -90,7 +91,11 @@ vi.mock("./filters", () => ({
   default: { updateHistograms: vi.fn().mockResolvedValue(undefined) },
 }));
 
-import pipelinesStore, { mergeMaterializedPropertyIds } from "./pipelines";
+import pipelinesStore, {
+  CONFIGURATION_CHANGED_DURING_RUN,
+  mergeMaterializedPropertyIds,
+} from "./pipelines";
+import rootStore from "./root";
 import { resolveLinkedStep, stepLinkState } from "@/utils/pipelineLinks";
 import { AnnotationShape, IPipeline } from "./model";
 
@@ -1340,3 +1345,197 @@ describe("linked steps", () => {
     expect(h.properties.fetchProperties).not.toHaveBeenCalled();
   });
 });
+
+describe("configuration switch during a run", () => {
+  // Opening a dataset of another configuration replaces main.configuration
+  // (and with it the loaded tools and properties) while a run continues.
+  function switchConfiguration() {
+    h.main.configuration = {
+      id: "config-b",
+      pipelines: [],
+      propertyIds: [],
+      compatibility: { channels: {} },
+    };
+  }
+
+  beforeEach(() => {
+    h.main.configuration = { ...h.main.configuration, id: "config-a" };
+  });
+
+  it("fails the next step and stops when the configuration changes during a run", async () => {
+    h.properties.properties = [
+      {
+        id: "user-prop",
+        name: "User property",
+        image: "img/user-prop",
+        shape: AnnotationShape.Polygon,
+        tags: { tags: ["nuclei"], exclusive: false },
+        workerInterface: {},
+      },
+    ];
+    h.annotations.submitAnnotationWorkerJob.mockImplementation(async () => {
+      switchConfiguration();
+      return submitResult("j", true);
+    });
+    const errors: any[] = [];
+
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipeline([
+        annotationStep("a", ["nuclei"]),
+        { ...propertyStep("p", ["nuclei"]), sourcePropertyId: "user-prop" },
+        propertyStep("q", ["nuclei"]),
+      ]),
+      // Stops even when the caller asked to continue past failures: every
+      // later step would fail the same way.
+      continueOnError: true,
+      onStepError: (_index, info) => errors.push(...info.errors),
+    });
+
+    expect(result).toEqual({
+      succeeded: 1,
+      failed: 1,
+      cancelled: 0,
+      failedStepIndex: 1,
+    });
+    expect(h.properties.submitPropertyJob).not.toHaveBeenCalled();
+    expect(h.properties.createProperty).not.toHaveBeenCalled();
+    expect(errors).toHaveLength(1);
+    expect(errors[0].error).toContain(CONFIGURATION_CHANGED_DURING_RUN);
+    expect(h.main.updateConfigurationPipelines).not.toHaveBeenCalled();
+    expect(pipelinesStore.runningPipelineId).toBeNull();
+  });
+
+  it("saves a materialized property id to the run's configuration after a switch", async () => {
+    const step = propertyStep("p", ["nuclei"]);
+    const pipe = pipeline([step]);
+    const configA = h.main.configuration;
+    configA.pipelines = [cloneForStore(pipe)];
+    h.properties.createProperty.mockResolvedValue({
+      id: "prop-created",
+      image: "img/prop",
+      shape: AnnotationShape.Polygon,
+      tags: { tags: ["nuclei"], exclusive: false },
+      workerInterface: {},
+    });
+    h.properties.submitPropertyJob.mockImplementation(async () => {
+      switchConfiguration();
+      return submitResult("j", true);
+    });
+    // Store actions dispatch through the root store too: pass them through.
+    const realDispatch = rootStore.dispatch.bind(rootStore);
+    const dispatch = vi
+      .spyOn(rootStore, "dispatch")
+      .mockImplementation(((type: string, payload?: unknown) =>
+        type === "ressourceChanged"
+          ? Promise.resolve()
+          : realDispatch(type, payload)) as typeof rootStore.dispatch);
+
+    let dispatched: unknown[][];
+    try {
+      await pipelinesStore.runPipeline({ pipeline: pipe });
+    } finally {
+      // Copied first: mockRestore clears the recorded calls.
+      dispatched = [...dispatch.mock.calls];
+      dispatch.mockRestore();
+    }
+
+    // Not through the loaded (now other) configuration.
+    expect(h.main.updateConfigurationPipelines).not.toHaveBeenCalled();
+    expect(h.main.api.updateConfigurationKey).toHaveBeenCalledTimes(1);
+    const [written, key] = h.main.api.updateConfigurationKey.mock.calls[0];
+    expect(written.id).toBe("config-a");
+    expect(key).toBe("pipelines");
+    expect(written.pipelines[0].steps[0].materializedPropertyId).toBe(
+      "prop-created",
+    );
+    expect(h.main.configuration.pipelines).toEqual([]);
+    expect(dispatched).toContainEqual(["ressourceChanged", "config-a"]);
+  });
+
+  it("takes a property created during a switch out of the other configuration", async () => {
+    const pipe = pipeline([
+      propertyStep("p", ["nuclei"]),
+      propertyStep("q", ["nuclei"]),
+    ]);
+    const configA = h.main.configuration;
+    configA.pipelines = [cloneForStore(pipe)];
+    const created = {
+      id: "prop-created",
+      image: "img/prop",
+      shape: AnnotationShape.Polygon,
+      tags: { tags: ["nuclei"], exclusive: false },
+      workerInterface: {},
+    };
+    h.properties.createProperty.mockImplementation(async () => {
+      // The switch lands while the create request is in flight, so the
+      // properties store registers the new property in the other one.
+      switchConfiguration();
+      h.properties.properties = [created];
+      return created;
+    });
+    const errors: any[] = [];
+
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipe,
+      continueOnError: true,
+      onStepError: (_index, info) => errors.push(...info.errors),
+    });
+
+    expect(h.properties.deleteProperty).toHaveBeenCalledWith("prop-created");
+    expect(h.properties.submitPropertyJob).not.toHaveBeenCalled();
+    // One failed step, then the run stops (continueOnError notwithstanding).
+    expect(h.properties.createProperty).toHaveBeenCalledTimes(1);
+    expect(result.failed).toBe(1);
+    expect(errors[0].error).toContain(CONFIGURATION_CHANGED_DURING_RUN);
+    // Nothing recorded on either configuration.
+    expect(
+      configA.pipelines[0].steps[0].materializedPropertyId,
+    ).toBeUndefined();
+    expect(h.main.api.updateConfigurationKey).not.toHaveBeenCalled();
+    expect(h.main.updateConfigurationPipelines).not.toHaveBeenCalled();
+  });
+
+  it("does not run a batch's remaining datasets after a configuration switch", async () => {
+    h.main.api.findDatasetViews.mockResolvedValue([
+      { datasetId: "d1" },
+      { datasetId: "d2" },
+      { datasetId: "d3" },
+    ]);
+    const datasetsRun: string[] = [];
+    h.annotations.submitAnnotationWorkerJob.mockImplementation(
+      async ({ datasetId }: any) => {
+        datasetsRun.push(datasetId);
+        switchConfiguration();
+        return submitResult("j", true);
+      },
+    );
+
+    const summary = await pipelinesStore.runPipelineBatch({
+      pipeline: pipeline([annotationStep("a")]),
+      configurationId: "config-a",
+    });
+
+    expect(datasetsRun).toEqual(["d1"]);
+    expect(summary).toEqual({ succeeded: 1, failed: 2, cancelled: 0 });
+    expect(pipelinesStore.runningPipelineId).toBeNull();
+  });
+
+  it("fails a batch child that starts after the configuration switched", async () => {
+    // The child is handed the batch's configuration, so it fails on its own
+    // even if it starts after the switch.
+    switchConfiguration();
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipeline([annotationStep("a")]),
+      configurationId: "config-a",
+      skipRunningState: true,
+      skipRefresh: true,
+    });
+
+    expect(result.failed).toBe(1);
+    expect(h.annotations.submitAnnotationWorkerJob).not.toHaveBeenCalled();
+  });
+});
+
+function cloneForStore(pipe: IPipeline): IPipeline {
+  return JSON.parse(JSON.stringify(pipe));
+}

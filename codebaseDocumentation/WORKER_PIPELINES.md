@@ -561,6 +561,21 @@ Behavior (mirror `computeAnnotationsWithWorkerBatch`):
    - Feed `onStepProgress` / `onStepError` from the job's event callbacks (reuse
      `createProgressEventCallback` / `createErrorEventCallback`).
    - On failure: if `!continueOnError`, stop; record which step failed.
+   - **As implemented:** before submitting, if the loaded configuration is no
+     longer the run's (another configuration was opened mid-run), the step
+     fails with `CONFIGURATION_CHANGED_DURING_RUN` and the run stops, even
+     with `continueOnError`. The steps read the loaded configuration's tools
+     and properties and record materialized property ids on it, so after a
+     switch they would look up, create or record properties in the wrong
+     configuration while their jobs target this run's dataset. Ids
+     materialized before the switch are saved to the run's own configuration
+     (`api.updateConfigurationKey` on the captured object), not to the one
+     now loaded; losing them would make its next run create the properties
+     again. A switch while `ensureMaterializedProperty` is creating a property
+     fails that step too: `createProperty` registered the new property in the
+     configuration loaded when the request returned, so it is removed from
+     that one's list, nothing is recorded, and the stale property is left
+     alone.
    - `progress.complete(perStepProgressId)`; bump the top-level progress.
 5. After the loop (once, not per step): `annotationStore.fetchAnnotations()`,
    `propertiesStore.fetchPropertyValues()`, `filters.updateHistograms()`, and
@@ -611,6 +626,11 @@ the batch runner and the pipeline runner: for each dataset view
 before the next dataset. Add `ProgressType.BATCH_PIPELINE_COMPUTE`. Reuse the
 `BATCH_DATASET_LIMIT` guard. Implement after v1 lands; the `runPipeline` action
 already takes a `datasetId`, so the outer loop is thin.
+
+**As implemented:** the batch captures the loaded configuration's id when it
+starts and hands it to each dataset's run (`runPipeline`'s `configurationId`),
+so a run that starts after a switch fails on its first step. The datasets left
+after a switch are not run and count as failed.
 
 ---
 
@@ -992,6 +1012,15 @@ Linked steps (§3.4):
   reload overlapped by a configuration switch confirms nothing —
   *"does not recheck a linked property a reload confirmed missing"*,
   *"does not confirm a linked property missing when the configuration changes during the reload"*.
+- A configuration switch mid-run stops the run: the next step fails (even with
+  continue-on-error), a batch runs no further datasets, ids materialized
+  before the switch are saved to the run's own configuration, and a property
+  created during the switch is taken out of the other configuration —
+  *"fails the next step and stops when the configuration changes during a run"*,
+  *"does not run a batch's remaining datasets after a configuration switch"*,
+  *"fails a batch child that starts after the configuration switched"*,
+  *"saves a materialized property id to the run's configuration after a switch"*,
+  *"takes a property created during a switch out of the other configuration"*.
 - The runner re-wires property steps to what a linked tool produces now, but
   never an unflagged step —
   *"re-wires a property step to the output tags its linked tool produces now"*,
