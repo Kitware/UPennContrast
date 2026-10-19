@@ -18,6 +18,10 @@ export const OPPOSITE_PAIRS: readonly (readonly [string, string])[] = [
   ["start", "stop"],
   ["dark", "light"],
   ["filtered", "unfiltered"],
+  // "filter" asks for a filter: as a loose prefix it also found "Remove
+  // filter: X" and "…filters" turn-off titles, which end one.
+  ["filter", "unfilter"],
+  ["merge", "unmerge"],
   ["2d", "3d"],
 ];
 

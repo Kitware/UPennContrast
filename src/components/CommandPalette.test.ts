@@ -391,11 +391,11 @@ describe("CommandPalette", () => {
     // "hide objects" example must be dropped, "show objects" kept.
     const unregisterState = registerCommandProvider(() => [
       command("objects.toggleDraw", "Show objects"),
-      command("property.list.p1.Area", "Show in object list: Area"),
       {
-        ...command("panel.toggle.annotationPanel", "Open Object Browser"),
-        aliases: ["objects"],
+        ...command("property.list.p1.Area", "Show in object list: Area"),
+        keywords: ["column", "add"],
       },
+      command("panel.toggle.annotationPanel", "Open Object Browser"),
       {
         ...command("analysis.measure", "Measure objects…"),
         aliases: ["measure"],
@@ -421,11 +421,11 @@ describe("CommandPalette", () => {
         await nextTick();
       }
       expect(all).toContain("z 3");
-      expect(all).toContain("list Area");
+      expect(all).toContain("add column Area");
       expect(all).toContain("show objects");
       expect(all).not.toContain("hide objects");
-      // Nothing here answers "minimap" or "snapshot".
-      expect(all).not.toContain("minimap");
+      // Nothing here answers the minimap examples.
+      expect(all).not.toContain("hide minimap");
       await wrapper.setProps({ modelValue: false });
       expect(vi.getTimerCount()).toBe(0);
     } finally {

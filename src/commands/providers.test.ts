@@ -386,7 +386,14 @@ describe("propertyFilterCommands", () => {
     mocks.store.requestPaletteOpen.mockClear();
     const [area, intensity] = propertyFilterCommands(ctx)();
     expect(area.title).toBe("Add filter: Name of p1/Area");
-    expect(intensity.title).toBe("Remove filter: Name of p2/Intensity");
+    expect(intensity.title).toBe("Stop filtering by: Name of p2/Intensity");
+    // "filter <name>" finds only the add, never the removal.
+    expect(ids(rankCommands([area, intensity], "filter intensity"))).toEqual(
+      [],
+    );
+    expect(ids(rankCommands([area, intensity], "filter area"))).toEqual([
+      area.id,
+    ]);
     area.run();
     expect(mocks.store.requestPaletteOpen).toHaveBeenCalledWith([
       "filtersPanel",

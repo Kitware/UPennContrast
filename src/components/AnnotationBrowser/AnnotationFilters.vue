@@ -214,7 +214,7 @@ useCommand(() =>
         turnOn: "Filter to objects in the current frame only",
         turnOff: "Include objects from every frame",
         keywords: ["frames", "annotations"],
-        turnOnKeywords: ["filters", "only"],
+        turnOnKeywords: ["filter", "only"],
         turnOffKeywords: ["all"],
         icon: "mdi-image-filter-center-focus",
       },

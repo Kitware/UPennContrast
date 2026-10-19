@@ -1,5 +1,5 @@
 // Example queries for the command palette's placeholder ("Try: z 3 · show
-// only DAPI · list Area"). A first query that finds nothing loses the user,
+// only DAPI · add column Area"). A first query that finds nothing loses the user,
 // so the examples are built from the open dataset (a slice, layer or property
 // that exists here), and each names the command it demonstrates: it is shown
 // only while that command is what Enter would run for it.
@@ -19,13 +19,22 @@ export interface IExample {
   // Id (or id prefix, for per-layer / per-property commands) of the command
   // this example demonstrates.
   target: string;
+  // The target flips with state (one id, two directions). Its query must
+  // then carry a direction word from stateWords.ts ("hide minimap", "add
+  // column Area"): a neutral one ("minimap", "list Area") tops out at the
+  // same id in either state and would run the opposite (tested).
+  flips?: boolean;
 }
 
 /** How many examples the placeholder shows at once. */
 export const EXAMPLES_SHOWN = 3;
 
 export function paletteExamples(ctx: IExampleContext): IExample[] {
-  const ex = (query: string, target: string): IExample => ({ query, target });
+  const ex = (query: string, target: string, flips = false): IExample => ({
+    query,
+    target,
+    flips,
+  });
   if (!ctx.inViewer) {
     return [
       ...(ctx.isLoggedIn ? [ex("upload", "data.upload")] : []),
@@ -44,7 +53,7 @@ export function paletteExamples(ctx: IExampleContext): IExample[] {
     const name =
       ctx.propertyNames.find((n) => /area/i.test(n)) ?? ctx.propertyNames[0];
     examples.push(
-      ex(`list ${name}`, "property.list."),
+      ex(`add column ${name}`, "property.list.", true),
       ex(`color by ${name}`, "property.colorBy."),
     );
   }
@@ -52,18 +61,18 @@ export function paletteExamples(ctx: IExampleContext): IExample[] {
     examples.push(ex(`t ${Math.min(10, ctx.timeCount)}`, "navigate.time:"));
   }
   if (ctx.zCount > 1) {
-    examples.push(ex("merge z", "layers.toggleZMaxMergeAll"));
+    examples.push(ex("merge z", "layers.toggleZMaxMergeAll", true));
   }
-  // Both verbs of the objects toggle: only the one its command answers in
-  // the current state survives examplesThatRun ("show objects" while objects
-  // are visible would otherwise run "Only show objects passing filters").
+  // Toggles get both directions; only the one its command answers in the
+  // current state survives examplesThatRun.
   examples.push(
-    ex("objects", "panel.toggle.annotationPanel"),
-    ex("hide objects", "objects.toggleDraw"),
-    ex("show objects", "objects.toggleDraw"),
+    ex("open objects", "panel.toggle.annotationPanel", true),
+    ex("hide objects", "objects.toggleDraw", true),
+    ex("show objects", "objects.toggleDraw", true),
     ex("measure", "analysis.measure"),
-    ex("minimap", "settings.minimap"),
-    ex("snapshot", "panel.toggle.snapshotPanel"),
+    ex("hide minimap", "settings.minimap", true),
+    ex("show minimap", "settings.minimap", true),
+    ex("open snapshots", "panel.toggle.snapshotPanel", true),
   );
   return examples;
 }

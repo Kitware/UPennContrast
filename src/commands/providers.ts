@@ -205,7 +205,7 @@ export function propertyListCommands(ctx: IProviderContext): TCommandProvider {
 }
 
 /**
- * "Add filter: …" / "Remove filter: …" for every property value path: adds or
+ * "Add filter: …" / "Stop filtering by: …" for every property value path: adds or
  * removes that property's histogram filter, as the Filters panel's picker does.
  */
 export function propertyFilterCommands(
@@ -217,9 +217,19 @@ export function propertyFilterCommands(
       const isFiltered = findIndexOfPath(path, filtered) >= 0;
       return {
         id: `property.filter.${createPathStringFromPathArray(path)}`,
-        title: `${isFiltered ? "Remove" : "Add"} filter: ${propertyLabel(path)}`,
+        // Removing never says "filter": "filter area" must not find (and run)
+        // the command that removes Area's filter.
+        title: isFiltered
+          ? `Stop filtering by: ${propertyLabel(path)}`
+          : `Add filter: ${propertyLabel(path)}`,
         group: "Properties",
-        keywords: ["filter", "range", "histogram", "threshold", "property"],
+        keywords: [
+          "range",
+          "histogram",
+          "threshold",
+          "property",
+          isFiltered ? "unfilter" : "filter",
+        ],
         icon: isFiltered
           ? "mdi-filter-remove-outline"
           : "mdi-filter-plus-outline",

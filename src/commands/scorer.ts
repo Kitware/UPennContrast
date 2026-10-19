@@ -31,7 +31,6 @@ interface IPrepared {
   aliases: string[];
   titleWords: string[];
   initials: string;
-  compactTitle: string;
   keywordWords: string[];
   description: string;
   descriptionWords: string[];
@@ -52,7 +51,6 @@ function prepare(command: ICommand): IPrepared {
       aliases: (command.aliases ?? []).map(normalize).filter(Boolean),
       titleWords,
       initials: titleWords.map((word) => word[0]).join(""),
-      compactTitle: titleWords.join(""),
       keywordWords: (command.keywords ?? [])
         .flatMap((keyword) => normalize(keyword).split(" "))
         .filter(Boolean),
@@ -102,7 +100,14 @@ function scoreWord(word: string, p: IPrepared): number {
   if (p.keywordWords.some((keyword) => keyword.startsWith(word))) {
     return 50;
   }
-  if (isMultiChar && isSubsequence(word, p.compactTitle)) {
+  // Within one title word only ("tbl" → "table"). Across the whole title it
+  // found letters scattered over several words: "area" in "dapi blob
+  // metrics elongation", so "filter area" ran "Add filter: …Elongation".
+  // Cross-word abbreviations are the initials rule above ("cs").
+  if (
+    isMultiChar &&
+    p.titleWords.some((titleWord) => isSubsequence(word, titleWord))
+  ) {
     return 30;
   }
   if (p.descriptionWords.some((descWord) => descWord.startsWith(word))) {

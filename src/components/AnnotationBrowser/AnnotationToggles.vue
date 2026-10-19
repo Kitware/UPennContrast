@@ -141,7 +141,7 @@ useCommand(() =>
         keywords: ["annotations", "draw"],
         // "filtered" only while it turns filtering on: "filtered objects"
         // must not find the command that turns it off.
-        turnOnKeywords: ["filtered", "passing"],
+        turnOnKeywords: ["filter", "filtered", "passing"],
         turnOffKeywords: ["unfiltered", "every", "all"],
         icon: "mdi-filter-outline",
         enabled: () => drawAnnotations.value,
@@ -153,7 +153,7 @@ useCommand(() =>
         turnOn: "Show tooltips only for objects passing filters",
         turnOff: "Show tooltips for every object",
         keywords: ["hover", "labels", "annotations"],
-        turnOnKeywords: ["filtered", "passing"],
+        turnOnKeywords: ["filter", "filtered", "passing"],
         turnOffKeywords: ["unfiltered", "every", "all"],
         icon: "mdi-tooltip-text-outline",
         // Same gate as the switch.

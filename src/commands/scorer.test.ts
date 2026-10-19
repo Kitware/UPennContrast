@@ -181,4 +181,17 @@ describe("command scorer", () => {
       scoreCommand(command("s", "Show objects"), "sho obj"),
     ).toBeGreaterThan(0);
   });
+
+  it("matches a subsequence within one title word, not across words", () => {
+    // a-r-e-a scattered over "dapi … metrics … elongation".
+    const elongation = command(
+      "e",
+      "Add filter: DAPI blob metrics / Elongation",
+    );
+    const area = command("a", "Add filter: DAPI blob metrics / Area");
+    expect(scoreCommand(elongation, "area")).toBe(0);
+    expect(rankCommands([elongation, area], "filter area")).toEqual([area]);
+    // Inside one word it still works.
+    expect(scoreCommand(command("t", "Open table"), "tbl")).toBeGreaterThan(0);
+  });
 });

@@ -22,7 +22,7 @@ describe("paletteExamples", () => {
     const examples = paletteExamples(viewer).map((e) => e.query);
     expect(examples).toContain("z 3");
     expect(examples).toContain("show only DAPI");
-    expect(examples).toContain("list Area"); // prefers an Area property
+    expect(examples).toContain("add column Area"); // prefers an Area property
     expect(examples).toContain("merge z");
     // One time point: no time example.
     expect(examples.some((e) => e.startsWith("t "))).toBe(false);
@@ -36,9 +36,9 @@ describe("paletteExamples", () => {
       propertyNames: [],
     });
     expect(
-      examples.some((e) => /^z |merge z|show only|list |color by/.test(e)),
+      examples.some((e) => /^z |merge z|show only|add column|color by/.test(e)),
     ).toBe(false);
-    expect(examples).toContain("objects");
+    expect(examples).toContain("open objects");
   });
 
   it("never suggests a slice past the end", () => {
@@ -76,5 +76,20 @@ describe("examplesThatRun", () => {
     expect(examplesThatRun(examples, (q) => top[q])).toEqual(["hide objects"]);
     expect(examplesThatRun(examples, () => undefined)).toEqual([]);
     expect(examplePlaceholder([], 0)).toBe("Search commands");
+  });
+});
+
+describe("examples for state-flipping commands", () => {
+  it("carry a direction word, so they can't run the opposite", async () => {
+    const { STATE_WORDS } = await import("./stateWords");
+    const flipping = paletteExamples(viewer).filter((example) => example.flips);
+    expect(flipping.length).toBeGreaterThan(3);
+    for (const { query } of flipping) {
+      const words = query.toLowerCase().split(/\s+/);
+      expect(
+        words.some((word) => STATE_WORDS.has(word)),
+        `"${query}" needs a direction word`,
+      ).toBe(true);
+    }
   });
 });
