@@ -120,7 +120,7 @@ import { aiPromptRequest } from "@/commands/requests";
 import {
   EXAMPLES_SHOWN,
   examplePlaceholder,
-  filterResolvable,
+  examplesThatRun,
   paletteExamples,
 } from "@/commands/examples";
 
@@ -164,15 +164,16 @@ const EXAMPLE_ROTATE_MS = 4000;
 const exampleOffset = ref(0);
 let exampleTimer: ReturnType<typeof setInterval> | null = null;
 
-// Only examples that find a command in the current state ("hide objects"
-// finds nothing while objects are hidden). Gated on `open`: the dialog keeps
+// Only examples whose top result is the command they demonstrate ("show
+// objects" while objects are visible would run "Only show objects passing
+// filters"). Gated on `open`: the dialog keeps
 // its content mounted after the first open, so without the gate this would
 // re-score ~10 queries against every command on each Z/time scrub (the
 // Navigator commands' enabled() reads the current position).
 const examples = computed(() =>
   !open.value
     ? []
-    : filterResolvable(
+    : examplesThatRun(
         paletteExamples({
           inViewer: providerContext.inViewer(),
           isLoggedIn: store.isLoggedIn,
@@ -187,9 +188,12 @@ const examples = computed(() =>
               : propertyStore.getPropertyById(path[0])?.name ?? path[0],
           ),
         }),
-        (example) =>
-          paramCommandsForQuery(example, providerContext).length > 0 ||
-          rankCommands(enabledCommands.value, example, 1).length > 0,
+        // What Enter would run: a typed command first, else the top match.
+        (query) =>
+          (
+            paramCommandsForQuery(query, providerContext)[0] ??
+            rankCommands(enabledCommands.value, query, 1)[0]
+          )?.id,
       ),
 );
 

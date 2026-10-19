@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   examplePlaceholder,
-  filterResolvable,
+  examplesThatRun,
   paletteExamples,
 } from "./examples";
 
@@ -14,9 +14,12 @@ const viewer = {
   propertyNames: ["Elongation", "Area"],
 };
 
+const queries = (ctx: typeof viewer) =>
+  paletteExamples(ctx).map((example) => example.query);
+
 describe("paletteExamples", () => {
   it("builds viewer examples from the dataset: a real slice, layer and property", () => {
-    const examples = paletteExamples(viewer);
+    const examples = paletteExamples(viewer).map((e) => e.query);
     expect(examples).toContain("z 3");
     expect(examples).toContain("show only DAPI");
     expect(examples).toContain("list Area"); // prefers an Area property
@@ -26,7 +29,7 @@ describe("paletteExamples", () => {
   });
 
   it("omits examples the dataset can't satisfy", () => {
-    const examples = paletteExamples({
+    const examples = queries({
       ...viewer,
       zCount: 1,
       layerNames: ["DAPI"],
@@ -39,15 +42,13 @@ describe("paletteExamples", () => {
   });
 
   it("never suggests a slice past the end", () => {
-    expect(paletteExamples({ ...viewer, zCount: 2 })).toContain("z 2");
+    expect(queries({ ...viewer, zCount: 2 })).toContain("z 2");
   });
 
   it("offers upload off the viewer only when logged in", () => {
     const off = { ...viewer, inViewer: false };
-    expect(paletteExamples(off)).toContain("upload");
-    expect(paletteExamples({ ...off, isLoggedIn: false })).not.toContain(
-      "upload",
-    );
+    expect(queries(off)).toContain("upload");
+    expect(queries({ ...off, isLoggedIn: false })).not.toContain("upload");
   });
 });
 
@@ -60,13 +61,20 @@ describe("examplePlaceholder", () => {
   });
 });
 
-describe("filterResolvable", () => {
-  it("keeps only examples that resolve, and the placeholder survives none", () => {
-    expect(
-      filterResolvable(["hide objects", "show objects"], (q) =>
-        q.startsWith("show"),
-      ),
-    ).toEqual(["show objects"]);
+describe("examplesThatRun", () => {
+  it("keeps an example only while its top result is the command it shows", () => {
+    const examples = [
+      { query: "hide objects", target: "objects.toggleDraw" },
+      { query: "show objects", target: "objects.toggleDraw" },
+    ];
+    // Objects visible: "show objects" tops out at the filtered-draw command,
+    // which is not what it demonstrates, so only "hide objects" stays.
+    const top: Record<string, string> = {
+      "hide objects": "objects.toggleDraw",
+      "show objects": "objects.toggleFilteredDraw",
+    };
+    expect(examplesThatRun(examples, (q) => top[q])).toEqual(["hide objects"]);
+    expect(examplesThatRun(examples, () => undefined)).toEqual([]);
     expect(examplePlaceholder([], 0)).toBe("Search commands");
   });
 });

@@ -386,9 +386,12 @@ queries ("Try: z 3 · show only DAPI · list Area") and moves to the next three
 each time the palette opens and every 4 s while it is open. They come from
 `paletteExamples` (`src/commands/examples.ts`), which builds them from the
 open dataset (a slice that exists, the first layer, an Area-like property),
-and the palette keeps only those that resolve to a command in the current
-state (`filterResolvable`: "hide objects" finds nothing while objects are
-hidden), so a first try succeeds: a first query that finds nothing loses the user.
+and each example names the command it demonstrates. The palette keeps only
+those whose top result, what Enter would run, is that command
+(`examplesThatRun`). "Finds something" was not enough: with objects visible,
+"show objects" still found "Only show objects passing filters" and would
+have turned filtering on. A first query that finds nothing, or the wrong
+thing, loses the user.
 The timer runs only while the palette is open.
 
 Every switch and checkbox in the viewer's panels has a command, and each
@@ -468,7 +471,7 @@ Run `pnpm test src/commands src/actions src/components/CommandPalette.test.ts sr
 - [ ] **A setting's command is titled by what it will do, and flips it.** — _"titles each command by what running it will do, and flips the setting"_
 - [ ] **Ask Nimbus AI (field button and mod+Enter) works with no match, hands over the trimmed query, beats the highlighted row on mod+Enter, and only appears where the AI panel can open.** — _"asks Nimbus AI from the field's button or mod+Enter, even with no match"_, _"shows no Ask Nimbus AI button where the AI panel can't open"_, _"is mod+Enter with no other modifier, per platform"_, _"opens the AI panel for a palette prompt, only when it may open"_
 - [ ] **The AI panel fills, focuses and does not send a palette prompt**, whether it arrives before or after the panel mounts, and keeps an unsent draft. A prompt the gate refuses is dropped, not left pending. — _"fills its input from a palette request made before it mounted, without sending"_, _"takes a request that arrives while it is open"_, _"keeps an unsent draft, adding the prompt on a new line"_
-- [ ] **Placeholder examples come from the dataset, resolve in the current state, rotate while open, and stop when closed.** No fixed state verb ("hide objects" while hidden). `examples` is gated on `open`, since the dialog keeps its content mounted and would otherwise re-score on every Z/time scrub. — _"builds viewer examples from the dataset: a real slice, layer and property"_, _"omits examples the dataset can't satisfy"_, _"keeps only examples that resolve, and the placeholder survives none"_, _"rotates dataset-based example queries in the placeholder while open, and stops when closed"_
+- [ ] **Placeholder examples come from the dataset, run the command they demonstrate in the current state (their top result, not merely any match), rotate while open, and stop when closed.** No fixed state verb ("hide objects" while hidden). `examples` is gated on `open`, since the dialog keeps its content mounted and would otherwise re-score on every Z/time scrub. — _"builds viewer examples from the dataset: a real slice, layer and property"_, _"omits examples the dataset can't satisfy"_, _"keeps an example only while its top result is the command it shows"_, _"rotates dataset-based example queries in the placeholder while open, and stops when closed"_
 - [ ] **The app-bar search trigger stays compact** (magnifier + hotkey hint, icon only below `lg`), so the viewer's account and AI buttons stay on screen. — _"shows a compact search pill that opens the command palette"_
 
 ### Parameterized commands

@@ -392,6 +392,14 @@ describe("CommandPalette", () => {
     const unregisterState = registerCommandProvider(() => [
       command("objects.toggleDraw", "Show objects"),
       command("property.list.p1.Area", "Show in object list: Area"),
+      {
+        ...command("panel.toggle.annotationPanel", "Open Object Browser"),
+        aliases: ["objects"],
+      },
+      {
+        ...command("analysis.measure", "Measure objects…"),
+        aliases: ["measure"],
+      },
     ]);
     try {
       mountPalette();
