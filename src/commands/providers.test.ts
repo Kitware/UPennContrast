@@ -291,6 +291,25 @@ describe("propertyListCommands", () => {
   });
 });
 
+describe("propertyListCommands direction", () => {
+  it("lets 'add' find only a hidden column and 'remove' only a shown one", () => {
+    mocks.properties.computedPropertyPaths = [
+      ["p1", "Area"],
+      ["p2", "Perimeter"],
+    ];
+    mocks.properties.displayedPropertyPaths = [["p1", "Area"]];
+    const commands = propertyListCommands(ctx)();
+    expect(ids(rankCommands(commands, "add column area"))).toEqual([]);
+    expect(ids(rankCommands(commands, "remove column area"))).toEqual([
+      "property.list.p1.Area",
+    ]);
+    expect(ids(rankCommands(commands, "add column perimeter"))).toEqual([
+      "property.list.p2.Perimeter",
+    ]);
+    expect(ids(rankCommands(commands, "remove column perimeter"))).toEqual([]);
+  });
+});
+
 describe("propertyListCommands at the column cap", () => {
   it("withholds 'Show in' once the list is full, but still offers 'Hide from'", () => {
     const full = Array.from({ length: 100 }, (_, i) => [`p${i}`, "v"]);

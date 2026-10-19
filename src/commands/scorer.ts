@@ -95,6 +95,8 @@ const STATE_VERBS: ReadonlySet<string> = new Set([
   "start",
   "stop",
   "unroll",
+  "add",
+  "remove",
 ]);
 
 function scoreWord(word: string, p: IPrepared): number {

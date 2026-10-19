@@ -179,7 +179,15 @@ export function propertyListCommands(ctx: IProviderContext): TCommandProvider {
         id: `property.list.${createPathStringFromPathArray(path)}`,
         title: `${isShown ? "Hide from" : "Show in"} object list: ${propertyLabel(path)}`,
         group: "Properties",
-        keywords: ["column", "table", "browser", "add", "remove", "property"],
+        // Only the direction it will go: "add column area" must not find
+        // the command that removes it.
+        keywords: [
+          "column",
+          "table",
+          "browser",
+          "property",
+          isShown ? "remove" : "add",
+        ],
         icon: isShown
           ? "mdi-table-column-remove"
           : "mdi-table-column-plus-after",
