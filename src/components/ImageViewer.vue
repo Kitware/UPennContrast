@@ -944,7 +944,10 @@ useCommand(() => {
       id: "view.toggleLock",
       title: isViewLocked.value ? "Unlock pan and zoom" : "Lock pan and zoom",
       group: "Actions",
-      keywords: ["freeze", "view", "navigation", "toggle"],
+      // Only what it will do: "freeze" must not find the unlock.
+      keywords: isViewLocked.value
+        ? ["unfreeze", "view", "navigation", "toggle"]
+        : ["freeze", "view", "navigation", "toggle"],
       icon: isViewLocked.value ? "mdi-lock-open-outline" : "mdi-lock-outline",
       hotkey: boundHotkey("l", "Lock/unlock view pan and zoom"),
       run: toggleViewLock,

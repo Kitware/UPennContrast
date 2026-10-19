@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { examplePlaceholder, paletteExamples } from "./examples";
+import {
+  examplePlaceholder,
+  filterResolvable,
+  paletteExamples,
+} from "./examples";
 
 const viewer = {
   inViewer: true,
@@ -53,5 +57,16 @@ describe("examplePlaceholder", () => {
     expect(examplePlaceholder(examples, 0)).toBe("Try: a · b · c");
     expect(examplePlaceholder(examples, 3)).toBe("Try: d · a · b");
     expect(examplePlaceholder(["a"], 5)).toBe("Try: a");
+  });
+});
+
+describe("filterResolvable", () => {
+  it("keeps only examples that resolve, and the placeholder survives none", () => {
+    expect(
+      filterResolvable(["hide objects", "show objects"], (q) =>
+        q.startsWith("show"),
+      ),
+    ).toEqual(["show objects"]);
+    expect(examplePlaceholder([], 0)).toBe("Search commands");
   });
 });

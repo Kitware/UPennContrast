@@ -356,7 +356,12 @@ useCommand(() => [
         ? "Use a black background"
         : "Use a white background",
     group: "Actions",
-    keywords: ["background", "color", "dark", "light", "setting"],
+    // Only the color it applies: "light background" must not find the
+    // command that turns a white background black.
+    keywords:
+      backgroundColor.value === "white"
+        ? ["background", "color", "dark", "setting"]
+        : ["background", "color", "light", "setting"],
     icon: "mdi-invert-colors",
     enabled: inViewer,
     run: () => {

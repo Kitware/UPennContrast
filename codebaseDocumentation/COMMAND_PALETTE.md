@@ -1,9 +1,11 @@
 # Command Palette (⌘K)
 
-> **Status: Phase 1 implemented** (branch `feature/command-palette`). See
-> _Implementation notes_ below for where the code ended up and where it
-> departs from this spec, and the _Regression checklist_ at the end. Phase 2
-> ("Ask AI") is not started. Part of the "adaptive interface" effort alongside
+> **Status: Phases 1 and 2 implemented** (Phase 1 on branch
+> `feature/command-palette`; Phase 2, "Ask Nimbus AI", with typed commands and
+> viewer-control coverage on `feature/palette-actions`). See _Implementation
+> notes_ below for where the code ended up and where it departs from this
+> spec, _Viewer controls, aliases and property columns_ for Ask Nimbus AI as
+> built, and the _Regression checklist_ at the end. Part of the "adaptive interface" effort alongside
 > `PANEL_LAYOUT_PERSISTENCE.md`, whose panel registry (Part 1, shipped with
 > this feature) it reads.
 
@@ -123,10 +125,13 @@ dots`, `cells ↔ nuclei ↔ segment`, `measure ↔ property ↔ metric`). Keep 
 - Results are grouped under group headers, capped at about 50 rows, with the
   hotkey hint on the right.
 
-Phase 2 (separate PR, optional): when nothing scores well, a final row
-**"Ask AI: <query>"** opens the AI panel (`src/store/aiPanel.ts`) with the
-query pre-filled. Gate it the same way the AI panel itself is gated (env flag
-and login). Never send keystrokes to the network while the user types.
+Phase 2 (implemented; see _Ask Nimbus AI_ under _Viewer controls, aliases
+and property columns_): the query can be handed to the AI panel
+(`src/store/aiPanel.ts`), pre-filled and not sent. As built it is a button at
+the end of the search field plus ⌘↵, not a final row: a row at the bottom of
+the results was out of sight below the scroll. It is gated the same way the
+AI panel is (env flag and login), and nothing is sent to the network while
+the user types.
 
 ## UI
 
@@ -378,7 +383,9 @@ queries ("Try: z 3 · show only DAPI · list Area") and moves to the next three
 each time the palette opens and every 4 s while it is open. They come from
 `paletteExamples` (`src/commands/examples.ts`), which builds them from the
 open dataset (a slice that exists, the first layer, an Area-like property),
-so a first try succeeds: a first query that finds nothing loses the user.
+and the palette keeps only those that resolve to a command in the current
+state (`filterResolvable`: "hide objects" finds nothing while objects are
+hidden), so a first try succeeds: a first query that finds nothing loses the user.
 The timer runs only while the palette is open.
 
 **Still missing:** tag and color selected objects (need an input), dark mode
@@ -406,7 +413,7 @@ Run `pnpm test src/commands src/actions src/components/CommandPalette.test.ts sr
 - [ ] **Name, initials, description, synonym and diacritics matches.** — _"ranks the worker first for its name"_, _"matches a run of the title's word initials ('cs' → Cellpose-SAM)"_, _"matches a description word ('segment nuclei' finds Cellpose)"_, _"matches through a synonym (spots → puncta)"_, _"matches ignoring diacritics in either direction"_
 - [ ] **A query naming a panel finds the panel first** ("objects", "obj", "measurements"), through its aliases. — _"ranks a panel by its alias above titles that only mention the word"_
 - [ ] **An exact alias outranks another command's title prefix**, so "filter" finds the Filters panel above 50+ "Add filter: …" rows. — _"ranks an exact alias above another command's title prefix"_
-- [ ] **A state verb never matches its opposite.** Show/hide are not synonyms; a whole state verb (show, hide, open, close, lock, unlock, on, off, start, stop, unroll…) must match a whole title word or keyword, never a substring ("lock" in "Unlock") or subsequence ("open" in "Close…"); and a state-flipping command's title, keywords and aliases name only what it will do ("Roll up Z", "Show the current Z slice", "Draw every object, ignoring filters"), so "show minimap", "lock pan", "unroll z" and "merge z" can't run the opposite. — _"never matches a state verb to its opposite"_, _"matches a whole state verb only to a whole title word or keyword"_, _"lets a query's show/hide find only the command that does it"_
+- [ ] **A state verb never matches its opposite.** Show/hide are not synonyms; a whole state verb (show, hide, open, close, lock, unlock, on, off, start, stop, unroll…) must match a whole title word or keyword, never a substring ("lock" in "Unlock") or subsequence ("open" in "Close…"); and a state-flipping command's title, keywords and aliases name only what it will do ("Roll up Z", "Show the current Z slice", "Draw every object, ignoring filters"), so "show minimap", "lock pan", "unroll z" and "merge z" can't run the opposite. — _"never matches a state verb to its opposite"_, _"matches a whole state verb only to a whole title word or keyword"_, _"lets a query's show/hide find only the command that does it"_, _"names only the background color it will apply"_
 - [ ] **A plural query word matches a singular title word.** — _"matches a plural query word against a singular title word"_
 - [ ] **Every query word must match**, and results are capped. — _"requires every query word to match"_, _"returns nothing for an empty query and caps results"_
 
@@ -445,7 +452,7 @@ Run `pnpm test src/commands src/actions src/components/CommandPalette.test.ts sr
 - [ ] **A setting's command is titled by what it will do, and flips it.** — _"titles each command by what running it will do, and flips the setting"_
 - [ ] **Ask Nimbus AI (field button and mod+Enter) works with no match, hands over the trimmed query, beats the highlighted row on mod+Enter, and only appears where the AI panel can open.** — _"asks Nimbus AI from the field's button or mod+Enter, even with no match"_, _"shows no Ask Nimbus AI button where the AI panel can't open"_, _"is mod+Enter with no other modifier, per platform"_, _"opens the AI panel for a palette prompt, only when it may open"_
 - [ ] **The AI panel fills, focuses and does not send a palette prompt**, whether it arrives before or after the panel mounts, and keeps an unsent draft. A prompt the gate refuses is dropped, not left pending. — _"fills its input from a palette request made before it mounted, without sending"_, _"takes a request that arrives while it is open"_, _"keeps an unsent draft, adding the prompt on a new line"_
-- [ ] **Placeholder examples come from the dataset, rotate while open, and stop when closed.** — _"builds viewer examples from the dataset: a real slice, layer and property"_, _"omits examples the dataset can't satisfy"_, _"rotates dataset-based example queries in the placeholder while open, and stops when closed"_
+- [ ] **Placeholder examples come from the dataset, resolve in the current state, rotate while open, and stop when closed.** No fixed state verb ("hide objects" while hidden). `examples` is gated on `open`, since the dialog keeps its content mounted and would otherwise re-score on every Z/time scrub. — _"builds viewer examples from the dataset: a real slice, layer and property"_, _"omits examples the dataset can't satisfy"_, _"keeps only examples that resolve, and the placeholder survives none"_, _"rotates dataset-based example queries in the placeholder while open, and stops when closed"_
 - [ ] **The app-bar search trigger stays compact** (magnifier + hotkey hint, icon only below `lg`), so the viewer's account and AI buttons stay on screen. — _"shows a compact search pill that opens the command palette"_
 
 ### Parameterized commands

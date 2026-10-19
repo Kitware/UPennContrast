@@ -387,6 +387,12 @@ describe("CommandPalette", () => {
 
   it("rotates dataset-based example queries in the placeholder while open, and stops when closed", async () => {
     vi.useFakeTimers();
+    // Objects are hidden, so only "Show objects" exists: the fixed
+    // "hide objects" example must be dropped, "show objects" kept.
+    const unregisterState = registerCommandProvider(() => [
+      command("objects.toggleDraw", "Show objects"),
+      command("property.list.p1.Area", "Show in object list: Area"),
+    ]);
     try {
       mountPalette();
       const placeholder = () =>
@@ -408,9 +414,14 @@ describe("CommandPalette", () => {
       }
       expect(all).toContain("z 3");
       expect(all).toContain("list Area");
+      expect(all).toContain("show objects");
+      expect(all).not.toContain("hide objects");
+      // Nothing here answers "minimap" or "snapshot".
+      expect(all).not.toContain("minimap");
       await wrapper.setProps({ modelValue: false });
       expect(vi.getTimerCount()).toBe(0);
     } finally {
+      unregisterState();
       vi.useRealTimers();
     }
   });

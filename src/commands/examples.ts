@@ -38,8 +38,29 @@ export function paletteExamples(ctx: IExampleContext): string[] {
   if (ctx.zCount > 1) {
     examples.push("merge z");
   }
-  examples.push("objects", "hide objects", "measure", "minimap", "snapshot");
+  // Both verbs: the palette keeps only the one that resolves in the current
+  // state (filterResolvable), since "hide objects" finds nothing while hidden.
+  examples.push(
+    "objects",
+    "hide objects",
+    "show objects",
+    "measure",
+    "minimap",
+    "snapshot",
+  );
   return examples;
+}
+
+/**
+ * The examples that find something right now: a typed command, or at least
+ * one ranked match. State-flipping commands answer only the verb of what they
+ * will do, so a fixed example like "hide objects" can stop resolving.
+ */
+export function filterResolvable(
+  examples: string[],
+  resolves: (query: string) => boolean,
+): string[] {
+  return examples.filter(resolves);
 }
 
 /**
@@ -47,6 +68,9 @@ export function paletteExamples(ctx: IExampleContext): string[] {
  * placeholder text. Fewer examples than slots shows each once.
  */
 export function examplePlaceholder(examples: string[], offset: number) {
+  if (examples.length === 0) {
+    return "Search commands";
+  }
   const count = Math.min(EXAMPLES_SHOWN, examples.length);
   const shown = Array.from(
     { length: count },

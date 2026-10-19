@@ -267,4 +267,17 @@ describe("ViewerSettings", () => {
     wrapper.unmount();
     route.value.name = "root";
   });
+
+  it("names only the background color it will apply", async () => {
+    const { rankCommands } = await import("@/commands/scorer");
+    const wrapper = mountComponent();
+    route.value.name = "datasetview";
+    // The mocked background is black, so the command turns it white.
+    const ids = (query: string) =>
+      rankCommands(enabledCommands.value, query).map((command) => command.id);
+    expect(ids("light background")).toContain("settings.backgroundColor");
+    expect(ids("dark background")).not.toContain("settings.backgroundColor");
+    wrapper.unmount();
+    route.value.name = "root";
+  });
 });

@@ -120,6 +120,7 @@ import { aiPromptRequest } from "@/commands/requests";
 import {
   EXAMPLES_SHOWN,
   examplePlaceholder,
+  filterResolvable,
   paletteExamples,
 } from "@/commands/examples";
 
@@ -157,28 +158,39 @@ useCommandProvider(propertyListCommands(providerContext));
 useCommandProvider(propertyFilterCommands(providerContext));
 
 // Rotating example queries in the field's placeholder, built from the open
-// dataset so each one works here. Read only while the palette is open (the
-// placeholder renders only then), and advanced on a timer that runs only
-// while it is open.
+// dataset so each one works here, and advanced on a timer that runs only
+// while the palette is open.
 const EXAMPLE_ROTATE_MS = 4000;
 const exampleOffset = ref(0);
 let exampleTimer: ReturnType<typeof setInterval> | null = null;
 
+// Only examples that find a command in the current state ("hide objects"
+// finds nothing while objects are hidden). Gated on `open`: the dialog keeps
+// its content mounted after the first open, so without the gate this would
+// re-score ~10 queries against every command on each Z/time scrub (the
+// Navigator commands' enabled() reads the current position).
 const examples = computed(() =>
-  paletteExamples({
-    inViewer: providerContext.inViewer(),
-    isLoggedIn: store.isLoggedIn,
-    zCount: store.dataset?.z.length ?? 0,
-    timeCount: store.dataset?.time.length ?? 0,
-    layerNames: store.layers.map((layer) => layer.name),
-    // A nested value's own name ("Area"); a top-level value's path is just
-    // the property id, so use the property's name.
-    propertyNames: propertyStore.computedPropertyPaths.map((path) =>
-      path.length > 1
-        ? path[path.length - 1]
-        : propertyStore.getPropertyById(path[0])?.name ?? path[0],
-    ),
-  }),
+  !open.value
+    ? []
+    : filterResolvable(
+        paletteExamples({
+          inViewer: providerContext.inViewer(),
+          isLoggedIn: store.isLoggedIn,
+          zCount: store.dataset?.z.length ?? 0,
+          timeCount: store.dataset?.time.length ?? 0,
+          layerNames: store.layers.map((layer) => layer.name),
+          // A nested value's own name ("Area"); a top-level value's path is just
+          // the property id, so use the property's name.
+          propertyNames: propertyStore.computedPropertyPaths.map((path) =>
+            path.length > 1
+              ? path[path.length - 1]
+              : propertyStore.getPropertyById(path[0])?.name ?? path[0],
+          ),
+        }),
+        (example) =>
+          paramCommandsForQuery(example, providerContext).length > 0 ||
+          rankCommands(enabledCommands.value, example, 1).length > 0,
+      ),
 );
 
 const placeholder = computed(() =>
