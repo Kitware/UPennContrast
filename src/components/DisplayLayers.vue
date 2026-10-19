@@ -397,6 +397,8 @@ useCommand(() => {
       keywords: ["channels", "visibility", "toggle"],
       icon: allVisible ? "mdi-eye-off-outline" : "mdi-eye-outline",
       hotkey: boundHotkey("0", "Show/hide all layers"),
+      // Single mode can show neither all layers nor none.
+      enabled: () => store.layerMode !== "single",
       run: store.toggleGlobalLayerVisibility,
     },
   ];

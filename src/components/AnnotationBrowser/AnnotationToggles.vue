@@ -62,6 +62,7 @@ import store from "@/store";
 import { useCommand } from "@/commands/registry";
 import { toggleCommands } from "@/commands/toggles";
 import { useInViewer } from "@/commands/context";
+import { ICommand } from "@/commands/types";
 import {
   AnnotationSelectionTypes,
   AnnotationSelectionTypesNames,
@@ -145,9 +146,40 @@ useCommand(() =>
         icon: "mdi-filter-outline",
         enabled: () => drawAnnotations.value,
       },
+      {
+        id: "objects.toggleFilteredTooltips",
+        setting: filteredAnnotationTooltips,
+        turnOn: "Show tooltips only for objects passing filters",
+        turnOff: "Show tooltips for every object, ignoring filters",
+        keywords: ["hover", "labels", "annotations"],
+        turnOnKeywords: ["filtered", "passing"],
+        turnOffKeywords: ["unfiltered", "every", "all"],
+        icon: "mdi-tooltip-text-outline",
+        // Same gate as the switch.
+        enabled: () => showTooltips.value && drawAnnotations.value,
+      },
     ],
     { when: inViewer },
   ),
+);
+
+// The selection-mode select: one command per mode other than the current.
+useCommand(() =>
+  annotationsSelectionTypeItems
+    .filter((item) => item.value !== annotationSelectionType.value)
+    .map(
+      (item): ICommand => ({
+        id: `objects.selectionMode.${item.value}`,
+        title: `Object selection mode: ${item.text}`,
+        group: "Actions",
+        keywords: ["select", "selection", "lasso", "objects"],
+        icon: "mdi-selection",
+        enabled: inViewer,
+        run: () => {
+          annotationSelectionType.value = item.value;
+        },
+      }),
+    ),
 );
 
 defineExpose({

@@ -124,6 +124,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { useCommand } from "@/commands/registry";
+import { toggleCommands } from "@/commands/toggles";
+import { useInViewer } from "@/commands/context";
 import filterStore from "@/store/filters";
 import store from "@/store";
 import { ITagAnnotationFilter } from "@/store/model";
@@ -197,6 +200,32 @@ const showAnnotationsFromHiddenLayers = computed({
     store.setShowAnnotationsFromHiddenLayers(value);
   },
 });
+
+// The Filters palette stays mounted on every route, so gate to the viewer.
+const inViewer = useInViewer();
+useCommand(() =>
+  toggleCommands(
+    [
+      {
+        id: "filters.onlyCurrentFrame",
+        setting: onlyCurrentFrame,
+        turnOn: "Filter to objects in the current frame only",
+        turnOff: "Filter across every frame, not only the current one",
+        keywords: ["filters", "frame", "annotations"],
+        icon: "mdi-image-filter-center-focus",
+      },
+      {
+        id: "filters.showFromHiddenLayers",
+        setting: showAnnotationsFromHiddenLayers,
+        turnOn: "Show objects from hidden layers",
+        turnOff: "Hide objects from hidden layers",
+        keywords: ["layers", "annotations", "invisible"],
+        icon: "mdi-layers-off-outline",
+      },
+    ],
+    { when: inViewer },
+  ),
+);
 
 defineExpose({
   advancedOpen,

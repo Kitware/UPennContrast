@@ -106,7 +106,10 @@ export function layerCommands(ctx: IProviderContext): TCommandProvider {
         // Looking the key up by description alone would give every layer
         // sharing a name the first one's key.
         hotkey: boundHotkey(`${index + 1}`, `Show/hide layer: ${layer.name}`),
-        enabled: ctx.inViewer,
+        // Single mode keeps exactly one layer visible: toggling the visible
+        // one leaves it visible, so "Hide layer" would do nothing there.
+        enabled: () =>
+          ctx.inViewer() && !(store.layerMode === "single" && layer.visible),
         run: () => store.toggleLayerVisibility(layer.id),
       };
     });

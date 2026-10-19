@@ -16,6 +16,7 @@ vi.mock("@/store", async () => {
   const { reactive } = await import("vue");
   mocks.store = reactive({
     isLoggedIn: true,
+    layerMode: "multiple",
     dataset: { channelNames: new Map([[0, "DAPI"]]) },
     tools: [] as any[],
     layers: [] as any[],
@@ -213,6 +214,23 @@ describe("layerCommands", () => {
     expect(ids(rankCommands(commands, "visible dapi"))).toEqual([]);
     commands[1].run();
     expect(mocks.store.toggleLayerVisibility).toHaveBeenCalledWith("l2");
+  });
+});
+
+describe("layerCommands in single mode", () => {
+  it("offers no 'Hide layer' for the one visible layer, which can't be hidden", () => {
+    mocks.store.layerMode = "single";
+    mocks.store.layers = [
+      { id: "l1", name: "DAPI", channel: 0, visible: true },
+      { id: "l2", name: "GFP", channel: 1, visible: false },
+    ];
+    const [dapi, gfp] = layerCommands(ctx)();
+    expect(dapi.title).toBe("Hide layer: DAPI");
+    expect(dapi.enabled!()).toBe(false);
+    expect(gfp.enabled!()).toBe(true);
+    mocks.store.layerMode = "multiple";
+    expect(layerCommands(ctx)()[0].enabled!()).toBe(true);
+    mocks.store.layers = [];
   });
 });
 

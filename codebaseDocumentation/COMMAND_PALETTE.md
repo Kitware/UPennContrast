@@ -333,7 +333,10 @@ with `useCommand` in the component that owns the control:
 | `LayersPanel.vue` | Layer mode: Single / Multiple / Unroll, Add layer |
 | `NavigatorPanel.vue` | Next/Previous XY, Z, time point (w/r, d/e, s/f), Unroll XY/Z/T, time lapse mode. The Navigator's unroll watch is what refreshes the dataset, so the unroll commands go through it |
 | `LargeImageDropdown.vue` | Switch image: X |
-| `ViewerSettings.vue`, `AnnotationToggles.vue` | Scale bar, minimap, values on hover, point scaling, dimension labels, background color, connections, only show objects passing filters |
+| `ViewerSettings.vue`, `AnnotationToggles.vue`, `PixelScaleBarSetting.vue` | Scale bar, pixel scale bar, minimap, values on hover, point scaling, dimension labels, background color, connections, only show objects passing filters, tooltips only for filtered objects, object selection mode |
+| `AnnotationFilters.vue` | Current frame only, objects from hidden layers |
+| `UISettings.vue` | Dark/light mode (no viewer gate: the theme applies everywhere) |
+| `TimelapsePanel.vue` | Track labels (time lapse mode only) |
 
 Boolean settings use `toggleCommands` (`src/commands/toggles.ts`): the title
 names what running the command will do, so it flips with the setting.
@@ -388,10 +391,18 @@ state (`filterResolvable`: "hide objects" finds nothing while objects are
 hidden), so a first try succeeds: a first query that finds nothing loses the user.
 The timer runs only while the palette is open.
 
-**Still missing:** tag and color selected objects (need an input), dark mode
-(Vuetify's `useTheme` is component-local), select all matching objects
-(server-list mode logic lives in `AnnotationList.vue`), and switching the
-Object Browser's tabs (Objects / Measurements / Connections).
+Every switch and checkbox in the viewer's panels has a command, and each
+command's `enabled` matches its control's disabled state. Layer visibility
+commands respect single layer mode, which keeps exactly one layer visible:
+the visible layer offers no "Hide layer", and "Show/Hide all layers" is not
+offered at all.
+
+**Still missing:** controls that need a value rather than a toggle (sliders
+for opacity and point radius, the compositing-mode list, colors), the
+advanced Visibility settings (overview raster, reveal-more, thresholds; they
+save to the configuration), tag and color selected objects (need an input),
+select all matching objects (server-list mode logic lives in
+`AnnotationList.vue`), and switching the Object Browser's tabs directly.
 
 ## Regression checklist
 
@@ -451,6 +462,8 @@ Run `pnpm test src/commands src/actions src/components/CommandPalette.test.ts sr
 - [ ] **Delete selected works in server-list mode from every entry point.** — _"deletes the selected ids, clears them and refreshes the page in server mode"_, _"uses the store action in local list mode"_
 - [ ] **A typed command shares its group's header with ranked matches.** — _"lists a typed command and ranked matches of its group under one header"_
 - [ ] **A command that opens a panel to show its result leaves the result in sight**: "Show in object list" switches the Object Browser to its Objects tab, and a newly added filter expands the Filters panel's Property values section (from any path, not only the palette). — _"offers each property as an object-list column, found by 'list area'"_, _"expands Property values when a filter is added from elsewhere"_
+- [ ] **Layer visibility commands respect single layer mode**: no "Hide layer" for the one visible layer, no "Show/Hide all layers". — _"offers no 'Hide layer' for the one visible layer, which can't be hidden"_
+- [ ] **Every viewer switch has a command gated like the switch** (filtered tooltips need tooltips and objects shown; selection modes offer the two that aren't current). — _"registers the filtered-tooltips switch, gated like the switch"_
 - [ ] **Property filters toggle through the Filters store.** — _"adds a property's filter, or removes one already there"_
 - [ ] **A setting's command is titled by what it will do, and flips it.** — _"titles each command by what running it will do, and flips the setting"_
 - [ ] **Ask Nimbus AI (field button and mod+Enter) works with no match, hands over the trimmed query, beats the highlighted row on mod+Enter, and only appears where the AI panel can open.** — _"asks Nimbus AI from the field's button or mod+Enter, even with no match"_, _"shows no Ask Nimbus AI button where the AI panel can't open"_, _"is mod+Enter with no other modifier, per platform"_, _"opens the AI panel for a palette prompt, only when it may open"_
