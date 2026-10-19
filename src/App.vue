@@ -1415,7 +1415,8 @@ useCommand(() => [
     id: "view.toggle3d",
     title: is3DView.value ? "Switch to 2D view" : "Switch to 3D view",
     group: "Actions",
-    keywords: ["volume", "3d", "2d", "render"],
+    // Only the mode it switches to: "3d" must not find "Switch to 2D view".
+    keywords: is3DView.value ? ["2d", "flat"] : ["volume", "3d", "render"],
     icon: "mdi-cube-scan",
     enabled: inViewer,
     run: toggle3DView,

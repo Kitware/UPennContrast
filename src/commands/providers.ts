@@ -96,7 +96,13 @@ export function layerCommands(ctx: IProviderContext): TCommandProvider {
         id: `layer.toggle.${layer.id}`,
         title: `Toggle layer: ${layer.name}`,
         group: "Layers",
-        keywords: channelName ? [channelName, "channel"] : ["channel"],
+        // The verb of what toggling will do, never its opposite: "hide dapi"
+        // must not find a layer that is already hidden.
+        keywords: [
+          ...(channelName ? [channelName] : []),
+          "channel",
+          layer.visible ? "hide" : "show",
+        ],
         description: layer.visible ? "Visible" : "Hidden",
         icon: layer.visible ? "mdi-eye" : "mdi-eye-off",
         // DisplayLayer binds each layer's position (1-based) as its toggle;
@@ -243,7 +249,9 @@ export function panelCommands(
         id: `panel.toggle.${panel.id}`,
         title: `${isOpen ? "Close" : "Open"} ${panel.title}`,
         group: "Panels",
-        keywords: ["panel", "palette", "show", "hide"],
+        // The verb of what running it will do: "show filters" must not find
+        // "Close Filters".
+        keywords: ["panel", "palette", isOpen ? "hide" : "show"],
         aliases: [panel.title, ...panel.aliases],
         icon: panel.icon,
         enabled: () =>

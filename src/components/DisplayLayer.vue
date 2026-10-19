@@ -227,15 +227,17 @@ useCommand(() => {
   const channel = store.dataset?.channelNames.get(props.modelValue.channel);
   return {
     id: `layer.zMaxMerge.${props.modelValue.id}`,
+    // While merged, nothing about it says "merge": "merge dapi" must not
+    // find the command that un-merges.
     title: isZMaxMerge.value
-      ? `Turn off Z max-merge: ${name}`
+      ? `Show the current Z slice: ${name}`
       : `Z max-merge layer: ${name}`,
     group: "Layers",
     keywords: [
       ...(channel ? [channel] : []),
-      "merge",
-      "projection",
-      "mip",
+      ...(isZMaxMerge.value
+        ? ["single", "slice"]
+        : ["merge", "projection", "mip"]),
       "channel",
     ],
     icon: "mdi-layers-triple-outline",

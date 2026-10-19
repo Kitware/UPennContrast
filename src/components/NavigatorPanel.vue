@@ -288,11 +288,15 @@ useCommand(() => [
       },
       {
         id: `navigate.${dim.key}.unroll`,
+        // While unrolled, nothing about it says "unroll": "unroll z" must
+        // not find the command that rolls it back up.
         title: dim.unroll.value
-          ? `Stop unrolling ${dim.hotkeyLabel}`
+          ? `Roll up ${dim.hotkeyLabel}`
           : `Unroll ${dim.hotkeyLabel}`,
         group: "Navigate",
-        keywords: ["grid", "tile", "side by side", "montage", dim.key],
+        keywords: dim.unroll.value
+          ? ["stack", "single", "collapse", dim.key]
+          : ["grid", "tile", "side by side", "montage", dim.key],
         icon: "mdi-view-grid-outline",
         enabled: () => hasSteps || dim.unroll.value,
         run: () => {

@@ -76,7 +76,34 @@ function isSubsequence(needle: string, haystack: string): boolean {
   return false;
 }
 
+// Whole state verbs in a query must name a whole title word or keyword. A
+// command whose title flips with state ("Unlock pan and zoom") would
+// otherwise match the opposite request through a substring ("lock") or a
+// subsequence ("open" in "Close Nimbus AI panel"), and do the opposite.
+// A partly typed verb ("sho") is not in the set and matches as usual.
+const STATE_VERBS: ReadonlySet<string> = new Set([
+  "show",
+  "hide",
+  "open",
+  "close",
+  "on",
+  "off",
+  "lock",
+  "unlock",
+  "enable",
+  "disable",
+  "start",
+  "stop",
+  "unroll",
+]);
+
 function scoreWord(word: string, p: IPrepared): number {
+  if (STATE_VERBS.has(word)) {
+    if (p.titleWords.includes(word)) {
+      return 80;
+    }
+    return p.keywordWords.includes(word) ? 50 : 0;
+  }
   if (p.titleWords.some((titleWord) => titleWord.startsWith(word))) {
     return 80;
   }

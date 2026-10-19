@@ -133,9 +133,11 @@ useCommand(() =>
       {
         id: "objects.toggleFilteredDraw",
         setting: filteredDraw,
+        // The off title must not contain the on phrase: "only show objects
+        // passing filters" would find it while filtering is on.
         turnOn: "Only show objects passing filters",
-        turnOff: "Show all objects, not only those passing filters",
-        keywords: ["filtered", "hide", "annotations", "draw"],
+        turnOff: "Draw every object, ignoring filters",
+        keywords: ["filtered", "annotations", "draw"],
         icon: "mdi-filter-outline",
         enabled: () => drawAnnotations.value,
       },

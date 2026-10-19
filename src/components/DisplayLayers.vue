@@ -373,12 +373,18 @@ useCommand(() => {
   return [
     {
       id: "layers.toggleZMaxMergeAll",
+      // While merged, nothing about it says "merge": "merge z" must not find
+      // the command that un-merges.
       title: allMerged
-        ? "Turn off Z max-merge for all layers"
+        ? "Show the current Z slice for all layers"
         : "Z max-merge all layers",
       group: "Layers",
-      keywords: ["projection", "mip", "maximum", "stack", "toggle"],
-      aliases: ["merge z", "z merge", "max merge", "max projection", "mip"],
+      keywords: allMerged
+        ? ["single", "slice", "stack", "toggle"]
+        : ["projection", "mip", "maximum", "stack", "toggle"],
+      aliases: allMerged
+        ? []
+        : ["merge z", "z merge", "max merge", "max projection", "mip"],
       icon: "mdi-layers-triple-outline",
       hotkey: boundHotkey("z", "Toggle Z max-merge for all layers"),
       enabled: () => !!hasMultipleZ.value,

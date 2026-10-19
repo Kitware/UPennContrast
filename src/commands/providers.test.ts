@@ -329,6 +329,27 @@ describe("propertyFilterCommands", () => {
   });
 });
 
+describe("state verbs", () => {
+  it("lets a query's show/hide find only the command that does it", () => {
+    mocks.store.layers = [
+      { id: "l1", name: "DAPI", channel: 0, visible: true },
+      { id: "l2", name: "GFP", channel: 1, visible: false },
+    ];
+    const layers = layerCommands(ctx)();
+    expect(ids(rankCommands(layers, "hide"))).toEqual(["layer.toggle.l1"]);
+    expect(ids(rankCommands(layers, "show"))).toEqual(["layer.toggle.l2"]);
+    const panels = panelCommands(ctx, {
+      isOpen: (id) => id === "filtersPanel",
+      toggle: vi.fn(),
+    })();
+    expect(ids(rankCommands(panels, "show filters"))).toEqual([]);
+    expect(ids(rankCommands(panels, "hide filters"))).toEqual([
+      "panel.toggle.filtersPanel",
+    ]);
+    mocks.store.layers = [];
+  });
+});
+
 describe("panelCommands", () => {
   it("flips Open/Close with the palette's state and toggles through the owner", () => {
     const open = new Set(["filtersPanel"]);

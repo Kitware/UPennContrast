@@ -146,4 +146,37 @@ describe("command scorer", () => {
     // Not stripped from short words or double-s endings.
     expect(scoreCommand(command("g", "Open Glas"), "glass")).toBe(0);
   });
+
+  it("never matches a state verb to its opposite", () => {
+    // The minimap is visible, so its command reads "Hide minimap": asking to
+    // show it must not find (and run) the hide.
+    expect(scoreCommand(command("m", "Hide minimap"), "show minimap")).toBe(0);
+    expect(scoreCommand(command("o", "Show objects"), "hide objects")).toBe(0);
+  });
+
+  it("matches a whole state verb only to a whole title word or keyword", () => {
+    // Substring: "lock" inside "Unlock". Subsequence: o-p-e-n inside
+    // "Close Nimbus AI panel". Word start: "unroll" inside "unrolling".
+    expect(scoreCommand(command("v", "Unlock pan and zoom"), "lock pan")).toBe(
+      0,
+    );
+    expect(scoreCommand(command("a", "Close Nimbus AI panel"), "open ai")).toBe(
+      0,
+    );
+    expect(scoreCommand(command("u", "Stop unrolling Z"), "unroll z")).toBe(0);
+    // Exact words and keywords still match, and a partly typed verb matches
+    // as usual.
+    expect(
+      scoreCommand(command("l", "Lock pan and zoom"), "lock"),
+    ).toBeGreaterThan(0);
+    expect(
+      scoreCommand(
+        command("k", "Open Filters", { keywords: ["show"] }),
+        "show filters",
+      ),
+    ).toBeGreaterThan(0);
+    expect(
+      scoreCommand(command("s", "Show objects"), "sho obj"),
+    ).toBeGreaterThan(0);
+  });
 });
