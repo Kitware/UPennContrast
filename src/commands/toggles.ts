@@ -11,7 +11,12 @@ export interface IToggleEntry {
   // Titles for running the command while the setting is off / on.
   turnOn: string;
   turnOff: string;
+  // Match terms for both directions; they must not assert either state.
   keywords?: string[];
+  // Match terms only while running it turns the setting on / off
+  // ("filtered" only while it turns filtering on).
+  turnOnKeywords?: string[];
+  turnOffKeywords?: string[];
   icon?: string;
   enabled?: () => boolean;
 }
@@ -30,7 +35,14 @@ export function toggleCommands(
     id: entry.id,
     title: entry.setting.value ? entry.turnOff : entry.turnOn,
     group,
-    keywords: [...(entry.keywords ?? []), "setting", "toggle"],
+    keywords: [
+      ...(entry.keywords ?? []),
+      ...((entry.setting.value
+        ? entry.turnOffKeywords
+        : entry.turnOnKeywords) ?? []),
+      "setting",
+      "toggle",
+    ],
     icon: entry.icon ?? "mdi-toggle-switch-outline",
     enabled: () => (when?.() ?? true) && (entry.enabled?.() ?? true),
     run: () => {

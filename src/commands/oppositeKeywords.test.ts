@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "fs";
 import { join, relative } from "path";
+import { OPPOSITE_PAIRS } from "./stateWords";
 
 // A state-flipping command must carry only the word for what it will do. If
 // one array literal holds both words of an opposite pair, a command built
@@ -11,21 +12,9 @@ import { join, relative } from "path";
 // ("hide objects", "show objects") are fine. It reads innermost array
 // literals, so an array holding a nested array literal is checked only
 // through that inner array.
-const OPPOSITES: readonly [string, string][] = [
-  ["show", "hide"],
-  ["open", "close"],
-  ["add", "remove"],
-  ["on", "off"],
-  ["lock", "unlock"],
-  ["freeze", "unfreeze"],
-  ["enable", "disable"],
-  ["start", "stop"],
-  ["dark", "light"],
-  ["2d", "3d"],
-];
 
 // Files that list the words on purpose, not as one command's keywords.
-const EXEMPT = ["commands/scorer.ts", "commands/oppositeKeywords.test.ts"];
+const EXEMPT = ["commands/stateWords.ts"];
 
 const srcRoot = join(__dirname, "..");
 
@@ -66,7 +55,7 @@ describe("command keyword arrays", () => {
           continue;
         }
         scanned++;
-        for (const [a, b] of OPPOSITES) {
+        for (const [a, b] of OPPOSITE_PAIRS) {
           if (words.has(a) && words.has(b)) {
             problems.push(
               `${path}: ${a}/${b} in ${literal.replace(/\s+/g, " ")}`,

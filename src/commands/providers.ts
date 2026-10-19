@@ -94,16 +94,12 @@ export function layerCommands(ctx: IProviderContext): TCommandProvider {
       const channelName = dataset?.channelNames.get(layer.channel);
       return {
         id: `layer.toggle.${layer.id}`,
-        title: `Toggle layer: ${layer.name}`,
+        // Named for what it will do, like every state-flipping command; the
+        // eye icon shows the current state. A "Visible"/"Hidden" description
+        // was searchable, so "visible dapi" found (and hid) a visible layer.
+        title: `${layer.visible ? "Hide" : "Show"} layer: ${layer.name}`,
         group: "Layers",
-        // The verb of what toggling will do, never its opposite: "hide dapi"
-        // must not find a layer that is already hidden.
-        keywords: [
-          ...(channelName ? [channelName] : []),
-          "channel",
-          layer.visible ? "hide" : "show",
-        ],
-        description: layer.visible ? "Visible" : "Hidden",
+        keywords: [...(channelName ? [channelName] : []), "channel", "toggle"],
         icon: layer.visible ? "mdi-eye" : "mdi-eye-off",
         // DisplayLayer binds each layer's position (1-based) as its toggle;
         // checking the description too keeps a stale binding from showing.

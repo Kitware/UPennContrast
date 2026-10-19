@@ -137,7 +137,11 @@ useCommand(() =>
         // passing filters" would find it while filtering is on.
         turnOn: "Only show objects passing filters",
         turnOff: "Draw every object, ignoring filters",
-        keywords: ["filtered", "annotations", "draw"],
+        keywords: ["annotations", "draw"],
+        // "filtered" only while it turns filtering on: "filtered objects"
+        // must not find the command that turns it off.
+        turnOnKeywords: ["filtered", "passing"],
+        turnOffKeywords: ["unfiltered", "every", "all"],
         icon: "mdi-filter-outline",
         enabled: () => drawAnnotations.value,
       },

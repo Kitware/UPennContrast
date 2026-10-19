@@ -1,5 +1,6 @@
 import { ICommand } from "./types";
 import { synonymsOf } from "./synonyms";
+import { STATE_WORDS } from "./stateWords";
 
 // Local, synchronous command matching: no network, no dependency. Scores, from
 // strongest: the whole query equals / prefixes the title, then per query word
@@ -76,31 +77,13 @@ function isSubsequence(needle: string, haystack: string): boolean {
   return false;
 }
 
-// Whole state verbs in a query must name a whole title word or keyword. A
-// command whose title flips with state ("Unlock pan and zoom") would
-// otherwise match the opposite request through a substring ("lock") or a
-// subsequence ("open" in "Close Nimbus AI panel"), and do the opposite.
-// A partly typed verb ("sho") is not in the set and matches as usual.
-const STATE_VERBS: ReadonlySet<string> = new Set([
-  "show",
-  "hide",
-  "open",
-  "close",
-  "on",
-  "off",
-  "lock",
-  "unlock",
-  "enable",
-  "disable",
-  "start",
-  "stop",
-  "unroll",
-  "add",
-  "remove",
-]);
-
+// Whole state words in a query (src/commands/stateWords.ts) must name a whole
+// title word or keyword. A command whose title flips with state ("Unlock pan
+// and zoom", "Unroll Z") would otherwise match the opposite request through a
+// substring ("lock", "roll") or a subsequence ("open" in "Close Nimbus AI
+// panel"), and do the opposite. A partly typed word ("sho") matches as usual.
 function scoreWord(word: string, p: IPrepared): number {
-  if (STATE_VERBS.has(word)) {
+  if (STATE_WORDS.has(word)) {
     if (p.titleWords.includes(word)) {
       return 80;
     }

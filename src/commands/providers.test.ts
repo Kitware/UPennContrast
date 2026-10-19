@@ -203,6 +203,13 @@ describe("layerCommands", () => {
     expect(commands[1].hotkey).toBeUndefined();
     expect(commands[0].keywords).toContain("DAPI");
     expect(commands[1].icon).toBe("mdi-eye-off");
+    // Titled for what it will do; no searchable current-state description.
+    expect(commands.map((c) => c.title)).toEqual([
+      "Hide layer: DAPI",
+      "Show layer: GFP",
+    ]);
+    expect(commands.every((c) => c.description === undefined)).toBe(true);
+    expect(ids(rankCommands(commands, "visible dapi"))).toEqual([]);
     commands[1].run();
     expect(mocks.store.toggleLayerVisibility).toHaveBeenCalledWith("l2");
   });
@@ -288,6 +295,29 @@ describe("propertyListCommands", () => {
       "p1",
       "Area",
     ]);
+  });
+});
+
+describe("toggleCommands per-state keywords", () => {
+  it("offers 'filtered' only while the command turns filtering on", async () => {
+    const { ref } = await import("vue");
+    const { toggleCommands } = await import("./toggles");
+    const filtered = ref(true);
+    const build = () =>
+      toggleCommands([
+        {
+          id: "f",
+          setting: filtered,
+          turnOn: "Only show objects passing filters",
+          turnOff: "Draw every object, ignoring filters",
+          keywords: ["annotations", "draw"],
+          turnOnKeywords: ["filtered", "passing"],
+          turnOffKeywords: ["unfiltered", "every", "all"],
+        },
+      ]);
+    expect(ids(rankCommands(build(), "filtered objects"))).toEqual([]);
+    filtered.value = false;
+    expect(ids(rankCommands(build(), "filtered objects"))).toEqual(["f"]);
   });
 });
 

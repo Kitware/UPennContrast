@@ -164,6 +164,8 @@ describe("command scorer", () => {
       0,
     );
     expect(scoreCommand(command("u", "Stop unrolling Z"), "unroll z")).toBe(0);
+    // "roll" inside "Unroll": Z is rolled up, so the command reads "Unroll Z".
+    expect(scoreCommand(command("r", "Unroll Z"), "roll z")).toBe(0);
     // Exact words and keywords still match, and a partly typed verb matches
     // as usual.
     expect(
