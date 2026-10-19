@@ -571,11 +571,21 @@ Behavior (mirror `computeAnnotationsWithWorkerBatch`):
      materialized before the switch are saved to the run's own configuration
      (`api.updateConfigurationKey` on the captured object), not to the one
      now loaded; losing them would make its next run create the properties
-     again. A switch while `ensureMaterializedProperty` is creating a property
-     fails that step too: `createProperty` registered the new property in the
-     configuration loaded when the request returned, so it is removed from
-     that one's list, nothing is recorded, and the stale property is left
-     alone.
+     again. The run keeps its own list of the steps it materialized and
+     merges their ids into the stored pipeline just before that save, since a
+     switch away and back reloads the configuration from the server without
+     the ids merged so far. A switch while `ensureMaterializedProperty` is
+     creating a property: if it lands during the create request,
+     `createProperty` registers the property nowhere and throws, so that step
+     fails and the run stops. A property it does return is registered in the
+     run's configuration and its id is recorded. After a switch the stale
+     (drifted) property is not removed, because removal rewrites the loaded
+     configuration's `propertyIds` from the loaded property list, which may
+     still be the previous configuration's until the new one's fetch lands.
+     The properties store enforces this for every caller: `setProperties`
+     refuses to save a list that a fetch loaded for another configuration
+     (`propertiesConfigurationId`), and skips the plot and track-label
+     reconcile when a switch lands during its save.
    - `progress.complete(perStepProgressId)`; bump the top-level progress.
 5. After the loop (once, not per step): `annotationStore.fetchAnnotations()`,
    `propertiesStore.fetchPropertyValues()`, `filters.updateHistograms()`, and
@@ -1018,13 +1028,19 @@ Linked steps (§3.4):
   *"does not confirm a linked property missing when the configuration changes during the reload"*.
 - A configuration switch mid-run stops the run: the next step fails (even with
   continue-on-error), a batch runs no further datasets, ids materialized
-  before the switch are saved to the run's own configuration, and a property
-  created during the switch is taken out of the other configuration —
+  before the switch (or a switch away and back) are saved to the run's own
+  configuration, and nothing is written through the property list after a
+  switch —
   *"fails the next step and stops when the configuration changes during a run"*,
   *"does not run a batch's remaining datasets after a configuration switch"*,
   *"fails a batch child that starts after the configuration switched"*,
   *"saves a materialized property id to the run's configuration after a switch"*,
-  *"takes a property created during a switch out of the other configuration"*,
+  *"stops when the property creation sees a configuration switch"*,
+  *"keeps a property created just before a switch and leaves the stale one"*,
+  *"keeps ids materialized before a switch away and back"*,
+  *"registers nothing when another configuration opens during the create request"*,
+  *"refuses to save a property list loaded for another configuration"*,
+  *"does not reconcile another configuration's plots after a switch during the save"*,
   *"does not reload linked properties for a batch whose configuration switched before the reload"*.
 - The runner re-wires property steps to what a linked tool produces now, but
   never an unflagged step —

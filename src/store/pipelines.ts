@@ -291,6 +291,9 @@ export class Pipelines extends VuexModule {
     // property that actually existed - never for a stale/dangling id.
     const staleId = existing?.id;
     const configurationId = main.configuration?.id;
+    // A property it returns is registered in the configuration loaded when
+    // the request went out (createProperty throws, registering nothing, if a
+    // switch landed during the request), so its id is always recorded here.
     const created = await properties.createProperty({
       name: step.name,
       image: step.image,
@@ -301,21 +304,15 @@ export class Pipelines extends VuexModule {
       shape: step.shape,
       workerInterface: step.workerInterfaceValues,
     });
-    if (created && main.configuration?.id !== configurationId) {
-      // createProperty registered it in the configuration loaded when the
-      // request returned, not this step's. Take it out of that one, record
-      // nothing, and leave the stale property alone (it is not in the loaded
-      // list): see CONFIGURATION_CHANGED_DURING_RUN.
-      if (properties.properties.some((p) => p.id === created.id)) {
-        await properties.deleteProperty(created.id);
-      }
-      throw new Error(CONFIGURATION_CHANGED_DURING_RUN);
-    }
     if (created) {
       step.materializedPropertyId = created.id;
+      // Removing the stale property rewrites the loaded configuration's
+      // propertyIds from the loaded list, which after a switch may be the
+      // previous configuration's: leave it then.
       if (
         staleId &&
         staleId !== created.id &&
+        main.configuration?.id === configurationId &&
         !this.isPropertyReferencedByPipelineStep(staleId, { stepId: step.id })
       ) {
         await properties.deleteProperty(staleId);
@@ -471,11 +468,14 @@ export class Pipelines extends VuexModule {
     let cancelled = 0;
     let failedStepIndex: number | null = null;
     let done = 0;
-    // Set when ensureMaterializedProperty actually assigns/changes a step's
-    // materializedPropertyId during this run. Only then is it worth PUTting
-    // the config back - a run with no property steps (or only reused,
-    // already-matching properties) shouldn't write the config at all.
-    let materializedPropertyChanged = false;
+    // The steps whose materializedPropertyId ensureMaterializedProperty
+    // assigned or changed during this run. Only then is it worth PUTting the
+    // config back - a run with no property steps (or only reused,
+    // already-matching properties) shouldn't write the config at all. Kept
+    // here as well as merged onto the stored pipeline at once, because a
+    // switch away and back reloads the configuration from the server without
+    // the ids merged so far.
+    const materializedSteps: TPipelineStep[] = [];
     // Set when a step fails because the configuration switched: the run
     // stops, continueOnError or not, since every later step would fail the
     // same way.
@@ -573,13 +573,12 @@ export class Pipelines extends VuexModule {
             if (
               runStep.materializedPropertyId !== previousMaterializedPropertyId
             ) {
-              materializedPropertyChanged = true;
+              materializedSteps.push(runStep);
               // Onto the stored step now (runStep is a copy wherever resolving
               // or wiring changed it), so later steps' reference checks see it.
               // The run configuration's current copy: a config write (e.g. by
               // an earlier dataset of a batch) replaces the object the caller
-              // passed. (A switch during the creation fails the step in
-              // ensureMaterializedProperty before this.)
+              // passed, and after a switch only the captured one is left.
               mergeMaterializedPropertyIds(
                 currentRunConfiguration().pipelines?.find(
                   (candidate) => candidate.id === pipeline.id,
@@ -659,7 +658,16 @@ export class Pipelines extends VuexModule {
       // only when something actually changed - an annotation-only run (or one
       // whose property steps all reused an already-matching property) has
       // nothing new to write back to the configuration.
-      if (materializedPropertyChanged) {
+      if (materializedSteps.length > 0) {
+        const storedPipeline = currentRunConfiguration().pipelines?.find(
+          (candidate) => candidate.id === pipeline.id,
+        );
+        if (storedPipeline) {
+          mergeMaterializedPropertyIds(storedPipeline, {
+            ...pipeline,
+            steps: materializedSteps,
+          });
+        }
         if (!configurationChanged()) {
           await main.updateConfigurationPipelines(cloneDeep(this.pipelines));
         } else {

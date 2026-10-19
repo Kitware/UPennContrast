@@ -322,6 +322,15 @@ that reads "the loaded configuration" itself, and stop if it changed
 (`runPipeline`/`runPipelineBatch`, `CONFIGURATION_CHANGED_DURING_RUN`). Write
 anything the action already produced to the captured configuration object, not
 through `syncConfiguration`, which writes whichever configuration is loaded.
+Never write a store list back after a switch either: `setConfiguration` starts
+the new configuration's `fetchProperties` without awaiting it, so for a while
+`properties.properties` is still the previous configuration's list, and
+`setProperties`/`deleteProperty` would save it as the new one's `propertyIds`
+(`setProperties` therefore refuses a list whose `propertiesConfigurationId`
+is not the loaded configuration, and `createProperty` registers nothing if a
+switch lands during its request). Keep a run-local record of what the action produced and merge it in
+just before the final write: a switch away and back reloads the configuration
+from the server, without anything merged into the old object.
 
 ### Every `throttle`/`debounce` needs a `cancel()` in `onBeforeUnmount`
 

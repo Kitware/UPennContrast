@@ -1358,6 +1358,18 @@ describe("configuration switch during a run", () => {
     };
   }
 
+  // Stubs girderResources' cache invalidation. Store actions dispatch
+  // through the root store too, so everything else passes through.
+  function stubRessourceChanged() {
+    const realDispatch = rootStore.dispatch.bind(rootStore);
+    return vi
+      .spyOn(rootStore, "dispatch")
+      .mockImplementation(((type: string, payload?: unknown) =>
+        type === "ressourceChanged"
+          ? Promise.resolve()
+          : realDispatch(type, payload)) as typeof rootStore.dispatch);
+  }
+
   beforeEach(() => {
     h.main.configuration = { ...h.main.configuration, id: "config-a" };
   });
@@ -1421,14 +1433,7 @@ describe("configuration switch during a run", () => {
       switchConfiguration();
       return submitResult("j", true);
     });
-    // Store actions dispatch through the root store too: pass them through.
-    const realDispatch = rootStore.dispatch.bind(rootStore);
-    const dispatch = vi
-      .spyOn(rootStore, "dispatch")
-      .mockImplementation(((type: string, payload?: unknown) =>
-        type === "ressourceChanged"
-          ? Promise.resolve()
-          : realDispatch(type, payload)) as typeof rootStore.dispatch);
+    const dispatch = stubRessourceChanged();
 
     let dispatched: unknown[][];
     try {
@@ -1452,47 +1457,116 @@ describe("configuration switch during a run", () => {
     expect(dispatched).toContainEqual(["ressourceChanged", "config-a"]);
   });
 
-  it("takes a property created during a switch out of the other configuration", async () => {
+  it("stops when the property creation sees a configuration switch", async () => {
     const pipe = pipeline([
       propertyStep("p", ["nuclei"]),
       propertyStep("q", ["nuclei"]),
     ]);
+    h.main.configuration.pipelines = [cloneForStore(pipe)];
+    // createProperty registers nothing and throws when a switch lands during
+    // its request (properties.createProperty.test.ts).
+    h.properties.createProperty.mockImplementation(async () => {
+      switchConfiguration();
+      throw new Error("switched during creation");
+    });
+
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipe,
+      continueOnError: true,
+    });
+
+    // One failed step, then the run stops (continueOnError notwithstanding).
+    expect(h.properties.createProperty).toHaveBeenCalledTimes(1);
+    expect(result.failed).toBe(1);
+    expect(h.properties.submitPropertyJob).not.toHaveBeenCalled();
+    // Nothing written through the property list or to either configuration.
+    expect(h.properties.deleteProperty).not.toHaveBeenCalled();
+    expect(h.main.api.updateConfigurationKey).not.toHaveBeenCalled();
+    expect(h.main.updateConfigurationPipelines).not.toHaveBeenCalled();
+  });
+
+  it("keeps a property created just before a switch and leaves the stale one", async () => {
+    const step = propertyStep("p", ["nuclei"]);
+    step.materializedPropertyId = "stale";
+    const pipe = pipeline([step, annotationStep("a")]);
     const configA = h.main.configuration;
     configA.pipelines = [cloneForStore(pipe)];
-    const created = {
+    // A drifted property: the step no longer matches it.
+    h.properties.properties = [
+      {
+        id: "stale",
+        image: "img/other",
+        shape: AnnotationShape.Polygon,
+        tags: { tags: ["nuclei"], exclusive: false },
+        workerInterface: {},
+      },
+    ];
+    h.properties.createProperty.mockImplementation(async () => {
+      // Registered in this configuration, then the switch lands before the
+      // stale property would be removed.
+      switchConfiguration();
+      return {
+        id: "prop-created",
+        image: "img/prop",
+        shape: AnnotationShape.Polygon,
+        tags: { tags: ["nuclei"], exclusive: false },
+        workerInterface: {},
+      };
+    });
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+    const dispatch = stubRessourceChanged();
+
+    try {
+      await pipelinesStore.runPipeline({ pipeline: pipe });
+    } finally {
+      dispatch.mockRestore();
+    }
+
+    // Deleting it would rewrite the loaded configuration's propertyIds from
+    // a list that may still be the previous configuration's.
+    expect(h.properties.deleteProperty).not.toHaveBeenCalled();
+    expect(h.annotations.submitAnnotationWorkerJob).not.toHaveBeenCalled();
+    const [written] = h.main.api.updateConfigurationKey.mock.calls[0];
+    expect(written.id).toBe("config-a");
+    expect(written.pipelines[0].steps[0].materializedPropertyId).toBe(
+      "prop-created",
+    );
+  });
+
+  it("keeps ids materialized before a switch away and back", async () => {
+    const pipe = pipeline([propertyStep("p", ["nuclei"]), annotationStep("a")]);
+    h.main.configuration.pipelines = [cloneForStore(pipe)];
+    // What the server holds: taken now, since the run writes the id onto
+    // the step objects it was handed.
+    const serverCopy = cloneForStore(pipe);
+    h.properties.createProperty.mockResolvedValue({
       id: "prop-created",
       image: "img/prop",
       shape: AnnotationShape.Polygon,
       tags: { tags: ["nuclei"], exclusive: false },
       workerInterface: {},
-    };
-    h.properties.createProperty.mockImplementation(async () => {
-      // The switch lands while the create request is in flight, so the
-      // properties store registers the new property in the other one.
+    });
+    h.properties.submitPropertyJob.mockImplementation(async () => {
+      // Away to another configuration and back: the configuration is
+      // reloaded from the server, without the id merged so far.
       switchConfiguration();
-      h.properties.properties = [created];
-      return created;
+      h.main.configuration = {
+        id: "config-a",
+        pipelines: [cloneForStore(serverCopy)],
+        propertyIds: [],
+        compatibility: { channels: {} },
+      };
+      return submitResult("j", true);
     });
-    const errors: any[] = [];
+    h.annotations.submitAnnotationWorkerJob.mockResolvedValue(
+      submitResult("j2", true),
+    );
 
-    const result = await pipelinesStore.runPipeline({
-      pipeline: pipe,
-      continueOnError: true,
-      onStepError: (_index, info) => errors.push(...info.errors),
-    });
+    await pipelinesStore.runPipeline({ pipeline: pipe });
 
-    expect(h.properties.deleteProperty).toHaveBeenCalledWith("prop-created");
-    expect(h.properties.submitPropertyJob).not.toHaveBeenCalled();
-    // One failed step, then the run stops (continueOnError notwithstanding).
-    expect(h.properties.createProperty).toHaveBeenCalledTimes(1);
-    expect(result.failed).toBe(1);
-    expect(errors[0].error).toContain(CONFIGURATION_CHANGED_DURING_RUN);
-    // Nothing recorded on either configuration.
-    expect(
-      configA.pipelines[0].steps[0].materializedPropertyId,
-    ).toBeUndefined();
-    expect(h.main.api.updateConfigurationKey).not.toHaveBeenCalled();
-    expect(h.main.updateConfigurationPipelines).not.toHaveBeenCalled();
+    expect(h.main.updateConfigurationPipelines).toHaveBeenCalledTimes(1);
+    const [written] = h.main.updateConfigurationPipelines.mock.calls[0];
+    expect(written[0].steps[0].materializedPropertyId).toBe("prop-created");
   });
 
   it("does not run a batch's remaining datasets after a configuration switch", async () => {
@@ -1517,6 +1591,12 @@ describe("configuration switch during a run", () => {
 
     expect(datasetsRun).toEqual(["d1"]);
     expect(summary).toEqual({ succeeded: 1, failed: 2, cancelled: 0 });
+    // The batch skips the remaining datasets itself rather than starting
+    // runs that fail on their first step.
+    const runsStarted = h.progress.create.mock.calls.filter(
+      ([entry]: any[]) => entry.title === "Pipeline: Test",
+    );
+    expect(runsStarted).toHaveLength(1);
     expect(pipelinesStore.runningPipelineId).toBeNull();
   });
 

@@ -234,6 +234,10 @@ export class Properties extends VuexModule {
   propertiesAPI = main.propertiesAPI;
 
   properties: IAnnotationProperty[] = [];
+  // The configuration whose fetch filled `properties`. After a switch the
+  // list is still the previous configuration's until the new fetch lands
+  // (setConfiguration does not await it). Null until the first fetch.
+  propertiesConfigurationId: string | null = null;
 
   displayedPropertyPaths: string[][] = [];
   // Virtual (spatial-table) paths the user has added as live columns this
@@ -1270,12 +1274,31 @@ export class Properties extends VuexModule {
     this.properties = [...properties];
   }
 
+  @Mutation
+  protected setPropertiesConfigurationId(configurationId: string | null) {
+    this.propertiesConfigurationId = configurationId;
+  }
+
   // rawError: true because this rolls back and rethrows so the caller can
   // report the real reason; a bare @Action would replace the message with
   // vuex-module-decorators' generic ERR_ACTION_ACCESS_UNDEFINED text. Part of
   // the create_property chain the AI panel reports on (#1239).
   @Action({ rawError: true })
   protected async setProperties(properties: IAnnotationProperty[]) {
+    // The list is saved as the loaded configuration's propertyIds, so it
+    // must be that configuration's list: a write made from the previous
+    // configuration's (an import rollback, a delete, a create right after a
+    // switch) would replace the new one's properties with the old ones.
+    const configurationId = main.configuration?.id;
+    if (
+      this.propertiesConfigurationId !== null &&
+      this.propertiesConfigurationId !== configurationId
+    ) {
+      throw new Error(
+        "Another configuration was opened, so the property list was not " +
+          "saved. Try again once it has loaded.",
+      );
+    }
     const previous = this.properties;
     this.setPropertiesImpl(properties);
     const propertyIds = this.properties.map((p) => p.id);
@@ -1284,6 +1307,11 @@ export class Properties extends VuexModule {
     } catch (error) {
       this.setPropertiesImpl(previous);
       throw error;
+    }
+    // The plots and track label below are the loaded configuration's: after
+    // a switch during the save they belong to another one.
+    if (main.configuration?.id !== configurationId) {
+      return;
     }
     // The persisted plot resolver drops axes whose property is unknown, but a
     // live deletion must do the same immediately. Reconcile only AFTER the
@@ -1341,6 +1369,7 @@ export class Properties extends VuexModule {
           return property ? [property] : [];
         }),
       );
+      this.setPropertiesConfigurationId(configuration.id);
       // Properties may load after fetchPropertyValues already ran (the stub
       // fetch can resolve first when cached), so trigger the count fetch here
       // too; the guard in fetchUncomputedCounts dedupes (no-op in wholesale
@@ -1495,7 +1524,18 @@ export class Properties extends VuexModule {
   // and the AI panel reports that reason to the user. See setProperties.
   @Action({ rawError: true })
   async createProperty(property: IAnnotationPropertyConfiguration) {
+    const configurationId = main.configuration?.id;
     const newProperty = await this.propertiesAPI.createProperty(property);
+    // After a switch to another configuration, this.properties may still be
+    // the previous one's list (the new one's fetch lands later), and
+    // setProperties would save it as the newly loaded configuration's
+    // propertyIds. Register nothing: the property stays unattached.
+    if (newProperty && main.configuration?.id !== configurationId) {
+      throw new Error(
+        "Another configuration was opened while the property was being " +
+          "created, so it was not added to either configuration.",
+      );
+    }
     if (newProperty) {
       // Pending until the configuration's propertyIds save settles; see
       // fetchProperties.
