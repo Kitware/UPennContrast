@@ -128,4 +128,27 @@ describe("AnnotationToggles", () => {
     expect(ids()).not.toContain("objects.selectionMode.ADD");
     wrapper.unmount();
   });
+
+  it("keeps 'filter' queries off the commands that turn filtering off", async () => {
+    const { rankCommands } = await import("@/commands/scorer");
+    const wrapper = mountComponent();
+    const found = (query: string) =>
+      rankCommands(enabledCommands.value, query).map((command) => command.id);
+    mockStore.value.filteredDraw = true;
+    mockStore.value.showTooltips = true;
+    mockStore.value.filteredAnnotationTooltips = true;
+    expect(found("filter objects")).not.toContain("objects.toggleFilteredDraw");
+    expect(found("filter tooltips")).not.toContain(
+      "objects.toggleFilteredTooltips",
+    );
+    // While off, the same queries find the commands that turn it on.
+    mockStore.value.filteredDraw = false;
+    mockStore.value.filteredAnnotationTooltips = false;
+    expect(found("filter objects")).toContain("objects.toggleFilteredDraw");
+    expect(found("filter tooltips")).toContain(
+      "objects.toggleFilteredTooltips",
+    );
+    mockStore.value.showTooltips = false;
+    wrapper.unmount();
+  });
 });

@@ -209,9 +209,13 @@ useCommand(() =>
       {
         id: "filters.onlyCurrentFrame",
         setting: onlyCurrentFrame,
+        // The off title and keywords name no part of the on state ("filter",
+        // "current"): "filter current frame" must not find the turn-off.
         turnOn: "Filter to objects in the current frame only",
-        turnOff: "Filter across every frame, not only the current one",
-        keywords: ["filters", "frame", "annotations"],
+        turnOff: "Include objects from every frame",
+        keywords: ["frames", "annotations"],
+        turnOnKeywords: ["filters", "only"],
+        turnOffKeywords: ["all"],
         icon: "mdi-image-filter-center-focus",
       },
       {

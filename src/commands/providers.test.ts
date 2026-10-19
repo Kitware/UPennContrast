@@ -329,7 +329,7 @@ describe("toggleCommands per-state keywords", () => {
           id: "f",
           setting: filtered,
           turnOn: "Only show objects passing filters",
-          turnOff: "Draw every object, ignoring filters",
+          turnOff: "Draw every object",
           keywords: ["annotations", "draw"],
           turnOnKeywords: ["filtered", "passing"],
           turnOffKeywords: ["unfiltered", "every", "all"],

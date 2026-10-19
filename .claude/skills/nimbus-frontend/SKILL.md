@@ -431,6 +431,30 @@ mounted on **every** route via `v-show`. So a command registered in, say,
 `enabled` to match its control's `:disabled`. The left palettes (Navigator,
 Layers, Tools) and `ImageViewer.vue` mount only in the viewer.
 
+### A state-flipping palette command names only what it will do
+
+A command whose title flips with state ("Hide minimap" / "Show minimap") must
+never match a query asking for the state it already has, or Enter does the
+opposite of what was typed. Seven Codex rounds on PR #1429 each found one
+more way in:
+
+- synonyms that equate opposites (show = hide);
+- loose matching: substring ("lock" in "Unlock", "roll" in "Unroll") or
+  subsequence ("open" in "Close…"); the scorer now matches the words in
+  `src/commands/stateWords.ts` only as whole title words or keywords;
+- keywords naming both directions (`["dark", "light"]`, `["add", "remove"]`);
+  `oppositeKeywords.test.ts` scans every array literal for these;
+- a description stating the current state ("Visible" made "visible dapi"
+  hide the layer);
+- a turn-off title that shares a word with the state it ends
+  ("Draw every object, ignoring **filters**" matched "filter objects").
+
+The rule: title, keywords, aliases and description describe only the
+result of running it, and a turn-off title shares no word with the on state
+except the neutral subject ("minimap", "scale bar"). Use `toggleCommands`
+with `turnOnKeywords` / `turnOffKeywords`, and test both states with the
+query a user would type for each.
+
 ### Select/Combobox Slot Items (No `.raw` Wrapper)
 
 Vuetify 4 removed the `.raw` wrapper from select slot items. Items are passed directly. This applies to ALL slot types: `#item`, `#chip`, and `#selection`.

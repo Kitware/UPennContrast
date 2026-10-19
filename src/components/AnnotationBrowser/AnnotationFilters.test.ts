@@ -22,8 +22,13 @@ vi.mock("@/store/filters", async () => {
   };
 });
 
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ name: "datasetview" }),
+}));
+
 vi.mock("@/store", () => ({
   default: {
+    dataset: { id: "ds1" },
     showAnnotationsFromHiddenLayers: false,
     setShowAnnotationsFromHiddenLayers: vi.fn(),
   },
@@ -109,5 +114,21 @@ describe("AnnotationFilters", () => {
     await nextTick();
     expect(wrapper.vm.propertyValuesOpen).toBe(false);
     (filterStore as any).filterPaths = [["prop", "area"]];
+  });
+
+  it("keeps 'filter current frame' off the command that turns it off", async () => {
+    const { rankCommands } = await import("@/commands/scorer");
+    const { enabledCommands } = await import("@/commands/registry");
+    const wrapper = mountComponent();
+    const found = (query: string) =>
+      rankCommands(enabledCommands.value, query).map((command) => command.id);
+    (filterStore as any).onlyCurrentFrame = true;
+    expect(found("filter current frame")).not.toContain(
+      "filters.onlyCurrentFrame",
+    );
+    expect(found("filter frame")).not.toContain("filters.onlyCurrentFrame");
+    (filterStore as any).onlyCurrentFrame = false;
+    expect(found("filter current frame")).toContain("filters.onlyCurrentFrame");
+    wrapper.unmount();
   });
 });

@@ -134,10 +134,10 @@ useCommand(() =>
       {
         id: "objects.toggleFilteredDraw",
         setting: filteredDraw,
-        // The off title must not contain the on phrase: "only show objects
-        // passing filters" would find it while filtering is on.
+        // The off title names no part of the on state ("filter" included):
+        // "filter objects" must not find it while filtering is on.
         turnOn: "Only show objects passing filters",
-        turnOff: "Draw every object, ignoring filters",
+        turnOff: "Draw every object",
         keywords: ["annotations", "draw"],
         // "filtered" only while it turns filtering on: "filtered objects"
         // must not find the command that turns it off.
@@ -149,8 +149,9 @@ useCommand(() =>
       {
         id: "objects.toggleFilteredTooltips",
         setting: filteredAnnotationTooltips,
+        // As above: no "filter" in the off title.
         turnOn: "Show tooltips only for objects passing filters",
-        turnOff: "Show tooltips for every object, ignoring filters",
+        turnOff: "Show tooltips for every object",
         keywords: ["hover", "labels", "annotations"],
         turnOnKeywords: ["filtered", "passing"],
         turnOffKeywords: ["unfiltered", "every", "all"],
