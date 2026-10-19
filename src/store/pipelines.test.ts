@@ -1310,6 +1310,25 @@ describe("linked steps", () => {
     expect((storeCopy.steps[0] as any).materializedPropertyId).toBe("fresh");
   });
 
+  it("does not confirm a linked property missing when the configuration changes during the reload", async () => {
+    h.main.configuration = { ...h.main.configuration, id: "config-a" };
+    h.properties.properties = [];
+    h.properties.fetchProperties.mockImplementation(async () => {
+      // A dataset switch replaces the configuration mid-reload.
+      h.main.configuration = { ...h.main.configuration, id: "config-b" };
+    });
+    const linked = pipeline([
+      { ...propertyStep("p"), sourcePropertyId: "switched-during-reload" },
+    ]);
+
+    expect(await pipelinesStore.loadMissingLinkedProperties(linked)).toBe(
+      false,
+    );
+    // Not recorded as confirmed missing: the next check reloads again.
+    await pipelinesStore.loadMissingLinkedProperties(linked);
+    expect(h.properties.fetchProperties).toHaveBeenCalledTimes(2);
+  });
+
   it("does not reload properties when every linked property is loaded", async () => {
     h.properties.properties = [existingProperty("user")];
     h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));

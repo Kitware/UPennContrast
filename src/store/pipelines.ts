@@ -656,10 +656,11 @@ export class Pipelines extends VuexModule {
   // duplicate of it). A step already running its fallback (it has a
   // materialized property) was found gone before and is not rechecked, so a
   // deleted source does not cost a fetch on every run. Returns false when the
-  // reload failed: whether the missing ones exist is then unknown. A property
-  // a reload confirmed missing is not rechecked (opening the editor or running
-  // would otherwise refetch every property each time). Never rejects (the
-  // editor calls it without awaiting).
+  // reload failed or the configuration changed during it: whether the missing
+  // ones exist is then unknown. A property a reload confirmed missing is not
+  // rechecked (opening the editor or running would otherwise refetch every
+  // property each time). Never rejects (the editor calls it without
+  // awaiting).
   @Action
   async loadMissingLinkedProperties(pipeline: IPipeline): Promise<boolean> {
     const needsCheck = (step: TPipelineStep) =>
@@ -672,8 +673,15 @@ export class Pipelines extends VuexModule {
     if (!pipeline.steps.some(needsCheck)) {
       return true;
     }
+    const configurationId = main.configuration?.id;
     try {
       await properties.fetchProperties();
+      // A configuration switch during the reload means its result (if any)
+      // says nothing about this pipeline's configuration: neither confirm
+      // the property missing nor let the run treat it as deleted.
+      if (main.configuration?.id !== configurationId) {
+        return false;
+      }
       for (const step of pipeline.steps.filter(needsCheck)) {
         if (step.kind === "property" && step.sourcePropertyId) {
           confirmedMissingPropertyIds.add(step.sourcePropertyId);

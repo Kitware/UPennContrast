@@ -412,7 +412,7 @@ behave exactly as before. Pure helpers live in `src/utils/pipelineLinks.ts`
 
 | | Linked to a live tool | Linked to a live property | Source deleted |
 |---|---|---|---|
-| What runs | The tool's current image, parameters, annotation setup, `connectTo`, `jobDateTag` (transient tool built from `resolveLinkedStep`) | The property itself (`submitPropertyJob` on its id); no materialization | The step's saved copy (a property step materializes from it as before). Before treating a linked property as deleted, the runner reloads the configuration's properties once (`loadMissingLinkedProperties`, after taking the run lock — it never rejects, so it cannot leave the lock held; once per batch; the editor does the same on open), so one that simply had not loaded yet is computed, not duplicated. If that reload fails, the step fails rather than materializing a possible duplicate. A step already running its fallback, or whose property a reload already confirmed missing, is not rechecked. A batch resolves linked steps once, so every dataset runs the settings in effect when it started |
+| What runs | The tool's current image, parameters, annotation setup, `connectTo`, `jobDateTag` (transient tool built from `resolveLinkedStep`) | The property itself (`submitPropertyJob` on its id); no materialization | The step's saved copy (a property step materializes from it as before). Before treating a linked property as deleted, the runner reloads the configuration's properties once (`loadMissingLinkedProperties`, after taking the run lock — it never rejects, so it cannot leave the lock held; once per batch; the editor does the same on open), so one that simply had not loaded yet is computed, not duplicated. If that reload fails, the step fails rather than materializing a possible duplicate. A step already running its fallback, or whose property a reload already confirmed missing, is not rechecked; a reload overlapped by a configuration switch confirms nothing and counts as failed. A batch resolves linked steps once, so every dataset runs the settings in effect when it started |
 | Editor: worker image | Locked | Locked | Locked |
 | Editor: parameters / tags | Locked: "edit them in the Tools panel, or Unlink to customize this step" | Locked: "Unlink to customize this step" (properties are immutable in the UI) | Locked |
 | Header chip | link icon + tool name | link icon + property name | "source deleted" for a tool, "source unavailable" for a property (it may only not be loaded yet; the runner reloads before deciding), or "tool has no worker" for a tool that still exists without a worker image (also unusable, so the saved copy runs) |
@@ -988,8 +988,10 @@ Linked steps (§3.4):
   and a run whose steps can't be prepared fails without holding the lock —
   *"runs every dataset with the linked settings resolved when the batch started"*,
   *"fails the run without holding the lock when its steps can't be prepared"*.
-- A property confirmed missing is not refetched on every open or run —
-  *"does not recheck a linked property a reload confirmed missing"*.
+- A property confirmed missing is not refetched on every open or run, and a
+  reload overlapped by a configuration switch confirms nothing —
+  *"does not recheck a linked property a reload confirmed missing"*,
+  *"does not confirm a linked property missing when the configuration changes during the reload"*.
 - The runner re-wires property steps to what a linked tool produces now, but
   never an unflagged step —
   *"re-wires a property step to the output tags its linked tool produces now"*,
