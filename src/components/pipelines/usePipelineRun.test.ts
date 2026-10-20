@@ -120,7 +120,7 @@ describe("createPipelineRunController", () => {
       options.onComplete?.({
         succeeded: 1,
         failed: 1,
-        cancelled: 0,
+        canceled: 0,
         failedStepIndex: 1,
       });
     });

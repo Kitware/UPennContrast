@@ -1078,7 +1078,7 @@ export class Properties extends VuexModule {
       total: number;
       completed: number;
       failed: number;
-      cancelled: number;
+      canceled: number;
       currentDatasetName: string;
     }) => void;
     // Called immediately with the cancel function so the caller can wire up
@@ -1088,17 +1088,17 @@ export class Properties extends VuexModule {
     onComplete: (results: {
       succeeded: number;
       failed: number;
-      cancelled: number;
+      canceled: number;
     }) => void;
   }): Promise<void> {
     const propertyId = property.id;
     const scales = main.scales;
     const submittedJobIds: string[] = [];
-    let isCancelled = false;
+    let isCanceled = false;
 
     // Create the cancel function and notify the caller immediately
     const cancel = () => {
-      isCancelled = true;
+      isCanceled = true;
       for (const jobId of submittedJobIds) {
         main.api.cancelJob(jobId);
       }
@@ -1113,7 +1113,7 @@ export class Properties extends VuexModule {
     const total = datasetIds.length;
 
     if (total === 0) {
-      onComplete({ succeeded: 0, failed: 0, cancelled: 0 });
+      onComplete({ succeeded: 0, failed: 0, canceled: 0 });
       return;
     }
 
@@ -1147,16 +1147,16 @@ export class Properties extends VuexModule {
 
     let completed = 0;
     let failed = 0;
-    let cancelled = 0;
+    let canceled = 0;
 
     for (const datasetId of datasetIds) {
-      if (isCancelled) {
-        cancelled++;
+      if (isCanceled) {
+        canceled++;
         onBatchProgress({
           total,
           completed,
           failed,
-          cancelled,
+          canceled,
           currentDatasetName: datasetNames[datasetId],
         });
         continue;
@@ -1167,7 +1167,7 @@ export class Properties extends VuexModule {
         total,
         completed,
         failed,
-        cancelled,
+        canceled,
         currentDatasetName: datasetName,
       });
 
@@ -1210,8 +1210,8 @@ export class Properties extends VuexModule {
 
           const success = await completionPromise;
 
-          if (isCancelled) {
-            cancelled++;
+          if (isCanceled) {
+            canceled++;
           } else if (success) {
             completed++;
           } else {
@@ -1228,14 +1228,14 @@ export class Properties extends VuexModule {
       // Update batch progress
       progress.update({
         id: batchProgressId,
-        progress: completed + failed + cancelled,
+        progress: completed + failed + canceled,
         total,
       });
       onBatchProgress({
         total,
         completed,
         failed,
-        cancelled,
+        canceled,
         currentDatasetName: datasetName,
       });
     }
@@ -1262,7 +1262,7 @@ export class Properties extends VuexModule {
     status.previousRun = completed > 0 && failed === 0 && refreshSucceeded;
     status.progressInfo = {};
 
-    onComplete({ succeeded: completed, failed, cancelled });
+    onComplete({ succeeded: completed, failed, canceled });
   }
 
   @Mutation

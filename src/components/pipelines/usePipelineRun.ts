@@ -27,7 +27,7 @@ export type TStepStatus =
   | "running"
   | "success"
   | "error"
-  | "cancelled"
+  | "canceled"
   | "skipped";
 
 export interface IStepRunState {
@@ -40,7 +40,7 @@ export interface IBatchRunProgress {
   total: number;
   completed: number;
   failed: number;
-  cancelled: number;
+  canceled: number;
   currentDatasetName: string;
 }
 
@@ -56,7 +56,7 @@ export function stepStatusIcon(status?: TStepStatus): string {
       return "mdi-check-circle";
     case "error":
       return "mdi-close-circle";
-    case "cancelled":
+    case "canceled":
       return "mdi-cancel";
     case "skipped":
       return "mdi-minus-circle-outline";
@@ -71,7 +71,7 @@ export function stepStatusColor(status?: TStepStatus): string | undefined {
       return "success";
     case "error":
       return "error";
-    case "cancelled":
+    case "canceled":
       return "warning";
     default:
       return undefined;
@@ -112,7 +112,7 @@ export function createPipelineRunController() {
   const applyToAllDatasets = ref(false);
 
   const cancelFn = ref<(() => void) | null>(null);
-  const cancelledByUser = ref(false);
+  const canceledByUser = ref(false);
 
   const {
     collectionDatasetCount,
@@ -172,7 +172,7 @@ export function createPipelineRunController() {
     activeStepIds.value = pipeline.steps.map((step) => step.id);
     result.value = null;
     cancelFn.value = null;
-    cancelledByUser.value = false;
+    canceledByUser.value = false;
     stepStatuses.value = makeBaselineStatuses(pipeline);
     stepJobIds.value = pipeline.steps.map(() => null);
   }
@@ -235,8 +235,8 @@ export function createPipelineRunController() {
         onStepComplete: (index, success) => {
           if (success) {
             setStatus(index, "success");
-          } else if (cancelledByUser.value) {
-            setStatus(index, "cancelled");
+          } else if (canceledByUser.value) {
+            setStatus(index, "canceled");
           } else {
             setStatus(index, "error");
           }
@@ -263,7 +263,7 @@ export function createPipelineRunController() {
       total: collectionDatasetCount.value,
       completed: 0,
       failed: 0,
-      cancelled: 0,
+      canceled: 0,
       currentDatasetName: "Starting…",
     };
     let completed = false;
@@ -303,7 +303,7 @@ export function createPipelineRunController() {
   }
 
   function cancel() {
-    cancelledByUser.value = true;
+    canceledByUser.value = true;
     cancelFn.value?.();
   }
 

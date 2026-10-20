@@ -256,7 +256,7 @@ describe("AnnotationWorkerMenu", () => {
       total: 10,
       completed: 3,
       failed: 1,
-      cancelled: 1,
+      canceled: 1,
       currentDatasetName: "test",
     };
     expect(vm.batchProgressPercent).toBe(50);

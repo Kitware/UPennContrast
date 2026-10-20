@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mousetrapDirective } from "./v-mousetrap";
 
-// Real Mousetrap (not mocked): the behaviour under test is its stopCallback,
+// Real Mousetrap (not mocked): the behavior under test is its stopCallback,
 // which ignores keys typed into text fields.
 
 const mounted: HTMLElement[] = [];

@@ -286,9 +286,9 @@ describe("runPipeline", () => {
     const result = await runPromise;
 
     expect(h.main.api.cancelJob).toHaveBeenCalledWith("j-cancel");
-    // Second step counted as cancelled, not submitted.
+    // Second step counted as canceled, not submitted.
     expect(h.annotations.submitAnnotationWorkerJob).toHaveBeenCalledTimes(1);
-    expect(result.cancelled).toBeGreaterThanOrEqual(1);
+    expect(result.canceled).toBeGreaterThanOrEqual(1);
   });
 
   it("returns an empty result with no enabled steps", async () => {
@@ -300,7 +300,7 @@ describe("runPipeline", () => {
     expect(result).toEqual({
       succeeded: 0,
       failed: 0,
-      cancelled: 0,
+      canceled: 0,
       failedStepIndex: null,
     });
     expect(h.annotations.submitAnnotationWorkerJob).not.toHaveBeenCalled();
@@ -624,7 +624,7 @@ describe("runPipelineBatch", () => {
     });
 
     expect(datasetsRun).toEqual(["d1", "d2"]);
-    expect(summary).toEqual({ succeeded: 2, failed: 0, cancelled: 0 });
+    expect(summary).toEqual({ succeeded: 2, failed: 0, canceled: 0 });
     // One end-of-batch refresh, not one per dataset.
     expect(h.annotations.fetchAnnotations).toHaveBeenCalledTimes(1);
   });
@@ -643,7 +643,7 @@ describe("runPipelineBatch", () => {
       configurationId: "cfg1",
     });
 
-    expect(summary).toEqual({ succeeded: 1, failed: 1, cancelled: 0 });
+    expect(summary).toEqual({ succeeded: 1, failed: 1, canceled: 0 });
   });
 
   it("returns empty when the collection has no datasets", async () => {
@@ -652,7 +652,7 @@ describe("runPipelineBatch", () => {
       pipeline: pipeline([annotationStep("a")]),
       configurationId: "cfg1",
     });
-    expect(summary).toEqual({ succeeded: 0, failed: 0, cancelled: 0 });
+    expect(summary).toEqual({ succeeded: 0, failed: 0, canceled: 0 });
     expect(h.annotations.submitAnnotationWorkerJob).not.toHaveBeenCalled();
   });
 
@@ -670,7 +670,7 @@ describe("runPipelineBatch", () => {
       onRejected,
     });
 
-    expect(summary).toEqual({ succeeded: 0, failed: 51, cancelled: 0 });
+    expect(summary).toEqual({ succeeded: 0, failed: 51, canceled: 0 });
     expect(onRejected).toHaveBeenCalledWith(51);
     expect(h.main.api.batchResources).not.toHaveBeenCalled();
     expect(h.annotations.submitAnnotationWorkerJob).not.toHaveBeenCalled();
