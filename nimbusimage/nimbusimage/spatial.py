@@ -43,7 +43,7 @@ class SpatialAccessor:
     ) -> dict:
         """Wait for a spatial job and return its final published result."""
         job_id = response["jobId"]
-        job = Job(self._gc, self._gc.get(f"job/{job_id}"))
+        job = Job.fetch(self._gc, job_id)
         if not job.wait(timeout=timeout):
             raise RuntimeError(
                 f"{operation} job {job_id} failed ({job.status_name})"

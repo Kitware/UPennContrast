@@ -142,6 +142,9 @@ function createDensityLayer(): IGeoJSOsmLayer {
   params.layer.crossDomain = "use-credentials";
   params.layer.autoshareRenderer = false;
   params.layer.nearestPixel = maxLevel;
+  // Semi-transparent heat map: keep only the current level, or every
+  // coarser level's tiles stay drawn beneath it (GeoJS's keepLower default).
+  params.layer.keepLower = false;
   params.layer.url = BLANK_TILE_URL;
   params.layer.visible = false;
   const layer = props.map.createLayer("osm", params.layer);

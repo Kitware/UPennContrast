@@ -20,6 +20,12 @@ For loading 10x Xenium bundles (`nimbusimage.xenium`; `xenium-umap` adds the UMA
 pip install 'nimbusimage[xenium]'
 ```
 
+For loading Spatial Genomics (GenePS) exports (`nimbusimage.sg`):
+
+```bash
+pip install 'nimbusimage[sg]'
+```
+
 ## Authentication
 
 The recommended setup uses a **Girder API key**, which is persistent and doesn't expire.
@@ -29,7 +35,7 @@ The recommended setup uses a **Girder API key**, which is persistent and doesn't
 - **nimbusimage.com (hosted):** Email **[support@cytopixel.com](mailto:support@cytopixel.com)** with your account email address to request an API key.
 - **Local/self-hosted server:** In the Girder admin UI, go to **Users** > select the user > **Edit User** > **API Keys** > create a new key and copy the key string.
 
-**Required scopes.** The simplest option is a **full-access key** (leave the scope list empty), which works for everything including polling job status. If you instead create a *scoped* key, it must include **`core.user_auth`** — without it, `job.wait()` / `job.refresh()` fail with a confusing `401 Unauthorized` even though you own the job. Add **`jobs.rest.list_job`** as well so job logs can be read. Recommended scoped-key set: `core.data.read`, `core.data.write`, `core.data.own`, `core.user_info.read`, `core.user_auth`, `jobs.rest.list_job`.
+**Key scope.** Use either a full-access key (**"Allow all actions on behalf of my user"**) or a custom-scoped key with **"List and read jobs"** (`jobs.rest.list_job`) alongside *Read data* / *Write data*. A key without "List and read jobs" can still read and write datasets and submit workers, and those jobs run. But it can't read job status or logs, so `job.wait()` / `job.refresh()` raise `PermissionError`. To fix that, add "List and read jobs" to the key if you can edit it; otherwise ask the server's admin (for nimbusimage.com, **support@cytopixel.com**) to add it.
 
 Set environment variables for persistent access:
 
@@ -277,3 +283,35 @@ dataset, of nuclei or of another bundle before writing anything.
 
 The `xenium-ingest` agent skill is the full runbook (coordinate frames, H&E alignment,
 orientation checks, and the traps hit on 709K-cell datasets).
+
+## Spatial Genomics ingest (`nimbusimage.sg`)
+
+Loads one ROI of a Spatial Genomics (GenePS / sganalysis) export as a dataset: the DAPI and
+GFP images, cell polygons, Leiden clusters (tags and a `Clustering / leiden` property),
+UMAP, cell area, the full cell x gene matrix as the spatial table, and the transcript list
+converted into the transcript overlay's store. Each step is a function and a
+`nimbusimage-sg` subcommand; `check` validates the export locally first (cell centroids on
+their own mask label, and a molecule recount against `CellxGene.csv`).
+
+```python
+import nimbusimage as ni
+from nimbusimage import sg
+
+roi = sg.SGRoi("extracted/", "roi_3")
+print(sg.check_frame(roi), sg.recount(roi))
+ds = sg.upload_images(ni.connect(), roi, "Pav_PTR roi_3")
+cells = sg.upload_polygons(ds, roi)               # an SGCellMap: label -> id, dataset, ROI
+cells.save("cells.npz")                           # later: sg.SGCellMap.read("cells.npz")
+sg.upload_cell_data(ds, roi, cells)
+sg.upload_spatial_table(ds, sg.build_spatial_table(roi, cells, "spatial.zarr.zip"))
+sg.register_transcripts(ds, cells, sg.build_transcript_store(roi, "transcripts.zarr.zip"))
+```
+
+```bash
+nimbusimage-sg inventory --export-dir extracted --count-spots
+nimbusimage-sg check --export-dir extracted --roi roi_3 --recount
+nimbusimage-sg ingest --export-dir extracted --roi roi_3 --work-dir state/
+```
+
+The `sg-ingest` agent skill is the runbook (export anatomy, the transcript conversion,
+the verification checklist, and the traps).

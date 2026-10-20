@@ -55,7 +55,7 @@ Special considerations for temporal relationships:
 - **Tag picker**: restrict the tracks drawn to objects carrying particular tags
 - **Labels**: show or hide the per-object time point labels
 - **Coloring** (two-button toggle): the palette icon gives every track its own color; the crossed-out-colors icon draws every track white, which is easier to read when many tracks overlap
-- **Shuffle** (shuffle icon): re-rolls the color assignment when two neighbouring tracks happen to land on similar hues. It re-permutes rather than rotating, so a second shuffle cannot land back on the palette you just rejected. Only available under per-track coloring
+- **Shuffle** (shuffle icon): re-rolls the color assignment when two neighboring tracks happen to land on similar hues. It re-permutes rather than rotating, so a second shuffle cannot land back on the palette you just rejected. Only available under per-track coloring
 - **"N tracks · M links"** readout: the dataset-wide count of tracks (connected groups of objects) and of connections. This is the place to look for "how many tracks do I have"
 - **Show tracks**: opens the Object list on the Connections tab, grouped by track
 - **Delete all timelapse connections**: removes every connection tagged "Time lapse connection". Other connections (Connect to nearest, hand-made ones) are left alone. Undoable with the undo button

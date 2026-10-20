@@ -96,6 +96,8 @@ The recommended setup uses an **API key**, which is persistent and doesn't expir
 - **nimbusimage.com (hosted):** Email **support@cytopixel.com** with your account email address to request an API key.
 - **Local/self-hosted server:** In the Girder admin UI, go to **Users** > select the user > **Edit User** > **API Keys** > create a new key and copy the key string.
 
+**Key scope.** Ask for (or create) a key that is either **full access** ("Allow all actions on behalf of my user") or custom-scoped with **"List and read jobs"** (`jobs.rest.list_job`) alongside *Read data* / *Write data*. Without "List and read jobs" a key can still submit workers, and they run, but it can't poll job status or read job logs. Users add the permission themselves if they can edit their keys, or ask the server's admin (support, for nimbusimage.com). See "Can't see a job's status ≠ the job didn't run" in `references/gotchas.md`.
+
 ```bash
 # Add to ~/.zshrc or ~/.bashrc for persistence
 
@@ -264,8 +266,8 @@ print(ds.view_url()) # or just the URL
 ```
 
 The collection gets the same defaults the UI would create: one layer per
-channel (up to six), named after the channel and coloured from the shared
-channel-colour table, with percentile contrast, plus pixel size from the tile
+channel (up to six), named after the channel and colored from the shared
+channel-color table, with percentile contrast, plus pixel size from the tile
 metadata and z-step inferred from the dimension labels.
 
 With `create_view=False` none of that is created. The dataset is still fully

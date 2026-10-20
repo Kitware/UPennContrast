@@ -1,4 +1,9 @@
 import main from "@/store";
+import {
+  goToLocation,
+  selectTool,
+  setVisibleLayers,
+} from "@/actions/operations";
 import annotationStore from "@/store/annotation";
 import filterStore from "@/store/filters";
 import propertyStore from "@/store/properties";
@@ -10,6 +15,7 @@ import {
   IAnalysisGate,
   IAnalysisPlot,
   IAnnotation,
+  IAnnotationPropertyValues,
   IChatImage,
   IColorByPropertyLegend,
   IContrast,
@@ -25,10 +31,12 @@ import {
   PropertyFilterMode,
   TAnalysisAxis,
   TAnalysisCategoricalKey,
+  TAnnotationOrStub,
   TLayerMode,
   TPropertyHistogram,
   TUnitLength,
   TUnitTime,
+  isHydratedAnnotation,
 } from "@/store/model";
 import {
   captureInterfaceScreenshot,
@@ -43,6 +51,7 @@ import {
   WORKER_INTERFACE_VALUE_FORMATS,
   type IChannelContext,
 } from "@/utils/workerInterface";
+import { collectLeafPaths } from "@/utils/propertyValues";
 import { registerPlot, type IAgentPlot } from "./plotRegistry";
 import {
   MAX_BOX_POINTS,
@@ -184,34 +193,54 @@ function resolveLayer(ref: string): IDisplayLayer {
   return layer;
 }
 
-function queryAnnotations(query: IAnnotationQuery = {}): IAnnotation[] {
-  let annotations = annotationStore.annotations;
-  if (query.ids) {
-    const ids = new Set(query.ids);
-    annotations = annotations.filter((a) => ids.has(a.id));
-  }
-  if (query.tags?.length) {
-    const tags = query.tags;
-    annotations = annotations.filter((a) =>
-      query.exclusive
+// Every annotation of the open dataset, in whatever form the store holds it.
+// Above stubThreshold the store runs in stub-only mode: `annotations` is EMPTY
+// and the population lives in `annotationStubs`, so a tool that read
+// `annotations` reported zero matches on exactly the datasets where the server
+// summary reports hundreds of thousands (AI_PANEL_SPEC.md §4). Iterates the
+// stub map directly rather than `annotationsForIteration`, which copies it into
+// a fresh array per access.
+function liveAnnotations(): Iterable<TAnnotationOrStub> {
+  return annotationStore.stubOnlyMode
+    ? annotationStore.annotationStubs.values()
+    : annotationStore.annotations;
+}
+
+// Resolve a query against the live population, full annotations or stubs.
+// Stubs carry every field a query filters on (tags, shape, channel, location),
+// so stub-only mode answers exactly what fully-loaded mode would.
+function queryAnnotations(query: IAnnotationQuery = {}): TAnnotationOrStub[] {
+  const ids = query.ids ? new Set(query.ids) : null;
+  const tags = query.tags?.length ? query.tags : null;
+  const { xy, z, time } = main;
+  const matches: TAnnotationOrStub[] = [];
+  for (const a of liveAnnotations()) {
+    if (ids && !ids.has(a.id)) {
+      continue;
+    }
+    if (
+      tags &&
+      !(query.exclusive
         ? tags.every((tag) => a.tags.includes(tag))
-        : tags.some((tag) => a.tags.includes(tag)),
-    );
+        : tags.some((tag) => a.tags.includes(tag)))
+    ) {
+      continue;
+    }
+    if (query.shape && a.shape !== query.shape) {
+      continue;
+    }
+    if (query.channel != null && a.channel !== query.channel) {
+      continue;
+    }
+    if (
+      query.currentFrameOnly &&
+      !(a.location.XY === xy && a.location.Z === z && a.location.Time === time)
+    ) {
+      continue;
+    }
+    matches.push(a);
   }
-  if (query.shape) {
-    annotations = annotations.filter((a) => a.shape === query.shape);
-  }
-  if (query.channel != null) {
-    annotations = annotations.filter((a) => a.channel === query.channel);
-  }
-  if (query.currentFrameOnly) {
-    const { xy, z, time } = main;
-    annotations = annotations.filter(
-      (a) =>
-        a.location.XY === xy && a.location.Z === z && a.location.Time === time,
-    );
-  }
-  return annotations;
+  return matches;
 }
 
 // Model tool inputs are not schema-enforced at runtime. Validate an annotation
@@ -285,15 +314,14 @@ function resolveQueryToIdSet(query: unknown): Set<string> | null {
   return new Set(queryAnnotations(query as IAnnotationQuery).map((a) => a.id));
 }
 
-// Ids of the annotations that currently exist for this dataset (the frontend
-// holds them all in memory). Property-value documents can outlive their
-// annotation — a backend cleanup gap leaves values orphaned after deletion
-// (see AI_PANEL_DATA_ANALYSIS_SPEC.md §9) — so analysis intersects with this
-// live set to keep stats and plots to real objects instead of ghost data.
+// Ids of the annotations that currently exist for this dataset (full
+// annotations, or stubs in stub-only mode). Property-value documents can
+// outlive their annotation — a backend cleanup gap leaves values orphaned
+// after deletion (see AI_PANEL_DATA_ANALYSIS_SPEC.md §9) — so analysis
+// intersects with this live set to keep stats and plots to real objects
+// instead of ghost data.
 function liveAnnotationIdSet(): Set<string> {
-  return new Set(
-    annotationStore.annotations.map((annotation) => annotation.id),
-  );
+  return new Set(annotationStore.allAnnotationIds);
 }
 
 // Analysis executors await fetchPropertyValues before reading the global
@@ -310,21 +338,155 @@ function assertDatasetUnchanged(context: IAgentToolContext) {
   }
 }
 
-// Collect [annotationId, value] pairs for one property value path. Iterates the
-// query's matches when a query was given (queryAnnotations already restricts to
-// live annotations), else every live annotation — never the raw propertyValues
-// keys, which can include values orphaned by deleted annotations. Only
-// finite-numeric leaves are kept (resolvePathValue drops the rest).
+// One annotation's property values, keyed by property id (the shape of an
+// IAnnotationPropertyValues entry).
+type TPropertyValueLookup = (
+  annotationId: string,
+) => IAnnotationPropertyValues[string] | undefined;
+
+// Where the analysis tools read property values from. Fully loaded, the store
+// holds every stored value document (fetchPropertyValues loads them
+// wholesale), plus virtual paths only once registered/displayed. In
+// stub-only mode it holds only the rendered annotations' values for the
+// Annotation Browser's displayed columns, so a stat over it would describe the
+// viewport rather than the dataset. There, fetch exactly the requested paths
+// for the annotations being analyzed, in one projected batch call. It
+// re-checks dataset identity after its own await; call it through
+// loadAnalysisInputs, which also re-checks the annotations themselves.
+async function loadAnalysisValues(
+  paths: string[][],
+  ids: Set<string>,
+  context: IAgentToolContext,
+): Promise<TPropertyValueLookup> {
+  if (!annotationStore.stubOnlyMode) {
+    const values = propertyStore.propertyValues;
+    return (annotationId) => values[annotationId];
+  }
+  const datasetId = requireDataset().id;
+  const byId = new Map<string, IAnnotationPropertyValues[string]>();
+  // An empty path list would send no projection, i.e. fetch every value of
+  // every annotation; nothing to read means nothing to fetch.
+  if (ids.size > 0 && paths.length > 0) {
+    let entries;
+    try {
+      entries = await propertyStore.propertiesAPI.getPropertyValuesForIds(
+        datasetId,
+        [...ids],
+        projectablePaths(paths),
+      );
+    } catch (error: any) {
+      throw new ToolExecutionError(
+        "Could not load property values: " +
+          (error?.response?.data?.message ??
+            error?.message ??
+            "the request failed"),
+      );
+    }
+    assertDatasetUnchanged(context);
+    // An annotation can have several value documents; merge them the way the
+    // wholesale load (PropertiesAPI.getPropertyValues) does.
+    for (const { annotationId, values } of entries) {
+      byId.set(annotationId, { ...byId.get(annotationId), ...values });
+    }
+  }
+  return (annotationId) => byId.get(annotationId);
+}
+
+// How many times a tool resolves its query and loads data before giving up
+// because the annotations keep changing underneath it.
+const MAX_SNAPSHOT_ATTEMPTS = 2;
+
+const SNAPSHOT_CHANGED_MESSAGE =
+  "The annotations kept changing while data loaded (a worker may still be " +
+  "adding or editing annotations). Try again once it has finished.";
+
+// Run `load` against a consistent annotation population. A tool resolves its
+// query before an await (a value fetch, a name hydrate); if annotations are
+// added, edited or deleted meanwhile (contentRevision moves), the result may no
+// longer describe the query, so resolve and load again, and throw if they keep
+// changing. The revision is global, so a caller can pass `isStillValid` to keep
+// a result an unrelated change did not affect.
+async function withStableAnnotations<T>(
+  load: () => Promise<T>,
+  isStillValid: (result: T) => boolean = () => false,
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    const revision = annotationStore.contentRevision;
+    const result = await load();
+    if (annotationStore.contentRevision === revision || isStillValid(result)) {
+      return result;
+    }
+    if (attempt >= MAX_SNAPSHOT_ATTEMPTS) {
+      throw new ToolExecutionError(SNAPSHOT_CHANGED_MESSAGE);
+    }
+  }
+}
+
+// The annotation ids a model-supplied analysis query matches: the query's
+// matches, or every live annotation when there is no query.
+function resolveAnalysisIds(query: unknown): Set<string> {
+  return resolveQueryToIdSet(query) ?? liveAnnotationIdSet();
+}
+
+function sameIds(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) {
+    return false;
+  }
+  for (const id of a) {
+    if (!b.has(id)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Resolve a model-supplied query and load the values the analysis reads, as
+// one consistent snapshot (see withStableAnnotations). Values belong to
+// annotation ids, not to their tags or geometry, so the snapshot stays valid
+// across a change that leaves the query matching the same ids.
+function loadAnalysisInputs(
+  query: unknown,
+  paths: string[][],
+  context: IAgentToolContext,
+): Promise<{ ids: Set<string>; valuesOf: TPropertyValueLookup }> {
+  return withStableAnnotations(
+    async () => {
+      const ids = resolveAnalysisIds(query);
+      const valuesOf = await loadAnalysisValues(paths, ids, context);
+      return { ids, valuesOf };
+    },
+    ({ ids }) => sameIds(ids, resolveAnalysisIds(query)),
+  );
+}
+
+// The paths to send as a projection. MongoDB rejects a projection naming both
+// a path and its descendant (values.p and values.p.mean collide), and the
+// ancestor already returns the descendant, so drop any path with a strict
+// prefix in the list.
+function projectablePaths(paths: string[][]): string[][] {
+  return paths.filter(
+    (path) =>
+      !paths.some(
+        (other) =>
+          other.length < path.length &&
+          other.every((segment, i) => segment === path[i]),
+      ),
+  );
+}
+
+// Collect [annotationId, value] pairs for one property value path over `ids`
+// (resolveAnalysisIds: the query's matches, else every live annotation) —
+// never the raw value keys, which can include values orphaned by deleted
+// annotations. Only finite-numeric leaves are kept (resolvePathValue drops the
+// rest).
 function collectPathValues(
   path: string[],
-  allowedIds: Set<string> | null,
+  ids: Iterable<string>,
+  valuesOf: TPropertyValueLookup,
 ): [string, number][] {
   const pairs: [string, number][] = [];
-  for (const annotationId of allowedIds ?? liveAnnotationIdSet()) {
-    const value = resolvePathValue(
-      propertyStore.propertyValues[annotationId],
-      path,
-    );
+  for (const annotationId of ids) {
+    const value = resolvePathValue(valuesOf(annotationId), path);
     if (value !== null) {
       pairs.push([annotationId, value]);
     }
@@ -408,23 +570,19 @@ function clampHistogramBuckets(value: unknown): number {
   return Math.min(Math.max(1, requested), MAX_HISTOGRAM_BUCKETS);
 }
 
-// Map each annotation id to its first tag (or "untagged") for tag-grouped
-// plots. Built once per plot call rather than searching annotations per point.
-function buildFirstTagMap(): Map<string, string> {
-  const firstTags = new Map<string, string>();
-  for (const annotation of annotationStore.annotations) {
-    firstTags.set(annotation.id, annotation.tags?.[0] ?? "untagged");
-  }
-  return firstTags;
+// Resolves an annotation id to its tags, from its full form or its stub
+// (stub-only mode) — an O(1) lookup, so tag-grouped plots and sample rows
+// resolve only the ids they show instead of indexing the whole population.
+// Reads the store getter once; call the returned function in the loop.
+function annotationTagResolver(): (annotationId: string) => string[] {
+  const resolve = annotationStore.getAnnotationOrStubFromId;
+  return (annotationId) => resolve(annotationId)?.tags ?? [];
 }
 
-// Map each annotation id to its full tag list, for sample rows.
-function buildTagsMap(): Map<string, string[]> {
-  const tags = new Map<string, string[]>();
-  for (const annotation of annotationStore.annotations) {
-    tags.set(annotation.id, annotation.tags ?? []);
-  }
-  return tags;
+// The trace an annotation lands in for tag-grouped plots: its first tag.
+function firstTagResolver(): (annotationId: string) => string {
+  const tagsOf = annotationTagResolver();
+  return (annotationId) => tagsOf(annotationId)[0] ?? "untagged";
 }
 
 // Resolve the parameter values for a worker image: fetch its interface, reject
@@ -515,9 +673,11 @@ function currentDisplayOptions() {
 // Axis-aligned bounding box (in image-pixel coordinates) of the given
 // annotations, padded by a fraction of its span with a minimum absolute pad
 // (so a single point still frames sensibly). Returns null if there are no
-// coordinates. Pure — the GeoJS camera application lives in the executor.
+// coordinates. A stub (stub-only mode) has no coordinates; it contributes its
+// centroid widened by its estimated radius. Pure — the GeoJS camera
+// application lives in the executor.
 export function annotationsBoundingBox(
-  annotations: IAnnotation[],
+  annotations: Iterable<TAnnotationOrStub>,
   padFraction = 0,
   minPad = 0,
 ): { left: number; top: number; right: number; bottom: number } | null {
@@ -526,11 +686,20 @@ export function annotationsBoundingBox(
   let maxX = -Infinity;
   let maxY = -Infinity;
   for (const annotation of annotations) {
-    for (const point of annotation.coordinates) {
-      minX = Math.min(minX, point.x);
-      minY = Math.min(minY, point.y);
-      maxX = Math.max(maxX, point.x);
-      maxY = Math.max(maxY, point.y);
+    if (isHydratedAnnotation(annotation)) {
+      for (const point of annotation.coordinates) {
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      }
+    } else {
+      const { x, y } = annotation.centroid;
+      const radius = annotation.estimatedRadius ?? 0;
+      minX = Math.min(minX, x - radius);
+      minY = Math.min(minY, y - radius);
+      maxX = Math.max(maxX, x + radius);
+      maxY = Math.max(maxY, y + radius);
     }
   }
   if (!Number.isFinite(minX)) {
@@ -862,10 +1031,6 @@ async function rectangularGate(
     xCategories: null,
     yCategories: null,
   };
-}
-
-function clamp(value: number, max: number) {
-  return Math.max(0, Math.min(value, Math.max(0, max - 1)));
 }
 
 // --- Background jobs -------------------------------------------------------
@@ -1354,12 +1519,14 @@ const registry: { [name: string]: IAgentToolEntry } = {
   },
 
   list_annotations: {
-    execute: async (input: {
-      query?: IAnnotationQuery;
-      limit?: number;
-      offset?: number;
-    }) => {
-      const matching = queryAnnotations(input.query);
+    execute: async (
+      input: {
+        query?: IAnnotationQuery;
+        limit?: number;
+        offset?: number;
+      },
+      context: IAgentToolContext,
+    ) => {
       // Model input is unvalidated: coerce to sane non-negative numbers and
       // clamp the page size to MAX_LIST_ANNOTATIONS so a single call can never
       // serialize an unbounded set into context.
@@ -1376,15 +1543,65 @@ const registry: { [name: string]: IAgentToolEntry } = {
           ? Math.max(1, Math.floor(input.limit))
           : 50;
       const limit = Math.min(requestedLimit, MAX_LIST_ANNOTATIONS);
-      const annotations = matching.slice(offset, offset + limit).map((a) => {
-        const n = a.coordinates.length || 1;
-        const centroid = a.coordinates.reduce(
-          (acc, p) => ({ x: acc.x + p.x / n, y: acc.y + p.y / n }),
-          { x: 0, y: 0 },
-        );
+      // The query is resolved before the name fetch below; re-resolve if the
+      // annotations change meanwhile, so the page matches the query.
+      const { matching, page, stubNames } = await withStableAnnotations(
+        async () => {
+          const matching = queryAnnotations(input.query);
+          const page = matching.slice(offset, offset + limit);
+          // A stub (stub-only mode) has a centroid but no name, so the page's
+          // names come from one batch hydrate of just those rows (at most
+          // MAX_LIST_ANNOTATIONS). Everything else is read from the stub, which is
+          // the client's current state.
+          const stubIds = page
+            .filter((a) => !isHydratedAnnotation(a))
+            .map((a) => a.id);
+          const stubNames = new Map<string, string | null>();
+          if (stubIds.length > 0) {
+            let hydrated: IAnnotation[];
+            try {
+              hydrated = await main.annotationsAPI.hydrateAnnotations(stubIds);
+            } catch (error: any) {
+              throw new ToolExecutionError(
+                "Could not load annotation names: " +
+                  (error?.response?.data?.message ??
+                    error?.message ??
+                    "the request failed"),
+              );
+            }
+            if (context.hasViewIdentityChanged?.()) {
+              throw new ToolExecutionError(
+                "Aborted: the active dataset changed while listing annotations; " +
+                  "not listing a different dataset than the request targeted.",
+              );
+            }
+            for (const annotation of hydrated) {
+              stubNames.set(annotation.id, annotation.name);
+            }
+          }
+          return { matching, page, stubNames };
+        },
+      );
+      // Serialize each row from the store as it is now, not the pre-await
+      // object: coloring by property replaces stubs without moving
+      // contentRevision (no analysis input depends on color), so the snapshot
+      // check above cannot see it.
+      const resolve = annotationStore.getAnnotationOrStubFromId;
+      const annotations = page.map((captured) => {
+        const a = resolve(captured.id) ?? captured;
+        let centroid: { x: number; y: number };
+        if (isHydratedAnnotation(a)) {
+          const n = a.coordinates.length || 1;
+          centroid = a.coordinates.reduce(
+            (acc, p) => ({ x: acc.x + p.x / n, y: acc.y + p.y / n }),
+            { x: 0, y: 0 },
+          );
+        } else {
+          centroid = a.centroid;
+        }
         return {
           id: a.id,
-          name: a.name,
+          name: isHydratedAnnotation(a) ? a.name : stubNames.get(a.id) ?? null,
           shape: a.shape,
           tags: a.tags,
           channel: a.channel,
@@ -1528,19 +1745,8 @@ const registry: { [name: string]: IAgentToolEntry } = {
 
   set_location: {
     execute: async (input: { xy?: number; z?: number; time?: number }) => {
-      const dataset = requireDataset();
-      if (input.xy != null) {
-        await main.setXY(clamp(input.xy, dataset.xy.length));
-      }
-      if (input.z != null) {
-        await main.setZ(clamp(input.z, dataset.z.length));
-      }
-      if (input.time != null) {
-        await main.setTime(clamp(input.time, dataset.time.length));
-      }
-      return {
-        result: { location: { xy: main.xy, z: main.z, time: main.time } },
-      };
+      requireDataset();
+      return { result: { location: await goToLocation(input) } };
     },
   },
 
@@ -1560,12 +1766,17 @@ const registry: { [name: string]: IAgentToolEntry } = {
           // Same path as the viewer's "recenter and fit" button.
           map.bounds(map.maxBounds(undefined, null), null);
         } else {
+          // Resolved through the store (full annotation, or stub in
+          // stub-only mode, where `annotations` is empty); a selected id a
+          // delete or undo left behind resolves to nothing and is skipped.
+          const resolve = annotationStore.getAnnotationOrStubFromId;
           const targets =
             input.fit === "selection"
-              ? annotationStore.annotations.filter((a) =>
-                  annotationStore.selectedAnnotationIds.has(a.id),
-                )
-              : annotationStore.annotations;
+              ? Array.from(
+                  annotationStore.selectedAnnotationIds,
+                  resolve,
+                ).filter((a): a is TAnnotationOrStub => a !== undefined)
+              : liveAnnotations();
           const bounds = annotationsBoundingBox(targets, 0.1, 20);
           if (!bounds) {
             throw new ToolExecutionError(
@@ -1851,16 +2062,7 @@ const registry: { [name: string]: IAgentToolEntry } = {
             "set_layer_mode before making several layers visible",
         );
       }
-      for (const layer of main.layers) {
-        const visible = visibleIds.has(layer.id);
-        if (layer.visible !== visible) {
-          await main.changeLayer({
-            layerId: layer.id,
-            delta: { visible },
-            sync: false,
-          });
-        }
-      }
+      await setVisibleLayers([...visibleIds]);
       await persistOrThrow("layer visibility", () =>
         main.syncConfiguration({ key: "layers", throwOnError: true }),
       );
@@ -2152,7 +2354,7 @@ const registry: { [name: string]: IAgentToolEntry } = {
           `No tool with id "${input.toolId}"; use list_tools to see the toolset`,
         );
       }
-      await main.setSelectedToolId(input.toolId);
+      await selectTool(input.toolId);
       return {
         result: {
           selectedToolId: main.selectedTool?.configuration.id ?? null,
@@ -2279,10 +2481,14 @@ const registry: { [name: string]: IAgentToolEntry } = {
           image: property.image,
           shape: property.shape,
           tags: property.tags?.tags ?? [],
-          // A property is "computed" if any value path for it exists.
-          computed: propertyStore.computedPropertyPaths.some(
-            (path) => path[0] === property.id,
-          ),
+          // A property is "computed" if any value path for it exists. In
+          // stub-only mode the paths come from a bounded sample of value
+          // documents, so absence there is not evidence: report null
+          // (unknown) rather than false.
+          computed:
+            propertyStore.computedPropertyPaths.some(
+              (path) => path[0] === property.id,
+            ) || (annotationStore.stubOnlyMode ? null : false),
         })),
       },
     }),
@@ -2459,16 +2665,50 @@ const registry: { [name: string]: IAgentToolEntry } = {
     ) => {
       await propertyStore.fetchPropertyValues();
       assertDatasetUnchanged(context);
-      const allowedIds = resolveQueryToIdSet(input.query);
+      const wanted = (path: string[]) =>
+        !input.propertyId || path[0] === input.propertyId;
+      // Fully loaded, computedPropertyPaths walks every value. In stub-only
+      // mode it comes from a bounded sample of value documents, which can miss
+      // a property computed on a subset of annotations (one shape or tag). So
+      // there, fetch each property's root and take the leaf paths from the
+      // values that come back.
+      const stubOnly = annotationStore.stubOnlyMode;
+      const fetchPaths = (
+        stubOnly
+          ? [
+              ...propertyStore.properties.map((property) => [property.id]),
+              ...propertyStore.allVirtualPropertyPaths,
+            ]
+          : propertyStore.computedPropertyPaths
+      ).filter(wanted);
+      const { ids, valuesOf } = await loadAnalysisInputs(
+        input.query,
+        fetchPaths,
+        context,
+      );
+      // Leaves grouped under the root they were fetched for (property order),
+      // sorted within a root so the order is stable across calls.
+      let paths = fetchPaths;
+      if (stubOnly) {
+        const leaves = collectLeafPaths(
+          Array.from(ids, valuesOf).filter((values) => values !== undefined),
+        );
+        paths = fetchPaths.flatMap((root) =>
+          leaves
+            .filter((leaf) => root.every((segment, i) => leaf[i] === segment))
+            .sort((a, b) => {
+              const left = a.join("\0");
+              const right = b.join("\0");
+              return left < right ? -1 : left > right ? 1 : 0;
+            }),
+        );
+      }
       const nameOf = (id: string) =>
         propertyStore.properties.find((p) => p.id === id)?.name ?? id;
       const stats = [];
-      for (const path of propertyStore.computedPropertyPaths) {
+      for (const path of paths) {
         const propertyId = path[0];
-        if (input.propertyId && propertyId !== input.propertyId) {
-          continue;
-        }
-        const values = collectPathValues(path, allowedIds).map(([, v]) => v);
+        const values = collectPathValues(path, ids, valuesOf).map(([, v]) => v);
         if (values.length === 0) {
           continue;
         }
@@ -2510,8 +2750,12 @@ const registry: { [name: string]: IAgentToolEntry } = {
       await propertyStore.fetchPropertyValues();
       assertDatasetUnchanged(context);
       const path = validatePropertyPath(input.propertyPath, "propertyPath");
-      const allowedIds = resolveQueryToIdSet(input.query);
-      const values = collectPathValues(path, allowedIds).map(([, v]) => v);
+      const { ids, valuesOf } = await loadAnalysisInputs(
+        input.query,
+        [path],
+        context,
+      );
+      const values = collectPathValues(path, ids, valuesOf).map(([, v]) => v);
       if (values.length === 0) {
         throw new ToolExecutionError(
           `No numeric values for property value path "${path.join(".")}"; ` +
@@ -2553,12 +2797,16 @@ const registry: { [name: string]: IAgentToolEntry } = {
       const paths = input.propertyPaths.map((path) =>
         validatePropertyPath(path, "propertyPaths[]"),
       );
-      const allowedIds = resolveQueryToIdSet(input.query);
+      const { ids, valuesOf } = await loadAnalysisInputs(
+        input.query,
+        paths,
+        context,
+      );
       // Only live annotations that actually have a property-value document —
       // skips values orphaned by deleted annotations, matching collectPathValues.
       const matchingIds: string[] = [];
-      for (const annotationId of allowedIds ?? liveAnnotationIdSet()) {
-        if (propertyStore.propertyValues[annotationId] !== undefined) {
+      for (const annotationId of ids) {
+        if (valuesOf(annotationId) !== undefined) {
           matchingIds.push(annotationId);
         }
       }
@@ -2566,15 +2814,15 @@ const registry: { [name: string]: IAgentToolEntry } = {
         typeof input.n === "number" && input.n > 0 ? Math.floor(input.n) : 20;
       const n = Math.min(Math.max(1, requestedN), MAX_SAMPLE_ROWS);
       const [sampledIds] = downsample(matchingIds, n);
-      const tagsById = buildTagsMap();
+      const tagsOf = annotationTagResolver();
       const rows = sampledIds.map((annotationId) => {
         const row: { [key: string]: unknown } = {
           annotationId,
-          tags: tagsById.get(annotationId) ?? [],
+          tags: tagsOf(annotationId),
         };
         for (const path of paths) {
           row[path.join(".")] = roundSignificant(
-            resolvePathValue(propertyStore.propertyValues[annotationId], path),
+            resolvePathValue(valuesOf(annotationId), path),
           );
         }
         return row;
@@ -2602,9 +2850,13 @@ const registry: { [name: string]: IAgentToolEntry } = {
       const xPath = validatePropertyPath(input.xPropertyPath, "xPropertyPath");
       const yPath = validatePropertyPath(input.yPropertyPath, "yPropertyPath");
       const title = requirePlotTitle(input.title);
-      const allowedIds = resolveQueryToIdSet(input.query);
-      const xValues = new Map(collectPathValues(xPath, allowedIds));
-      const yValues = new Map(collectPathValues(yPath, allowedIds));
+      const { ids: matchingIds, valuesOf } = await loadAnalysisInputs(
+        input.query,
+        [xPath, yPath],
+        context,
+      );
+      const xValues = new Map(collectPathValues(xPath, matchingIds, valuesOf));
+      const yValues = new Map(collectPathValues(yPath, matchingIds, valuesOf));
       const sharedIds: string[] = [];
       for (const id of xValues.keys()) {
         if (yValues.has(id)) {
@@ -2632,10 +2884,10 @@ const registry: { [name: string]: IAgentToolEntry } = {
       });
       let data: unknown[];
       if (input.colorByTag) {
-        const firstTags = buildFirstTagMap();
+        const firstTagOf = firstTagResolver();
         const groups = new Map<string, string[]>();
         for (const id of ids) {
-          const tag = firstTags.get(id) ?? "untagged";
+          const tag = firstTagOf(id);
           const group = groups.get(tag);
           if (group) {
             group.push(id);
@@ -2684,8 +2936,12 @@ const registry: { [name: string]: IAgentToolEntry } = {
       assertDatasetUnchanged(context);
       const path = validatePropertyPath(input.propertyPath, "propertyPath");
       const title = requirePlotTitle(input.title);
-      const allowedIds = resolveQueryToIdSet(input.query);
-      const values = collectPathValues(path, allowedIds).map(([, v]) => v);
+      const { ids, valuesOf } = await loadAnalysisInputs(
+        input.query,
+        [path],
+        context,
+      );
+      const values = collectPathValues(path, ids, valuesOf).map(([, v]) => v);
       if (values.length === 0) {
         throw new ToolExecutionError(
           `No numeric values for property value path "${path.join(".")}"; ` +
@@ -2750,7 +3006,18 @@ const registry: { [name: string]: IAgentToolEntry } = {
         validatePropertyPath(path, "propertyPaths[]"),
       );
       const title = requirePlotTitle(input.title);
-      const allowedIds = resolveQueryToIdSet(input.query);
+      // Validate before the value fetch, which in stub-only mode is a
+      // whole-population request.
+      if (input.groupByTag && paths.length !== 1) {
+        throw new ToolExecutionError(
+          "groupByTag requires exactly one propertyPath (one box per tag)",
+        );
+      }
+      const { ids, valuesOf } = await loadAnalysisInputs(
+        input.query,
+        paths,
+        context,
+      );
       // At/below the cap: hand Plotly the raw points so it draws exact
       // quartiles and individual outliers. Above it: shipping every point is
       // wasteful and an every-kth downsample silently shifts the box's
@@ -2779,16 +3046,11 @@ const registry: { [name: string]: IAgentToolEntry } = {
       };
       let data: unknown[];
       if (input.groupByTag) {
-        if (paths.length !== 1) {
-          throw new ToolExecutionError(
-            "groupByTag requires exactly one propertyPath (one box per tag)",
-          );
-        }
         const path = paths[0];
-        const firstTags = buildFirstTagMap();
+        const firstTagOf = firstTagResolver();
         const groups = new Map<string, number[]>();
-        for (const [id, value] of collectPathValues(path, allowedIds)) {
-          const tag = firstTags.get(id) ?? "untagged";
+        for (const [id, value] of collectPathValues(path, ids, valuesOf)) {
+          const tag = firstTagOf(id);
           const group = groups.get(tag);
           if (group) {
             group.push(value);
@@ -2808,7 +3070,9 @@ const registry: { [name: string]: IAgentToolEntry } = {
       } else {
         data = [];
         for (const path of paths) {
-          const values = collectPathValues(path, allowedIds).map(([, v]) => v);
+          const values = collectPathValues(path, ids, valuesOf).map(
+            ([, v]) => v,
+          );
           if (values.length === 0) {
             continue;
           }

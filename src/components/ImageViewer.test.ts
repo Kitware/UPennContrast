@@ -1233,6 +1233,9 @@ describe("ImageViewer", () => {
       expect(layerParams.tilesAtZoom(8)).toEqual({ x: 1, y: 1 });
       expect(layerParams.tilesMaxBounds(8)).toEqual({ x: 512, y: 512 });
       expect(layerParams.visible).toBe(false);
+      // Transparent overview tiles: coarser levels must not stay drawn
+      // beneath the current one (they show through as halos).
+      expect(layerParams.keepLower).toBe(false);
       expect(
         mockedAnnotationStore.annotationsAPI.annotationRasterTemplateUrl,
       ).toHaveBeenCalledWith(

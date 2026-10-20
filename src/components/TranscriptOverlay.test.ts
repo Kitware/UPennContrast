@@ -149,11 +149,13 @@ function makeMap(bounds = { left: 0, top: 0, right: 600, bottom: 300 }) {
       held.splice(held.indexOf(layer), 1);
     }),
     node: () => [document.createElement("div")],
-    createLayer: vi.fn((kind: string) => {
-      const layer = kind === "osm" ? makeOsm() : featureLayer;
-      held.push(layer);
-      return layer;
-    }),
+    createLayer: vi.fn<(kind: string, params: Record<string, any>) => any>(
+      (kind) => {
+        const layer = kind === "osm" ? makeOsm() : featureLayer;
+        held.push(layer);
+        return layer;
+      },
+    ),
     held,
   };
   return {
@@ -347,6 +349,20 @@ describe("TranscriptOverlay", () => {
     await vi.advanceTimersByTimeAsync(250);
     expect(mocks.fetchTranscriptPoints).toHaveBeenCalled();
     expect(osmLayer.visible()).toBe(false);
+  });
+
+  it("creates heat-map layers that keep only the current level", async () => {
+    const parts = makeMap({ left: 0, top: 0, right: 4000, bottom: 2000 });
+    (transcriptsStore as any).pointBudget = 100;
+    mount(parts);
+    await vi.advanceTimersByTimeAsync(250);
+    const osmCalls = parts.map.createLayer.mock.calls.filter(
+      ([kind]) => kind === "osm",
+    );
+    expect(osmCalls.length).toBeGreaterThan(0);
+    for (const [, params] of osmCalls) {
+      expect(params.keepLower).toBe(false);
+    }
   });
 
   it("draws one heat map per gene in its own color and deletes removed ones", async () => {

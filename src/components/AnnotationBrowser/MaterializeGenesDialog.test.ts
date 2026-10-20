@@ -71,6 +71,42 @@ async function openDialog(mode: "live" | "copy" | "score" = "copy") {
   return wrapper;
 }
 
+describe("MaterializeGenesDialog as the app-level instance", () => {
+  it("clears the form when the dataset changes, so no other table's genes are posted", async () => {
+    const wrapper = shallowMount(MaterializeGenesDialog, {
+      props: { open: false, showActivator: false },
+    });
+    const vm = wrapper.vm as any;
+    vm.symbols = ["CD3E"];
+    vm.mode = "copy";
+    vm.propertyName = "Old dataset measurement";
+    vm.done = "Copied 1 gene";
+    await nextTick();
+    (store as any).dataset = { id: "ds2", name: "Kidney" };
+    await nextTick();
+    expect(vm.symbols).toEqual([]);
+    expect(vm.mode).toBe("live");
+    expect(vm.propertyName).toBe("Gene Expression");
+    expect(vm.done).toBe("");
+    expect(vm.canSubmit).toBe(false);
+    (store as any).dataset = { id: "ds1", name: "Lymph" };
+    await nextTick();
+  });
+
+  it("follows v-model:open and shows no activator of its own", async () => {
+    const wrapper = shallowMount(MaterializeGenesDialog, {
+      props: { open: false, showActivator: false },
+    });
+    expect((wrapper.vm as any).dialog).toBe(false);
+    await wrapper.setProps({ open: true });
+    expect((wrapper.vm as any).dialog).toBe(true);
+    (wrapper.vm as any).dialog = false;
+    await nextTick();
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+    expect(wrapper.text()).not.toContain("Genes from spatial table");
+  });
+});
+
 describe("MaterializeGenesDialog", () => {
   beforeEach(() => {
     vi.useFakeTimers();

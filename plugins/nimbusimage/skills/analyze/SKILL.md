@@ -68,6 +68,22 @@ ds.properties.delete_values(prop.id)
 hist = ds.properties.histogram("propertyId.Area", buckets=50)
 ```
 
+### Gene expression from a spatial table
+
+On datasets with a registered spatial table (Xenium or Spatial Genomics ingest), gene
+counts are **not** stored property values. Each gene is a virtual property path
+`["spatial", "<gene>"]` read live from the table. In the app a gene appears in pickers
+only after it's added (**Measure objects** → **Gene expression** → **Add genes…**). From
+Python no adding is needed:
+
+```python
+path = ds.spatial.virtual_path("KRT7")            # ["spatial", "KRT7"]
+f = {"propertyFilters": [{"path": path, "mode": "range", "min": 100}]}
+ds.annotations.summary(filters=f)                  # server-side count
+ds.spatial.aggregate(["KRT7"], {"tags": {"values": ["Leiden 0"], "exclusive": False}})
+ds.spatial.materialize(["KRT7"])                   # copy into a real property
+```
+
 ### Running property workers
 
 For server-side computation using Docker workers, use the workers skill.

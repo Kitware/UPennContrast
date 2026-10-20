@@ -68,7 +68,7 @@ invariants extracted from these rounds.
 - **Severity:** P2
 - **Summary:** `resolveAnnotationBrowserConfig` drops an unknown-property path
   at hydration, but a live deletion had no twin: `setProperties` reconciled
-  analysis plots only, so the panel kept labelling from the deleted property
+  analysis plots only, so the panel kept labeling from the deleted property
   and a later browser save could persist the orphaned path until reload.
 - **Status:** fixed — `reconcileTrackLabelPathForPropertyIds` (connectionList
   store) clears the path through the scheduling setter when its property id

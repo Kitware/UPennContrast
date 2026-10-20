@@ -128,6 +128,31 @@ store.dispatch('sendUserMessage', 'Find the nuclei in this image.'); // fire, do
 
 Agent tool executors live in `src/agent/executors.ts` (`executeAgentTool(name, input, ctx)`), importable in the Vite dev page for isolated testing: `await import('/src/agent/executors.ts?t=' + Date.now())` (the query-bust avoids a stale module cache). Worker tools save parameters under `tool.values.workerInterfaceValues`; `channelCheckboxes` values are `{channelIndex: true}` maps (a `true` value selects — key-presence alone does not).
 
+### Whole-population reads must handle stub-only mode
+
+Above `stubThreshold` (100K) `annotationStore.annotations` is **empty**. The
+population is in `annotationStubs`, and `propertyStore.propertyValues` holds
+only the rendered annotations' values for the displayed columns. Code that
+reads either one as "the dataset" returns zero there, or worse, a viewport-sized
+subset presented as the whole. Nothing errors, and every small-fixture test
+passes. This shipped in the AI panel: list/select/color/tag, every analysis
+tool and `fit` saw nothing on exactly the datasets where the server summary
+reported 700K (AI_PANEL_SPEC.md §4.1).
+
+- Count with `annotationCount`. Get ids with `allAnnotationIds`. Look up one id
+  with `getAnnotationOrStubFromId` (O(1); capture the getter once before a
+  loop). To iterate, use `annotationStubs.values()` in stub-only mode, or
+  `annotationsForIteration`, which copies the map into a new array on every
+  access. Stubs have tags/shape/channel/location/color/centroid, but no
+  `name` or `coordinates`; narrow with `isHydratedAnnotation`.
+- Property values for an arbitrary population: below the threshold, read the
+  store. Above it, use the server: aggregates via `fetchAnnotationSummary` or the
+  analysis endpoints, or values via `getPropertyValuesForIds(ds, ids, paths)`
+  with a **non-empty** `paths` (an empty list means every value).
+- Test it by putting the store mock in stub-only mode (`stubOnlyMode: true`,
+  `annotations: []`, stubs populated), and confirm the test fails with the fix
+  reverted. `executors.test.ts` `describe("stub-only mode")` is the pattern.
+
 ### Never assign a big per-annotation map to state without `markRaw`
 
 `annotationStubs`, `hydratedAnnotations`, and `annotationCentroids` hold one
@@ -282,6 +307,29 @@ URLs: the breadcrumb view switcher keeps the current query when it moves to
 another dataset. See `codebaseDocumentation/DATASET_LOCATION.md` and its
 regression checklist.
 
+### Per-resource component state under a reused route: key it by id
+
+Vue Router reuses a route's component when only a param changes (`/project/A`
+→ `/project/B`), so any local state in it, or in a child, stays alive across
+the switch. That state includes error messages, progress, job subscriptions
+and open dialogs, and late responses for A land in it too. On PR #1414,
+`ZenodoPublish`'s refusal message for project A showed on project B. Don't
+reset the refs one by one in a `watch(() => props.project.id)`: that list is
+hand-maintained and misses the next ref someone adds. Key the component by
+the resource id in the parent (`<zenodo-publish :key="project.id" ...>`), so
+each resource gets a fresh instance. A late `emit` from the old instance is
+dropped (Vue's `emit` returns early once `isUnmounted`). Test it by switching
+the resource under a mounted parent and asserting a new child `vm`
+(`ProjectInfo.test.ts` *"gives each project its own ZenodoPublish
+instance"*).
+
+A related trap: work that "resumes" a server-side operation, such as
+re-subscribing to a running job, must not run only in `onMounted`. Run it
+whenever the resource *reports* the state (`watch(status, …, { immediate:
+true })`), guard it to once per job, and treat "reports running but no job
+exists" as a stale copy to re-read. The store does not refetch cached
+resources on navigation.
+
 ### Every `throttle`/`debounce` needs a `cancel()` in `onBeforeUnmount`
 
 A trailing call that fires after teardown runs against a dead view — in
@@ -380,6 +428,56 @@ Vuetify 4 changed the default theme from `"light"` to `"system"`. Our config set
 }
 ```
 
+### The viewer's app bar is already full — measure before widening a control
+
+On the dataset view the app bar holds about 20 controls and already overflows
+by ~50px at 1024px wide. Anything wider than an icon pushes the right-hand
+buttons (help, account, Nimbus AI) off screen with no scrollbar and no error;
+a 264px search-field trigger hid all three anywhere from 960px to ~1300px.
+Before widening an app-bar control, measure on the **viewer** route (not the
+home page, which has half the controls) at 1024 and 1280px:
+
+```js
+const ai = document.querySelector('[aria-label="Nimbus AI panel"]');
+[innerWidth, Math.round(ai.getBoundingClientRect().right)]  // right must be <= innerWidth
+```
+
+Collapse to an icon below `lg` (1280px) rather than `md`.
+
+### Palette commands registered in a right-hand palette are global unless gated
+
+`useCommand` registers for the component's lifetime, and the right-hand
+FloatingPalettes (Settings, Object Browser, Snapshots) keep their content
+mounted on **every** route via `v-show`. So a command registered in, say,
+`ViewerSettings.vue` shows on the dataset list too. Gate it with
+`useInViewer()` from `src/commands/context.ts`, and set each command's
+`enabled` to match its control's `:disabled`. The left palettes (Navigator,
+Layers, Tools) and `ImageViewer.vue` mount only in the viewer.
+
+### A state-flipping palette command names only what it will do
+
+A command whose title flips with state ("Hide minimap" / "Show minimap") must
+never match a query asking for the state it already has, or Enter does the
+opposite of what was typed. Seven Codex rounds on PR #1429 each found one
+more way in:
+
+- synonyms that equate opposites (show = hide);
+- loose matching: substring ("lock" in "Unlock", "roll" in "Unroll") or
+  subsequence ("open" in "Close…"); the scorer now matches the words in
+  `src/commands/stateWords.ts` only as whole title words or keywords;
+- keywords naming both directions (`["dark", "light"]`, `["add", "remove"]`);
+  `oppositeKeywords.test.ts` scans every array literal for these;
+- a description stating the current state ("Visible" made "visible dapi"
+  hide the layer);
+- a turn-off title that shares a word with the state it ends
+  ("Draw every object, ignoring **filters**" matched "filter objects").
+
+The rule: title, keywords, aliases and description describe only the
+result of running it, and a turn-off title shares no word with the on state
+except the neutral subject ("minimap", "scale bar"). Use `toggleCommands`
+with `turnOnKeywords` / `turnOffKeywords`, and test both states with the
+query a user would type for each.
+
 ### Select/Combobox Slot Items (No `.raw` Wrapper)
 
 Vuetify 4 removed the `.raw` wrapper from select slot items. Items are passed directly. This applies to ALL slot types: `#item`, `#chip`, and `#selection`.
@@ -464,7 +562,7 @@ class, so `dense` still works and the only symptom is
 `[Vuetify UPGRADE] 'dense' is deprecated` in the console. Don't trust
 Vuetify's own JSDoc here: `makeVRowProps` says `@deprecated use
 density="compact"` while the runtime warning and the class mapping both say
-`comfortable`. `comfortable` is the behaviour-preserving one.
+`comfortable`. `comfortable` is the behavior-preserving one.
 
 **The warning is one-shot per mounted row, not per render.** `deprecate()` is
 called from `VRow.setup()`, so re-rendering or updating an existing row never
@@ -938,7 +1036,7 @@ produced (the store refuses at its cap by no-oping, and the executor went on
 to configure and report a plot that did not exist).
 
 The rule: **a mocked action must reproduce the state change its caller depends
-on, including its refusal behaviour.** If the real action appends, the mock
+on, including its refusal behavior.** If the real action appends, the mock
 appends; if the real one silently no-ops past a cap, the mock does too. When a
 test needs extra side effects on top, factor the default into a helper and
 call it, rather than replacing the implementation and silently dropping the
