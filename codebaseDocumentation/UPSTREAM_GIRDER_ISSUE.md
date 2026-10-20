@@ -53,33 +53,27 @@ The response from the PUT is `200 OK` and includes `"_accessLevel": -1` in the r
 
 **Suggested fix**
 
-In `AccessControlledModel.setAccessList`, after building `acList`, add a check:
+The thing to prevent is a resource left with **no user at ADMIN**. It doesn't matter who holds ADMIN: an owner handing a folder to someone else and then stepping down is legitimate. In `AccessControlledModel.setAccessList`, after building `acList`, add a check:
 
 ```python
 if user is not None and not user.get('admin') and not force:
-    has_self_admin = any(
-        entry['id'] == user['_id'] and entry['level'] == AccessType.ADMIN
-        for entry in acList['users']
-    )
-    has_self_via_group = any(
-        # any group that includes the user at ADMIN level
-        ...  # group membership lookup
-        for group in acList['groups']
-    )
-    if not (has_self_admin or has_self_via_group):
+    if not any(entry['level'] >= AccessType.ADMIN
+               for entry in acList['users']):
         raise ValidationException(
-            'You cannot remove your own ADMIN access from this resource.'
-            ' Have another ADMIN user remove your access instead.',
+            'A resource must keep at least one user with ADMIN access.'
+            ' Give another user ADMIN first.',
             field='access',
         )
 ```
+
+`setUserAccess` would need the same check, since removing or demoting the last ADMIN one entry at a time has the same effect.
 
 This:
 
 - Leaves site admins unrestricted (recovery path).
 - Leaves the explicit `force=True` code path unrestricted (internal Girder code that intentionally bypasses access checks).
-- Allows ownership transfer via the standard pattern: add new owner as ADMIN, have them remove the old owner.
-- The group-membership check is the tricky part — if you don't want to walk groups, a strict "user must appear at ADMIN in `acList['users']`" rule is also defensible and simpler.
+- Allows ownership transfer: give the new owner ADMIN, then either of you can remove the old owner.
+- Counts users only. Group ADMIN grants could count too, but a group can be emptied or deleted independently of the resource, so a group-only ACL can still end up with nobody able to administer it.
 
 **Softer alternative**
 
@@ -91,32 +85,39 @@ We're a downstream project (NimbusImage / `upenncontrast_annotation`) where fold
 
 **Workaround for downstream**
 
+A `model.folder.save` listener that compares against the stored document, so a folder that already had no ADMIN isn't frozen (NimbusImage's version, which also covers its own share endpoints, is `server/helpers/last_admin_guard.py`):
+
 ```python
 from girder import events
 from girder.api import rest
 from girder.constants import AccessType
 from girder.exceptions import ValidationException
+from girder.models.folder import Folder
 
-def _ensure_creator_admin(event):
+
+def _has_admin_user(doc):
+    return any(entry.get('level', -1) >= AccessType.ADMIN
+               for entry in (doc.get('access') or {}).get('users', []))
+
+
+def _keep_an_admin(event):
     doc = event.info
     if not isinstance(doc, dict) or '_id' not in doc:
         return
     # ... filter to your resource type ...
-    creator_id = doc.get('creatorId')
-    if creator_id is None:
+    if _has_admin_user(doc):
         return
-    access = doc.get('access') or {}
-    if not any(
-        e.get('id') == creator_id and e.get('level') == AccessType.ADMIN
-        for e in access.get('users', [])
-    ):
-        current = rest.getCurrentUser()
-        if current is None or current.get('admin'):
-            return
-        raise ValidationException(
-            'Creator must retain ADMIN access',
-            field='access',
-        )
+    stored = Folder().findOne({'_id': doc['_id']}, fields=['access'])
+    if stored is None or not _has_admin_user(stored):
+        return  # already had no ADMIN; this save didn't remove it
+    current = rest.getCurrentUser()
+    if current is None or current.get('admin'):
+        return
+    raise ValidationException(
+        'A folder must keep at least one user with ADMIN access.',
+        field='access',
+    )
 
-events.bind('model.folder.save', 'my-plugin.creator-admin', _ensure_creator_admin)
+
+events.bind('model.folder.save', 'my-plugin.keep-an-admin', _keep_an_admin)
 ```

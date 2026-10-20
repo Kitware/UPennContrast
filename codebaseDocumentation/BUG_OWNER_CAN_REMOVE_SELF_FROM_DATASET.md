@@ -1,7 +1,7 @@
 # Bug: Dataset owner can remove their own access via raw Girder ACL endpoint
 
 **Discovered:** 2026-05-18 while exercising the NimbusImage API as a non-admin user (`arjunraj`).
-**Fixed in plugin:** branch `fix/dataset-owner-cannot-remove-self` — see `server/helpers/folder_access_guard.py` and `test/test_folder_access_guard.py`.
+**Fixed in plugin:** PR #1165 (branch `fix/dataset-owner-cannot-remove-self`). See `server/helpers/last_admin_guard.py` and `test/test_last_admin_guard.py`. The rule: a dataset or project always keeps at least one user at ADMIN; see "Fix as implemented" below.
 **Upstream Girder report:** see `UPSTREAM_GIRDER_ISSUE.md` (filed separately).
 
 ## Summary
@@ -35,13 +35,22 @@ Subsequent `GET folder/{DS}` still returns the folder (because `public: true` wa
 
 ## Root cause
 
-The `dataset_view/share` endpoint (`server/api/datasetView.py` line 271) uses `Folder().setUserAccess(...)` which is **incremental** (one user at a time) — so it cannot remove the caller.
+The `dataset_view/share` endpoint uses `Folder().setUserAccess(...)`, which is **incremental** (one user at a time). That doesn't stop it removing the caller, though: an owner sending `-1` for themselves (or a co-owner removing the last other ADMIN) left the dataset with no owner too. `project/:id/share` had the same hole, on the project's own ACL as well as the datasets it reaches.
 
-The raw Girder endpoint `PUT /folder/{id}/access` uses `setAccessList` semantics — full ACL replacement. The NimbusImage plugin does **not** override or guard this endpoint, so any owner with ADMIN on the folder can replace the ACL with one that omits themselves.
+The raw Girder endpoint `PUT /folder/{id}/access` uses `setAccessList` semantics — full ACL replacement. The NimbusImage plugin did **not** override or guard this endpoint (before PR #1165), so any owner with ADMIN on the folder can replace the ACL with one that omits themselves.
 
-## Recommended fix
+## Fix as implemented
 
-Add a guard at the plugin layer that intercepts ACL changes on `contrastDataset` folders and refuses to remove the creator. Options:
+The first version of the guard required the dataset's **creator** to keep ADMIN. Paul's review on PR #1165 pointed out that the real problem is a dataset with **nobody** left at ADMIN; who holds it shouldn't matter, and a creator should be able to hand a dataset over. The rule is therefore: no change may leave a `contrastDataset` folder or a project with no user at ADMIN.
+
+- Before any write, `require_keeps_an_admin` (called from `access_helpers.requireCanSetUserAccess`) refuses (400) removing or demoting the last user at ADMIN, on `dataset_view/share`, on `project/:id/share` for the project's own ACL, and on every dataset that share reaches.
+- A `model.folder.save` listener catches everything else that saves a dataset folder, including the raw `PUT /folder/{id}/access` above (Option B below).
+- Only user entries count, not group grants: group membership is managed elsewhere and a group can be emptied.
+- Site admins are exempt (recovery), as is code running outside a request. A dataset that already has no ADMIN isn't frozen, but a folder can't become a dataset without one.
+
+## Options considered
+
+Each of these was written for the original creator-keeps-ADMIN rule.
 
 ### Option A — Override the folder access endpoint (per-plugin route)
 
@@ -65,7 +74,7 @@ Centralize "set folder access" in a helper in `server/helpers/` that always re-a
 
 ## Test to add
 
-`devops/girder/plugins/AnnotationPlugin/upenncontrast_annotation/test/test_sharing.py` (new or existing):
+Superseded: see `test/test_last_admin_guard.py` and the "Last ADMIN" group of `SHARING.md` "Regression checklist". The original sketch:
 
 ```python
 def test_owner_cannot_remove_self_via_raw_folder_access(user, dataset_folder):
