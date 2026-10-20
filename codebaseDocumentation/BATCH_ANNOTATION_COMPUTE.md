@@ -43,8 +43,8 @@ The cancel function is provided to the caller via an `onCancel` callback that fi
 
 When the user clicks "Cancel All" during batch processing:
 1. The `isCancelled` flag is set to `true`.
-2. All already-submitted jobs are cancelled via `api.cancelJob()`.
-3. Remaining datasets in the loop are skipped (counted as cancelled).
+2. All already-submitted jobs are canceled via `api.cancelJob()`.
+3. Remaining datasets in the loop are skipped (counted as canceled).
 
 ## Dataset limit
 
@@ -86,7 +86,7 @@ const success = await completionPromise;  // always safe
 
 - **Overall batch progress**: A `v-progress-linear` bar showing `completed + failed + cancelled / total` datasets.
 - **Per-dataset progress**: The existing single-job progress bar updates for each active job. Each per-dataset progress bar is cleared when its job finishes.
-- **Status text**: Shows completed/failed/cancelled counts and the name of the currently processing dataset.
+- **Status text**: Shows completed/failed/canceled counts and the name of the currently processing dataset.
 - The batch progress bar stays visible for 3 seconds after completion so users can see the final result.
 
 ## Error handling

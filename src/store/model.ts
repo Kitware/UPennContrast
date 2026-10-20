@@ -812,6 +812,8 @@ export interface IProjectZenodo {
   progress?: IZenodoProgress | null;
   error?: string | null;
   lastPublished?: string;
+  // The upload job, once an upload has been started.
+  jobId?: string | null;
 }
 
 export interface IProject {
@@ -1104,6 +1106,9 @@ export interface IGeoJSLayerSpec {
   minLevel?: number;
   maxLevel?: number;
   nearestPixel?: boolean | number;
+  // Keep coarser levels' tiles drawn beneath the current one (GeoJS default
+  // true). Transparent overlays need false or the coarse tiles show through.
+  keepLower?: boolean;
   queue?: IGeoJSFetchQueue;
   tileHeight: number;
   tileOffset: () => IGeoJSPoint2D;

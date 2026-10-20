@@ -266,8 +266,8 @@ print(ds.view_url()) # or just the URL
 ```
 
 The collection gets the same defaults the UI would create: one layer per
-channel (up to six), named after the channel and coloured from the shared
-channel-colour table, with percentile contrast, plus pixel size from the tile
+channel (up to six), named after the channel and colored from the shared
+channel-color table, with percentile contrast, plus pixel size from the tile
 metadata and z-step inferred from the dimension labels.
 
 With `create_view=False` none of that is created. The dataset is still fully

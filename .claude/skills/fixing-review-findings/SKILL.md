@@ -53,6 +53,7 @@ A reviewer flags **one instance** of a pattern per round. After fixing it, grep 
 | **Correctness work coupled to display-only data** | Hidden panels whose data also powers filters/exports | Compute mandatory and visible-only input scopes separately. Hidden mode requests only mandatory inputs; failure of an optional widened fetch must not block correctness work that can use local fields or a cached mandatory subset. On that failure path, derive the resolution subset from the paths actually retained — do not feed a broad visible scope a narrow cache and publish plausible empty output for its missing inputs. Sign the actual required input set, not the visibility flag, and reuse a cached superset. |
 | **Disabled work still treated as mandatory** | Persisted gates, filters, pipeline steps, hidden panels | Name each consumer's scope explicitly: hidden/filtering work may use the enabled subset, while visible counts/highlights may still materialize disabled entries and therefore must sign their inputs. Sweep fetch scope, derived-state resolution, and downstream query signatures. If disabled inputs are omitted, omit their derived outputs too; resolving them from a narrower active-only projection can publish plausible but false empty state. Re-enable/open transitions must wake the work when it becomes necessary. |
 | **A check reads intent, not the object it checks** | Anything validated against data that loads asynchronously: unroll flags vs the loaded dataset, a selected id vs the fetched record, a requested page size vs the returned page | The flag or request changes on click; the data follows only when its fetch lands, and a stale fetch can land after the flag flips back. Validate against what the loaded object actually is: record the inputs it was fetched with, next to it, when it commits. Clamping against the live unroll flags reset the location to 0 when unroll was toggled on and off quickly (PR #1389, `datasetUnroll`). |
+| **Mutual exclusion added one pair at a time** | Action buttons that change the same resource (upload / publish / discard of one deposition) | Each `:disabled="otherAction"` guard covers one ordered pair, and each review round finds the next missing direction (PR #1414: publish↔discard, then discard during upload, then upload during discard). Name the shared resource and gate every action on ONE flag (`requestInFlight` = any of those requests pending, plus any running job the view follows). Test each action with each other in flight. |
 | **Cost before the guard** | Getters/handlers with a cheap precondition and expensive body | Does the cheap check run FIRST, in every consumer? A cap that filters or hashes 700K annotations to discover the limit was exceeded is doing the work it exists to prevent. Use a bounded walk (`limit + 1` as an overflow bit), then share that bounded result across the watcher, action, and renderer; checking `.length` after building the full collection is not a guard. |
 | **A signature hashes values but not their structure** | Incremental hashes over nested rows, fields, or variable-length lists | Feed field/record boundaries into the hash, not only value separators and a final count; test two inputs with the same flattened values redistributed across records |
 | **A derived-data identity is lossy** | Staleness checks, incremental recompute, deduplication | Sums, moments, rounded coordinates, or sampled fields are summaries, not identities. Persist a canonical cryptographic hash at the write boundary, backfill legacy rows once, and test a collision pair that the tempting summary cannot distinguish. |
@@ -79,7 +80,7 @@ because the last three are the ones that get missed:
 | Surface | What to look for |
 |---|---|
 | Other code paths | Anything branching on, short-circuiting from, or caching the old fact. **Especially guards and early returns**, which encode "nothing else can be true here" |
-| Tests | A test asserting X still passes and now pins the wrong behaviour |
+| Tests | A test asserting X still passes and now pins the wrong behavior |
 | **User-facing strings** | Banners, tooltips, error text, tool descriptions. These state invariants in prose and nothing typechecks them |
 | **Spec / doc prose** | `codebaseDocumentation/*.md` claims go stale silently; a wrong doc is a finding |
 | **Comments** | A comment explaining why the old thing was safe is now an argument for a bug |
@@ -139,7 +140,7 @@ When you fix something, ask **"what is the other one?"** before moving on:
 | the flat rendering branch | the grouped/track branch |
 | one scope/mode branch | the other three |
 | how one render path reflects a state | how the *other* render path reflects it |
-| creating a throttled/debounced callback | cancelling it in `onBeforeUnmount` |
+| creating a throttled/debounced callback | canceling it in `onBeforeUnmount` |
 
 **A test that enumerates today's instances cannot catch tomorrow's.** The
 teardown-cancel test named the five throttles that existed when it was written,
@@ -157,7 +158,7 @@ caught this one round after the rewrite.
 
 Record instances **where they are created**, not where they are published — mock
 the constructor (`vi.mock("lodash", …)` delegating to `importOriginal` so timing
-behaviour is unchanged) and push each wrapper into an array:
+behavior is unchanged) and push each wrapper into an array:
 
 ```ts
 const createdThrottles = vi.hoisted(() => [] as any[]);
@@ -173,7 +174,7 @@ vi.mock("lodash", async (importOriginal) => {
 Keep a count floor (the recording can break too) and label failures with the
 exposed name when there is one, `unexposed#N` otherwise — the label is what
 turns a red test into a fix. Verify the test can fail on the case that motivated
-it: here, un-exposing *and* un-cancelling one throttle, which the exposed-surface
+it: here, un-exposing *and* un-canceling one throttle, which the exposed-surface
 version passed and this one reports as `unexposed#4`.
 
 The general rule: when a test discovers what it checks, ask what feeds the
@@ -233,7 +234,7 @@ Then **hold the invariants with contract tables**, not one test per finding: eve
 The next review round found the same root cause one level up — the value object carried the context for *some* consumers (per-cell steps) while others (transcripts, regions, the table upload) still took a loose frame and **fell back to a default when it was missing**; a mistyped path silently gave an H&E dataset the identity transform. Two rules came out of it:
 
 - **Defaults only where the result is verified.** A default is safe where something downstream checks the answer (`open_cells` verifies every map against the server's vertices, so a wrong default frame is refused). Where nothing checks it (registering a transform), a missing input must be an error, never a guess.
-- **Make the fake hostile, not merely faithful.** The in-memory fake returned creation order, so no test could see that re-deriving ids depended on list order — which the real server does not promise (it sorts by `_id`, and ObjectIds from different instances in the same second don't follow creation order). The fake now lists in *reverse* order, and the fix matches by geometry instead of position. When a fake stands in for a server, give it the server's weakest guarantees, not its most convenient behaviour.
+- **Make the fake hostile, not merely faithful.** The in-memory fake returned creation order, so no test could see that re-deriving ids depended on list order — which the real server does not promise (it sorts by `_id`, and ObjectIds from different instances in the same second don't follow creation order). The fake now lists in *reverse* order, and the fix matches by geometry instead of position. When a fake stands in for a server, give it the server's weakest guarantees, not its most convenient behavior.
 
 Two gaps the contract tables still had, found by round 9 of the same review:
 
@@ -494,7 +495,7 @@ Two more from the same round:
   count), the way two real clicks would (PR #1389, *"keeps the location when a
   stale unrolled refresh lands after unroll is turned off"*).
 
-Mechanically: after writing the test, restore the pre-fix behaviour (`git
+Mechanically: after writing the test, restore the pre-fix behavior (`git
 stash`, or a scripted edit you undo from a backup) and **watch it fail**.
 "It would obviously fail" has been wrong here more than once.
 

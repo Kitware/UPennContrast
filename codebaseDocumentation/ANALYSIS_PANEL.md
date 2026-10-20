@@ -356,7 +356,7 @@ the picture is sampled, and the footer says so.
   `colorLegendLabels`). A property named like a clustering (`clust`, `kmeans`,
   `leiden`, `louvain`) with ≤ 30 integer values colors by category; any other
   number — a gene count is an integer too — on a Viridis ramp over the 1st–99th
-  percentile, with a grey "No value" trace. The category palette
+  percentile, with a gray "No value" trace. The category palette
   (`categoricalPalette.ts`) is Tableau 20 without its two grays, so no category
   can be mistaken for "No value".
 - **Draw order.** All dots are one trace colored per point, in sample order
@@ -532,7 +532,7 @@ Change any of this and re-check these. Each item names the test that holds it.
 - Gates reach the list as AND-composed DEFINITIONS, never id lists
   (SERVER_GATING.md, Phase 3) — *"sends gate DEFINITIONS, never gate id
   lists (SERVER_GATING.md P3)"*
-- An empty gate is recognised as match-none — *"is true when a gate resolved to no annotations"*, *"is false again once the gate matches something"*, *"expresses a match-nothing gate as an empty id constraint"*
+- An empty gate is recognized as match-none — *"is true when a gate resolved to no annotations"*, *"is false again once the gate matches something"*, *"expresses a match-nothing gate as an empty id constraint"*
 
 **Match-none at the request boundary (`src/store/__tests__/annotationsAPI.test.ts`)**
 - No page request is issued for an impossible query — *"returns an empty page without issuing a request"*

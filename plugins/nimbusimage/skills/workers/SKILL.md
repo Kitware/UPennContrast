@@ -209,7 +209,7 @@ job.finished      # bool: True if status >= 3
 job.log           # str: job log output
 ```
 
-Status codes: 0=inactive, 1=queued, 2=running, **3=success**, 4=error, 5=cancelled. Note: status 3 is SUCCESS, not "still running" — easy to confuse.
+Status codes: 0=inactive, 1=queued, 2=running, **3=success**, 4=error, 5=canceled. Note: status 3 is SUCCESS, not "still running" — easy to confuse.
 
 ### When you can't see what a job is doing
 

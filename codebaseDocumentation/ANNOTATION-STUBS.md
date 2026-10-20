@@ -27,7 +27,7 @@ Right now every `updateVisibilityAndHydration` call builds `idsToHydrate` (up to
 
 `updateVisibilityDebounced` is debounced 250 ms, but a zoom-then-pan can legitimately call `updateVisibility` multiple times (the cameraInfo watcher debounces; the `xy/z/time` and `filteredAnnotations` watchers fire immediately). Each fires `_hydrateFromBackend` independently. With (1) done, this matters less, but still batches HTTP.
 
-**Approach:** Debounce `_hydrateFromBackend` itself (or the Step 7 computation) with a short trailing-edge timer. Latest call wins; earlier in-flight requests can be cancelled via `AbortController` to stop stale responses from overwriting newer cache state.
+**Approach:** Debounce `_hydrateFromBackend` itself (or the Step 7 computation) with a short trailing-edge timer. Latest call wins; earlier in-flight requests can be canceled via `AbortController` to stop stale responses from overwriting newer cache state.
 
 **Files:** `src/store/annotation.ts` — the module-level `_hydrateFromBackend` function.
 
@@ -52,7 +52,7 @@ Documented in Phase 5 notes below under "Hydration set doesn't change on zoom." 
 ## Stub-only mode: known bugs + AnnotationList scaling decision (2026-06-17)
 
 ### Status correction
-The "Next Steps" above are partly stale. As of 2026-06-17: **(1) the accumulating LRU hydration cache is DONE** (`mergeHydratedAnnotations`, cap 10k, protects selected ids); `stubPerf` instrumentation (`window.__stubPerf`) is in. Still open: **(2) debounce / AbortController on the fetch itself** (only the watcher is debounced, 250 ms — the fetch fires un-cancelled), and **(3) zoom hydration selection** (still uses the 2× expanded viewport for both visibility and hydration, so zoom doesn't re-prioritize).
+The "Next Steps" above are partly stale. As of 2026-06-17: **(1) the accumulating LRU hydration cache is DONE** (`mergeHydratedAnnotations`, cap 10k, protects selected ids); `stubPerf` instrumentation (`window.__stubPerf`) is in. Still open: **(2) debounce / AbortController on the fetch itself** (only the watcher is debounced, 250 ms — the fetch fires un-canceled), and **(3) zoom hydration selection** (still uses the 2× expanded viewport for both visibility and hydration, so zoom doesn't re-prioritize).
 
 ### Known bugs — coordinate access in stub-only mode — FIXED (2026-06-17)
 In stub-only mode, `annotationsForIteration` returns `IAnnotationStub`s cast as `IAnnotation` — they have `.centroid` but **no `.coordinates`**. Any code that reads `.coordinates` on a list/filter item breaks. Both were latent (only fire on the relevant interaction), which is why normal use didn't catch them. Both now fixed (TDD; full suite green):
@@ -981,7 +981,7 @@ Xenium dataset.
 
 - **C1 — Debounce the hydration fetch + `AbortController` (DONE 2026-06-20).** Previously
   only the camera watcher was debounced (250 ms); the viewport hydration fetch itself fired
-  un-cancelled, so rapid zoom/pan/frame/filter changes could stack redundant in-flight
+  un-canceled, so rapid zoom/pan/frame/filter changes could stack redundant in-flight
   requests and a stale response could overwrite newer cache state. Now `updateVisibilityAndHydration`
   Step 7 routes the fetch through a module-level debounced + abortable task
   (`viewportHydrationTask`, 200 ms trailing edge): rapid calls collapse to one fetch, and a
@@ -3586,7 +3586,7 @@ The model later does `pf["id"]` unconditionally and `pf.get("tags")` (expects a 
 
 ---
 
-### Finding 4 — Debounced/throttled fns in AnnotationViewer aren't cancelled on unmount · Medium · Error Handling
+### Finding 4 — Debounced/throttled fns in AnnotationViewer aren't canceled on unmount · Medium · Error Handling
 
 **File:** `src/components/AnnotationViewer.vue:3564` (`onBeforeUnmount`); fns: `updateVisibilityDebounced` (:3392), `restyleAnnotationsThrottled` (:1502). `onMounted` invokes `updateVisibilityDebounced()`.
 
