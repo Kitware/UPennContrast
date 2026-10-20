@@ -206,4 +206,36 @@ describe("updateAnnotationsPerId failure rollback", () => {
     await expect(pending).rejects.toThrow("offline");
     expect(annotationStore.annotations.map(({ id }) => id)).toEqual(["b"]);
   });
+
+  it("reverts a failed edit after a color assignment copied it forward", async () => {
+    const saves = holdSaves();
+    const pending = rename("a", "renamed");
+    // Color-by-property writes colors server-side and copies each stored
+    // annotation forward with its new color, unsaved rename included.
+    annotationStore.applyColorAssignment([{ color: "#0000ff", ids: ["a"] }]);
+
+    saves[0].reject(new Error("offline"));
+    await expect(pending).rejects.toThrow("offline");
+    expect(stored("a").name).toBe("A");
+    expect(stored("a").color).toBe("#0000ff");
+  });
+
+  it("restores the original when an edit listing an id twice fails after an earlier failed edit", async () => {
+    const saves = holdSaves();
+    const original = stored("a");
+    const first = rename("a", "renamed");
+    const second = annotationStore.updateAnnotationsPerId({
+      annotationIds: ["a", "a"],
+      editFunction: (annotation) => {
+        annotation.color = "#ff0000";
+      },
+    });
+
+    saves[0].reject(new Error("offline"));
+    await expect(first).rejects.toThrow("offline");
+    saves[1].reject(new Error("offline"));
+    await expect(second).rejects.toThrow("offline");
+
+    expect(stored("a")).toEqual(original);
+  });
 });

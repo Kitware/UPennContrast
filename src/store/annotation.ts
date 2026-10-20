@@ -1594,7 +1594,9 @@ export class Annotations extends VuexModule {
     const claims: IPendingAnnotationEdits[] = [];
     let succeeded = false;
     try {
-      for (const annotationId of annotationIds) {
+      // Deduplicated: a second claim of the same id in one call would start
+      // a new chain on top of the first claim's unconfirmed write.
+      for (const annotationId of new Set(annotationIds)) {
         const annotationIndex = this.annotationIdToIdx[annotationId];
         if (annotationIndex === undefined) {
           continue;
@@ -2865,7 +2867,9 @@ export class Annotations extends VuexModule {
           return annotation;
         }
         changed = true;
-        return markRaw({ ...annotation, color });
+        return markRaw(
+          followServerAnnotationWrite(annotation, { ...annotation, color }),
+        );
       });
     }
     // Only when a color actually moved: an assignment that changes nothing
@@ -3140,7 +3144,10 @@ let latestAnnotationFetch: Promise<void> = Promise.resolve();
 // - confirmed: the annotation as the server holds it, advanced by each
 //   patch that succeeds;
 // - written: the object the latest edit stored, so a settle can tell whether
-//   the store still holds this chain's work or a fetch replaced it.
+//   the store still holds this chain's work or a fetch replaced it. A
+//   mutation that copies a pending annotation forward with fields the server
+//   wrote (applyColorAssignment) must go through followServerAnnotationWrite,
+//   or the chain loses track of it and a failed edit stays on screen.
 interface IPendingAnnotationEdits {
   pending: number;
   failed: boolean;
@@ -3167,6 +3174,24 @@ function claimAnnotationEdit(stored: IAnnotation, written: IAnnotation) {
   };
   pendingAnnotationEdits.set(written.id, edits);
   return edits;
+}
+
+// `replacement` is `stored` with fields the server has already written. If
+// `stored` is a pending chain's latest write, the chain follows it and counts
+// those fields as confirmed. Returns `replacement`.
+function followServerAnnotationWrite(
+  stored: IAnnotation,
+  replacement: IAnnotation,
+) {
+  const chain = pendingAnnotationEdits.get(stored.id);
+  if (chain?.written === stored) {
+    chain.written = replacement;
+    chain.confirmed = {
+      ...chain.confirmed,
+      ...getAnnotationUpdatePatch(stored, replacement),
+    };
+  }
+  return replacement;
 }
 
 // Record one edit's outcome. Returns true when it was the chain's last
