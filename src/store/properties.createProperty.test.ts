@@ -254,6 +254,267 @@ describe("createProperty propagates the real failure reason", () => {
     expect(reconcile).not.toHaveBeenCalled();
   });
 
+  it("keeps a list another configuration's fetch loaded during a failed save", async () => {
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([
+      { id: "p1", name: "Area" },
+      { id: "p2", name: "Perimeter" },
+    ]);
+    const put = vi.spyOn(main.api, "updateConfigurationKey");
+    put.mockImplementationOnce(async () => {
+      // c2 opens and its properties fetch lands before c1's save fails.
+      (main as any).setConfigurationImpl({
+        id: "c2",
+        data: {
+          id: "c2",
+          name: "other",
+          layers: [],
+          tools: [],
+          scales: {},
+          propertyIds: ["from-c2"],
+        } as any,
+      });
+      (
+        propertyStore as unknown as {
+          setPropertiesImpl: (
+            properties: { id: string; name: string }[],
+          ) => void;
+        }
+      ).setPropertiesImpl([{ id: "from-c2", name: "Count" }]);
+      setListConfiguration("c2");
+      throw new Error("Read-only collection");
+    });
+
+    await messageOf(propertyStore.deleteProperty("p1"));
+
+    // Not rolled back over c2's list.
+    expect(propertyStore.properties.map((p) => p.id)).toEqual(["from-c2"]);
+    expect(propertyStore.propertiesConfigurationId).toBe("c2");
+    // So a later save on c2 writes c2's ids, not c1's.
+    put.mockResolvedValue({} as any);
+    await propertyStore.deleteProperties([]);
+    expect(put).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: "c2" }),
+      "propertyIds",
+    );
+    expect(main.configuration!.propertyIds).toEqual(["from-c2"]);
+  });
+
+  it("restores the configuration's propertyIds when the save fails", async () => {
+    (main as any).configuration.propertyIds = ["p1", "p2"];
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([
+      { id: "p1", name: "Area" },
+      { id: "p2", name: "Perimeter" },
+    ]);
+    vi.spyOn(main.api, "updateConfigurationKey").mockRejectedValue(
+      new Error("Read-only collection"),
+    );
+
+    await messageOf(propertyStore.deleteProperty("p1"));
+
+    expect(main.configuration!.propertyIds).toEqual(["p1", "p2"]);
+    expect(propertyStore.properties.map((p) => p.id)).toEqual(["p1", "p2"]);
+  });
+
+  it("keeps a later save's propertyIds when an earlier overlapping save fails", async () => {
+    (main as any).configuration.propertyIds = ["p1", "p2", "p3"];
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([
+      { id: "p1", name: "Area" },
+      { id: "p2", name: "Perimeter" },
+      { id: "p3", name: "Count" },
+    ]);
+    let failFirst!: (error: Error) => void;
+    vi.spyOn(main.api, "updateConfigurationKey")
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failFirst = reject;
+          }),
+      )
+      .mockResolvedValue({} as any);
+
+    const first = messageOf(propertyStore.deleteProperty("p1"));
+    await propertyStore.deleteProperty("p2");
+    failFirst(new Error("Read-only collection"));
+    await first;
+
+    // The second save's ids and list stand; the first's rollback is moot.
+    expect(main.configuration!.propertyIds).toEqual(["p3"]);
+    expect(propertyStore.properties.map((p) => p.id)).toEqual(["p3"]);
+  });
+
+  // Two overlapping deletes, neither of which reaches the server, failing in
+  // the given order.
+  async function failTwoOverlappingDeletes(failOrder: number[]) {
+    (main as any).configuration.propertyIds = ["p1", "p2", "p3"];
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([
+      { id: "p1", name: "Area" },
+      { id: "p2", name: "Perimeter" },
+      { id: "p3", name: "Count" },
+    ]);
+    const fails: ((error: Error) => void)[] = [];
+    vi.spyOn(main.api, "updateConfigurationKey").mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          fails.push(reject);
+        }),
+    );
+
+    const first = messageOf(propertyStore.deleteProperty("p1"));
+    const second = messageOf(propertyStore.deleteProperty("p2"));
+    for (const index of failOrder) {
+      fails[index](new Error("Read-only collection"));
+      await (index === 0 ? first : second);
+    }
+
+    // Neither delete reached the server: both stores show all three.
+    expect(main.configuration!.propertyIds).toEqual(["p1", "p2", "p3"]);
+    expect(propertyStore.properties.map((p) => p.id)).toEqual([
+      "p1",
+      "p2",
+      "p3",
+    ]);
+  }
+
+  it("restores what the server holds when overlapping saves both fail (earlier first)", async () => {
+    await failTwoOverlappingDeletes([0, 1]);
+  });
+
+  it("restores what the server holds when overlapping saves both fail (out of order)", async () => {
+    await failTwoOverlappingDeletes([1, 0]);
+  });
+
+  it("ends on an earlier save's value when a later save fails before it is sent", async () => {
+    (main as any).configuration.propertyIds = ["p1", "p2", "p3"];
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([
+      { id: "p1", name: "Area" },
+      { id: "p2", name: "Perimeter" },
+      { id: "p3", name: "Count" },
+    ]);
+    let finishFirst!: (value: any) => void;
+    vi.spyOn(main.api, "updateConfigurationKey")
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishFirst = resolve;
+          }),
+      )
+      // Fails at once, while the first is still in flight (as a save does
+      // when the session expired, before it reaches the API's queue).
+      .mockRejectedValueOnce(new Error("Not logged in"));
+
+    const first = propertyStore.deleteProperty("p1");
+    await messageOf(propertyStore.deleteProperty("p2"));
+    finishFirst({});
+    await first;
+
+    // The server holds the first delete only.
+    expect(main.configuration!.propertyIds).toEqual(["p2", "p3"]);
+    expect(propertyStore.properties.map((p) => p.id)).toEqual(["p2", "p3"]);
+  });
+
+  it("restores onto the reloaded configuration after a switch away and back", async () => {
+    (main as any).configuration.propertyIds = ["p1", "p2"];
+    const both = [
+      { id: "p1", name: "Area" },
+      { id: "p2", name: "Perimeter" },
+    ];
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl(both);
+    let failFirst!: (error: Error) => void;
+    vi.spyOn(main.api, "updateConfigurationKey")
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failFirst = reject;
+          }),
+      )
+      .mockResolvedValue({} as any);
+
+    const first = messageOf(propertyStore.deleteProperty("p1"));
+    // Away and back: c1 is reloaded from the server as a new object, and its
+    // properties fetch lands.
+    (main as any).setConfigurationImpl({
+      id: "c1",
+      data: {
+        id: "c1",
+        name: "config",
+        layers: [],
+        tools: [],
+        scales: {},
+        propertyIds: ["p1", "p2"],
+      } as any,
+    });
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl(both);
+    const second = propertyStore.deleteProperty("p2");
+    failFirst(new Error("Read-only collection"));
+    await first;
+    await second;
+
+    // The server holds the second delete only.
+    expect(main.configuration!.propertyIds).toEqual(["p1"]);
+    expect(propertyStore.properties.map((p) => p.id)).toEqual(["p1"]);
+  });
+
+  it("rebuilds the list from the restored ids when a fetch landed during a failed save", async () => {
+    (main as any).configuration.propertyIds = ["p1", "p2"];
+    const both = [
+      { id: "p1", name: "Area" },
+      { id: "p2", name: "Perimeter" },
+    ];
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl(both);
+    vi.spyOn(main.api, "updateConfigurationKey").mockImplementation(
+      async () => {
+        // A fetch of the same configuration reads the not-yet-saved ids
+        // (p1 deleted) and replaces the list with them.
+        (
+          propertyStore as unknown as {
+            setPropertiesImpl: (
+              properties: { id: string; name: string }[],
+            ) => void;
+          }
+        ).setPropertiesImpl([both[1]]);
+        throw new Error("Read-only collection");
+      },
+    );
+
+    await messageOf(propertyStore.deleteProperty("p1"));
+
+    // The delete failed, so the list matches the restored ids again.
+    expect(main.configuration!.propertyIds).toEqual(["p1", "p2"]);
+    expect(propertyStore.properties.map((p) => p.id)).toEqual(["p1", "p2"]);
+  });
+
   it("reconciles plots immediately after deleting an attached property", async () => {
     (
       propertyStore as unknown as {
@@ -315,6 +576,79 @@ describe("createProperty propagates the real failure reason", () => {
     expect(await messageOf(propertyStore.deleteProperty("p1"))).toBe(
       "Read-only collection",
     );
+  });
+});
+
+describe("updateConfigurationPipelines rollback", () => {
+  beforeEach(() => {
+    setLoggedIn(true);
+    (main as any).setConfigurationImpl({
+      id: "c1",
+      data: { id: "c1", name: "config", pipelines: [] } as any,
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const pipelinesNamed = (name: string) =>
+    [{ id: "pipe", name, steps: [] }] as any[];
+
+  it("restores the configuration's pipelines when the save fails", async () => {
+    (main as any).configuration.pipelines = pipelinesNamed("saved");
+    vi.spyOn(main.api, "updateConfigurationKey").mockRejectedValue(
+      new Error("Read-only collection"),
+    );
+
+    await messageOf(main.updateConfigurationPipelines(pipelinesNamed("edit")));
+
+    expect(main.configuration!.pipelines[0].name).toBe("saved");
+  });
+
+  it("restores the saved pipelines when overlapping saves both fail", async () => {
+    (main as any).configuration.pipelines = pipelinesNamed("saved");
+    const fails: ((error: Error) => void)[] = [];
+    vi.spyOn(main.api, "updateConfigurationKey").mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          fails.push(reject);
+        }),
+    );
+
+    const first = messageOf(
+      main.updateConfigurationPipelines(pipelinesNamed("first")),
+    );
+    const second = messageOf(
+      main.updateConfigurationPipelines(pipelinesNamed("second")),
+    );
+    fails[0](new Error("Read-only collection"));
+    await first;
+    fails[1](new Error("Read-only collection"));
+    await second;
+
+    expect(main.configuration!.pipelines[0].name).toBe("saved");
+  });
+
+  it("keeps a later save's pipelines when an earlier overlapping save fails", async () => {
+    let failFirst!: (error: Error) => void;
+    vi.spyOn(main.api, "updateConfigurationKey")
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failFirst = reject;
+          }),
+      )
+      .mockResolvedValue({} as any);
+
+    const first = messageOf(
+      main.updateConfigurationPipelines(pipelinesNamed("first")),
+    );
+    await main.updateConfigurationPipelines(pipelinesNamed("second"));
+    failFirst(new Error("Read-only collection"));
+    await first;
+
+    expect(main.configuration!.pipelines[0].name).toBe("second");
   });
 });
 

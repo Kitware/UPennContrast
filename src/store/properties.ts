@@ -85,6 +85,13 @@ let propertyDatasetGeneration = 0;
 // yet registered server-side, so a batch fetch omits them (fetchProperties).
 const pendingPropertyIds = new Set<string>();
 
+// The properties each in-flight setProperties started from, so that once the
+// last one settles after a failure the list can be rebuilt from the restored
+// ids even if an earlier save removed some of them. Cleared with the count.
+const propertiesBeforePendingSaves = new Map<string, IAnnotationProperty>();
+let pendingPropertySaves = 0;
+let pendingPropertySaveFailed = false;
+
 export interface IPropertyStatus {
   running: boolean;
   previousRun: boolean | null;
@@ -1300,14 +1307,51 @@ export class Properties extends VuexModule {
           "property list was not saved. Try again once they have loaded.",
       );
     }
-    const previous = this.properties;
+    const configuration = main.configuration;
+    for (const property of this.properties) {
+      propertiesBeforePendingSaves.set(property.id, property);
+    }
+    pendingPropertySaves++;
     this.setPropertiesImpl(properties);
     const propertyIds = this.properties.map((p) => p.id);
     try {
       await this.context.dispatch("updateConfigurationProperties", propertyIds);
     } catch (error) {
-      this.setPropertiesImpl(previous);
+      pendingPropertySaveFailed = true;
       throw error;
+    } finally {
+      if (--pendingPropertySaves === 0) {
+        // By now updateConfigurationProperties has put back the ids the
+        // server holds (see writeConfigurationKey). Rebuild the list from
+        // them rather than restore a snapshot, which a later save or a fetch
+        // during the await may have superseded. Not if the list is now
+        // another configuration's (that one's fetch landed meanwhile).
+        // The restore landed on the loaded object if it has this id (a
+        // switch away and back loads a new one), else on the captured one.
+        const restoredIds = (
+          main.configuration?.id === configurationId
+            ? main.configuration
+            : configuration
+        )?.propertyIds;
+        if (
+          pendingPropertySaveFailed &&
+          restoredIds &&
+          this.propertiesConfigurationId === configurationId
+        ) {
+          const known = new Map(propertiesBeforePendingSaves);
+          for (const property of this.properties) {
+            known.set(property.id, property);
+          }
+          this.setPropertiesImpl(
+            restoredIds.flatMap((id) => {
+              const property = known.get(id);
+              return property ? [property] : [];
+            }),
+          );
+        }
+        propertiesBeforePendingSaves.clear();
+        pendingPropertySaveFailed = false;
+      }
     }
     // The plots and track label below are the loaded configuration's: after
     // a switch during the save they belong to another one.

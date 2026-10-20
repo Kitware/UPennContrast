@@ -334,6 +334,34 @@ switch lands during its request). Keep a run-local record of what the action pro
 just before the final write: a switch away and back reloads the configuration
 from the server, without anything merged into the old object.
 
+### A failed optimistic write restores what the server holds, not its snapshot
+
+An optimistic write (set the value, await the save, restore `previous` on
+failure) breaks once writes can overlap. A later write may sit on top of the
+failed one, an earlier write it built on may have failed too, or a fetch may
+have replaced the value during the await. Restoring the snapshot then puts a
+value back that the server never held, or overwrites a newer one. After a
+configuration switch it is worse: the old configuration's property list went
+back in under the new one's ownership, and the next save wrote it into the new
+configuration. Checking "is the value still the one I wrote?" is not enough
+either: a nested rollback (from a copying mutation, or a fetch) gives it a new
+identity, so the outer rollback is skipped and the list and its ids disagree.
+
+What works here (`writeConfigurationKey` in `index.ts`): per configuration key,
+count pending writes and record the last value the server confirmed. Restore
+nothing while any write of the key is pending. When the last one settles, if
+any of them failed, set the key to the confirmed value. Don't restore at the
+latest write's failure: a write can fail before it reaches the API's per-key
+queue (a session that expired), while an earlier one is still in flight and
+then succeeds. Restore onto the loaded configuration object when it has the
+same id, since a switch away and back loads a new object. Rebuild derived state
+from the restored value at the same point rather than restoring it separately:
+`setProperties` rebuilds the list from the restored `propertyIds`, keeping the
+objects that in-flight saves started from so a property an earlier failed save
+removed can come back. Tests: *"restores what the server holds when
+overlapping saves both fail (earlier first)"*, *"(out of order)"*, *"ends on an
+earlier save's value when a later save fails before it is sent"*.
+
 ### Every `throttle`/`debounce` needs a `cancel()` in `onBeforeUnmount`
 
 A trailing call that fires after teardown runs against a dead view — in

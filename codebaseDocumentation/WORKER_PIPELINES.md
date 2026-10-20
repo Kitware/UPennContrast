@@ -586,7 +586,15 @@ Behavior (mirror `computeAnnotationsWithWorkerBatch`):
      saves only a list that a fetch loaded for the loaded configuration
      (`propertiesConfigurationId`; it refuses one loaded for another
      configuration, and one no fetch has loaded yet), and skips the plot and
-     track-label reconcile when a switch lands during its save.
+     track-label reconcile when a switch lands during its save. A failed save
+     restores what the server holds, not its own snapshot (which a later save
+     or a fetch may have superseded): `updateConfigurationProperties` and
+     `updateConfigurationPipelines` go through `writeConfigurationKey`, which
+     restores nothing until the last pending write of a key settles; then, if
+     any of them failed, the key gets the last value the server confirmed (on
+     the loaded object if it has the same id, since a switch away and back
+     loads a new one). `setProperties` rebuilds the list from those ids at the
+     same point, unless the list is now another configuration's.
    - `progress.complete(perStepProgressId)`; bump the top-level progress.
 5. After the loop (once, not per step): `annotationStore.fetchAnnotations()`,
    `propertiesStore.fetchPropertyValues()`, `filters.updateHistograms()`, and
@@ -1042,6 +1050,17 @@ Linked steps (§3.4):
   *"registers nothing when another configuration opens during the create request"*,
   *"refuses to save a property list loaded for another configuration"*,
   *"refuses to save a property list no fetch has loaded"*,
+  *"keeps a list another configuration's fetch loaded during a failed save"*,
+  *"keeps a later save's propertyIds when an earlier overlapping save fails"*,
+  *"keeps a later save's pipelines when an earlier overlapping save fails"*,
+  *"restores the configuration's propertyIds when the save fails"*,
+  *"restores what the server holds when overlapping saves both fail (earlier first)"*,
+  *"restores what the server holds when overlapping saves both fail (out of order)"*,
+  *"restores the saved pipelines when overlapping saves both fail"*,
+  *"rebuilds the list from the restored ids when a fetch landed during a failed save"*,
+  *"ends on an earlier save's value when a later save fails before it is sent"*,
+  *"restores onto the reloaded configuration after a switch away and back"*,
+  *"sends a save queued behind a failed one"*,
   *"does not reconcile another configuration's plots after a switch during the save"*,
   *"does not reload linked properties for a batch whose configuration switched before the reload"*.
 - The runner re-wires property steps to what a linked tool produces now, but
