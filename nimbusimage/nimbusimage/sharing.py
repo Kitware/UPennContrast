@@ -1,9 +1,10 @@
 """SharingAccessor — dataset access control.
 
 All access changes go through the `dataset_view/share` endpoint, which is
-**incremental** (modifies one user's access at a time), and the server
-refuses any share that would take the dataset's creator below ADMIN.
-This is the only safe way to change a dataset's ACL from Python.
+**incremental** (modifies one user's access at a time). This is the only
+safe way to change a dataset's ACL from Python. It does not stop you from
+removing or demoting yourself: as the dataset's only ADMIN, that locks you
+out, so never target yourself.
 
 DO NOT bypass this accessor by calling the raw Girder endpoint:
 

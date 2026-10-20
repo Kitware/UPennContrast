@@ -144,7 +144,7 @@ Polygons tagged `region` are never cells for any of these.
 
 | Method | Signature | Returns |
 |--------|-----------|---------|
-| `share` | `(user_email_or_name, access="read")` | `None` — changes the dataset, all its views and their collections; the server refuses (400) taking the dataset's creator below ADMIN |
+| `share` | `(user_email_or_name, access="read")` | `None` — changes the dataset, all its views and their collections; never target yourself (as the only ADMIN, removing or demoting yourself locks you out) |
 | `set_public` | `(public=True)` | `dict` — `{dataset, public, datasetViewsUpdated, configurationsUpdated}` |
 | `get_access` | `()` | `dict` — `{datasetId, public, users, groups, configurations}`; each user has `login`, `email`, `level` (0 read, 1 write, 2 admin) |
 
