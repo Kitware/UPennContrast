@@ -81,10 +81,11 @@ export function mergeMaterializedPropertyIds(
   }
 }
 
-// Linked property ids a reload found missing (see
-// loadMissingLinkedProperties). Property ids are never reused, so a deleted
-// one stays deleted.
-const confirmedMissingPropertyIds = new Set<string>();
+// Linked properties a reload found missing, as `${configurationId}:${id}`
+// (see loadMissingLinkedProperties). Per configuration: one property can be
+// registered in several (a duplicated configuration shares them), and
+// removing it from one only unregisters it there.
+const confirmedMissingProperties = new Set<string>();
 
 export const CONFIGURATION_CHANGED_DURING_RUN =
   "Another configuration was opened during the run. Open a dataset of this " +
@@ -728,22 +729,30 @@ export class Pipelines extends VuexModule {
   // deleted source does not cost a fetch on every run. Returns false when the
   // reload failed or the configuration changed during it: whether the missing
   // ones exist is then unknown. A property a reload confirmed missing is not
-  // rechecked (opening the editor or running would otherwise refetch every
-  // property each time). Never rejects (the editor calls it without
-  // awaiting).
+  // rechecked in that configuration (opening the editor or running would
+  // otherwise refetch every property each time). While the loaded list is
+  // not this configuration's (its fetch has not landed), every linked step is
+  // checked. Never rejects (the editor calls it without awaiting).
   @Action
   async loadMissingLinkedProperties(pipeline: IPipeline): Promise<boolean> {
+    const configurationId = main.configuration?.id;
+    const missingKey = (propertyId: string) =>
+      `${configurationId}:${propertyId}`;
+    // A list no fetch has loaded for this configuration yet (still loading,
+    // or still the previous configuration's) says nothing about which of
+    // its properties exist: check every linked step then.
+    const listIsLoaded = () =>
+      properties.propertiesConfigurationId === configurationId;
     const needsCheck = (step: TPipelineStep) =>
       step.enabled &&
       step.kind === "property" &&
       !!step.sourcePropertyId &&
       !step.materializedPropertyId &&
-      !confirmedMissingPropertyIds.has(step.sourcePropertyId) &&
-      !findSourceProperty(step, properties.properties);
+      !confirmedMissingProperties.has(missingKey(step.sourcePropertyId)) &&
+      (!listIsLoaded() || !findSourceProperty(step, properties.properties));
     if (!pipeline.steps.some(needsCheck)) {
       return true;
     }
-    const configurationId = main.configuration?.id;
     try {
       await properties.fetchProperties();
       // A configuration switch during the reload means its result (if any)
@@ -754,7 +763,7 @@ export class Pipelines extends VuexModule {
       }
       for (const step of pipeline.steps.filter(needsCheck)) {
         if (step.kind === "property" && step.sourcePropertyId) {
-          confirmedMissingPropertyIds.add(step.sourcePropertyId);
+          confirmedMissingProperties.add(missingKey(step.sourcePropertyId));
         }
       }
       return true;

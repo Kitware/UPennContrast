@@ -47,6 +47,8 @@ const h = vi.hoisted(() => ({
     deleteProperty: vi.fn().mockResolvedValue(undefined),
     deleteProperties: vi.fn().mockResolvedValue(undefined),
     properties: [] as any[],
+    // Which configuration's fetch filled `properties` (see properties.ts).
+    propertiesConfigurationId: undefined as string | null | undefined,
     fetchPropertyValues: vi.fn().mockResolvedValue(undefined),
     fetchProperties: vi.fn().mockResolvedValue(undefined),
     getWorkerInterface: vi.fn().mockReturnValue(null),
@@ -163,6 +165,7 @@ beforeEach(() => {
   };
   h.main.tools = [];
   h.properties.properties = [];
+  h.properties.propertiesConfigurationId = undefined;
   h.properties.workerImageList = {};
   h.annotations.annotationTags = new Set();
   h.annotations.annotations = [];
@@ -1332,6 +1335,69 @@ describe("linked steps", () => {
     // Not recorded as confirmed missing: the next check reloads again.
     await pipelinesStore.loadMissingLinkedProperties(linked);
     expect(h.properties.fetchProperties).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not carry a property found missing in one configuration to another", async () => {
+    const shared = {
+      id: "shared",
+      name: "Shared",
+      image: "img/user-prop",
+      shape: AnnotationShape.Polygon,
+      tags: { tags: ["nuclei"], exclusive: false },
+      workerInterface: {},
+    };
+    const linked = pipeline([
+      { ...propertyStep("p", ["nuclei"]), sourcePropertyId: "shared" },
+    ]);
+    // Configuration B no longer registers the shared property: its reload
+    // confirms it missing there.
+    h.main.configuration = { ...h.main.configuration, id: "config-b" };
+    h.properties.propertiesConfigurationId = "config-b";
+    h.properties.properties = [];
+    expect(await pipelinesStore.loadMissingLinkedProperties(linked)).toBe(true);
+    expect(h.properties.fetchProperties).toHaveBeenCalledTimes(1);
+
+    // Configuration A still registers it, and its properties are still
+    // loading (the list is B's) when the pipeline runs.
+    h.main.configuration = { ...h.main.configuration, id: "config-a" };
+    h.properties.fetchProperties.mockImplementation(async () => {
+      h.properties.properties = [shared];
+      h.properties.propertiesConfigurationId = "config-a";
+    });
+    h.properties.submitPropertyJob.mockResolvedValue(submitResult("j", true));
+
+    await pipelinesStore.runPipeline({ pipeline: linked });
+
+    // Reloaded for A, then computed A's property: no fallback duplicate.
+    expect(h.properties.fetchProperties).toHaveBeenCalledTimes(2);
+    expect(h.properties.createProperty).not.toHaveBeenCalled();
+    expect(h.properties.submitPropertyJob).toHaveBeenCalledWith(
+      expect.objectContaining({ property: shared }),
+    );
+  });
+
+  it("reloads linked properties while the loaded list is another configuration's", async () => {
+    const shared = {
+      id: "shared",
+      name: "Shared",
+      image: "img/user-prop",
+      shape: AnnotationShape.Polygon,
+      tags: { tags: ["nuclei"], exclusive: false },
+      workerInterface: {},
+    };
+    // The previous configuration's list happens to hold the property, but
+    // that says nothing about whether this configuration registers it.
+    h.main.configuration = { ...h.main.configuration, id: "config-a" };
+    h.properties.propertiesConfigurationId = "config-b";
+    h.properties.properties = [shared];
+
+    await pipelinesStore.loadMissingLinkedProperties(
+      pipeline([
+        { ...propertyStep("p", ["nuclei"]), sourcePropertyId: "shared" },
+      ]),
+    );
+
+    expect(h.properties.fetchProperties).toHaveBeenCalledTimes(1);
   });
 
   it("does not reload properties when every linked property is loaded", async () => {
