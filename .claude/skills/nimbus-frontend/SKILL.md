@@ -358,7 +358,10 @@ same id, since a switch away and back loads a new object. Rebuild derived state
 from the restored value at the same point rather than restoring it separately:
 `setProperties` rebuilds the list from the restored `propertyIds`, keeping the
 objects that in-flight saves started from so a property an earlier failed save
-removed can come back. Tests: *"restores what the server holds when
+removed can come back. Key that bookkeeping exactly as the write it shadows
+(per configuration here): process-wide counters let a save pending on one
+configuration hold back another configuration's rebuild, then clear its
+failure flag. Tests: *"restores what the server holds when
 overlapping saves both fail (earlier first)"*, *"(out of order)"*, *"ends on an
 earlier save's value when a later save fails before it is sent"*.
 

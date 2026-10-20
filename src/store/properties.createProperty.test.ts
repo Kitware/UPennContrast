@@ -482,6 +482,60 @@ describe("createProperty propagates the real failure reason", () => {
     expect(propertyStore.properties.map((p) => p.id)).toEqual(["p1"]);
   });
 
+  it("rebuilds another configuration's list when its save fails while one on the first is pending", async () => {
+    (main as any).configuration.propertyIds = ["p1", "p2"];
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([
+      { id: "p1", name: "Area" },
+      { id: "p2", name: "Perimeter" },
+    ]);
+    let finishC1!: (value: any) => void;
+    vi.spyOn(main.api, "updateConfigurationKey").mockImplementation(
+      async (configuration: any) => {
+        if (configuration.id === "c1") {
+          return new Promise((resolve) => {
+            finishC1 = resolve;
+          });
+        }
+        throw new Error("Read-only collection");
+      },
+    );
+
+    const c1Save = propertyStore.deleteProperty("p1");
+    // c2 opens and its properties load while c1's save is pending.
+    (main as any).setConfigurationImpl({
+      id: "c2",
+      data: {
+        id: "c2",
+        name: "other",
+        layers: [],
+        tools: [],
+        scales: {},
+        propertyIds: ["q1", "q2"],
+      } as any,
+    });
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([
+      { id: "q1", name: "Count" },
+      { id: "q2", name: "Mean" },
+    ]);
+    setListConfiguration("c2");
+    // c2's save fails first, then c1's succeeds.
+    await messageOf(propertyStore.deleteProperty("q1"));
+    finishC1({});
+    await c1Save;
+
+    // c2's delete never reached the server: its list matches its ids.
+    expect(main.configuration!.propertyIds).toEqual(["q1", "q2"]);
+    expect(propertyStore.properties.map((p) => p.id)).toEqual(["q1", "q2"]);
+  });
+
   it("rebuilds the list from the restored ids when a fetch landed during a failed save", async () => {
     (main as any).configuration.propertyIds = ["p1", "p2"];
     const both = [

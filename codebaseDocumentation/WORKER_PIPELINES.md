@@ -594,7 +594,10 @@ Behavior (mirror `computeAnnotationsWithWorkerBatch`):
      any of them failed, the key gets the last value the server confirmed (on
      the loaded object if it has the same id, since a switch away and back
      loads a new one). `setProperties` rebuilds the list from those ids at the
-     same point, unless the list is now another configuration's.
+     same point, unless the list is now another configuration's. Its
+     pending-save bookkeeping is per configuration, like
+     `writeConfigurationKey`'s: a save still pending on one configuration must
+     not hold back the rebuild after another configuration's save fails.
    - `progress.complete(perStepProgressId)`; bump the top-level progress.
 5. After the loop (once, not per step): `annotationStore.fetchAnnotations()`,
    `propertiesStore.fetchPropertyValues()`, `filters.updateHistograms()`, and
@@ -1060,6 +1063,7 @@ Linked steps (§3.4):
   *"rebuilds the list from the restored ids when a fetch landed during a failed save"*,
   *"ends on an earlier save's value when a later save fails before it is sent"*,
   *"restores onto the reloaded configuration after a switch away and back"*,
+  *"rebuilds another configuration's list when its save fails while one on the first is pending"*,
   *"sends a save queued behind a failed one"*,
   *"does not reconcile another configuration's plots after a switch during the save"*,
   *"does not reload linked properties for a batch whose configuration switched before the reload"*.

@@ -85,12 +85,20 @@ let propertyDatasetGeneration = 0;
 // yet registered server-side, so a batch fetch omits them (fetchProperties).
 const pendingPropertyIds = new Set<string>();
 
-// The properties each in-flight setProperties started from, so that once the
-// last one settles after a failure the list can be rebuilt from the restored
-// ids even if an earlier save removed some of them. Cleared with the count.
-const propertiesBeforePendingSaves = new Map<string, IAnnotationProperty>();
-let pendingPropertySaves = 0;
-let pendingPropertySaveFailed = false;
+// In-flight setProperties saves, per configuration (the same grouping as
+// writeConfigurationKey's propertyIds writes, so the list is rebuilt when that
+// configuration's ids are restored). `before` holds the properties those saves
+// started from, so once the last one settles after a failure the list can be
+// rebuilt from the restored ids even if an earlier save removed some of them.
+// An entry lives until that configuration's last pending save settles.
+const pendingPropertySaves = new Map<
+  string,
+  {
+    pending: number;
+    failed: boolean;
+    before: Map<string, IAnnotationProperty>;
+  }
+>();
 
 export interface IPropertyStatus {
   running: boolean;
@@ -1307,20 +1315,26 @@ export class Properties extends VuexModule {
           "property list was not saved. Try again once they have loaded.",
       );
     }
-    const configuration = main.configuration;
-    for (const property of this.properties) {
-      propertiesBeforePendingSaves.set(property.id, property);
+    const configuration = main.configuration!;
+    let saves = pendingPropertySaves.get(configuration.id);
+    if (!saves) {
+      saves = { pending: 0, failed: false, before: new Map() };
+      pendingPropertySaves.set(configuration.id, saves);
     }
-    pendingPropertySaves++;
+    for (const property of this.properties) {
+      saves.before.set(property.id, property);
+    }
+    saves.pending++;
     this.setPropertiesImpl(properties);
     const propertyIds = this.properties.map((p) => p.id);
     try {
       await this.context.dispatch("updateConfigurationProperties", propertyIds);
     } catch (error) {
-      pendingPropertySaveFailed = true;
+      saves.failed = true;
       throw error;
     } finally {
-      if (--pendingPropertySaves === 0) {
+      if (--saves.pending === 0) {
+        pendingPropertySaves.delete(configuration.id);
         // By now updateConfigurationProperties has put back the ids the
         // server holds (see writeConfigurationKey). Rebuild the list from
         // them rather than restore a snapshot, which a later save or a fetch
@@ -1332,13 +1346,12 @@ export class Properties extends VuexModule {
           main.configuration?.id === configurationId
             ? main.configuration
             : configuration
-        )?.propertyIds;
+        ).propertyIds;
         if (
-          pendingPropertySaveFailed &&
-          restoredIds &&
+          saves.failed &&
           this.propertiesConfigurationId === configurationId
         ) {
-          const known = new Map(propertiesBeforePendingSaves);
+          const known = new Map(saves.before);
           for (const property of this.properties) {
             known.set(property.id, property);
           }
@@ -1349,8 +1362,6 @@ export class Properties extends VuexModule {
             }),
           );
         }
-        propertiesBeforePendingSaves.clear();
-        pendingPropertySaveFailed = false;
       }
     }
     // The plots and track label below are the loaded configuration's: after
