@@ -51,7 +51,7 @@ Two things to know before touching a `dense` outside `v-row`:
 
 - **Vuetify's own JSDoc contradicts its runtime.** `makeVRowProps` is annotated
   `@deprecated use density="compact"` while the warning and the class mapping
-  both say `comfortable`. `comfortable` is the behaviour-preserving choice —
+  both say `comfortable`. `comfortable` is the behavior-preserving choice —
   `compact` would tighten gutters that `dense` never tightened.
 - **On anything other than `v-row`, `dense` was always dead** — `VCard`,
   `VListSubheader`, and our own `tag-picker` / `docker-image-select` /

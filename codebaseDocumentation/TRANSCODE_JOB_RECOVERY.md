@@ -86,7 +86,7 @@ Each invariant names the test that holds it (`src/store/index.test.ts`).
   *"finishes, replaying the log entry by entry, with the usual toast"*.
 - The quota message comes from the job's own log —
   *"surfaces the quota message from the finished job's log"*.
-- Cancelled is a failure; a job with no log still finishes; a log given as
+- Canceled is a failure; a job with no log still finishes; a log given as
   one string (the declared `IJob.log` type) is used too —
   *"reports a cancelled job as a failure"*,
   *"finishes a job that has no log"*,

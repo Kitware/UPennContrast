@@ -550,7 +550,7 @@ Behavior (mirror `computeAnnotationsWithWorkerBatch`):
    *before* the loop starts (avoids the timing bug documented in
    `BATCH_ANNOTATION_COMPUTE.md`).
 4. For each enabled step, in order:
-   - If `isCancelled`, mark remaining as cancelled and break.
+   - If `isCancelled`, mark remaining as canceled and break.
    - Create a per-step progress entry (`ANNOTATION_COMPUTE` or
      `PROPERTY_COMPUTE`) titled `<pipeline>: <step.name>`.
    - **Annotation step:** `buildTransientTool(step)` → submit via the refactored
