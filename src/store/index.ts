@@ -247,10 +247,6 @@ function createGirderRestClient(options: {
   return client;
 }
 
-// Tracks the most recently issued fetchRecentDatasetViews call so older
-// in-flight requests can detect they are stale and skip the state write.
-// Without this, a slower request with a different filter can land last and
-// overwrite the result of a newer request.
 // Optimistic writes of one configuration key can overlap. A failed write must
 // not restore its own snapshot: a later write may have been made on top of
 // it, an earlier write it built on may have failed too, or an earlier one may
@@ -258,9 +254,21 @@ function createGirderRestClient(options: {
 // per-key queue, e.g. when the session expired). So nothing is restored
 // until the last pending write of the key settles; then, if any of them
 // failed, the key gets the last value the server confirmed.
+// `adopted` lists property ids a server job registered while writes were
+// pending (see adoptServerConfirmedPropertyId), in the order they arrived.
+// `unsaved` holds those a write sent before their adoption may have removed:
+// the job adds its id on the server, but a write replaces the whole list, and
+// either can land first. So once the last write settles, the list is saved
+// again if it still has one of them.
 const configurationKeyWrites = new Map<
   string,
-  { pending: number; failed: boolean; confirmed: unknown }
+  {
+    pending: number;
+    failed: boolean;
+    confirmed: unknown;
+    adopted: string[];
+    unsaved: Set<string>;
+  }
 >();
 
 async function writeConfigurationKey<K extends "propertyIds" | "pipelines">(
@@ -275,30 +283,94 @@ async function writeConfigurationKey<K extends "propertyIds" | "pipelines">(
   const writesKey = `${configuration.id}:${key}`;
   let writes = configurationKeyWrites.get(writesKey);
   if (!writes) {
-    writes = { pending: 0, failed: false, confirmed: configuration[key] };
+    writes = {
+      pending: 0,
+      failed: false,
+      confirmed: configuration[key],
+      adopted: [],
+      unsaved: new Set(),
+    };
     configurationKeyWrites.set(writesKey, writes);
   }
+  const adoptedBefore = writes.adopted.length;
   writes.pending++;
   configuration[key] = value;
   try {
     await sync();
-    writes.confirmed = value;
+    // Only propertyIds writes have adoptions.
+    if (key === "propertyIds" && writes.adopted.length > 0) {
+      const ids = value as string[];
+      // This write decided on the ids adopted before it was sent.
+      for (const id of writes.adopted.slice(0, adoptedBefore)) {
+        writes.unsaved.delete(id);
+      }
+      const missing = writes.adopted
+        .slice(adoptedBefore)
+        .filter((id) => !ids.includes(id));
+      for (const id of missing) {
+        writes.unsaved.add(id);
+      }
+      // Kept as confirmed (the follow-up save below makes it so), or a later
+      // failure would restore them away.
+      writes.confirmed = missing.length > 0 ? [...ids, ...missing] : value;
+    } else {
+      writes.confirmed = value;
+    }
   } catch (error) {
     writes.failed = true;
     throw error;
   } finally {
     if (--writes.pending === 0) {
       configurationKeyWrites.delete(writesKey);
+      const current = loaded();
+      const isLoaded = current?.id === configuration.id;
+      const target = isLoaded ? current : configuration;
       if (writes.failed) {
-        const current = loaded();
-        const target =
-          current?.id === configuration.id ? current : configuration;
         target[key] = writes.confirmed as IDatasetConfiguration[K];
+      }
+      // `sync` saves the loaded configuration, so only while it is this one.
+      if (
+        isLoaded &&
+        [...writes.unsaved].some((id) => (target[key] as string[]).includes(id))
+      ) {
+        writeConfigurationKey(target, key, target[key], sync, loaded).catch(
+          (error) =>
+            logError("Failed to save server-registered properties:", error),
+        );
       }
     }
   }
 }
 
+// A server job registered `propertyId` in this configuration itself. Add it
+// to the live list and, while propertyIds writes are pending, to what a
+// failed write restores; otherwise that restore would drop it and the next
+// save would unregister it on the server. A pending write sent before now
+// may still remove it on the server, so writeConfigurationKey saves the list
+// again once they settle. Idempotent.
+export function adoptServerConfirmedPropertyId(
+  configuration: IDatasetConfiguration,
+  propertyId: string,
+) {
+  const writes = configurationKeyWrites.get(`${configuration.id}:propertyIds`);
+  if (writes) {
+    const confirmed = writes.confirmed as string[];
+    if (!confirmed.includes(propertyId)) {
+      writes.confirmed = [...confirmed, propertyId];
+    }
+    if (!writes.adopted.includes(propertyId)) {
+      writes.adopted.push(propertyId);
+    }
+  }
+  if (!configuration.propertyIds.includes(propertyId)) {
+    configuration.propertyIds = [...configuration.propertyIds, propertyId];
+  }
+}
+
+// Tracks the most recently issued fetchRecentDatasetViews call so older
+// in-flight requests can detect they are stale and skip the state write.
+// Without this, a slower request with a different filter can land last and
+// overwrite the result of a newer request.
 let recentDatasetViewsRequestId = 0;
 
 // Annotation-browser persistence bookkeeping. Module-level rather than Vuex

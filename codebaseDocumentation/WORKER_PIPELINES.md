@@ -598,6 +598,14 @@ Behavior (mirror `computeAnnotationsWithWorkerBatch`):
      pending-save bookkeeping is per configuration, like
      `writeConfigurationKey`'s: a save still pending on one configuration must
      not hold back the rebuild after another configuration's save fails.
+     A property a server job registered itself (gene panel, neighborhood)
+     is adopted through `adoptServerConfirmedPropertyId`, which adds it to
+     the confirmed value as well as the live list, so a failed pending save
+     keeps it. A save sent before the adoption replaces the whole list and
+     may land on the server after the job's add, so once the last pending
+     save settles the list is saved again if it still has the id. Until a
+     fetch loads the adopted property into the list, `setProperties` carries
+     its id over, so a save in between does not unregister it.
    - `progress.complete(perStepProgressId)`; bump the top-level progress.
 5. After the loop (once, not per step): `annotationStore.fetchAnnotations()`,
    `propertiesStore.fetchPropertyValues()`, `filters.updateHistograms()`, and
@@ -1068,6 +1076,10 @@ Linked steps (§3.4):
   *"ends on an earlier save's value when a later save fails before it is sent"*,
   *"restores onto the reloaded configuration after a switch away and back"*,
   *"rebuilds another configuration's list when its save fails while one on the first is pending"*,
+  *"keeps a property adopted during a pending save when that save fails"*,
+  *"keeps a property adopted during a save that succeeds when a later overlapping save fails"*,
+  *"saves again a property adopted while an earlier save was in flight"*,
+  *"carries over an adopted property no fetch has loaded yet when saving"*,
   *"sends a save queued behind a failed one"*,
   *"does not reconcile another configuration's plots after a switch during the save"*,
   *"does not reload linked properties for a batch whose configuration switched before the reload"*.

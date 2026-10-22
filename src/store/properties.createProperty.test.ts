@@ -631,6 +631,188 @@ describe("createProperty propagates the real failure reason", () => {
       "Read-only collection",
     );
   });
+
+  // A server job (materialize, neighborhood) registered "x" and the client
+  // adopted it, then fetched the list as refreshWrittenMeasurements does.
+  async function adoptAndFetch(listed: { id: string; name: string }[]) {
+    await propertyStore.adoptServerRegisteredProperty("x");
+    // Idempotent, also while a save is pending.
+    await propertyStore.adoptServerRegisteredProperty("x");
+    vi.spyOn(propertyStore.propertiesAPI, "getProperties").mockResolvedValue(
+      listed as any,
+    );
+    await propertyStore.fetchProperties();
+  }
+
+  it("keeps a property adopted during a pending save when that save fails", async () => {
+    (main as any).configuration.propertyIds = ["p1", "p2"];
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([
+      { id: "p1", name: "Area" },
+      { id: "p2", name: "Perimeter" },
+    ]);
+    let failDelete!: (error: Error) => void;
+    const saved: string[][] = [];
+    vi.spyOn(main.api, "updateConfigurationKey")
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failDelete = reject;
+          }),
+      )
+      .mockImplementation(async (configuration: any, key: string) => {
+        if (key === "propertyIds") saved.push([...configuration.propertyIds]);
+        return {} as any;
+      });
+
+    const deletion = messageOf(propertyStore.deleteProperty("p1"));
+    await adoptAndFetch([
+      { id: "p2", name: "Perimeter" },
+      { id: "x", name: "Gene panel" },
+    ]);
+    failDelete(new Error("Read-only collection"));
+    await deletion;
+
+    // The server holds p1, p2 and the job's x.
+    expect(main.configuration!.propertyIds).toEqual(["p1", "p2", "x"]);
+    expect(propertyStore.properties.map((p) => p.id)).toEqual([
+      "p1",
+      "p2",
+      "x",
+    ]);
+
+    // The next save keeps x registered rather than unregistering it.
+    vi.spyOn(propertyStore.propertiesAPI, "createProperty").mockResolvedValue({
+      id: "p3",
+      name: "Count",
+    } as any);
+    await propertyStore.createProperty({ name: "Count" } as any);
+    expect(saved).toEqual([["p1", "p2", "x", "p3"]]);
+  });
+
+  it("saves again a property adopted while an earlier save was in flight", async () => {
+    (main as any).configuration.propertyIds = ["p1", "p2"];
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([
+      { id: "p1", name: "Area" },
+      { id: "p2", name: "Perimeter" },
+    ]);
+    let finishDelete!: (value: any) => void;
+    const saved: string[][] = [];
+    vi.spyOn(main.api, "updateConfigurationKey")
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishDelete = resolve;
+          }),
+      )
+      .mockImplementation(async (configuration: any, key: string) => {
+        if (key === "propertyIds") saved.push([...configuration.propertyIds]);
+        return {} as any;
+      });
+
+    // Sent before x was adopted, the delete's list lacks x, and it may land
+    // on the server after the job added x, removing it there.
+    const deletion = propertyStore.deleteProperty("p1");
+    await adoptAndFetch([
+      { id: "p2", name: "Perimeter" },
+      { id: "x", name: "Gene panel" },
+    ]);
+    finishDelete({});
+    await deletion;
+
+    await vi.waitFor(() => expect(saved).toEqual([["p2", "x"]]));
+    expect(main.configuration!.propertyIds).toEqual(["p2", "x"]);
+  });
+
+  it("keeps a property adopted during a save that succeeds when a later overlapping save fails", async () => {
+    (main as any).configuration.propertyIds = ["p1", "p2", "p3"];
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([
+      { id: "p1", name: "Area" },
+      { id: "p2", name: "Perimeter" },
+      { id: "p3", name: "Count" },
+    ]);
+    let finishFirst!: (value: any) => void;
+    let failSecond!: (error: Error) => void;
+    const saved: string[][] = [];
+    vi.spyOn(main.api, "updateConfigurationKey")
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishFirst = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failSecond = reject;
+          }),
+      )
+      .mockImplementation(async (configuration: any, key: string) => {
+        if (key === "propertyIds") saved.push([...configuration.propertyIds]);
+        return {} as any;
+      });
+
+    // The first save was sent before x was adopted, so its value lacks x.
+    const first = propertyStore.deleteProperty("p1");
+    await adoptAndFetch([
+      { id: "p2", name: "Perimeter" },
+      { id: "p3", name: "Count" },
+      { id: "x", name: "Gene panel" },
+    ]);
+    const second = messageOf(propertyStore.deleteProperty("p2"));
+    finishFirst({});
+    await first;
+    failSecond(new Error("Read-only collection"));
+    await second;
+
+    // The first delete landed; x stays, and is saved again in case that
+    // delete removed it on the server.
+    expect(main.configuration!.propertyIds).toEqual(["p2", "p3", "x"]);
+    expect(propertyStore.properties.map((p) => p.id)).toEqual([
+      "p2",
+      "p3",
+      "x",
+    ]);
+    await vi.waitFor(() => expect(saved).toEqual([["p2", "p3", "x"]]));
+  });
+
+  it("carries over an adopted property no fetch has loaded yet when saving", async () => {
+    (main as any).configuration.propertyIds = ["p1"];
+    (
+      propertyStore as unknown as {
+        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
+      }
+    ).setPropertiesImpl([{ id: "p1", name: "Area" }]);
+    const saved: string[][] = [];
+    vi.spyOn(main.api, "updateConfigurationKey").mockImplementation(
+      async (configuration: any, key: string) => {
+        if (key === "propertyIds") saved.push([...configuration.propertyIds]);
+        return {} as any;
+      },
+    );
+    vi.spyOn(propertyStore.propertiesAPI, "createProperty").mockResolvedValue({
+      id: "p2",
+      name: "Perimeter",
+    } as any);
+
+    // A create lands between the adoption and the fetch that loads x.
+    await propertyStore.adoptServerRegisteredProperty("x");
+    await propertyStore.createProperty({ name: "Perimeter" } as any);
+
+    expect(saved).toEqual([["p1", "p2", "x"]]);
+    expect(main.configuration!.propertyIds).toEqual(["p1", "p2", "x"]);
+  });
 });
 
 describe("updateConfigurationPipelines rollback", () => {
