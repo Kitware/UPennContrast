@@ -513,6 +513,16 @@ const emit = defineEmits<{
 
 const controller = inject<PipelineRunController>(PipelineRunControllerKey)!;
 
+// The loaded property list, if it is this configuration's: right after a
+// switch it is still the previous configuration's until the new fetch lands,
+// and its properties may not be registered here (see propertiesOf in the
+// pipelines store, which the runner uses for the same reason).
+const configurationProperties = computed(() =>
+  propertiesStore.propertiesConfigurationId === store.configuration?.id
+    ? propertiesStore.properties
+    : [],
+);
+
 // The working copy, edited as a deep clone so nothing is persisted until
 // Save/Run. Re-cloned only when pointed at a *different* pipeline (id change).
 //
@@ -528,7 +538,7 @@ const localPipeline = ref<IPipeline>(clonePipelineForEditing(props.pipeline));
 function displayedSteps(steps: TPipelineStep[]): TPipelineStep[] {
   return computeAutoWiredSteps(
     steps.map((step) =>
-      resolveLinkedStep(step, store.tools, propertiesStore.properties),
+      resolveLinkedStep(step, store.tools, configurationProperties.value),
     ),
   );
 }
@@ -721,7 +731,7 @@ function updateSteps(steps: TPipelineStep[]) {
 
 const linkStates = computed<TStepLinkState[]>(() =>
   localPipeline.value.steps.map((step) =>
-    stepLinkState(step, store.tools, propertiesStore.properties),
+    stepLinkState(step, store.tools, configurationProperties.value),
   ),
 );
 
@@ -863,7 +873,9 @@ const linkableProperties = computed(() => {
       ),
     ),
   );
-  return propertiesStore.properties.filter((p) => !materializedIds.has(p.id));
+  return configurationProperties.value.filter(
+    (p) => !materializedIds.has(p.id),
+  );
 });
 
 const canConfirmAddStep = computed(() => {

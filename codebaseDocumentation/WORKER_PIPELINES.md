@@ -1090,6 +1090,24 @@ Linked steps (§3.4):
   *"keeps an exclusive-match change on an auto-wired step"*,
   *"loads the worker interface when a linked step's image changes"*,
   *"does not seed a step with the first image's defaults after another image was picked"*.
+- A run submits what the editor shows. An annotation step's worker values get
+  the interface default for any parameter they lack (as the tool's own menu
+  does; an accepted AI tool suggestion is saved without values), loading the
+  interface only if it was never fetched. A cancel during that load, or during
+  the submit request, stops the job. Property steps are not filled: their
+  values are the materialized property's parameters, compared for drift —
+  *"submits a linked tool's interface defaults for parameters it has no value for"*,
+  *"loads an uncached worker interface before filling defaults"*,
+  *"does not refetch a worker interface the worker does not have"*,
+  *"does not submit a step cancelled while its worker interface loads"*,
+  *"cancels a job whose run was cancelled while it was being submitted"*.
+- Nothing is read from another configuration's property list (right after a
+  switch, before this one's fetch lands): the runner neither computes a
+  linked property found there nor materializes from a miss there, and the
+  editor neither shows nor offers its properties —
+  *"does not compute a linked property from another configuration's list after a failed reload"*,
+  *"does not materialize a property from another configuration's list"*,
+  *"does not offer or show another configuration's properties while this one's are loading"*.
 - A linked step is read-only: its settings are locked with a pointer to the
   Tools panel, and only its name and enabled flag change —
   *"locks a linked step's settings and says where to edit them"*,

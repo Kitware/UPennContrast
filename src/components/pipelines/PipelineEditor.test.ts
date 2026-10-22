@@ -17,6 +17,8 @@ const h = vi.hoisted(() => ({
   },
   properties: {
     properties: [] as any[],
+    // Which configuration's fetch filled `properties` (see properties.ts).
+    propertiesConfigurationId: undefined as string | undefined,
     workerImageList: { "img/x": {} } as Record<string, any>,
     fetchWorkerImageList: vi.fn(),
   },
@@ -155,11 +157,40 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.store.tools = [];
   h.properties.properties = [];
+  h.properties.propertiesConfigurationId = undefined;
+  (h.store.configuration as any).id = undefined;
   h.pipelinesStore.pipelines = [];
   h.pipelinesStore.createStepId.mockReturnValue("new-step");
 });
 
 describe("PipelineEditor linked steps", () => {
+  it("does not offer or show another configuration's properties while this one's are loading", () => {
+    // Right after a switch, the loaded list is still the other
+    // configuration's.
+    (h.store.configuration as any).id = "config-a";
+    h.properties.propertiesConfigurationId = "config-b";
+    h.properties.properties = [
+      {
+        id: "elsewhere",
+        name: "Elsewhere",
+        image: "img/prop",
+        shape: AnnotationShape.Polygon,
+        tags: { tags: ["theirs"], exclusive: false },
+        workerInterface: {},
+      },
+    ];
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [propertyStep("p", { sourcePropertyId: "elsewhere" })],
+    });
+    const vm = wrapper.vm as any;
+
+    expect(vm.linkableProperties).toEqual([]);
+    // The step shows its saved copy, not the other configuration's values.
+    expect(vm.displayedPipeline.steps[0].inputTags.tags).toEqual(["own"]);
+  });
+
   it("shows a linked step with its tool's live values on open, without marking it dirty", () => {
     h.store.tools = [workerTool("t1", 5, ["from-tool"])];
     const wrapper = mountEditor({

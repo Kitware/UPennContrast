@@ -247,6 +247,19 @@ Existing in-codebase idioms for writing once:
 
 Writes to genuinely *different* resources can't be merged (the configuration vs the dataset view are separate endpoints); say so at the call site rather than leaving it looking like an oversight.
 
+### A run must submit what the editor shows
+
+A pipeline step is shown through one path (`displayedSteps`, plus the step
+editor's displayed defaults) and run through another (`stepsAsRun`, then
+`buildTransientTool`). Any filling the display does must happen on the run
+path too: a linked tool saved without values was shown with interface
+defaults and run with none (`withInterfaceDefaults`). When the run path gains
+an await before a submit (fetching that interface), it needs the same
+re-checks as the top of the step: configuration switch and cancel, since
+`cancel()` can only cancel a job it already knows. Fetch an interface only
+when `getWorkerInterface` is `undefined`; `null` means the worker has none,
+and re-asking runs a worker job.
+
 ### Live-resolved display: everything derived from the source must follow it
 
 When a view shows values resolved live from a store (a linked pipeline step
@@ -345,7 +358,9 @@ Never write a store list back after a switch either: `setConfiguration` starts
 the new configuration's `fetchProperties` without awaiting it, so for a while
 `properties.properties` is still the previous configuration's list, and
 `setProperties`/`deleteProperty` would save it as the new one's `propertyIds`
-(`setProperties` therefore refuses a list whose `propertiesConfigurationId`
+(every reader must check `propertiesConfigurationId` too, not only writers:
+the runner and the pipeline editor read the list through `propertiesOf` /
+`configurationProperties`; `setProperties` refuses a list whose `propertiesConfigurationId`
 is not the loaded configuration, including `null`: a list no fetch has loaded
 is no configuration's, and treating "unknown" as safe let a stale list through
 after a failed first fetch; and `createProperty` registers nothing if a

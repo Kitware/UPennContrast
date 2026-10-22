@@ -152,6 +152,9 @@ beforeEach(() => {
   h.annotations.fetchAnnotations.mockResolvedValue(undefined);
   h.properties.fetchPropertyValues.mockResolvedValue(undefined);
   h.properties.fetchProperties.mockResolvedValue(undefined);
+  // clearAllMocks keeps implementations: reset the ones tests override.
+  h.properties.getWorkerInterface.mockReturnValue(null);
+  h.properties.fetchWorkerInterface.mockResolvedValue(undefined);
   h.properties.deleteProperty.mockResolvedValue(undefined);
   h.properties.deleteProperties.mockResolvedValue(undefined);
   h.progress.create.mockResolvedValue("prog");
@@ -871,6 +874,174 @@ describe("linked steps", () => {
     expect(submittedTool.values.annotation.tags).toEqual(["from-tool"]);
   });
 
+  it("submits a linked tool's interface defaults for parameters it has no value for", async () => {
+    // Saved with one value only (an accepted AI suggestion saves none).
+    const tool = workerTool("t1");
+    h.main.tools = [tool];
+    h.properties.getWorkerInterface.mockReturnValue({
+      threshold: { type: "number", default: 3 },
+      radius: { type: "number", default: 2 },
+    });
+    let submittedTool: any = null;
+    h.annotations.submitAnnotationWorkerJob.mockImplementation(
+      async ({ tool: submitted }: any) => {
+        submittedTool = submitted;
+        return submitResult("j", true);
+      },
+    );
+
+    await pipelinesStore.runPipeline({
+      pipeline: pipeline([{ ...annotationStep("a"), sourceToolId: "t1" }]),
+    });
+
+    // As the tool's own menu submits it: saved values, then defaults.
+    expect(submittedTool.values.workerInterfaceValues).toEqual({
+      threshold: 7,
+      radius: 2,
+    });
+    // The tool itself is not modified.
+    expect(tool.values.workerInterfaceValues).toEqual({ threshold: 7 });
+  });
+
+  it("loads an uncached worker interface before filling defaults", async () => {
+    h.main.tools = [workerTool("t1", { workerInterfaceValues: {} })];
+    let loaded = false;
+    // Never fetched (undefined), as opposed to fetched without one (null).
+    h.properties.getWorkerInterface.mockImplementation(() =>
+      loaded ? { radius: { type: "number", default: 2 } } : undefined,
+    );
+    h.properties.fetchWorkerInterface.mockImplementation(async () => {
+      loaded = true;
+    });
+    let submittedTool: any = null;
+    h.annotations.submitAnnotationWorkerJob.mockImplementation(
+      async ({ tool: submitted }: any) => {
+        submittedTool = submitted;
+        return submitResult("j", true);
+      },
+    );
+
+    await pipelinesStore.runPipeline({
+      pipeline: pipeline([{ ...annotationStep("a"), sourceToolId: "t1" }]),
+    });
+
+    expect(h.properties.fetchWorkerInterface).toHaveBeenCalledWith({
+      image: "img/tool",
+    });
+    expect(submittedTool.values.workerInterfaceValues).toEqual({ radius: 2 });
+  });
+
+  it("does not submit a step cancelled while its worker interface loads", async () => {
+    h.main.tools = [workerTool("t1")];
+    h.properties.getWorkerInterface.mockReturnValue(undefined);
+    let finishFetch!: () => void;
+    h.properties.fetchWorkerInterface.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishFetch = resolve;
+        }),
+    );
+    let cancel!: () => void;
+    const run = pipelinesStore.runPipeline({
+      pipeline: pipeline([{ ...annotationStep("a"), sourceToolId: "t1" }]),
+      onCancel: (c) => {
+        cancel = c;
+      },
+    });
+    await vi.waitFor(() =>
+      expect(h.properties.fetchWorkerInterface).toHaveBeenCalled(),
+    );
+
+    cancel();
+    finishFetch();
+    const result = await run;
+
+    expect(h.annotations.submitAnnotationWorkerJob).not.toHaveBeenCalled();
+    expect(result.cancelled).toBe(1);
+  });
+
+  it("cancels a job whose run was cancelled while it was being submitted", async () => {
+    let finishSubmit!: (value: any) => void;
+    h.annotations.submitAnnotationWorkerJob.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishSubmit = resolve;
+        }),
+    );
+    let cancel!: () => void;
+    const run = pipelinesStore.runPipeline({
+      pipeline: pipeline([annotationStep("a")]),
+      onCancel: (c) => {
+        cancel = c;
+      },
+    });
+    await vi.waitFor(() =>
+      expect(h.annotations.submitAnnotationWorkerJob).toHaveBeenCalled(),
+    );
+
+    cancel();
+    finishSubmit(submitResult("submitted-late", false));
+    await run;
+
+    expect(h.main.api.cancelJob).toHaveBeenCalledWith("submitted-late");
+  });
+
+  it("does not refetch a worker interface the worker does not have", async () => {
+    // null: fetched before, and the worker has no interface.
+    h.properties.getWorkerInterface.mockReturnValue(null);
+    h.annotations.submitAnnotationWorkerJob.mockResolvedValue(
+      submitResult("j", true),
+    );
+
+    await pipelinesStore.runPipeline({
+      pipeline: pipeline([annotationStep("a"), annotationStep("b")]),
+    });
+
+    expect(h.properties.fetchWorkerInterface).not.toHaveBeenCalled();
+  });
+
+  it("does not materialize a property from another configuration's list", async () => {
+    const step = propertyStep("p", ["nuclei"]);
+    step.materializedPropertyId = "materialized";
+    h.main.configuration = { ...h.main.configuration, id: "config-a" };
+    h.properties.propertiesConfigurationId = "config-b";
+    h.properties.properties = [];
+
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipeline([step]),
+    });
+
+    // A miss in the other list would create a property that could not be
+    // registered here, leaving it orphaned on the server.
+    expect(h.properties.createProperty).not.toHaveBeenCalled();
+    expect(result.failed).toBe(1);
+  });
+
+  it("does not compute a linked property from another configuration's list after a failed reload", async () => {
+    const shared = existingProperty("shared");
+    // Right after a switch: the loaded list is still the other
+    // configuration's, and this configuration's reload fails.
+    h.main.configuration = { ...h.main.configuration, id: "config-a" };
+    h.properties.propertiesConfigurationId = "config-b";
+    h.properties.properties = [shared];
+    h.properties.fetchProperties.mockRejectedValue(new Error("offline"));
+    const errors: any[] = [];
+
+    const result = await pipelinesStore.runPipeline({
+      pipeline: pipeline([
+        { ...propertyStep("p"), sourcePropertyId: "shared" },
+      ]),
+      onStepError: (_index, info) => errors.push(...info.errors),
+    });
+
+    expect(h.properties.submitPropertyJob).not.toHaveBeenCalled();
+    expect(h.properties.createProperty).not.toHaveBeenCalled();
+    expect(result.failed).toBe(1);
+    expect(errors[0].error).toContain(
+      "Could not check whether the linked property still exists",
+    );
+  });
+
   it("runs a linked annotation step from its saved copy when the tool is gone", async () => {
     h.main.tools = [];
     let submittedTool: any = null;
@@ -1438,6 +1609,8 @@ describe("configuration switch during a run", () => {
 
   beforeEach(() => {
     h.main.configuration = { ...h.main.configuration, id: "config-a" };
+    // config-a's properties have loaded.
+    h.properties.propertiesConfigurationId = "config-a";
   });
 
   it("fails the next step and stops when the configuration changes during a run", async () => {

@@ -18,6 +18,7 @@ import { BATCH_DATASET_LIMIT } from "./constants";
 import { logError } from "@/utils/log";
 import { findSourceProperty, resolveLinkedStep } from "@/utils/pipelineLinks";
 import { computeAutoWiredSteps } from "@/utils/pipelineWiring";
+import { getDefault } from "@/utils/workerInterface";
 
 import {
   AnnotationShape,
@@ -34,6 +35,7 @@ import {
   IProgressInfo,
   IToolConfiguration,
   IToolTemplate,
+  IWorkerInterfaceValues,
   MessageType,
   ProgressType,
   TPipelineStep,
@@ -106,6 +108,58 @@ function buildTransientTool(step: IAnnotationPipelineStep): IToolConfiguration {
     },
     template: SEGMENTATION_TEMPLATE,
   };
+}
+
+// An annotation step's worker values as submitted: its parameters, with the
+// worker interface's default for any it has no value for. Running a tool from
+// its own menu does the same (AnnotationWorkerMenu.populateInterfaceValues),
+// and a tool saved without values (an accepted AI suggestion) is shown with
+// those defaults on a linked step, so the run must use them too. The step and
+// its source are not modified. Without an interface (one that cannot be
+// loaded) the step's values go as they are, as from the tool's menu.
+async function withInterfaceDefaults(
+  step: IAnnotationPipelineStep,
+): Promise<IAnnotationPipelineStep> {
+  if (!step.image) {
+    return step;
+  }
+  // Only when never fetched: null means the worker has none, and asking again
+  // would run a worker job for every step (the tool menu also fetches only
+  // an undefined interface).
+  if (properties.getWorkerInterface(step.image) === undefined) {
+    try {
+      await properties.fetchWorkerInterface({ image: step.image });
+    } catch (error) {
+      logError(`Failed to fetch worker interface for ${step.image}:`, error);
+    }
+  }
+  const workerInterface = properties.getWorkerInterface(step.image);
+  const missing = Object.keys(workerInterface ?? {}).filter(
+    (id) => !(id in step.workerInterfaceValues),
+  );
+  if (!workerInterface || missing.length === 0) {
+    return step;
+  }
+  const defaults: IWorkerInterfaceValues = {};
+  for (const id of missing) {
+    defaults[id] = getDefault(
+      workerInterface[id].type,
+      workerInterface[id].default,
+    );
+  }
+  return {
+    ...step,
+    workerInterfaceValues: { ...defaults, ...step.workerInterfaceValues },
+  };
+}
+
+// The loaded property list, if it is the given configuration's. After a
+// switch it is the previous configuration's until the new one's fetch lands,
+// and a property found there may not be registered in this configuration.
+function propertiesOf(configurationId: string | undefined) {
+  return properties.propertiesConfigurationId === configurationId
+    ? properties.properties
+    : [];
 }
 
 @Module({ dynamic: true, store, name: "pipelines" })
@@ -274,6 +328,14 @@ export class Pipelines extends VuexModule {
   async ensureMaterializedProperty(
     step: IPropertyPipelineStep,
   ): Promise<IAnnotationProperty | null> {
+    // Not from another configuration's list (right after a switch, before
+    // this one's properties load): a miss there would create a property
+    // that setProperties then refuses to register, leaving it orphaned.
+    if (properties.propertiesConfigurationId !== main.configuration?.id) {
+      throw new Error(
+        "The properties of this configuration have not loaded; try again.",
+      );
+    }
     const existing = step.materializedPropertyId
       ? properties.properties.find((p) => p.id === step.materializedPropertyId)
       : undefined;
@@ -536,16 +598,27 @@ export class Pipelines extends VuexModule {
         } | null = null;
 
         if (runStep.kind === "annotation") {
-          submitted = await annotations.submitAnnotationWorkerJob({
-            tool: buildTransientTool(runStep),
-            datasetId: targetDatasetId,
-            eventCallback,
-            errorCallback,
-          });
+          const runValues = await withInterfaceDefaults(runStep);
+          // The interface fetch is an await (it may wait for a worker job):
+          // check again before submitting.
+          if (configurationChanged()) {
+            throw new Error(CONFIGURATION_CHANGED_DURING_RUN);
+          }
+          if (!isCancelled) {
+            submitted = await annotations.submitAnnotationWorkerJob({
+              tool: buildTransientTool(runValues),
+              datasetId: targetDatasetId,
+              eventCallback,
+              errorCallback,
+            });
+          }
         } else {
+          // Only from the run configuration's own list: with another's
+          // loaded (a failed reload after a switch), the property is
+          // unknown, not present.
           const linkedProperty = findSourceProperty(
             runStep,
-            properties.properties,
+            propertiesOf(runConfigurationId),
           );
           if (linkedProperty) {
             // Compute the user's own property directly: no materialized
@@ -600,6 +673,11 @@ export class Pipelines extends VuexModule {
 
         if (submitted) {
           currentJob = submitted.job;
+          // cancel() only reaches a job it knows of: one cancelled while its
+          // submission was in flight is cancelled now.
+          if (isCancelled) {
+            main.api.cancelJob(submitted.job.jobId);
+          }
           onStepJob?.(stepIndex, submitted.job.jobId);
           success = await submitted.completionPromise;
           currentJob = null;
@@ -716,7 +794,11 @@ export class Pipelines extends VuexModule {
     return (pipeline: IPipeline): TPipelineStep[] =>
       computeAutoWiredSteps(
         pipeline.steps.map((step) =>
-          resolveLinkedStep(step, main.tools, properties.properties),
+          resolveLinkedStep(
+            step,
+            main.tools,
+            propertiesOf(main.configuration?.id),
+          ),
         ),
       );
   }
