@@ -344,6 +344,59 @@ describe("updateAnnotationsPerId failure rollback", () => {
     expect(stored("a").name).toBe("newer read");
   });
 
+  it("does not let an older read-back apply after a newer one failed", async () => {
+    const reads: {
+      resolve: (copies: IAnnotation[]) => void;
+      reject: (error: Error) => void;
+    }[] = [];
+    api.hydrateAnnotations.mockImplementation(
+      () => new Promise((resolve, reject) => reads.push({ resolve, reject })),
+    );
+    const saves = holdSaves();
+    const failEdit = async (index: number) => {
+      const edit = rename("a", `renamed ${index}`);
+      saves[index].reject(new Error("offline"));
+      await expect(edit).rejects.toThrow("offline");
+    };
+    await failEdit(0);
+    await failEdit(1);
+    await vi.waitFor(() => expect(reads).toHaveLength(2));
+    // The second read-back fails, then a third edit fails and reads back.
+    reads[1].reject(new Error("offline"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await failEdit(2);
+    await vi.waitFor(() => expect(reads).toHaveLength(3));
+
+    reads[0].resolve([makeAnnotation("a", { name: "oldest read" })]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    reads[2].resolve([makeAnnotation("a", { name: "newest read" })]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(stored("a").name).toBe("newest read");
+  });
+
+  it("does not let a read-back undo a color assignment that changed nothing on screen", async () => {
+    let finishRead!: (copies: IAnnotation[]) => void;
+    api.hydrateAnnotations.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishRead = resolve;
+        }),
+    );
+    const saves = holdSaves();
+    const failed = rename("a", "renamed");
+    saves[0].reject(new Error("offline"));
+    await expect(failed).rejects.toThrow("offline");
+    // The server clears colors after the read-back was sent; the restored
+    // color is already null, so nothing changes on screen.
+    annotationStore.applyColorAssignment([]);
+    // The read-back reports a color someone else set before the clear.
+    finishRead([makeAnnotation("a", { name: "A", color: "#abcdef" })]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(stored("a").color).toBeNull();
+  });
+
   it("keeps the restored value when the read-back fails", async () => {
     api.hydrateAnnotations.mockRejectedValue(new Error("still offline"));
     const saves = holdSaves();

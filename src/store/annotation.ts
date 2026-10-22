@@ -1680,7 +1680,7 @@ export class Annotations extends VuexModule {
     // can restore the same object, so identity alone can't tell them apart.
     const generations = new Map(
       restored.map(({ id }) => {
-        const generation = (readBackGenerations.get(id) ?? 0) + 1;
+        const generation = ++lastReadBackToken;
         readBackGenerations.set(id, generation);
         return [id, generation];
       }),
@@ -2935,6 +2935,8 @@ export class Annotations extends VuexModule {
         // pending edit that matched it optimistically must count it as
         // confirmed, or a failed edit's rollback would undo it.
         confirmServerAnnotationFields(annotation, { color });
+        // Also newer than a pending read-back, even if nothing changes here.
+        supersedeReadBack(annotation.id);
         if (annotation.color === color) {
           return annotation;
         }
@@ -3281,8 +3283,18 @@ function followServerAnnotationWrite(
 
 // The latest read-back started for each annotation (see
 // reconcileRestoredAnnotations); an entry is removed once that read-back has
-// finished.
+// finished. Tokens come from one counter that never resets, so an older
+// read-back still pending can't match a newer one after an entry was removed.
 const readBackGenerations = new Map<string, number>();
+let lastReadBackToken = 0;
+
+// A server write newer than any pending read-back of these annotations (an
+// authoritative color assignment): those read-backs must not apply.
+function supersedeReadBack(annotationId: string) {
+  if (readBackGenerations.has(annotationId)) {
+    readBackGenerations.set(annotationId, ++lastReadBackToken);
+  }
+}
 
 function forgetReadBacks(generations: Map<string, number>) {
   for (const [id, generation] of generations) {
