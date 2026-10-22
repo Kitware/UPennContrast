@@ -23,13 +23,13 @@ the raw endpoint in the first place. See
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
+from nimbusimage._access import ACCESS_MAP
 from nimbusimage._access import resolve_access as _resolve_access
 
 if TYPE_CHECKING:
     import girder_client
 
-# Girder AccessType.WRITE
-_WRITE = 1
+_WRITE = ACCESS_MAP["write"]
 
 
 class SharingAccessor:
@@ -60,6 +60,13 @@ class SharingAccessor:
                 nothing to share through), or none the caller can write.
         """
         access_type = _resolve_access(access)
+        # Permission first: without WRITE the views a caller can read may
+        # be none at all, and "no views" would name the wrong problem.
+        access_list = self.get_access()
+        if access_list["currentUserLevel"] < _WRITE:
+            raise ValueError(
+                f"Sharing needs WRITE access on dataset {self._dataset_id}."
+            )
         views = self._gc.get(
             "dataset_view",
             parameters={"datasetId": self._dataset_id, "limit": 0},
@@ -68,11 +75,6 @@ class SharingAccessor:
             raise ValueError(
                 f"Dataset {self._dataset_id} has no dataset views; "
                 "link it to a collection before sharing."
-            )
-        access_list = self.get_access()
-        if access_list["currentUserLevel"] < _WRITE:
-            raise ValueError(
-                f"Sharing needs WRITE access on dataset {self._dataset_id}."
             )
         writable_view_ids = set(access_list["writableViewIds"])
         # Only collections the caller can read are listed; an absent one

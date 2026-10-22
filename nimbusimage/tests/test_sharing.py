@@ -108,6 +108,19 @@ class TestShare:
             SharingAccessor(mock_gc, "ds_001").share("user@test.com")
         mock_gc.post.assert_not_called()
 
+    def test_share_reports_missing_write_before_listing_views(
+        self, mock_gc
+    ):
+        """A READ user who can't read any of the views sees no views at
+        all; the error must name the permission, not tell them to link a
+        collection."""
+        _serve(mock_gc, views=[], access={**ACCESS, "currentUserLevel": 0})
+        with pytest.raises(ValueError, match="WRITE access on dataset"):
+            SharingAccessor(mock_gc, "ds_001").share("user@test.com")
+        assert [c.args[0] for c in mock_gc.get.call_args_list] == [
+            "dataset_view/access/ds_001"
+        ]
+
     def test_share_with_nothing_writable_raises_before_posting(
         self, mock_gc
     ):
