@@ -211,7 +211,7 @@ describe("MaterializeGenesDialog", () => {
     expect(vm.running).toBe(false);
   });
 
-  it("polls a scheduled job until it succeeds", async () => {
+  it("polls a scheduled job until it succeeds, adopting its property at once", async () => {
     mocks.materialize.mockResolvedValue({
       propertyId: "p1",
       written: 0,
@@ -231,6 +231,10 @@ describe("MaterializeGenesDialog", () => {
     vm.symbols = ["CD3E"];
     await vm.materialize();
     expect(vm.running).toBe(true);
+    // The server registered the property when the request was made: it is
+    // adopted now, before the job finishes, so a property change meanwhile
+    // does not save a list without it.
+    expect(mocks.adoptServerRegisteredProperty).toHaveBeenCalledWith("p1");
     await vi.advanceTimersByTimeAsync(2000);
     expect(mocks.fetchJob).toHaveBeenCalledTimes(1);
     expect(vm.running).toBe(true);

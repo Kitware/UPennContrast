@@ -30,7 +30,7 @@ import {
   SPATIAL_PROPERTY_ID,
 } from "./model";
 
-import main from "./index";
+import main, { adoptServerConfirmedPropertyId } from "./index";
 
 import { canComputeAnnotationProperty } from "@/utils/annotation";
 import {
@@ -84,6 +84,12 @@ let propertyDatasetGeneration = 0;
 // Ids of properties being created: added to the local configuration but not
 // yet registered server-side, so a batch fetch omits them (fetchProperties).
 const pendingPropertyIds = new Set<string>();
+
+// Server-registered properties adopted into a configuration's ids that no
+// fetch has loaded into the list yet, as `${configurationId}:${id}`. A save in
+// that window builds its ids from the list, so it carries these over rather
+// than unregister them (see setProperties).
+const adoptedUnloadedPropertyIds = new Set<string>();
 
 // In-flight setProperties saves, per configuration (the same grouping as
 // writeConfigurationKey's propertyIds writes, so the list is rebuilt when that
@@ -1326,7 +1332,15 @@ export class Properties extends VuexModule {
     }
     saves.pending++;
     this.setPropertiesImpl(properties);
-    const propertyIds = this.properties.map((p) => p.id);
+    const listedIds = this.properties.map((p) => p.id);
+    const propertyIds = [
+      ...listedIds,
+      ...configuration.propertyIds.filter(
+        (id) =>
+          adoptedUnloadedPropertyIds.has(`${configuration.id}:${id}`) &&
+          !listedIds.includes(id),
+      ),
+    ];
     try {
       await this.context.dispatch("updateConfigurationProperties", propertyIds);
     } catch (error) {
@@ -1402,6 +1416,10 @@ export class Properties extends VuexModule {
       // loaded copy of those only (pending now, or when the request went
       // out), or the next setProperties would persist the drop.
       const pendingAtRequest = new Set(pendingPropertyIds);
+      // This fetch loads (or finds deleted) the adoptions requested with it.
+      const adoptedAtRequest = propertyIds
+        .map((id) => `${configuration.id}:${id}`)
+        .filter((key) => adoptedUnloadedPropertyIds.has(key));
       const fetched = new Map(
         (await this.propertiesAPI.getProperties(propertyIds)).map(
           (property) => [property.id, property],
@@ -1426,6 +1444,9 @@ export class Properties extends VuexModule {
         }),
       );
       this.setPropertiesConfigurationId(configuration.id);
+      for (const key of adoptedAtRequest) {
+        adoptedUnloadedPropertyIds.delete(key);
+      }
       // Properties may load after fetchPropertyValues already ran (the stub
       // fetch can resolve first when cached), so trigger the count fetch here
       // too; the guard in fetchUncomputedCounts dedupes (no-op in wholesale
@@ -1445,13 +1466,19 @@ export class Properties extends VuexModule {
    * registered it in the configuration itself; the client's copy of the
    * configuration does not know it yet, so fetchProperties would not load
    * it and the new measurement stayed invisible until a reload. Adopt the
-   * id locally — no write, the server already saved it.
+   * id locally (the server already saved it) and as confirmed, so a pending
+   * propertyIds save that fails does not restore it away. Until a fetch
+   * loads it, saves carry it over.
    */
   @Action
   async adoptServerRegisteredProperty(propertyId: string) {
     const configuration = main.configuration;
-    if (configuration && !configuration.propertyIds.includes(propertyId)) {
-      configuration.propertyIds = [...configuration.propertyIds, propertyId];
+    if (!configuration) {
+      return;
+    }
+    adoptServerConfirmedPropertyId(configuration, propertyId);
+    if (!this.properties.some((property) => property.id === propertyId)) {
+      adoptedUnloadedPropertyIds.add(`${configuration.id}:${propertyId}`);
     }
   }
 

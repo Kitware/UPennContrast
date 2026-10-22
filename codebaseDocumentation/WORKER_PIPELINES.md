@@ -635,6 +635,17 @@ Behavior (mirror `computeAnnotationsWithWorkerBatch`):
      pending-save bookkeeping is per configuration, like
      `writeConfigurationKey`'s: a save still pending on one configuration must
      not hold back the rebuild after another configuration's save fails.
+     A property the server registered itself (the gene-panel and
+     neighborhood requests register it when they are made, not when their
+     job finishes) is adopted as soon as the request returns, through
+     `adoptServerConfirmedPropertyId`, which adds it to the confirmed value
+     as well as the live list, so a failed pending save keeps it; a save
+     sent before the adoption that succeeds also keeps it confirmed. Until a
+     fetch loads the adopted property into the list, `setProperties` carries
+     its id over, so a save in between does not unregister it. Not covered:
+     a property save sent while such a request is in flight replaces the
+     server's list without the id; only a server-side merge of propertyIds
+     writes could prevent that.
    - `progress.complete(perStepProgressId)`; bump the top-level progress.
 5. After the loop (once, not per step): `annotationStore.fetchAnnotations()`,
    `propertiesStore.fetchPropertyValues()`, `filters.updateHistograms()`, and
@@ -1115,6 +1126,11 @@ Linked steps (§3.4):
   *"ends on an earlier save's value when a later save fails before it is sent"*,
   *"restores onto the reloaded configuration after a switch away and back"*,
   *"rebuilds another configuration's list when its save fails while one on the first is pending"*,
+  *"keeps a property adopted during a pending save when that save fails"*,
+  *"keeps a property adopted during a save that succeeds when a later overlapping save fails"*,
+  *"polls a scheduled job until it succeeds, adopting its property at once"*,
+  *"schedules the job in pixels, polls it, and reloads the properties"*,
+  *"carries over an adopted property no fetch has loaded yet when saving"*,
   *"sends a save queued behind a failed one"*,
   *"does not reconcile another configuration's plots after a switch during the save"*,
   *"does not reload linked properties for a batch whose configuration switched before the reload"*.

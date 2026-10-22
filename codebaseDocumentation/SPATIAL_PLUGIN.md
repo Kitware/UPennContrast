@@ -615,7 +615,7 @@ Each line names the test that holds it.
   posted — *"clears the form when the dataset changes, so no other table's genes are posted"*.
 - Materialize dialog: inline write reloads properties; job polling until success; failed
   job and rejected request reported; a job keeps polling after the dialog closes and still
-  refreshes the values, and a dataset change stops it — *"writes inline results and reloads the property list"*, *"polls a scheduled job until it succeeds"*, *"reports a failed job and a rejected request"*, *"keeps polling after the dialog closes and still refreshes the values"*, *"stops polling when the dataset changes"*.
+  refreshes the values, and a dataset change stops it — *"writes inline results and reloads the property list"*, *"polls a scheduled job until it succeeds, adopting its property at once"*, *"reports a failed job and a rejected request"*, *"keeps polling after the dialog closes and still refreshes the values"*, *"stops polling when the dataset changes"*.
 - Picker debounces typing, keeps picked symbols listed, caps at max — *"lists picked symbols alongside search results and debounces typing"*, *"caps the selection at max"*.
 - Summary expression: only with a table and picked genes, same scope, in the CSV —
   *"aggregates expression over the same scope only when a table exists and genes are picked"*.
