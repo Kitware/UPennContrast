@@ -247,6 +247,25 @@ Existing in-codebase idioms for writing once:
 
 Writes to genuinely *different* resources can't be merged (the configuration vs the dataset view are separate endpoints); say so at the call site rather than leaving it looking like an oversight.
 
+### Live-resolved display: everything derived from the source must follow it
+
+When a view shows values resolved live from a store (a linked pipeline step
+showing its tool's current settings), the display is not the only thing
+derived from that source. A working copy captured at open time, or a resource
+loaded on mount (a worker interface for the step's image), goes stale the
+moment the source changes while the view is open. Nothing complains until a
+later edit or Save reads the stale copy: removing a step then restored its old
+wiring, and a tool's new image left the step with no parameter controls (PR
+#1430). Rules:
+
+- Load per-value resources in a `watch` on the value, not only `onMounted` or
+  the in-view change handler. Guard an async mount seed against the value
+  having changed during its await.
+- Before applying an edit to a working copy, carry over the fields the live
+  derivation owns, and only those (wiring owns tags and shape, never the
+  step's own exclusive-match flag). Carrying the whole object silently
+  reverts the edit being applied.
+
 ### Watching Getters That Rebuild Their Return Object
 
 `watch(() => someGetter, cb, { deep: true })` on a getter that returns a **new object on every read** fires on every dependency touch — including dependencies the getter reads but that don't change the output (`deep: true` skips the value comparison entirely). This shipped a real bug: a deep watch on `currentFilters` cleared the selection on every Z-scrub because the getter read `z` unconditionally. tsc/lint/reasoning all passed; only the live app caught it.

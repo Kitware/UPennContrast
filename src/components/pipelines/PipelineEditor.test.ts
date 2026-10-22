@@ -203,6 +203,75 @@ describe("PipelineEditor linked steps", () => {
     expect(vm.isDirty).toBe(false);
   });
 
+  // A linked tool's output tags change while the editor is open, then the
+  // step the property step reads from is removed or disabled.
+  async function changeUpstreamAfterToolChange(change: "removed" | "disabled") {
+    h.store.tools = [workerTool("t1", 5, ["original"])];
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1"), propertyStep("p")],
+    });
+    const vm = wrapper.vm as any;
+    // The linked tool's output tags change elsewhere; the property step
+    // after it is shown wired to them.
+    h.store.tools = [workerTool("t1", 5, ["changed-elsewhere"])];
+    expect(vm.displayedPipeline.steps[1].inputTags.tags).toEqual([
+      "changed-elsewhere",
+    ]);
+
+    if (change === "removed") {
+      vm.removeStep(0);
+    } else {
+      vm.handleStepUpdate(0, {
+        ...vm.displayedPipeline.steps[0],
+        enabled: false,
+      });
+    }
+
+    const property = vm.displayedPipeline.steps.find(
+      (step: any) => step.id === "p",
+    );
+    expect(property.inputTags.tags).toEqual(["changed-elsewhere"]);
+    await vm.save();
+    const [saved] = h.pipelinesStore.savePipeline.mock.calls[0];
+    expect(
+      saved.steps.find((step: any) => step.id === "p").inputTags.tags,
+    ).toEqual(["changed-elsewhere"]);
+  }
+
+  it("keeps the wiring last shown when the upstream step is removed", async () => {
+    await changeUpstreamAfterToolChange("removed");
+  });
+
+  it("keeps the wiring last shown when the upstream step is disabled", async () => {
+    await changeUpstreamAfterToolChange("disabled");
+  });
+
+  it("keeps an exclusive-match change on an auto-wired step", async () => {
+    h.store.tools = [workerTool("t1", 5, ["wired"])];
+    const wrapper = mountEditor({
+      id: "pipe",
+      name: "P",
+      steps: [linkedAnnotationStep("a", "t1"), propertyStep("p")],
+    });
+    const vm = wrapper.vm as any;
+    const shown = vm.displayedPipeline.steps[1];
+
+    vm.handleStepUpdate(1, {
+      ...shown,
+      inputTags: { ...shown.inputTags, exclusive: true },
+    });
+
+    expect(vm.displayedPipeline.steps[1].inputTags).toEqual({
+      tags: ["wired"],
+      exclusive: true,
+    });
+    await vm.save();
+    const [saved] = h.pipelinesStore.savePipeline.mock.calls[0];
+    expect(saved.steps[1].inputTags.exclusive).toBe(true);
+  });
+
   it("keeps only the name and enabled flag from an edit to a linked step", async () => {
     h.store.tools = [workerTool("t1", 5, ["t"])];
     const wrapper = mountEditor({

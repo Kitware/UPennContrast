@@ -79,6 +79,69 @@ describe("PipelineStepEditor linked steps", () => {
     expect(wrapper.emitted("update:modelValue")).toBeUndefined();
   });
 
+  it("loads the worker interface when a linked step's image changes", async () => {
+    const wrapper = mountStepEditor(
+      annotationStep({}, { sourceToolId: "t1" }),
+      linked,
+    );
+    await nextTick();
+    await nextTick();
+    // The linked tool's image changes in the Tools panel to one whose
+    // interface is not cached yet.
+    h.properties.getWorkerInterface.mockImplementation((image: string) =>
+      image === "img/tool" ? workerInterface : null,
+    );
+    h.properties.fetchWorkerInterface.mockClear();
+
+    await wrapper.setProps({
+      modelValue: annotationStep(
+        {},
+        { sourceToolId: "t1", image: "img/new-tool" },
+      ),
+    });
+
+    expect(h.properties.fetchWorkerInterface).toHaveBeenCalledWith({
+      image: "img/new-tool",
+    });
+    // Shown, not written: a linked step's settings are its tool's.
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  });
+
+  it("does not seed a step with the first image's defaults after another image was picked", async () => {
+    let finishFirstFetch!: () => void;
+    const cached = new Set<string>();
+    h.properties.getWorkerInterface.mockImplementation((image: string) =>
+      cached.has(image) ? workerInterface : null,
+    );
+    h.properties.fetchWorkerInterface.mockImplementation(
+      ({ image }: { image: string }) =>
+        image === "img/tool"
+          ? new Promise<void>((resolve) => {
+              finishFirstFetch = () => {
+                cached.add(image);
+                resolve();
+              };
+            })
+          : Promise.resolve(),
+    );
+    // A new, unlinked step: its first interface fetch is still running...
+    const wrapper = mountStepEditor(annotationStep({}));
+    await vi.waitFor(() =>
+      expect(h.properties.fetchWorkerInterface).toHaveBeenCalledWith({
+        image: "img/tool",
+      }),
+    );
+    // ...when another image is picked (the parent passes the picked step).
+    await wrapper.setProps({
+      modelValue: annotationStep({ chosen: 1 }, { image: "img/other" }),
+    });
+    finishFirstFetch();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The first image's defaults are not written onto the picked step.
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  });
+
   it("locks a linked step's settings and says where to edit them", async () => {
     const wrapper = mountStepEditor(
       annotationStep({ threshold: 1 }, { sourceToolId: "t1" }),

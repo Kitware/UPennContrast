@@ -693,8 +693,30 @@ const stepCaptions = computed<(string | null)[]>(() => {
   });
 });
 
+// An auto-wired step's wiring as shown can be newer than the working copy's:
+// it follows its upstream step live (a linked tool's output tags change in the
+// Tools panel). Carry the shown wiring over before applying a change, so a
+// step whose upstream is then removed or disabled keeps what was last shown,
+// not the tags it had when the editor opened.
 function updateSteps(steps: TPipelineStep[]) {
-  localPipeline.value.steps = withWiredTags(steps);
+  const shown = new Map(displayedStepList.value.map((s) => [s.id, s]));
+  localPipeline.value.steps = withWiredTags(
+    steps.map((step) => {
+      const displayed = shown.get(step.id);
+      return step.kind === "property" &&
+        step.autoWired === true &&
+        !step.sourcePropertyId &&
+        displayed?.kind === "property"
+        ? // Only what wiring owns: the step's own settings (exclusive match)
+          // may be what this change edits.
+          {
+            ...step,
+            inputTags: { ...step.inputTags, tags: displayed.inputTags.tags },
+            shape: displayed.shape,
+          }
+        : step;
+    }),
+  );
 }
 
 const linkStates = computed<TStepLinkState[]>(() =>

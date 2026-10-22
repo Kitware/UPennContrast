@@ -114,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { cloneDeep, omit } from "lodash";
 import propertiesStore from "@/store/properties";
 import DockerImageSelect from "@/components/DockerImageSelect.vue";
@@ -434,6 +434,19 @@ async function onImageChange(newImage: string | null) {
   patchStep(patch);
 }
 
+// The image can change from outside the editor too: a linked step follows its
+// tool's image live. Load the new image's interface then, or its parameters
+// would not show (onImageChange covers only a pick made here; the mount
+// covers the first image).
+watch(
+  () => step.value.image,
+  (newImage, oldImage) => {
+    if (newImage && newImage !== oldImage) {
+      void ensureWorkerInterface(newImage);
+    }
+  },
+);
+
 onMounted(async () => {
   if (Object.keys(propertiesStore.workerImageList).length === 0) {
     await propertiesStore.fetchWorkerImageList();
@@ -443,6 +456,11 @@ onMounted(async () => {
     return;
   }
   await ensureWorkerInterface(current.image);
+  // A different image picked while this fetch ran has been seeded by
+  // onImageChange; this image's defaults would overwrite it.
+  if (step.value.image !== current.image) {
+    return;
+  }
   // Linked steps show defaults without writing them
   // (displayedWorkerInterfaceValues).
   if (

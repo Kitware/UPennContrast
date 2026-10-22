@@ -1080,6 +1080,16 @@ Linked steps (§3.4):
 - The editor shows linked steps live, never reads that as unsaved —
   *"shows a linked step with its tool's live values on open, without marking it dirty"*,
   *"shows a tool change made elsewhere while the editor is open"*.
+- What the editor derives from a live source follows it, not just the display.
+  An auto-wired step keeps the wiring last shown when its upstream step is
+  removed or disabled (only tags and shape: its exclusive-match setting stays
+  its own), and a step editor loads the worker interface of an image that
+  changed outside it, without writing a linked step's values —
+  *"keeps the wiring last shown when the upstream step is removed"*,
+  *"keeps the wiring last shown when the upstream step is disabled"*,
+  *"keeps an exclusive-match change on an auto-wired step"*,
+  *"loads the worker interface when a linked step's image changes"*,
+  *"does not seed a step with the first image's defaults after another image was picked"*.
 - A linked step is read-only: its settings are locked with a pointer to the
   Tools panel, and only its name and enabled flag change —
   *"locks a linked step's settings and says where to edit them"*,
