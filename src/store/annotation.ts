@@ -3283,17 +3283,22 @@ function followServerAnnotationWrite(
 
 // The latest read-back started for each annotation (see
 // reconcileRestoredAnnotations); an entry is removed once that read-back has
-// finished. Tokens come from one counter that never resets, so an older
+// finished, or when a newer server write supersedes it. Tokens come from one counter that never resets, so an older
 // read-back still pending can't match a newer one after an entry was removed.
 const readBackGenerations = new Map<string, number>();
 let lastReadBackToken = 0;
 
+// Read-backs whose bookkeeping is still held (tests assert it drains).
+export function pendingReadBackCount() {
+  return readBackGenerations.size;
+}
+
 // A server write newer than any pending read-back of these annotations (an
-// authoritative color assignment): those read-backs must not apply.
+// authoritative color assignment): those read-backs must not apply. Removing
+// the entry is enough, since a token never matches a missing entry; replacing
+// it with a fresh token would leave an entry no read-back owns or removes.
 function supersedeReadBack(annotationId: string) {
-  if (readBackGenerations.has(annotationId)) {
-    readBackGenerations.set(annotationId, ++lastReadBackToken);
-  }
+  readBackGenerations.delete(annotationId);
 }
 
 function forgetReadBacks(generations: Map<string, number>) {

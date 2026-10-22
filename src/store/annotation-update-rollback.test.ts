@@ -56,7 +56,7 @@ vi.mock("@/utils/log", () => ({
   logWarning: vi.fn(),
 }));
 
-import annotationStore from "./annotation";
+import annotationStore, { pendingReadBackCount } from "./annotation";
 import { AnnotationShape, IAnnotation } from "./model";
 
 function makeAnnotation(
@@ -395,6 +395,25 @@ describe("updateAnnotationsPerId failure rollback", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(stored("a").color).toBeNull();
+  });
+
+  it("forgets a read-back that a color assignment superseded", async () => {
+    let finishRead!: (copies: IAnnotation[]) => void;
+    api.hydrateAnnotations.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishRead = resolve;
+        }),
+    );
+    const saves = holdSaves();
+    const failed = rename("a", "renamed");
+    saves[0].reject(new Error("offline"));
+    await expect(failed).rejects.toThrow("offline");
+    annotationStore.applyColorAssignment([]);
+    finishRead([makeAnnotation("a", { name: "A" })]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(pendingReadBackCount()).toBe(0);
   });
 
   it("keeps the restored value when the read-back fails", async () => {
