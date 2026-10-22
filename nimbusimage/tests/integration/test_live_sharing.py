@@ -4,6 +4,7 @@ The unit tests pin the request bodies; these prove the server accepts
 them and that access actually changes for another, non-admin user.
 """
 
+import contextlib
 import json
 import secrets
 
@@ -15,8 +16,16 @@ import nimbusimage as ni
 pytestmark = pytest.mark.integration
 
 
-@pytest.fixture
-def second_user(client, api_url):
+# A minimal configuration document, as the web app creates one.
+CONFIGURATION_METADATA = {
+    "subtype": "contrastConfiguration", "compatibility": {},
+    "layers": [], "tools": [], "propertyIds": [],
+    "snapshots": [], "scales": {},
+}
+
+
+@contextlib.contextmanager
+def _temporary_user(client, api_url):
     """A temporary non-admin user, deleted afterwards.
 
     Yields ``(login, ni.NimbusClient)`` with the client authenticated as
@@ -42,6 +51,18 @@ def second_user(client, api_url):
         client.girder.delete(f"user/{user['_id']}")
 
 
+@pytest.fixture
+def second_user(client, api_url):
+    with _temporary_user(client, api_url) as user:
+        yield user
+
+
+@pytest.fixture
+def third_user(client, api_url):
+    with _temporary_user(client, api_url) as user:
+        yield user
+
+
 def _can_read(other_client, dataset_id):
     try:
         other_client.girder.get(f"folder/{dataset_id}")
@@ -56,11 +77,10 @@ def _user_levels(ds):
     return {u["login"]: u["level"] for u in ds.sharing.get_access()["users"]}
 
 
-def _has_no_grant(ds, login):
-    # "remove" sends accessType -1, which the server currently stores as
-    # a level -1 entry rather than deleting it; either way the user holds
-    # no READ-or-better grant.
-    return _user_levels(ds).get(login, -1) < 0
+def _has_no_entry(ds, login):
+    # "remove" sends accessType -1, which the server turns into deleting
+    # the user's entry (#1406), not storing an inert level -1 one.
+    return login not in _user_levels(ds)
 
 
 class TestLiveSharing:
@@ -88,7 +108,7 @@ class TestLiveSharing:
 
         ds.sharing.share(login, access="remove")
 
-        assert _has_no_grant(ds, login)
+        assert _has_no_entry(ds, login)
         assert not _can_read(other, ds.id)
 
     @pytest.mark.parametrize("access, level", [("write", 1), ("admin", 2)])
@@ -104,7 +124,7 @@ class TestLiveSharing:
         assert folder["_accessLevel"] == level
 
         ds.sharing.share(login, access="remove")
-        assert _has_no_grant(ds, login)
+        assert _has_no_entry(ds, login)
 
     def test_set_public_round_trip(self, private_test_dataset, second_user):
         ds = private_test_dataset
@@ -145,6 +165,62 @@ class TestLiveSharing:
         assert _user_levels(ds)[login] == 0
         assert _can_read(other, ds.id)
 
+    def test_collaborator_shares_through_writable_views_only(
+        self, client, private_test_dataset, second_user, third_user
+    ):
+        """A dataset can have a view, and a collection, that the sharer
+        can only read. dataset_view/share refuses a whole request that
+        names one (403), so share() sends only the views the sharer can
+        write, each with its collection."""
+        ds = private_test_dataset
+        gc = client.girder
+        collaborator_login, collaborator = second_user
+        target_login, target = third_user
+        first_view = gc.get(
+            "dataset_view", parameters={"datasetId": ds.id, "limit": 0}
+        )[0]
+        collection = gc.post(
+            "upenn_collection",
+            parameters={"folderId": ds.id, "name": "read-only cfg"},
+            data={"metadata": json.dumps(CONFIGURATION_METADATA)},
+        )
+        second_view = None
+        try:
+            second_view = gc.post(
+                "dataset_view",
+                json={
+                    "datasetId": ds.id,
+                    "configurationId": collection["_id"],
+                    "layerContrasts": {},
+                    "lastLocation": {"xy": 0, "z": 0, "time": 0},
+                },
+            )
+            # READ on the second view and its collection, then WRITE on
+            # the first view, its collection and the dataset itself.
+            for view, level in ((second_view, 0), (first_view, 1)):
+                gc.post(
+                    "dataset_view/share",
+                    json={
+                        "datasetViewIds": [view["_id"]],
+                        "userMailOrUsername": collaborator_login,
+                        "accessType": level,
+                    },
+                )
+
+            collaborator.dataset(ds.id).sharing.share(
+                target_login, access="read"
+            )
+
+            assert _can_read(target, ds.id)
+            shared_views = target.girder.get(
+                "dataset_view", parameters={"datasetId": ds.id, "limit": 0}
+            )
+            assert [v["_id"] for v in shared_views] == [first_view["_id"]]
+        finally:
+            if second_view is not None:
+                gc.delete(f"dataset_view/{second_view['_id']}")
+            gc.delete(f"upenn_collection/{collection['_id']}")
+
     @pytest.mark.xfail(
         strict=True,
         reason="The server guard that keeps a dataset's creator at ADMIN "
@@ -172,17 +248,13 @@ class TestLiveSharing:
                 "metadata": json.dumps({"subtype": "contrastDataset"}),
             },
         )
-        view = None
+        collection = view = None
         # Cleanup runs as admin: without the guard the owner is locked out.
         try:
             collection = gc.post(
                 "upenn_collection",
                 parameters={"folderId": folder["_id"], "name": "cfg"},
-                data={"metadata": json.dumps({
-                    "subtype": "contrastConfiguration", "compatibility": {},
-                    "layers": [], "tools": [], "propertyIds": [],
-                    "snapshots": [], "scales": {},
-                })},
+                data={"metadata": json.dumps(CONFIGURATION_METADATA)},
             )
             view = gc.post(
                 "dataset_view",
@@ -203,6 +275,10 @@ class TestLiveSharing:
         finally:
             if view is not None:
                 client.girder.delete(f"dataset_view/{view['_id']}")
+            if collection is not None:
+                client.girder.delete(
+                    f"upenn_collection/{collection['_id']}"
+                )
             client.girder.delete(f"folder/{folder['_id']}")
 
 

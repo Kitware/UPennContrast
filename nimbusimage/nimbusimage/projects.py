@@ -127,8 +127,13 @@ class Project:
 
         Requires ADMIN (owner) access on the project.
 
+        Resources in the project that the caller doesn't own are left
+        unchanged.
+
         Returns:
-            The server's summary: ``projectId`` and ``public``.
+            The server's summary: ``projectId``, ``public`` and
+            ``skipped`` (how many resources were left unchanged because
+            the caller doesn't own them).
         """
         return self._gc.post(
             f"project/{self.id}/set_public",

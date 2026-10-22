@@ -236,10 +236,12 @@ curl -s -X POST -H "Girder-Token: $TOKEN" -H "Content-Type: application/json" \
   }' "http://localhost:8080/api/v1/dataset_view"
 
 # Share a dataset with another user. Sets the user's level on the dataset
-# folder, the listed views and their collections. datasetViewIds is required;
-# send all views of the dataset (GET dataset_view?datasetId=...&limit=0), as
-# the web app's Share dialog does. accessType: 0 read, 1 write, 2 admin,
-# -1 remove. Needs WRITE on every document. Never PUT folder/{id}/access
+# folder, the listed views and their collections. datasetViewIds is required.
+# Needs WRITE on the dataset and on every listed view and its collection, or the
+# whole request is a 403: send only the views in writableViewIds from
+# GET dataset_view/access/{datasetId} whose configuration has
+# currentUserLevel >= 1, as the web app's Share dialog does.
+# accessType: 0 read, 1 write, 2 admin, -1 remove. Never PUT folder/{id}/access
 # instead — it replaces the whole ACL and can lock the owner out.
 curl -s -X POST -H "Girder-Token: $TOKEN" -H "Content-Type: application/json" \
   -d '{"datasetViewIds": ["VIEW_ID"], "userMailOrUsername": "colleague", "accessType": 0}' \

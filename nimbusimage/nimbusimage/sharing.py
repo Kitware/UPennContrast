@@ -28,6 +28,9 @@ from nimbusimage._access import resolve_access as _resolve_access
 if TYPE_CHECKING:
     import girder_client
 
+# Girder AccessType.WRITE
+_WRITE = 1
+
 
 class SharingAccessor:
     def __init__(self, gc: girder_client.GirderClient, dataset_id: str):
@@ -39,19 +42,22 @@ class SharingAccessor:
     ) -> None:
         """Share this dataset with a user.
 
-        Grants (or revokes) access on the dataset folder and on every
-        dataset view of it, plus each view's collection — the same set
-        the web app's Share dialog changes by default. The caller needs
-        WRITE access on all of them.
+        Grants (or revokes) access on the dataset folder and on each of
+        its dataset views that the caller can write, plus those views'
+        collections. A view is included only if the caller can write both
+        the view and its collection: the server refuses a whole request
+        that names anything else (403). Views and collections the caller
+        can't write are left unchanged, as in the web app's Share dialog.
 
         Args:
             user_email_or_name: User's email or username.
             access: 'read', 'write', 'admin', or 'remove'.
 
         Raises:
-            ValueError: If the dataset has no dataset views (the server
-                derives the dataset and collections from the views, so
-                there is nothing to share through).
+            ValueError: If the caller lacks WRITE on the dataset, or the
+                dataset has no dataset views (the server derives the
+                dataset and collections from the views, so there is
+                nothing to share through), or none the caller can write.
         """
         access_type = _resolve_access(access)
         views = self._gc.get(
@@ -63,10 +69,34 @@ class SharingAccessor:
                 f"Dataset {self._dataset_id} has no dataset views; "
                 "link it to a collection before sharing."
             )
+        access_list = self.get_access()
+        if access_list["currentUserLevel"] < _WRITE:
+            raise ValueError(
+                f"Sharing needs WRITE access on dataset {self._dataset_id}."
+            )
+        writable_view_ids = set(access_list["writableViewIds"])
+        # Only collections the caller can read are listed; an absent one
+        # is not writable either.
+        writable_config_ids = {
+            config["id"]
+            for config in access_list["configurations"]
+            if config["currentUserLevel"] >= _WRITE
+        }
+        view_ids = [
+            view["_id"] for view in views
+            if view["_id"] in writable_view_ids
+            and view["configurationId"] in writable_config_ids
+        ]
+        if not view_ids:
+            raise ValueError(
+                f"You can't write any of dataset {self._dataset_id}'s "
+                "views together with its collection, so there is "
+                "nothing to share it through."
+            )
         self._gc.post(
             "dataset_view/share",
             json={
-                "datasetViewIds": [view["_id"] for view in views],
+                "datasetViewIds": view_ids,
                 "userMailOrUsername": user_email_or_name,
                 "accessType": access_type,
             },
@@ -76,11 +106,15 @@ class SharingAccessor:
         """Set whether this dataset is publicly accessible.
 
         Also sets the public flag on the dataset's views and their
-        collections. Requires ADMIN (owner) access on the dataset.
+        collections that the caller owns (ADMIN); other users' views and
+        collections are left unchanged. Requires ADMIN (owner) access on
+        the dataset.
 
         Returns:
             The server's summary: ``dataset``, ``public``,
-            ``datasetViewsUpdated`` and ``configurationsUpdated``.
+            ``datasetViewsUpdated`` and ``configurationsUpdated``, and
+            ``datasetViewsSkipped`` and ``configurationsSkipped`` for
+            other users' items left in the other state.
         """
         return self._gc.post(
             "dataset_view/set_public",
@@ -95,8 +129,11 @@ class SharingAccessor:
 
         Returns:
             ``{"datasetId", "public", "users", "groups",
-            "configurations"}``; each user entry has ``id``, ``login``,
-            ``name``, ``email`` and ``level`` (0 read, 1 write, 2 admin).
+            "configurations", "writableViewIds", "currentUserLevel"}``;
+            each user entry has ``id``, ``login``, ``name``, ``email`` and
+            ``level`` (0 read, 1 write, 2 admin). Each configuration
+            carries the caller's ``currentUserLevel`` on it, and
+            ``writableViewIds`` lists the views the caller can write.
         """
         return self._gc.get(
             f"dataset_view/access/{self._dataset_id}"
