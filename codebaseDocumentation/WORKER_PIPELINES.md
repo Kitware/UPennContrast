@@ -474,11 +474,15 @@ on the server. A step linked to it then treats its source as deleted and, on
 its next run, materializes a pipeline-owned property from its saved copy. The
 delete dialog (`PropertyBody.vue`) therefore:
 
-- **Warns** when enabled steps link to the property
-  (`pipelinesStore.pipelineStepsLinkedToProperty`, by `sourcePropertyId`),
-  naming each pipeline and step, and the confirm button reads "Remove anyway".
-  Disabled steps are not listed (they don't run), nor steps that only
-  materialized the property (the pipeline owns it and re-creates it as before).
+- **Warns** when pipeline steps use the property
+  (`pipelinesStore.pipelineStepsLinkedToProperty`): steps linked to it
+  (`sourcePropertyId`) and steps that created it (`materializedPropertyId`),
+  disabled ones included and marked, since they use it again once re-enabled.
+  Each would create a new pipeline-owned property on its next run. The dialog
+  names each pipeline and step, and the confirm button reads "Remove anyway".
+- **Reports a refused removal.** `deleteProperty` can be refused (this
+  configuration's properties have not loaded) or fail to save; the dialog
+  then stays open with the reason instead of closing as if it had worked.
 - **Blocks** the removal while a run or batch computes the property
   (`pipelinesStore.runningPipelineComputingProperty`): the pipeline in
   `runningPipelineId` has an enabled property step whose `sourcePropertyId` or
@@ -1048,11 +1052,12 @@ Linked steps (§3.4):
   *"holds the run lock while it reloads linked properties"*,
   *"does not reload a linked property already running its fallback"*,
   *"runs a step already on its fallback when another step's reload fails"*.
-- Removing a property in the Properties panel names the enabled steps linked
-  to it and asks to "Remove anyway" (only enabled `sourcePropertyId` links),
-  and is blocked while a running pipeline computes it (linked or
-  materialized), also in the handler —
-  *"lists the enabled pipeline steps linked to a property"*,
+- Removing a property in the Properties panel names the steps that use it
+  (linked or created it, disabled ones included) and asks to "Remove anyway",
+  is blocked while a running pipeline computes it (also in the handler), and
+  reports a refused removal instead of closing —
+  *"lists the pipeline steps that use a property"*,
+  *"keeps the dialog open and says why when the removal is refused"*,
   *"finds the running pipeline that computes a property"*,
   *"names the pipeline steps linked to the property and offers Remove anyway"*,
   *"blocks removing a property while a pipeline that computes it is running"*.

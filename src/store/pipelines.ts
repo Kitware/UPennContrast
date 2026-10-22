@@ -89,6 +89,11 @@ export interface IPipelineStepLink {
   pipelineName: string;
   stepId: string;
   stepName: string;
+  // Off now, but it uses the property again once re-enabled.
+  enabled: boolean;
+  // How the step uses it: linked to it (sourcePropertyId), or it is the
+  // property the step created (materializedPropertyId).
+  use: "linked" | "created";
 }
 
 // Linked properties a reload found missing, as `${configurationId}:${id}`
@@ -242,27 +247,37 @@ export class Pipelines extends VuexModule {
       );
   }
 
-  // The enabled property steps linked to `propertyId` (sourcePropertyId), by
-  // pipeline. Removing the property from the configuration makes each of them
-  // fall back to its saved copy on its next run, materializing a
-  // pipeline-owned property instead, so the Properties panel names them
-  // before it removes the property.
+  // The property steps that use `propertyId`, by pipeline: linked to it
+  // (sourcePropertyId) or created it (materializedPropertyId), disabled ones
+  // included (they use it again once re-enabled). Removing the property from
+  // the configuration makes each of them create a new pipeline-owned
+  // property on its next run, so the Properties panel names them first.
   get pipelineStepsLinkedToProperty() {
     return (propertyId: string): IPipelineStepLink[] =>
       this.pipelines.flatMap((pipeline) =>
-        pipeline.steps
-          .filter(
-            (step) =>
-              step.enabled &&
-              step.kind === "property" &&
-              step.sourcePropertyId === propertyId,
-          )
-          .map((step) => ({
-            pipelineId: pipeline.id,
-            pipelineName: pipeline.name,
-            stepId: step.id,
-            stepName: step.name,
-          })),
+        pipeline.steps.flatMap((step): IPipelineStepLink[] => {
+          if (step.kind !== "property") {
+            return [];
+          }
+          const use =
+            step.sourcePropertyId === propertyId
+              ? "linked"
+              : step.materializedPropertyId === propertyId
+                ? "created"
+                : null;
+          return use
+            ? [
+                {
+                  pipelineId: pipeline.id,
+                  pipelineName: pipeline.name,
+                  stepId: step.id,
+                  stepName: step.name,
+                  enabled: step.enabled,
+                  use,
+                },
+              ]
+            : [];
+        }),
       );
   }
 

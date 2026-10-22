@@ -139,11 +139,13 @@ reloads the properties, and if it really was deleted, computes a new property
 from the last saved copy of its settings. A tool that still exists but no longer has a worker image shows "tool
 has no worker" and is treated the same way.
 
-Deleting a property in the Properties panel that a pipeline step is linked to
-first lists the enabled pipeline steps linked to it. Choose **Remove anyway** to delete it;
-those steps then use their last saved copy on their next run and create a new
-property. While a pipeline that computes the property is running, it can't be
-deleted: wait for the run to finish, or cancel it.
+Removing a property in the Properties panel that pipeline steps use (linked to
+it, or created by them, including disabled steps) first lists those steps.
+Choose **Remove anyway** to remove it; each of those steps then creates a new
+property on its next run. While a pipeline that computes the property is
+running, it can't be removed: wait for the run to finish, or cancel it. If the
+removal is refused (for example the collection's properties have not loaded
+yet), the dialog stays open and says why.
 
 ### Configuring a step
 

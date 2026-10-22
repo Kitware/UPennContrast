@@ -1888,7 +1888,7 @@ describe("removing a property that pipeline steps use", () => {
     return { ...propertyStep(id), sourcePropertyId: propertyId, enabled };
   }
 
-  it("lists the enabled pipeline steps linked to a property", () => {
+  it("lists the pipeline steps that use a property", () => {
     const materialized = propertyStep("owned");
     materialized.materializedPropertyId = "user-prop";
     h.main.configuration.pipelines = [
@@ -1914,18 +1914,40 @@ describe("removing a property that pipeline steps use", () => {
       },
     ];
 
+    // Disabled steps too (they use it again once re-enabled), and a step
+    // that created the property: removing it makes each create a new one.
     expect(pipelinesStore.pipelineStepsLinkedToProperty("user-prop")).toEqual([
       {
         pipelineId: "pipe1",
         pipelineName: "Segment and measure",
         stepId: "measure",
         stepName: "measure",
+        enabled: true,
+        use: "linked",
+      },
+      {
+        pipelineId: "pipe2",
+        pipelineName: "Disabled link",
+        stepId: "off",
+        stepName: "off",
+        enabled: false,
+        use: "linked",
+      },
+      {
+        pipelineId: "pipe3",
+        pipelineName: "Materialized only",
+        stepId: "owned",
+        stepName: "owned",
+        enabled: true,
+        use: "created",
       },
       {
         pipelineId: "pipe4",
         pipelineName: "Second pipeline",
         stepId: "again",
         stepName: "again",
+        enabled: true,
+        use: "linked",
       },
     ]);
     expect(pipelinesStore.pipelineStepsLinkedToProperty("unused")).toEqual([]);
