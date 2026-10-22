@@ -247,6 +247,38 @@ Existing in-codebase idioms for writing once:
 
 Writes to genuinely *different* resources can't be merged (the configuration vs the dataset view are separate endpoints); say so at the call site rather than leaving it looking like an oversight.
 
+### A run must submit what the editor shows
+
+A pipeline step is shown through one path (`displayedSteps`, plus the step
+editor's displayed defaults) and run through another (`stepsAsRun`, then
+`buildTransientTool`). Any filling the display does must happen on the run
+path too: a linked tool saved without values was shown with interface
+defaults and run with none (`withInterfaceDefaults`). When the run path gains
+an await before a submit (fetching that interface), it needs the same
+re-checks as the top of the step: configuration switch and cancel, since
+`cancel()` can only cancel a job it already knows. Fetch an interface only
+when `getWorkerInterface` is `undefined`; `null` means the worker has none,
+and re-asking runs a worker job.
+
+### Live-resolved display: everything derived from the source must follow it
+
+When a view shows values resolved live from a store (a linked pipeline step
+showing its tool's current settings), the display is not the only thing
+derived from that source. A working copy captured at open time, or a resource
+loaded on mount (a worker interface for the step's image), goes stale the
+moment the source changes while the view is open. Nothing complains until a
+later edit or Save reads the stale copy: removing a step then restored its old
+wiring, and a tool's new image left the step with no parameter controls (PR
+#1430). Rules:
+
+- Load per-value resources in a `watch` on the value, not only `onMounted` or
+  the in-view change handler. Guard an async mount seed against the value
+  having changed during its await.
+- Before applying an edit to a working copy, carry over the fields the live
+  derivation owns, and only those (wiring owns tags and shape, never the
+  step's own exclusive-match flag). Carrying the whole object silently
+  reverts the edit being applied.
+
 ### Watching Getters That Rebuild Their Return Object
 
 `watch(() => someGetter, cb, { deep: true })` on a getter that returns a **new object on every read** fires on every dependency touch — including dependencies the getter reads but that don't change the output (`deep: true` skips the value comparison entirely). This shipped a real bug: a deep watch on `currentFilters` cleared the selection on every Z-scrub because the getter read `z` unconditionally. tsc/lint/reasoning all passed; only the live app caught it.
@@ -306,6 +338,66 @@ datasets with the old view still loaded). Out-of-range indices also travel in
 URLs: the breadcrumb view switcher keeps the current query when it moves to
 another dataset. See `codebaseDocumentation/DATASET_LOCATION.md` and its
 regression checklist.
+
+### A long-running action must pin the configuration it started on
+
+`main.configuration`, `main.tools` and `properties.properties` are the LOADED
+configuration's, and opening a dataset of another configuration replaces all
+of them while an action that spans worker jobs (a pipeline run, a batch) keeps
+going. Each later read then sees the other configuration. Lookups fail, the
+fallback creates properties there, and ids are recorded there, while the jobs
+still target the original dataset. Guarding one lookup (resolving it once at
+the start, or the reload guard in `loadMissingLinkedProperties`) leaves every
+other read exposed. Capture `main.configuration.id` before the first await,
+then check it before each unit of work, including any reload or cache write
+that reads "the loaded configuration" itself, and stop if it changed
+(`runPipeline`/`runPipelineBatch`, `CONFIGURATION_CHANGED_DURING_RUN`). Write
+anything the action already produced to the captured configuration object, not
+through `syncConfiguration`, which writes whichever configuration is loaded.
+Never write a store list back after a switch either: `setConfiguration` starts
+the new configuration's `fetchProperties` without awaiting it, so for a while
+`properties.properties` is still the previous configuration's list, and
+`setProperties`/`deleteProperty` would save it as the new one's `propertyIds`
+(every reader must check `propertiesConfigurationId` too, not only writers:
+the runner and the pipeline editor read the list through `propertiesOf` /
+`configurationProperties`; `setProperties` refuses a list whose `propertiesConfigurationId`
+is not the loaded configuration, including `null`: a list no fetch has loaded
+is no configuration's, and treating "unknown" as safe let a stale list through
+after a failed first fetch; and `createProperty` registers nothing if a
+switch lands during its request). Keep a run-local record of what the action produced and merge it in
+just before the final write: a switch away and back reloads the configuration
+from the server, without anything merged into the old object.
+
+### A failed optimistic write restores what the server holds, not its snapshot
+
+An optimistic write (set the value, await the save, restore `previous` on
+failure) breaks once writes can overlap. A later write may sit on top of the
+failed one, an earlier write it built on may have failed too, or a fetch may
+have replaced the value during the await. Restoring the snapshot then puts a
+value back that the server never held, or overwrites a newer one. After a
+configuration switch it is worse: the old configuration's property list went
+back in under the new one's ownership, and the next save wrote it into the new
+configuration. Checking "is the value still the one I wrote?" is not enough
+either: a nested rollback (from a copying mutation, or a fetch) gives it a new
+identity, so the outer rollback is skipped and the list and its ids disagree.
+
+What works here (`writeConfigurationKey` in `index.ts`): per configuration key,
+count pending writes and record the last value the server confirmed. Restore
+nothing while any write of the key is pending. When the last one settles, if
+any of them failed, set the key to the confirmed value. Don't restore at the
+latest write's failure: a write can fail before it reaches the API's per-key
+queue (a session that expired), while an earlier one is still in flight and
+then succeeds. Restore onto the loaded configuration object when it has the
+same id, since a switch away and back loads a new object. Rebuild derived state
+from the restored value at the same point rather than restoring it separately:
+`setProperties` rebuilds the list from the restored `propertyIds`, keeping the
+objects that in-flight saves started from so a property an earlier failed save
+removed can come back. Key that bookkeeping exactly as the write it shadows
+(per configuration here): process-wide counters let a save pending on one
+configuration hold back another configuration's rebuild, then clear its
+failure flag. Tests: *"restores what the server holds when
+overlapping saves both fail (earlier first)"*, *"(out of order)"*, *"ends on an
+earlier save's value when a later save fails before it is sent"*.
 
 ### Per-resource component state under a reused route: key it by id
 
@@ -638,6 +730,8 @@ defaults: {
   VCheckboxBtn: { density: "comfortable" },
 }
 ```
+
+**An explicit prop beats a `v-defaults-provider` default.** A wrapper that forwards `:disabled="disabled"` with a `false` default passes `false` explicitly, which overrides a surrounding `<v-defaults-provider :defaults="{ global: { disabled: true } }">`. A locked pipeline step's Tags field rendered editable-looking this way while every other field dimmed. Forward `:disabled="disabled || undefined"` so an unset prop falls through to the provider. Test it by mounting under `VDefaultsProvider` and asserting the `v-input--disabled` class: `findComponent().props("disabled")` reads the raw prop and returns `null` either way.
 
 ## @girder/components Compatibility
 
