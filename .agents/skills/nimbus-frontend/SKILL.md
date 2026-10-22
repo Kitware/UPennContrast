@@ -399,19 +399,20 @@ failure flag. Tests: *"restores what the server holds when
 overlapping saves both fail (earlier first)"*, *"(out of order)"*, *"ends on an
 earlier save's value when a later save fails before it is sent"*.
 
-**Queueing writes to fix their order changes two more things.** Annotation
-edits (`saveAnnotationsInOrder` in `annotation.ts`) are sent one at a time per
-annotation, so the server applies them in the order their responses settle.
-A request held in a queue is sent later, so check what can happen in between:
-- **A server-side write over the same data can overtake it.** A
-  color-by-property job that ran while a recolor waited was then overwritten
-  by the recolor. Such jobs wait for the queue first
-  (`annotationSavesSettled`).
-- **The session can change.** The API classes resolve the live Girder client
-  when a request is sent, so a queued edit would go out as another user or to
-  another server after a share link or server switch. Record the client
-  (`toRaw(main.girderRest)`) when queueing, and refuse to send once it has
-  changed.
+**Don't fix the estimate's ordering problem by queueing writes; read back.**
+A rollback that replays successful patches in response order can be wrong
+when overlapping saves were applied by the server in another order, or a
+failed bulk save was partly written. PR #1433 first sent each annotation's
+saves one at a time. Every review round then found something new the queue
+changed: a color-by-property job overtook a held edit, a held edit crossed a
+session switch, undo didn't wait for it, and its cancellation looked like a
+possible write. A held write is a mechanism every other write path must
+coordinate with. Instead, after restoring the estimate, read the affected
+records back (`reconcileRestoredAnnotations`, via `hydrateAnnotations`), and
+apply each server copy only if the store still holds the restored object, in
+the same session and dataset. A read can't overwrite the server, so
+overlapping writes can't corrupt anything; the worst case is a briefly stale
+display.
 
 ### Per-resource component state under a reused route: key it by id
 

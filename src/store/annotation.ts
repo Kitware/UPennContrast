@@ -1624,9 +1624,7 @@ export class Annotations extends VuexModule {
       }
       this.setAnnotationsAtIndices(localUpdates);
       if (annotationUpdates.length) {
-        await saveAnnotationsInOrder(annotationUpdates, (updates) =>
-          this.annotationsAPI.updateAnnotations(updates),
-        );
+        await this.annotationsAPI.updateAnnotations(annotationUpdates);
         this.bumpMutationCounter();
       }
       succeeded = true;
@@ -1658,7 +1656,56 @@ export class Annotations extends VuexModule {
         }
       });
       this.setAnnotationsAtIndices(restores);
+      if (restores.length > 0) {
+        void this.reconcileRestoredAnnotations(
+          restores.map(({ annotation }) => annotation),
+        );
+      }
     }
+  }
+
+  // After a failed edit is put back, read the annotations back: the restored
+  // value is an estimate of what the server holds (overlapping saves may have
+  // been applied in another order than their responses arrived, a bulk save
+  // that failed may be partly written). Only a read: it can't overwrite the
+  // server, so overlapping writes, undo or a session switch can't make it
+  // corrupt anything. Each server copy replaces an annotation only while the
+  // store still holds the restored object, in the same session and dataset;
+  // otherwise something newer replaced it. On a failed read the estimate stays.
+  @Action
+  private async reconcileRestoredAnnotations(restored: IAnnotation[]) {
+    const session = toRaw(main.girderRest);
+    const datasetId = main.dataset?.id;
+    let serverCopies: IAnnotation[];
+    try {
+      serverCopies = await this.annotationsAPI.hydrateAnnotations(
+        restored.map(({ id }) => id),
+      );
+    } catch (error) {
+      logError(
+        `Failed to read back annotations after a failed edit: ${
+          (error as Error).message
+        }`,
+      );
+      return;
+    }
+    if (toRaw(main.girderRest) !== session || main.dataset?.id !== datasetId) {
+      return;
+    }
+    const restoredById = new Map(restored.map((a) => [a.id, a]));
+    const updates: IndexedAnnotationUpdate[] = [];
+    for (const serverCopy of serverCopies) {
+      const index = this.annotationIdToIdx[serverCopy.id];
+      const stored = index === undefined ? undefined : this.annotations[index];
+      if (stored && stored === restoredById.get(serverCopy.id)) {
+        updates.push({
+          annotation: serverCopy,
+          index,
+          updateCentroid: true,
+        });
+      }
+    }
+    this.setAnnotationsAtIndices(updates);
   }
 
   @Action
@@ -1873,14 +1920,6 @@ export class Annotations extends VuexModule {
     // old ones. 400/401/403 are rejected before any write (see
     // failureMayHaveWritten), so nothing changed and the
     // (potentially large) refetch can be skipped.
-    // Queued edits first (see annotationSavesSettled): the assignment is the
-    // last word on colors here and on the server. Not if the session changed
-    // meanwhile (another server, a share link): the job belongs to the old one.
-    const session = currentGirderSession();
-    await annotationSavesSettled();
-    if (currentGirderSession() !== session) {
-      return null;
-    }
     let backendMayHaveChanged = true;
     let applied = false;
     try {
@@ -1954,13 +1993,6 @@ export class Annotations extends VuexModule {
       return;
     }
     const configurationId = main.configuration?.id;
-    // Queued edits first, and not across a session change, as in
-    // applyColorByProperty.
-    const session = currentGirderSession();
-    await annotationSavesSettled();
-    if (currentGirderSession() !== session) {
-      return;
-    }
     let backendMayHaveChanged = true;
     let applied = false;
     try {
@@ -3230,74 +3262,13 @@ function followServerAnnotationWrite(
   return replacement;
 }
 
-// The latest save of each annotation that has not settled yet. One
-// annotation's saves go out one at a time, in order: overlapping requests
-// could be applied by the server in a different order than their responses
-// arrive, and settleAnnotationEdit takes response order as server order.
-const lastAnnotationSaves = new Map<string, Promise<unknown>>();
-
-// Settles once every annotation save already queued or in flight has. A
-// server-side write over the whole dataset (color-by-property) waits for it:
-// saveAnnotationsInOrder holds an edit back behind an earlier one, and an
-// edit sent after the job would overwrite the job's colors on the server
-// while the canvas shows the job's.
-function annotationSavesSettled() {
-  return Promise.allSettled(new Set(lastAnnotationSaves.values()));
-}
-
-// The Girder client requests go out through: replaced when the user logs in,
-// switches servers or opens a share link (the API classes resolve the live
-// one when a request is sent).
-function currentGirderSession() {
-  return toRaw(main.girderRest);
-}
-
-export const SESSION_CHANGED_BEFORE_SAVE =
-  "The session changed before this edit was saved, so it was not sent.";
-
-async function saveAnnotationsInOrder(
-  updates: AnnotationUpdatePatch[],
-  save: (updates: AnnotationUpdatePatch[]) => Promise<unknown>,
-) {
-  // A save held back behind an earlier one is sent later through whatever
-  // client is live then: not through another session than the edit's.
-  const session = currentGirderSession();
-  const earlier = new Set<Promise<unknown>>();
-  for (const { id } of updates) {
-    const previous = lastAnnotationSaves.get(id);
-    if (previous) {
-      earlier.add(previous);
-    }
-  }
-  const request =
-    earlier.size === 0
-      ? save(updates)
-      : Promise.allSettled(earlier).then(() => {
-          if (currentGirderSession() !== session) {
-            throw new Error(SESSION_CHANGED_BEFORE_SAVE);
-          }
-          return save(updates);
-        });
-  for (const { id } of updates) {
-    lastAnnotationSaves.set(id, request);
-  }
-  try {
-    return await request;
-  } finally {
-    for (const { id } of updates) {
-      if (lastAnnotationSaves.get(id) === request) {
-        lastAnnotationSaves.delete(id);
-      }
-    }
-  }
-}
-
 // Record one edit's outcome. Returns true when it was the chain's last
 // pending edit and some edit in the chain failed, so the caller should put
 // `confirmed` back. A patch carries whole field values, so applying the ones
-// that succeeded to `confirmed` tracks what the server holds. (A non-400
-// failure of the bulk save can still leave part of it written; callers that
-// must match the server exactly refetch, as colorAnnotationIds does.)
+// that succeeded to `confirmed` estimates what the server holds; overlapping
+// saves can be applied in another order than their responses arrive, and a
+// non-400 failure of the bulk save can leave part of it written, so the
+// caller then reads the annotation back (reconcileRestoredAnnotations).
 function settleAnnotationEdit(
   edits: IPendingAnnotationEdits,
   patch: AnnotationUpdatePatch,

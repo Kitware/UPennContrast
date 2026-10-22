@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 const { api, mainState } = vi.hoisted(() => ({
   api: {
     updateAnnotations: vi.fn(),
-    colorByProperty: vi.fn(),
+    hydrateAnnotations: vi.fn(),
     getAnnotationCount: vi.fn(),
     getAnnotationsForDatasetId: vi.fn(),
     getConnectionsForDatasetId: vi.fn(),
@@ -56,7 +56,7 @@ vi.mock("@/utils/log", () => ({
   logWarning: vi.fn(),
 }));
 
-import annotationStore, { SESSION_CHANGED_BEFORE_SAVE } from "./annotation";
+import annotationStore from "./annotation";
 import { AnnotationShape, IAnnotation } from "./model";
 
 function makeAnnotation(
@@ -134,6 +134,9 @@ describe("updateAnnotationsPerId failure rollback", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The read-back after a failed edit: by default the server returns
+    // nothing, so the restored estimate stands.
+    api.hydrateAnnotations.mockResolvedValue([]);
     mainState.dataset = { id: "ds" };
     annotationStore.setStubOnlyMode(false);
     annotationStore.setAnnotations([
@@ -238,95 +241,96 @@ describe("updateAnnotationsPerId failure rollback", () => {
     expect(stored("a")).toEqual(original);
   });
 
-  it("sends an annotation's saves one at a time, in order", async () => {
-    // Overlapping requests could be applied by the server in another order
-    // than their responses arrive; the rollback takes response order as the
-    // server's.
+  it("restores what the server holds when saves fail out of order", async () => {
     const saves = holdSaves();
     const first = rename("a", "renamed");
     const second = recolor("a", "#ff0000");
-    // Another annotation's save is not held back.
-    const other = rename("b", "other");
 
-    expect(api.updateAnnotations).toHaveBeenCalledTimes(2);
-    expect(api.updateAnnotations.mock.calls[1][0]).toEqual([
-      { id: "b", name: "other" },
-    ]);
-    saves[1].resolve();
-    await other;
+    saves[1].reject(new Error("offline"));
+    await expect(second).rejects.toThrow("offline");
+    // The rename is still in flight: keep it.
+    expect(stored("a").name).toBe("renamed");
 
     saves[0].resolve();
     await first;
-    await sent(saves, 3);
-    expect(api.updateAnnotations.mock.calls[2][0]).toEqual([
-      { id: "a", color: "#ff0000" },
-    ]);
-    saves[2].reject(new Error("offline"));
-    await expect(second).rejects.toThrow("offline");
-    // The server holds the rename, not the recolor.
     expect(stored("a").name).toBe("renamed");
     expect(stored("a").color).toBeNull();
   });
 
-  it("colors by property only after queued edits have been saved", async () => {
+  it("reads a failed edit's annotation back and shows the server's copy", async () => {
+    // Overlapping saves can be applied in another order than their responses
+    // arrive: the restored value is only an estimate.
+    const serverCopy = makeAnnotation("a", {
+      name: "server",
+      color: "#123456",
+    });
+    api.hydrateAnnotations.mockResolvedValue([serverCopy]);
     const saves = holdSaves();
-    const first = rename("a", "renamed");
-    // Queued behind the rename: not sent yet.
-    const second = recolor("a", "#ff0000");
-    api.colorByProperty.mockResolvedValue({
-      assignment: [{ color: "#00ff00", ids: ["a"] }],
-    });
+    const pending = rename("a", "renamed");
 
-    const coloring = annotationStore.applyColorByProperty({
-      propertyPath: ["p"],
-      propertyName: "P",
-    });
-    await Promise.resolve();
-    expect(api.colorByProperty).not.toHaveBeenCalled();
+    saves[0].reject(new Error("offline"));
+    await expect(pending).rejects.toThrow("offline");
 
-    saves[0].resolve();
-    await first;
-    await sent(saves, 2);
-    expect(api.colorByProperty).not.toHaveBeenCalled();
-    saves[1].resolve();
-    await second;
-    await coloring;
-
-    // The server colored last, so the canvas shows its color.
-    expect(api.colorByProperty).toHaveBeenCalledTimes(1);
-    expect(stored("a").color).toBe("#00ff00");
+    await vi.waitFor(() => expect(stored("a")).toEqual(serverCopy));
+    expect(api.hydrateAnnotations).toHaveBeenCalledWith(["a"]);
   });
 
-  it("does not send a queued edit through a session that replaced the edit's", async () => {
+  it("keeps a newer edit when the read-back lands after it", async () => {
+    let finishRead!: (copies: IAnnotation[]) => void;
+    api.hydrateAnnotations.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishRead = resolve;
+        }),
+    );
+    const saves = holdSaves();
+    const failed = rename("a", "renamed");
+    saves[0].reject(new Error("offline"));
+    await expect(failed).rejects.toThrow("offline");
+
+    // A new edit before the read-back returns.
+    const newer = recolor("a", "#00ff00");
+    finishRead([makeAnnotation("a", { name: "A" })]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(stored("a").color).toBe("#00ff00");
+    saves[1].resolve();
+    await newer;
+  });
+
+  it("does not apply a read-back that lands after a session change", async () => {
+    let finishRead!: (copies: IAnnotation[]) => void;
+    api.hydrateAnnotations.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishRead = resolve;
+        }),
+    );
     const saves = holdSaves();
     const original = stored("a");
-    const first = rename("a", "renamed");
-    const second = recolor("a", "#ff0000");
-
-    // Another server or a share link opens while the recolor is queued.
-    mainState.girderRest = {};
+    const pending = rename("a", "renamed");
     saves[0].reject(new Error("offline"));
-    await expect(first).rejects.toThrow("offline");
+    await expect(pending).rejects.toThrow("offline");
 
-    await expect(second).rejects.toThrow(SESSION_CHANGED_BEFORE_SAVE);
-    expect(api.updateAnnotations).toHaveBeenCalledTimes(1);
-    expect(stored("a")).toEqual(original);
+    // Another server or a share link opens before the read-back returns.
+    mainState.girderRest = {};
+    finishRead([makeAnnotation("a", { name: "other server" })]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(stored("a")).toBe(original);
   });
 
-  it("does not color by property across a session change", async () => {
+  it("keeps the restored value when the read-back fails", async () => {
+    api.hydrateAnnotations.mockRejectedValue(new Error("still offline"));
     const saves = holdSaves();
-    const first = rename("a", "renamed");
-    const coloring = annotationStore.applyColorByProperty({
-      propertyPath: ["p"],
-      propertyName: "P",
-    });
+    const original = stored("a");
+    const pending = rename("a", "renamed");
+    saves[0].reject(new Error("offline"));
+    await expect(pending).rejects.toThrow("offline");
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    mainState.girderRest = {};
-    saves[0].resolve();
-    await first;
-
-    expect(await coloring).toBeNull();
-    expect(api.colorByProperty).not.toHaveBeenCalled();
+    expect(stored("a")).toBe(original);
   });
 
   it("keeps an assigned color that matched a failed edit's color", async () => {
