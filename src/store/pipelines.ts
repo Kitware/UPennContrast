@@ -83,6 +83,19 @@ export function mergeMaterializedPropertyIds(
   }
 }
 
+// A pipeline step that uses a property, named for the user.
+export interface IPipelineStepLink {
+  pipelineId: string;
+  pipelineName: string;
+  stepId: string;
+  stepName: string;
+  // Off now, but it uses the property again once re-enabled.
+  enabled: boolean;
+  // How the step uses it: linked to it (sourcePropertyId), or it is the
+  // property the step created (materializedPropertyId).
+  use: "linked" | "created";
+}
+
 // Linked properties a reload found missing, as `${configurationId}:${id}`
 // (see loadMissingLinkedProperties). Per configuration: one property can be
 // registered in several (a duplicated configuration shares them), and
@@ -232,6 +245,62 @@ export class Pipelines extends VuexModule {
               s.id !== exclude.stepId,
           ),
       );
+  }
+
+  // The property steps that use `propertyId`, by pipeline: linked to it
+  // (sourcePropertyId) or created it (materializedPropertyId), disabled ones
+  // included (they use it again once re-enabled). Removing the property from
+  // the configuration makes each of them create a new pipeline-owned
+  // property on its next run, so the Properties panel names them first.
+  get pipelineStepsLinkedToProperty() {
+    return (propertyId: string): IPipelineStepLink[] =>
+      this.pipelines.flatMap((pipeline) =>
+        pipeline.steps.flatMap((step): IPipelineStepLink[] => {
+          if (step.kind !== "property") {
+            return [];
+          }
+          const use =
+            step.sourcePropertyId === propertyId
+              ? "linked"
+              : step.materializedPropertyId === propertyId
+                ? "created"
+                : null;
+          return use
+            ? [
+                {
+                  pipelineId: pipeline.id,
+                  pipelineName: pipeline.name,
+                  stepId: step.id,
+                  stepName: step.name,
+                  enabled: step.enabled,
+                  use,
+                },
+              ]
+            : [];
+        }),
+      );
+  }
+
+  // The running pipeline (single run or batch), if one of its enabled
+  // property steps computes `propertyId`: the property it is linked to, or
+  // the one it materialized. Removing that property mid-run would split the
+  // run's results between it and a fallback property the remaining steps or
+  // datasets create. Read from the stored pipeline, which is what both run
+  // entry points submit.
+  get runningPipelineComputingProperty() {
+    return (propertyId: string): IPipeline | null => {
+      const running = this.runningPipelineId
+        ? this.getPipelineById(this.runningPipelineId)
+        : null;
+      const computesProperty = running?.steps.some(
+        (step) =>
+          step.enabled &&
+          step.kind === "property" &&
+          (step.sourcePropertyId === propertyId ||
+            step.materializedPropertyId === propertyId),
+      );
+      return computesProperty ? running : null;
+    };
   }
 
   // Delete a pipeline. By default also deletes the persisted properties its

@@ -1625,12 +1625,19 @@ export class Properties extends VuexModule {
   }
 
   @Action
-  async deletePropertyValues(propertyId: string) {
-    if (!main.dataset?.id) {
-      return;
+  async deletePropertyValues({
+    propertyId,
+    datasetId,
+  }: {
+    propertyId: string;
+    // The dataset whose values to delete, captured by the caller: another
+    // dataset may be open by the time this runs.
+    datasetId: string;
+  }) {
+    await this.propertiesAPI.deletePropertyValues(propertyId, datasetId);
+    if (main.dataset?.id === datasetId) {
+      await this.fetchPropertyValues();
     }
-    await this.propertiesAPI.deletePropertyValues(propertyId, main.dataset.id);
-    await this.fetchPropertyValues();
   }
 
   @Action

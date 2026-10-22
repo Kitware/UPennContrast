@@ -1882,3 +1882,115 @@ describe("configuration switch during a run", () => {
 function cloneForStore(pipe: IPipeline): IPipeline {
   return JSON.parse(JSON.stringify(pipe));
 }
+
+describe("removing a property that pipeline steps use", () => {
+  function linkedStep(id: string, propertyId: string, enabled = true): any {
+    return { ...propertyStep(id), sourcePropertyId: propertyId, enabled };
+  }
+
+  it("lists the pipeline steps that use a property", () => {
+    const materialized = propertyStep("owned");
+    materialized.materializedPropertyId = "user-prop";
+    h.main.configuration.pipelines = [
+      {
+        id: "pipe1",
+        name: "Segment and measure",
+        steps: [
+          annotationStep("segment"),
+          linkedStep("measure", "user-prop"),
+          linkedStep("other", "another-prop"),
+        ],
+      },
+      {
+        id: "pipe2",
+        name: "Disabled link",
+        steps: [linkedStep("off", "user-prop", false)],
+      },
+      { id: "pipe3", name: "Materialized only", steps: [materialized] },
+      {
+        id: "pipe4",
+        name: "Second pipeline",
+        steps: [linkedStep("again", "user-prop")],
+      },
+    ];
+
+    // Disabled steps too (they use it again once re-enabled), and a step
+    // that created the property: removing it makes each create a new one.
+    expect(pipelinesStore.pipelineStepsLinkedToProperty("user-prop")).toEqual([
+      {
+        pipelineId: "pipe1",
+        pipelineName: "Segment and measure",
+        stepId: "measure",
+        stepName: "measure",
+        enabled: true,
+        use: "linked",
+      },
+      {
+        pipelineId: "pipe2",
+        pipelineName: "Disabled link",
+        stepId: "off",
+        stepName: "off",
+        enabled: false,
+        use: "linked",
+      },
+      {
+        pipelineId: "pipe3",
+        pipelineName: "Materialized only",
+        stepId: "owned",
+        stepName: "owned",
+        enabled: true,
+        use: "created",
+      },
+      {
+        pipelineId: "pipe4",
+        pipelineName: "Second pipeline",
+        stepId: "again",
+        stepName: "again",
+        enabled: true,
+        use: "linked",
+      },
+    ]);
+    expect(pipelinesStore.pipelineStepsLinkedToProperty("unused")).toEqual([]);
+  });
+
+  it("finds the running pipeline that computes a property", () => {
+    const materialized = propertyStep("owned");
+    materialized.materializedPropertyId = "owned-prop";
+    const running: IPipeline = {
+      id: "pipe1",
+      name: "Running",
+      steps: [
+        linkedStep("measure", "user-prop"),
+        materialized,
+        linkedStep("off", "disabled-prop", false),
+      ],
+    };
+    const idle: IPipeline = {
+      id: "pipe2",
+      name: "Idle",
+      steps: [linkedStep("idle", "idle-prop")],
+    };
+    h.main.configuration.pipelines = [running, idle];
+
+    // Nothing runs: no removal is blocked.
+    expect(
+      pipelinesStore.runningPipelineComputingProperty("user-prop"),
+    ).toBeNull();
+
+    pipelinesStore.setRunningPipelineId("pipe1");
+    // A linked property and one the pipeline materialized are both computed
+    // by the run; a disabled step's property and another pipeline's are not.
+    expect(
+      pipelinesStore.runningPipelineComputingProperty("user-prop")?.id,
+    ).toBe("pipe1");
+    expect(
+      pipelinesStore.runningPipelineComputingProperty("owned-prop")?.id,
+    ).toBe("pipe1");
+    expect(
+      pipelinesStore.runningPipelineComputingProperty("disabled-prop"),
+    ).toBeNull();
+    expect(
+      pipelinesStore.runningPipelineComputingProperty("idle-prop"),
+    ).toBeNull();
+  });
+});
