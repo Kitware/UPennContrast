@@ -22,6 +22,8 @@ const { api, mainState } = vi.hoisted(() => ({
     getConnectionsForDatasetId: vi.fn(),
   },
   mainState: {
+    // The live Girder client: replaced on login, server switch, share link.
+    girderRest: {} as object,
     isLoggedIn: true,
     dataset: { id: "ds" } as { id: string } | null,
     configuration: {},
@@ -54,7 +56,7 @@ vi.mock("@/utils/log", () => ({
   logWarning: vi.fn(),
 }));
 
-import annotationStore from "./annotation";
+import annotationStore, { SESSION_CHANGED_BEFORE_SAVE } from "./annotation";
 import { AnnotationShape, IAnnotation } from "./model";
 
 function makeAnnotation(
@@ -293,6 +295,38 @@ describe("updateAnnotationsPerId failure rollback", () => {
     // The server colored last, so the canvas shows its color.
     expect(api.colorByProperty).toHaveBeenCalledTimes(1);
     expect(stored("a").color).toBe("#00ff00");
+  });
+
+  it("does not send a queued edit through a session that replaced the edit's", async () => {
+    const saves = holdSaves();
+    const original = stored("a");
+    const first = rename("a", "renamed");
+    const second = recolor("a", "#ff0000");
+
+    // Another server or a share link opens while the recolor is queued.
+    mainState.girderRest = {};
+    saves[0].reject(new Error("offline"));
+    await expect(first).rejects.toThrow("offline");
+
+    await expect(second).rejects.toThrow(SESSION_CHANGED_BEFORE_SAVE);
+    expect(api.updateAnnotations).toHaveBeenCalledTimes(1);
+    expect(stored("a")).toEqual(original);
+  });
+
+  it("does not color by property across a session change", async () => {
+    const saves = holdSaves();
+    const first = rename("a", "renamed");
+    const coloring = annotationStore.applyColorByProperty({
+      propertyPath: ["p"],
+      propertyName: "P",
+    });
+
+    mainState.girderRest = {};
+    saves[0].resolve();
+    await first;
+
+    expect(await coloring).toBeNull();
+    expect(api.colorByProperty).not.toHaveBeenCalled();
   });
 
   it("keeps an assigned color that matched a failed edit's color", async () => {

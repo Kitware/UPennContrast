@@ -399,6 +399,20 @@ failure flag. Tests: *"restores what the server holds when
 overlapping saves both fail (earlier first)"*, *"(out of order)"*, *"ends on an
 earlier save's value when a later save fails before it is sent"*.
 
+**Queueing writes to fix their order changes two more things.** Annotation
+edits (`saveAnnotationsInOrder` in `annotation.ts`) are sent one at a time per
+annotation, so the server applies them in the order their responses settle.
+A request held in a queue is sent later, so check what can happen in between:
+- **A server-side write over the same data can overtake it.** A
+  color-by-property job that ran while a recolor waited was then overwritten
+  by the recolor. Such jobs wait for the queue first
+  (`annotationSavesSettled`).
+- **The session can change.** The API classes resolve the live Girder client
+  when a request is sent, so a queued edit would go out as another user or to
+  another server after a share link or server switch. Record the client
+  (`toRaw(main.girderRest)`) when queueing, and refuse to send once it has
+  changed.
+
 ### Per-resource component state under a reused route: key it by id
 
 Vue Router reuses a route's component when only a param changes (`/project/A`

@@ -1873,12 +1873,17 @@ export class Annotations extends VuexModule {
     // old ones. 400/401/403 are rejected before any write (see
     // failureMayHaveWritten), so nothing changed and the
     // (potentially large) refetch can be skipped.
+    // Queued edits first (see annotationSavesSettled): the assignment is the
+    // last word on colors here and on the server. Not if the session changed
+    // meanwhile (another server, a share link): the job belongs to the old one.
+    const session = currentGirderSession();
+    await annotationSavesSettled();
+    if (currentGirderSession() !== session) {
+      return null;
+    }
     let backendMayHaveChanged = true;
     let applied = false;
     try {
-      // Queued edits first (see annotationSavesSettled): the assignment is
-      // the last word on colors here and on the server.
-      await annotationSavesSettled();
       const result = await this.annotationsAPI.colorByProperty({
         datasetId,
         ...request,
@@ -1949,11 +1954,16 @@ export class Annotations extends VuexModule {
       return;
     }
     const configurationId = main.configuration?.id;
+    // Queued edits first, and not across a session change, as in
+    // applyColorByProperty.
+    const session = currentGirderSession();
+    await annotationSavesSettled();
+    if (currentGirderSession() !== session) {
+      return;
+    }
     let backendMayHaveChanged = true;
     let applied = false;
     try {
-      // Queued edits first, as in applyColorByProperty.
-      await annotationSavesSettled();
       await this.annotationsAPI.clearColorByProperty(datasetId);
       // Same dataset-switch guard as applyColorByProperty for the LOCAL
       // apply: an empty assignment nulls EVERY loaded color, so applying it
@@ -3235,10 +3245,23 @@ function annotationSavesSettled() {
   return Promise.allSettled(new Set(lastAnnotationSaves.values()));
 }
 
+// The Girder client requests go out through: replaced when the user logs in,
+// switches servers or opens a share link (the API classes resolve the live
+// one when a request is sent).
+function currentGirderSession() {
+  return toRaw(main.girderRest);
+}
+
+export const SESSION_CHANGED_BEFORE_SAVE =
+  "The session changed before this edit was saved, so it was not sent.";
+
 async function saveAnnotationsInOrder(
   updates: AnnotationUpdatePatch[],
   save: (updates: AnnotationUpdatePatch[]) => Promise<unknown>,
 ) {
+  // A save held back behind an earlier one is sent later through whatever
+  // client is live then: not through another session than the edit's.
+  const session = currentGirderSession();
   const earlier = new Set<Promise<unknown>>();
   for (const { id } of updates) {
     const previous = lastAnnotationSaves.get(id);
@@ -3249,7 +3272,12 @@ async function saveAnnotationsInOrder(
   const request =
     earlier.size === 0
       ? save(updates)
-      : Promise.allSettled(earlier).then(() => save(updates));
+      : Promise.allSettled(earlier).then(() => {
+          if (currentGirderSession() !== session) {
+            throw new Error(SESSION_CHANGED_BEFORE_SAVE);
+          }
+          return save(updates);
+        });
   for (const { id } of updates) {
     lastAnnotationSaves.set(id, request);
   }
