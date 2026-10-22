@@ -481,8 +481,12 @@ delete dialog (`PropertyBody.vue`) therefore:
   Each would create a new pipeline-owned property on its next run. The dialog
   names each pipeline and step, and the confirm button reads "Remove anyway".
 - **Reports a refused removal.** `deleteProperty` can be refused (this
-  configuration's properties have not loaded) or fail to save; the dialog
-  then stays open with the reason instead of closing as if it had worked.
+  configuration's properties have not loaded) or fail to save. The removal
+  takes the property out of the list before it saves, which unmounts this row
+  and its dialog, so the reason goes to a global notification as well as the
+  dialog. "Also delete the computed values" targets the dataset the removal
+  started on (captured before the await, passed to `deletePropertyValues`),
+  not whichever is open when the save completes.
 - **Blocks** the removal while a run or batch computes the property
   (`pipelinesStore.runningPipelineComputingProperty`): the pipeline in
   `runningPipelineId` has an enabled property step whose `sourcePropertyId` or
@@ -1058,6 +1062,7 @@ Linked steps (§3.4):
   reports a refused removal instead of closing —
   *"lists the pipeline steps that use a property"*,
   *"keeps the dialog open and says why when the removal is refused"*,
+  *"deletes the computed values of the dataset the removal started on"*,
   *"finds the running pipeline that computes a property"*,
   *"names the pipeline steps linked to the property and offers Remove anyway"*,
   *"blocks removing a property while a pipeline that computes it is running"*.

@@ -19,6 +19,12 @@ vi.mock("@/utils/log", () => ({
   logError: vi.fn(),
 }));
 
+const storeMock = vi.hoisted(() => ({ dataset: { id: "ds-a" } as any }));
+vi.mock("@/store", () => ({ default: storeMock }));
+
+const progressMock = vi.hoisted(() => ({ createNotification: vi.fn() }));
+vi.mock("@/store/progress", () => ({ default: progressMock }));
+
 // Reactive, so a run that starts while the dialog is open reaches the
 // component's computeds as it would through the real Vuex getters.
 const pipelinesMock = await vi.hoisted(async () => {
@@ -79,6 +85,8 @@ describe("PropertyBody", () => {
     (jobsStore.getJobLog as any) = vi.fn().mockReturnValue(null);
     pipelinesMock.state.linkedSteps = [];
     pipelinesMock.state.runningPipeline = null;
+    storeMock.dataset = { id: "ds-a" };
+    progressMock.createNotification.mockClear();
     document.body.innerHTML = "";
   });
 
@@ -141,11 +149,43 @@ describe("PropertyBody", () => {
     dialog.button("Remove")!.click();
     await vi.waitFor(() =>
       expect(document.body.querySelector(".v-dialog")?.textContent).toContain(
-        "The property was not removed",
+        '"Test Property" was not removed',
       ),
     );
     expect((wrapper.vm as any).deleteDialog).toBe(true);
     expect(propertyStore.deletePropertyValues).not.toHaveBeenCalled();
+    // The removal unmounts this row before it saves, so the reason is also
+    // reported where it is seen once the row is gone.
+    expect(progressMock.createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "error",
+        title: "Property not removed",
+      }),
+    );
+  });
+
+  it("deletes the computed values of the dataset the removal started on", async () => {
+    let finishRemoval!: () => void;
+    (propertyStore.deleteProperty as any) = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRemoval = resolve;
+        }),
+    );
+    const wrapper = mountComponent();
+    const vm = wrapper.vm as any;
+    vm.deleteComputedValues = true;
+
+    const removal = vm.deleteProperty();
+    // Another dataset opens while the removal saves.
+    storeMock.dataset = { id: "ds-b" };
+    finishRemoval();
+    await removal;
+
+    expect(propertyStore.deletePropertyValues).toHaveBeenCalledWith({
+      propertyId: "prop-1",
+      datasetId: "ds-a",
+    });
   });
 
   it("keeps the plain delete confirmation when no pipeline step links to the property", async () => {
@@ -213,7 +253,10 @@ describe("PropertyBody", () => {
     vm.deleteComputedValues = true;
     await vm.deleteProperty();
     expect(propertyStore.deleteProperty).toHaveBeenCalledWith("prop-1");
-    expect(propertyStore.deletePropertyValues).toHaveBeenCalledWith("prop-1");
+    expect(propertyStore.deletePropertyValues).toHaveBeenCalledWith({
+      propertyId: "prop-1",
+      datasetId: "ds-a",
+    });
   });
 
   it("copyLogToClipboard uses navigator.clipboard", async () => {

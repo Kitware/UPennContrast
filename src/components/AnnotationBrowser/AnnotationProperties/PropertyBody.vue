@@ -176,7 +176,13 @@ import { ref, computed, watch } from "vue";
 import propertyStore from "@/store/properties";
 import jobsStore from "@/store/jobs";
 import pipelinesStore from "@/store/pipelines";
-import { IAnnotationProperty, AnnotationNames } from "@/store/model";
+import progress from "@/store/progress";
+import store from "@/store";
+import {
+  IAnnotationProperty,
+  AnnotationNames,
+  NotificationType,
+} from "@/store/model";
 import { logError } from "@/utils/log";
 
 const props = defineProps<{
@@ -248,20 +254,35 @@ async function deleteProperty(): Promise<boolean> {
   if (runningPipeline.value) {
     return false;
   }
+  // Captured first: another dataset may be open once the removal has saved.
+  const datasetId = store.dataset?.id;
+  const deleteValues = deleteComputedValues.value;
+  const propertyName = props.property.name;
   try {
     await propertyStore.deleteProperty(props.property.id);
   } catch (error) {
     logError("Failed to remove property:", error);
-    deleteError.value = `The property was not removed: ${
+    const message = `"${propertyName}" was not removed: ${
       (error as Error).message
     }`;
+    deleteError.value = message;
+    // The removal takes the property out of the list before it saves, which
+    // unmounts this row and its dialog: say so where it is seen either way.
+    progress.createNotification({
+      type: NotificationType.ERROR,
+      title: "Property not removed",
+      message,
+    });
     return false;
   }
-  if (deleteComputedValues.value) {
+  if (deleteValues && datasetId) {
     // The property is removed either way; a failure here only leaves its
     // computed values in place.
     try {
-      await propertyStore.deletePropertyValues(props.property.id);
+      await propertyStore.deletePropertyValues({
+        propertyId: props.property.id,
+        datasetId,
+      });
     } catch (error) {
       logError("Failed to delete the property's computed values:", error);
     }
