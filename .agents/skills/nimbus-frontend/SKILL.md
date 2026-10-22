@@ -420,6 +420,21 @@ fails"*, *"carries over an adopted property no fetch has loaded yet when
 saving"*, *"polls a scheduled job until it succeeds, adopting its property at
 once"*.
 
+**Don't fix the estimate's ordering problem by queueing writes; read back.**
+A rollback that replays successful patches in response order can be wrong
+when overlapping saves were applied by the server in another order, or a
+failed bulk save was partly written. PR #1433 first sent each annotation's
+saves one at a time. Every review round then found something new the queue
+changed: a color-by-property job overtook a held edit, a held edit crossed a
+session switch, undo didn't wait for it, and its cancellation looked like a
+possible write. A held write is a mechanism every other write path must
+coordinate with. Instead, after restoring the estimate, read the affected
+records back (`reconcileRestoredAnnotations`, via `hydrateAnnotations`), and
+apply each server copy only if the store still holds the restored object, in
+the same session and dataset. A read can't overwrite the server, so
+overlapping writes can't corrupt anything; the worst case is a briefly stale
+display.
+
 ### Per-resource component state under a reused route: key it by id
 
 Vue Router reuses a route's component when only a param changes (`/project/A`
