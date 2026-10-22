@@ -11,7 +11,7 @@
  * These tests use the REAL store module with the save request held open, so
  * the interleavings are deterministic.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 const { api, mainState } = vi.hoisted(() => ({
   api: {
@@ -74,9 +74,14 @@ function makeAnnotation(
   };
 }
 
+// Saves a test left held: settled after each test, so a failing test does
+// not leave a save pending that the next test's saves would queue behind.
+const heldSaves: { resolve: () => void; reject: (e: Error) => void }[] = [];
+
 // Hold each updateAnnotations call open until the test settles it.
 function holdSaves() {
-  const saves: { resolve: () => void; reject: (e: Error) => void }[] = [];
+  const saves = heldSaves;
+  saves.length = 0;
   api.updateAnnotations.mockImplementation(
     () =>
       new Promise<void>((resolve, reject) => saves.push({ resolve, reject })),
@@ -102,11 +107,24 @@ function recolor(id: string, color: string) {
   });
 }
 
+// An annotation's saves go out one at a time: wait until the next queued one
+// has been sent.
+async function sent(saves: unknown[], count: number) {
+  await vi.waitFor(() => expect(saves).toHaveLength(count));
+}
+
 function stored(id: string) {
   return annotationStore.annotations[annotationStore.annotationIdToIdx[id]];
 }
 
 describe("updateAnnotationsPerId failure rollback", () => {
+  afterEach(async () => {
+    for (const save of heldSaves.splice(0)) {
+      save.resolve();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mainState.dataset = { id: "ds" };
@@ -126,6 +144,36 @@ describe("updateAnnotationsPerId failure rollback", () => {
     saves[0].reject(new Error("offline"));
     await expect(pending).rejects.toThrow("offline");
     expect(stored("a")).toBe(original);
+  });
+
+  it("reverts a failed edit in the stubs and hydrated copies the canvas draws from", async () => {
+    // With the stub system active, layers render from the stub map and the
+    // hydrated map, not annotations[].
+    annotationStore.setStubsFromServer([
+      {
+        id: "a",
+        centroid: { x: 0, y: 0 },
+        location: { XY: 0, Z: 0, Time: 0 },
+        shape: AnnotationShape.Point,
+        channel: 0,
+        tags: [],
+        color: null,
+      },
+    ]);
+    annotationStore.mergeHydratedAnnotations({
+      newEntries: [{ id: "a", annotation: stored("a") }],
+      touchedIds: [],
+    });
+    const saves = holdSaves();
+    const pending = recolor("a", "#ff0000");
+    expect(annotationStore.annotationStubs.get("a")!.color).toBe("#ff0000");
+    expect(annotationStore.hydratedAnnotations.get("a")!.color).toBe("#ff0000");
+
+    saves[0].reject(new Error("offline"));
+    await expect(pending).rejects.toThrow("offline");
+
+    expect(annotationStore.annotationStubs.get("a")!.color).toBeNull();
+    expect(annotationStore.hydratedAnnotations.get("a")!.color).toBeNull();
   });
 
   it("does not write over annotations a fetch reloaded during a failed save", async () => {
@@ -159,6 +207,7 @@ describe("updateAnnotationsPerId failure rollback", () => {
     // The recolor is still in flight and may succeed: leave it on screen.
     expect(stored("a").color).toBe("#ff0000");
 
+    await sent(saves, 2);
     saves[1].resolve();
     await second;
     // The server holds the recolor but not the failed rename.
@@ -175,26 +224,59 @@ describe("updateAnnotationsPerId failure rollback", () => {
 
     saves[0].reject(new Error("offline"));
     await expect(first).rejects.toThrow("offline");
+    await sent(saves, 2);
     saves[1].reject(new Error("offline"));
     await expect(second).rejects.toThrow("offline");
 
     expect(stored("a")).toEqual(original);
   });
 
-  it("restores what the server holds when saves fail out of order", async () => {
+  it("sends an annotation's saves one at a time, in order", async () => {
+    // Overlapping requests could be applied by the server in another order
+    // than their responses arrive; the rollback takes response order as the
+    // server's.
     const saves = holdSaves();
     const first = rename("a", "renamed");
     const second = recolor("a", "#ff0000");
+    // Another annotation's save is not held back.
+    const other = rename("b", "other");
 
-    saves[1].reject(new Error("offline"));
-    await expect(second).rejects.toThrow("offline");
-    // The rename is still in flight: keep it.
-    expect(stored("a").name).toBe("renamed");
+    expect(api.updateAnnotations).toHaveBeenCalledTimes(2);
+    expect(api.updateAnnotations.mock.calls[1][0]).toEqual([
+      { id: "b", name: "other" },
+    ]);
+    saves[1].resolve();
+    await other;
 
     saves[0].resolve();
     await first;
+    await sent(saves, 3);
+    expect(api.updateAnnotations.mock.calls[2][0]).toEqual([
+      { id: "a", color: "#ff0000" },
+    ]);
+    saves[2].reject(new Error("offline"));
+    await expect(second).rejects.toThrow("offline");
+    // The server holds the rename, not the recolor.
     expect(stored("a").name).toBe("renamed");
     expect(stored("a").color).toBeNull();
+  });
+
+  it("keeps an assigned color that matched a failed edit's color", async () => {
+    const saves = holdSaves();
+    const first = recolor("a", "#ff0000");
+    const second = rename("a", "renamed");
+
+    saves[0].reject(new Error("offline"));
+    await expect(first).rejects.toThrow("offline");
+    // Color-by-property assigns the same red server-side while the rename is
+    // pending: nothing changes on screen, but the server now holds it.
+    annotationStore.applyColorAssignment([{ color: "#ff0000", ids: ["a"] }]);
+    await sent(saves, 2);
+    saves[1].resolve();
+    await second;
+
+    expect(stored("a").color).toBe("#ff0000");
+    expect(stored("a").name).toBe("renamed");
   });
 
   it("does not restore an annotation deleted during a failed save", async () => {
@@ -233,6 +315,7 @@ describe("updateAnnotationsPerId failure rollback", () => {
 
     saves[0].reject(new Error("offline"));
     await expect(first).rejects.toThrow("offline");
+    await sent(saves, 2);
     saves[1].reject(new Error("offline"));
     await expect(second).rejects.toThrow("offline");
 

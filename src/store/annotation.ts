@@ -1538,12 +1538,14 @@ export class Annotations extends VuexModule {
    * would corrupt the stored annotation, defeat patch diffing in
    * getAnnotationUpdatePatch, and prevent rollback on error.
    */
-  // rawError: true because both paths below rethrow after rolling back, so the
+  // rawError: true because both paths below rethrow, so the
   // real reason reaches the caller (and the console/Sentry) instead of
   // vuex-module-decorators' generic ERR_ACTION_ACCESS_UNDEFINED text. The
   // sync indicator is unaffected either way: setSaving receives the error
   // caught inside this action, before any wrapping. See index.ts
-  // syncConfiguration.
+  // syncConfiguration. (Only the full path is optimistic: a failed edit is
+  // put back to what the server holds once no edit of that annotation is
+  // pending, see pendingAnnotationEdits; the promise can reject before that.)
   @Action({ rawError: true })
   public async updateAnnotationsPerId({
     annotationIds,
@@ -1622,7 +1624,9 @@ export class Annotations extends VuexModule {
       }
       this.setAnnotationsAtIndices(localUpdates);
       if (annotationUpdates.length) {
-        await this.annotationsAPI.updateAnnotations(annotationUpdates);
+        await saveAnnotationsInOrder(annotationUpdates, (updates) =>
+          this.annotationsAPI.updateAnnotations(updates),
+        );
         this.bumpMutationCounter();
       }
       succeeded = true;
@@ -2863,6 +2867,10 @@ export class Annotations extends VuexModule {
     if (this.annotations.length > 0) {
       this.annotations = this.annotations.map((annotation) => {
         const color = colorById.get(annotation.id) ?? null;
+        // The server wrote this color, whether or not it is already shown: a
+        // pending edit that matched it optimistically must count it as
+        // confirmed, or a failed edit's rollback would undo it.
+        confirmServerAnnotationFields(annotation, { color });
         if (annotation.color === color) {
           return annotation;
         }
@@ -3176,9 +3184,26 @@ function claimAnnotationEdit(stored: IAnnotation, written: IAnnotation) {
   return edits;
 }
 
-// `replacement` is `stored` with fields the server has already written. If
-// `stored` is a pending chain's latest write, the chain follows it and counts
-// those fields as confirmed. Returns `replacement`.
+// Fields of `stored` the server has written (an authoritative assignment).
+// If `stored` is a pending chain's latest write, they count as confirmed,
+// including when they equal what the chain already shows.
+function confirmServerAnnotationFields(
+  stored: IAnnotation,
+  fields: Partial<IAnnotation>,
+) {
+  if (pendingAnnotationEdits.size === 0) {
+    return;
+  }
+  const chain = pendingAnnotationEdits.get(stored.id);
+  if (chain?.written === stored) {
+    chain.confirmed = { ...chain.confirmed, ...fields };
+  }
+}
+
+// `replacement` is `stored` copied forward with fields the server has
+// written (confirm them with confirmServerAnnotationFields first). If
+// `stored` is a pending chain's latest write, the chain follows the copy.
+// Returns `replacement`.
 function followServerAnnotationWrite(
   stored: IAnnotation,
   replacement: IAnnotation,
@@ -3186,12 +3211,43 @@ function followServerAnnotationWrite(
   const chain = pendingAnnotationEdits.get(stored.id);
   if (chain?.written === stored) {
     chain.written = replacement;
-    chain.confirmed = {
-      ...chain.confirmed,
-      ...getAnnotationUpdatePatch(stored, replacement),
-    };
   }
   return replacement;
+}
+
+// The latest save of each annotation that has not settled yet. One
+// annotation's saves go out one at a time, in order: overlapping requests
+// could be applied by the server in a different order than their responses
+// arrive, and settleAnnotationEdit takes response order as server order.
+const lastAnnotationSaves = new Map<string, Promise<unknown>>();
+
+async function saveAnnotationsInOrder(
+  updates: AnnotationUpdatePatch[],
+  save: (updates: AnnotationUpdatePatch[]) => Promise<unknown>,
+) {
+  const earlier = new Set<Promise<unknown>>();
+  for (const { id } of updates) {
+    const previous = lastAnnotationSaves.get(id);
+    if (previous) {
+      earlier.add(previous);
+    }
+  }
+  const request =
+    earlier.size === 0
+      ? save(updates)
+      : Promise.allSettled(earlier).then(() => save(updates));
+  for (const { id } of updates) {
+    lastAnnotationSaves.set(id, request);
+  }
+  try {
+    return await request;
+  } finally {
+    for (const { id } of updates) {
+      if (lastAnnotationSaves.get(id) === request) {
+        lastAnnotationSaves.delete(id);
+      }
+    }
+  }
 }
 
 // Record one edit's outcome. Returns true when it was the chain's last
