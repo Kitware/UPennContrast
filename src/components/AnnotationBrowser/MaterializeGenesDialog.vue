@@ -351,6 +351,12 @@ async function submit() {
           )
         : await store.spatialAPI.materialize(datasetId, symbols.value, name);
     if (!polling.isLive(request)) return;
+    // The server registered the property in the configuration when the
+    // request was made: adopt it now, not when the job finishes, or a
+    // property created or removed meanwhile would save a list without it.
+    if (result.propertyId) {
+      void propertyStore.adoptServerRegisteredProperty(result.propertyId);
+    }
     const target = { propertyId: result.propertyId, name };
     if (result.jobId) {
       if (polling.isCurrent(request)) {

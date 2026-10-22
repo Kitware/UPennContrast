@@ -405,16 +405,20 @@ a property, and the client appends the id in memory) is missing from the
 confirmed value, so a pending write that fails restores it away, and the next
 save deletes it on the server. Route such changes through a helper that adds
 them to the confirmed value while writes are pending
-(`adoptServerConfirmedPropertyId`). Don't assume the server still holds it
-after a write that was sent before the change and succeeds after it: the
-server's add (`$addToSet`) and the client's whole-list replace can land in
-either order, so save the list again once the writes settle. And check every
-path that builds the next write: `setProperties` builds ids from the loaded
-list, not the configuration, so an adopted id no fetch has loaded yet must be
-carried over. Tests: *"keeps a property adopted during a pending save when
-that save fails"*, *"saves again a property adopted while an earlier save was
-in flight"*, *"carries over an adopted property no fetch has loaded yet when
-saving"*.
+(`adoptServerConfirmedPropertyId`). Adopt it as soon as the server made
+the change, not when a later job reports done: the gene-panel and
+neighborhood requests register their property when the request is made, so
+adopting at job end left the whole job's runtime for a property save to
+unregister it. Don't add a client-side "save it again" repair for the
+remaining window (a save sent while that request was in flight); it bypassed
+the list-rebuild bookkeeping and could resurrect deletions, and only a
+server-side merge of propertyIds writes closes it. And check every path that
+builds the next write: `setProperties` builds ids from the loaded list, not
+the configuration, so an adopted id no fetch has loaded yet must be carried
+over. Tests: *"keeps a property adopted during a pending save when that save
+fails"*, *"carries over an adopted property no fetch has loaded yet when
+saving"*, *"polls a scheduled job until it succeeds, adopting its property at
+once"*.
 
 ### Per-resource component state under a reused route: key it by id
 

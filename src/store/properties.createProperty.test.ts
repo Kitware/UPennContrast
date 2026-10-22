@@ -693,44 +693,6 @@ describe("createProperty propagates the real failure reason", () => {
     expect(saved).toEqual([["p1", "p2", "x", "p3"]]);
   });
 
-  it("saves again a property adopted while an earlier save was in flight", async () => {
-    (main as any).configuration.propertyIds = ["p1", "p2"];
-    (
-      propertyStore as unknown as {
-        setPropertiesImpl: (properties: { id: string; name: string }[]) => void;
-      }
-    ).setPropertiesImpl([
-      { id: "p1", name: "Area" },
-      { id: "p2", name: "Perimeter" },
-    ]);
-    let finishDelete!: (value: any) => void;
-    const saved: string[][] = [];
-    vi.spyOn(main.api, "updateConfigurationKey")
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            finishDelete = resolve;
-          }),
-      )
-      .mockImplementation(async (configuration: any, key: string) => {
-        if (key === "propertyIds") saved.push([...configuration.propertyIds]);
-        return {} as any;
-      });
-
-    // Sent before x was adopted, the delete's list lacks x, and it may land
-    // on the server after the job added x, removing it there.
-    const deletion = propertyStore.deleteProperty("p1");
-    await adoptAndFetch([
-      { id: "p2", name: "Perimeter" },
-      { id: "x", name: "Gene panel" },
-    ]);
-    finishDelete({});
-    await deletion;
-
-    await vi.waitFor(() => expect(saved).toEqual([["p2", "x"]]));
-    expect(main.configuration!.propertyIds).toEqual(["p2", "x"]);
-  });
-
   it("keeps a property adopted during a save that succeeds when a later overlapping save fails", async () => {
     (main as any).configuration.propertyIds = ["p1", "p2", "p3"];
     (
@@ -776,15 +738,16 @@ describe("createProperty propagates the real failure reason", () => {
     failSecond(new Error("Read-only collection"));
     await second;
 
-    // The first delete landed; x stays, and is saved again in case that
-    // delete removed it on the server.
+    // The first delete landed; x, adopted after it was sent, stays confirmed
+    // when the second delete fails.
     expect(main.configuration!.propertyIds).toEqual(["p2", "p3", "x"]);
     expect(propertyStore.properties.map((p) => p.id)).toEqual([
       "p2",
       "p3",
       "x",
     ]);
-    await vi.waitFor(() => expect(saved).toEqual([["p2", "p3", "x"]]));
+    // No save of its own: x is registered on the server already.
+    expect(saved).toEqual([]);
   });
 
   it("carries over an adopted property no fetch has loaded yet when saving", async () => {

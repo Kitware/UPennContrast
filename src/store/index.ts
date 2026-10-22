@@ -254,12 +254,10 @@ function createGirderRestClient(options: {
 // per-key queue, e.g. when the session expired). So nothing is restored
 // until the last pending write of the key settles; then, if any of them
 // failed, the key gets the last value the server confirmed.
-// `adopted` lists property ids a server job registered while writes were
-// pending (see adoptServerConfirmedPropertyId), in the order they arrived.
-// `unsaved` holds those a write sent before their adoption may have removed:
-// the job adds its id on the server, but a write replaces the whole list, and
-// either can land first. So once the last write settles, the list is saved
-// again if it still has one of them.
+// `adopted` lists property ids the server registered itself while writes
+// were pending (see adoptServerConfirmedPropertyId), in the order they
+// arrived: they count as confirmed, so a failed write does not restore them
+// away, including after a write sent before their adoption succeeds.
 const configurationKeyWrites = new Map<
   string,
   {
@@ -267,7 +265,6 @@ const configurationKeyWrites = new Map<
     failed: boolean;
     confirmed: unknown;
     adopted: string[];
-    unsaved: Set<string>;
   }
 >();
 
@@ -288,7 +285,6 @@ async function writeConfigurationKey<K extends "propertyIds" | "pipelines">(
       failed: false,
       confirmed: configuration[key],
       adopted: [],
-      unsaved: new Set(),
     };
     configurationKeyWrites.set(writesKey, writes);
   }
@@ -297,21 +293,14 @@ async function writeConfigurationKey<K extends "propertyIds" | "pipelines">(
   configuration[key] = value;
   try {
     await sync();
-    // Only propertyIds writes have adoptions.
-    if (key === "propertyIds" && writes.adopted.length > 0) {
+    // Only propertyIds writes have adoptions. A write sent before an id was
+    // adopted could not include it, so it stays confirmed; a write sent
+    // after decided on it (a property the user removed stays removed).
+    if (key === "propertyIds" && writes.adopted.length > adoptedBefore) {
       const ids = value as string[];
-      // This write decided on the ids adopted before it was sent.
-      for (const id of writes.adopted.slice(0, adoptedBefore)) {
-        writes.unsaved.delete(id);
-      }
       const missing = writes.adopted
         .slice(adoptedBefore)
         .filter((id) => !ids.includes(id));
-      for (const id of missing) {
-        writes.unsaved.add(id);
-      }
-      // Kept as confirmed (the follow-up save below makes it so), or a later
-      // failure would restore them away.
       writes.confirmed = missing.length > 0 ? [...ids, ...missing] : value;
     } else {
       writes.confirmed = value;
@@ -322,32 +311,23 @@ async function writeConfigurationKey<K extends "propertyIds" | "pipelines">(
   } finally {
     if (--writes.pending === 0) {
       configurationKeyWrites.delete(writesKey);
-      const current = loaded();
-      const isLoaded = current?.id === configuration.id;
-      const target = isLoaded ? current : configuration;
       if (writes.failed) {
+        const current = loaded();
+        const target =
+          current?.id === configuration.id ? current : configuration;
         target[key] = writes.confirmed as IDatasetConfiguration[K];
-      }
-      // `sync` saves the loaded configuration, so only while it is this one.
-      if (
-        isLoaded &&
-        [...writes.unsaved].some((id) => (target[key] as string[]).includes(id))
-      ) {
-        writeConfigurationKey(target, key, target[key], sync, loaded).catch(
-          (error) =>
-            logError("Failed to save server-registered properties:", error),
-        );
       }
     }
   }
 }
 
-// A server job registered `propertyId` in this configuration itself. Add it
-// to the live list and, while propertyIds writes are pending, to what a
-// failed write restores; otherwise that restore would drop it and the next
-// save would unregister it on the server. A pending write sent before now
-// may still remove it on the server, so writeConfigurationKey saves the list
-// again once they settle. Idempotent.
+// The server registered `propertyId` in this configuration itself (a
+// materialize or neighborhood request does when it is made). Add it to the
+// live list and, while propertyIds writes are pending, to what a failed write
+// restores; otherwise that restore would drop it and the next save would
+// unregister it on the server. Idempotent. Not covered: a write sent while
+// that request was in flight replaces the server's list without the id; only
+// a server-side merge of propertyIds writes could prevent that.
 export function adoptServerConfirmedPropertyId(
   configuration: IDatasetConfiguration,
   propertyId: string,
