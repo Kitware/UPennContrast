@@ -16,6 +16,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 const { api, mainState } = vi.hoisted(() => ({
   api: {
     updateAnnotations: vi.fn(),
+    colorByProperty: vi.fn(),
     getAnnotationCount: vi.fn(),
     getAnnotationsForDatasetId: vi.fn(),
     getConnectionsForDatasetId: vi.fn(),
@@ -119,10 +120,14 @@ function stored(id: string) {
 
 describe("updateAnnotationsPerId failure rollback", () => {
   afterEach(async () => {
-    for (const save of heldSaves.splice(0)) {
-      save.resolve();
+    // A save queued behind a settled one is sent a few ticks later: keep
+    // settling until none is left.
+    for (let round = 0; round < 10; round++) {
+      for (const save of heldSaves.splice(0)) {
+        save.resolve();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
-    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   beforeEach(() => {
@@ -259,6 +264,35 @@ describe("updateAnnotationsPerId failure rollback", () => {
     // The server holds the rename, not the recolor.
     expect(stored("a").name).toBe("renamed");
     expect(stored("a").color).toBeNull();
+  });
+
+  it("colors by property only after queued edits have been saved", async () => {
+    const saves = holdSaves();
+    const first = rename("a", "renamed");
+    // Queued behind the rename: not sent yet.
+    const second = recolor("a", "#ff0000");
+    api.colorByProperty.mockResolvedValue({
+      assignment: [{ color: "#00ff00", ids: ["a"] }],
+    });
+
+    const coloring = annotationStore.applyColorByProperty({
+      propertyPath: ["p"],
+      propertyName: "P",
+    });
+    await Promise.resolve();
+    expect(api.colorByProperty).not.toHaveBeenCalled();
+
+    saves[0].resolve();
+    await first;
+    await sent(saves, 2);
+    expect(api.colorByProperty).not.toHaveBeenCalled();
+    saves[1].resolve();
+    await second;
+    await coloring;
+
+    // The server colored last, so the canvas shows its color.
+    expect(api.colorByProperty).toHaveBeenCalledTimes(1);
+    expect(stored("a").color).toBe("#00ff00");
   });
 
   it("keeps an assigned color that matched a failed edit's color", async () => {

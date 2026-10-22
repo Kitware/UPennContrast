@@ -1876,6 +1876,9 @@ export class Annotations extends VuexModule {
     let backendMayHaveChanged = true;
     let applied = false;
     try {
+      // Queued edits first (see annotationSavesSettled): the assignment is
+      // the last word on colors here and on the server.
+      await annotationSavesSettled();
       const result = await this.annotationsAPI.colorByProperty({
         datasetId,
         ...request,
@@ -1949,6 +1952,8 @@ export class Annotations extends VuexModule {
     let backendMayHaveChanged = true;
     let applied = false;
     try {
+      // Queued edits first, as in applyColorByProperty.
+      await annotationSavesSettled();
       await this.annotationsAPI.clearColorByProperty(datasetId);
       // Same dataset-switch guard as applyColorByProperty for the LOCAL
       // apply: an empty assignment nulls EVERY loaded color, so applying it
@@ -3220,6 +3225,15 @@ function followServerAnnotationWrite(
 // could be applied by the server in a different order than their responses
 // arrive, and settleAnnotationEdit takes response order as server order.
 const lastAnnotationSaves = new Map<string, Promise<unknown>>();
+
+// Settles once every annotation save already queued or in flight has. A
+// server-side write over the whole dataset (color-by-property) waits for it:
+// saveAnnotationsInOrder holds an edit back behind an earlier one, and an
+// edit sent after the job would overwrite the job's colors on the server
+// while the canvas shows the job's.
+function annotationSavesSettled() {
+  return Promise.allSettled(new Set(lastAnnotationSaves.values()));
+}
 
 async function saveAnnotationsInOrder(
   updates: AnnotationUpdatePatch[],
