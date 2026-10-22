@@ -1676,6 +1676,15 @@ export class Annotations extends VuexModule {
   private async reconcileRestoredAnnotations(restored: IAnnotation[]) {
     const session = toRaw(main.girderRest);
     const datasetId = main.dataset?.id;
+    // Only the latest read-back of an annotation may apply: two rollbacks
+    // can restore the same object, so identity alone can't tell them apart.
+    const generations = new Map(
+      restored.map(({ id }) => {
+        const generation = (readBackGenerations.get(id) ?? 0) + 1;
+        readBackGenerations.set(id, generation);
+        return [id, generation];
+      }),
+    );
     let serverCopies: IAnnotation[];
     try {
       serverCopies = await this.annotationsAPI.hydrateAnnotations(
@@ -1687,9 +1696,11 @@ export class Annotations extends VuexModule {
           (error as Error).message
         }`,
       );
+      forgetReadBacks(generations);
       return;
     }
     if (toRaw(main.girderRest) !== session || main.dataset?.id !== datasetId) {
+      forgetReadBacks(generations);
       return;
     }
     const restoredById = new Map(restored.map((a) => [a.id, a]));
@@ -1697,7 +1708,12 @@ export class Annotations extends VuexModule {
     for (const serverCopy of serverCopies) {
       const index = this.annotationIdToIdx[serverCopy.id];
       const stored = index === undefined ? undefined : this.annotations[index];
-      if (stored && stored === restoredById.get(serverCopy.id)) {
+      if (
+        stored &&
+        stored === restoredById.get(serverCopy.id) &&
+        readBackGenerations.get(serverCopy.id) ===
+          generations.get(serverCopy.id)
+      ) {
         updates.push({
           annotation: serverCopy,
           index,
@@ -1705,6 +1721,7 @@ export class Annotations extends VuexModule {
         });
       }
     }
+    forgetReadBacks(generations);
     this.setAnnotationsAtIndices(updates);
   }
 
@@ -3260,6 +3277,19 @@ function followServerAnnotationWrite(
     chain.written = replacement;
   }
   return replacement;
+}
+
+// The latest read-back started for each annotation (see
+// reconcileRestoredAnnotations); an entry is removed once that read-back has
+// finished.
+const readBackGenerations = new Map<string, number>();
+
+function forgetReadBacks(generations: Map<string, number>) {
+  for (const [id, generation] of generations) {
+    if (readBackGenerations.get(id) === generation) {
+      readBackGenerations.delete(id);
+    }
+  }
 }
 
 // Record one edit's outcome. Returns true when it was the chain's last

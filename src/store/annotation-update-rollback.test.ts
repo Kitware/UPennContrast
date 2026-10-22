@@ -321,6 +321,29 @@ describe("updateAnnotationsPerId failure rollback", () => {
     expect(stored("a")).toBe(original);
   });
 
+  it("applies only the latest read-back when two failed edits' read-backs overlap", async () => {
+    const reads: ((copies: IAnnotation[]) => void)[] = [];
+    api.hydrateAnnotations.mockImplementation(
+      () => new Promise((resolve) => reads.push(resolve)),
+    );
+    const saves = holdSaves();
+    const first = rename("a", "renamed");
+    saves[0].reject(new Error("offline"));
+    await expect(first).rejects.toThrow("offline");
+    // A second edit fails too; both rollbacks restore the same object.
+    const second = recolor("a", "#ff0000");
+    saves[1].reject(new Error("offline"));
+    await expect(second).rejects.toThrow("offline");
+    await vi.waitFor(() => expect(reads).toHaveLength(2));
+
+    reads[0]([makeAnnotation("a", { name: "older read" })]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    reads[1]([makeAnnotation("a", { name: "newer read" })]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(stored("a").name).toBe("newer read");
+  });
+
   it("keeps the restored value when the read-back fails", async () => {
     api.hydrateAnnotations.mockRejectedValue(new Error("still offline"));
     const saves = holdSaves();
