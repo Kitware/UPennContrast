@@ -251,6 +251,54 @@ function createGirderRestClient(options: {
 // in-flight requests can detect they are stale and skip the state write.
 // Without this, a slower request with a different filter can land last and
 // overwrite the result of a newer request.
+// Optimistic writes of one configuration key can overlap. A failed write must
+// not restore its own snapshot: a later write may have been made on top of
+// it, an earlier write it built on may have failed too, or an earlier one may
+// still succeed after it (a write can fail before reaching the API's
+// per-key queue, e.g. when the session expired). So nothing is restored
+// until the last pending write of the key settles; then, if any of them
+// failed, the key gets the last value the server confirmed.
+const configurationKeyWrites = new Map<
+  string,
+  { pending: number; failed: boolean; confirmed: unknown }
+>();
+
+async function writeConfigurationKey<K extends "propertyIds" | "pipelines">(
+  configuration: IDatasetConfiguration,
+  key: K,
+  value: IDatasetConfiguration[K],
+  sync: () => Promise<unknown>,
+  // The configuration object loaded now: a switch away and back loads a new
+  // object for the same id, and the restore belongs on that one.
+  loaded: () => IDatasetConfiguration | null,
+) {
+  const writesKey = `${configuration.id}:${key}`;
+  let writes = configurationKeyWrites.get(writesKey);
+  if (!writes) {
+    writes = { pending: 0, failed: false, confirmed: configuration[key] };
+    configurationKeyWrites.set(writesKey, writes);
+  }
+  writes.pending++;
+  configuration[key] = value;
+  try {
+    await sync();
+    writes.confirmed = value;
+  } catch (error) {
+    writes.failed = true;
+    throw error;
+  } finally {
+    if (--writes.pending === 0) {
+      configurationKeyWrites.delete(writesKey);
+      if (writes.failed) {
+        const current = loaded();
+        const target =
+          current?.id === configuration.id ? current : configuration;
+        target[key] = writes.confirmed as IDatasetConfiguration[K];
+      }
+    }
+  }
+}
+
 let recentDatasetViewsRequestId = 0;
 
 // Annotation-browser persistence bookkeeping. Module-level rather than Vuex
@@ -2833,14 +2881,13 @@ export class Main extends VuexModule {
     if (!configuration) {
       throw new Error("Cannot update properties without a configuration");
     }
-    const previous = configuration.propertyIds;
-    configuration.propertyIds = propertyIds;
-    try {
-      await this.syncConfiguration({ key: "propertyIds", throwOnError: true });
-    } catch (error) {
-      configuration.propertyIds = previous;
-      throw error;
-    }
+    await writeConfigurationKey(
+      configuration,
+      "propertyIds",
+      propertyIds,
+      () => this.syncConfiguration({ key: "propertyIds", throwOnError: true }),
+      () => this.configuration,
+    );
   }
 
   // rawError: true because this rolls back and rethrows so the caller can
@@ -2853,14 +2900,13 @@ export class Main extends VuexModule {
     if (!configuration) {
       throw new Error("Cannot update pipelines without a configuration");
     }
-    const previous = configuration.pipelines;
-    configuration.pipelines = pipelines;
-    try {
-      await this.syncConfiguration({ key: "pipelines", throwOnError: true });
-    } catch (error) {
-      configuration.pipelines = previous;
-      throw error;
-    }
+    await writeConfigurationKey(
+      configuration,
+      "pipelines",
+      pipelines,
+      () => this.syncConfiguration({ key: "pipelines", throwOnError: true }),
+      () => this.configuration,
+    );
   }
 
   // rawError: true is required because the throwOnError path rethrows the

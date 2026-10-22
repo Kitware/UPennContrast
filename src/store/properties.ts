@@ -85,6 +85,21 @@ let propertyDatasetGeneration = 0;
 // yet registered server-side, so a batch fetch omits them (fetchProperties).
 const pendingPropertyIds = new Set<string>();
 
+// In-flight setProperties saves, per configuration (the same grouping as
+// writeConfigurationKey's propertyIds writes, so the list is rebuilt when that
+// configuration's ids are restored). `before` holds the properties those saves
+// started from, so once the last one settles after a failure the list can be
+// rebuilt from the restored ids even if an earlier save removed some of them.
+// An entry lives until that configuration's last pending save settles.
+const pendingPropertySaves = new Map<
+  string,
+  {
+    pending: number;
+    failed: boolean;
+    before: Map<string, IAnnotationProperty>;
+  }
+>();
+
 export interface IPropertyStatus {
   running: boolean;
   previousRun: boolean | null;
@@ -234,6 +249,12 @@ export class Properties extends VuexModule {
   propertiesAPI = main.propertiesAPI;
 
   properties: IAnnotationProperty[] = [];
+  // The configuration whose fetch filled `properties`. After a switch the
+  // list is still the previous configuration's until the new fetch lands
+  // (setConfiguration does not await it). Null until a fetch succeeds.
+  // setProperties saves only a list whose owner is the loaded
+  // configuration.
+  propertiesConfigurationId: string | null = null;
 
   displayedPropertyPaths: string[][] = [];
   // Virtual (spatial-table) paths the user has added as live columns this
@@ -1270,20 +1291,83 @@ export class Properties extends VuexModule {
     this.properties = [...properties];
   }
 
+  @Mutation
+  protected setPropertiesConfigurationId(configurationId: string | null) {
+    this.propertiesConfigurationId = configurationId;
+  }
+
   // rawError: true because this rolls back and rethrows so the caller can
   // report the real reason; a bare @Action would replace the message with
   // vuex-module-decorators' generic ERR_ACTION_ACCESS_UNDEFINED text. Part of
   // the create_property chain the AI panel reports on (#1239).
   @Action({ rawError: true })
   protected async setProperties(properties: IAnnotationProperty[]) {
-    const previous = this.properties;
+    // The list is saved as the loaded configuration's propertyIds, so it
+    // must be the list a fetch loaded for that configuration. One from the
+    // previous configuration (an import rollback, a delete, a create right
+    // after a switch) would replace the new one's properties with the old
+    // ones, and one no fetch has loaded yet (still loading, or the fetch
+    // failed) would replace them with whatever the write adds.
+    const configurationId = main.configuration?.id;
+    if (this.propertiesConfigurationId !== configurationId) {
+      throw new Error(
+        "The properties of this configuration have not loaded, so the " +
+          "property list was not saved. Try again once they have loaded.",
+      );
+    }
+    const configuration = main.configuration!;
+    let saves = pendingPropertySaves.get(configuration.id);
+    if (!saves) {
+      saves = { pending: 0, failed: false, before: new Map() };
+      pendingPropertySaves.set(configuration.id, saves);
+    }
+    for (const property of this.properties) {
+      saves.before.set(property.id, property);
+    }
+    saves.pending++;
     this.setPropertiesImpl(properties);
     const propertyIds = this.properties.map((p) => p.id);
     try {
       await this.context.dispatch("updateConfigurationProperties", propertyIds);
     } catch (error) {
-      this.setPropertiesImpl(previous);
+      saves.failed = true;
       throw error;
+    } finally {
+      if (--saves.pending === 0) {
+        pendingPropertySaves.delete(configuration.id);
+        // By now updateConfigurationProperties has put back the ids the
+        // server holds (see writeConfigurationKey). Rebuild the list from
+        // them rather than restore a snapshot, which a later save or a fetch
+        // during the await may have superseded. Not if the list is now
+        // another configuration's (that one's fetch landed meanwhile).
+        // The restore landed on the loaded object if it has this id (a
+        // switch away and back loads a new one), else on the captured one.
+        const restoredIds = (
+          main.configuration?.id === configurationId
+            ? main.configuration
+            : configuration
+        ).propertyIds;
+        if (
+          saves.failed &&
+          this.propertiesConfigurationId === configurationId
+        ) {
+          const known = new Map(saves.before);
+          for (const property of this.properties) {
+            known.set(property.id, property);
+          }
+          this.setPropertiesImpl(
+            restoredIds.flatMap((id) => {
+              const property = known.get(id);
+              return property ? [property] : [];
+            }),
+          );
+        }
+      }
+    }
+    // The plots and track label below are the loaded configuration's: after
+    // a switch during the save they belong to another one.
+    if (main.configuration?.id !== configurationId) {
+      return;
     }
     // The persisted plot resolver drops axes whose property is unknown, but a
     // live deletion must do the same immediately. Reconcile only AFTER the
@@ -1310,7 +1394,8 @@ export class Properties extends VuexModule {
   // This action should be called when changing configuration
   async fetchProperties() {
     if (main.configuration) {
-      const propertyIds = main.configuration.propertyIds;
+      const configuration = main.configuration;
+      const propertyIds = configuration.propertyIds;
       // The server omits ids it cannot resolve. A deleted property should
       // drop out, but one being created is in the local configuration before
       // its propertyIds save lands, so the server omits it too. Keep the
@@ -1322,6 +1407,12 @@ export class Properties extends VuexModule {
           (property) => [property.id, property],
         ),
       );
+      // A response for a configuration that has since been replaced (e.g.
+      // a dataset switch while a fetch was in flight) must not overwrite
+      // the new configuration's properties.
+      if (main.configuration?.id !== configuration.id) {
+        return;
+      }
       const loaded = new Map(
         this.properties.map((property) => [property.id, property]),
       );
@@ -1334,6 +1425,7 @@ export class Properties extends VuexModule {
           return property ? [property] : [];
         }),
       );
+      this.setPropertiesConfigurationId(configuration.id);
       // Properties may load after fetchPropertyValues already ran (the stub
       // fetch can resolve first when cached), so trigger the count fetch here
       // too; the guard in fetchUncomputedCounts dedupes (no-op in wholesale
@@ -1488,7 +1580,18 @@ export class Properties extends VuexModule {
   // and the AI panel reports that reason to the user. See setProperties.
   @Action({ rawError: true })
   async createProperty(property: IAnnotationPropertyConfiguration) {
+    const configurationId = main.configuration?.id;
     const newProperty = await this.propertiesAPI.createProperty(property);
+    // After a switch to another configuration, this.properties may still be
+    // the previous one's list (the new one's fetch lands later), and
+    // setProperties would save it as the newly loaded configuration's
+    // propertyIds. Register nothing: the property stays unattached.
+    if (newProperty && main.configuration?.id !== configurationId) {
+      throw new Error(
+        "Another configuration was opened while the property was being " +
+          "created, so it was not added to either configuration.",
+      );
+    }
     if (newProperty) {
       // Pending until the configuration's propertyIds save settles; see
       // fetchProperties.
