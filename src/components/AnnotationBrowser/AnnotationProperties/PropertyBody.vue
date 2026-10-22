@@ -56,7 +56,34 @@
                   {{ property.name }}
                 </v-col>
               </v-row>
-              <v-row>
+              <v-row v-if="runningPipeline">
+                <v-col>
+                  <v-alert type="error" variant="tonal" density="compact">
+                    The pipeline "{{ runningPipeline.name }}" is running and
+                    computes this property. Wait for it to finish, or cancel it,
+                    before removing the property: removing it now would split
+                    the run's results between this property and a new one.
+                  </v-alert>
+                </v-col>
+              </v-row>
+              <v-row v-else-if="linkedSteps.length > 0">
+                <v-col>
+                  <v-alert type="warning" variant="tonal" density="compact">
+                    These pipeline steps are linked to this property:
+                    <ul class="linked-steps">
+                      <li
+                        v-for="link in linkedSteps"
+                        :key="`${link.pipelineId}:${link.stepId}`"
+                      >
+                        {{ link.pipelineName }}: {{ link.stepName }}
+                      </li>
+                    </ul>
+                    If you remove it, they fall back to their saved copy on
+                    their next run and create a pipeline-owned property instead.
+                  </v-alert>
+                </v-col>
+              </v-row>
+              <v-row v-if="!runningPipeline">
                 <v-col>
                   <v-checkbox
                     hide-details
@@ -74,6 +101,7 @@
               >Cancel</v-btn
             >
             <v-btn
+              v-if="!runningPipeline"
               variant="flat"
               color="error"
               size="small"
@@ -83,7 +111,7 @@
                   deleteDialog = false;
                 }
               "
-              >Delete</v-btn
+              >{{ linkedSteps.length > 0 ? "Remove anyway" : "Delete" }}</v-btn
             >
           </v-card-actions>
         </v-card>
@@ -142,6 +170,7 @@
 import { ref, computed, watch } from "vue";
 import propertyStore from "@/store/properties";
 import jobsStore from "@/store/jobs";
+import pipelinesStore from "@/store/pipelines";
 import { IAnnotationProperty, AnnotationNames } from "@/store/model";
 import { logError } from "@/utils/log";
 
@@ -185,7 +214,24 @@ watch(
   },
 );
 
+// Enabled pipeline steps linked to this property: removing it makes them fall
+// back to their saved copy, so the confirmation names them.
+const linkedSteps = computed(() =>
+  pipelinesStore.pipelineStepsLinkedToProperty(props.property.id),
+);
+
+// A running pipeline (or batch) that computes this property. Its removal is
+// blocked until the run ends: the remaining steps or datasets would compute
+// into a fallback property instead.
+const runningPipeline = computed(() =>
+  pipelinesStore.runningPipelineComputingProperty(props.property.id),
+);
+
 function deleteProperty() {
+  // Also checked here: a run can start while the dialog is open.
+  if (runningPipeline.value) {
+    return;
+  }
   propertyStore.deleteProperty(props.property.id);
   if (deleteComputedValues.value) {
     propertyStore.deletePropertyValues(props.property.id);
@@ -237,6 +283,8 @@ defineExpose({
   showCopySnackbar,
   currentJobId,
   jobLog,
+  linkedSteps,
+  runningPipeline,
   deleteProperty,
   copyLogToClipboard,
   copyToClipboardFallback,
@@ -245,6 +293,10 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
+.linked-steps {
+  margin: 4px 0 4px 20px;
+}
+
 .job-log {
   max-height: 400px;
   min-height: 200px;

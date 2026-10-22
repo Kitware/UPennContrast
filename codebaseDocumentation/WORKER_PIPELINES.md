@@ -468,6 +468,35 @@ pipeline deletion and property-step removal cannot reach it.
 pipeline-materialized property that another step links to is not deleted when
 its own pipeline replaces or drops it.
 
+**Removing a linked property in the Properties panel.** Removing a property
+only unregisters it from the configuration's `propertyIds`; the document stays
+on the server. A step linked to it then treats its source as deleted and, on
+its next run, materializes a pipeline-owned property from its saved copy. The
+delete dialog (`PropertyBody.vue`) therefore:
+
+- **Warns** when enabled steps link to the property
+  (`pipelinesStore.pipelineStepsLinkedToProperty`, by `sourcePropertyId`),
+  naming each pipeline and step, and the confirm button reads "Remove anyway".
+  Disabled steps are not listed (they don't run), nor steps that only
+  materialized the property (the pipeline owns it and re-creates it as before).
+- **Blocks** the removal while a run or batch computes the property
+  (`pipelinesStore.runningPipelineComputingProperty`): the pipeline in
+  `runningPipelineId` has an enabled property step whose `sourcePropertyId` or
+  `materializedPropertyId` is the property. Removing either mid-run would make
+  the remaining steps or datasets compute into a new property, splitting the
+  results. Read from the stored pipeline, which both run entry points submit;
+  the handler re-checks, since a run can start while the dialog is open.
+
+Freezing the linked property for the duration of a batch (suggested on #1430)
+would not prevent the split: a frozen batch keeps computing into a property no
+longer in the configuration, where the user can't see the values. The guard is
+in the component, not in `propertiesStore.deleteProperties`, because the
+running pipeline itself removes a drifted-away property through that action.
+
+Not covered: an annotation import with "overwrite properties"
+(`src/utils/annotationImport.ts`) unregisters every property of the
+configuration with no linked-step warning and no running-pipeline block.
+
 **Not linked (by design).** The step *name* and *enabled* flag stay per-step.
 A locked section disables every control in it, so parameter help tooltips are
 unavailable on linked steps.
@@ -1019,6 +1048,14 @@ Linked steps (§3.4):
   *"holds the run lock while it reloads linked properties"*,
   *"does not reload a linked property already running its fallback"*,
   *"runs a step already on its fallback when another step's reload fails"*.
+- Removing a property in the Properties panel names the enabled steps linked
+  to it and asks to "Remove anyway" (only enabled `sourcePropertyId` links),
+  and is blocked while a running pipeline computes it (linked or
+  materialized), also in the handler —
+  *"lists the enabled pipeline steps linked to a property"*,
+  *"finds the running pipeline that computes a property"*,
+  *"names the pipeline steps linked to the property and offers Remove anyway"*,
+  *"blocks removing a property while a pipeline that computes it is running"*.
 - Drift replacement never deletes a property another step links to —
   *"does not delete a drifted-away property that another step links to"*.
 - Deleting a pipeline never deletes a linked property, nor a property it
