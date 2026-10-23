@@ -508,16 +508,17 @@ it applies the same two rules over all of them:
 
 - **Warns**: with the option checked, the import dialog lists the steps that
   use any of those properties (`pipelineStepsUsingOverwrittenProperties`, each
-  link with the property's name), and the overwrite confirmation counts them.
+  link with the property's name), and the overwrite confirmation counts the distinct steps.
 - **Blocks** while a running pipeline computes one of them
   (`runningPipelineComputingOverwrittenProperty`): the Import button is
   disabled with the reason, and `importAnnotationsFromData` refuses the
   overwrite itself before creating anything, so no caller can bypass it. The
   import awaits the backend before it removes anything, and a run can start in
-  that window, so each removal re-checks: a property a run started computing is
-  kept, with a warning notification naming it, instead of failing an import
-  that already succeeded. The project-creation import (`NewDataset.vue`) never
-  overwrites, and the GeoJSON import creates no properties.
+  that window, so the removal re-checks each property: one a run started
+  computing is kept, with a warning notification naming it, rather than failing
+  an import that already succeeded; the rest go in one `deleteProperties` call.
+  The project-creation import (`NewDataset.vue`) never overwrites, and the
+  GeoJSON import creates no properties.
 
 **Not linked (by design).** The step *name* and *enabled* flag stay per-step.
 A locked section disables every control in it, so parameter help tooltips are

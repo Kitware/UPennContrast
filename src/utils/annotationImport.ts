@@ -33,6 +33,7 @@ export const defaultImportOptions: ImportOptions = {
 
 // A pipeline step that uses a property "Overwrite properties" would remove.
 export interface IOverwrittenPropertyLink extends IPipelineStepLink {
+  propertyId: string;
   propertyName: string;
 }
 
@@ -46,7 +47,7 @@ export function pipelineStepsUsingOverwrittenProperties(): IOverwrittenPropertyL
   return propertyStore.properties.flatMap(({ id, name }) =>
     pipelinesStore
       .pipelineStepsLinkedToProperty(id)
-      .map((link) => ({ ...link, propertyName: name })),
+      .map((link) => ({ ...link, propertyId: id, propertyName: name })),
   );
 }
 
@@ -192,10 +193,9 @@ export async function importAnnotationsFromData(
         annotationIdsToRemove,
       );
     }
-    for (const propertyId of propertyIdsToRemove) {
-      // Re-checked per property: a pipeline may have started during the
-      // import (or an earlier removal), and removing a property it computes
-      // would split that run's results.
+    // Re-checked here: a pipeline may have started during the import, and
+    // removing a property it computes would split that run's results.
+    const removableIds = propertyIdsToRemove.filter((propertyId) => {
       const running = runningPipelineComputingOverwrittenProperty([propertyId]);
       if (running) {
         progress.createNotification({
@@ -206,9 +206,12 @@ export async function importAnnotationsFromData(
             `"${running.pipeline.name}" started computing it during the ` +
             "import. Remove it once the run ends if you no longer need it.",
         });
-        continue;
       }
-      await propertyStore.deleteProperty(propertyId);
+      return !running;
+    });
+    if (removableIds.length > 0) {
+      // One configuration sync for all of them.
+      await propertyStore.deleteProperties(removableIds);
     }
 
     // Refresh data

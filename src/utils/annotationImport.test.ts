@@ -36,6 +36,7 @@ vi.mock("@/store/properties", () => ({
     },
     createProperty: vi.fn(),
     deleteProperty: vi.fn(),
+    deleteProperties: vi.fn(),
     fetchPropertyValues: vi.fn(),
     fetchProperties: vi.fn(),
   },
@@ -251,6 +252,7 @@ describe("importAnnotationsFromData", () => {
     expect(mockedPropertyStore.deleteProperty).not.toHaveBeenCalledWith(
       "existing-p1",
     );
+    expect(mockedPropertyStore.deleteProperties).not.toHaveBeenCalled();
     expect(
       mockedStore.annotationsAPI.deleteMultipleAnnotations,
     ).not.toHaveBeenCalled();
@@ -291,9 +293,9 @@ describe("importAnnotationsFromData", () => {
     expect(
       mockedStore.annotationsAPI.deleteMultipleAnnotations,
     ).toHaveBeenCalledWith(["existing-a1", "existing-a2"]);
-    expect(mockedPropertyStore.deleteProperty).toHaveBeenCalledWith(
+    expect(mockedPropertyStore.deleteProperties).toHaveBeenCalledWith([
       "existing-p1",
-    );
+    ]);
   });
 
   it("does not delete pre-existing annotations/properties when overwrite options are false", async () => {
@@ -305,9 +307,7 @@ describe("importAnnotationsFromData", () => {
     expect(
       mockedStore.annotationsAPI.deleteMultipleAnnotations,
     ).not.toHaveBeenCalled();
-    expect(mockedPropertyStore.deleteProperty).not.toHaveBeenCalledWith(
-      "existing-p1",
-    );
+    expect(mockedPropertyStore.deleteProperties).not.toHaveBeenCalled();
   });
 
   it("lists the pipeline steps that use a property an overwrite would remove", () => {
@@ -328,7 +328,7 @@ describe("importAnnotationsFromData", () => {
     );
 
     expect(pipelineStepsUsingOverwrittenProperties()).toEqual([
-      { ...link, propertyName: "Intensity" },
+      { ...link, propertyId: "p2", propertyName: "Intensity" },
     ]);
   });
 
@@ -352,7 +352,7 @@ describe("importAnnotationsFromData", () => {
     expect(
       mockedStore.annotationsAPI.importAnnotationData,
     ).not.toHaveBeenCalled();
-    expect(mockedPropertyStore.deleteProperty).not.toHaveBeenCalled();
+    expect(mockedPropertyStore.deleteProperties).not.toHaveBeenCalled();
   });
 
   it("still imports while a pipeline runs when properties are not overwritten", async () => {
@@ -392,12 +392,11 @@ describe("importAnnotationsFromData", () => {
       overwriteProperties: true,
     });
 
-    expect(mockedPropertyStore.deleteProperty).not.toHaveBeenCalledWith(
-      "existing-p1",
-    );
-    expect(mockedPropertyStore.deleteProperty).toHaveBeenCalledWith(
+    // Only the other property is removed, in one batch.
+    expect(mockedPropertyStore.deleteProperties).toHaveBeenCalledTimes(1);
+    expect(mockedPropertyStore.deleteProperties).toHaveBeenCalledWith([
       "existing-p2",
-    );
+    ]);
     expect(progress.createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Property not overwritten",

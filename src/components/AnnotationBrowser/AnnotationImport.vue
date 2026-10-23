@@ -75,7 +75,7 @@
               <ul class="linked-steps">
                 <li
                   v-for="link in overwrittenPropertyLinks"
-                  :key="`${link.pipelineId}:${link.stepId}:${link.propertyName}`"
+                  :key="`${link.pipelineId}:${link.stepId}:${link.propertyId}`"
                 >
                   {{ link.pipelineName }}: {{ link.stepName }} ("{{
                     link.propertyName
@@ -132,15 +132,11 @@
                     running and computes one of them, so the import stays
                     disabled until the run ends.
                   </p>
-                  <p v-else-if="overwrittenPropertyLinks.length" class="mt-2">
-                    {{ overwrittenPropertyLinks.length }} pipeline
-                    {{
-                      overwrittenPropertyLinks.length === 1
-                        ? "step uses"
-                        : "steps use"
-                    }}
-                    them and will create new properties on their next run; they
-                    are listed once you confirm.
+                  <p v-else-if="overwrittenStepCount" class="mt-2">
+                    {{ overwrittenStepCount }} pipeline
+                    {{ overwrittenStepCount === 1 ? "step uses" : "steps use" }}
+                    them and will create new properties on their next run; the
+                    import dialog lists them.
                   </p>
                 </v-card-text>
                 <v-card-actions>
@@ -240,6 +236,17 @@ const canImport = computed(() => !!store.dataset);
 // each creates a new pipeline-owned property on its next run.
 const overwrittenPropertyLinks = computed(() =>
   pipelineStepsUsingOverwrittenProperties(),
+);
+
+// Distinct steps: one step can use two of the properties (linked to one,
+// created the other).
+const overwrittenStepCount = computed(
+  () =>
+    new Set(
+      overwrittenPropertyLinks.value.map(
+        ({ pipelineId, stepId }) => `${pipelineId}:${stepId}`,
+      ),
+    ).size,
 );
 
 // A running pipeline that computes one of those properties: overwriting is
@@ -342,6 +349,7 @@ defineExpose({
   overwriteAnnotations,
   overwriteProperties,
   overwrittenPropertyLinks,
+  overwrittenStepCount,
   overwriteBlockedBy,
   isOverwriteBlocked,
   importDialog,

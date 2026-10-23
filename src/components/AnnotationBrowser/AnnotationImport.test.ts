@@ -194,6 +194,23 @@ describe("AnnotationImport", () => {
     expect(importButton?.disabled).toBe(false);
   });
 
+  it("counts a step that uses two overwritten properties once", async () => {
+    const step = {
+      pipelineId: "pipe1",
+      pipelineName: "Segment",
+      stepId: "s1",
+      stepName: "Measure",
+      enabled: true,
+    };
+    pipelinesMock.state.linkedSteps = [
+      { ...step, use: "linked" },
+      { ...step, use: "created" },
+    ];
+    const { wrapper } = await openWithOverwriteProperties();
+    expect((wrapper.vm as any).overwrittenPropertyLinks).toHaveLength(2);
+    expect((wrapper.vm as any).overwrittenStepCount).toBe(1);
+  });
+
   it("reset clears Overwrite properties", () => {
     const wrapper = mountComponent();
     wrapper.vm.overwriteProperties = true;
